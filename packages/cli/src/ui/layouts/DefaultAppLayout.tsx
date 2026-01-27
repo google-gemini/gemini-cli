@@ -57,7 +57,7 @@ export const DefaultAppLayout: React.FC = () => {
             <BackgroundShellDisplay
               shells={uiState.backgroundShells}
               activePid={uiState.activeBackgroundShellPid}
-              width={width}
+              width={uiState.terminalWidth}
               height={uiState.backgroundShellHeight}
               isFocused={
                 uiState.embeddedShellFocused && !uiState.dialogsVisible

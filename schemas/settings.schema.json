@@ -323,6 +323,13 @@
           "default": true,
           "type": "boolean"
         },
+        "showSpinner": {
+          "title": "Show Spinner",
+          "description": "Show the spinner during operations.",
+          "markdownDescription": "Show the spinner during operations.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "customWittyPhrases": {
           "title": "Custom Witty Phrases",
           "description": "Custom witty phrases to display during loading. When provided, the CLI cycles through these instead of the defaults.",

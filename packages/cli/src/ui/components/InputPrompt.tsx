@@ -12,10 +12,11 @@ import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
 import { HalfLinePaddedBox } from './shared/HalfLinePaddedBox.js';
-import type { TextBuffer } from './shared/text-buffer.js';
 import {
+  type TextBuffer,
   logicalPosToOffset,
   PASTED_TEXT_PLACEHOLDER_REGEX,
+  getTransformUnderCursor,
 } from './shared/text-buffer.js';
 import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
 import chalk from 'chalk';
@@ -58,6 +59,7 @@ import { StreamingState } from '../types.js';
 import { useMouseClick } from '../hooks/useMouseClick.js';
 import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
+import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 
 /**
  * Returns if the terminal can be trusted to handle paste events atomically
@@ -401,6 +403,59 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       buffer.moveToVisualPosition(visualRow, relX);
     },
     { isActive: focus },
+  );
+
+  const isAlternateBuffer = useAlternateBuffer();
+
+  // Double-click to expand/collapse paste placeholders
+  useMouseClick(
+    innerBoxRef,
+    (_event, relX, relY) => {
+      if (!isAlternateBuffer) return;
+
+      const visualLine = buffer.viewportVisualLines[relY];
+      if (!visualLine) return;
+
+      // Even if we click past the end of the line, we might want to collapse an expanded paste
+      const isPastEndOfLine = relX >= stringWidth(visualLine);
+
+      const logicalPos = isPastEndOfLine
+        ? null
+        : buffer.getLogicalPositionFromVisual(
+            buffer.visualScrollRow + relY,
+            relX,
+          );
+
+      // Check for paste placeholder (collapsed state)
+      if (logicalPos) {
+        const transform = getTransformUnderCursor(
+          logicalPos.row,
+          logicalPos.col,
+          buffer.transformationsByLine,
+        );
+        if (transform?.type === 'paste' && transform.id) {
+          buffer.togglePasteExpansion(
+            transform.id,
+            logicalPos.row,
+            logicalPos.col,
+          );
+          return;
+        }
+      }
+
+      // If we didn't click a placeholder to expand, check if we are inside or after
+      // an expanded paste region and collapse it.
+      const row = buffer.visualScrollRow + relY;
+      const expandedId = buffer.getExpandedPasteAtLine(row);
+      if (expandedId) {
+        buffer.togglePasteExpansion(
+          expandedId,
+          row,
+          logicalPos?.col ?? relX, // Fallback to relX if past end of line
+        );
+      }
+    },
+    { isActive: focus, name: 'double-click' },
   );
 
   useMouse(
@@ -1202,6 +1257,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   const absoluteVisualIdx =
                     scrollVisualRow + visualIdxInRenderedSet;
                   const mapEntry = buffer.visualToLogicalMap[absoluteVisualIdx];
+                  if (!mapEntry) return null;
+
                   const cursorVisualRow =
                     cursorVisualRowAbsolute - scrollVisualRow;
                   const isOnCursorLine =

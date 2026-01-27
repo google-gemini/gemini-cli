@@ -15,7 +15,7 @@ import { isBinary, ShellExecutionService } from '@google/gemini-cli-core';
 import { type PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { SHELL_COMMAND_NAME } from '../constants.js';
-import { formatMemoryUsage } from '../utils/formatters.js';
+import { formatBytes } from '../utils/formatters.js';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import os from 'node:os';
@@ -385,7 +385,7 @@ export const useShellCommandProcessor = (
                 if (isBinaryStream) {
                   currentDisplayOutput =
                     binaryBytesReceived > 0
-                      ? `[Receiving binary output... ${formatMemoryUsage(binaryBytesReceived)} received]`
+                      ? `[Receiving binary output... ${formatBytes(binaryBytesReceived)} received]`
                       : '[Binary output detected. Halting stream...]';
                 } else {
                   currentDisplayOutput = cumulativeStdout;
@@ -450,9 +450,6 @@ export const useShellCommandProcessor = (
           let finalStatus = ToolCallStatus.Success;
 
           if (result.error) {
-            finalStatus = ToolCallStatus.Error;
-            finalOutput = `${result.error.message}\n${finalOutput}`;
-          } else if (result.aborted) {
             finalStatus = ToolCallStatus.Canceled;
             finalOutput = `Command was cancelled.\n${finalOutput}`;
           } else if (result.backgrounded) {

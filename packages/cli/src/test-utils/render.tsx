@@ -40,6 +40,7 @@ vi.mock('../utils/persistentState.js', () => ({
 vi.mock('../ui/utils/terminalUtils.js', () => ({
   isLowColorDepth: vi.fn(() => false),
   getColorDepth: vi.fn(() => 24),
+  isITerm2: vi.fn(() => false),
 }));
 
 // Wrapper around ink-testing-library's render that ensures act() is called

@@ -17,6 +17,10 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { LocalAgentExecutor, type ActivityCallback } from './local-executor.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
+import {
+  DiscoveredMCPTool,
+  MCP_QUALIFIED_NAME_SEPARATOR,
+} from '../tools/mcp-tool.js';
 import { LSTool } from '../tools/ls.js';
 import { LS_TOOL_NAME, READ_FILE_TOOL_NAME } from '../tools/tool-names.js';
 import {
@@ -31,6 +35,7 @@ import {
   type Content,
   type PartListUnion,
   type Tool,
+  type CallableTool,
 } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { MockTool } from '../test-utils/mock-tool.js';
@@ -492,6 +497,56 @@ describe('LocalAgentExecutor', () => {
 
       // Should exclude subagent
       expect(agentRegistry.getTool(subAgentName)).toBeUndefined();
+    });
+
+    it('should enforce qualified names for MCP tools in agent definitions', async () => {
+      const serverName = 'mcp-server';
+      const toolName = 'mcp-tool';
+      const qualifiedName = `${serverName}${MCP_QUALIFIED_NAME_SEPARATOR}${toolName}`;
+
+      const mockMcpTool = {
+        tool: vi.fn(),
+        callTool: vi.fn(),
+      } as unknown as CallableTool;
+
+      const mcpTool = new DiscoveredMCPTool(
+        mockMcpTool,
+        serverName,
+        toolName,
+        'description',
+        {},
+        mockConfig.getMessageBus(),
+      );
+
+      // Mock getTool to return our real DiscoveredMCPTool instance
+      const getToolSpy = vi
+        .spyOn(parentToolRegistry, 'getTool')
+        .mockImplementation((name) => {
+          if (name === toolName || name === qualifiedName) {
+            return mcpTool;
+          }
+          return undefined;
+        });
+
+      // 1. Qualified name works and registers the tool (using short name per status quo)
+      const definition = createTestDefinition([qualifiedName]);
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      const agentRegistry = executor['toolRegistry'];
+      // Registry shortening logic means it's registered as 'mcp-tool' internally
+      expect(agentRegistry.getTool(toolName)).toBeDefined();
+
+      // 2. Unqualified name for MCP tool THROWS
+      const badDefinition = createTestDefinition([toolName]);
+      await expect(
+        LocalAgentExecutor.create(badDefinition, mockConfig, onActivity),
+      ).rejects.toThrow(/must be requested with its server prefix/);
+
+      getToolSpy.mockRestore();
     });
   });
 

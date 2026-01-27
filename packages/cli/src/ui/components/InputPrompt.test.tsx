@@ -9,7 +9,7 @@ import {
   createMockSettings,
 } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
-import { act } from 'react';
+import { act, useState } from 'react';
 import type { InputPromptProps } from './InputPrompt.js';
 import { InputPrompt } from './InputPrompt.js';
 import type { TextBuffer } from './shared/text-buffer.js';
@@ -2895,6 +2895,176 @@ describe('InputPrompt', () => {
 
       await waitFor(() => {
         expect(mockSetEmbeddedShellFocused).toHaveBeenCalledWith(false);
+      });
+
+      unmount();
+    });
+
+    it('should toggle paste expansion on double-click', async () => {
+      const id = '[Pasted Text: 10 lines]';
+      const largeText =
+        'line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10';
+
+      const baseProps = props;
+      const TestWrapper = () => {
+        const [isExpanded, setIsExpanded] = useState(false);
+        const currentLines = isExpanded ? largeText.split('\n') : [id];
+        const currentText = isExpanded ? largeText : id;
+
+        const buffer = {
+          ...baseProps.buffer,
+          text: currentText,
+          lines: currentLines,
+          viewportVisualLines: currentLines,
+          allVisualLines: currentLines,
+          pastedContent: { [id]: largeText },
+          transformationsByLine: isExpanded
+            ? currentLines.map(() => [])
+            : [
+                [
+                  {
+                    logStart: 0,
+                    logEnd: id.length,
+                    logicalText: id,
+                    collapsedText: id,
+                    type: 'paste',
+                    id,
+                  },
+                ],
+              ],
+          visualScrollRow: 0,
+          visualToLogicalMap: currentLines.map(
+            (_, i) => [i, 0] as [number, number],
+          ),
+          visualToTransformedMap: currentLines.map(() => 0),
+          getLogicalPositionFromVisual: vi.fn().mockReturnValue({
+            row: 0,
+            col: 2,
+          }),
+          togglePasteExpansion: vi.fn().mockImplementation(() => {
+            setIsExpanded(!isExpanded);
+          }),
+          getExpandedPasteAtLine: vi
+            .fn()
+            .mockReturnValue(isExpanded ? id : null),
+        };
+
+        return <InputPrompt {...baseProps} buffer={buffer as TextBuffer} />;
+      };
+
+      const { stdin, stdout, unmount, simulateClick } = renderWithProviders(
+        <TestWrapper />,
+        {
+          mouseEventsEnabled: true,
+          useAlternateBuffer: true,
+          uiActions,
+        },
+      );
+
+      // 1. Verify initial placeholder
+      await waitFor(() => {
+        expect(stdout.lastFrame()).toMatchSnapshot();
+      });
+
+      // Simulate double-click to expand
+      await simulateClick(stdin, 5, 2);
+      await simulateClick(stdin, 5, 2);
+
+      // 2. Verify expanded content is visible
+      await waitFor(() => {
+        expect(stdout.lastFrame()).toMatchSnapshot();
+      });
+
+      // Simulate double-click to collapse
+      await simulateClick(stdin, 5, 2);
+      await simulateClick(stdin, 5, 2);
+
+      // 3. Verify placeholder is restored
+      await waitFor(() => {
+        expect(stdout.lastFrame()).toMatchSnapshot();
+      });
+
+      unmount();
+    });
+
+    it('should collapse expanded paste on double-click after the end of the line', async () => {
+      const id = '[Pasted Text: 10 lines]';
+      const largeText =
+        'line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10';
+
+      const baseProps = props;
+      const TestWrapper = () => {
+        const [isExpanded, setIsExpanded] = useState(true); // Start expanded
+        const currentLines = isExpanded ? largeText.split('\n') : [id];
+        const currentText = isExpanded ? largeText : id;
+
+        const buffer = {
+          ...baseProps.buffer,
+          text: currentText,
+          lines: currentLines,
+          viewportVisualLines: currentLines,
+          allVisualLines: currentLines,
+          pastedContent: { [id]: largeText },
+          transformationsByLine: isExpanded
+            ? currentLines.map(() => [])
+            : [
+                [
+                  {
+                    logStart: 0,
+                    logEnd: id.length,
+                    logicalText: id,
+                    collapsedText: id,
+                    type: 'paste',
+                    id,
+                  },
+                ],
+              ],
+          visualScrollRow: 0,
+          visualToLogicalMap: currentLines.map(
+            (_, i) => [i, 0] as [number, number],
+          ),
+          visualToTransformedMap: currentLines.map(() => 0),
+          getLogicalPositionFromVisual: vi.fn().mockImplementation(
+            (_vRow, _vCol) =>
+              // Simulate that we are past the end of the line by returning something
+              // that getTransformUnderCursor won't match, or having the caller handle it.
+              null,
+          ),
+          togglePasteExpansion: vi.fn().mockImplementation(() => {
+            setIsExpanded(!isExpanded);
+          }),
+          getExpandedPasteAtLine: vi
+            .fn()
+            .mockImplementation((row) =>
+              isExpanded && row >= 0 && row < 10 ? id : null,
+            ),
+        };
+
+        return <InputPrompt {...baseProps} buffer={buffer as TextBuffer} />;
+      };
+
+      const { stdin, stdout, unmount, simulateClick } = renderWithProviders(
+        <TestWrapper />,
+        {
+          mouseEventsEnabled: true,
+          useAlternateBuffer: true,
+          uiActions,
+        },
+      );
+
+      // Verify initially expanded
+      await waitFor(() => {
+        expect(stdout.lastFrame()).toContain('line1');
+      });
+
+      // Simulate double-click WAY to the right on the first line
+      await simulateClick(stdin, 100, 2);
+      await simulateClick(stdin, 100, 2);
+
+      // Verify it is NOW collapsed
+      await waitFor(() => {
+        expect(stdout.lastFrame()).toContain(id);
+        expect(stdout.lastFrame()).not.toContain('line1');
       });
 
       unmount();
