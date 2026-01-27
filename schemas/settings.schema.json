@@ -1033,8 +1033,8 @@
             },
             "customIgnoreFilePaths": {
               "title": "Custom Ignore File Paths",
-              "description": "Additional ignore file paths to respect. These files take precedence over .geminiignore and .gitignore.",
-              "markdownDescription": "Additional ignore file paths to respect. These files take precedence over .geminiignore and .gitignore.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `[]`",
+              "description": "Additional ignore file paths to respect. These files take precedence over .geminiignore and .gitignore. Files earlier in the array take precedence over files later in the array, e.g. the first file takes precedence over the second one.",
+              "markdownDescription": "Additional ignore file paths to respect. These files take precedence over .geminiignore and .gitignore. Files earlier in the array take precedence over files later in the array, e.g. the first file takes precedence over the second one.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `[]`",
               "default": [],
               "type": "array",
               "items": {
