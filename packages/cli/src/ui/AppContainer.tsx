@@ -65,6 +65,7 @@ import {
   generateSummary,
   type AgentsDiscoveredPayload,
   ChangeAuthRequestedError,
+  isVSCodeTerminal,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -479,7 +480,12 @@ export const AppContainer = (props: AppContainerProps) => {
 
   const refreshStatic = useCallback(() => {
     if (!isAlternateBuffer) {
-      stdout.write(ansiEscapes.clearTerminal);
+      // VS Code's terminal doesn't handle clearTerminal well - it causes constant
+      // scrolling to top. Instead, just force a re-render without clearing.
+      // See: https://github.com/Ujjiyara/gemini-cli/issues/XXX
+      if (!isVSCodeTerminal()) {
+        stdout.write(ansiEscapes.clearTerminal);
+      }
     }
     setHistoryRemountKey((prev) => prev + 1);
   }, [setHistoryRemountKey, isAlternateBuffer, stdout]);

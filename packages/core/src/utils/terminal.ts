@@ -64,3 +64,15 @@ export function shouldEnterAlternateScreen(
 ): boolean {
   return useAlternateBuffer && !isScreenReader;
 }
+
+/**
+ * Detects if the current terminal is VS Code's integrated terminal.
+ * Used to apply VS Code-specific terminal handling.
+ */
+export function isVSCodeTerminal(): boolean {
+  return (
+    process.env['TERM_PROGRAM'] === 'vscode' ||
+    Boolean(process.env['VSCODE_GIT_IPC_HANDLE']) ||
+    Boolean(process.env['VSCODE_GIT_ASKPASS_MAIN'])
+  );
+}
