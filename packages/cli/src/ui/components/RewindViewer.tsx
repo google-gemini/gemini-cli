@@ -6,6 +6,7 @@
 
 import type React from 'react';
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, Text } from 'ink';
 import { useUIState } from '../contexts/UIStateContext.js';
 import {
@@ -40,6 +41,7 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
   onExit,
   onRewind,
 }) => {
+  const { t } = useTranslation('dialogs');
   const [isRewinding, setIsRewinding] = useState(false);
   const { terminalWidth, terminalHeight } = useUIState();
   const {
@@ -77,13 +79,13 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
         value: {
           id: 'current-position',
           type: 'user',
-          content: 'Stay at current position',
+          content: t('rewindViewer.stayAtCurrent'),
           timestamp: new Date().toISOString(),
         } as MessageRecord,
         index: interactionItems.length,
       },
     ];
-  }, [interactions]);
+  }, [interactions, t]);
 
   useKeypress(
     (key) => {
@@ -136,7 +138,7 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
           <Box>
             <CliSpinner />
           </Box>
-          <Text>Rewinding...</Text>
+          <Text>{t('rewindViewer.rewinding')}</Text>
         </Box>
       );
     }
@@ -185,7 +187,10 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
       paddingY={1}
     >
       <Box marginBottom={1}>
-        <Text bold>{'> '}Rewind</Text>
+        <Text bold>
+          {'> '}
+          {t('rewindViewer.title')}
+        </Text>
       </Box>
 
       <Box flexDirection="column" flexGrow={1}>
@@ -227,7 +232,7 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
                     {partToString(userPrompt.content)}
                   </Text>
                   <Text color={theme.text.secondary}>
-                    Cancel rewind and stay here
+                    {t('rewindViewer.cancelRewindDesc')}
                   </Text>
                 </Box>
               );
@@ -259,8 +264,10 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
                       {stats.fileCount === 1
                         ? firstFileName
                           ? firstFileName
-                          : '1 file changed'
-                        : `${stats.fileCount} files changed`}{' '}
+                          : t('rewindViewer.singleFileChanged')
+                        : t('rewindViewer.filesChanged', {
+                            count: stats.fileCount,
+                          })}{' '}
                     </Text>
                     {stats.addedLines > 0 && (
                       <Text color="green">+{stats.addedLines} </Text>
@@ -271,7 +278,7 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
                   </Box>
                 ) : (
                   <Text color={theme.text.secondary}>
-                    No files have been changed
+                    {t('rewindViewer.noFilesChanged')}
                   </Text>
                 )}
               </Box>
@@ -282,8 +289,7 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
 
       <Box marginTop={1}>
         <Text color={theme.text.secondary}>
-          (Use Enter to select a message, Esc to close, Right/Left to
-          expand/collapse)
+          {t('rewindViewer.instructions')}
         </Text>
       </Box>
     </Box>
