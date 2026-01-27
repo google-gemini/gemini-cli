@@ -18,12 +18,14 @@ import {
   type IndividualToolCallDisplay,
 } from '../types.js';
 
+import { checkExhaustive } from '../../utils/checks.js';
+
 export function mapCoreStatusToDisplayStatus(
   coreStatus: CoreStatus,
 ): ToolCallStatus {
   switch (coreStatus) {
     case 'validating':
-      return ToolCallStatus.Executing;
+      return ToolCallStatus.Pending;
     case 'awaiting_approval':
       return ToolCallStatus.Confirming;
     case 'executing':
@@ -37,8 +39,7 @@ export function mapCoreStatusToDisplayStatus(
     case 'scheduled':
       return ToolCallStatus.Pending;
     default:
-      debugLogger.warn(`Unknown core status encountered: ${coreStatus}`);
-      return ToolCallStatus.Error;
+      return checkExhaustive(coreStatus);
   }
 }
 
