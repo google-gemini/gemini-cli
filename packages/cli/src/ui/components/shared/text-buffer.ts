@@ -2812,7 +2812,7 @@ export function useTextBuffer({
       let newText = fs.readFileSync(filePath, 'utf8');
       newText = newText.replace(/\r\n?/g, '\n');
 
-      // Attempt to re-collapse unchanged pasted content
+      // Attempt to re-collapse unchanged pasted content back into placeholders
       const sortedPlaceholders = Object.entries(pastedContent).sort(
         (a, b) => b[1].length - a[1].length,
       );
