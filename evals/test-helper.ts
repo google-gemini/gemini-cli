@@ -62,6 +62,9 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
       const result = await rig.run({
         args: evalCase.prompt,
         approvalMode: evalCase.approvalMode ?? 'yolo',
+        env: {
+          GEMINI_CLI_ENABLE_ACTIVITY_LOG: 'true',
+        },
       });
 
       const unauthorizedErrorPrefix =
@@ -73,6 +76,9 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
       }
 
       await evalCase.assert(rig, result);
+    } catch (e) {
+      await copyActivityLogs(rig, evalCase.name);
+      throw e;
     } finally {
       await logToFile(
         evalCase.name,
@@ -86,6 +92,36 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
     it.skip(evalCase.name, fn);
   } else {
     it(evalCase.name, fn);
+  }
+}
+
+async function copyActivityLogs(rig: TestRig, name: string) {
+  if (!rig.homeDir) return;
+  const logDir = 'evals/logs';
+  await fs.promises.mkdir(logDir, { recursive: true });
+  const sanitizedName = name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+
+  // Find all .jsonl files in the home directory
+  const findJsonl = (dir: string): string[] => {
+    let results: string[] = [];
+    if (!fs.existsSync(dir)) return results;
+    const list = fs.readdirSync(dir);
+    for (const file of list) {
+      const fullPath = path.join(dir, file);
+      const stat = fs.statSync(fullPath);
+      if (stat.isDirectory()) {
+        results = results.concat(findJsonl(fullPath));
+      } else if (file.endsWith('.jsonl')) {
+        results.push(fullPath);
+      }
+    }
+    return results;
+  };
+
+  const jsonlFiles = findJsonl(rig.homeDir);
+  for (let i = 0; i < jsonlFiles.length; i++) {
+    const dest = `${logDir}/${sanitizedName}${i > 0 ? `_${i}` : ''}.jsonl`;
+    await fs.promises.copyFile(jsonlFiles[i], dest);
   }
 }
 
