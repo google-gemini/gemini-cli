@@ -70,6 +70,10 @@ import { ROOT_SCHEDULER_ID } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import * as ToolUtils from '../utils/tool-utils.js';
 import type { EditorType } from '../utils/editor.js';
+import {
+  getToolCallContext,
+  type ToolCallContext,
+} from '../utils/toolCallContext.js';
 
 describe('Scheduler (Orchestrator)', () => {
   let scheduler: Scheduler;
@@ -1008,6 +1012,70 @@ describe('Scheduler (Orchestrator)', () => {
       // finalizeCall should be called exactly once for this ID
       expect(mockStateManager.finalizeCall).toHaveBeenCalledTimes(1);
       expect(mockStateManager.finalizeCall).toHaveBeenCalledWith('call-1');
+    });
+  });
+
+  describe('Tool Call Context Propagation', () => {
+    it('should propagate context to the tool executor', async () => {
+      const schedulerId = 'custom-scheduler';
+      const parentCallId = 'parent-call';
+      const customScheduler = new Scheduler({
+        config: mockConfig,
+        messageBus: mockMessageBus,
+        getPreferredEditor,
+        schedulerId,
+        parentCallId,
+      });
+
+      const validatingCall: ValidatingToolCall = {
+        status: 'validating',
+        request: req1,
+        tool: mockTool,
+        invocation: mockInvocation as unknown as AnyToolInvocation,
+      };
+
+      // Mock queueLength to run the loop once
+      Object.defineProperty(mockStateManager, 'queueLength', {
+        get: vi.fn().mockReturnValueOnce(1).mockReturnValue(0),
+        configurable: true,
+      });
+
+      vi.mocked(mockStateManager.dequeue).mockReturnValue(validatingCall);
+      Object.defineProperty(mockStateManager, 'firstActiveCall', {
+        get: vi.fn().mockReturnValue(validatingCall),
+        configurable: true,
+      });
+      vi.mocked(mockStateManager.getToolCall).mockReturnValue(validatingCall);
+
+      mockToolRegistry.getTool.mockReturnValue(mockTool);
+      mockPolicyEngine.check.mockResolvedValue({
+        decision: PolicyDecision.ALLOW,
+      });
+
+      let capturedContext: ToolCallContext | undefined;
+      mockExecutor.execute.mockImplementation(async () => {
+        capturedContext = getToolCallContext();
+        return {
+          status: 'success',
+          request: req1,
+          tool: mockTool,
+          invocation: mockInvocation as unknown as AnyToolInvocation,
+          response: {
+            callId: req1.callId,
+            responseParts: [],
+            resultDisplay: 'ok',
+            error: undefined,
+            errorType: undefined,
+          },
+        } as unknown as SuccessfulToolCall;
+      });
+
+      await customScheduler.schedule(req1, signal);
+
+      expect(capturedContext).toBeDefined();
+      expect(capturedContext!.callId).toBe(req1.callId);
+      expect(capturedContext!.schedulerId).toBe(schedulerId);
+      expect(capturedContext!.parentCallId).toBe(parentCallId);
     });
   });
 });

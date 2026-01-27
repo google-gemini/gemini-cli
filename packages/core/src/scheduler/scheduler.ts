@@ -36,6 +36,7 @@ import {
   type SerializableConfirmationDetails,
   type ToolConfirmationRequest,
 } from '../confirmation-bus/types.js';
+import { runWithToolCallContext } from '../utils/toolCallContext.js';
 
 interface SchedulerQueueItem {
   requests: ToolCallRequestInfo[];
@@ -256,6 +257,7 @@ export class Scheduler {
       return this.state.completedBatch;
     } finally {
       this.isProcessing = false;
+      this.state.clearBatch();
       this._processNextInRequestQueue();
     }
   }
@@ -282,30 +284,39 @@ export class Scheduler {
     request: ToolCallRequestInfo,
     tool: AnyDeclarativeTool,
   ): ValidatingToolCall | ErroredToolCall {
-    try {
-      const invocation = tool.build(request.args);
-      return {
-        status: 'validating',
-        request,
-        tool,
-        invocation,
-        startTime: Date.now(),
+    return runWithToolCallContext(
+      {
+        callId: request.callId,
         schedulerId: this.schedulerId,
-      };
-    } catch (e) {
-      return {
-        status: 'error',
-        request,
-        tool,
-        response: createErrorResponse(
-          request,
-          e instanceof Error ? e : new Error(String(e)),
-          ToolErrorType.INVALID_TOOL_PARAMS,
-        ),
-        durationMs: 0,
-        schedulerId: this.schedulerId,
-      };
-    }
+        parentCallId: this.parentCallId,
+      },
+      () => {
+        try {
+          const invocation = tool.build(request.args);
+          return {
+            status: 'validating',
+            request,
+            tool,
+            invocation,
+            startTime: Date.now(),
+            schedulerId: this.schedulerId,
+          };
+        } catch (e) {
+          return {
+            status: 'error',
+            request,
+            tool,
+            response: createErrorResponse(
+              request,
+              e instanceof Error ? e : new Error(String(e)),
+              ToolErrorType.INVALID_TOOL_PARAMS,
+            ),
+            durationMs: 0,
+            schedulerId: this.schedulerId,
+          };
+        }
+      },
+    );
   }
 
   // --- Phase 2: Processing Loop ---
@@ -460,17 +471,29 @@ export class Scheduler {
     if (signal.aborted) throw new Error('Operation cancelled');
     this.state.updateStatus(callId, 'executing');
 
-    const result = await this.executor.execute({
-      call: this.state.firstActiveCall as ExecutingToolCall,
-      signal,
-      outputUpdateHandler: (id, out) =>
-        this.state.updateStatus(id, 'executing', { liveOutput: out }),
-      onUpdateToolCall: (updated) => {
-        if (updated.status === 'executing' && updated.pid) {
-          this.state.updateStatus(callId, 'executing', { pid: updated.pid });
-        }
+    const activeCall = this.state.firstActiveCall as ExecutingToolCall;
+
+    const result = await runWithToolCallContext(
+      {
+        callId: activeCall.request.callId,
+        schedulerId: this.schedulerId,
+        parentCallId: this.parentCallId,
       },
-    });
+      () =>
+        this.executor.execute({
+          call: activeCall,
+          signal,
+          outputUpdateHandler: (id, out) =>
+            this.state.updateStatus(id, 'executing', { liveOutput: out }),
+          onUpdateToolCall: (updated) => {
+            if (updated.status === 'executing' && updated.pid) {
+              this.state.updateStatus(callId, 'executing', {
+                pid: updated.pid,
+              });
+            }
+          },
+        }),
+    );
 
     if (result.status === 'success') {
       this.state.updateStatus(callId, 'success', result.response);
