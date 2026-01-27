@@ -47,6 +47,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import { EOL } from 'node:os';
 import * as path from 'node:path';
+import { isSubpath } from '../utils/paths.js';
 import * as crypto from 'node:crypto';
 import * as summarizer from '../utils/summarizer.js';
 import { ToolErrorType } from './tool-error.js';
@@ -99,10 +100,31 @@ describe('ShellTool', () => {
       getWorkspaceContext: vi
         .fn()
         .mockReturnValue(new WorkspaceContext(tempRootDir)),
-      getGeminiClient: vi.fn(),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+      },
+      isPathAllowed(this: Config, absolutePath: string): boolean {
+        const workspaceContext = this.getWorkspaceContext();
+        if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+          return true;
+        }
+
+        const projectTempDir = this.storage.getProjectTempDir();
+        return isSubpath(path.resolve(projectTempDir), absolutePath);
+      },
+      validatePathAccess(this: Config, absolutePath: string): string | null {
+        if (this.isPathAllowed(absolutePath)) {
+          return null;
+        }
+
+        const workspaceDirs = this.getWorkspaceContext().getDirectories();
+        const projectTempDir = this.storage.getProjectTempDir();
+        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+      },
+      getGeminiClient: vi.fn().mockReturnValue({}),
+      getShellToolInactivityTimeout: vi.fn().mockReturnValue(1000),
       getEnableInteractiveShell: vi.fn().mockReturnValue(false),
-      isInteractive: vi.fn().mockReturnValue(true),
-      getShellToolInactivityTimeout: vi.fn().mockReturnValue(300000),
+      sanitizationConfig: {},
     } as unknown as Config;
 
     const bus = createMockMessageBus();
@@ -183,9 +205,7 @@ describe('ShellTool', () => {
       const outsidePath = path.resolve(tempRootDir, '../outside');
       expect(() =>
         shellTool.build({ command: 'ls', dir_path: outsidePath }),
-      ).toThrow(
-        `Directory '${outsidePath}' is not within any of the registered workspace directories.`,
-      );
+      ).toThrow(/Path not in workspace/);
     });
 
     it('should return an invocation for a valid absolute directory path', () => {
@@ -235,7 +255,7 @@ describe('ShellTool', () => {
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        { pager: 'cat' },
+        { pager: 'cat', sanitizationConfig: {} },
       );
       expect(result.llmContent).toContain('Background PIDs: 54322');
       // The file should be deleted by the tool
@@ -260,7 +280,7 @@ describe('ShellTool', () => {
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        { pager: 'cat' },
+        { pager: 'cat', sanitizationConfig: {} },
       );
     });
 
@@ -281,7 +301,7 @@ describe('ShellTool', () => {
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        { pager: 'cat' },
+        { pager: 'cat', sanitizationConfig: {} },
       );
     });
 
@@ -308,7 +328,7 @@ describe('ShellTool', () => {
           expect.any(Function),
           expect.any(AbortSignal),
           false,
-          { pager: 'cat' },
+          { pager: 'cat', sanitizationConfig: {} },
         );
       },
       20000,

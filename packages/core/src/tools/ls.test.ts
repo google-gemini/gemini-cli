@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { isSubpath } from '../utils/paths.js';
 import os from 'node:os';
 import { LSTool } from './ls.js';
 import type { Config } from '../config/config.js';
@@ -29,6 +30,10 @@ describe('LSTool', () => {
       path.join(realTmp, 'ls-tool-secondary-'),
     );
 
+    const mockStorage = {
+      getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+    };
+
     mockConfig = {
       getTargetDir: () => tempRootDir,
       getWorkspaceContext: () =>
@@ -38,6 +43,25 @@ describe('LSTool', () => {
         respectGitIgnore: true,
         respectGeminiIgnore: true,
       }),
+      storage: mockStorage,
+      isPathAllowed(this: Config, absolutePath: string): boolean {
+        const workspaceContext = this.getWorkspaceContext();
+        if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+          return true;
+        }
+
+        const projectTempDir = this.storage.getProjectTempDir();
+        return isSubpath(path.resolve(projectTempDir), absolutePath);
+      },
+      validatePathAccess(this: Config, absolutePath: string): string | null {
+        if (this.isPathAllowed(absolutePath)) {
+          return null;
+        }
+
+        const workspaceDirs = this.getWorkspaceContext().getDirectories();
+        const projectTempDir = this.storage.getProjectTempDir();
+        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+      },
     } as unknown as Config;
 
     lsTool = new LSTool(mockConfig, createMockMessageBus());
@@ -70,7 +94,7 @@ describe('LSTool', () => {
 
     it('should reject paths outside workspace with clear error message', () => {
       expect(() => lsTool.build({ dir_path: '/etc/passwd' })).toThrow(
-        `Path must be within one of the workspace directories: ${tempRootDir}, ${tempSecondaryDir}`,
+        /Path not in workspace: Attempted path ".*" resolves outside the allowed workspace directories: .*/,
       );
     });
 
@@ -297,7 +321,7 @@ describe('LSTool', () => {
     it('should reject paths outside all workspace directories', () => {
       const params = { dir_path: '/etc/passwd' };
       expect(() => lsTool.build(params)).toThrow(
-        'Path must be within one of the workspace directories',
+        /Path not in workspace: Attempted path ".*" resolves outside the allowed workspace directories: .*/,
       );
     });
 

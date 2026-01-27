@@ -230,8 +230,11 @@ export async function handleAtCommand({
       continue;
     }
 
-    const workspaceContext = config.getWorkspaceContext();
-    if (!workspaceContext.isPathWithinWorkspace(pathName)) {
+    const resolvedPathName = path.isAbsolute(pathName)
+      ? pathName
+      : path.resolve(config.getTargetDir(), pathName);
+
+    if (!config.isPathAllowed(resolvedPathName)) {
       onDebugMessage(
         `Path ${pathName} is not in the workspace and will be skipped.`,
       );

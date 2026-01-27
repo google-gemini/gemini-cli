@@ -9,6 +9,7 @@ import type { ReadFileToolParams } from './read-file.js';
 import { ReadFileTool } from './read-file.js';
 import { ToolErrorType } from './tool-error.js';
 import path from 'node:path';
+import { isSubpath } from '../utils/paths.js';
 import os from 'node:os';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
@@ -46,6 +47,24 @@ describe('ReadFileTool', () => {
         getProjectTempDir: () => path.join(tempRootDir, '.temp'),
       },
       isInteractive: () => false,
+      isPathAllowed(this: Config, absolutePath: string): boolean {
+        const workspaceContext = this.getWorkspaceContext();
+        if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+          return true;
+        }
+
+        const projectTempDir = this.storage.getProjectTempDir();
+        return isSubpath(path.resolve(projectTempDir), absolutePath);
+      },
+      validatePathAccess(this: Config, absolutePath: string): string | null {
+        if (this.isPathAllowed(absolutePath)) {
+          return null;
+        }
+
+        const workspaceDirs = this.getWorkspaceContext().getDirectories();
+        const projectTempDir = this.storage.getProjectTempDir();
+        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+      },
     } as unknown as Config;
     tool = new ReadFileTool(mockConfigInstance, createMockMessageBus());
   });
@@ -82,9 +101,7 @@ describe('ReadFileTool', () => {
       const params: ReadFileToolParams = {
         file_path: '/outside/root.txt',
       };
-      expect(() => tool.build(params)).toThrow(
-        /File path must be within one of the workspace directories/,
-      );
+      expect(() => tool.build(params)).toThrow(/Path not in workspace/);
     });
 
     it('should allow access to files in project temp directory', () => {
@@ -100,9 +117,7 @@ describe('ReadFileTool', () => {
       const params: ReadFileToolParams = {
         file_path: '/completely/outside/path.txt',
       };
-      expect(() => tool.build(params)).toThrow(
-        /File path must be within one of the workspace directories.*or within the project temp directory/,
-      );
+      expect(() => tool.build(params)).toThrow(/Path not in workspace/);
     });
 
     it('should throw error if path is empty', () => {
@@ -437,6 +452,27 @@ describe('ReadFileTool', () => {
           }),
           storage: {
             getProjectTempDir: () => path.join(tempRootDir, '.temp'),
+          },
+          isPathAllowed(this: Config, absolutePath: string): boolean {
+            const workspaceContext = this.getWorkspaceContext();
+            if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+              return true;
+            }
+
+            const projectTempDir = this.storage.getProjectTempDir();
+            return isSubpath(path.resolve(projectTempDir), absolutePath);
+          },
+          validatePathAccess(
+            this: Config,
+            absolutePath: string,
+          ): string | null {
+            if (this.isPathAllowed(absolutePath)) {
+              return null;
+            }
+
+            const workspaceDirs = this.getWorkspaceContext().getDirectories();
+            const projectTempDir = this.storage.getProjectTempDir();
+            return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
           },
         } as unknown as Config;
         tool = new ReadFileTool(mockConfigInstance, createMockMessageBus());
