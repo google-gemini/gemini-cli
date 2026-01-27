@@ -128,8 +128,10 @@ export class ClientCredentialsAuthHandler implements AuthenticationHandler {
 
       this.accessToken = tokenData.access_token;
       if (tokenData.expires_in) {
-        // Set expiry with 60 second buffer
-        this.tokenExpiresAt = Date.now() + (tokenData.expires_in - 60) * 1000;
+        // Set expiry with a configurable buffer, defaulting to 60 seconds
+        const expiryBufferSeconds = 60; // TODO: Make configurable
+        this.tokenExpiresAt = Date.now() + (tokenData.expires_in - expiryBufferSeconds) * 1000;
+      }
       }
 
       return { Authorization: `Bearer ${this.accessToken}` };
