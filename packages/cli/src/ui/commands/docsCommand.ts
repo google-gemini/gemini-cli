@@ -11,6 +11,7 @@ import {
   type SlashCommand,
   CommandKind,
 } from './types.js';
+import { t } from '../../i18n/index.js';
 import { MessageType } from '../types.js';
 
 export const docsCommand: SlashCommand = {
@@ -25,7 +26,7 @@ export const docsCommand: SlashCommand = {
       context.ui.addItem(
         {
           type: MessageType.INFO,
-          text: `Please open the following URL in your browser to view the documentation:\n${docsUrl}`,
+          text: t('commands:docs.responses.openUrl', { url: docsUrl }),
         },
         Date.now(),
       );
@@ -33,7 +34,7 @@ export const docsCommand: SlashCommand = {
       context.ui.addItem(
         {
           type: MessageType.INFO,
-          text: `Opening documentation in your browser: ${docsUrl}`,
+          text: t('commands:docs.responses.opening', { url: docsUrl }),
         },
         Date.now(),
       );

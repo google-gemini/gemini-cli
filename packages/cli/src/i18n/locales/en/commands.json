@@ -265,5 +265,9 @@
     "success": "Last output copied to the clipboard",
     "failed": "Failed to copy to the clipboard. {{error}}",
     "noText": "Last AI output contains no text to copy."
+  },
+  "docs.responses": {
+    "openUrl": "Please open the following URL in your browser to view the documentation:\n{{url}}",
+    "opening": "Opening documentation in your browser: {{url}}"
   }
 }

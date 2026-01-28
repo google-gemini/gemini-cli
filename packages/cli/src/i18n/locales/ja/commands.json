@@ -138,8 +138,7 @@
     "serverNotFound": "サーバー '{{name}}' が見つかりませんでした。/mcp list を使用して利用可能なサーバーを確認してください。",
     "blockedBySettings": "設定によりブロックされました。",
     "disabledByAdmin": "管理者によって MCP が無効にされています。有効になると読み込まれます。",
-    "statusChanged": "MCP サーバー '{{name}}' を{{status}}にしました{{session}}。",
-    "restartingAll": "MCP サーバーを再起動しています..."
+    "statusChanged": "MCP サーバー '{{name}}' を{{status}}にしました{{session}}。"
   },
   "chat.responses": {
     "missingTagSave": "タグがありません。使用法: /chat save <タグ>",
@@ -260,5 +259,9 @@
     "success": "最新の出力をクリップボードにコピーしました",
     "failed": "クリップボードへのコピーに失敗しました。{{error}}",
     "noText": "最新の AI 出力にコピー可能なテキストが含まれていません。"
+  },
+  "docs.responses": {
+    "openUrl": "ドキュメントを表示するには、ブラウザで以下の URL を開いてください:\n{{url}}",
+    "opening": "ブラウザでドキュメントを開いています: {{url}}"
   }
 }
