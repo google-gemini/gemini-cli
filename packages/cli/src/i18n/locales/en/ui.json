@@ -148,6 +148,13 @@
     "title": "Available Gemini CLI tools:",
     "noTools": "No tools available"
   },
+  "tipsDisplay": {
+    "title": "Tips for getting started:",
+    "tip1": "1. Ask questions, edit files, or run commands.",
+    "tip2": "2. Be specific for the best results.",
+    "tip3_geminiMd": "3. Create GEMINI.md files to customize your interactions with Gemini.",
+    "tip_help": "{{number}}. /help for more information."
+  },
   "skillsList": {
     "builtin": " [Built-in]",
     "availableTitle": "Available Agent Skills:",

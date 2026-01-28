@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type React from 'react';
+import React from 'react';
 import { Box, Text } from 'ink';
+import { useTranslation } from 'react-i18next';
 import { theme } from '../semantic-colors.js';
 import { type Config } from '@google/gemini-cli-core';
 
@@ -14,31 +15,45 @@ interface TipsProps {
 }
 
 export const Tips: React.FC<TipsProps> = ({ config }) => {
+  const { t } = useTranslation('ui');
   const geminiMdFileCount = config.getGeminiMdFileCount();
   return (
     <Box flexDirection="column">
-      <Text color={theme.text.primary}>Tips for getting started:</Text>
-      <Text color={theme.text.primary}>
-        1. Ask questions, edit files, or run commands.
-      </Text>
-      <Text color={theme.text.primary}>
-        2. Be specific for the best results.
-      </Text>
+      <Text color={theme.text.primary}>{t('tipsDisplay.title')}</Text>
+      <Text color={theme.text.primary}>{t('tipsDisplay.tip1')}</Text>
+      <Text color={theme.text.primary}>{t('tipsDisplay.tip2')}</Text>
       {geminiMdFileCount === 0 && (
         <Text color={theme.text.primary}>
-          3. Create{' '}
-          <Text bold color={theme.text.accent}>
-            GEMINI.md
-          </Text>{' '}
-          files to customize your interactions with Gemini.
+          3.{' '}
+          {t('tipsDisplay.tip3_geminiMd')
+            .split('GEMINI.md')
+            .map((part, i) => (
+              <React.Fragment key={i}>
+                {part}
+                {i === 0 && (
+                  <Text bold color={theme.text.accent}>
+                    GEMINI.md
+                  </Text>
+                )}
+              </React.Fragment>
+            ))}
         </Text>
       )}
       <Text color={theme.text.primary}>
-        {geminiMdFileCount === 0 ? '4.' : '3.'}{' '}
-        <Text bold color={theme.text.accent}>
-          /help
-        </Text>{' '}
-        for more information.
+        {t('tipsDisplay.tip_help', {
+          number: geminiMdFileCount === 0 ? '4' : '3',
+        })
+          .split('/help')
+          .map((part, i) => (
+            <React.Fragment key={i}>
+              {part}
+              {i === 0 && (
+                <Text bold color={theme.text.accent}>
+                  /help
+                </Text>
+              )}
+            </React.Fragment>
+          ))}
       </Text>
     </Box>
   );

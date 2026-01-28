@@ -136,6 +136,13 @@
     "title": "利用可能な Gemini CLI ツール:",
     "noTools": "利用可能なツールはありません"
   },
+  "tipsDisplay": {
+    "title": "使い始めるためのヒント:",
+    "tip1": "1. 質問、ファイルの編集、コマンドの実行ができます。",
+    "tip2": "2. 最善の結果を得るために、具体的に指示してください。",
+    "tip3_geminiMd": "3. GEMINI.md ファイルを作成して、Gemini とのやり取りをカスタマイズできます。",
+    "tip_help": "{{number}}. 詳細については /help を参照してください。"
+  },
   "skillsList": {
     "builtin": " [組み込み]",
     "availableTitle": "利用可能なエージェントスキル:",
