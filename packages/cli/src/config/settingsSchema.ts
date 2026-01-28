@@ -526,15 +526,6 @@ const SETTINGS_SCHEMA = {
         description: 'Show the model name in the chat for each model turn.',
         showInDialog: true,
       },
-      useFullWidth: {
-        type: 'boolean',
-        label: 'Use Full Width',
-        category: 'UI',
-        requiresRestart: false,
-        default: true,
-        description: 'Use the entire width of the terminal for output.',
-        showInDialog: true,
-      },
       useAlternateBuffer: {
         type: 'boolean',
         label: 'Use Alternate Screen Buffer',
@@ -545,6 +536,15 @@ const SETTINGS_SCHEMA = {
           'Use an alternate screen buffer for the UI, preserving shell history.',
         showInDialog: true,
       },
+      useBackgroundColor: {
+        type: 'boolean',
+        label: 'Use Background Color',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description: 'Whether to use background colors in the UI.',
+        showInDialog: true,
+      },
       incrementalRendering: {
         type: 'boolean',
         label: 'Incremental Rendering',
@@ -553,6 +553,15 @@ const SETTINGS_SCHEMA = {
         default: true,
         description:
           'Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled.',
+        showInDialog: true,
+      },
+      showSpinner: {
+        type: 'boolean',
+        label: 'Show Spinner',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description: 'Show the spinner during operations.',
         showInDialog: true,
       },
       customWittyPhrases: {
@@ -1471,12 +1480,12 @@ const SETTINGS_SCHEMA = {
       },
       skills: {
         type: 'boolean',
-        label: 'Agent Skills',
+        label: 'Agent Skills (Deprecated)',
         category: 'Experimental',
         requiresRestart: true,
         default: false,
-        description: 'Enable Agent Skills (experimental).',
-        showInDialog: true,
+        description: '[Deprecated] Enable Agent Skills (experimental).',
+        showInDialog: false,
       },
       useOSC52Paste: {
         type: 'boolean',
@@ -1552,7 +1561,6 @@ const SETTINGS_SCHEMA = {
         default: true,
         description: 'Enable Agent Skills.',
         showInDialog: true,
-        ignoreInDocs: true,
       },
       disabled: {
         type: 'array',

@@ -26,6 +26,7 @@ export enum MessageBusType {
 export interface ToolCallsUpdateMessage {
   type: MessageBusType.TOOL_CALLS_UPDATE;
   toolCalls: ToolCall[];
+  schedulerId: string;
 }
 
 export interface ToolConfirmationRequest {
@@ -133,11 +134,11 @@ export interface Question {
   header: string;
   /** Question type: 'choice' renders selectable options, 'text' renders free-form input, 'yesno' renders a binary Yes/No choice. Defaults to 'choice'. */
   type?: QuestionType;
-  /** Available choices. Required when type is 'choice' (or omitted), ignored for 'text'. */
+  /** Selectable choices. REQUIRED when type='choice' or omitted. IGNORED for 'text' and 'yesno'. */
   options?: QuestionOption[];
-  /** Allow multiple selections. Only applies to 'choice' type. */
+  /** Allow multiple selections. Only applies when type='choice'. */
   multiSelect?: boolean;
-  /** Placeholder hint text for 'text' type input field. */
+  /** Placeholder hint text. Only applies when type='text'. */
   placeholder?: string;
 }
 
@@ -151,6 +152,8 @@ export interface AskUserResponse {
   type: MessageBusType.ASK_USER_RESPONSE;
   correlationId: string;
   answers: { [questionIndex: string]: string };
+  /** When true, indicates the user cancelled the dialog without submitting answers */
+  cancelled?: boolean;
 }
 
 export type Message =

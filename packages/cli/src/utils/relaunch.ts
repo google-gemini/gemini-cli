@@ -40,6 +40,8 @@ export async function relaunchAppInChildProcess(
     return;
   }
 
+  let latestAdminSettings = remoteAdminSettings;
+
   const runner = () => {
     // process.argv is [node, script, ...args]
     // We want to construct [ ...nodeArgs, script, ...scriptArgs]
@@ -63,9 +65,15 @@ export async function relaunchAppInChildProcess(
       env: newEnv,
     });
 
-    if (remoteAdminSettings) {
-      child.send({ type: 'admin-settings', settings: remoteAdminSettings });
+    if (latestAdminSettings) {
+      child.send({ type: 'admin-settings', settings: latestAdminSettings });
     }
+
+    child.on('message', (msg: { type?: string; settings?: unknown }) => {
+      if (msg.type === 'admin-settings-update' && msg.settings) {
+        latestAdminSettings = msg.settings as FetchAdminControlsResponse;
+      }
+    });
 
     return new Promise<number>((resolve, reject) => {
       child.on('error', reject);

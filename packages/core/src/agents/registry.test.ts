@@ -25,6 +25,7 @@ import { SimpleExtensionLoader } from '../utils/extensionLoader.js';
 import type { ConfigParameters } from '../config/config.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
 import { ThinkingLevel } from '@google/genai';
+import type { AcknowledgedAgentsService } from './acknowledgedAgents.js';
 
 vi.mock('./agentLoader.js', () => ({
   loadAgentsFromDirectory: vi
@@ -400,6 +401,58 @@ describe('AgentRegistry', () => {
       await registry.initialize();
 
       expect(registry.getDefinition('extension-agent')).toBeUndefined();
+    });
+
+    it('should use agentCardUrl as hash for acknowledgement of remote agents', async () => {
+      mockConfig = makeMockedConfig({ enableAgents: true });
+      // Trust the folder so it attempts to load project agents
+      vi.spyOn(mockConfig, 'isTrustedFolder').mockReturnValue(true);
+      vi.spyOn(mockConfig, 'getFolderTrust').mockReturnValue(true);
+
+      const registry = new TestableAgentRegistry(mockConfig);
+
+      const remoteAgent: AgentDefinition = {
+        kind: 'remote',
+        name: 'RemoteAgent',
+        description: 'A remote agent',
+        agentCardUrl: 'https://example.com/card',
+        inputConfig: { inputSchema: { type: 'object' } },
+        metadata: { hash: 'file-hash', filePath: 'path/to/file.md' },
+      };
+
+      vi.mocked(tomlLoader.loadAgentsFromDirectory).mockResolvedValue({
+        agents: [remoteAgent],
+        errors: [],
+      });
+
+      const ackService = {
+        isAcknowledged: vi.fn().mockResolvedValue(true),
+        acknowledge: vi.fn(),
+      };
+      vi.spyOn(mockConfig, 'getAcknowledgedAgentsService').mockReturnValue(
+        ackService as unknown as AcknowledgedAgentsService,
+      );
+
+      // Mock A2AClientManager to avoid network calls
+      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
+        loadAgent: vi.fn().mockResolvedValue({ name: 'RemoteAgent' }),
+        clearCache: vi.fn(),
+      } as unknown as A2AClientManager);
+
+      await registry.initialize();
+
+      // Verify ackService was called with the URL, not the file hash
+      expect(ackService.isAcknowledged).toHaveBeenCalledWith(
+        expect.anything(),
+        'RemoteAgent',
+        'https://example.com/card',
+      );
+
+      // Also verify that the agent's metadata was updated to use the URL as hash
+      // Use getDefinition because registerAgent might have been called
+      expect(registry.getDefinition('RemoteAgent')?.metadata?.hash).toBe(
+        'https://example.com/card',
+      );
     });
   });
 

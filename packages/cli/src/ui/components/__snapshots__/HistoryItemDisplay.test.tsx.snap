@@ -51,7 +51,8 @@ exports[`<HistoryItemDisplay /> > gemini items (alternateBuffer=false) > should 
    47 Line 47
    48 Line 48
    49 Line 49
-   50 Line 50"
+   50 Line 50
+"
 `;
 
 exports[`<HistoryItemDisplay /> > gemini items (alternateBuffer=false) > should render a full gemini_content item when using availableTerminalHeightGemini 1`] = `
@@ -105,13 +106,13 @@ exports[`<HistoryItemDisplay /> > gemini items (alternateBuffer=false) > should 
    47 Line 47
    48 Line 48
    49 Line 49
-   50 Line 50"
+   50 Line 50
+"
 `;
 
 exports[`<HistoryItemDisplay /> > gemini items (alternateBuffer=false) > should render a truncated gemini item 1`] = `
 "✦ Example code block:
-   ... first 41 lines hidden ...
-   42 Line 42
+   ... first 42 lines hidden ...
    43 Line 43
    44 Line 44
    45 Line 45
@@ -119,13 +120,13 @@ exports[`<HistoryItemDisplay /> > gemini items (alternateBuffer=false) > should 
    47 Line 47
    48 Line 48
    49 Line 49
-   50 Line 50"
+   50 Line 50
+"
 `;
 
 exports[`<HistoryItemDisplay /> > gemini items (alternateBuffer=false) > should render a truncated gemini_content item 1`] = `
 "  Example code block:
-   ... first 41 lines hidden ...
-   42 Line 42
+   ... first 42 lines hidden ...
    43 Line 43
    44 Line 44
    45 Line 45
@@ -133,7 +134,8 @@ exports[`<HistoryItemDisplay /> > gemini items (alternateBuffer=false) > should 
    47 Line 47
    48 Line 48
    49 Line 49
-   50 Line 50"
+   50 Line 50
+"
 `;
 
 exports[`<HistoryItemDisplay /> > gemini items (alternateBuffer=true) > should render a full gemini item when using availableTerminalHeightGemini 1`] = `
@@ -187,7 +189,8 @@ exports[`<HistoryItemDisplay /> > gemini items (alternateBuffer=true) > should r
    47 Line 47
    48 Line 48
    49 Line 49
-   50 Line 50"
+   50 Line 50
+"
 `;
 
 exports[`<HistoryItemDisplay /> > gemini items (alternateBuffer=true) > should render a full gemini_content item when using availableTerminalHeightGemini 1`] = `
@@ -241,7 +244,8 @@ exports[`<HistoryItemDisplay /> > gemini items (alternateBuffer=true) > should r
    47 Line 47
    48 Line 48
    49 Line 49
-   50 Line 50"
+   50 Line 50
+"
 `;
 
 exports[`<HistoryItemDisplay /> > gemini items (alternateBuffer=true) > should render a truncated gemini item 1`] = `
@@ -295,7 +299,8 @@ exports[`<HistoryItemDisplay /> > gemini items (alternateBuffer=true) > should r
    47 Line 47
    48 Line 48
    49 Line 49
-   50 Line 50"
+   50 Line 50
+"
 `;
 
 exports[`<HistoryItemDisplay /> > gemini items (alternateBuffer=true) > should render a truncated gemini_content item 1`] = `
@@ -349,7 +354,8 @@ exports[`<HistoryItemDisplay /> > gemini items (alternateBuffer=true) > should r
    47 Line 47
    48 Line 48
    49 Line 49
-   50 Line 50"
+   50 Line 50
+"
 `;
 
 exports[`<HistoryItemDisplay /> > renders AgentsStatus for "agents_list" type 1`] = `

@@ -7,7 +7,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { GrepToolParams } from './grep.js';
 import { GrepTool } from './grep.js';
+import type { ToolResult } from './tools.js';
 import path from 'node:path';
+import { isSubpath } from '../utils/paths.js';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import type { Config } from '../config/config.js';
@@ -15,8 +17,12 @@ import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.j
 import { ToolErrorType } from './tool-error.js';
 import * as glob from 'glob';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import { execStreaming } from '../utils/shell-utils.js';
 
 vi.mock('glob', { spy: true });
+vi.mock('../utils/shell-utils.js', () => ({
+  execStreaming: vi.fn(),
+}));
 
 // Mock the child_process module to control grep/git grep behavior
 vi.mock('child_process', () => ({
@@ -37,17 +43,40 @@ describe('GrepTool', () => {
   let tempRootDir: string;
   let grepTool: GrepTool;
   const abortSignal = new AbortController().signal;
-
-  const mockConfig = {
-    getTargetDir: () => tempRootDir,
-    getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
-    getFileExclusions: () => ({
-      getGlobExcludes: () => [],
-    }),
-  } as unknown as Config;
+  let mockConfig: Config;
 
   beforeEach(async () => {
     tempRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'grep-tool-root-'));
+
+    mockConfig = {
+      getTargetDir: () => tempRootDir,
+      getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
+      getFileExclusions: () => ({
+        getGlobExcludes: () => [],
+      }),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+      },
+      isPathAllowed(this: Config, absolutePath: string): boolean {
+        const workspaceContext = this.getWorkspaceContext();
+        if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+          return true;
+        }
+
+        const projectTempDir = this.storage.getProjectTempDir();
+        return isSubpath(path.resolve(projectTempDir), absolutePath);
+      },
+      validatePathAccess(this: Config, absolutePath: string): string | null {
+        if (this.isPathAllowed(absolutePath)) {
+          return null;
+        }
+
+        const workspaceDirs = this.getWorkspaceContext().getDirectories();
+        const projectTempDir = this.storage.getProjectTempDir();
+        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+      },
+    } as unknown as Config;
+
     grepTool = new GrepTool(mockConfig, createMockMessageBus());
 
     // Create some test files and directories
@@ -115,7 +144,7 @@ describe('GrepTool', () => {
       };
       // Check for the core error message, as the full path might vary
       expect(grepTool.validateToolParams(params)).toContain(
-        'Failed to access path stats for',
+        'Path does not exist',
       );
       expect(grepTool.validateToolParams(params)).toContain('nonexistent');
     });
@@ -128,6 +157,14 @@ describe('GrepTool', () => {
       );
     });
   });
+
+  function createLineGenerator(lines: string[]): AsyncGenerator<string> {
+    return (async function* () {
+      for (const line of lines) {
+        yield line;
+      }
+    })();
+  }
 
   describe('execute', () => {
     it('should find matches for a simple pattern in all files', async () => {
@@ -146,6 +183,35 @@ describe('GrepTool', () => {
       expect(result.llmContent).toContain('L1: another world in sub dir');
       expect(result.returnDisplay).toBe('Found 3 matches');
     }, 30000);
+
+    it('should include files that start with ".." in JS fallback', async () => {
+      await fs.writeFile(path.join(tempRootDir, '..env'), 'world in ..env');
+      const params: GrepToolParams = { pattern: 'world' };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+      expect(result.llmContent).toContain('File: ..env');
+      expect(result.llmContent).toContain('L1: world in ..env');
+    });
+
+    it('should ignore system grep output that escapes base path', async () => {
+      vi.mocked(execStreaming).mockImplementationOnce(() =>
+        createLineGenerator(['..env:1:hello', '../secret.txt:2:leak']),
+      );
+
+      const params: GrepToolParams = { pattern: 'hello' };
+      const invocation = grepTool.build(params) as unknown as {
+        isCommandAvailable: (command: string) => Promise<boolean>;
+        execute: (signal: AbortSignal) => Promise<ToolResult>;
+      };
+      invocation.isCommandAvailable = vi.fn(
+        async (command: string) => command === 'grep',
+      );
+
+      const result = await invocation.execute(abortSignal);
+      expect(result.llmContent).toContain('File: ..env');
+      expect(result.llmContent).toContain('L1: hello');
+      expect(result.llmContent).not.toContain('secret.txt');
+    });
 
     it('should find matches in a specific path', async () => {
       const params: GrepToolParams = { pattern: 'world', dir_path: 'sub' };
@@ -269,6 +335,27 @@ describe('GrepTool', () => {
         getFileExclusions: () => ({
           getGlobExcludes: () => [],
         }),
+        storage: {
+          getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+        },
+        isPathAllowed(this: Config, absolutePath: string): boolean {
+          const workspaceContext = this.getWorkspaceContext();
+          if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+            return true;
+          }
+
+          const projectTempDir = this.storage.getProjectTempDir();
+          return isSubpath(path.resolve(projectTempDir), absolutePath);
+        },
+        validatePathAccess(this: Config, absolutePath: string): string | null {
+          if (this.isPathAllowed(absolutePath)) {
+            return null;
+          }
+
+          const workspaceDirs = this.getWorkspaceContext().getDirectories();
+          const projectTempDir = this.storage.getProjectTempDir();
+          return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+        },
       } as unknown as Config;
 
       const multiDirGrepTool = new GrepTool(
@@ -325,6 +412,27 @@ describe('GrepTool', () => {
         getFileExclusions: () => ({
           getGlobExcludes: () => [],
         }),
+        storage: {
+          getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+        },
+        isPathAllowed(this: Config, absolutePath: string): boolean {
+          const workspaceContext = this.getWorkspaceContext();
+          if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+            return true;
+          }
+
+          const projectTempDir = this.storage.getProjectTempDir();
+          return isSubpath(path.resolve(projectTempDir), absolutePath);
+        },
+        validatePathAccess(this: Config, absolutePath: string): string | null {
+          if (this.isPathAllowed(absolutePath)) {
+            return null;
+          }
+
+          const workspaceDirs = this.getWorkspaceContext().getDirectories();
+          const projectTempDir = this.storage.getProjectTempDir();
+          return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+        },
       } as unknown as Config;
 
       const multiDirGrepTool = new GrepTool(

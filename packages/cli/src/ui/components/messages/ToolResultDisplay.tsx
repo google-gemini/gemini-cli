@@ -13,9 +13,10 @@ import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { theme } from '../../semantic-colors.js';
 import type { AnsiOutput } from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
+import { tryParseJSON } from '../../../utils/jsonoutput.js';
 
 const STATIC_HEIGHT = 1;
-const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
+const RESERVED_LINE_COUNT = 6; // for tool name, status, padding, and 'ShowMoreLines' hint
 const MIN_LINES_SHOWN = 2; // show at least this many lines
 
 // Large threshold to ensure we don't cause performance issues for very large
@@ -63,9 +64,26 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
 
   if (!truncatedResultDisplay) return null;
 
+  // Check if string content is valid JSON and pretty-print it
+  const prettyJSON =
+    typeof truncatedResultDisplay === 'string'
+      ? tryParseJSON(truncatedResultDisplay)
+      : null;
+  const formattedJSON = prettyJSON ? JSON.stringify(prettyJSON, null, 2) : null;
+
   let content: React.ReactNode;
 
-  if (typeof truncatedResultDisplay === 'string' && renderOutputAsMarkdown) {
+  if (formattedJSON) {
+    // Render pretty-printed JSON
+    content = (
+      <Text wrap="wrap" color={theme.text.primary}>
+        {formattedJSON}
+      </Text>
+    );
+  } else if (
+    typeof truncatedResultDisplay === 'string' &&
+    renderOutputAsMarkdown
+  ) {
     content = (
       <MarkdownDisplay
         text={truncatedResultDisplay}
