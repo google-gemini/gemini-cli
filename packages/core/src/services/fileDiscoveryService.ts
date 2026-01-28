@@ -79,6 +79,10 @@ export class FileDiscoveryService {
     }
   }
 
+  getTargetDir(): string {
+    return this.projectRoot;
+  }
+
   private applyFilterFilesOptions(options?: FilterFilesOptions): void {
     if (!options) return;
 
