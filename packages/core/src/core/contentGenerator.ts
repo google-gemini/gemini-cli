@@ -140,8 +140,9 @@ export async function createContentGenerator(
       'User-Agent': userAgent,
     };
 
-    if (config.vertexai && config.requestType) {
-      baseHeaders['X-Vertex-AI-LLM-Request-Type'] = config.requestType;
+    const requestType = config.vertexai ? config.requestType?.trim() : undefined;
+    if (requestType) {
+      baseHeaders['X-Vertex-AI-LLM-Request-Type'] = requestType;
     }
 
     if (
