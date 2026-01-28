@@ -7,6 +7,7 @@
 import type { HistoryItemStats } from '../types.js';
 import { MessageType } from '../types.js';
 import { formatDuration } from '../utils/formatters.js';
+import { t } from '../../i18n/index.js';
 import {
   type CommandContext,
   type SlashCommand,
@@ -19,7 +20,7 @@ async function defaultSessionView(context: CommandContext) {
   if (!sessionStartTime) {
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: 'Session start time is unavailable, cannot calculate stats.',
+      text: t('commands:stats.responses.startTimeUnavailable'),
     });
     return;
   }
