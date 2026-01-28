@@ -144,6 +144,10 @@
     "localAgents": "Local Agents",
     "remoteAgents": "Remote Agents"
   },
+  "toolsList": {
+    "title": "Available Gemini CLI tools:",
+    "noTools": "No tools available"
+  },
   "screenReader": {
     "userPrefix": "User: ",
     "modelPrefix": "Model: ",
