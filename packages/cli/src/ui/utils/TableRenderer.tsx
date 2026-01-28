@@ -7,7 +7,7 @@
 import React from 'react';
 import { Text, Box } from 'ink';
 import { theme } from '../semantic-colors.js';
-import { RenderInline, getPlainTextLength } from './InlineMarkdownRenderer.js';
+import stringWidth from 'string-width';
 
 interface TableRendererProps {
   headers: string[];
@@ -15,92 +15,169 @@ interface TableRendererProps {
   terminalWidth: number;
 }
 
+const stripMarkdown = (text: string): string =>
+  text
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/_(.*?)_/g, '$1')
+    .replace(/~~(.*?)~~/g, '$1')
+    .replace(/`(.*?)`/g, '$1')
+    .replace(/<u>(.*?)<\/u>/g, '$1')
+    .replace(/\[(.*?)\]\(.*?\)/g, '$1');
+
+const getDisplayWidth = (text: string): number =>
+  stringWidth(stripMarkdown(text));
+
+const wrapText = (text: string, maxWidth: number): string[] => {
+  if (maxWidth <= 0) return [text];
+
+  const plainText = stripMarkdown(text);
+  const displayWidth = stringWidth(plainText);
+
+  if (displayWidth <= maxWidth) {
+    return [plainText];
+  }
+
+  const lines: string[] = [];
+  const words = plainText.split(/(\s+)/);
+  let currentLine = '';
+  let currentLineWidth = 0;
+
+  for (const word of words) {
+    const wordWidth = stringWidth(word);
+
+    if (wordWidth > maxWidth && currentLine === '') {
+      let remaining = word;
+      while (stringWidth(remaining) > maxWidth) {
+        let splitIndex = 0;
+        let width = 0;
+        for (let i = 0; i < remaining.length; i++) {
+          const charWidth = stringWidth(remaining[i]);
+          if (width + charWidth > maxWidth) break;
+          width += charWidth;
+          splitIndex = i + 1;
+        }
+        if (splitIndex === 0) splitIndex = 1;
+        lines.push(remaining.substring(0, splitIndex));
+        remaining = remaining.substring(splitIndex);
+      }
+      currentLine = remaining;
+      currentLineWidth = stringWidth(remaining);
+    } else if (currentLineWidth + wordWidth <= maxWidth) {
+      currentLine += word;
+      currentLineWidth += wordWidth;
+    } else {
+      if (currentLine.trim()) {
+        lines.push(currentLine.trimEnd());
+      }
+      currentLine = word.trimStart();
+      currentLineWidth = stringWidth(currentLine);
+    }
+  }
+
+  if (currentLine.trim()) {
+    lines.push(currentLine.trimEnd());
+  }
+
+  return lines.length > 0 ? lines : [''];
+};
+
 /**
  * Custom table renderer for markdown tables
  * We implement our own instead of using ink-table due to module compatibility issues
+ * This version supports multi-line cells when content is too long.
  */
 export const TableRenderer: React.FC<TableRendererProps> = ({
   headers,
   rows,
   terminalWidth,
 }) => {
-  // Calculate column widths using actual display width after markdown processing
-  const columnWidths = headers.map((header, index) => {
-    const headerWidth = getPlainTextLength(header);
-    const maxRowWidth = Math.max(
-      ...rows.map((row) => getPlainTextLength(row[index] || '')),
-    );
-    return Math.max(headerWidth, maxRowWidth) + 2; // Add padding
-  });
+  const numColumns = headers.length;
+  const plainHeaders = headers.map(stripMarkdown);
 
-  // Ensure table fits within terminal width
-  const totalWidth = columnWidths.reduce((sum, width) => sum + width + 1, 1);
-  const scaleFactor =
-    totalWidth > terminalWidth ? terminalWidth / totalWidth : 1;
-  const adjustedWidths = columnWidths.map((width) =>
-    Math.floor(width * scaleFactor),
+  const minColumnWidths = plainHeaders.map((header) =>
+    Math.max(stringWidth(header) + 2, 15),
   );
 
-  // Helper function to render a cell with proper width
-  const renderCell = (
+  const idealColumnWidths = plainHeaders.map((header, index) => {
+    const headerWidth = stringWidth(header);
+    const maxRowWidth = Math.max(
+      0,
+      ...rows.map((row) => getDisplayWidth(row[index] || '')),
+    );
+    return Math.max(headerWidth, maxRowWidth) + 2;
+  });
+
+  const borderOverhead = 1 + numColumns * 3 + 1;
+  const availableContentWidth = Math.max(
+    numColumns * 15,
+    terminalWidth - borderOverhead,
+  );
+
+  const totalIdealWidth = idealColumnWidths.reduce((sum, w) => sum + w, 0);
+
+  const isNarrowForMinLayout = terminalWidth < numColumns * 15 + borderOverhead;
+
+  const showRowSeparators =
+    numColumns === 1 ||
+    isNarrowForMinLayout ||
+    totalIdealWidth > availableContentWidth;
+
+  let adjustedWidths: number[];
+  if (totalIdealWidth <= availableContentWidth) {
+    adjustedWidths = [...idealColumnWidths];
+  } else {
+    const scaleFactor = availableContentWidth / totalIdealWidth;
+    adjustedWidths = idealColumnWidths.map((ideal, index) => {
+      const scaled = Math.floor(ideal * scaleFactor);
+      return Math.max(scaled, Math.min(minColumnWidths[index], 12));
+    });
+
+    const totalAssigned = adjustedWidths.reduce((sum, w) => sum + w, 0);
+    let remaining = availableContentWidth - totalAssigned;
+    let colIndex = 0;
+    while (remaining > 0 && colIndex < adjustedWidths.length) {
+      adjustedWidths[colIndex]++;
+      remaining--;
+      colIndex = (colIndex + 1) % adjustedWidths.length;
+    }
+  }
+
+  const wrapCellContent = (content: string, width: number): string[] => {
+    const contentWidth = Math.max(0, width - 2);
+    return wrapText(content, contentWidth);
+  };
+
+  const padToWidth = (content: string, targetWidth: number): string => {
+    const currentWidth = stringWidth(content);
+    if (currentWidth >= targetWidth) {
+      return content;
+    }
+    return content + ' '.repeat(targetWidth - currentWidth);
+  };
+
+  const renderCellLine = (
     content: string,
     width: number,
     isHeader = false,
   ): React.ReactNode => {
     const contentWidth = Math.max(0, width - 2);
-    const displayWidth = getPlainTextLength(content);
 
-    let cellContent = content;
-    if (displayWidth > contentWidth) {
-      if (contentWidth <= 3) {
-        // Just truncate by character count
-        cellContent = content.substring(
-          0,
-          Math.min(content.length, contentWidth),
-        );
-      } else {
-        // Truncate preserving markdown formatting using binary search
-        let left = 0;
-        let right = content.length;
-        let bestTruncated = content;
-
-        // Binary search to find the optimal truncation point
-        while (left <= right) {
-          const mid = Math.floor((left + right) / 2);
-          const candidate = content.substring(0, mid);
-          const candidateWidth = getPlainTextLength(candidate);
-
-          if (candidateWidth <= contentWidth - 3) {
-            bestTruncated = candidate;
-            left = mid + 1;
-          } else {
-            right = mid - 1;
-          }
-        }
-
-        cellContent = bestTruncated + '...';
-      }
-    }
-
-    // Calculate exact padding needed
-    const actualDisplayWidth = getPlainTextLength(cellContent);
-    const paddingNeeded = Math.max(0, contentWidth - actualDisplayWidth);
+    const paddedContent = padToWidth(content, contentWidth);
 
     return (
       <Text>
         {isHeader ? (
           <Text bold color={theme.text.link}>
-            <RenderInline text={cellContent} />
+            {paddedContent}
           </Text>
         ) : (
-          <RenderInline text={cellContent} />
+          <Text color={theme.text.primary}>{paddedContent}</Text>
         )}
-        {' '.repeat(paddingNeeded)}
       </Text>
     );
   };
 
-  // Helper function to render border
   const renderBorder = (type: 'top' | 'middle' | 'bottom'): React.ReactNode => {
     const chars = {
       top: { left: '┌', middle: '┬', right: '┐', horizontal: '─' },
@@ -115,44 +192,61 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     return <Text color={theme.border.default}>{border}</Text>;
   };
 
-  // Helper function to render a table row
   const renderRow = (cells: string[], isHeader = false): React.ReactNode => {
-    const renderedCells = cells.map((cell, index) => {
-      const width = adjustedWidths[index] || 0;
-      return renderCell(cell || '', width, isHeader);
+    const wrappedCells = cells.map((cell, index) => {
+      const width = adjustedWidths[index] || 15;
+      const plainCell = isHeader ? cell : stripMarkdown(cell || '');
+      return wrapCellContent(plainCell, width);
     });
 
-    return (
-      <Text color={theme.text.primary}>
-        │{' '}
-        {renderedCells.map((cell, index) => (
-          <React.Fragment key={index}>
-            {cell}
-            {index < renderedCells.length - 1 ? ' │ ' : ''}
-          </React.Fragment>
-        ))}{' '}
-        │
-      </Text>
-    );
+    const maxLines = Math.max(1, ...wrappedCells.map((lines) => lines.length));
+
+    const rowLines: React.ReactNode[] = [];
+    for (let lineIndex = 0; lineIndex < maxLines; lineIndex++) {
+      const renderedCells = wrappedCells.map((lines, colIndex) => {
+        const width = adjustedWidths[colIndex] || 15;
+        const lineContent = lines[lineIndex] || '';
+        return renderCellLine(lineContent, width, isHeader && lineIndex === 0);
+      });
+
+      rowLines.push(
+        <Text key={lineIndex} color={theme.text.primary}>
+          │{' '}
+          {renderedCells.map((cell, index) => (
+            <React.Fragment key={index}>
+              {cell}
+              {index < renderedCells.length - 1 ? ' │ ' : ''}
+            </React.Fragment>
+          ))}{' '}
+          │
+        </Text>,
+      );
+    }
+
+    return <>{rowLines}</>;
+  };
+
+  const renderRowSeparator = (): React.ReactNode => {
+    const borderParts = adjustedWidths.map((w) => '─'.repeat(w));
+    const separator = '├' + borderParts.join('┼') + '┤';
+    return <Text color={theme.border.default}>{separator}</Text>;
   };
 
   return (
     <Box flexDirection="column" marginY={1}>
-      {/* Top border */}
       {renderBorder('top')}
 
-      {/* Header row */}
-      {renderRow(headers, true)}
+      {renderRow(plainHeaders, true)}
 
-      {/* Middle border */}
       {renderBorder('middle')}
 
-      {/* Data rows */}
       {rows.map((row, index) => (
-        <React.Fragment key={index}>{renderRow(row)}</React.Fragment>
+        <React.Fragment key={index}>
+          {renderRow(row)}
+          {showRowSeparators && index < rows.length - 1 && renderRowSeparator()}
+        </React.Fragment>
       ))}
 
-      {/* Bottom border */}
       {renderBorder('bottom')}
     </Box>
   );
