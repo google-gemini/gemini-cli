@@ -17,6 +17,7 @@ import {
   cpSlice,
   cpLen,
   stripUnsafeCharacters,
+  cpIndexToOffset,
 } from '../../utils/textUtils.js';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../../keyMatchers.js';
@@ -558,6 +559,13 @@ export function BaseSettingsDialog({
                                 ? theme.text.secondary
                                 : theme.text.primary
                           }
+                          terminalCursorFocus={
+                            editingKey === item.key && cursorVisible
+                          }
+                          terminalCursorPosition={cpIndexToOffset(
+                            editBuffer,
+                            editCursorPos,
+                          )}
                         >
                           {displayValue}
                         </Text>

@@ -71,6 +71,13 @@ export function cpLen(str: string): number {
   return toCodePoints(str).length;
 }
 
+/**
+ * Converts a code point index to a UTF-16 code unit offset.
+ */
+export function cpIndexToOffset(str: string, cpIndex: number): number {
+  return cpSlice(str, 0, cpIndex).length;
+}
+
 export function cpSlice(str: string, start: number, end?: number): string {
   // Slice by code‑point indices and re‑join.
   const arr = toCodePoints(str).slice(start, end);
