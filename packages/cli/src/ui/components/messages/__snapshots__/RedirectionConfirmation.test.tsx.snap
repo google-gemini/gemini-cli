@@ -7,7 +7,7 @@ Note: Command contains redirection which can be undesirable.
 Tip:  Toggle auto-edit (Shift+Tab) to allow redirection in the future.
 Allow execution of: 'echo, redirection (>)'?
 
-● 1. Allow once
+• 1. Allow once
   2. Allow for this session
   3. No, suggest changes (esc)
 "

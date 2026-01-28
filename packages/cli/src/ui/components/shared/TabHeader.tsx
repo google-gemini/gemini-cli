@@ -38,7 +38,7 @@ export interface TabHeaderProps {
   showStatusIcons?: boolean;
   /**
    * Custom status icon renderer. Return undefined to use default icons.
-   * Default icons: '✓' for completed, '□' for incomplete, '≡' for special tabs
+   * Default icons: '✓' for completed, '▫' for incomplete, '≡' for special tabs
    */
   renderStatusIcon?: (
     tab: Tab,
@@ -50,10 +50,10 @@ export interface TabHeaderProps {
 /**
  * A header component that displays tab indicators for multi-tab interfaces.
  *
- * Renders in the format: `← Tab1 │ Tab2 │ Tab3 →`
+ * Renders in the format: `￩ Tab1 │ Tab2 │ Tab3 ￫`
  *
  * Features:
- * - Shows completion status (✓ or □) per tab
+ * - Shows completion status (✓ or ▫) per tab
  * - Highlights current tab with accent color
  * - Supports special tabs (like "Review") with different icons
  * - Customizable status icons
@@ -82,12 +82,12 @@ export function TabHeader({
 
     // Default icons
     if (tab.isSpecial) return '≡';
-    return isCompleted ? '✓' : '□';
+    return isCompleted ? '✓' : '▫';
   };
 
   return (
     <Box flexDirection="row" marginBottom={1} aria-role="tablist">
-      {showArrows && <Text color={theme.text.secondary}>{'← '}</Text>}
+      {showArrows && <Text color={theme.text.secondary}>{'￩ '}</Text>}
       {tabs.map((tab, i) => (
         <React.Fragment key={tab.key}>
           {i > 0 && <Text color={theme.text.secondary}>{' │ '}</Text>}
@@ -105,7 +105,7 @@ export function TabHeader({
           </Text>
         </React.Fragment>
       ))}
-      {showArrows && <Text color={theme.text.secondary}>{' →'}</Text>}
+      {showArrows && <Text color={theme.text.secondary}>{' ￫'}</Text>}
     </Box>
   );
 }

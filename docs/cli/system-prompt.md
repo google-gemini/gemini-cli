@@ -53,7 +53,7 @@ error with: `missing system prompt file '<path>'`.
 
 ## UI indicator
 
-When `GEMINI_SYSTEM_MD` is active, the CLI shows a `|⌐■_■|` indicator in the UI
+When `GEMINI_SYSTEM_MD` is active, the CLI shows a `|⌐▪_▪|` indicator in the UI
 to signal custom system‑prompt mode.
 
 ## Variable Substitution
