@@ -289,5 +289,14 @@
       "selectTheme": "select theme",
       "full": "(Use Enter to {{action}}, Tab to {{toggle}}, Esc to close)"
     }
+  },
+  "baseSettings": {
+    "searchPlaceholder": "Search to filter",
+    "noMatches": "No matches found.",
+    "applyTo": "Apply To",
+    "help": {
+      "tabChangeFocus": ", Tab to change focus",
+      "full": "(Use Enter to select, Ctrl+L to reset{{scopeHelp}}, Esc to close)"
+    }
   }
 }

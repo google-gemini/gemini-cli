@@ -6,6 +6,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Box, Text } from 'ink';
+import { useTranslation } from 'react-i18next';
 import chalk from 'chalk';
 import { theme } from '../../semantic-colors.js';
 import type { LoadableSettingScope } from '../../../config/settings.js';
@@ -112,7 +113,7 @@ export function BaseSettingsDialog({
   title,
   borderColor,
   searchEnabled = true,
-  searchPlaceholder = 'Search to filter',
+  searchPlaceholder,
   searchBuffer,
   items,
   showScopeSelector = true,
@@ -127,6 +128,7 @@ export function BaseSettingsDialog({
   onKeyPress,
   footerContent,
 }: BaseSettingsDialogProps): React.JSX.Element {
+  const { t } = useTranslation('dialogs');
   // Internal state
   const [activeIndex, setActiveIndex] = useState(0);
   const [scrollOffset, setScrollOffset] = useState(0);
@@ -458,7 +460,9 @@ export function BaseSettingsDialog({
             <TextInput
               focus={focusSection === 'settings' && !editingKey}
               buffer={searchBuffer}
-              placeholder={searchPlaceholder}
+              placeholder={
+                searchPlaceholder ?? t('baseSettings.searchPlaceholder')
+              }
             />
           </Box>
         )}
@@ -468,7 +472,9 @@ export function BaseSettingsDialog({
         {/* Items list */}
         {visibleItems.length === 0 ? (
           <Box marginX={1} height={1} flexDirection="column">
-            <Text color={theme.text.secondary}>No matches found.</Text>
+            <Text color={theme.text.secondary}>
+              {t('baseSettings.noMatches')}
+            </Text>
           </Box>
         ) : (
           <>
@@ -590,7 +596,8 @@ export function BaseSettingsDialog({
         {showScopeSelector && (
           <Box marginX={1} flexDirection="column">
             <Text bold={focusSection === 'scope'} wrap="truncate">
-              {focusSection === 'scope' ? '> ' : '  '}Apply To
+              {focusSection === 'scope' ? '> ' : '  '}
+              {t('baseSettings.applyTo')}
             </Text>
             <RadioButtonSelect
               items={scopeItems}
@@ -611,8 +618,11 @@ export function BaseSettingsDialog({
         {/* Help text */}
         <Box marginX={1}>
           <Text color={theme.text.secondary}>
-            (Use Enter to select, Ctrl+L to reset
-            {showScopeSelector ? ', Tab to change focus' : ''}, Esc to close)
+            {t('baseSettings.help.full', {
+              scopeHelp: showScopeSelector
+                ? t('baseSettings.help.tabChangeFocus')
+                : '',
+            })}
           </Text>
         </Box>
 

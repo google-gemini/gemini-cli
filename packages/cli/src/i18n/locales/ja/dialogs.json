@@ -289,5 +289,14 @@
       "selectTheme": "テーマを選択",
       "full": "(Enterで{{action}}、Tabで{{toggle}}、Escで閉じる)"
     }
+  },
+  "baseSettings": {
+    "searchPlaceholder": "検索して絞り込み",
+    "noMatches": "一致する項目が見つかりませんでした。",
+    "applyTo": "適用先",
+    "help": {
+      "tabChangeFocus": "、Tabでフォーカス切替",
+      "full": "(Enterで選択、Ctrl+Lでリセット{{scopeHelp}}、Escで閉じる)"
+    }
   }
 }
