@@ -25,6 +25,7 @@ interface McpStatusProps {
   blockedServers: Array<{ name: string; extensionName: string }>;
   serverStatus: (serverName: string) => MCPServerStatus;
   authStatus: HistoryItemMcpStatus['authStatus'];
+  enablementState: HistoryItemMcpStatus['enablementState'];
   discoveryInProgress: boolean;
   connectingServers: string[];
   showDescriptions: boolean;
@@ -39,6 +40,7 @@ export const McpStatus: React.FC<McpStatusProps> = ({
   blockedServers,
   serverStatus,
   authStatus,
+  enablementState,
   discoveryInProgress,
   connectingServers,
   showDescriptions,
@@ -104,23 +106,35 @@ export const McpStatus: React.FC<McpStatusProps> = ({
         let statusText = '';
         let statusColor = theme.text.primary;
 
-        switch (status) {
-          case MCPServerStatus.CONNECTED:
-            statusIndicator = '🟢';
-            statusText = 'Ready';
-            statusColor = theme.status.success;
-            break;
-          case MCPServerStatus.CONNECTING:
-            statusIndicator = '🔄';
-            statusText = 'Starting... (first startup may take longer)';
-            statusColor = theme.status.warning;
-            break;
-          case MCPServerStatus.DISCONNECTED:
-          default:
-            statusIndicator = '🔴';
-            statusText = 'Disconnected';
-            statusColor = theme.status.error;
-            break;
+        // Check enablement state
+        const serverEnablement = enablementState[serverName];
+        const isDisabled = serverEnablement && !serverEnablement.enabled;
+
+        if (isDisabled) {
+          statusIndicator = '⏸️';
+          statusText = serverEnablement.isSessionDisabled
+            ? 'Disabled (session)'
+            : 'Disabled';
+          statusColor = theme.text.secondary;
+        } else {
+          switch (status) {
+            case MCPServerStatus.CONNECTED:
+              statusIndicator = '🟢';
+              statusText = 'Ready';
+              statusColor = theme.status.success;
+              break;
+            case MCPServerStatus.CONNECTING:
+              statusIndicator = '🔄';
+              statusText = 'Starting... (first startup may take longer)';
+              statusColor = theme.status.warning;
+              break;
+            case MCPServerStatus.DISCONNECTED:
+            default:
+              statusIndicator = '🔴';
+              statusText = 'Disconnected';
+              statusColor = theme.status.error;
+              break;
+          }
         }
 
         let serverDisplayName = serverName;

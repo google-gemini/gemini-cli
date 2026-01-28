@@ -29,7 +29,7 @@ import { StreamingState } from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
 
-export const Composer = () => {
+export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const config = useConfig();
   const settings = useSettings();
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
@@ -50,7 +50,7 @@ export const Composer = () => {
   return (
     <Box
       flexDirection="column"
-      width={uiState.mainAreaWidth}
+      width={uiState.terminalWidth}
       flexGrow={0}
       flexShrink={0}
     >
@@ -71,8 +71,12 @@ export const Composer = () => {
         />
       )}
 
-      {(!uiState.slashCommands || !uiState.isConfigInitialized) && (
-        <ConfigInitDisplay />
+      {(!uiState.slashCommands ||
+        !uiState.isConfigInitialized ||
+        uiState.isResuming) && (
+        <ConfigInitDisplay
+          message={uiState.isResuming ? 'Resuming session...' : undefined}
+        />
       )}
 
       <QueuedMessageDisplay messageQueue={uiState.messageQueue} />
@@ -109,7 +113,7 @@ export const Composer = () => {
               maxHeight={
                 uiState.constrainHeight ? debugConsoleMaxHeight : undefined
               }
-              width={uiState.mainAreaWidth}
+              width={uiState.terminalWidth}
               hasFocus={uiState.showErrorDetails}
             />
             <ShowMoreLines constrainHeight={uiState.constrainHeight} />
@@ -133,7 +137,7 @@ export const Composer = () => {
           setShellModeActive={uiActions.setShellModeActive}
           approvalMode={showApprovalModeIndicator}
           onEscapePromptChange={uiActions.onEscapePromptChange}
-          focus={true}
+          focus={isFocused}
           vimHandleInput={uiActions.vimHandleInput}
           isEmbeddedShellFocused={uiState.embeddedShellFocused}
           popAllMessages={uiActions.popAllMessages}

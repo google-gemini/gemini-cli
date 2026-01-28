@@ -18,6 +18,7 @@ interface AboutBoxProps {
   gcpProject: string;
   ideClient: string;
   userEmail?: string;
+  tier?: string;
 }
 
 export const AboutBox: React.FC<AboutBoxProps> = ({
@@ -29,6 +30,7 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
   gcpProject,
   ideClient,
   userEmail,
+  tier,
 }) => (
   <Box
     borderStyle="round"
@@ -103,19 +105,23 @@ export const AboutBox: React.FC<AboutBoxProps> = ({
       </Box>
       <Box>
         <Text color={theme.text.primary}>
-          {selectedAuthType.startsWith('oauth') ? 'OAuth' : selectedAuthType}
+          {selectedAuthType.startsWith('oauth')
+            ? userEmail
+              ? `Logged in with Google (${userEmail})`
+              : 'Logged in with Google'
+            : selectedAuthType}
         </Text>
       </Box>
     </Box>
-    {userEmail && (
+    {tier && (
       <Box flexDirection="row">
         <Box width="35%">
           <Text bold color={theme.text.link}>
-            User Email
+            Tier
           </Text>
         </Box>
         <Box>
-          <Text color={theme.text.primary}>{userEmail}</Text>
+          <Text color={theme.text.primary}>{tier}</Text>
         </Box>
       </Box>
     )}

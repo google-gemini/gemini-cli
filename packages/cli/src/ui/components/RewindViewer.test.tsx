@@ -239,6 +239,7 @@ describe('RewindViewer', () => {
 
       // Select
       act(() => {
+        stdin.write('\x1b[A'); // Move up from 'Stay at current position'
         stdin.write('\r');
       });
       expect(lastFrame()).toMatchSnapshot('confirmation-dialog');
@@ -252,17 +253,16 @@ describe('RewindViewer', () => {
     it.each([
       {
         description: 'removes reference markers',
-        prompt:
-          'some command @file\n--- Content from referenced files ---\nContent from file:\nblah blah\n--- End of content ---',
+        prompt: `some command @file\n--- Content from referenced files ---\nContent from file:\nblah blah\n--- End of content ---`,
       },
       {
         description: 'strips expanded MCP resource content',
         prompt:
           'read @server3:mcp://demo-resource hello\n' +
-          '--- Content from referenced files ---\n' +
+          `--- Content from referenced files ---\n` +
           '\nContent from @server3:mcp://demo-resource:\n' +
           'This is the content of the demo resource.\n' +
-          '--- End of content ---',
+          `--- End of content ---`,
       },
     ])('$description', async ({ prompt }) => {
       const conversation = createConversation([
@@ -281,6 +281,7 @@ describe('RewindViewer', () => {
 
       // Select
       act(() => {
+        stdin.write('\x1b[A'); // Move up from 'Stay at current position'
         stdin.write('\r'); // Select
       });
 

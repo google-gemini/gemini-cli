@@ -61,6 +61,8 @@ import {
   SessionStartSource,
   SessionEndReason,
   getVersion,
+  ValidationCancelledError,
+  ValidationRequiredError,
   type FetchAdminControlsResponse,
 } from '@google/gemini-cli-core';
 import {
@@ -324,6 +326,12 @@ export async function main() {
   const argv = await parseArguments(settings.merged);
   parseArgsHandle?.end();
 
+  if (argv.startupMessages) {
+    argv.startupMessages.forEach((msg) => {
+      coreEvents.emitFeedback('info', msg);
+    });
+  }
+
   // Check for invalid input combinations early to prevent crashes
   if (argv.promptInteractive && !process.stdin.isTTY) {
     writeToStderr(
@@ -373,12 +381,13 @@ export async function main() {
   // Refresh auth to fetch remote admin settings from CCPA and before entering
   // the sandbox because the sandbox will interfere with the Oauth2 web
   // redirect.
-  if (
-    settings.merged.security.auth.selectedType &&
-    !settings.merged.security.auth.useExternal
-  ) {
+  let initialAuthFailed = false;
+  if (!settings.merged.security.auth.useExternal) {
     try {
-      if (partialConfig.isInteractive()) {
+      if (
+        partialConfig.isInteractive() &&
+        settings.merged.security.auth.selectedType
+      ) {
         const err = validateAuthMethod(
           settings.merged.security.auth.selectedType,
         );
@@ -389,7 +398,7 @@ export async function main() {
         await partialConfig.refreshAuth(
           settings.merged.security.auth.selectedType,
         );
-      } else {
+      } else if (!partialConfig.isInteractive()) {
         const authType = await validateNonInteractiveAuth(
           settings.merged.security.auth.selectedType,
           settings.merged.security.auth.useExternal,
@@ -399,9 +408,19 @@ export async function main() {
         await partialConfig.refreshAuth(authType);
       }
     } catch (err) {
-      debugLogger.error('Error authenticating:', err);
-      await runExitCleanup();
-      process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
+      if (err instanceof ValidationCancelledError) {
+        // User cancelled verification, exit immediately.
+        await runExitCleanup();
+        process.exit(ExitCodes.SUCCESS);
+      }
+
+      // If validation is required, we don't treat it as a fatal failure.
+      // We allow the app to start, and the React-based ValidationDialog
+      // will handle it.
+      if (!(err instanceof ValidationRequiredError)) {
+        debugLogger.error('Error authenticating:', err);
+        initialAuthFailed = true;
+      }
     }
   }
 
@@ -427,6 +446,10 @@ export async function main() {
     // another way to decouple refreshAuth from requiring a config.
 
     if (sandboxConfig) {
+      if (initialAuthFailed) {
+        await runExitCleanup();
+        process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
+      }
       let stdinData = '';
       if (!process.stdin.isTTY) {
         stdinData = await readStdin();
@@ -664,9 +687,8 @@ export async function main() {
         const additionalContext = result.getAdditionalContext();
         if (additionalContext) {
           // Prepend context to input (System Context -> Stdin -> Question)
-          input = input
-            ? `${additionalContext}\n\n${input}`
-            : additionalContext;
+          const wrappedContext = `<hook_context>${additionalContext}</hook_context>`;
+          input = input ? `${wrappedContext}\n\n${input}` : wrappedContext;
         }
       }
     }
@@ -728,6 +750,7 @@ function setWindowTitle(title: string, settings: LoadedSettings) {
     const windowTitle = computeTerminalTitle({
       streamingState: StreamingState.Idle,
       isConfirming: false,
+      isSilentWorking: false,
       folderName: title,
       showThoughts: !!settings.merged.ui.showStatusInTitle,
       useDynamicTitle: settings.merged.ui.dynamicWindowTitle,

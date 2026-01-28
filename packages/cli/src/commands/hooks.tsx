@@ -14,7 +14,10 @@ export const hooksCommand: CommandModule = {
   describe: 'Manage Gemini CLI hooks.',
   builder: (yargs) =>
     yargs
-      .middleware(() => initializeOutputListenersAndFlush())
+      .middleware((argv) => {
+        initializeOutputListenersAndFlush();
+        argv['isCommand'] = true;
+      })
       .command(migrateCommand)
       .demandCommand(1, 'You need at least one command before continuing.')
       .version(false),

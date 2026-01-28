@@ -50,10 +50,13 @@ export function EditorSettingsDialog({
     (key) => {
       if (key.name === 'tab') {
         setFocusedSection((prev) => (prev === 'editor' ? 'scope' : 'editor'));
+        return true;
       }
       if (key.name === 'escape') {
         onExit();
+        return true;
       }
+      return false;
     },
     { isActive: true },
   );

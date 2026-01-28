@@ -43,7 +43,7 @@ const mockSetVimMode = vi.fn();
 
 vi.mock('../contexts/UIStateContext.js', () => ({
   useUIState: () => ({
-    mainAreaWidth: 100, // Fixed width for consistent snapshots
+    terminalWidth: 100, // Fixed width for consistent snapshots
   }),
 }));
 
@@ -307,6 +307,26 @@ describe('SettingsDialog', () => {
       // Use snapshot to capture visual layout including indicators
       expect(output).toMatchSnapshot();
     });
+
+    it('should use almost full height of the window but no more when the window height is 25 rows', async () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+
+      // Render with a fixed height of 25 rows
+      const { lastFrame } = renderDialog(settings, onSelect, {
+        availableTerminalHeight: 25,
+      });
+
+      // Wait for the dialog to render
+      await waitFor(() => {
+        const output = lastFrame();
+        expect(output).toBeDefined();
+        const lines = output!.split('\n');
+
+        expect(lines.length).toBeGreaterThanOrEqual(24);
+        expect(lines.length).toBeLessThanOrEqual(25);
+      });
+    });
   });
 
   describe('Setting Descriptions', () => {
@@ -381,7 +401,7 @@ describe('SettingsDialog', () => {
 
       await waitFor(() => {
         // Should wrap to last setting (without relying on exact bullet character)
-        expect(lastFrame()).toContain('Codebase Investigator Max Num Turns');
+        expect(lastFrame()).toContain('Hook Notifications');
       });
 
       unmount();
@@ -1072,6 +1092,87 @@ describe('SettingsDialog', () => {
     });
   });
 
+  describe('Restart and Search Conflict Regression', () => {
+    it('should prioritize restart request over search text box when showRestartPrompt is true', async () => {
+      vi.mocked(getSettingsSchema).mockReturnValue(TOOLS_SHELL_FAKE_SCHEMA);
+      const settings = createMockSettings();
+      const onRestartRequest = vi.fn();
+
+      const { stdin, lastFrame, unmount } = renderDialog(settings, vi.fn(), {
+        onRestartRequest,
+      });
+
+      // Wait for initial render
+      await waitFor(() => expect(lastFrame()).toContain('Show Color'));
+
+      // Navigate to "Enable Interactive Shell" (second item in TOOLS_SHELL_FAKE_SCHEMA)
+      act(() => {
+        stdin.write(TerminalKeys.DOWN_ARROW);
+      });
+
+      // Wait for navigation to complete
+      await waitFor(() =>
+        expect(lastFrame()).toContain('● Enable Interactive Shell'),
+      );
+
+      // Toggle it to trigger restart required
+      act(() => {
+        stdin.write(TerminalKeys.ENTER);
+      });
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain(
+          'To see changes, Gemini CLI must be restarted',
+        );
+      });
+
+      // Press 'r' - it should call onRestartRequest, NOT be handled by search
+      act(() => {
+        stdin.write('r');
+      });
+
+      await waitFor(() => {
+        expect(onRestartRequest).toHaveBeenCalled();
+      });
+
+      unmount();
+    });
+
+    it('should hide search box when showRestartPrompt is true', async () => {
+      vi.mocked(getSettingsSchema).mockReturnValue(TOOLS_SHELL_FAKE_SCHEMA);
+      const settings = createMockSettings();
+
+      const { stdin, lastFrame, unmount } = renderDialog(settings, vi.fn());
+
+      // Search box should be visible initially (searchPlaceholder)
+      expect(lastFrame()).toContain('Search to filter');
+
+      // Navigate to "Enable Interactive Shell" and toggle it
+      act(() => {
+        stdin.write(TerminalKeys.DOWN_ARROW);
+      });
+
+      await waitFor(() =>
+        expect(lastFrame()).toContain('● Enable Interactive Shell'),
+      );
+
+      act(() => {
+        stdin.write(TerminalKeys.ENTER);
+      });
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain(
+          'To see changes, Gemini CLI must be restarted',
+        );
+      });
+
+      // Search box should now be hidden
+      expect(lastFrame()).not.toContain('Search to filter');
+
+      unmount();
+    });
+  });
+
   describe('String Settings Editing', () => {
     it('should allow editing and committing a string setting', async () => {
       let settings = createMockSettings({ 'a.string.setting': 'initial' });
@@ -1213,9 +1314,7 @@ describe('SettingsDialog', () => {
       await waitFor(() => {
         expect(lastFrame()).toContain('vim');
         expect(lastFrame()).toContain('Vim Mode');
-        expect(lastFrame()).not.toContain(
-          'Codebase Investigator Max Num Turns',
-        );
+        expect(lastFrame()).not.toContain('Hook Notifications');
       });
 
       unmount();

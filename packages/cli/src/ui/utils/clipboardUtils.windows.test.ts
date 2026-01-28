@@ -16,6 +16,9 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     spawnAsync: vi.fn(),
+    Storage: class {
+      getProjectTempDir = vi.fn(() => "C:\\User's Files");
+    },
   };
 });
 

@@ -5,13 +5,15 @@ exports[`<GeminiMessage /> - Raw Markdown Display Snapshots > renders pending st
 
    \`\`\`javascript
    const x = 1;
-   \`\`\`"
+   \`\`\`
+"
 `;
 
 exports[`<GeminiMessage /> - Raw Markdown Display Snapshots > renders pending state with renderMarkdown=true 1`] = `
 "✦ Test bold and code markdown
 
-   1 const x = 1;"
+   1 const x = 1;
+"
 `;
 
 exports[`<GeminiMessage /> - Raw Markdown Display Snapshots > renders with renderMarkdown=false '(raw markdown with syntax highlightin…' 1`] = `
@@ -19,11 +21,13 @@ exports[`<GeminiMessage /> - Raw Markdown Display Snapshots > renders with rende
 
    \`\`\`javascript
    const x = 1;
-   \`\`\`"
+   \`\`\`
+"
 `;
 
 exports[`<GeminiMessage /> - Raw Markdown Display Snapshots > renders with renderMarkdown=true '(default)' 1`] = `
 "✦ Test bold and code markdown
 
-   1 const x = 1;"
+   1 const x = 1;
+"
 `;

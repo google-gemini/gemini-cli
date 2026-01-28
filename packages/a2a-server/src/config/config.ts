@@ -86,8 +86,15 @@ export async function loadConfig(
     // Git-aware file filtering settings
     fileFiltering: {
       respectGitIgnore: settings.fileFiltering?.respectGitIgnore,
+      respectGeminiIgnore: settings.fileFiltering?.respectGeminiIgnore,
       enableRecursiveFileSearch:
         settings.fileFiltering?.enableRecursiveFileSearch,
+      customIgnoreFilePaths: [
+        ...(settings.fileFiltering?.customIgnoreFilePaths || []),
+        ...(process.env['CUSTOM_IGNORE_FILE_PATHS']
+          ? process.env['CUSTOM_IGNORE_FILE_PATHS'].split(path.delimiter)
+          : []),
+      ],
     },
     ideMode: false,
     folderTrust,
@@ -97,9 +104,14 @@ export async function loadConfig(
     previewFeatures: settings.general?.previewFeatures,
     interactive: true,
     enableInteractiveShell: true,
+    ptyInfo: 'auto',
   };
 
-  const fileService = new FileDiscoveryService(workspaceDir);
+  const fileService = new FileDiscoveryService(workspaceDir, {
+    respectGitIgnore: configParams?.fileFiltering?.respectGitIgnore,
+    respectGeminiIgnore: configParams?.fileFiltering?.respectGeminiIgnore,
+    customIgnoreFilePaths: configParams?.fileFiltering?.customIgnoreFilePaths,
+  });
   const { memoryContent, fileCount, filePaths } =
     await loadServerHierarchicalMemory(
       workspaceDir,

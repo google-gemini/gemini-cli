@@ -7,7 +7,7 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { opendir } from 'node:fs/promises';
-import { homedir } from '@google/gemini-cli-core';
+import { homedir, type WorkspaceContext } from '@google/gemini-cli-core';
 
 const MAX_SUGGESTIONS = 50;
 const MATCH_BUFFER_MULTIPLIER = 3;
@@ -138,4 +138,29 @@ export async function getDirectorySuggestions(
   } catch (_) {
     return [];
   }
+}
+
+export interface BatchAddResult {
+  added: string[];
+  errors: string[];
+}
+
+/**
+ * Helper to batch add directories to the workspace context.
+ * Handles expansion and error formatting.
+ */
+export function batchAddDirectories(
+  workspaceContext: WorkspaceContext,
+  paths: string[],
+): BatchAddResult {
+  const result = workspaceContext.addDirectories(
+    paths.map((p) => expandHomeDir(p.trim())),
+  );
+
+  const errors: string[] = [];
+  for (const failure of result.failed) {
+    errors.push(`Error adding '${failure.path}': ${failure.error.message}`);
+  }
+
+  return { added: result.added, errors };
 }

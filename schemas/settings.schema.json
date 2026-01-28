@@ -302,13 +302,6 @@
           "default": false,
           "type": "boolean"
         },
-        "useFullWidth": {
-          "title": "Use Full Width",
-          "description": "Use the entire width of the terminal for output.",
-          "markdownDescription": "Use the entire width of the terminal for output.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
-          "default": true,
-          "type": "boolean"
-        },
         "useAlternateBuffer": {
           "title": "Use Alternate Screen Buffer",
           "description": "Use an alternate screen buffer for the UI, preserving shell history.",
@@ -316,10 +309,24 @@
           "default": false,
           "type": "boolean"
         },
+        "useBackgroundColor": {
+          "title": "Use Background Color",
+          "description": "Whether to use background colors in the UI.",
+          "markdownDescription": "Whether to use background colors in the UI.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "incrementalRendering": {
           "title": "Incremental Rendering",
           "description": "Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled.",
           "markdownDescription": "Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "showSpinner": {
+          "title": "Show Spinner",
+          "description": "Show the spinner during operations.",
+          "markdownDescription": "Show the spinner during operations.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
@@ -1023,6 +1030,16 @@
               "markdownDescription": "Enable fuzzy search when searching for files.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
               "type": "boolean"
+            },
+            "customIgnoreFilePaths": {
+              "title": "Custom Ignore File Paths",
+              "description": "Additional ignore file paths to respect. These files take precedence over .geminiignore and .gitignore. Files earlier in the array take precedence over files later in the array, e.g. the first file takes precedence over the second one.",
+              "markdownDescription": "Additional ignore file paths to respect. These files take precedence over .geminiignore and .gitignore. Files earlier in the array take precedence over files later in the array, e.g. the first file takes precedence over the second one.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `[]`",
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           },
           "additionalProperties": false
@@ -1095,6 +1112,14 @@
           "default": false,
           "type": "boolean"
         },
+        "approvalMode": {
+          "title": "Approval Mode",
+          "description": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet.",
+          "markdownDescription": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `default`",
+          "default": "default",
+          "type": "string",
+          "enum": ["default", "auto_edit", "plan"]
+        },
         "core": {
           "title": "Core Tools",
           "description": "Restrict the set of built-in tools with an allowlist. Match semantics mirror tools.allowed; see the built-in tools documentation for available names.",
@@ -1165,8 +1190,8 @@
         "disableLLMCorrection": {
           "title": "Disable LLM Correction",
           "description": "Disable LLM-based error correction for edit tools. When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct.",
-          "markdownDescription": "Disable LLM-based error correction for edit tools. When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+          "markdownDescription": "Disable LLM-based error correction for edit tools. When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "enableHooks": {
@@ -1403,8 +1428,8 @@
         "enableEventDrivenScheduler": {
           "title": "Event Driven Scheduler",
           "description": "Enables event-driven scheduler within the CLI session.",
-          "markdownDescription": "Enables event-driven scheduler within the CLI session.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+          "markdownDescription": "Enables event-driven scheduler within the CLI session.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "extensionReloading": {
@@ -1421,81 +1446,12 @@
           "default": false,
           "type": "boolean"
         },
-        "skills": {
-          "title": "Agent Skills",
-          "description": "Enable Agent Skills (experimental).",
-          "markdownDescription": "Enable Agent Skills (experimental).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
-          "type": "boolean"
-        },
-        "codebaseInvestigatorSettings": {
-          "title": "Codebase Investigator Settings",
-          "description": "Configuration for Codebase Investigator.",
-          "markdownDescription": "Configuration for Codebase Investigator.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
-          "default": {},
-          "type": "object",
-          "properties": {
-            "enabled": {
-              "title": "Enable Codebase Investigator",
-              "description": "Enable the Codebase Investigator agent.",
-              "markdownDescription": "Enable the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
-              "default": true,
-              "type": "boolean"
-            },
-            "maxNumTurns": {
-              "title": "Codebase Investigator Max Num Turns",
-              "description": "Maximum number of turns for the Codebase Investigator agent.",
-              "markdownDescription": "Maximum number of turns for the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `10`",
-              "default": 10,
-              "type": "number"
-            },
-            "maxTimeMinutes": {
-              "title": "Max Time (Minutes)",
-              "description": "Maximum time for the Codebase Investigator agent (in minutes).",
-              "markdownDescription": "Maximum time for the Codebase Investigator agent (in minutes).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `3`",
-              "default": 3,
-              "type": "number"
-            },
-            "thinkingBudget": {
-              "title": "Thinking Budget",
-              "description": "The thinking budget for the Codebase Investigator agent.",
-              "markdownDescription": "The thinking budget for the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `8192`",
-              "default": 8192,
-              "type": "number"
-            },
-            "model": {
-              "title": "Model",
-              "description": "The model to use for the Codebase Investigator agent.",
-              "markdownDescription": "The model to use for the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `auto`",
-              "default": "auto",
-              "type": "string"
-            }
-          },
-          "additionalProperties": false
-        },
         "useOSC52Paste": {
           "title": "Use OSC 52 Paste",
           "description": "Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).",
           "markdownDescription": "Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
-        },
-        "cliHelpAgentSettings": {
-          "title": "CLI Help Agent Settings",
-          "description": "Configuration for CLI Help Agent.",
-          "markdownDescription": "Configuration for CLI Help Agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
-          "default": {},
-          "type": "object",
-          "properties": {
-            "enabled": {
-              "title": "Enable CLI Help Agent",
-              "description": "Enable the CLI Help Agent.",
-              "markdownDescription": "Enable the CLI Help Agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
-              "default": true,
-              "type": "boolean"
-            }
-          },
-          "additionalProperties": false
         },
         "plan": {
           "title": "Plan",
@@ -1574,8 +1530,8 @@
         "enabled": {
           "title": "Enable Hooks",
           "description": "Canonical toggle for the hooks system. When disabled, no hooks will be executed.",
-          "markdownDescription": "Canonical toggle for the hooks system. When disabled, no hooks will be executed.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
+          "markdownDescription": "Canonical toggle for the hooks system. When disabled, no hooks will be executed.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "disabled": {

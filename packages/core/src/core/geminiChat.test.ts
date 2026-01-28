@@ -219,6 +219,37 @@ describe('GeminiChat', () => {
     });
   });
 
+  describe('setHistory', () => {
+    it('should recalculate lastPromptTokenCount when history is updated', () => {
+      const initialHistory: Content[] = [
+        { role: 'user', parts: [{ text: 'Hello' }] },
+      ];
+      const chatWithHistory = new GeminiChat(
+        mockConfig,
+        '',
+        [],
+        initialHistory,
+      );
+      const initialCount = chatWithHistory.getLastPromptTokenCount();
+
+      const newHistory: Content[] = [
+        {
+          role: 'user',
+          parts: [
+            {
+              text: 'This is a much longer history item that should result in more tokens than just hello.',
+            },
+          ],
+        },
+      ];
+      chatWithHistory.setHistory(newHistory);
+
+      expect(chatWithHistory.getLastPromptTokenCount()).toBeGreaterThan(
+        initialCount,
+      );
+    });
+  });
+
   describe('sendMessageStream', () => {
     it('should succeed if a tool call is followed by an empty part', async () => {
       // 1. Mock a stream that contains a tool call, then an invalid (empty) part.

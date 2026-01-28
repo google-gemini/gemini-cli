@@ -35,6 +35,7 @@ describe('ToolConfirmationMessage Redirection', () => {
 
     const { lastFrame } = renderWithProviders(
       <ToolConfirmationMessage
+        callId="test-call-id"
         confirmationDetails={confirmationDetails}
         config={mockConfig}
         availableTerminalHeight={30}
@@ -43,12 +44,6 @@ describe('ToolConfirmationMessage Redirection', () => {
     );
 
     const output = lastFrame();
-    expect(output).toContain('echo "hello" > test.txt');
-    expect(output).toContain(
-      'Note: Command contains redirection which can be undesirable.',
-    );
-    expect(output).toContain(
-      'Tip:  Toggle auto-edit (Shift+Tab) to allow redirection in the future.',
-    );
+    expect(output).toMatchSnapshot();
   });
 });
