@@ -41,6 +41,7 @@
     "@opentelemetry/sdk-node": "^0.203.0",
     "@types/glob": "^8.1.0",
     "@types/html-to-text": "^9.0.4",
+    "@types/node-notifier": "^8.0.5",
     "@xterm/headless": "5.5.0",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.0",
@@ -58,6 +59,7 @@
     "marked": "^15.0.12",
     "mime": "4.0.7",
     "mnemonist": "^0.40.3",
+    "node-notifier": "^10.0.1",
     "open": "^10.1.2",
     "picomatch": "^4.0.1",
     "read-package-up": "^11.0.0",
@@ -78,8 +80,8 @@
     "@lydell/node-pty-linux-x64": "1.1.0",
     "@lydell/node-pty-win32-arm64": "1.1.0",
     "@lydell/node-pty-win32-x64": "1.1.0",
-    "node-pty": "^1.0.0",
-    "keytar": "^7.9.0"
+    "keytar": "^7.9.0",
+    "node-pty": "^1.0.0"
   },
   "devDependencies": {
     "@google/gemini-cli-test-utils": "file:../test-utils",

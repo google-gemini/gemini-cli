@@ -43,6 +43,7 @@ const mockCoreEvents = vi.hoisted(() => ({
   off: vi.fn(),
   drainBacklogs: vi.fn(),
   emit: vi.fn(),
+  emitWindowFocusChanged: vi.fn(),
 }));
 
 // Mock IdeClient

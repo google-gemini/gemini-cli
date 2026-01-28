@@ -46,6 +46,7 @@ const PolicyRuleSchema = z.object({
     }),
   modes: z.array(z.nativeEnum(ApprovalMode)).optional(),
   allow_redirection: z.boolean().optional(),
+  notify: z.boolean().optional(),
 });
 
 /**
@@ -346,6 +347,7 @@ export async function loadPoliciesFromToml(
                   priority: transformPriority(rule.priority, tier),
                   modes: rule.modes,
                   allowRedirection: rule.allow_redirection,
+                  notify: rule.notify,
                   source: `${tierName.charAt(0).toUpperCase() + tierName.slice(1)}: ${file}`,
                 };
 

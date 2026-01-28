@@ -52,10 +52,18 @@ export class MessageBus extends EventEmitter {
       }
 
       if (message.type === MessageBusType.TOOL_CONFIRMATION_REQUEST) {
-        const { decision } = await this.policyEngine.check(
+        const { decision, rule } = await this.policyEngine.check(
           message.toolCall,
           message.serverName,
         );
+
+        if (rule?.notify) {
+          this.emitMessage({
+            type: MessageBusType.NOTIFICATION_REQUEST,
+            message: `Executing: ${message.toolCall.name}`,
+            force: true,
+          });
+        }
 
         switch (decision) {
           case PolicyDecision.ALLOW:
