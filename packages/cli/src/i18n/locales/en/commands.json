@@ -180,5 +180,21 @@
     "disableAllSuccess": "Disabled {{count}} hook successfully.",
     "disableAllSuccess_plural": "Disabled {{count}} hooks successfully.",
     "disableAllFailed": "Failed to disable hooks: {{error}}"
+  },
+  "skills.responses": {
+    "managerFailed": "Could not retrieve skill manager.",
+    "missingNameDisable": "Please provide a skill name to disable.",
+    "adminDisabled": "Agent skills are disabled by your admin.",
+    "notFound": "Skill \"{{name}}\" not found.",
+    "reloadHint": " You can run \"/skills reload\" to refresh your current instance.",
+    "missingNameEnable": "Please provide a skill name to enable.",
+    "configFailed": "Could not retrieve configuration.",
+    "reloading": "Reloading agent skills...",
+    "reloadSuccess": "Agent skills reloaded successfully.",
+    "newlyAvailable": "{{count}} newly available skill",
+    "newlyAvailable_plural": "{{count}} newly available skills",
+    "noLongerAvailable": "{{count}} skill no longer available",
+    "noLongerAvailable_plural": "{{count}} skills no longer available",
+    "reloadFailed": "Failed to reload skills: {{error}}"
   }
 }

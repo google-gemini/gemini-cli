@@ -177,5 +177,19 @@
     "allDisabled": "すべてのフックは既に無効です。",
     "disableAllSuccess": "{{count}} 個のフックを無効にしました。",
     "disableAllFailed": "フックの一括無効化に失敗しました: {{error}}"
+  },
+  "skills.responses": {
+    "managerFailed": "スキルマネージャーを取得できませんでした。",
+    "missingNameDisable": "無効にするスキル名を入力してください。",
+    "adminDisabled": "エージェントスキルは管理者によって無効にされています。",
+    "notFound": "スキル \"{{name}}\" が見つかりませんでした。",
+    "reloadHint": " \"/skills reload\" を実行して現在のインスタンスを更新できます。",
+    "missingNameEnable": "有効にするスキル名を入力してください。",
+    "configFailed": "設定を取得できませんでした。",
+    "reloading": "エージェントスキルを再読み込み中...",
+    "reloadSuccess": "エージェントスキルの再読み込みに成功しました。",
+    "newlyAvailable": "{{count}} 個のスキルが新しく利用可能になりました。",
+    "noLongerAvailable": "{{count}} 個のスキルが利用できなくなりました。",
+    "reloadFailed": "スキルの再読み込みに失敗しました: {{error}}"
   }
 }

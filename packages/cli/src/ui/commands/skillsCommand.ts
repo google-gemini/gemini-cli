@@ -10,6 +10,7 @@ import {
   type SlashCommandActionReturn,
   CommandKind,
 } from './types.js';
+import { t } from '../../i18n/index.js';
 import {
   MessageType,
   type HistoryItemSkillsList,
@@ -41,7 +42,7 @@ async function listAction(
   if (!skillManager) {
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: 'Could not retrieve skill manager.',
+      text: t('commands:skills.responses.managerFailed'),
     });
     return;
   }
@@ -74,7 +75,7 @@ async function disableAction(
   if (!skillName) {
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: 'Please provide a skill name to disable.',
+      text: t('commands:skills.responses.missingNameDisable'),
     });
     return;
   }
@@ -83,7 +84,7 @@ async function disableAction(
     context.ui.addItem(
       {
         type: MessageType.ERROR,
-        text: 'Agent skills are disabled by your admin.',
+        text: t('commands:skills.responses.adminDisabled'),
       },
       Date.now(),
     );
@@ -95,7 +96,7 @@ async function disableAction(
     context.ui.addItem(
       {
         type: MessageType.ERROR,
-        text: `Skill "${skillName}" not found.`,
+        text: t('commands:skills.responses.notFound', { name: skillName }),
       },
       Date.now(),
     );
@@ -113,8 +114,7 @@ async function disableAction(
     (label, path) => `${label} (${path})`,
   );
   if (result.status === 'success' || result.status === 'no-op') {
-    feedback +=
-      ' You can run "/skills reload" to refresh your current instance.';
+    feedback += t('commands:skills.responses.reloadHint');
   }
 
   context.ui.addItem({
@@ -131,7 +131,7 @@ async function enableAction(
   if (!skillName) {
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: 'Please provide a skill name to enable.',
+      text: t('commands:skills.responses.missingNameEnable'),
     });
     return;
   }
@@ -141,7 +141,7 @@ async function enableAction(
     context.ui.addItem(
       {
         type: MessageType.ERROR,
-        text: 'Agent skills are disabled by your admin.',
+        text: t('commands:skills.responses.adminDisabled'),
       },
       Date.now(),
     );
@@ -155,8 +155,7 @@ async function enableAction(
     (label, path) => `${label} (${path})`,
   );
   if (result.status === 'success' || result.status === 'no-op') {
-    feedback +=
-      ' You can run "/skills reload" to refresh your current instance.';
+    feedback += t('commands:skills.responses.reloadHint');
   }
 
   context.ui.addItem({
@@ -172,7 +171,7 @@ async function reloadAction(
   if (!config) {
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: 'Could not retrieve configuration.',
+      text: t('commands:skills.responses.configFailed'),
     });
     return;
   }
@@ -185,7 +184,7 @@ async function reloadAction(
   const pendingTimeout = setTimeout(() => {
     context.ui.setPendingItem({
       type: MessageType.INFO,
-      text: 'Reloading agent skills...',
+      text: t('commands:skills.responses.reloading'),
     });
     pendingItemSet = true;
   }, 100);
@@ -215,17 +214,19 @@ async function reloadAction(
       (name) => !afterNames.has(name),
     ).length;
 
-    let successText = 'Agent skills reloaded successfully.';
+    let successText = t('commands:skills.responses.reloadSuccess');
     const details: string[] = [];
 
     if (added.length > 0) {
       details.push(
-        `${added.length} newly available skill${added.length > 1 ? 's' : ''}`,
+        t('commands:skills.responses.newlyAvailable', { count: added.length }),
       );
     }
     if (removedCount > 0) {
       details.push(
-        `${removedCount} skill${removedCount > 1 ? 's' : ''} no longer available`,
+        t('commands:skills.responses.noLongerAvailable', {
+          count: removedCount,
+        }),
       );
     }
 
@@ -246,7 +247,9 @@ async function reloadAction(
     }
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: `Failed to reload skills: ${error instanceof Error ? error.message : String(error)}`,
+      text: t('commands:skills.responses.reloadFailed', {
+        error: error instanceof Error ? error.message : String(error),
+      }),
     });
   }
 }
