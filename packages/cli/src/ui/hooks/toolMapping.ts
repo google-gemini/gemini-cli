@@ -52,8 +52,10 @@ export function mapCoreStatusToDisplayStatus(
  */
 export function mapToDisplay(
   toolOrTools: ToolCall[] | ToolCall,
+  options: { borderTop?: boolean; borderBottom?: boolean } = {},
 ): HistoryItemToolGroup {
   const toolCalls = Array.isArray(toolOrTools) ? toolOrTools : [toolOrTools];
+  const { borderTop, borderBottom } = options;
 
   const toolDisplays = toolCalls.map((call): IndividualToolCallDisplay => {
     let description: string;
@@ -136,5 +138,7 @@ export function mapToDisplay(
   return {
     type: 'tool_group',
     tools: toolDisplays,
+    borderTop,
+    borderBottom,
   };
 }

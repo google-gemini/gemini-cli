@@ -53,10 +53,13 @@ export function ValidationDialog({
     (key) => {
       if (keyMatchers[Command.ESCAPE](key) || keyMatchers[Command.QUIT](key)) {
         onChoice('cancel');
+        return true;
       } else if (state === 'waiting' && keyMatchers[Command.RETURN](key)) {
         // User confirmed verification is complete - transition to 'complete' state
         setState('complete');
+        return true;
       }
+      return false;
     },
     { isActive: state !== 'complete' },
   );
