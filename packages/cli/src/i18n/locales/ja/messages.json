@@ -47,7 +47,7 @@
     },
     "queue": {
       "actionRequired": "アクションが必要",
-      "indexProgress": "{{total}} 中 {{index}}"
+      "indexProgress": "{{total}} の内 {{index}}"
     }
   },
   "diff": {

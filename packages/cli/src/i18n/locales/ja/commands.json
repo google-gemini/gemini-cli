@@ -259,6 +259,22 @@
     "alreadyAdded": "以下のディレクトリは既にワークスペースに含まれています:\n- {{directories}}",
     "showTitle": "現在のワークスペースディレクトリ:\n{{list}}"
   },
+  "rewind.responses": {
+    "fetchFailed": "会話ファイルを取得できませんでした",
+    "unknownError": "巻き戻し中に不明なエラーが発生しました",
+    "configNotFound": "設定が見つかりませんでした",
+    "clientNotInitialized": "クライアントが初期化されていません",
+    "recordingServiceUnavailable": "レコーディングサービスを利用できません",
+    "noConversationFound": "会話が見つかりませんでした。",
+    "nothingToRewind": "巻き戻す履歴がありません。",
+    "fileChangesReverted": "ファイルの変更を元に戻しました。"
+  },
+  "profile.responses": {
+    "toggled": "プロファイル表示を切り替えました。"
+  },
+  "stats.responses": {
+    "startTimeUnavailable": "セッション開始時刻が取得できないため、統計情報を計算できません。"
+  },
   "compress.responses": {
     "alreadyCompressing": "現在圧縮中です。前のリクエストが完了するまでお待ちください。",
     "failed": "チャット履歴の圧縮に失敗しました。",

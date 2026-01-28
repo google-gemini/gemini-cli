@@ -265,6 +265,22 @@
     "alreadyAdded": "The following directories are already in the workspace:\n- {{directories}}",
     "showTitle": "Current workspace directories:\n{{list}}"
   },
+  "rewind.responses": {
+    "fetchFailed": "Could not fetch conversation file",
+    "unknownError": "Unknown error during rewind",
+    "configNotFound": "Config not found",
+    "clientNotInitialized": "Client not initialized",
+    "recordingServiceUnavailable": "Recording service unavailable",
+    "noConversationFound": "No conversation found.",
+    "nothingToRewind": "Nothing to rewind to.",
+    "fileChangesReverted": "File changes reverted."
+  },
+  "profile.responses": {
+    "toggled": "Toggled profile display."
+  },
+  "stats.responses": {
+    "startTimeUnavailable": "Session start time is unavailable, cannot calculate stats."
+  },
   "compress.responses": {
     "alreadyCompressing": "Already compressing, wait for previous request to complete",
     "failed": "Failed to compress chat history.",
