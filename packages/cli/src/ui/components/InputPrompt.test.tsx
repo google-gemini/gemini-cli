@@ -23,6 +23,7 @@ import * as path from 'node:path';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import { CommandKind } from '../commands/types.js';
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { Text } from 'ink';
 import type { UseShellHistoryReturn } from '../hooks/useShellHistory.js';
 import { useShellHistory } from '../hooks/useShellHistory.js';
 import type { UseCommandCompletionReturn } from '../hooks/useCommandCompletion.js';
@@ -55,6 +56,17 @@ vi.mock('../hooks/useKittyKeyboardProtocol.js');
 vi.mock('../utils/terminalUtils.js', () => ({
   isLowColorDepth: vi.fn(() => false),
 }));
+
+// Mock ink BEFORE importing components that use it to intercept terminalCursorPosition
+vi.mock('ink', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('ink')>();
+  return {
+    ...actual,
+    Text: vi.fn(({ children, ...props }) => (
+      <actual.Text {...props}>{children}</actual.Text>
+    )),
+  };
+});
 
 const mockSlashCommands: SlashCommand[] = [
   {
@@ -1709,10 +1721,22 @@ describe('InputPrompt', () => {
           expected: `hello ${chalk.inverse('👍')} world`,
         },
         {
+          name: 'after multi-byte unicode characters',
+          text: '👍A',
+          visualCursor: [0, 1],
+          expected: `👍${chalk.inverse('A')}`,
+        },
+        {
           name: 'at the end of a line with unicode characters',
           text: 'hello 👍',
           visualCursor: [0, 8],
           expected: `hello 👍${chalk.inverse(' ')}`,
+        },
+        {
+          name: 'at the end of a short line with unicode characters',
+          text: '👍',
+          visualCursor: [0, 1],
+          expected: `👍${chalk.inverse(' ')}`,
         },
         {
           name: 'on an empty line',
@@ -3366,6 +3390,202 @@ describe('InputPrompt', () => {
         unmount();
       },
     );
+  });
+
+  describe('IME Cursor Support', () => {
+    it('should report correct cursor position for simple ASCII text', async () => {
+      const text = 'hello';
+      mockBuffer.text = text;
+      mockBuffer.lines = [text];
+      mockBuffer.viewportVisualLines = [text];
+      mockBuffer.visualToLogicalMap = [[0, 0]];
+      mockBuffer.visualCursor = [0, 3]; // Cursor after 'hel'
+      mockBuffer.visualScrollRow = 0;
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        { uiActions },
+      );
+
+      await waitFor(() => {
+        expect(stdout.lastFrame()).toContain('hello');
+      });
+
+      // Check Text calls from the LAST render
+      const textCalls = vi.mocked(Text).mock.calls;
+      const cursorLineCall = [...textCalls]
+        .reverse()
+        .find((call) => call[0].terminalCursorFocus === true);
+
+      expect(cursorLineCall).toBeDefined();
+      // 'hel' is 3 characters wide
+      expect(cursorLineCall![0].terminalCursorPosition).toBe(3);
+      unmount();
+    });
+
+    it('should report correct cursor position for text with double-width characters', async () => {
+      const text = '👍hello';
+      mockBuffer.text = text;
+      mockBuffer.lines = [text];
+      mockBuffer.viewportVisualLines = [text];
+      mockBuffer.visualToLogicalMap = [[0, 0]];
+      mockBuffer.visualCursor = [0, 2]; // Cursor after '👍h' (Note: '👍' is one code point but width 2)
+      mockBuffer.visualScrollRow = 0;
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        { uiActions },
+      );
+
+      await waitFor(() => {
+        expect(stdout.lastFrame()).toContain('👍hello');
+      });
+
+      const textCalls = vi.mocked(Text).mock.calls;
+      const cursorLineCall = [...textCalls]
+        .reverse()
+        .find((call) => call[0].terminalCursorFocus === true);
+
+      expect(cursorLineCall).toBeDefined();
+      // '👍' is width 2, 'h' is width 1. Total width = 3.
+      expect(cursorLineCall![0].terminalCursorPosition).toBe(3);
+      unmount();
+    });
+
+    it('should report correct cursor position for a line full of "😀" emojis', async () => {
+      const text = '😀😀😀';
+      mockBuffer.text = text;
+      mockBuffer.lines = [text];
+      mockBuffer.viewportVisualLines = [text];
+      mockBuffer.visualToLogicalMap = [[0, 0]];
+      mockBuffer.visualCursor = [0, 2]; // Cursor after 2 emojis (each 1 code point, width 2)
+      mockBuffer.visualScrollRow = 0;
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        { uiActions },
+      );
+
+      await waitFor(() => {
+        expect(stdout.lastFrame()).toContain('😀😀😀');
+      });
+
+      const textCalls = vi.mocked(Text).mock.calls;
+      const cursorLineCall = [...textCalls]
+        .reverse()
+        .find((call) => call[0].terminalCursorFocus === true);
+
+      expect(cursorLineCall).toBeDefined();
+      // 2 emojis * width 2 = 4
+      expect(cursorLineCall![0].terminalCursorPosition).toBe(4);
+      unmount();
+    });
+
+    it('should report correct cursor position for mixed emojis and multi-line input', async () => {
+      const lines = ['😀😀', 'hello 😀', 'world'];
+      mockBuffer.text = lines.join('\n');
+      mockBuffer.lines = lines;
+      mockBuffer.viewportVisualLines = lines;
+      mockBuffer.visualToLogicalMap = [
+        [0, 0],
+        [1, 0],
+        [2, 0],
+      ];
+      mockBuffer.visualCursor = [1, 7]; // Second line, after 'hello 😀' (6 chars + 1 emoji = 7 code points)
+      mockBuffer.visualScrollRow = 0;
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        { uiActions },
+      );
+
+      await waitFor(() => {
+        expect(stdout.lastFrame()).toContain('hello 😀');
+      });
+
+      const textCalls = vi.mocked(Text).mock.calls;
+      const lineCalls = textCalls.filter(
+        (call) => call[0].terminalCursorPosition !== undefined,
+      );
+      const lastRenderLineCalls = lineCalls.slice(-3);
+
+      const focusCall = lastRenderLineCalls.find(
+        (call) => call[0].terminalCursorFocus === true,
+      );
+      expect(focusCall).toBeDefined();
+      // 'hello ' is 6 units, '😀' is 2 units. Total = 8.
+      expect(focusCall![0].terminalCursorPosition).toBe(8);
+      unmount();
+    });
+
+    it('should report correct cursor position and focus for multi-line input', async () => {
+      const lines = ['first line', 'second line', 'third line'];
+      mockBuffer.text = lines.join('\n');
+      mockBuffer.lines = lines;
+      mockBuffer.viewportVisualLines = lines;
+      mockBuffer.visualToLogicalMap = [
+        [0, 0],
+        [1, 0],
+        [2, 0],
+      ];
+      mockBuffer.visualCursor = [1, 7]; // Cursor on second line, after 'second '
+      mockBuffer.visualScrollRow = 0;
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        { uiActions },
+      );
+
+      await waitFor(() => {
+        expect(stdout.lastFrame()).toContain('second line');
+      });
+
+      const textCalls = vi.mocked(Text).mock.calls;
+
+      // We look for the last set of line calls.
+      // Line calls have terminalCursorPosition set.
+      const lineCalls = textCalls.filter(
+        (call) => call[0].terminalCursorPosition !== undefined,
+      );
+      const lastRenderLineCalls = lineCalls.slice(-3);
+
+      expect(lastRenderLineCalls.length).toBe(3);
+
+      // Only one line should have terminalCursorFocus=true
+      const focusCalls = lastRenderLineCalls.filter(
+        (call) => call[0].terminalCursorFocus === true,
+      );
+      expect(focusCalls.length).toBe(1);
+      expect(focusCalls[0][0].terminalCursorPosition).toBe(7);
+      unmount();
+    });
+
+    it('should report cursor position 0 when input is empty and placeholder is shown', async () => {
+      mockBuffer.text = '';
+      mockBuffer.lines = [''];
+      mockBuffer.viewportVisualLines = [''];
+      mockBuffer.visualToLogicalMap = [[0, 0]];
+      mockBuffer.visualCursor = [0, 0];
+      mockBuffer.visualScrollRow = 0;
+
+      const { stdout, unmount } = renderWithProviders(
+        <InputPrompt {...props} placeholder="Type here" />,
+        { uiActions },
+      );
+
+      await waitFor(() => {
+        expect(stdout.lastFrame()).toContain('Type here');
+      });
+
+      const textCalls = vi.mocked(Text).mock.calls;
+      const cursorLineCall = [...textCalls]
+        .reverse()
+        .find((call) => call[0].terminalCursorFocus === true);
+
+      expect(cursorLineCall).toBeDefined();
+      expect(cursorLineCall![0].terminalCursorPosition).toBe(0);
+      unmount();
+    });
   });
 
   describe('image path transformation snapshots', () => {

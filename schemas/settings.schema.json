@@ -1437,9 +1437,9 @@
           "type": "boolean"
         },
         "skills": {
-          "title": "Agent Skills",
-          "description": "Enable Agent Skills (experimental).",
-          "markdownDescription": "Enable Agent Skills (experimental).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "title": "Agent Skills (Deprecated)",
+          "description": "[Deprecated] Enable Agent Skills (experimental).",
+          "markdownDescription": "[Deprecated] Enable Agent Skills (experimental).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
