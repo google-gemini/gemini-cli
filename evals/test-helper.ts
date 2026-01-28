@@ -67,7 +67,6 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
         args: evalCase.prompt,
         approvalMode: evalCase.approvalMode ?? 'yolo',
         env: {
-          GEMINI_CLI_ENABLE_ACTIVITY_LOG: 'true',
           GEMINI_CLI_ACTIVITY_LOG_FILE: activityLogFile,
         },
       });

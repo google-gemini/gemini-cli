@@ -71,10 +71,7 @@ export async function runNonInteractive({
       },
     });
 
-    if (
-      config.storage &&
-      process.env['GEMINI_CLI_ENABLE_ACTIVITY_LOG'] === 'true'
-    ) {
+    if (config.storage && process.env['GEMINI_CLI_ACTIVITY_LOG_FILE']) {
       const { registerActivityLogger } = await import(
         './utils/activityLogger.js'
       );

@@ -264,8 +264,8 @@ describe('runNonInteractive', () => {
     // so we no longer expect shutdownTelemetry to be called directly here
   });
 
-  it('should register activity logger when enabled via environment variable', async () => {
-    vi.stubEnv('GEMINI_CLI_ENABLE_ACTIVITY_LOG', 'true');
+  it('should register activity logger when GEMINI_CLI_ACTIVITY_LOG_FILE is set', async () => {
+    vi.stubEnv('GEMINI_CLI_ACTIVITY_LOG_FILE', '/tmp/test.jsonl');
     const events: ServerGeminiStreamEvent[] = [
       {
         type: GeminiEventType.Finished,
@@ -284,6 +284,29 @@ describe('runNonInteractive', () => {
     });
 
     expect(mockRegisterActivityLogger).toHaveBeenCalledWith(mockConfig);
+    vi.unstubAllEnvs();
+  });
+
+  it('should not register activity logger when GEMINI_CLI_ACTIVITY_LOG_FILE is not set', async () => {
+    vi.stubEnv('GEMINI_CLI_ACTIVITY_LOG_FILE', '');
+    const events: ServerGeminiStreamEvent[] = [
+      {
+        type: GeminiEventType.Finished,
+        value: { reason: undefined, usageMetadata: { totalTokenCount: 0 } },
+      },
+    ];
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents(events),
+    );
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: 'test',
+      prompt_id: 'prompt-id-activity-logger-off',
+    });
+
+    expect(mockRegisterActivityLogger).not.toHaveBeenCalled();
     vi.unstubAllEnvs();
   });
 

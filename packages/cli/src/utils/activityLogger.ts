@@ -329,7 +329,11 @@ export class ActivityLogger extends EventEmitter {
  * @param config The CLI configuration
  */
 export function registerActivityLogger(config: Config) {
-  if (config.storage) {
+  const isLoggingEnabled =
+    (config.isInteractive() && config.getDebugMode()) ||
+    !!process.env['GEMINI_CLI_ACTIVITY_LOG_FILE'];
+
+  if (config.storage && isLoggingEnabled) {
     const capture = ActivityLogger.getInstance();
     capture.enable();
 
