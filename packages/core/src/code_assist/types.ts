@@ -317,7 +317,7 @@ const McpSettingSchema = z.object({
 });
 
 export const FetchAdminControlsResponseSchema = z.object({
-  secureModeEnabled: z.boolean().optional(),
+  strictModeDisabled: z.boolean().optional(),
   mcpSetting: McpSettingSchema.optional(),
   cliFeatureSetting: CliFeatureSettingSchema.optional(),
 });
