@@ -484,9 +484,19 @@ console.log(JSON.stringify({
           'hooks-system.before-tool-selection.responses',
         ),
       });
-      // Create inline hook command (works on both Unix and Windows)
-      const hookCommand =
-        "node -e \"console.log(JSON.stringify({hookSpecificOutput: {hookEventName: 'BeforeToolSelection', toolConfig: {mode: 'ANY', allowedFunctionNames: ['read_file', 'run_shell_command']}}}))\"";
+
+      // Write hook script to file (inline node -e has quoting issues on Windows)
+      const hookScript = `console.log(JSON.stringify({
+  hookSpecificOutput: {
+    hookEventName: 'BeforeToolSelection',
+    toolConfig: {
+      mode: 'ANY',
+      allowedFunctionNames: ['read_file', 'run_shell_command']
+    }
+  }
+}));`;
+      const scriptPath = join(rig.testDir!, 'before_tool_selection_hook.cjs');
+      writeFileSync(scriptPath, hookScript);
 
       rig.setup('should modify tool selection with BeforeToolSelection hooks', {
         settings: {
@@ -500,7 +510,7 @@ console.log(JSON.stringify({
                 hooks: [
                   {
                     type: 'command',
-                    command: hookCommand,
+                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
                     timeout: 5000,
                   },
                 ],
