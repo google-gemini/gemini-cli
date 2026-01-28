@@ -58,6 +58,7 @@ describe('skillsCommand', () => {
                 (name: string) => skills.find((s) => s.name === name) ?? null,
               ),
           }),
+          getContentGenerator: vi.fn(),
         } as unknown as Config,
         settings: {
           merged: createTestMergedSettings({ skills: { disabled: [] } }),
@@ -367,7 +368,7 @@ describe('skillsCommand', () => {
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.ERROR,
-          text: 'Agent skills are disabled by your admin.',
+          text: 'Agent skills is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
         }),
         expect.any(Number),
       );
@@ -385,7 +386,7 @@ describe('skillsCommand', () => {
       expect(context.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.ERROR,
-          text: 'Agent skills are disabled by your admin.',
+          text: 'Agent skills is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
         }),
         expect.any(Number),
       );

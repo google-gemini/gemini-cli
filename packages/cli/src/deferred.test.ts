@@ -86,7 +86,7 @@ describe('deferred', () => {
       await runDeferredCommand(settings);
 
       expect(mockDebugLogger.error).toHaveBeenCalledWith(
-        'Error: MCP is disabled by your admin.',
+        'Error: MCP is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
       );
       expect(mockRunExitCleanup).toHaveBeenCalled();
       expect(mockExit).toHaveBeenCalledWith(ExitCodes.FATAL_CONFIG_ERROR);
@@ -103,7 +103,7 @@ describe('deferred', () => {
       await runDeferredCommand(settings);
 
       expect(mockDebugLogger.error).toHaveBeenCalledWith(
-        'Error: Extensions are disabled by your admin.',
+        'Error: Extensions is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
       );
       expect(mockRunExitCleanup).toHaveBeenCalled();
       expect(mockExit).toHaveBeenCalledWith(ExitCodes.FATAL_CONFIG_ERROR);
@@ -120,7 +120,7 @@ describe('deferred', () => {
       await runDeferredCommand(settings);
 
       expect(mockDebugLogger.error).toHaveBeenCalledWith(
-        'Error: Agent skills are disabled by your admin.',
+        'Error: Agent skills is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
       );
       expect(mockRunExitCleanup).toHaveBeenCalled();
       expect(mockExit).toHaveBeenCalledWith(ExitCodes.FATAL_CONFIG_ERROR);
@@ -184,7 +184,7 @@ describe('deferred', () => {
       await runDeferredCommand(mcpSettings);
 
       expect(mockDebugLogger.error).toHaveBeenCalledWith(
-        'Error: MCP is disabled by your admin.',
+        'Error: MCP is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
       );
     });
 
