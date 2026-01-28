@@ -5,38 +5,28 @@
  */
 
 import fs from 'node:fs';
-import path from 'node:path';
 import ignore from 'ignore';
 import picomatch from 'picomatch';
+import type { FileDiscoveryService } from '../../services/fileDiscoveryService.js';
 
 const hasFileExtension = picomatch('**/*[*.]*');
 
-export interface LoadIgnoreRulesOptions {
-  projectRoot: string;
-  useGitignore: boolean;
-  useGeminiignore: boolean;
-  ignoreDirs: string[];
-}
-
-export function loadIgnoreRules(options: LoadIgnoreRulesOptions): Ignore {
+export function loadIgnoreRules(
+  service: FileDiscoveryService,
+  ignoreDirs: string[] = [],
+): Ignore {
   const ignorer = new Ignore();
-  if (options.useGitignore) {
-    const gitignorePath = path.join(options.projectRoot, '.gitignore');
-    if (fs.existsSync(gitignorePath)) {
-      ignorer.add(fs.readFileSync(gitignorePath, 'utf8'));
+  const ignoreFiles = service.getAllIgnoreFilePaths();
+
+  for (const filePath of ignoreFiles) {
+    if (fs.existsSync(filePath)) {
+      ignorer.add(fs.readFileSync(filePath, 'utf8'));
     }
   }
 
-  if (options.useGeminiignore) {
-    const geminiignorePath = path.join(options.projectRoot, '.geminiignore');
-    if (fs.existsSync(geminiignorePath)) {
-      ignorer.add(fs.readFileSync(geminiignorePath, 'utf8'));
-    }
-  }
-
-  const ignoreDirs = ['.git', ...options.ignoreDirs];
+  const allIgnoreDirs = ['.git', ...ignoreDirs];
   ignorer.add(
-    ignoreDirs.map((dir) => {
+    allIgnoreDirs.map((dir) => {
       if (dir.endsWith('/')) {
         return dir;
       }

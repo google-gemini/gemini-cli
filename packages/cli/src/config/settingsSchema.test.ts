@@ -107,6 +107,14 @@ describe('SettingsSchema', () => {
         getSettingsSchema().context.properties.fileFiltering.properties
           ?.enableRecursiveFileSearch,
       ).toBeDefined();
+      expect(
+        getSettingsSchema().context.properties.fileFiltering.properties
+          ?.customIgnoreFilePaths,
+      ).toBeDefined();
+      expect(
+        getSettingsSchema().context.properties.fileFiltering.properties
+          ?.customIgnoreFilePaths.type,
+      ).toBe('array');
     });
 
     it('should have unique categories', () => {
