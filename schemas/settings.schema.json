@@ -302,13 +302,6 @@
           "default": false,
           "type": "boolean"
         },
-        "useFullWidth": {
-          "title": "Use Full Width",
-          "description": "Use the entire width of the terminal for output.",
-          "markdownDescription": "Use the entire width of the terminal for output.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
-          "default": true,
-          "type": "boolean"
-        },
         "useAlternateBuffer": {
           "title": "Use Alternate Screen Buffer",
           "description": "Use an alternate screen buffer for the UI, preserving shell history.",
@@ -316,10 +309,24 @@
           "default": false,
           "type": "boolean"
         },
+        "useBackgroundColor": {
+          "title": "Use Background Color",
+          "description": "Whether to use background colors in the UI.",
+          "markdownDescription": "Whether to use background colors in the UI.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "incrementalRendering": {
           "title": "Incremental Rendering",
           "description": "Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled.",
           "markdownDescription": "Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "showSpinner": {
+          "title": "Show Spinner",
+          "description": "Show the spinner during operations.",
+          "markdownDescription": "Show the spinner during operations.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
@@ -1023,6 +1030,16 @@
               "markdownDescription": "Enable fuzzy search when searching for files.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
               "type": "boolean"
+            },
+            "customIgnoreFilePaths": {
+              "title": "Custom Ignore File Paths",
+              "description": "Additional ignore file paths to respect. These files take precedence over .geminiignore and .gitignore. Files earlier in the array take precedence over files later in the array, e.g. the first file takes precedence over the second one.",
+              "markdownDescription": "Additional ignore file paths to respect. These files take precedence over .geminiignore and .gitignore. Files earlier in the array take precedence over files later in the array, e.g. the first file takes precedence over the second one.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `[]`",
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           },
           "additionalProperties": false
@@ -1426,13 +1443,6 @@
           "title": "JIT Context Loading",
           "description": "Enable Just-In-Time (JIT) context loading.",
           "markdownDescription": "Enable Just-In-Time (JIT) context loading.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
-          "type": "boolean"
-        },
-        "skills": {
-          "title": "Agent Skills",
-          "description": "Enable Agent Skills (experimental).",
-          "markdownDescription": "Enable Agent Skills (experimental).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },

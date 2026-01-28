@@ -36,6 +36,7 @@ import {
   type SerializableConfirmationDetails,
   type ToolConfirmationRequest,
 } from '../confirmation-bus/types.js';
+import { runWithToolCallContext } from '../utils/toolCallContext.js';
 
 interface SchedulerQueueItem {
   requests: ToolCallRequestInfo[];
@@ -48,6 +49,8 @@ export interface SchedulerOptions {
   config: Config;
   messageBus: MessageBus;
   getPreferredEditor: () => EditorType | undefined;
+  schedulerId: string;
+  parentCallId?: string;
 }
 
 const createErrorResponse = (
@@ -85,6 +88,8 @@ export class Scheduler {
   private readonly config: Config;
   private readonly messageBus: MessageBus;
   private readonly getPreferredEditor: () => EditorType | undefined;
+  private readonly schedulerId: string;
+  private readonly parentCallId?: string;
 
   private isProcessing = false;
   private isCancelling = false;
@@ -94,7 +99,13 @@ export class Scheduler {
     this.config = options.config;
     this.messageBus = options.messageBus;
     this.getPreferredEditor = options.getPreferredEditor;
-    this.state = new SchedulerStateManager(this.messageBus);
+    this.schedulerId = options.schedulerId;
+    this.parentCallId = options.parentCallId;
+    this.state = new SchedulerStateManager(
+      this.messageBus,
+      this.schedulerId,
+      (call) => logToolCall(this.config, new ToolCallEvent(call)),
+    );
     this.executor = new ToolExecutor(this.config);
     this.modifier = new ToolModificationHandler();
 
@@ -228,16 +239,21 @@ export class Scheduler {
     try {
       const toolRegistry = this.config.getToolRegistry();
       const newCalls: ToolCall[] = requests.map((request) => {
+        const enrichedRequest: ToolCallRequestInfo = {
+          ...request,
+          schedulerId: this.schedulerId,
+          parentCallId: this.parentCallId,
+        };
         const tool = toolRegistry.getTool(request.name);
 
         if (!tool) {
           return this._createToolNotFoundErroredToolCall(
-            request,
+            enrichedRequest,
             toolRegistry.getAllToolNames(),
           );
         }
 
-        return this._validateAndCreateToolCall(request, tool);
+        return this._validateAndCreateToolCall(enrichedRequest, tool);
       });
 
       this.state.enqueue(newCalls);
@@ -245,6 +261,7 @@ export class Scheduler {
       return this.state.completedBatch;
     } finally {
       this.isProcessing = false;
+      this.state.clearBatch();
       this._processNextInRequestQueue();
     }
   }
@@ -263,6 +280,7 @@ export class Scheduler {
         ToolErrorType.TOOL_NOT_REGISTERED,
       ),
       durationMs: 0,
+      schedulerId: this.schedulerId,
     };
   }
 
@@ -270,28 +288,39 @@ export class Scheduler {
     request: ToolCallRequestInfo,
     tool: AnyDeclarativeTool,
   ): ValidatingToolCall | ErroredToolCall {
-    try {
-      const invocation = tool.build(request.args);
-      return {
-        status: 'validating',
-        request,
-        tool,
-        invocation,
-        startTime: Date.now(),
-      };
-    } catch (e) {
-      return {
-        status: 'error',
-        request,
-        tool,
-        response: createErrorResponse(
-          request,
-          e instanceof Error ? e : new Error(String(e)),
-          ToolErrorType.INVALID_TOOL_PARAMS,
-        ),
-        durationMs: 0,
-      };
-    }
+    return runWithToolCallContext(
+      {
+        callId: request.callId,
+        schedulerId: this.schedulerId,
+        parentCallId: this.parentCallId,
+      },
+      () => {
+        try {
+          const invocation = tool.build(request.args);
+          return {
+            status: 'validating',
+            request,
+            tool,
+            invocation,
+            startTime: Date.now(),
+            schedulerId: this.schedulerId,
+          };
+        } catch (e) {
+          return {
+            status: 'error',
+            request,
+            tool,
+            response: createErrorResponse(
+              request,
+              e instanceof Error ? e : new Error(String(e)),
+              ToolErrorType.INVALID_TOOL_PARAMS,
+            ),
+            durationMs: 0,
+            schedulerId: this.schedulerId,
+          };
+        }
+      },
+    );
   }
 
   // --- Phase 2: Processing Loop ---
@@ -363,16 +392,6 @@ export class Scheduler {
       }
     }
 
-    // Fetch the updated call from state before finalizing to capture the
-    // terminal status.
-    const terminalCall = this.state.getToolCall(active.request.callId);
-    if (terminalCall && this.isTerminal(terminalCall.status)) {
-      logToolCall(
-        this.config,
-        new ToolCallEvent(terminalCall as CompletedToolCall),
-      );
-    }
-
     this.state.finalizeCall(active.request.callId);
   }
 
@@ -397,6 +416,7 @@ export class Scheduler {
           ToolErrorType.POLICY_VIOLATION,
         ),
       );
+      this.state.finalizeCall(callId);
       return;
     }
 
@@ -411,6 +431,7 @@ export class Scheduler {
         state: this.state,
         modifier: this.modifier,
         getPreferredEditor: this.getPreferredEditor,
+        schedulerId: this.schedulerId,
       });
       outcome = result.outcome;
       lastDetails = result.lastDetails;
@@ -427,6 +448,7 @@ export class Scheduler {
     // Handle cancellation (cascades to entire batch)
     if (outcome === ToolConfirmationOutcome.Cancel) {
       this.state.updateStatus(callId, 'cancelled', 'User denied execution.');
+      this.state.finalizeCall(callId);
       this.state.cancelAllQueued('User cancelled operation');
       return; // Skip execution
     }
@@ -445,17 +467,29 @@ export class Scheduler {
     if (signal.aborted) throw new Error('Operation cancelled');
     this.state.updateStatus(callId, 'executing');
 
-    const result = await this.executor.execute({
-      call: this.state.firstActiveCall as ExecutingToolCall,
-      signal,
-      outputUpdateHandler: (id, out) =>
-        this.state.updateStatus(id, 'executing', { liveOutput: out }),
-      onUpdateToolCall: (updated) => {
-        if (updated.status === 'executing' && updated.pid) {
-          this.state.updateStatus(callId, 'executing', { pid: updated.pid });
-        }
+    const activeCall = this.state.firstActiveCall as ExecutingToolCall;
+
+    const result = await runWithToolCallContext(
+      {
+        callId: activeCall.request.callId,
+        schedulerId: this.schedulerId,
+        parentCallId: this.parentCallId,
       },
-    });
+      () =>
+        this.executor.execute({
+          call: activeCall,
+          signal,
+          outputUpdateHandler: (id, out) =>
+            this.state.updateStatus(id, 'executing', { liveOutput: out }),
+          onUpdateToolCall: (updated) => {
+            if (updated.status === 'executing' && updated.pid) {
+              this.state.updateStatus(callId, 'executing', {
+                pid: updated.pid,
+              });
+            }
+          },
+        }),
+    );
 
     if (result.status === 'success') {
       this.state.updateStatus(callId, 'success', result.response);

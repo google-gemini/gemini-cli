@@ -4,29 +4,128 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { useTabbedNavigation } from './useTabbedNavigation.js';
+import { useKeypress } from './useKeypress.js';
+import type { Key, KeypressHandler } from '../contexts/KeypressContext.js';
 
 vi.mock('./useKeypress.js', () => ({
   useKeypress: vi.fn(),
 }));
 
+const createKey = (partial: Partial<Key>): Key => ({
+  name: partial.name || '',
+  sequence: partial.sequence || '',
+  shift: partial.shift || false,
+  alt: partial.alt || false,
+  ctrl: partial.ctrl || false,
+  cmd: partial.cmd || false,
+  insertable: partial.insertable || false,
+  ...partial,
+});
+
 vi.mock('../keyMatchers.js', () => ({
   keyMatchers: {
     'cursor.left': vi.fn((key) => key.name === 'left'),
     'cursor.right': vi.fn((key) => key.name === 'right'),
+    'dialog.next': vi.fn((key) => key.name === 'tab' && !key.shift),
+    'dialog.previous': vi.fn((key) => key.name === 'tab' && key.shift),
   },
   Command: {
     MOVE_LEFT: 'cursor.left',
     MOVE_RIGHT: 'cursor.right',
+    DIALOG_NEXT: 'dialog.next',
+    DIALOG_PREV: 'dialog.previous',
   },
 }));
 
 describe('useTabbedNavigation', () => {
+  let capturedHandler: KeypressHandler;
+
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.mocked(useKeypress).mockImplementation((handler) => {
+      capturedHandler = handler;
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('keyboard navigation', () => {
+    it('moves to next tab on Right arrow', () => {
+      const { result } = renderHook(() =>
+        useTabbedNavigation({ tabCount: 3, enableArrowNavigation: true }),
+      );
+
+      act(() => {
+        capturedHandler(createKey({ name: 'right' }));
+      });
+
+      expect(result.current.currentIndex).toBe(1);
+    });
+
+    it('moves to previous tab on Left arrow', () => {
+      const { result } = renderHook(() =>
+        useTabbedNavigation({
+          tabCount: 3,
+          initialIndex: 1,
+          enableArrowNavigation: true,
+        }),
+      );
+
+      act(() => {
+        capturedHandler(createKey({ name: 'left' }));
+      });
+
+      expect(result.current.currentIndex).toBe(0);
+    });
+
+    it('moves to next tab on Tab key', () => {
+      const { result } = renderHook(() =>
+        useTabbedNavigation({ tabCount: 3, enableTabKey: true }),
+      );
+
+      act(() => {
+        capturedHandler(createKey({ name: 'tab', shift: false }));
+      });
+
+      expect(result.current.currentIndex).toBe(1);
+    });
+
+    it('moves to previous tab on Shift+Tab key', () => {
+      const { result } = renderHook(() =>
+        useTabbedNavigation({
+          tabCount: 3,
+          initialIndex: 1,
+          enableTabKey: true,
+        }),
+      );
+
+      act(() => {
+        capturedHandler(createKey({ name: 'tab', shift: true }));
+      });
+
+      expect(result.current.currentIndex).toBe(0);
+    });
+
+    it('does not navigate when isNavigationBlocked returns true', () => {
+      const { result } = renderHook(() =>
+        useTabbedNavigation({
+          tabCount: 3,
+          enableArrowNavigation: true,
+          isNavigationBlocked: () => true,
+        }),
+      );
+
+      act(() => {
+        capturedHandler(createKey({ name: 'right' }));
+      });
+
+      expect(result.current.currentIndex).toBe(0);
+    });
   });
 
   describe('initialization', () => {

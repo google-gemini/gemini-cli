@@ -16,7 +16,6 @@ import { SettingsContext } from '../ui/contexts/SettingsContext.js';
 import { ShellFocusContext } from '../ui/contexts/ShellFocusContext.js';
 import { UIStateContext, type UIState } from '../ui/contexts/UIStateContext.js';
 import { ConfigContext } from '../ui/contexts/ConfigContext.js';
-import { calculateMainAreaWidth } from '../ui/utils/ui-sizing.js';
 import { VimModeProvider } from '../ui/contexts/VimModeContext.js';
 import { MouseProvider } from '../ui/contexts/MouseContext.js';
 import { ScrollProvider } from '../ui/contexts/ScrollProvider.js';
@@ -27,6 +26,7 @@ import {
 } from '../ui/contexts/UIActionsContext.js';
 import { type HistoryItemToolGroup, StreamingState } from '../ui/types.js';
 import { ToolActionsProvider } from '../ui/contexts/ToolActionsContext.js';
+import { AskUserActionsProvider } from '../ui/contexts/AskUserActionsContext.js';
 
 import { makeFakeConfig, type Config } from '@google/gemini-cli-core';
 import { FakePersistentState } from './persistentStateFake.js';
@@ -36,6 +36,12 @@ export const persistentStateMock = new FakePersistentState();
 
 vi.mock('../utils/persistentState.js', () => ({
   persistentState: persistentStateMock,
+}));
+
+vi.mock('../ui/utils/terminalUtils.js', () => ({
+  isLowColorDepth: vi.fn(() => false),
+  getColorDepth: vi.fn(() => 24),
+  isITerm2: vi.fn(() => false),
 }));
 
 // Wrapper around ink-testing-library's render that ensures act() is called
@@ -147,7 +153,6 @@ export const createMockSettings = (
 const baseMockUiState = {
   renderMarkdown: true,
   streamingState: StreamingState.Idle,
-  mainAreaWidth: 100,
   terminalWidth: 120,
   terminalHeight: 40,
   currentModel: 'gemini-pro',
@@ -198,6 +203,7 @@ const mockUIActions: UIActions = {
   setEmbeddedShellFocused: vi.fn(),
   setAuthContext: vi.fn(),
   handleRestart: vi.fn(),
+  handleNewAgentsSelect: vi.fn(),
 };
 
 export const renderWithProviders = (
@@ -268,7 +274,7 @@ export const renderWithProviders = (
     });
   }
 
-  const mainAreaWidth = calculateMainAreaWidth(terminalWidth, finalSettings);
+  const mainAreaWidth = terminalWidth;
 
   const finalUiState = {
     ...baseState,
@@ -295,20 +301,28 @@ export const renderWithProviders = (
                       config={config}
                       toolCalls={allToolCalls}
                     >
-                      <KeypressProvider>
-                        <MouseProvider mouseEventsEnabled={mouseEventsEnabled}>
-                          <ScrollProvider>
-                            <Box
-                              width={terminalWidth}
-                              flexShrink={0}
-                              flexGrow={0}
-                              flexDirection="column"
-                            >
-                              {component}
-                            </Box>
-                          </ScrollProvider>
-                        </MouseProvider>
-                      </KeypressProvider>
+                      <AskUserActionsProvider
+                        request={null}
+                        onSubmit={vi.fn()}
+                        onCancel={vi.fn()}
+                      >
+                        <KeypressProvider>
+                          <MouseProvider
+                            mouseEventsEnabled={mouseEventsEnabled}
+                          >
+                            <ScrollProvider>
+                              <Box
+                                width={terminalWidth}
+                                flexShrink={0}
+                                flexGrow={0}
+                                flexDirection="column"
+                              >
+                                {component}
+                              </Box>
+                            </ScrollProvider>
+                          </MouseProvider>
+                        </KeypressProvider>
+                      </AskUserActionsProvider>
                     </ToolActionsProvider>
                   </UIActionsContext.Provider>
                 </StreamingContext.Provider>
@@ -402,10 +416,13 @@ export function renderHookWithProviders<Result, Props>(
   const result = { current: undefined as unknown as Result };
 
   let setPropsFn: ((props: Props) => void) | undefined;
+  let forceUpdateFn: (() => void) | undefined;
 
   function TestComponent({ initialProps }: { initialProps: Props }) {
     const [props, setProps] = useState(initialProps);
+    const [, forceUpdate] = useState(0);
     setPropsFn = setProps;
+    forceUpdateFn = () => forceUpdate((n) => n + 1);
     result.current = renderCallback(props);
     return null;
   }
@@ -425,8 +442,10 @@ export function renderHookWithProviders<Result, Props>(
 
   function rerender(newProps?: Props) {
     act(() => {
-      if (setPropsFn && newProps) {
-        setPropsFn(newProps);
+      if (arguments.length > 0 && setPropsFn) {
+        setPropsFn(newProps as Props);
+      } else if (forceUpdateFn) {
+        forceUpdateFn();
       }
     });
   }

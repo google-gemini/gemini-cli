@@ -8,6 +8,8 @@ import path from 'node:path';
 import os from 'node:os';
 import process from 'node:process';
 import * as crypto from 'node:crypto';
+import * as fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 export const GEMINI_DIR = '.gemini';
 export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
@@ -342,4 +344,35 @@ export function isSubpath(parentPath: string, childPath: string): boolean {
     relative !== '..' &&
     !pathModule.isAbsolute(relative)
   );
+}
+
+/**
+ * Resolves a path to its real path, sanitizing it first.
+ * - Removes 'file://' protocol if present.
+ * - Decodes URI components (e.g. %20 -> space).
+ * - Resolves symbolic links using fs.realpathSync.
+ *
+ * @param pathStr The path string to resolve.
+ * @returns The resolved real path.
+ */
+export function resolveToRealPath(path: string): string {
+  let resolvedPath = path;
+
+  try {
+    if (resolvedPath.startsWith('file://')) {
+      resolvedPath = fileURLToPath(resolvedPath);
+    }
+
+    resolvedPath = decodeURIComponent(resolvedPath);
+  } catch (_e) {
+    // Ignore error (e.g. malformed URI), keep path from previous step
+  }
+
+  try {
+    return fs.realpathSync(resolvedPath);
+  } catch (_e) {
+    // If realpathSync fails, it might be because the path doesn't exist.
+    // In that case, we can fall back to the path processed.
+    return resolvedPath;
+  }
 }

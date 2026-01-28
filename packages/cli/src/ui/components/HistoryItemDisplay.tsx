@@ -67,7 +67,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         <UserMessage text={itemForDisplay.text} width={terminalWidth} />
       )}
       {itemForDisplay.type === 'user_shell' && (
-        <UserShellMessage text={itemForDisplay.text} />
+        <UserShellMessage text={itemForDisplay.text} width={terminalWidth} />
       )}
       {itemForDisplay.type === 'gemini' && (
         <GeminiMessage
@@ -141,6 +141,8 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           isFocused={isFocused}
           activeShellPtyId={activeShellPtyId}
           embeddedShellFocused={embeddedShellFocused}
+          borderTop={itemForDisplay.borderTop}
+          borderBottom={itemForDisplay.borderBottom}
         />
       )}
       {itemForDisplay.type === 'compression' && (
