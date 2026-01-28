@@ -10,6 +10,7 @@ import type {
   CommandContext,
 } from './types.js';
 import { CommandKind } from './types.js';
+import { t } from '../../i18n/index.js';
 import type { MessageActionReturn } from '@google/gemini-cli-core';
 import {
   DiscoveredMCPTool,
@@ -48,7 +49,7 @@ const authCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Config not loaded.',
+        content: t('commands:mcp.responses.configNotLoaded'),
       };
     }
 
@@ -75,14 +76,16 @@ const authCommand: SlashCommand = {
         return {
           type: 'message',
           messageType: 'info',
-          content: 'No MCP servers configured with OAuth authentication.',
+          content: t('commands:mcp.responses.noOauthServers'),
         };
       }
 
       return {
         type: 'message',
         messageType: 'info',
-        content: `MCP servers with OAuth authentication:\n${allOAuthServers.map((s) => `  - ${s}`).join('\n')}\n\nUse /mcp auth <server-name> to authenticate.`,
+        content: t('commands:mcp.responses.oauthServersList', {
+          servers: allOAuthServers.map((s) => `  - ${s}`).join('\n'),
+        }),
       };
     }
 
@@ -91,7 +94,7 @@ const authCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: `MCP server '${serverName}' not found.`,
+        content: t('commands:mcp.responses.notFound', { name: serverName }),
       };
     }
 
@@ -106,7 +109,7 @@ const authCommand: SlashCommand = {
     try {
       context.ui.addItem({
         type: 'info',
-        text: `Starting OAuth authentication for MCP server '${serverName}'...`,
+        text: t('commands:mcp.responses.authStarting', { name: serverName }),
       });
 
       // Import dynamically to avoid circular dependencies
@@ -123,7 +126,7 @@ const authCommand: SlashCommand = {
 
       context.ui.addItem({
         type: 'info',
-        text: `✅ Successfully authenticated with MCP server '${serverName}'!`,
+        text: t('commands:mcp.responses.authSuccess', { name: serverName }),
       });
 
       // Trigger tool re-discovery to pick up authenticated server
@@ -131,7 +134,9 @@ const authCommand: SlashCommand = {
       if (mcpClientManager) {
         context.ui.addItem({
           type: 'info',
-          text: `Restarting MCP server '${serverName}'...`,
+          text: t('commands:mcp.responses.restartingServer', {
+            name: serverName,
+          }),
         });
         await mcpClientManager.restartServer(serverName);
       }
@@ -147,13 +152,18 @@ const authCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: `Successfully authenticated and refreshed tools for '${serverName}'.`,
+        content: t('commands:mcp.responses.refreshSuccess', {
+          name: serverName,
+        }),
       };
     } catch (error) {
       return {
         type: 'message',
         messageType: 'error',
-        content: `Failed to authenticate with MCP server '${serverName}': ${getErrorMessage(error)}`,
+        content: t('commands:mcp.responses.authFailed', {
+          name: serverName,
+          error: getErrorMessage(error),
+        }),
       };
     } finally {
       coreEvents.removeListener(CoreEvent.OauthDisplayMessage, displayListener);
@@ -180,7 +190,7 @@ const listAction = async (
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Config not loaded.',
+      content: t('commands:mcp.responses.configNotLoaded'),
     };
   }
 
@@ -189,7 +199,7 @@ const listAction = async (
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Could not retrieve tool registry.',
+      content: t('commands:mcp.responses.registryFailed'),
     };
   }
 
@@ -324,7 +334,7 @@ const refreshCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Config not loaded.',
+        content: t('commands:mcp.responses.configNotLoaded'),
       };
     }
 
@@ -333,13 +343,13 @@ const refreshCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Could not retrieve mcp client manager.',
+        content: t('commands:mcp.responses.managerFailed'),
       };
     }
 
     context.ui.addItem({
       type: 'info',
-      text: 'Restarting MCP servers...',
+      text: t('commands:mcp.responses.restartingAll'),
     });
 
     await mcpClientManager.restart();
@@ -367,7 +377,7 @@ async function handleEnableDisable(
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Config not loaded.',
+      content: t('commands:mcp.responses.configNotLoaded'),
     };
   }
 
@@ -380,7 +390,9 @@ async function handleEnableDisable(
     return {
       type: 'message',
       messageType: 'error',
-      content: `Server name required. Usage: /mcp ${action} <server-name> [--session]`,
+      content: t('commands:mcp.responses.usageEnableDisable', {
+        command: action,
+      }),
     };
   }
 
@@ -393,7 +405,7 @@ async function handleEnableDisable(
     return {
       type: 'message',
       messageType: 'error',
-      content: `Server '${serverName}' not found. Use /mcp list to see available servers.`,
+      content: t('commands:mcp.responses.serverNotFound', { name: serverName }),
     };
   }
 
@@ -413,7 +425,7 @@ async function handleEnableDisable(
       return {
         type: 'message',
         messageType: 'error',
-        content: result.reason ?? 'Blocked by settings.',
+        content: result.reason ?? t('commands:mcp.responses.blockedBySettings'),
       };
     }
     if (isSession) {
@@ -425,7 +437,7 @@ async function handleEnableDisable(
       context.ui.addItem(
         {
           type: 'warning',
-          text: 'MCP disabled by admin. Will load when enabled.',
+          text: t('commands:mcp.responses.disabledByAdmin'),
         },
         Date.now(),
       );
@@ -438,12 +450,16 @@ async function handleEnableDisable(
     }
   }
 
-  const msg = `MCP server '${name}' ${enable ? 'enabled' : 'disabled'}${isSession ? ' for this session' : ''}.`;
+  const msg = t('commands:mcp.responses.statusChanged', {
+    name,
+    status: enable ? 'enabled' : 'disabled',
+    session: isSession ? ' for this session' : '',
+  });
 
   const mcpClientManager = config.getMcpClientManager();
   if (mcpClientManager) {
     context.ui.addItem(
-      { type: 'info', text: 'Restarting MCP servers...' },
+      { type: 'info', text: t('commands:mcp.responses.restartingAll') },
       Date.now(),
     );
     await mcpClientManager.restart();

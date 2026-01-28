@@ -122,5 +122,24 @@
     "uninstalling": "Uninstalling extension \"{{name}}\"...",
     "uninstallSuccess": "Extension \"{{name}}\" uninstalled successfully.",
     "uninstallFailed": "Failed to uninstall extension \"{{name}}\": {{error}}"
+  },
+  "mcp.responses": {
+    "configNotLoaded": "Config not loaded.",
+    "noOauthServers": "No MCP servers configured with OAuth authentication.",
+    "oauthServersList": "MCP servers with OAuth authentication:\n{{servers}}\n\nUse /mcp auth <server-name> to authenticate.",
+    "notFound": "MCP server '{{name}}' not found.",
+    "authStarting": "Starting OAuth authentication for MCP server '{{name}}'...",
+    "authSuccess": "✅ Successfully authenticated with MCP server '{{name}}'!",
+    "restartingServer": "Restarting MCP server '{{name}}'...",
+    "refreshSuccess": "Successfully authenticated and refreshed tools for '{{name}}'.",
+    "authFailed": "Failed to authenticate with MCP server '{{name}}': {{error}}",
+    "registryFailed": "Could not retrieve tool registry.",
+    "managerFailed": "Could not retrieve mcp client manager.",
+    "restartingAll": "Restarting MCP servers...",
+    "usageEnableDisable": "Server name required. Usage: /mcp {{command}} <server-name> [--session]",
+    "serverNotFound": "Server '{{name}}' not found. Use /mcp list to see available servers.",
+    "blockedBySettings": "Blocked by settings.",
+    "disabledByAdmin": "MCP disabled by admin. Will load when enabled.",
+    "statusChanged": "MCP server '{{name}}' {{status}}{{session}}."
   }
 }

@@ -120,5 +120,24 @@
     "uninstalling": "拡張機能 \"{{name}}\" をアンインストール中...",
     "uninstallSuccess": "拡張機能 \"{{name}}\" が正常にアンインストールされました。",
     "uninstallFailed": "拡張機能 \"{{name}}\" のアンインストールに失敗しました: {{error}}"
+  },
+  "mcp.responses": {
+    "configNotLoaded": "設定が読み込まれていません。",
+    "noOauthServers": "OAuth 認証が設定されている MCP サーバーはありません。",
+    "oauthServersList": "OAuth 認証が設定されている MCP サーバー:\n{{servers}}\n\n/mcp auth <server-name> を使用して認証してください。",
+    "notFound": "MCP サーバー '{{name}}' が見つかりませんでした。",
+    "authStarting": "MCP サーバー '{{name}}' の OAuth 認証を開始しています...",
+    "authSuccess": "✅ MCP サーバー '{{name}}' との認証に成功しました！",
+    "restartingServer": "MCP サーバー '{{name}}' を再起動しています...",
+    "refreshSuccess": "'{{name}}' の認証に成功し、ツールを更新しました。",
+    "authFailed": "MCP サーバー '{{name}}' との認証に失敗しました: {{error}}",
+    "registryFailed": "ツールレジストリを取得できませんでした。",
+    "managerFailed": "MCP クライアントマネージャーを取得できませんでした。",
+    "restartingAll": "MCP サーバーを再起動しています...",
+    "usageEnableDisable": "サーバー名が必要です。使用法: /mcp {{command}} <server-name> [--session]",
+    "serverNotFound": "サーバー '{{name}}' が見つかりませんでした。/mcp list を使用して利用可能なサーバーを確認してください。",
+    "blockedBySettings": "設定によりブロックされました。",
+    "disabledByAdmin": "管理者によって MCP が無効にされています。有効になると読み込まれます。",
+    "statusChanged": "MCP サーバー '{{name}}' を{{status}}にしました{{session}}。"
   }
 }
