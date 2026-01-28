@@ -99,6 +99,46 @@
     "lastLinesHidden": "... last {{count}} line hidden ...",
     "lastLinesHidden_plural": "... last {{count}} lines hidden ..."
   },
+  "mcpStatus": {
+    "noServers": "No MCP servers configured.",
+    "documentationPrefix": "Please view MCP documentation in your browser: ",
+    "documentationSuffix": " or use the cli /docs command",
+    "startingUp": "⏳ MCP servers are starting up ({{count}} initializing)...",
+    "startupNote": "Note: First startup may take longer. Tool availability will update automatically.",
+    "configuredServers": "Configured MCP servers:",
+    "serverFrom": " (from {{name}})",
+    "status": {
+      "disabledSession": "Disabled (session)",
+      "disabled": "Disabled",
+      "ready": "Ready",
+      "starting": "Starting... (first startup may take longer)",
+      "disconnected": "Disconnected",
+      "blocked": "Blocked"
+    },
+    "counts": {
+      "tool": "{{count}} tool",
+      "tool_plural": "{{count}} tools",
+      "prompt": "{{count}} prompt",
+      "prompt_plural": "{{count}} prompts",
+      "resource": "{{count}} resource",
+      "resource_plural": "{{count}} resources"
+    },
+    "auth": {
+      "oauth": " (OAuth)",
+      "oauthExpired": " (OAuth expired)",
+      "oauthNotAuthenticated": " (OAuth not authenticated)"
+    },
+    "readyHint": " (tools and prompts will appear when ready)",
+    "cachedHint": " ({{count}} tools cached)",
+    "labels": {
+      "tools": "Tools:",
+      "prompts": "Prompts:",
+      "resources": "Resources:",
+      "parameters": "Parameters:",
+      "resource": "resource",
+      "hidden": "  ... {{count}} {{name}} hidden"
+    }
+  },
   "screenReader": {
     "userPrefix": "User: ",
     "modelPrefix": "Model: ",

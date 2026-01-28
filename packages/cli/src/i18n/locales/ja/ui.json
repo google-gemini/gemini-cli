@@ -90,6 +90,43 @@
     "firstLinesHidden": "... 最初の {{count}} 行を非表示 ...",
     "lastLinesHidden": "... 最後の {{count}} 行を非表示 ..."
   },
+  "mcpStatus": {
+    "noServers": "設定されている MCP サーバーはありません。",
+    "documentationPrefix": "ブラウザで MCP ドキュメントを表示するか (",
+    "documentationSuffix": ")、cli /docs コマンドを使用してください。",
+    "startingUp": "⏳ MCP サーバーを起動中 ({{count}} 台初期化中)...",
+    "startupNote": "注: 初回の起動には時間がかかる場合があります。ツールは利用可能になり次第、自動的に更新されます。",
+    "configuredServers": "設定済みの MCP サーバー:",
+    "serverFrom": " ({{name}} より)",
+    "status": {
+      "disabledSession": "無効 (セッション)",
+      "disabled": "無効",
+      "ready": "準備完了",
+      "starting": "起動中... (初回の起動には時間がかかる場合があります)",
+      "disconnected": "切断済み",
+      "blocked": "ブロック済み"
+    },
+    "counts": {
+      "tool": "{{count}} 個のツール",
+      "prompt": "{{count}} 個のプロンプト",
+      "resource": "{{count}} 個のリソース"
+    },
+    "auth": {
+      "oauth": " (OAuth)",
+      "oauthExpired": " (OAuth 期限切れ)",
+      "oauthNotAuthenticated": " (OAuth 未認証)"
+    },
+    "readyHint": " (ツールとプロンプトは準備ができ次第表示されます)",
+    "cachedHint": " ({{count}} 個のツールがキャッシュ済み)",
+    "labels": {
+      "tools": "ツール:",
+      "prompts": "プロンプト:",
+      "resources": "リソース:",
+      "parameters": "パラメータ:",
+      "resource": "リソース",
+      "hidden": "  ... {{count}} 個の{{name}}を非表示"
+    }
+  },
   "screenReader": {
     "userPrefix": "ユーザー: ",
     "modelPrefix": "モデル: ",
