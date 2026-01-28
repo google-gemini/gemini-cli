@@ -8,14 +8,19 @@ import {
   renderWithProviders,
   createMockSettings,
 } from '../../../test-utils/render.js';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { ToolGroupMessage } from './ToolGroupMessage.js';
 import type { IndividualToolCallDisplay } from '../../types.js';
 import { ToolCallStatus } from '../../types.js';
 import { Scrollable } from '../shared/Scrollable.js';
-import type { Config } from '@google/gemini-cli-core';
+import { ASK_USER_DISPLAY_NAME, makeFakeConfig } from '@google/gemini-cli-core';
+import os from 'node:os';
 
 describe('<ToolGroupMessage />', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   const createToolCall = (
     overrides: Partial<IndividualToolCallDisplay> = {},
   ): IndividualToolCallDisplay => ({
@@ -35,16 +40,16 @@ describe('<ToolGroupMessage />', () => {
     isFocused: true,
   };
 
-  const baseMockConfig = {
-    getModel: () => 'gemini-pro',
-    getTargetDir: () => '/test',
-    getDebugMode: () => false,
-    isTrustedFolder: () => true,
-    getIdeMode: () => false,
-    getEnableInteractiveShell: () => true,
-    getPreviewFeatures: () => false,
-    isEventDrivenSchedulerEnabled: () => true,
-  } as unknown as Config;
+  const baseMockConfig = makeFakeConfig({
+    model: 'gemini-pro',
+    targetDir: os.tmpdir(),
+    debugMode: false,
+    folderTrust: false,
+    ideMode: false,
+    enableInteractiveShell: true,
+    previewFeatures: false,
+    enableEventDrivenScheduler: true,
+  });
 
   describe('Golden Snapshots', () => {
     it('renders single successful tool call', () => {
@@ -83,10 +88,11 @@ describe('<ToolGroupMessage />', () => {
           status: ToolCallStatus.Error,
         }),
       ];
-      const mockConfig = {
-        ...baseMockConfig,
-        isEventDrivenSchedulerEnabled: () => false,
-      } as unknown as Config;
+      const mockConfig = makeFakeConfig({
+        model: 'gemini-pro',
+        targetDir: os.tmpdir(),
+        enableEventDrivenScheduler: false,
+      });
 
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
@@ -116,10 +122,11 @@ describe('<ToolGroupMessage />', () => {
           },
         }),
       ];
-      const mockConfig = {
-        ...baseMockConfig,
-        isEventDrivenSchedulerEnabled: () => false,
-      } as unknown as Config;
+      const mockConfig = makeFakeConfig({
+        model: 'gemini-pro',
+        targetDir: os.tmpdir(),
+        enableEventDrivenScheduler: false,
+      });
 
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
@@ -177,10 +184,11 @@ describe('<ToolGroupMessage />', () => {
           status: ToolCallStatus.Pending,
         }),
       ];
-      const mockConfig = {
-        ...baseMockConfig,
-        isEventDrivenSchedulerEnabled: () => false,
-      } as unknown as Config;
+      const mockConfig = makeFakeConfig({
+        model: 'gemini-pro',
+        targetDir: os.tmpdir(),
+        enableEventDrivenScheduler: false,
+      });
 
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
@@ -381,10 +389,11 @@ describe('<ToolGroupMessage />', () => {
   describe('Border Color Logic', () => {
     it('uses yellow border when tools are pending', () => {
       const toolCalls = [createToolCall({ status: ToolCallStatus.Pending })];
-      const mockConfig = {
-        ...baseMockConfig,
-        isEventDrivenSchedulerEnabled: () => false,
-      } as unknown as Config;
+      const mockConfig = makeFakeConfig({
+        model: 'gemini-pro',
+        targetDir: os.tmpdir(),
+        enableEventDrivenScheduler: false,
+      });
 
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
@@ -503,10 +512,11 @@ describe('<ToolGroupMessage />', () => {
           },
         }),
       ];
-      const mockConfig = {
-        ...baseMockConfig,
-        isEventDrivenSchedulerEnabled: () => false,
-      } as unknown as Config;
+      const mockConfig = makeFakeConfig({
+        model: 'gemini-pro',
+        targetDir: os.tmpdir(),
+        enableEventDrivenScheduler: false,
+      });
 
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
@@ -539,10 +549,11 @@ describe('<ToolGroupMessage />', () => {
       const settings = createMockSettings({
         security: { enablePermanentToolApproval: true },
       });
-      const mockConfig = {
-        ...baseMockConfig,
-        isEventDrivenSchedulerEnabled: () => false,
-      } as unknown as Config;
+      const mockConfig = makeFakeConfig({
+        model: 'gemini-pro',
+        targetDir: os.tmpdir(),
+        enableEventDrivenScheduler: false,
+      });
 
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
@@ -574,10 +585,11 @@ describe('<ToolGroupMessage />', () => {
         }),
       ];
 
-      const mockConfig = {
-        ...baseMockConfig,
-        isEventDrivenSchedulerEnabled: () => false,
-      } as unknown as Config;
+      const mockConfig = makeFakeConfig({
+        model: 'gemini-pro',
+        targetDir: os.tmpdir(),
+        enableEventDrivenScheduler: false,
+      });
 
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
@@ -604,10 +616,7 @@ describe('<ToolGroupMessage />', () => {
         }),
       ];
 
-      const mockConfig = {
-        ...baseMockConfig,
-        isEventDrivenSchedulerEnabled: () => true,
-      } as unknown as Config;
+      const mockConfig = baseMockConfig;
 
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
@@ -640,10 +649,7 @@ describe('<ToolGroupMessage />', () => {
         }),
       ];
 
-      const mockConfig = {
-        ...baseMockConfig,
-        isEventDrivenSchedulerEnabled: () => true,
-      } as unknown as Config;
+      const mockConfig = baseMockConfig;
 
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
@@ -655,6 +661,74 @@ describe('<ToolGroupMessage />', () => {
       expect(output).not.toContain('confirm-tool');
       expect(output).not.toContain('Do you want to proceed?');
       expect(output).toMatchSnapshot();
+      unmount();
+    });
+  });
+
+  describe('Ask User Filtering', () => {
+    it.each([
+      ToolCallStatus.Pending,
+      ToolCallStatus.Executing,
+      ToolCallStatus.Confirming,
+    ])('filters out ask_user when status is %s', (status) => {
+      const toolCalls = [
+        createToolCall({
+          callId: `ask-user-${status}`,
+          name: ASK_USER_DISPLAY_NAME,
+          status,
+        }),
+      ];
+
+      const { lastFrame, unmount } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        { config: baseMockConfig },
+      );
+
+      expect(lastFrame()).toMatchSnapshot();
+      unmount();
+    });
+
+    it.each([ToolCallStatus.Success, ToolCallStatus.Error])(
+      'does NOT filter out ask_user when status is %s',
+      (status) => {
+        const toolCalls = [
+          createToolCall({
+            callId: `ask-user-${status}`,
+            name: ASK_USER_DISPLAY_NAME,
+            status,
+          }),
+        ];
+
+        const { lastFrame, unmount } = renderWithProviders(
+          <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+          { config: baseMockConfig },
+        );
+
+        expect(lastFrame()).toMatchSnapshot();
+        unmount();
+      },
+    );
+
+    it('shows other tools when ask_user is filtered out', () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'other-tool',
+          name: 'other-tool',
+          status: ToolCallStatus.Success,
+        }),
+        createToolCall({
+          callId: 'ask-user-pending',
+          name: ASK_USER_DISPLAY_NAME,
+          status: ToolCallStatus.Pending,
+        }),
+      ];
+
+      const { lastFrame, unmount } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        { config: baseMockConfig },
+      );
+
+      expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
   });

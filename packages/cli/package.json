@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.27.0-nightly.20260121.97aac696f",
+  "version": "0.28.0-nightly.20260128.adc8e11bb",
   "description": "Gemini CLI",
   "license": "Apache-2.0",
   "repository": {
@@ -26,7 +26,7 @@
     "dist"
   ],
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.27.0-nightly.20260121.97aac696f"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.28.0-nightly.20260128.adc8e11bb"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.12.0",

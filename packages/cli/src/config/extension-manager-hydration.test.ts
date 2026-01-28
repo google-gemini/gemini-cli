@@ -306,6 +306,7 @@ System using model: \${MODEL_NAME}
       'MY_VALUE',
       mockRequestSetting,
       ExtensionSettingScope.USER,
+      process.cwd(),
     );
 
     await extensionManager.restartExtension(extension);
