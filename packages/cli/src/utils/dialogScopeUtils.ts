@@ -19,12 +19,12 @@ export function getScopeItems(t: (key: string) => string): Array<{
   value: LoadableSettingScope;
 }> {
   return [
-    { label: t('editor.userSettings'), value: SettingScope.User },
+    { label: t('scopes.user'), value: SettingScope.User },
     {
-      label: t('editor.workspaceSettings'),
+      label: t('scopes.workspace'),
       value: SettingScope.Workspace,
     },
-    { label: t('editor.systemSettings'), value: SettingScope.System },
+    { label: t('scopes.system'), value: SettingScope.System },
   ];
 }
 
