@@ -132,7 +132,7 @@ HistoryItemDisplay
 │ ls                                                                                                                   │
 │ Allow execution of: 'ls'?                                                                                            │
 │                                                                                                                      │
-│ ● 1. Allow once                                                                                                      │
+│ • 1. Allow once                                                                                                      │
 │   2. Allow for this session                                                                                          │
 │   3. No, suggest changes (esc)                                                                                       │
 │                                                                                                                      │

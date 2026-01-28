@@ -201,7 +201,7 @@ async function main() {
     console.log('\n📋 Parsed Results:');
     console.log(`  - Branch: ${headRef}`);
     console.log(
-      `  - Channel: ${channel} → npm tag: ${channel === 'stable' ? 'latest' : 'preview'}`,
+      `  - Channel: ${channel} ￫ npm tag: ${channel === 'stable' ? 'latest' : 'preview'}`,
     );
     console.log(`  - Version: ${version}`);
     console.log(`  - Release ref: ${releaseRef}`);
@@ -268,7 +268,7 @@ async function main() {
 
 **📋 Release Details:**
 - **Environment**: \`${environment}\`
-- **Channel**: \`${channel}\` → publishing to npm tag \`${npmTag}\`
+- **Channel**: \`${channel}\` ￫ publishing to npm tag \`${npmTag}\`
 - **Version**: \`${version}\`
 - **Hotfix PR**: Merged ✅
 - **Release Branch**: [\`${releaseRef}\`](https://github.com/${context.repo.owner}/${context.repo.repo}/tree/${releaseRef})

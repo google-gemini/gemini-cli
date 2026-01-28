@@ -88,7 +88,7 @@ describe('extensions update command', () => {
       {
         state: ExtensionUpdateState.UPDATE_AVAILABLE,
         expectedLog:
-          'Extension "my-extension" successfully updated: 1.0.0 → 1.1.0.',
+          'Extension "my-extension" successfully updated: 1.0.0 ￫ 1.1.0.',
         shouldCallUpdateExtension: true,
       },
       {
@@ -130,7 +130,7 @@ describe('extensions update command', () => {
           { name: 'ext2', originalVersion: '2.0.0', updatedVersion: '2.1.0' },
         ],
         expectedLog:
-          'Extension "ext1" successfully updated: 1.0.0 → 1.1.0.\nExtension "ext2" successfully updated: 2.0.0 → 2.1.0.',
+          'Extension "ext1" successfully updated: 1.0.0 ￫ 1.1.0.\nExtension "ext2" successfully updated: 2.0.0 ￫ 2.1.0.',
       },
       {
         updatedExtensions: [],

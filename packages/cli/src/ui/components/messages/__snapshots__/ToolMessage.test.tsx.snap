@@ -93,7 +93,7 @@ exports[`<ToolMessage /> > renders basic tool information 1`] = `
 
 exports[`<ToolMessage /> > renders emphasis correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  test-tool A tool for testing                                            ← │
+│ ✓  test-tool A tool for testing                                            ￩ │
 │                                                                              │
 │ MockMarkdown:Test result                                                     │"
 `;

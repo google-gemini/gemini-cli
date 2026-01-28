@@ -854,7 +854,7 @@ export class MCPOAuthProvider {
           );
         }
 
-        debugLogger.debug('→ Attempting dynamic client registration...');
+        debugLogger.debug('￫ Attempting dynamic client registration...');
         const { metadata: authServerMetadata } =
           await this.discoverAuthServerMetadataForRegistration(
             config.authorizationUrl,
@@ -899,7 +899,7 @@ export class MCPOAuthProvider {
     );
 
     displayMessage(`Authentication required for MCP Server: '${serverName}'
-→ Opening your browser for OAuth sign-in...
+￫ Opening your browser for OAuth sign-in...
 
 If the browser does not open, copy and paste this URL into your browser:
 ${authUrl}

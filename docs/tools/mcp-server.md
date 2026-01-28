@@ -479,9 +479,9 @@ For each configured server in `mcpServers`:
 
 1. **Status tracking begins:** Server status is set to `CONNECTING`
 2. **Transport selection:** Based on configuration properties:
-   - `httpUrl` → `StreamableHTTPClientTransport`
-   - `url` → `SSEClientTransport`
-   - `command` → `StdioClientTransport`
+   - `httpUrl` ￫ `StreamableHTTPClientTransport`
+   - `url` ￫ `SSEClientTransport`
+   - `command` ￫ `StdioClientTransport`
 3. **Connection establishment:** The MCP client attempts to connect with the
    configured timeout
 4. **Error handling:** Connection failures are logged and the server status is
@@ -562,8 +562,8 @@ if (this.trust) {
 
 The system maintains internal allow-lists for:
 
-- **Server-level:** `serverName` → All tools from this server are trusted
-- **Tool-level:** `serverName.toolName` → This specific tool is trusted
+- **Server-level:** `serverName` ￫ All tools from this server are trusted
+- **Tool-level:** `serverName.toolName` ￫ This specific tool is trusted
 
 #### User choice handling
 

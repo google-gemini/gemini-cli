@@ -55,8 +55,8 @@ describe('TabHeader', () => {
         <TabHeader tabs={MOCK_TABS} currentIndex={0} />,
       );
       const frame = lastFrame();
-      expect(frame).toContain('←');
-      expect(frame).toContain('→');
+      expect(frame).toContain('￩');
+      expect(frame).toContain('￫');
       expect(frame).toMatchSnapshot();
     });
 
@@ -65,8 +65,8 @@ describe('TabHeader', () => {
         <TabHeader tabs={MOCK_TABS} currentIndex={0} showArrows={false} />,
       );
       const frame = lastFrame();
-      expect(frame).not.toContain('←');
-      expect(frame).not.toContain('→');
+      expect(frame).not.toContain('￩');
+      expect(frame).not.toContain('￫');
       expect(frame).toMatchSnapshot();
     });
   });
@@ -77,8 +77,8 @@ describe('TabHeader', () => {
         <TabHeader tabs={MOCK_TABS} currentIndex={0} />,
       );
       const frame = lastFrame();
-      // Default uncompleted icon is □
-      expect(frame).toContain('□');
+      // Default uncompleted icon is ▫
+      expect(frame).toContain('▫');
       expect(frame).toMatchSnapshot();
     });
 
@@ -87,7 +87,7 @@ describe('TabHeader', () => {
         <TabHeader tabs={MOCK_TABS} currentIndex={0} showStatusIcons={false} />,
       );
       const frame = lastFrame();
-      expect(frame).not.toContain('□');
+      expect(frame).not.toContain('▫');
       expect(frame).not.toContain('✓');
       expect(frame).toMatchSnapshot();
     });
@@ -103,7 +103,7 @@ describe('TabHeader', () => {
       const frame = lastFrame();
       // Should have 2 checkmarks and 1 box
       const checkmarkCount = (frame?.match(/✓/g) || []).length;
-      const boxCount = (frame?.match(/□/g) || []).length;
+      const boxCount = (frame?.match(/▫/g) || []).length;
       expect(checkmarkCount).toBe(2);
       expect(boxCount).toBe(1);
       expect(frame).toMatchSnapshot();
@@ -161,7 +161,7 @@ describe('TabHeader', () => {
         />,
       );
       const frame = lastFrame();
-      expect(frame).toContain('□');
+      expect(frame).toContain('▫');
       expect(frame).toMatchSnapshot();
     });
   });

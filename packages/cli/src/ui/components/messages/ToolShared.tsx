@@ -229,6 +229,6 @@ export const ToolInfo: React.FC<ToolInfoProps> = ({
 export const TrailingIndicator: React.FC = () => (
   <Text color={theme.text.primary} wrap="truncate">
     {' '}
-    ←
+    ￩
   </Text>
 );

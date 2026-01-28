@@ -474,7 +474,7 @@ export function BaseSettingsDialog({
           <>
             {showScrollUp && (
               <Box marginX={1}>
-                <Text color={theme.text.secondary}>▲</Text>
+                <Text color={theme.text.secondary}>▴</Text>
               </Box>
             )}
             {visibleItems.map((item, idx) => {
@@ -518,7 +518,7 @@ export function BaseSettingsDialog({
                           isActive ? theme.status.success : theme.text.secondary
                         }
                       >
-                        {isActive ? '●' : ''}
+                        {isActive ? '•' : ''}
                       </Text>
                     </Box>
                     <Box
@@ -578,7 +578,7 @@ export function BaseSettingsDialog({
             })}
             {showScrollDown && (
               <Box marginX={1}>
-                <Text color={theme.text.secondary}>▼</Text>
+                <Text color={theme.text.secondary}>▾</Text>
               </Box>
             )}
           </>
