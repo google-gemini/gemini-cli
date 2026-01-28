@@ -82,6 +82,10 @@
         "label": "Sub-agents (experimental)",
         "slug": "docs/core/subagents"
       },
+      {
+        "label": "Remote subagents (experimental)",
+        "slug": "docs/core/remote-agents"
+      },
       { "label": "Hooks (experimental)", "slug": "docs/hooks" },
       { "label": "IDE integration", "slug": "docs/ide-integration" },
       { "label": "MCP servers", "slug": "docs/tools/mcp-server" }

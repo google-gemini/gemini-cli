@@ -156,6 +156,7 @@ export const useShellCommandProcessor = (
       setIsBackgroundShellVisible((prev) => !prev);
       wasVisibleBeforeForegroundRef.current = false;
     } else {
+      setIsBackgroundShellVisible(false);
       addItemToHistory(
         {
           type: 'info',
@@ -170,6 +171,7 @@ export const useShellCommandProcessor = (
     const pidToBackground = activeShellPtyId || activeToolPtyId;
     if (pidToBackground) {
       ShellExecutionService.background(pidToBackground);
+      wasVisibleBeforeForegroundRef.current = false;
     }
   }, [activeShellPtyId, activeToolPtyId]);
 

@@ -1420,6 +1420,12 @@ describe('AppContainer State Management', () => {
           activePtyId: 'pty-1',
           loopDetectionConfirmationRequest: null,
           lastOutputTime: startTime,
+          backgroundShellCount: 0,
+          isBackgroundShellVisible: false,
+          toggleBackgroundShell: vi.fn(),
+          backgroundCurrentShell: vi.fn(),
+          backgroundShells: new Map(),
+          dismissBackgroundShell: vi.fn(),
           retryStatus: null,
         });
 
@@ -1487,6 +1493,12 @@ describe('AppContainer State Management', () => {
           activePtyId: 'pty-1',
           loopDetectionConfirmationRequest: null,
           lastOutputTime: startTime, // lastOutputTime <= operationStartTime
+          backgroundShellCount: 0,
+          isBackgroundShellVisible: false,
+          toggleBackgroundShell: vi.fn(),
+          backgroundCurrentShell: vi.fn(),
+          backgroundShells: new Map(),
+          dismissBackgroundShell: vi.fn(),
           retryStatus: null,
         });
 

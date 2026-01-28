@@ -9,6 +9,7 @@ import type React from 'react';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { ShellExecutionService } from '@google/gemini-cli-core';
 import { keyToAnsi, type Key } from '../hooks/keyToAnsi.js';
+import { Command, keyMatchers } from '../keyMatchers.js';
 
 export interface ShellInputPromptProps {
   activeShellPtyId: number | null;
@@ -33,6 +34,12 @@ export const ShellInputPrompt: React.FC<ShellInputPromptProps> = ({
       if (!focus || !activeShellPtyId) {
         return;
       }
+
+      // Allow background shell toggle to bubble up
+      if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL](key)) {
+        return;
+      }
+
       if (key.ctrl && key.shift && key.name === 'up') {
         ShellExecutionService.scrollPty(activeShellPtyId, -1);
         return;

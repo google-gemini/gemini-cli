@@ -1003,6 +1003,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
     backgroundShellsRef.current = backgroundShells;
   }, [backgroundShells]);
 
+  const lastOutputTimeRef = useRef(0);
+  const tabFocusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    lastOutputTimeRef.current = lastOutputTime;
+  }, [lastOutputTime]);
+
   const { shouldShowFocusHint, inactivityStatus } = useShellInactivityStatus({
     activePtyId,
     lastOutputTime,
@@ -1493,7 +1500,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setCopyModeEnabled(false);
         enableMouseEvents();
         // We don't want to process any other keys if we're in copy mode.
-        return;
+        return true;
       }
 
       // Debug log keystrokes if enabled
@@ -1504,7 +1511,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       if (isAlternateBuffer && keyMatchers[Command.TOGGLE_COPY_MODE](key)) {
         setCopyModeEnabled(true);
         disableMouseEvents();
-        return;
+        return true;
       }
 
       if (keyMatchers[Command.QUIT](key)) {
@@ -1517,13 +1524,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
         cancelOngoingRequest?.();
 
         setCtrlCPressCount((prev) => prev + 1);
-        return;
+        return true;
       } else if (keyMatchers[Command.EXIT](key)) {
         if (buffer.text.length > 0) {
-          return;
+          return false;
         }
         setCtrlDPressCount((prev) => prev + 1);
-        return;
+        return true;
       }
 
       let enteringConstrainHeightMode = false;
@@ -1534,8 +1541,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
       if (keyMatchers[Command.SHOW_ERROR_DETAILS](key)) {
         setShowErrorDetails((prev) => !prev);
+        return true;
       } else if (keyMatchers[Command.SHOW_FULL_TODOS](key)) {
         setShowFullTodos((prev) => !prev);
+        return true;
       } else if (keyMatchers[Command.TOGGLE_MARKDOWN](key)) {
         setRenderMarkdown((prev) => {
           const newValue = !prev;
@@ -1543,6 +1552,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
           refreshStatic();
           return newValue;
         });
+        return true;
       } else if (
         keyMatchers[Command.SHOW_IDE_CONTEXT_DETAIL](key) &&
         config.getIdeMode() &&
@@ -1550,26 +1560,36 @@ Logging in with Google... Restarting Gemini CLI to continue.
       ) {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleSlashCommand('/ide status');
+        return true;
       } else if (
         keyMatchers[Command.SHOW_MORE_LINES](key) &&
         !enteringConstrainHeightMode
       ) {
         setConstrainHeight(false);
+        return true;
       } else if (
         keyMatchers[Command.FOCUS_SHELL_INPUT](key) &&
         (activePtyId ||
           (isBackgroundShellVisible && backgroundShells.size > 0)) &&
-        !embeddedShellFocused &&
         buffer.text.length === 0
       ) {
-        setEmbeddedShellFocused(true);
-      } else if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL](key)) {
-        if (activePtyId) {
-          backgroundCurrentShell();
-        } else {
-          if (isBackgroundShellVisible && !embeddedShellFocused) {
-            setEmbeddedShellFocused(true);
-            return;
+        if (key.name === 'tab' && key.shift) {
+          // Always change focus
+          setEmbeddedShellFocused(false);
+          return true;
+        }
+
+        if (embeddedShellFocused) {
+          handleWarning('Press Shift+Tab to focus out.');
+          return true;
+        }
+
+        const now = Date.now();
+        // If the shell hasn't produced output in the last 100ms, it's considered idle.
+        const isIdle = now - lastOutputTimeRef.current >= 100;
+        if (isIdle) {
+          if (tabFocusTimeoutRef.current) {
+            clearTimeout(tabFocusTimeoutRef.current);
           }
           toggleBackgroundShell();
           if (!isBackgroundShellVisible) {
@@ -1578,8 +1598,40 @@ Logging in with Google... Restarting Gemini CLI to continue.
             if (backgroundShells.size > 1) {
               setIsBackgroundShellListOpen(true);
             }
+          } else {
+            // We are about to hide it
+            tabFocusTimeoutRef.current = setTimeout(() => {
+              setEmbeddedShellFocused(false);
+            }, 100);
+          }
+          return true;
+        }
+
+        // Not idle, just focus it
+        setEmbeddedShellFocused(true);
+        return true;
+      } else if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL](key)) {
+        if (activePtyId) {
+          backgroundCurrentShell();
+          // After backgrounding, we explicitly do NOT show or focus the background UI.
+        } else {
+          if (isBackgroundShellVisible && !embeddedShellFocused) {
+            setEmbeddedShellFocused(true);
+          } else {
+            const wasVisible = isBackgroundShellVisible;
+            toggleBackgroundShell();
+            // Toggle focus based on intent: if we were hiding, unfocus; if showing, focus.
+            if (!wasVisible && backgroundShells.size > 0) {
+              setEmbeddedShellFocused(true);
+              if (backgroundShells.size > 1) {
+                setIsBackgroundShellListOpen(true);
+              }
+            } else {
+              setEmbeddedShellFocused(false);
+            }
           }
         }
+        return true;
       } else if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL_LIST](key)) {
         if (backgroundShells.size > 0 && isBackgroundShellVisible) {
           if (!embeddedShellFocused) {
@@ -1587,7 +1639,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
           }
           setIsBackgroundShellListOpen(true);
         }
+        return true;
       }
+      return false;
     },
     [
       constrainHeight,
@@ -1613,10 +1667,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
       backgroundShells,
       isBackgroundShellVisible,
       setIsBackgroundShellListOpen,
+      lastOutputTimeRef,
+      tabFocusTimeoutRef,
+      handleWarning,
     ],
   );
 
-  useKeypress(handleGlobalKeypress, { isActive: true });
+  useKeypress(handleGlobalKeypress, { isActive: true, priority: true });
 
   useEffect(() => {
     // Respect hideWindowTitle settings

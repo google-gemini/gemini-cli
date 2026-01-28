@@ -171,21 +171,13 @@ If you need to further tune your sub-agent, you can do so by selecting the model
 to optimize for with `/model` and then asking the model why it does not think
 that your sub-agent was called with a specific prompt and the given description.
 
-## Remote agents (Agent2Agent)
+## Remote subagents (Agent2Agent)
 
-Gemini CLI can also delegate tasks to remote agents using the Model Context
-Protocol (MCP) or compatible Agent2Agent interfaces.
+Gemini CLI can also delegate tasks to remote subagents using the Agent-to-Agent
+(A2A) protocol.
 
-To define a remote agent, use `kind: remote` and provide the `agent_card_url`.
-
-```markdown
----
-name: bigquery-analyst
-description: Can query BigQuery datasets and visualize results.
-kind: remote
-agent_card_url: https://agent.example.com/cards/bigquery-analyst
----
-```
+See the [Remote Subagents documentation](/docs/core/remote-agents) for detailed
+configuration and usage instructions.
 
 ## Extension sub-agents
 
