@@ -9,7 +9,7 @@ import { theme } from '../semantic-colors.js';
 import { ExpandableText, MAX_WIDTH } from './shared/ExpandableText.js';
 import { CommandKind } from '../commands/types.js';
 import { Colors } from '../colors.js';
-import { sanitizeForListDisplay } from '../utils/textUtils.js';
+import { sanitizeForDisplay } from '../utils/textUtils.js';
 
 export interface Suggestion {
   label: string;
@@ -117,7 +117,7 @@ export function SuggestionsDisplay({
             {suggestion.description && (
               <Box flexGrow={1} paddingLeft={3}>
                 <Text color={textColor} wrap="truncate">
-                  {sanitizeForListDisplay(suggestion.description, 100)}
+                  {sanitizeForDisplay(suggestion.description, 100)}
                 </Text>
               </Box>
             )}
