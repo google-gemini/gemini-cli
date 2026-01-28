@@ -164,15 +164,15 @@ describe('GeminiIgnoreParser', () => {
       expect(parser.isIgnored('important.txt')).toBe(false);
     });
 
-    it('should return all existing file paths', () => {
+    it('should return all existing file paths in reverse order', () => {
       const parser = new IgnoreFileParser(projectRoot, [
         'nonexistent.ignore',
         primaryFile,
         secondaryFile,
       ]);
       expect(parser.getIgnoreFilePaths()).toEqual([
-        path.join(projectRoot, primaryFile),
         path.join(projectRoot, secondaryFile),
+        path.join(projectRoot, primaryFile),
       ]);
     });
   });

@@ -249,7 +249,7 @@ describe('RipGrepTool', () => {
   let grepTool: RipGrepTool;
   const abortSignal = new AbortController().signal;
 
-  const mockConfig = {
+  let mockConfig = {
     getTargetDir: () => tempRootDir,
     getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
     getDebugMode: () => false,
@@ -278,6 +278,10 @@ describe('RipGrepTool', () => {
       getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
       getDebugMode: () => false,
       getFileFilteringRespectGeminiIgnore: () => true,
+      getFileFilteringOptions: () => ({
+        respectGitIgnore: true,
+        respectGeminiIgnore: true,
+      }),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
       },

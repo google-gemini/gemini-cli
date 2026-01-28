@@ -114,6 +114,8 @@ export class IgnoreFileParser implements IgnoreFileFilter {
 
   getIgnoreFilePaths(): string[] {
     return this.fileNames
+      .slice()
+      .reverse()
       .map((fileName) => path.join(this.projectRoot, fileName))
       .filter((filePath) => fs.existsSync(filePath));
   }

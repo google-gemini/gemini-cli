@@ -248,13 +248,13 @@ class GrepToolInvocation extends BaseToolInvocation<
           new Set(allMatches.map((m) => m.filePath)),
         );
         const absoluteFilePaths = uniqueFiles.map((f) =>
-          path.resolve(searchDirAbs!, f),
+          path.resolve(searchDirAbs, f),
         );
         const allowedFiles =
           this.fileDiscoveryService.filterFiles(absoluteFilePaths);
         const allowedSet = new Set(allowedFiles);
         allMatches = allMatches.filter((m) =>
-          allowedSet.has(path.resolve(searchDirAbs!, m.filePath)),
+          allowedSet.has(path.resolve(searchDirAbs, m.filePath)),
         );
       }
 

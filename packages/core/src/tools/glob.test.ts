@@ -18,8 +18,10 @@ import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.j
 import { ToolErrorType } from './tool-error.js';
 import * as glob from 'glob';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
-import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
-import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
+import {
+  DEFAULT_FILE_FILTERING_OPTIONS,
+  GEMINI_IGNORE_FILE_NAME,
+} from '../config/constants.js';
 
 vi.mock('glob', { spy: true });
 
@@ -367,72 +369,6 @@ describe('GlobTool', () => {
   });
 
   describe('ignore file handling', () => {
-    interface IgnoreFileTestCase {
-      name: string;
-      ignoreFile: { name: string; content: string };
-      filesToCreate: string[];
-      globToolParams: GlobToolParams;
-      expectedCountMessage: string;
-      expectedToContain?: string[];
-      notExpectedToContain?: string[];
-    }
-
-    it.each<IgnoreFileTestCase>([
-      {
-        name: 'should respect .gitignore files by default',
-        ignoreFile: { name: '.gitignore', content: '*.ignored.txt' },
-        filesToCreate: ['a.ignored.txt', 'b.notignored.txt'],
-        globToolParams: { pattern: '*.txt' },
-        expectedCountMessage: 'Found 3 file(s)',
-        notExpectedToContain: ['a.ignored.txt'],
-      },
-      {
-        name: 'should respect .geminiignore files by default',
-        ignoreFile: {
-          name: GEMINI_IGNORE_FILE_NAME,
-          content: '*.geminiignored.txt',
-        },
-        filesToCreate: ['a.geminiignored.txt', 'b.notignored.txt'],
-        globToolParams: { pattern: '*.txt' },
-        expectedCountMessage: 'Found 3 file(s)',
-        notExpectedToContain: ['a.geminiignored.txt'],
-      },
-      {
-        name: 'should not respect .gitignore when respect_git_ignore is false',
-        ignoreFile: { name: '.gitignore', content: '*.ignored.txt' },
-        filesToCreate: ['a.ignored.txt'],
-        globToolParams: { pattern: '*.txt', respect_git_ignore: false },
-        expectedCountMessage: 'Found 3 file(s)',
-        expectedToContain: ['a.ignored.txt'],
-      },
-      {
-        name: 'should not respect .geminiignore when respect_gemini_ignore is false',
-        ignoreFile: {
-          name: GEMINI_IGNORE_FILE_NAME,
-          content: '*.geminiignored.txt',
-        },
-        filesToCreate: ['a.geminiignored.txt'],
-        globToolParams: { pattern: '*.txt', respect_gemini_ignore: false },
-        expectedCountMessage: 'Found 3 file(s)',
-        expectedToContain: ['a.geminiignored.txt'],
-      },
-    ])(
-      '$name',
-      async ({
-        ignoreFile,
-        filesToCreate,
-        globToolParams,
-        expectedCountMessage,
-        expectedToContain,
-        notExpectedToContain,
-      }) => {
-        await fs.writeFile(
-          path.join(tempRootDir, ignoreFile.name),
-          ignoreFile.content,
-        );
-        for (const file of filesToCreate) {
-          await fs.writeFile(path.join(tempRootDir, file), 'content');
-        }
     it('should respect .gitignore files by default', async () => {
       await fs.writeFile(
         path.join(tempRootDir, '.gitignore'),
@@ -452,7 +388,7 @@ describe('GlobTool', () => {
 
     it('should respect .geminiignore files by default', async () => {
       await fs.writeFile(
-        path.join(tempRootDir, '.geminiignore'),
+        path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME),
         'gemini-ignored_test.txt',
       );
       await fs.writeFile(
@@ -490,7 +426,7 @@ describe('GlobTool', () => {
 
     it('should not respect .geminiignore when respect_gemini_ignore is false', async () => {
       await fs.writeFile(
-        path.join(tempRootDir, '.geminiignore'),
+        path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME),
         'gemini-ignored_test.txt',
       );
       await fs.writeFile(
