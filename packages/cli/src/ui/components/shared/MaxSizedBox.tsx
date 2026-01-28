@@ -6,6 +6,7 @@
 
 import type React from 'react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, Text, ResizeObserver, type DOMElement } from 'ink';
 import { theme } from '../../semantic-colors.js';
 import { useOverflowActions } from '../../contexts/OverflowContext.js';
@@ -36,6 +37,7 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
   overflowDirection = 'top',
   additionalHiddenLinesCount = 0,
 }) => {
+  const { t } = useTranslation('ui');
   const id = useId();
   const { addOverflowingId, removeOverflowingId } = useOverflowActions() || {};
   const observerRef = useRef<ResizeObserver | null>(null);
@@ -116,8 +118,7 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
     >
       {totalHiddenLines > 0 && overflowDirection === 'top' && (
         <Text color={theme.text.secondary} wrap="truncate">
-          ... first {totalHiddenLines} line{totalHiddenLines === 1 ? '' : 's'}{' '}
-          hidden ...
+          {t('maxSizedBox.firstLinesHidden', { count: totalHiddenLines })}
         </Text>
       )}
       <Box flexDirection="column" overflow="hidden" flexGrow={1}>
@@ -132,8 +133,7 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
       </Box>
       {totalHiddenLines > 0 && overflowDirection === 'bottom' && (
         <Text color={theme.text.secondary} wrap="truncate">
-          ... last {totalHiddenLines} line{totalHiddenLines === 1 ? '' : 's'}{' '}
-          hidden ...
+          {t('maxSizedBox.lastLinesHidden', { count: totalHiddenLines })}
         </Text>
       )}
     </Box>

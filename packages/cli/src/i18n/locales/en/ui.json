@@ -93,6 +93,12 @@
       "default": "  Type your message or @path/to/file"
     }
   },
+  "maxSizedBox": {
+    "firstLinesHidden": "... first {{count}} line hidden ...",
+    "firstLinesHidden_plural": "... first {{count}} lines hidden ...",
+    "lastLinesHidden": "... last {{count}} line hidden ...",
+    "lastLinesHidden_plural": "... last {{count}} lines hidden ..."
+  },
   "modelStats": {
     "title": "Model Stats For Nerds",
     "noCalls": "No API calls have been made in this session.",

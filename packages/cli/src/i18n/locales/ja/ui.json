@@ -86,6 +86,10 @@
       "default": "  メッセージを入力するか、@path/to/file でファイルを参照します"
     }
   },
+  "maxSizedBox": {
+    "firstLinesHidden": "... 最初の {{count}} 行を非表示 ...",
+    "lastLinesHidden": "... 最後の {{count}} 行を非表示 ..."
+  },
   "modelStats": {
     "title": "モデル統計 (詳細)",
     "noCalls": "このセッションではまだAPI呼び出しが行われていません。",
