@@ -109,7 +109,7 @@ export function ValidationDialog({
         onChoice(choice);
       }
     },
-    [validationLink, onChoice],
+    [validationLink, onChoice, t],
   );
 
   if (state === 'error') {

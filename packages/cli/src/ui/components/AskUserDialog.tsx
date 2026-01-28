@@ -632,7 +632,13 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     }
 
     return list;
-  }, [questionOptions, question.multiSelect, question.type, customOptionText]);
+  }, [
+    questionOptions,
+    question.multiSelect,
+    question.type,
+    customOptionText,
+    t,
+  ]);
 
   const handleHighlight = useCallback(
     (itemValue: OptionItem) => {

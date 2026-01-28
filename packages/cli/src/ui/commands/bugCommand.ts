@@ -67,7 +67,7 @@ export const bugCommand: SlashCommand = {
       os: osVersion,
       sandbox: sandboxEnv,
       model: modelVersion,
-      authType: authType,
+      authType,
       memory: memoryUsage,
       terminalName,
       terminalBg: terminalBgColor,
