@@ -263,5 +263,11 @@
   "docs.responses": {
     "openUrl": "ドキュメントを表示するには、ブラウザで以下の URL を開いてください:\n{{url}}",
     "opening": "ブラウザでドキュメントを開いています: {{url}}"
+  },
+  "setupGithub.responses": {
+    "notRepo": "GitHub リポジトリを特定できませんでした。/setup-github は git リポジトリから実行する必要があります。",
+    "createDirFailed": "{{path}} ディレクトリを作成できません。現在のディレクトリに書き込み権限がありますか？",
+    "downloadSuccess": "{{workflows}} 個のワークフロー、{{commands}} 個のコマンドのダウンロードが完了し、.gitignore を更新しました。{{url}} の手順に従って（/setup-github のステップはスキップ）セットアップを完了してください。",
+    "shellDescription": "Gemini を使用した issue のトリアージと PR レビューのための GitHub Actions を設定しています。"
   }
 }

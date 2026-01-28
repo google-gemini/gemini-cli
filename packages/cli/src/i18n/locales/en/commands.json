@@ -269,5 +269,11 @@
   "docs.responses": {
     "openUrl": "Please open the following URL in your browser to view the documentation:\n{{url}}",
     "opening": "Opening documentation in your browser: {{url}}"
+  },
+  "setupGithub.responses": {
+    "notRepo": "Unable to determine the GitHub repository. /setup-github must be run from a git repository.",
+    "createDirFailed": "Unable to create {{path}} directory. Do you have file permissions in the current directory?",
+    "downloadSuccess": "Successfully downloaded {{workflows}} workflows , {{commands}} commands and updated .gitignore. Follow the steps in {{url}} (skipping the /setup-github step) to complete setup.",
+    "shellDescription": "Setting up GitHub Actions to triage issues and review PRs with Gemini."
   }
 }
