@@ -58,6 +58,7 @@ export class GitService {
   async setupShadowGitRepository() {
     const repoDir = this.getHistoryDir();
     const gitConfigPath = path.join(repoDir, '.gitconfig');
+    const systemConfigPath = path.join(repoDir, '.gitconfig_system_empty');
 
     await fs.mkdir(repoDir, { recursive: true });
 
@@ -67,7 +68,11 @@ export class GitService {
       '[user]\n  name = Gemini CLI\n  email = gemini-cli@google.com\n[commit]\n  gpgsign = false\n';
     await fs.writeFile(gitConfigPath, gitConfigContent);
 
-    const repo = simpleGit(repoDir);
+    const repo = simpleGit(repoDir).env({
+      // Prevent git from using the user's global git config.
+      GIT_CONFIG_GLOBAL: gitConfigPath,
+      GIT_CONFIG_SYSTEM: systemConfigPath,
+    });
     let isRepoDefined = false;
     try {
       isRepoDefined = await repo.checkIsRepo(CheckRepoActions.IS_REPO_ROOT);
@@ -104,12 +109,14 @@ export class GitService {
 
   private get shadowGitRepository(): SimpleGit {
     const repoDir = this.getHistoryDir();
+    const gitConfigPath = path.join(repoDir, '.gitconfig');
+    const systemConfigPath = path.join(repoDir, '.gitconfig_system_empty');
     return simpleGit(this.projectRoot).env({
       GIT_DIR: path.join(repoDir, '.git'),
       GIT_WORK_TREE: this.projectRoot,
       // Prevent git from using the user's global git config.
-      HOME: repoDir,
-      XDG_CONFIG_HOME: repoDir,
+      GIT_CONFIG_GLOBAL: gitConfigPath,
+      GIT_CONFIG_SYSTEM: systemConfigPath,
     });
   }
 
