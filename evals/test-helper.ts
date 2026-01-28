@@ -34,6 +34,7 @@ export type EvalPolicy = 'ALWAYS_PASSES' | 'USUALLY_PASSES';
 export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
   const fn = async () => {
     const rig = new TestRig();
+    const { logDir, sanitizedName } = await prepareLogDir(evalCase.name);
     let isSuccess = false;
     try {
       rig.setup(evalCase.name, evalCase.params);
@@ -60,8 +61,7 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
         execSync('git commit --allow-empty -m "Initial commit"', execOptions);
       }
 
-      const { logDir, sanitizedName } = await prepareLogDir(evalCase.name);
-      const activityLogFile = path.resolve(`${logDir}/${sanitizedName}.jsonl`);
+      const activityLogFile = path.join(logDir, `${sanitizedName}.jsonl`);
 
       const result = await rig.run({
         args: evalCase.prompt,
@@ -82,12 +82,13 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
       await evalCase.assert(rig, result);
       isSuccess = true;
     } finally {
-      const { logDir, sanitizedName } = await prepareLogDir(evalCase.name);
-      const logFile = `${logDir}/${sanitizedName}.log`;
-      const activityLogFile = path.resolve(`${logDir}/${sanitizedName}.jsonl`);
+      const logFile = path.join(logDir, `${sanitizedName}.log`);
+      const activityLogFile = path.join(logDir, `${sanitizedName}.jsonl`);
 
-      if (isSuccess && fs.existsSync(activityLogFile)) {
-        await fs.promises.unlink(activityLogFile);
+      if (isSuccess) {
+        await fs.promises.unlink(activityLogFile).catch((err) => {
+          if (err.code !== 'ENOENT') throw err;
+        });
       }
 
       await fs.promises.writeFile(
