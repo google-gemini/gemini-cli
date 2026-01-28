@@ -131,13 +131,24 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.UNDO,
-      positive: [createKey('z', { shift: false, ctrl: true })],
-      negative: [createKey('z'), createKey('z', { shift: true, ctrl: true })],
+      positive: [
+        createKey('z', { shift: false, cmd: true }),
+        createKey('z', { shift: false, alt: true }),
+      ],
+      negative: [
+        createKey('z'),
+        createKey('z', { shift: true, cmd: true }),
+        createKey('z', { shift: false, ctrl: true }),
+      ],
     },
     {
       command: Command.REDO,
-      positive: [createKey('z', { shift: true, ctrl: true })],
-      negative: [createKey('z'), createKey('z', { shift: false, ctrl: true })],
+      positive: [
+        createKey('z', { shift: true, cmd: true }),
+        createKey('z', { shift: true, alt: true }),
+        createKey('z', { shift: true, ctrl: true }),
+      ],
+      negative: [createKey('z'), createKey('z', { shift: false, cmd: true })],
     },
 
     // Screen control
