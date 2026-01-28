@@ -53,8 +53,8 @@ const ChecklistListDisplay: React.FC<{ items: ChecklistItemData[] }> = ({
   items,
 }) => (
   <Box flexDirection="column" aria-role="list">
-    {items.map((item, index) => (
-      <ChecklistItem item={item} key={index} role="listitem" />
+    {items.map((item) => (
+      <ChecklistItem item={item} key={item.label} role="listitem" />
     ))}
   </Box>
 );
@@ -65,11 +65,18 @@ export const Checklist: React.FC<ChecklistProps> = ({
   isExpanded,
   toggleHint,
 }) => {
-  const inProgress: ChecklistItemData | null = useMemo(() => items.find((item) => item.status === 'in_progress') || null, [items]);
+  const inProgress: ChecklistItemData | null = useMemo(
+    () => items.find((item) => item.status === 'in_progress') || null,
+    [items],
+  );
 
-  const hasActiveItems = useMemo(() => items.some(
-      (item) => item.status === 'pending' || item.status === 'in_progress',
-    ), [items]);
+  const hasActiveItems = useMemo(
+    () =>
+      items.some(
+        (item) => item.status === 'pending' || item.status === 'in_progress',
+      ),
+    [items],
+  );
 
   if (items.length === 0 || (!isExpanded && !hasActiveItems)) {
     return null;

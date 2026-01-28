@@ -1,12 +1,12 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`<ChecklistItem /> > renders cancelled item correctly 1`] = `"✗ Skipped this"`;
+exports[`<ChecklistItem /> > renders { status: 'cancelled', label: 'Skipped this' } item correctly 1`] = `"✗ Skipped this"`;
 
-exports[`<ChecklistItem /> > renders completed item correctly 1`] = `"✓ Done this"`;
+exports[`<ChecklistItem /> > renders { status: 'completed', label: 'Done this' } item correctly 1`] = `"✓ Done this"`;
 
-exports[`<ChecklistItem /> > renders in_progress item correctly 1`] = `"» Doing this"`;
+exports[`<ChecklistItem /> > renders { status: 'in_progress', label: 'Doing this' } item correctly 1`] = `"» Doing this"`;
 
-exports[`<ChecklistItem /> > renders pending item correctly 1`] = `"☐ Do this"`;
+exports[`<ChecklistItem /> > renders { status: 'pending', label: 'Do this' } item correctly 1`] = `"☐ Do this"`;
 
 exports[`<ChecklistItem /> > truncates long text when wrap="truncate" 1`] = `"» This is a very long text th…"`;
 

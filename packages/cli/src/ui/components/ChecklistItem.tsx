@@ -7,6 +7,7 @@
 import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
+import { checkExhaustive } from '../../utils/checks.js';
 
 export type ChecklistStatus =
   | 'pending'
@@ -42,12 +43,13 @@ const ChecklistStatusDisplay: React.FC<{ status: ChecklistStatus }> = ({
         </Text>
       );
     case 'cancelled':
-    default:
       return (
         <Text color={theme.status.error} aria-label="Cancelled">
           ✗
         </Text>
       );
+    default:
+      checkExhaustive(status);
   }
 };
 
@@ -69,8 +71,10 @@ export const ChecklistItem: React.FC<ChecklistItemProps> = ({
       case 'completed':
       case 'cancelled':
         return theme.text.secondary;
-      default:
+      case 'pending':
         return theme.text.primary;
+      default:
+        checkExhaustive(item.status);
     }
   })();
   const strikethrough = item.status === 'cancelled';

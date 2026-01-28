@@ -10,32 +10,12 @@ import { ChecklistItem, type ChecklistItemData } from './ChecklistItem.js';
 import { Box } from 'ink';
 
 describe('<ChecklistItem />', () => {
-  it('renders pending item correctly', () => {
-    const item: ChecklistItemData = { status: 'pending', label: 'Do this' };
-    const { lastFrame } = render(<ChecklistItem item={item} />);
-    expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('renders in_progress item correctly', () => {
-    const item: ChecklistItemData = {
-      status: 'in_progress',
-      label: 'Doing this',
-    };
-    const { lastFrame } = render(<ChecklistItem item={item} />);
-    expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('renders completed item correctly', () => {
-    const item: ChecklistItemData = { status: 'completed', label: 'Done this' };
-    const { lastFrame } = render(<ChecklistItem item={item} />);
-    expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('renders cancelled item correctly', () => {
-    const item: ChecklistItemData = {
-      status: 'cancelled',
-      label: 'Skipped this',
-    };
+  it.each([
+    { status: 'pending', label: 'Do this' },
+    { status: 'in_progress', label: 'Doing this' },
+    { status: 'completed', label: 'Done this' },
+    { status: 'cancelled', label: 'Skipped this' },
+  ] as ChecklistItemData[])('renders %s item correctly', (item) => {
     const { lastFrame } = render(<ChecklistItem item={item} />);
     expect(lastFrame()).toMatchSnapshot();
   });
