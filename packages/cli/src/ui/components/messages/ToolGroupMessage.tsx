@@ -116,11 +116,10 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
     [toolCalls, isEventDriven],
   );
 
-  // If all tools are hidden (e.g. group only contains confirming or pending tools),
-  // render nothing in the history log unless we need to show a visible border.
-  // We only need to render if borderBottomOverride is explicitly true (to close
-  // off a border from previous tools). When it's undefined or false, we can
-  // safely return null to avoid rendering ghost borders.
+  // If all tools are filtered out (e.g., in-progress AskUser tools, confirming tools
+  // in event-driven mode), only render if we need to close a border from previous
+  // tool groups. borderBottomOverride=true means we must render the closing border;
+  // undefined or false means there's nothing to display.
   if (visibleToolCalls.length === 0 && borderBottomOverride !== true) {
     return null;
   }
