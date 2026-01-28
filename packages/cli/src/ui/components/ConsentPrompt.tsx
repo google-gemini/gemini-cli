@@ -6,6 +6,7 @@
 
 import { Box } from 'ink';
 import { type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { theme } from '../semantic-colors.js';
 import { MarkdownDisplay } from '../utils/MarkdownDisplay.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
@@ -19,6 +20,7 @@ type ConsentPromptProps = {
 
 export const ConsentPrompt = (props: ConsentPromptProps) => {
   const { prompt, onConfirm, terminalWidth } = props;
+  const { t } = useTranslation('dialogs');
 
   return (
     <Box
@@ -40,8 +42,8 @@ export const ConsentPrompt = (props: ConsentPromptProps) => {
       <Box marginTop={1}>
         <RadioButtonSelect
           items={[
-            { label: 'Yes', value: true, key: 'Yes' },
-            { label: 'No', value: false, key: 'No' },
+            { label: t('consent.yes'), value: true, key: t('consent.yes') },
+            { label: t('consent.no'), value: false, key: t('consent.no') },
           ]}
           onSelect={onConfirm}
         />
