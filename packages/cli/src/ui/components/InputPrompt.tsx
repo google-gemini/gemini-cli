@@ -18,7 +18,12 @@ import {
   PASTED_TEXT_PLACEHOLDER_REGEX,
   getTransformUnderCursor,
 } from './shared/text-buffer.js';
-import { cpSlice, cpLen, toCodePoints } from '../utils/textUtils.js';
+import {
+  cpSlice,
+  cpLen,
+  toCodePoints,
+  cpIndexToOffset,
+} from '../utils/textUtils.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
 import { useShellHistory } from '../hooks/useShellHistory.js';
@@ -1242,7 +1247,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
             {buffer.text.length === 0 && placeholder ? (
               showCursor ? (
-                <Text>
+                <Text
+                  terminalCursorFocus={showCursor}
+                  terminalCursorPosition={0}
+                >
                   {chalk.inverse(placeholder.slice(0, 1))}
                   <Text color={theme.text.secondary}>
                     {placeholder.slice(1)}
@@ -1363,7 +1371,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
                   return (
                     <Box key={`line-${visualIdxInRenderedSet}`} height={1}>
-                      <Text>
+                      <Text
+                        terminalCursorFocus={showCursor && isOnCursorLine}
+                        terminalCursorPosition={cpIndexToOffset(
+                          lineText,
+                          cursorVisualColAbsolute,
+                        )}
+                      >
                         {renderedLine}
                         {showCursorBeforeGhost &&
                           (showCursor ? chalk.inverse(' ') : ' ')}
