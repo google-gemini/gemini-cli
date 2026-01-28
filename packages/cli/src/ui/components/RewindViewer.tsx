@@ -90,7 +90,7 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
       if (!selectedMessageId) {
         if (keyMatchers[Command.ESCAPE](key)) {
           onExit();
-          return;
+          return true;
         }
         if (keyMatchers[Command.EXPAND_SUGGESTION](key)) {
           if (
@@ -98,12 +98,15 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
             highlightedMessageId !== 'current-position'
           ) {
             setExpandedMessageId(highlightedMessageId);
+            return true;
           }
         }
         if (keyMatchers[Command.COLLAPSE_SUGGESTION](key)) {
           setExpandedMessageId(null);
+          return true;
         }
       }
+      return false;
     },
     { isActive: true },
   );

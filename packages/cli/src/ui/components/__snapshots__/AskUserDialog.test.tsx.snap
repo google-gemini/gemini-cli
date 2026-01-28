@@ -34,18 +34,18 @@ exports[`AskUserDialog > Text type questions > shows default placeholder when no
 `;
 
 exports[`AskUserDialog > allows navigating to Review tab and back 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ← □ Tests │ □ Docs │ ≡ Review →                                                                                      │
-│                                                                                                                      │
-│ Review your answers:                                                                                                 │
-│                                                                                                                      │
-│ ⚠ You have 2 unanswered questions                                                                                    │
-│                                                                                                                      │
-│ Tests → (not answered)                                                                                               │
-│ Docs → (not answered)                                                                                                │
-│                                                                                                                      │
-│ Enter to submit · Tab/Shift+Tab to edit answers · Esc to cancel                                                      │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+"╭─────────────────────────────────────────────────────────────────╮
+│ ← □ Tests │ □ Docs │ ≡ Review →                                 │
+│                                                                 │
+│ Review your answers:                                            │
+│                                                                 │
+│ ⚠ You have 2 unanswered questions                               │
+│                                                                 │
+│ Tests → (not answered)                                          │
+│ Docs → (not answered)                                           │
+│                                                                 │
+│ Enter to submit · Tab/Shift+Tab to edit answers · Esc to cancel │
+╰─────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`AskUserDialog > hides progress header for single question 1`] = `
@@ -123,16 +123,16 @@ exports[`AskUserDialog > shows progress header for multiple questions 1`] = `
 `;
 
 exports[`AskUserDialog > shows warning for unanswered questions on Review tab 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ← □ License │ □ README │ ≡ Review →                                                                                  │
-│                                                                                                                      │
-│ Review your answers:                                                                                                 │
-│                                                                                                                      │
-│ ⚠ You have 2 unanswered questions                                                                                    │
-│                                                                                                                      │
-│ License → (not answered)                                                                                             │
-│ README → (not answered)                                                                                              │
-│                                                                                                                      │
-│ Enter to submit · Tab/Shift+Tab to edit answers · Esc to cancel                                                      │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+"╭─────────────────────────────────────────────────────────────────╮
+│ ← □ License │ □ README │ ≡ Review →                             │
+│                                                                 │
+│ Review your answers:                                            │
+│                                                                 │
+│ ⚠ You have 2 unanswered questions                               │
+│                                                                 │
+│ License → (not answered)                                        │
+│ README → (not answered)                                         │
+│                                                                 │
+│ Enter to submit · Tab/Shift+Tab to edit answers · Esc to cancel │
+╰─────────────────────────────────────────────────────────────────╯"
 `;
