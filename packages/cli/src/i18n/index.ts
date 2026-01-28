@@ -162,8 +162,10 @@ function getSavedLanguagePreference(): string | null {
     const settingsPath = path.join(homeDir, '.gemini', 'settings.json');
     const content = fsSync.readFileSync(settingsPath, 'utf8');
     const settings = JSON.parse(content) as Record<string, unknown>;
-    const general = settings['general'] as Record<string, unknown> | undefined;
-    const lang = general?.['language'];
+    const experimental = settings['experimental'] as
+      | Record<string, unknown>
+      | undefined;
+    const lang = experimental?.['language'];
     if (typeof lang === 'string' && lang !== 'auto') {
       return lang;
     }
