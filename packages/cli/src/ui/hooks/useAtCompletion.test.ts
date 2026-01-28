@@ -10,7 +10,10 @@ import { renderHook } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { useAtCompletion } from './useAtCompletion.js';
 import type { Config, FileSearch } from '@google/gemini-cli-core';
-import { FileSearchFactory } from '@google/gemini-cli-core';
+import {
+  FileSearchFactory,
+  FileDiscoveryService,
+} from '@google/gemini-cli-core';
 import type { FileSystemStructure } from '@google/gemini-cli-test-utils';
 import { createTmpDir, cleanupTmpDir } from '@google/gemini-cli-test-utils';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
@@ -148,8 +151,10 @@ describe('useAtCompletion', () => {
       const fileSearch = FileSearchFactory.create({
         projectRoot: testRootDir,
         ignoreDirs: [],
-        useGitignore: false,
-        useGeminiignore: false,
+        fileDiscoveryService: new FileDiscoveryService(testRootDir, {
+          respectGitIgnore: false,
+          respectGeminiIgnore: false,
+        }),
         cache: false,
         cacheTtl: 0,
         enableRecursiveFileSearch: true,
@@ -271,8 +276,10 @@ describe('useAtCompletion', () => {
       const realFileSearch = FileSearchFactory.create({
         projectRoot: testRootDir,
         ignoreDirs: [],
-        useGitignore: true,
-        useGeminiignore: true,
+        fileDiscoveryService: new FileDiscoveryService(testRootDir, {
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+        }),
         cache: false,
         cacheTtl: 0,
         enableRecursiveFileSearch: true,
