@@ -77,7 +77,7 @@
   {
     "label": "Ecosystem and extensibility",
     "items": [
-      { "label": "Agent skills", "slug": "docs/cli/skills" },
+      { "label": "Agent skills (experimental)", "slug": "docs/cli/skills" },
       {
         "label": "Sub-agents (experimental)",
         "slug": "docs/core/subagents"
