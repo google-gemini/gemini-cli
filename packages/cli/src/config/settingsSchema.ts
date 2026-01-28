@@ -1605,7 +1605,7 @@ const SETTINGS_SCHEMA = {
         default: true,
         description:
           'Canonical toggle for the hooks system. When disabled, no hooks will be executed.',
-        showInDialog: false,
+        showInDialog: true,
       },
       disabled: {
         type: 'array',
