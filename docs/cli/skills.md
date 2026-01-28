@@ -91,8 +91,9 @@ gemini skills disable my-expertise --scope workspace
 
 ## Creating a Skill
 
-A skill is a directory containing a `SKILL.md` file at its root. This file uses
-YAML frontmatter for metadata and Markdown for instructions.
+A skill is a directory containing a `SKILL.md` file at its root. This file
+serves as the entry point for your skill and uses YAML frontmatter for metadata
+and Markdown for instructions.
 
 ### Folder Structure
 
