@@ -34,9 +34,16 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   });
 
   // Ensure table fits within terminal width
-  const totalWidth = columnWidths.reduce((sum, width) => sum + width + 1, 1);
+  // We calculate scale based on content width vs available width (terminal - borders)
+  // Fixed overhead per column is 1 (separator/edge), plus 1 for the final edge
+  const fixedOverhead = headers.length + 1;
+  const totalColumnWidth = columnWidths.reduce((sum, width) => sum + width, 0);
+
+  // Subtract 1 from available width to avoid edge-case wrapping on some terminals
+  const availableWidth = Math.max(0, terminalWidth - fixedOverhead - 1);
+
   const scaleFactor =
-    totalWidth > terminalWidth ? terminalWidth / totalWidth : 1;
+    totalColumnWidth > availableWidth ? availableWidth / totalColumnWidth : 1;
   const adjustedWidths = columnWidths.map((width) =>
     Math.floor(width * scaleFactor),
   );
