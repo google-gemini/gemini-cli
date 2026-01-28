@@ -306,5 +306,12 @@
     "system": "System Settings",
     "alsoModifiedIn": "(Also modified in {{scopes}})",
     "modifiedIn": "(Modified in {{scopes}})"
+  },
+  "logout": {
+    "title": "You are now logged out.",
+    "description": "Login again to continue using Gemini CLI, or exit the application.",
+    "loginButton": "Login",
+    "exitButton": "Exit",
+    "instructions": "(Use Enter to select, Esc to close)"
   }
 }
