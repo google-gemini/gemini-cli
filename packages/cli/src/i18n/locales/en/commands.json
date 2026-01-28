@@ -283,5 +283,9 @@
   "vim.responses": {
     "entered": "Entered Vim mode. Run /vim again to exit.",
     "exited": "Exited Vim mode."
+  },
+  "init.responses": {
+    "configFailed": "Configuration not available.",
+    "created": "Empty GEMINI.md created. Now analyzing the project to populate it."
   }
 }

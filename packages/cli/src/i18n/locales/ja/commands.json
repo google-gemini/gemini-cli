@@ -277,5 +277,9 @@
   "vim.responses": {
     "entered": "Vim モードを開始しました。終了するには再度 /vim を実行してください。",
     "exited": "Vim モードを終了しました。"
+  },
+  "init.responses": {
+    "configFailed": "設定を利用できません。",
+    "created": "空の GEMINI.md を作成しました。プロジェクトを分析して内容を生成しています。"
   }
 }

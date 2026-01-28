@@ -12,6 +12,7 @@ import type {
   SlashCommandActionReturn,
 } from './types.js';
 import { CommandKind } from './types.js';
+import { t } from '../../i18n/index.js';
 import { performInit } from '@google/gemini-cli-core';
 
 export const initCommand: SlashCommand = {
@@ -27,7 +28,7 @@ export const initCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Configuration not available.',
+        content: t('commands:init.responses.configFailed'),
       };
     }
     const targetDir = context.services.config.getTargetDir();
@@ -42,7 +43,7 @@ export const initCommand: SlashCommand = {
       context.ui.addItem(
         {
           type: 'info',
-          text: 'Empty GEMINI.md created. Now analyzing the project to populate it.',
+          text: t('commands:init.responses.created'),
         },
         Date.now(),
       );
