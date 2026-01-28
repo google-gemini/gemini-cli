@@ -120,7 +120,7 @@ function detectSuspiciousOverwrite(
   // 3. Check for common file headers (imports, package declarations)
   const commonHeaderPatterns = [
     { pattern: /^package\s+\w+/m, name: 'package declaration' }, // Go package
-    { pattern: /^import\s+[({]/m, name: 'import block' }, // Go/Python imports
+    { pattern: /^import\s+/m, name: 'import block' }, // Go/Python/JS/TS imports
     { pattern: /^#include\s+</m, name: 'include directive' }, // C/C++ includes
     { pattern: /^from\s+\w+\s+import/m, name: 'import statement' }, // Python imports
     { pattern: /^\/\*\*$/m, name: 'license/copyright header' }, // JSDoc/license headers
@@ -156,7 +156,9 @@ function detectSuspiciousOverwrite(
   ) {
     // Count how many function/class definitions are in the content
     const definitionCount = (
-      proposedContent.match(/^\s*(func|function|def|class)\s+\w+/gm) || []
+      proposedContent.match(
+        /^\s*(func|function|def|class|interface|type)\s+\w+/gm,
+      ) || []
     ).length;
 
     if (definitionCount <= 2) {
