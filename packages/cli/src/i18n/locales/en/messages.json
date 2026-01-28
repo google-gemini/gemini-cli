@@ -19,5 +19,31 @@
     "tokenCountError": "Could not compress chat history due to a token counting error.",
     "emptySummary": "Chat history compression failed: the model returned an empty summary.",
     "noop": "Nothing to compress."
+  },
+  "toolConfirmation": {
+    "options": {
+      "allowOnce": "Allow once",
+      "allowSession": "Allow for this session",
+      "allowFuture": "Allow for all future sessions",
+      "modifyEditor": "Modify with external editor",
+      "cancel": "No, suggest changes (esc)",
+      "allowToolSession": "Allow tool for this session",
+      "allowServerSession": "Allow all server tools for this session",
+      "allowToolFuture": "Allow tool for all future sessions"
+    },
+    "questions": {
+      "applyChange": "Apply this change?",
+      "allowExecCount": "Allow execution of {{count}} commands?",
+      "allowExecRoot": "Allow execution of: '{{command}}'?",
+      "proceed": "Do you want to proceed?",
+      "allowMcp": "Allow execution of MCP tool \"{{tool}}\" from server \"{{server}}\"?"
+    },
+    "body": {
+      "urlsToFetch": "URLs to fetch:",
+      "mcpServer": "MCP Server: {{server}}",
+      "mcpTool": "Tool: {{tool}}",
+      "modifyInProgress": "Modify in progress: ",
+      "closeEditorToContinue": "Save and close external editor to continue"
+    }
   }
 }

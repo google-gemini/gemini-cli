@@ -19,5 +19,31 @@
     "tokenCountError": "トークン計数エラーのため、チャット履歴を圧縮できませんでした。",
     "emptySummary": "チャット履歴の圧縮に失敗しました：モデルが空のサマリーを返しました。",
     "noop": "圧縮するものがありません。"
+  },
+  "toolConfirmation": {
+    "options": {
+      "allowOnce": "今回のみ許可",
+      "allowSession": "このセッション中許可",
+      "allowFuture": "今後常に許可",
+      "modifyEditor": "外部エディタで修正",
+      "cancel": "いいえ、修正を提案する (Esc)",
+      "allowToolSession": "このツールの実行をセッション中許可",
+      "allowServerSession": "このサーバーの全ツールをセッション中許可",
+      "allowToolFuture": "このツールの実行を今後常に許可"
+    },
+    "questions": {
+      "applyChange": "この変更を適用しますか？",
+      "allowExecCount": "{{count}} 個のコマンドの実行を許可しますか？",
+      "allowExecRoot": "'{{command}}' の実行を許可しますか？",
+      "proceed": "続行しますか？",
+      "allowMcp": "サーバー \"{{server}}\" の MCP ツール \"{{tool}}\" の実行を許可しますか？"
+    },
+    "body": {
+      "urlsToFetch": "取得する URL:",
+      "mcpServer": "MCP サーバー: {{server}}",
+      "mcpTool": "ツール: {{tool}}",
+      "modifyInProgress": "修正中: ",
+      "closeEditorToContinue": "外部エディタを保存して閉じると続行します"
+    }
   }
 }
