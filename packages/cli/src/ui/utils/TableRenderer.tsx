@@ -128,9 +128,9 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
         {renderedCells.map((cell, index) => (
           <React.Fragment key={index}>
             {cell}
-            <Text color={theme.border.default}>
-              {index < renderedCells.length - 1 ? ' │ ' : ''}
-            </Text>
+            {index < renderedCells.length - 1 && (
+              <Text color={theme.border.default}>{' │ '}</Text>
+            )}
           </React.Fragment>
         ))}{' '}
         <Text color={theme.border.default}>│</Text>
