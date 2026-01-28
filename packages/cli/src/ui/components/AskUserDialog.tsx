@@ -14,6 +14,7 @@ import {
   useContext,
 } from 'react';
 import { Box, Text } from 'ink';
+import { useTranslation } from 'react-i18next';
 import { theme } from '../semantic-colors.js';
 import type { Question } from '@google/gemini-cli-core';
 import { BaseSelectionList } from './shared/BaseSelectionList.js';
@@ -136,6 +137,7 @@ const ReviewView: React.FC<ReviewViewProps> = ({
   onSubmit,
   progressHeader,
 }) => {
+  const { t } = useTranslation('dialogs');
   const unansweredCount = questions.length - Object.keys(answers).length;
   const hasUnanswered = unansweredCount > 0;
 
@@ -161,15 +163,14 @@ const ReviewView: React.FC<ReviewViewProps> = ({
       {progressHeader}
       <Box marginBottom={1}>
         <Text bold color={theme.text.primary}>
-          Review your answers:
+          {t('askUser.reviewAnswers')}
         </Text>
       </Box>
 
       {hasUnanswered && (
         <Box marginBottom={1}>
           <Text color={theme.status.warning}>
-            ⚠ You have {unansweredCount} unanswered question
-            {unansweredCount > 1 ? 's' : ''}
+            ⚠ {t('askUser.unansweredQuestions', { count: unansweredCount })}
           </Text>
         </Box>
       )}
@@ -179,13 +180,13 @@ const ReviewView: React.FC<ReviewViewProps> = ({
           <Text color={theme.text.secondary}>{q.header}</Text>
           <Text color={theme.text.secondary}> → </Text>
           <Text color={answers[i] ? theme.text.primary : theme.status.warning}>
-            {answers[i] || '(not answered)'}
+            {answers[i] || t('askUser.notAnswered')}
           </Text>
         </Box>
       ))}
       <DialogFooter
-        primaryAction="Enter to submit"
-        navigationActions="Tab/Shift+Tab to edit answers"
+        primaryAction={t('askUser.hintsReviewEnterSubmit')}
+        navigationActions={t('askUser.hintsReviewTabShiftTabEditAnswers')}
       />
     </Box>
   );
@@ -214,6 +215,7 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
   progressHeader,
   keyboardHints,
 }) => {
+  const { t } = useTranslation('dialogs');
   const prefix = '> ';
   const horizontalPadding = 4 + 1; // Padding from Box (2) and border (2) + 1 for cursor
   const bufferWidth =
@@ -268,7 +270,7 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
     };
   }, [onEditingCustomOption]);
 
-  const placeholder = question.placeholder || 'Enter your response';
+  const placeholder = question.placeholder || t('askUser.defaultPlaceholder');
 
   return (
     <Box
@@ -395,6 +397,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
   progressHeader,
   keyboardHints,
 }) => {
+  const { t } = useTranslation('dialogs');
   const uiState = useContext(UIStateContext);
   const terminalWidth = uiState?.terminalWidth ?? 80;
   const availableWidth = terminalWidth;
@@ -620,8 +623,8 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     if (question.multiSelect) {
       const doneItem: OptionItem = {
         key: 'done',
-        label: 'Done',
-        description: 'Finish selection',
+        label: t('askUser.doneLabel'),
+        description: t('askUser.finishSelection'),
         type: 'done',
         index: list.length,
       };
@@ -713,8 +716,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       </Box>
       {question.multiSelect && (
         <Text color={theme.text.secondary} italic>
-          {' '}
-          (Select all that apply)
+          {t('askUser.selectMultiple')}
         </Text>
       )}
 
@@ -734,7 +736,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
 
           // Render inline text input for custom option
           if (optionItem.type === 'other') {
-            const placeholder = 'Enter a custom value';
+            const placeholder = t('askUser.enterCustomValue');
             return (
               <Box flexDirection="row">
                 {showCheck && (
@@ -805,6 +807,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
   onCancel,
   onActiveTextInputChange,
 }) => {
+  const { t } = useTranslation('dialogs');
   const [state, dispatch] = useReducer(askUserDialogReducerLogic, initialState);
   const { answers, isEditingCustomOption, submitted } = state;
 
@@ -946,14 +949,14 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
       return {
         ...currentQuestion,
         options: [
-          { label: 'Yes', description: '' },
-          { label: 'No', description: '' },
+          { label: t('askUser.yes'), description: '' },
+          { label: t('askUser.no'), description: '' },
         ],
         multiSelect: false,
       };
     }
     return currentQuestion;
-  }, [currentQuestion]);
+  }, [currentQuestion, t]);
 
   const tabs = useMemo((): Tab[] => {
     const questionTabs: Tab[] = questions.map((q, i) => ({
@@ -963,12 +966,12 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
     if (questions.length > 1) {
       questionTabs.push({
         key: 'review',
-        header: 'Review',
+        header: t('askUser.reviewTab'),
         isSpecial: true,
       });
     }
     return questionTabs;
-  }, [questions]);
+  }, [questions, t]);
 
   const progressHeader =
     questions.length > 1 ? (
@@ -998,17 +1001,17 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
     <DialogFooter
       primaryAction={
         currentQuestion.type === 'text' || isEditingCustomOption
-          ? 'Enter to submit'
-          : 'Enter to select'
+          ? t('askUser.hintsReviewEnterSubmit')
+          : t('askUser.hintsReviewEnterSelect')
       }
       navigationActions={
         questions.length > 1
           ? currentQuestion.type === 'text' || isEditingCustomOption
-            ? 'Tab/Shift+Tab to switch questions'
-            : '←/→ to switch questions'
+            ? t('askUser.hintsReviewTabShiftTabSwitchQuestions')
+            : t('askUser.hintsReviewLeftRightSwitchQuestions')
           : currentQuestion.type === 'text' || isEditingCustomOption
             ? undefined
-            : '↑/↓ to navigate'
+            : t('askUser.hintsReviewUpDownNavigate')
       }
     />
   );

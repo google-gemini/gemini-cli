@@ -317,5 +317,30 @@
   "adminSettings": {
     "message": "管理者設定が変更されました。新しい設定を適用するには、セッションを再起動してください。",
     "restartHint": "'r'キーで再起動、または 'Ctrl+C' を2回押して終了します。"
+  },
+  "askUser": {
+    "reviewAnswers": "回答内容を確認してください:",
+    "unansweredQuestions": "未回答の質問が {{count}} 件あります",
+    "notAnswered": "(未回答)",
+    "hintsReviewEnterConfirm": "Enter で確定",
+    "hintsReviewEnterSubmit": "Enter で送信",
+    "hintsReviewEnterSelect": "Enter で選択",
+    "hintsReviewTabShiftTabEditAnswers": "Tab/Shift+Tab で回答を編集",
+    "hintsReviewTabShiftTabSwitchQuestions": "Tab/Shift+Tab で質問を切り替え",
+    "hintsReviewLeftRightSwitchQuestions": "←/→ で質問を切り替え",
+    "hintsReviewUpDownNavigate": "↑/↓ で移動",
+    "defaultPlaceholder": "回答を入力してください",
+    "doneLabel": "完了",
+    "finishSelection": "選択を終了する",
+    "hintsMultiple": "Space で切り替え · Enter で確定 · Esc でキャンセル",
+    "hintsSingle": "Enter で選択 · Esc でキャンセル",
+    "hintsText": "Enter で送信 · Esc でキャンセル",
+    "questionCount": "質問 {{current}} / {{total}}",
+    "customAnswerLabel": "独自の回答を入力",
+    "selectMultiple": " (複数選択可)",
+    "enterCustomValue": "独自の値を入力してください",
+    "reviewTab": "確認",
+    "yes": "はい",
+    "no": "いいえ"
   }
 }

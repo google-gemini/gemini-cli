@@ -317,5 +317,29 @@
   "adminSettings": {
     "message": "Admin settings have changed. Please restart the session to apply new settings.",
     "restartHint": "Press 'r' to restart, or 'Ctrl+C' twice to exit."
+  },
+  "askUser": {
+    "reviewAnswers": "Review your answers:",
+    "unansweredQuestions": "You have {{count}} unanswered question",
+    "unansweredQuestions_plural": "You have {{count}} unanswered questions",
+    "notAnswered": "(not answered)",
+    "hintsReviewEnterConfirm": "Enter to confirm",
+    "hintsReviewEnterSubmit": "Enter to submit",
+    "hintsReviewEnterSelect": "Enter to select",
+    "hintsReviewTabShiftTabEditAnswers": "Tab/Shift+Tab to edit answers",
+    "hintsReviewTabShiftTabSwitchQuestions": "Tab/Shift+Tab to switch questions",
+    "hintsReviewLeftRightSwitchQuestions": "←/→ to switch questions",
+    "hintsReviewUpDownNavigate": "↑/↓ to navigate",
+    "defaultPlaceholder": "Enter your response",
+    "doneLabel": "Done",
+    "finishSelection": "Finish selection",
+    "hintsReviewSpaceToggle": "Space to toggle",
+    "questionCount": "Question {{current}} of {{total}}",
+    "customAnswerLabel": "Type your own answer",
+    "selectMultiple": " (Select all that apply)",
+    "enterCustomValue": "Enter a custom value",
+    "reviewTab": "Review",
+    "yes": "Yes",
+    "no": "No"
   }
 }
