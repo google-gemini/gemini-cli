@@ -5,11 +5,15 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import * as themeModule from './theme.js';
+import {
+  createCustomTheme,
+  validateCustomTheme,
+  pickDefaultThemeName,
+  darkTheme,
+  type Theme,
+} from './theme.js';
 import { themeManager } from './theme-manager.js';
-
-const { validateCustomTheme, createCustomTheme } = themeModule;
-type CustomTheme = themeModule.CustomTheme;
+import type { CustomTheme } from '@google/gemini-cli-core';
 
 describe('createCustomTheme', () => {
   const baseTheme: CustomTheme = {
@@ -152,7 +156,6 @@ describe('themeManager.loadCustomThemes', () => {
   };
 
   it('should use values from DEFAULT_THEME when DiffAdded and DiffRemoved are not provided', () => {
-    const { darkTheme } = themeModule;
     const legacyTheme: Partial<CustomTheme> = { ...baseTheme };
     delete legacyTheme.DiffAdded;
     delete legacyTheme.DiffRemoved;
@@ -170,12 +173,11 @@ describe('themeManager.loadCustomThemes', () => {
 });
 
 describe('pickDefaultThemeName', () => {
-  const { pickDefaultThemeName } = themeModule;
   const mockThemes = [
     { name: 'Dark Theme', type: 'dark', colors: { Background: '#000000' } },
     { name: 'Light Theme', type: 'light', colors: { Background: '#ffffff' } },
     { name: 'Blue Theme', type: 'dark', colors: { Background: '#0000ff' } },
-  ] as unknown as themeModule.Theme[];
+  ] as unknown as Theme[];
 
   it('should return exact match if found', () => {
     expect(
