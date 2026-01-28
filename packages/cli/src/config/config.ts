@@ -560,7 +560,11 @@ export async function loadCliConfig(
   }
 
   // Force approval mode to default if the folder is not trusted.
-  if (!trustedFolder && approvalMode !== ApprovalMode.DEFAULT) {
+  if (
+    !trustedFolder &&
+    approvalMode !== ApprovalMode.DEFAULT &&
+    approvalMode !== ApprovalMode.PLAN
+  ) {
     debugLogger.warn(
       `Approval mode overridden to "default" because the current folder is not trusted.`,
     );

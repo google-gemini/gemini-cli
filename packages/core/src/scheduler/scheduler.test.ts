@@ -55,7 +55,7 @@ import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { PolicyEngine } from '../policy/policy-engine.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
-import { PolicyDecision } from '../policy/types.js';
+import { PolicyDecision, ApprovalMode } from '../policy/types.js';
 import {
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
@@ -78,6 +78,7 @@ import {
   getToolCallContext,
   type ToolCallContext,
 } from '../utils/toolCallContext.js';
+import { PLAN_MODE_DENIAL_MESSAGE } from '../core/coreToolScheduler.js';
 
 describe('Scheduler (Orchestrator)', () => {
   let scheduler: Scheduler;
@@ -149,6 +150,7 @@ describe('Scheduler (Orchestrator)', () => {
       isInteractive: vi.fn().mockReturnValue(true),
       getEnableHooks: vi.fn().mockReturnValue(true),
       setApprovalMode: vi.fn(),
+      getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
     } as unknown as Mocked<Config>;
 
     mockMessageBus = {
@@ -676,6 +678,28 @@ describe('Scheduler (Orchestrator)', () => {
       );
       // Deny shouldn't throw, execution is just skipped, state is updated
       expect(mockExecutor.execute).not.toHaveBeenCalled();
+    });
+
+    it('should update state to error with PLAN_MODE_DENIAL_MESSAGE and STOP_EXECUTION if Policy returns DENY in PLAN mode', async () => {
+      vi.mocked(checkPolicy).mockResolvedValue(PolicyDecision.DENY);
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
+
+      await scheduler.schedule(req1, signal);
+
+      expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
+        'call-1',
+        'error',
+        expect.objectContaining({
+          errorType: ToolErrorType.STOP_EXECUTION,
+          responseParts: expect.arrayContaining([
+            expect.objectContaining({
+              functionResponse: expect.objectContaining({
+                response: { error: PLAN_MODE_DENIAL_MESSAGE },
+              }),
+            }),
+          ]),
+        }),
+      );
     });
 
     it('should handle errors from checkPolicy (e.g. non-interactive ASK_USER)', async () => {

@@ -1399,7 +1399,11 @@ export class Config {
   }
 
   setApprovalMode(mode: ApprovalMode): void {
-    if (!this.isTrustedFolder() && mode !== ApprovalMode.DEFAULT) {
+    if (
+      !this.isTrustedFolder() &&
+      mode !== ApprovalMode.DEFAULT &&
+      mode !== ApprovalMode.PLAN
+    ) {
       throw new Error(
         'Cannot enable privileged approval modes in an untrusted folder.',
       );

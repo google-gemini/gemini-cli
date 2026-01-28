@@ -21,7 +21,7 @@ import {
   type ErroredToolCall,
 } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
-import { PolicyDecision } from '../policy/types.js';
+import { PolicyDecision, ApprovalMode } from '../policy/types.js';
 import {
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
@@ -37,6 +37,7 @@ import {
   type ToolConfirmationRequest,
 } from '../confirmation-bus/types.js';
 import { runWithToolCallContext } from '../utils/toolCallContext.js';
+import { PLAN_MODE_DENIAL_MESSAGE } from '../core/coreToolScheduler.js';
 
 interface SchedulerQueueItem {
   requests: ToolCallRequestInfo[];
@@ -407,13 +408,21 @@ export class Scheduler {
     const decision = await checkPolicy(toolCall, this.config);
 
     if (decision === PolicyDecision.DENY) {
+      let errorMessage = 'Tool execution denied by policy.';
+      let errorType = ToolErrorType.POLICY_VIOLATION;
+
+      if (this.config.getApprovalMode() === ApprovalMode.PLAN) {
+        errorMessage = PLAN_MODE_DENIAL_MESSAGE;
+        errorType = ToolErrorType.STOP_EXECUTION;
+      }
+
       this.state.updateStatus(
         callId,
         'error',
         createErrorResponse(
           toolCall.request,
-          new Error('Tool execution denied by policy.'),
-          ToolErrorType.POLICY_VIOLATION,
+          new Error(errorMessage),
+          errorType,
         ),
       );
       this.state.finalizeCall(callId);
