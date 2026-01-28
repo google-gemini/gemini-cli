@@ -34,7 +34,6 @@ exports[`<ToolGroupMessage /> > Confirmation Handling > renders confirmation wit
 │                                                                              │
 │ Test result                                                                  │
 │ Do you want to proceed?                                                      │
-│                                                                              │
 │ Do you want to proceed?                                                      │
 │                                                                              │
 │ ● 1. Allow once                                                              │
@@ -50,7 +49,6 @@ exports[`<ToolGroupMessage /> > Confirmation Handling > renders confirmation wit
 │                                                                              │
 │ Test result                                                                  │
 │ Do you want to proceed?                                                      │
-│                                                                              │
 │ Do you want to proceed?                                                      │
 │                                                                              │
 │ ● 1. Allow once                                                              │
@@ -67,7 +65,6 @@ exports[`<ToolGroupMessage /> > Confirmation Handling > shows confirmation dialo
 │                                                                              │
 │ Test result                                                                  │
 │ Confirm first tool                                                           │
-│                                                                              │
 │ Do you want to proceed?                                                      │
 │                                                                              │
 │ ● 1. Allow once                                                              │
@@ -76,6 +73,16 @@ exports[`<ToolGroupMessage /> > Confirmation Handling > shows confirmation dialo
 │                                                                              │
 │                                                                              │
 │ ?  second-confirm A tool for testing                                         │
+│                                                                              │
+│ Test result                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`<ToolGroupMessage /> > Event-Driven Scheduler > hides confirming tools when event-driven scheduler is enabled 1`] = `""`;
+
+exports[`<ToolGroupMessage /> > Event-Driven Scheduler > shows only successful tools when mixed with confirming tools 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ✓  success-tool A tool for testing                                           │
 │                                                                              │
 │ Test result                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────╯"
@@ -150,7 +157,6 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders tool call awaiting co
 │                                                                              │
 │ Test result                                                                  │
 │ Are you sure you want to proceed?                                            │
-│                                                                              │
 │ Do you want to proceed?                                                      │
 │                                                                              │
 │ ● 1. Allow once                                                              │

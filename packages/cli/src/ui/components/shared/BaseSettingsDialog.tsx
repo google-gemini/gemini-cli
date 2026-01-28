@@ -50,6 +50,8 @@ export interface BaseSettingsDialogProps {
   // Header
   /** Dialog title displayed at the top */
   title: string;
+  /** Optional border color for the dialog */
+  borderColor?: string;
 
   // Search (optional feature)
   /** Whether to show the search input. Default: true */
@@ -107,6 +109,7 @@ export interface BaseSettingsDialogProps {
  */
 export function BaseSettingsDialog({
   title,
+  borderColor,
   searchEnabled = true,
   searchPlaceholder = 'Search to filter',
   searchBuffer,
@@ -333,7 +336,7 @@ export function BaseSettingsDialog({
           } else if (newIndex < scrollOffset) {
             setScrollOffset(newIndex);
           }
-          return;
+          return true;
         }
         if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
           const newIndex = activeIndex < items.length - 1 ? activeIndex + 1 : 0;
@@ -343,7 +346,7 @@ export function BaseSettingsDialog({
           } else if (newIndex >= scrollOffset + maxItemsToShow) {
             setScrollOffset(newIndex - maxItemsToShow + 1);
           }
-          return;
+          return true;
         }
 
         // Enter - toggle or start edit
@@ -356,19 +359,19 @@ export function BaseSettingsDialog({
             const initialValue = rawVal !== undefined ? String(rawVal) : '';
             startEditing(currentItem.key, initialValue);
           }
-          return;
+          return true;
         }
 
         // Ctrl+L - clear/reset to default (using only Ctrl+L to avoid Ctrl+C exit conflict)
         if (keyMatchers[Command.CLEAR_SCREEN](key) && currentItem) {
           onItemClear(currentItem.key, currentItem);
-          return;
+          return true;
         }
 
         // Number keys for quick edit on number fields
         if (currentItem?.type === 'number' && /^[0-9]$/.test(key.sequence)) {
           startEditing(currentItem.key, key.sequence);
-          return;
+          return true;
         }
       }
 
@@ -383,6 +386,8 @@ export function BaseSettingsDialog({
         onClose();
         return;
       }
+
+      return;
     },
     { isActive: true },
   );
@@ -390,7 +395,7 @@ export function BaseSettingsDialog({
   return (
     <Box
       borderStyle="round"
-      borderColor={theme.border.default}
+      borderColor={borderColor ?? theme.border.default}
       flexDirection="row"
       padding={1}
       width="100%"
@@ -562,6 +567,7 @@ export function BaseSettingsDialog({
               onHighlight={handleScopeHighlight}
               isFocused={focusSection === 'scope'}
               showNumbers={focusSection === 'scope'}
+              priority={focusSection === 'scope'}
             />
           </Box>
         )}

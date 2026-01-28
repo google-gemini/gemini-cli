@@ -36,6 +36,8 @@ export type {
   TrackedExecutingToolCall,
   TrackedCompletedToolCall,
   TrackedCancelledToolCall,
+  MarkToolsAsSubmittedFn,
+  CancelAllFn,
 };
 
 // Unified type that covers both implementations

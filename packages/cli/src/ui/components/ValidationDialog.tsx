@@ -48,17 +48,20 @@ export function ValidationDialog({
     },
   ];
 
-  // Handle keypresses during 'waiting' state (ESC to cancel, Enter to confirm completion)
+  // Handle keypresses globally for cancellation, and specific logic for waiting state
   useKeypress(
     (key) => {
       if (keyMatchers[Command.ESCAPE](key) || keyMatchers[Command.QUIT](key)) {
         onChoice('cancel');
-      } else if (keyMatchers[Command.RETURN](key)) {
+        return true;
+      } else if (state === 'waiting' && keyMatchers[Command.RETURN](key)) {
         // User confirmed verification is complete - transition to 'complete' state
         setState('complete');
+        return true;
       }
+      return false;
     },
-    { isActive: state === 'waiting' },
+    { isActive: state !== 'complete' },
   );
 
   // When state becomes 'complete', show success message briefly then proceed

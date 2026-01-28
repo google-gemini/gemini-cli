@@ -62,10 +62,13 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         } else {
           onClose();
         }
+        return true;
       }
       if (key.name === 'tab') {
         setPersistMode((prev) => !prev);
+        return true;
       }
+      return false;
     },
     { isActive: true },
   );

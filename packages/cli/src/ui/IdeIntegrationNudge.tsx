@@ -32,7 +32,9 @@ export function IdeIntegrationNudge({
           userSelection: 'no',
           isExtensionPreInstalled: false,
         });
+        return true;
       }
+      return false;
     },
     { isActive: true },
   );

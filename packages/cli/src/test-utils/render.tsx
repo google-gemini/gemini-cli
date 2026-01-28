@@ -9,13 +9,13 @@ import { Box } from 'ink';
 import type React from 'react';
 import { vi } from 'vitest';
 import { act, useState } from 'react';
+import os from 'node:os';
 import { LoadedSettings, type Settings } from '../config/settings.js';
 import { KeypressProvider } from '../ui/contexts/KeypressContext.js';
 import { SettingsContext } from '../ui/contexts/SettingsContext.js';
 import { ShellFocusContext } from '../ui/contexts/ShellFocusContext.js';
 import { UIStateContext, type UIState } from '../ui/contexts/UIStateContext.js';
 import { ConfigContext } from '../ui/contexts/ConfigContext.js';
-import { calculateMainAreaWidth } from '../ui/utils/ui-sizing.js';
 import { VimModeProvider } from '../ui/contexts/VimModeContext.js';
 import { MouseProvider } from '../ui/contexts/MouseContext.js';
 import { ScrollProvider } from '../ui/contexts/ScrollProvider.js';
@@ -26,14 +26,22 @@ import {
 } from '../ui/contexts/UIActionsContext.js';
 import { type HistoryItemToolGroup, StreamingState } from '../ui/types.js';
 import { ToolActionsProvider } from '../ui/contexts/ToolActionsContext.js';
+import { AskUserActionsProvider } from '../ui/contexts/AskUserActionsContext.js';
 
-import { type Config } from '@google/gemini-cli-core';
+import { makeFakeConfig, type Config } from '@google/gemini-cli-core';
 import { FakePersistentState } from './persistentStateFake.js';
+import { AppContext, type AppState } from '../ui/contexts/AppContext.js';
 
 export const persistentStateMock = new FakePersistentState();
 
 vi.mock('../utils/persistentState.js', () => ({
   persistentState: persistentStateMock,
+}));
+
+vi.mock('../ui/utils/terminalUtils.js', () => ({
+  isLowColorDepth: vi.fn(() => false),
+  getColorDepth: vi.fn(() => 24),
+  isITerm2: vi.fn(() => false),
 }));
 
 // Wrapper around ink-testing-library's render that ensures act() is called
@@ -91,21 +99,27 @@ export const simulateClick = async (
   });
 };
 
-const mockConfig = {
-  getModel: () => 'gemini-pro',
-  getTargetDir: () =>
-    '/Users/test/project/foo/bar/and/some/more/directories/to/make/it/long',
-  getDebugMode: () => false,
-  isTrustedFolder: () => true,
-  getIdeMode: () => false,
-  getEnableInteractiveShell: () => true,
-  getPreviewFeatures: () => false,
+let mockConfigInternal: Config | undefined;
+
+const getMockConfigInternal = (): Config => {
+  if (!mockConfigInternal) {
+    mockConfigInternal = makeFakeConfig({
+      targetDir: os.tmpdir(),
+      enableEventDrivenScheduler: true,
+    });
+  }
+  return mockConfigInternal;
 };
 
-const configProxy = new Proxy(mockConfig, {
-  get(target, prop) {
-    if (prop in target) {
-      return target[prop as keyof typeof target];
+const configProxy = new Proxy({} as Config, {
+  get(_target, prop) {
+    if (prop === 'getTargetDir') {
+      return () =>
+        '/Users/test/project/foo/bar/and/some/more/directories/to/make/it/long';
+    }
+    const internal = getMockConfigInternal();
+    if (prop in internal) {
+      return internal[prop as keyof typeof internal];
     }
     throw new Error(`mockConfig does not have property ${String(prop)}`);
   },
@@ -139,11 +153,15 @@ export const createMockSettings = (
 const baseMockUiState = {
   renderMarkdown: true,
   streamingState: StreamingState.Idle,
-  mainAreaWidth: 100,
   terminalWidth: 120,
   terminalHeight: 40,
   currentModel: 'gemini-pro',
   terminalBackgroundColor: undefined,
+};
+
+export const mockAppState: AppState = {
+  version: '1.2.3',
+  startupWarnings: [],
 };
 
 const mockUIActions: UIActions = {
@@ -185,6 +203,7 @@ const mockUIActions: UIActions = {
   setEmbeddedShellFocused: vi.fn(),
   setAuthContext: vi.fn(),
   handleRestart: vi.fn(),
+  handleNewAgentsSelect: vi.fn(),
 };
 
 export const renderWithProviders = (
@@ -199,6 +218,7 @@ export const renderWithProviders = (
     useAlternateBuffer = true,
     uiActions,
     persistentState,
+    appState = mockAppState,
   }: {
     shellFocus?: boolean;
     settings?: LoadedSettings;
@@ -212,6 +232,7 @@ export const renderWithProviders = (
       get?: typeof persistentStateMock.get;
       set?: typeof persistentStateMock.set;
     };
+    appState?: AppState;
   } = {},
 ): ReturnType<typeof render> & { simulateClick: typeof simulateClick } => {
   const baseState: UIState = new Proxy(
@@ -253,7 +274,7 @@ export const renderWithProviders = (
     });
   }
 
-  const mainAreaWidth = calculateMainAreaWidth(terminalWidth, finalSettings);
+  const mainAreaWidth = terminalWidth;
 
   const finalUiState = {
     ...baseState,
@@ -268,36 +289,49 @@ export const renderWithProviders = (
     .flatMap((item) => item.tools);
 
   const renderResult = render(
-    <ConfigContext.Provider value={config}>
-      <SettingsContext.Provider value={finalSettings}>
-        <UIStateContext.Provider value={finalUiState}>
-          <VimModeProvider settings={finalSettings}>
-            <ShellFocusContext.Provider value={shellFocus}>
-              <StreamingContext.Provider value={finalUiState.streamingState}>
-                <UIActionsContext.Provider value={finalUIActions}>
-                  <ToolActionsProvider config={config} toolCalls={allToolCalls}>
-                    <KeypressProvider>
-                      <MouseProvider mouseEventsEnabled={mouseEventsEnabled}>
-                        <ScrollProvider>
-                          <Box
-                            width={terminalWidth}
-                            flexShrink={0}
-                            flexGrow={0}
-                            flexDirection="column"
+    <AppContext.Provider value={appState}>
+      <ConfigContext.Provider value={config}>
+        <SettingsContext.Provider value={finalSettings}>
+          <UIStateContext.Provider value={finalUiState}>
+            <VimModeProvider settings={finalSettings}>
+              <ShellFocusContext.Provider value={shellFocus}>
+                <StreamingContext.Provider value={finalUiState.streamingState}>
+                  <UIActionsContext.Provider value={finalUIActions}>
+                    <ToolActionsProvider
+                      config={config}
+                      toolCalls={allToolCalls}
+                    >
+                      <AskUserActionsProvider
+                        request={null}
+                        onSubmit={vi.fn()}
+                        onCancel={vi.fn()}
+                      >
+                        <KeypressProvider>
+                          <MouseProvider
+                            mouseEventsEnabled={mouseEventsEnabled}
                           >
-                            {component}
-                          </Box>
-                        </ScrollProvider>
-                      </MouseProvider>
-                    </KeypressProvider>
-                  </ToolActionsProvider>
-                </UIActionsContext.Provider>
-              </StreamingContext.Provider>
-            </ShellFocusContext.Provider>
-          </VimModeProvider>
-        </UIStateContext.Provider>
-      </SettingsContext.Provider>
-    </ConfigContext.Provider>,
+                            <ScrollProvider>
+                              <Box
+                                width={terminalWidth}
+                                flexShrink={0}
+                                flexGrow={0}
+                                flexDirection="column"
+                              >
+                                {component}
+                              </Box>
+                            </ScrollProvider>
+                          </MouseProvider>
+                        </KeypressProvider>
+                      </AskUserActionsProvider>
+                    </ToolActionsProvider>
+                  </UIActionsContext.Provider>
+                </StreamingContext.Provider>
+              </ShellFocusContext.Provider>
+            </VimModeProvider>
+          </UIStateContext.Provider>
+        </SettingsContext.Provider>
+      </ConfigContext.Provider>
+    </AppContext.Provider>,
     terminalWidth,
   );
 
@@ -382,10 +416,13 @@ export function renderHookWithProviders<Result, Props>(
   const result = { current: undefined as unknown as Result };
 
   let setPropsFn: ((props: Props) => void) | undefined;
+  let forceUpdateFn: (() => void) | undefined;
 
   function TestComponent({ initialProps }: { initialProps: Props }) {
     const [props, setProps] = useState(initialProps);
+    const [, forceUpdate] = useState(0);
     setPropsFn = setProps;
+    forceUpdateFn = () => forceUpdate((n) => n + 1);
     result.current = renderCallback(props);
     return null;
   }
@@ -405,8 +442,10 @@ export function renderHookWithProviders<Result, Props>(
 
   function rerender(newProps?: Props) {
     act(() => {
-      if (setPropsFn && newProps) {
-        setPropsFn(newProps);
+      if (arguments.length > 0 && setPropsFn) {
+        setPropsFn(newProps as Props);
+      } else if (forceUpdateFn) {
+        forceUpdateFn();
       }
     });
   }
