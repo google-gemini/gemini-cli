@@ -255,6 +255,16 @@
     "submitUrl": "To submit your bug report, please open the following URL in your browser:\n{{url}}{{message}}",
     "openFailed": "Could not open URL in browser: {{error}}"
   },
+  "directory.responses": {
+    "configFailed": "Configuration is not available.",
+    "addMemorySuccess": "Successfully added GEMINI.md files from the following directories if there are:\n- {{directories}}",
+    "refreshMemoryError": "Error refreshing memory: {{error}}",
+    "addSuccess": "Successfully added directories:\n- {{directories}}",
+    "sandboxNotSupported": "The /directory add command is not supported in restrictive sandbox profiles. Please use --include-directories when starting the session instead.",
+    "missingPath": "Please provide at least one path to add.",
+    "alreadyAdded": "The following directories are already in the workspace:\n- {{directories}}",
+    "showTitle": "Current workspace directories:\n{{list}}"
+  },
   "compress.responses": {
     "alreadyCompressing": "Already compressing, wait for previous request to complete",
     "failed": "Failed to compress chat history.",

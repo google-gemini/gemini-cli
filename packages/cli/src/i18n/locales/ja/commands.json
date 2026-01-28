@@ -249,6 +249,16 @@
     "submitUrl": "バグレポートを送信するには、ブラウザで以下の URL を開いてください:\n{{url}}{{message}}",
     "openFailed": "ブラウザで URL を開けませんでした: {{error}}"
   },
+  "directory.responses": {
+    "configFailed": "設定を利用できません。",
+    "addMemorySuccess": "以下のディレクトリから GEMINI.md ファイルを正常に追加しました（存在する場合）:\n- {{directories}}",
+    "refreshMemoryError": "メモリの再読み込み中にエラーが発生しました: {{error}}",
+    "addSuccess": "ディレクトリを正常に追加しました:\n- {{directories}}",
+    "sandboxNotSupported": "/directory add コマンドは制限付きサンドボックスプロファイルではサポートされていません。セッション開始時に --include-directories を使用してください。",
+    "missingPath": "追加するパスを少なくとも1つ指定してください。",
+    "alreadyAdded": "以下のディレクトリは既にワークスペースに含まれています:\n- {{directories}}",
+    "showTitle": "現在のワークスペースディレクトリ:\n{{list}}"
+  },
   "compress.responses": {
     "alreadyCompressing": "現在圧縮中です。前のリクエストが完了するまでお待ちください。",
     "failed": "チャット履歴の圧縮に失敗しました。",

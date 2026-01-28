@@ -18,6 +18,7 @@ import {
   getDirectorySuggestions,
   batchAddDirectories,
 } from '../utils/directoryUtils.js';
+import { t } from '../../i18n/index.js';
 import type { Config } from '@google/gemini-cli-core';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
@@ -34,7 +35,7 @@ async function finishAddingDirectories(
   if (!config) {
     addItem({
       type: MessageType.ERROR,
-      text: 'Configuration is not available.',
+      text: t('commands:directory.responses.configFailed'),
     });
     return;
   }
@@ -46,10 +47,16 @@ async function finishAddingDirectories(
       }
       addItem({
         type: MessageType.INFO,
-        text: `Successfully added GEMINI.md files from the following directories if there are:\n- ${added.join('\n- ')}`,
+        text: t('commands:directory.responses.addMemorySuccess', {
+          directories: added.join('\n- '),
+        }),
       });
     } catch (error) {
-      errors.push(`Error refreshing memory: ${(error as Error).message}`);
+      errors.push(
+        t('commands:directory.responses.refreshMemoryError', {
+          error: (error as Error).message,
+        }),
+      );
     }
   }
 
@@ -67,7 +74,9 @@ async function finishAddingDirectories(
     }
     addItem({
       type: MessageType.INFO,
-      text: `Successfully added directories:\n- ${added.join('\n- ')}`,
+      text: t('commands:directory.responses.addSuccess', {
+        directories: added.join('\n- '),
+      }),
     });
   }
 
@@ -145,7 +154,7 @@ export const directoryCommand: SlashCommand = {
         if (!config) {
           addItem({
             type: MessageType.ERROR,
-            text: 'Configuration is not available.',
+            text: t('commands:directory.responses.configFailed'),
           });
           return;
         }
@@ -154,8 +163,7 @@ export const directoryCommand: SlashCommand = {
           return {
             type: 'message' as const,
             messageType: 'error' as const,
-            content:
-              'The /directory add command is not supported in restrictive sandbox profiles. Please use --include-directories when starting the session instead.',
+            content: t('commands:directory.responses.sandboxNotSupported'),
           };
         }
 
@@ -166,7 +174,7 @@ export const directoryCommand: SlashCommand = {
         if (pathsToAdd.length === 0) {
           addItem({
             type: MessageType.ERROR,
-            text: 'Please provide at least one path to add.',
+            text: t('commands:directory.responses.missingPath'),
           });
           return;
         }
@@ -202,9 +210,9 @@ export const directoryCommand: SlashCommand = {
         if (alreadyAdded.length > 0) {
           addItem({
             type: MessageType.INFO,
-            text: `The following directories are already in the workspace:\n- ${alreadyAdded.join(
-              '\n- ',
-            )}`,
+            text: t('commands:directory.responses.alreadyAdded', {
+              directories: alreadyAdded.join('\n- '),
+            }),
           });
         }
 
@@ -274,7 +282,7 @@ export const directoryCommand: SlashCommand = {
         if (!config) {
           addItem({
             type: MessageType.ERROR,
-            text: 'Configuration is not available.',
+            text: t('commands:directory.responses.configFailed'),
           });
           return;
         }
@@ -283,7 +291,9 @@ export const directoryCommand: SlashCommand = {
         const directoryList = directories.map((dir) => `- ${dir}`).join('\n');
         addItem({
           type: MessageType.INFO,
-          text: `Current workspace directories:\n${directoryList}`,
+          text: t('commands:directory.responses.showTitle', {
+            list: directoryList,
+          }),
         });
       },
     },
