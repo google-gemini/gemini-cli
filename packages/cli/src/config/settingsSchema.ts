@@ -524,6 +524,16 @@ const SETTINGS_SCHEMA = {
         description: 'Show the model name in the chat for each model turn.',
         showInDialog: true,
       },
+      showUserIdentity: {
+        type: 'boolean',
+        label: 'Show User Identity',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          "Show the logged-in user's identity (e.g. email) in the UI.",
+        showInDialog: true,
+      },
       useAlternateBuffer: {
         type: 'boolean',
         label: 'Use Alternate Screen Buffer',
