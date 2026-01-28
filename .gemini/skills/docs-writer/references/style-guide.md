@@ -33,7 +33,8 @@
   a natural tone.
 - **Simple vocabulary:** Use common words. Define technical terms when
   necessary.
-- **Conciseness:** Keep sentences short and focused.
+- **Conciseness:** Keep sentences short and focused, but don't omit
+  helpful information.
 - **"Please":** Avoid using the word "please."
 
 ## IV. Procedures and steps
