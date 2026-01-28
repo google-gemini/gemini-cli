@@ -34,6 +34,14 @@ export type EvalPolicy = 'ALWAYS_PASSES' | 'USUALLY_PASSES';
 export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
   const fn = async () => {
     const rig = new TestRig();
+    let result = '';
+    const sanitizedName = evalCase.name
+      .replace(/[^a-z0-9]/gi, '_')
+      .toLowerCase();
+    const logDir = path.resolve('evals/logs');
+    await fs.promises.mkdir(logDir, { recursive: true });
+    const debugLogPath = path.join(logDir, `${sanitizedName}.debug.log`);
+
     try {
       rig.setup(evalCase.name, evalCase.params);
 
@@ -59,9 +67,13 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
         execSync('git commit --allow-empty -m "Initial commit"', execOptions);
       }
 
-      const result = await rig.run({
+      result = await rig.run({
         args: evalCase.prompt,
         approvalMode: evalCase.approvalMode ?? 'yolo',
+        env: {
+          GEMINI_DEBUG_LOG_FILE: debugLogPath,
+          DEBUG_MODE: 'true',
+        },
       });
 
       const unauthorizedErrorPrefix =
@@ -78,6 +90,9 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
         evalCase.name,
         JSON.stringify(rig.readToolLogs(), null, 2),
       );
+      if (result) {
+        await logToFile(evalCase.name, result, '.output.log');
+      }
       await rig.cleanup();
     }
   };
@@ -98,10 +113,14 @@ export interface EvalCase {
   assert: (rig: TestRig, result: string) => Promise<void>;
 }
 
-async function logToFile(name: string, content: string) {
+async function logToFile(
+  name: string,
+  content: string,
+  extension: string = '.log',
+) {
   const logDir = 'evals/logs';
   await fs.promises.mkdir(logDir, { recursive: true });
   const sanitizedName = name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-  const logFile = `${logDir}/${sanitizedName}.log`;
+  const logFile = `${logDir}/${sanitizedName}${extension}`;
   await fs.promises.writeFile(logFile, content);
 }

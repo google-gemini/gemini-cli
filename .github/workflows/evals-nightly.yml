@@ -59,6 +59,7 @@ jobs:
           GEMINI_MODEL: '${{ matrix.model }}'
           RUN_EVALS: "${{ github.event.inputs.run_all != 'false' }}"
           TEST_NAME_PATTERN: '${{ github.event.inputs.test_name_pattern }}'
+          DEBUG_MODE: 'true'
         run: |
           CMD="npm run test:all_evals"
           PATTERN="${{ env.TEST_NAME_PATTERN }}"
