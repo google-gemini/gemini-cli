@@ -35,40 +35,56 @@ enum TerminalKeys {
   CTRL_L = '\u000C',
 }
 
-const createMockItems = (): SettingsDialogItem[] => [
-  {
-    key: 'boolean-setting',
-    label: 'Boolean Setting',
-    description: 'A boolean setting for testing',
-    displayValue: 'true',
-    rawValue: true,
-    type: 'boolean',
-  },
-  {
-    key: 'string-setting',
-    label: 'String Setting',
-    description: 'A string setting for testing',
-    displayValue: 'test-value',
-    rawValue: 'test-value',
-    type: 'string',
-  },
-  {
-    key: 'number-setting',
-    label: 'Number Setting',
-    description: 'A number setting for testing',
-    displayValue: '42',
-    rawValue: 42,
-    type: 'number',
-  },
-  {
-    key: 'enum-setting',
-    label: 'Enum Setting',
-    description: 'An enum setting for testing',
-    displayValue: 'option-a',
-    rawValue: 'option-a',
-    type: 'enum',
-  },
-];
+const createMockItems = (count = 4): SettingsDialogItem[] => {
+  const items: SettingsDialogItem[] = [
+    {
+      key: 'boolean-setting',
+      label: 'Boolean Setting',
+      description: 'A boolean setting for testing',
+      displayValue: 'true',
+      rawValue: true,
+      type: 'boolean',
+    },
+    {
+      key: 'string-setting',
+      label: 'String Setting',
+      description: 'A string setting for testing',
+      displayValue: 'test-value',
+      rawValue: 'test-value',
+      type: 'string',
+    },
+    {
+      key: 'number-setting',
+      label: 'Number Setting',
+      description: 'A number setting for testing',
+      displayValue: '42',
+      rawValue: 42,
+      type: 'number',
+    },
+    {
+      key: 'enum-setting',
+      label: 'Enum Setting',
+      description: 'An enum setting for testing',
+      displayValue: 'option-a',
+      rawValue: 'option-a',
+      type: 'enum',
+    },
+  ];
+
+  // If count is larger than our base mock items, generate dynamic ones
+  if (count > items.length) {
+    for (let i = items.length; i < count; i++) {
+      items.push({
+        key: `extra-setting-${i}`,
+        label: `Extra Setting ${i}`,
+        displayValue: `value-${i}`,
+        type: 'string',
+      });
+    }
+  }
+
+  return items.slice(0, count);
+};
 
 describe('BaseSettingsDialog', () => {
   let mockOnItemToggle: ReturnType<typeof vi.fn>;
@@ -211,7 +227,7 @@ describe('BaseSettingsDialog', () => {
     });
 
     it('should wrap around when navigating past last item', async () => {
-      const items = createMockItems().slice(0, 2); // Only 2 items
+      const items = createMockItems(2); // Only 2 items
       const { stdin } = renderDialog({ items });
 
       // Press down twice to go past the last item
@@ -260,6 +276,112 @@ describe('BaseSettingsDialog', () => {
     });
   });
 
+  describe('scrolling and resizing list (search filtering)', () => {
+    it('should preserve focus on the active item if it remains in the filtered list', async () => {
+      const items = createMockItems(5); // items 0 to 4
+      const { rerender, stdin, lastFrame } = renderDialog({
+        items,
+        maxItemsToShow: 5,
+      });
+
+      // Move focus down to item 2 ("Number Setting")
+      // Separate acts needed so React state updates between keypresses
+      await act(async () => {
+        stdin.write(TerminalKeys.DOWN_ARROW);
+      });
+      await act(async () => {
+        stdin.write(TerminalKeys.DOWN_ARROW);
+      });
+
+      // Rerender with a filtered list where "Number Setting" is now at index 1
+      const filteredItems = [items[0], items[2], items[4]];
+      rerender(
+        <KeypressProvider>
+          <BaseSettingsDialog
+            title="Test Settings"
+            items={filteredItems}
+            selectedScope={SettingScope.User}
+            maxItemsToShow={5}
+            onItemToggle={mockOnItemToggle}
+            onEditCommit={mockOnEditCommit}
+            onItemClear={mockOnItemClear}
+            onClose={mockOnClose}
+          />
+        </KeypressProvider>,
+      );
+
+      // Verify the dialog hasn't crashed and the items are displayed
+      await waitFor(() => {
+        const frame = lastFrame();
+        expect(frame).toContain('Boolean Setting');
+        expect(frame).toContain('Number Setting');
+        expect(frame).toContain('Extra Setting 4');
+        expect(frame).not.toContain('No matches found.');
+      });
+
+      // Press Enter. If focus was preserved, it should be on "Number Setting" (index 1).
+      // Since it's a number, it enters edit mode (mockOnItemToggle is NOT called).
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER);
+      });
+
+      await waitFor(() => {
+        expect(mockOnItemToggle).not.toHaveBeenCalled();
+      });
+    });
+
+    it('should reset focus to the top if the active item is filtered out', async () => {
+      const items = createMockItems(5);
+      const { rerender, stdin, lastFrame } = renderDialog({
+        items,
+        maxItemsToShow: 5,
+      });
+
+      // Move focus down to item 2 ("Number Setting")
+      await act(async () => {
+        stdin.write(TerminalKeys.DOWN_ARROW);
+      });
+      await act(async () => {
+        stdin.write(TerminalKeys.DOWN_ARROW);
+      });
+
+      // Rerender with a filtered list that EXCLUDES "Number Setting"
+      const filteredItems = [items[0], items[1]];
+      rerender(
+        <KeypressProvider>
+          <BaseSettingsDialog
+            title="Test Settings"
+            items={filteredItems}
+            selectedScope={SettingScope.User}
+            maxItemsToShow={5}
+            onItemToggle={mockOnItemToggle}
+            onEditCommit={mockOnEditCommit}
+            onItemClear={mockOnItemClear}
+            onClose={mockOnClose}
+          />
+        </KeypressProvider>,
+      );
+
+      await waitFor(() => {
+        const frame = lastFrame();
+        expect(frame).toContain('Boolean Setting');
+        expect(frame).toContain('String Setting');
+      });
+
+      // Press Enter. Since focus reset to index 0 ("Boolean Setting"), it should toggle.
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER);
+      });
+
+      await waitFor(() => {
+        expect(mockOnItemToggle).toHaveBeenCalledWith(
+          'boolean-setting',
+          expect.anything(),
+        );
+      });
+    });
+  });
+
   describe('item interactions', () => {
     it('should call onItemToggle for boolean items on Enter', async () => {
       const { stdin } = renderDialog();
@@ -278,7 +400,7 @@ describe('BaseSettingsDialog', () => {
     });
 
     it('should call onItemToggle for enum items on Enter', async () => {
-      const items = createMockItems();
+      const items = createMockItems(4);
       // Move enum to first position
       const enumItem = items.find((i) => i.type === 'enum')!;
       const { stdin } = renderDialog({ items: [enumItem] });
@@ -297,7 +419,7 @@ describe('BaseSettingsDialog', () => {
     });
 
     it('should enter edit mode for string items on Enter', async () => {
-      const items = createMockItems();
+      const items = createMockItems(4);
       const stringItem = items.find((i) => i.type === 'string')!;
       const { lastFrame, stdin } = renderDialog({ items: [stringItem] });
 
@@ -315,7 +437,7 @@ describe('BaseSettingsDialog', () => {
     });
 
     it('should enter edit mode for number items on Enter', async () => {
-      const items = createMockItems();
+      const items = createMockItems(4);
       const numberItem = items.find((i) => i.type === 'number')!;
       const { lastFrame, stdin } = renderDialog({ items: [numberItem] });
 
@@ -350,7 +472,7 @@ describe('BaseSettingsDialog', () => {
 
   describe('edit mode', () => {
     it('should commit edit on Enter', async () => {
-      const items = createMockItems();
+      const items = createMockItems(4);
       const stringItem = items.find((i) => i.type === 'string')!;
       const { stdin } = renderDialog({ items: [stringItem] });
 
@@ -379,7 +501,7 @@ describe('BaseSettingsDialog', () => {
     });
 
     it('should commit edit on Escape', async () => {
-      const items = createMockItems();
+      const items = createMockItems(4);
       const stringItem = items.find((i) => i.type === 'string')!;
       const { stdin } = renderDialog({ items: [stringItem] });
 
@@ -399,7 +521,7 @@ describe('BaseSettingsDialog', () => {
     });
 
     it('should commit edit and navigate on Down arrow', async () => {
-      const items = createMockItems();
+      const items = createMockItems(4);
       const stringItem = items.find((i) => i.type === 'string')!;
       const numberItem = items.find((i) => i.type === 'number')!;
       const { stdin } = renderDialog({ items: [stringItem, numberItem] });
@@ -420,7 +542,7 @@ describe('BaseSettingsDialog', () => {
     });
 
     it('should commit edit and navigate on Up arrow', async () => {
-      const items = createMockItems();
+      const items = createMockItems(4);
       const stringItem = items.find((i) => i.type === 'string')!;
       const numberItem = items.find((i) => i.type === 'number')!;
       const { stdin } = renderDialog({ items: [stringItem, numberItem] });
@@ -446,7 +568,7 @@ describe('BaseSettingsDialog', () => {
     });
 
     it('should allow number input for number fields', async () => {
-      const items = createMockItems();
+      const items = createMockItems(4);
       const numberItem = items.find((i) => i.type === 'number')!;
       const { stdin } = renderDialog({ items: [numberItem] });
 
@@ -481,7 +603,7 @@ describe('BaseSettingsDialog', () => {
     });
 
     it('should support quick number entry for number fields', async () => {
-      const items = createMockItems();
+      const items = createMockItems(4);
       const numberItem = items.find((i) => i.type === 'number')!;
       const { stdin } = renderDialog({ items: [numberItem] });
 
