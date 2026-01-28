@@ -34,6 +34,7 @@ export type EvalPolicy = 'ALWAYS_PASSES' | 'USUALLY_PASSES';
 export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
   const fn = async () => {
     const rig = new TestRig();
+    let isSuccess = false;
     try {
       rig.setup(evalCase.name, evalCase.params);
 
@@ -80,9 +81,16 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
       }
 
       await evalCase.assert(rig, result);
+      isSuccess = true;
     } finally {
       const { logDir, sanitizedName } = await prepareLogDir(evalCase.name);
       const logFile = `${logDir}/${sanitizedName}.log`;
+      const activityLogFile = path.resolve(`${logDir}/${sanitizedName}.jsonl`);
+
+      if (isSuccess && fs.existsSync(activityLogFile)) {
+        await fs.promises.unlink(activityLogFile);
+      }
+
       await fs.promises.writeFile(
         logFile,
         JSON.stringify(rig.readToolLogs(), null, 2),
