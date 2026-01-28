@@ -616,7 +616,7 @@ describe('Policy Engine Integration Tests', () => {
       ).toBe(PolicyDecision.ALLOW);
     });
 
-    it('should allow tools in non-interactive mode with AUTO_EDIT approval mode', async () => {
+    it('should allow edit tools but deny shell commands in non-interactive AUTO_EDIT mode', async () => {
       const settings: Settings = {};
 
       const config = await createPolicyEngineConfig(
@@ -627,10 +627,15 @@ describe('Policy Engine Integration Tests', () => {
       const engineConfig = { ...config, nonInteractive: true };
       const engine = new PolicyEngine(engineConfig);
 
-      // ASK_USER should become ALLOW in non-interactive AUTO_EDIT mode
+      // Edit tools should be ALLOW (handled by AUTO_EDIT policy rules)
       expect(
         (await engine.check({ name: 'write_file' }, undefined)).decision,
       ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'replace' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+
+      // Shell commands should be DENY (not auto-approved in AUTO_EDIT mode)
       expect(
         (
           await engine.check(
@@ -638,7 +643,7 @@ describe('Policy Engine Integration Tests', () => {
             undefined,
           )
         ).decision,
-      ).toBe(PolicyDecision.ALLOW);
+      ).toBe(PolicyDecision.DENY);
     });
 
     it('should handle empty settings gracefully', async () => {

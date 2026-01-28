@@ -473,13 +473,10 @@ export class PolicyEngine {
   private applyNonInteractiveMode(decision: PolicyDecision): PolicyDecision {
     // In non-interactive mode, handle ASK_USER based on approval mode:
     // - YOLO mode: ASK_USER becomes ALLOW (auto-approve all tools)
-    // - AUTO_EDIT mode: ASK_USER becomes ALLOW (auto-approve for automation)
+    // - AUTO_EDIT mode: Handled by policy rules (only edit tools are auto-approved)
     // - DEFAULT/PLAN mode: ASK_USER becomes DENY (cannot prompt user)
     if (this.nonInteractive && decision === PolicyDecision.ASK_USER) {
-      if (
-        this.approvalMode === ApprovalMode.YOLO ||
-        this.approvalMode === ApprovalMode.AUTO_EDIT
-      ) {
+      if (this.approvalMode === ApprovalMode.YOLO) {
         return PolicyDecision.ALLOW;
       }
       return PolicyDecision.DENY;

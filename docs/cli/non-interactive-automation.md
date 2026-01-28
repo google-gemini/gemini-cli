@@ -41,11 +41,24 @@ Or using the long form:
 echo "Run terraform plan" | gemini --approval-mode=yolo
 ```
 
-#### 2. AUTO_EDIT Mode (Auto-approve edit tools)
+#### 2. AUTO_EDIT Mode (Auto-approve edit tools only)
+
+**SECURITY NOTE:** AUTO_EDIT mode only auto-approves file editing tools
+(write_file, replace, etc.). Shell commands and other tools are still denied in
+non-interactive mode.
 
 ```bash
 echo "Fix the typo in README.md" | gemini --approval-mode=auto_edit
 ```
+
+This mode is safer than YOLO because it:
+
+- Only allows file modifications
+- Denies shell command execution
+- Prevents remote code execution (RCE) attacks
+
+**Use case:** Safe file editing in CI/CD without allowing arbitrary command
+execution.
 
 ## CI/CD Integration Examples
 
@@ -130,7 +143,33 @@ Using `--yolo` mode auto-approves **all** tools, including:
 1. Only use in trusted environments
 2. Review generated commands before execution
 3. Use policy files to restrict specific tools
-4. Consider using `--approval-mode=auto_edit` for safer automation
+4. **Prefer `--approval-mode=auto_edit` for safer automation**
+
+### AUTO_EDIT Mode (Recommended for CI/CD)
+
+AUTO_EDIT mode is **significantly safer** than YOLO because:
+
+- ✅ Only auto-approves file editing tools (write_file, replace)
+- ❌ Denies shell command execution
+- ❌ Denies network requests
+- ✅ Prevents Remote Code Execution (RCE) attacks
+
+**Use AUTO_EDIT when:**
+
+- Running in CI/CD pipelines
+- Processing untrusted input
+- Automating code reviews or refactoring
+- You only need file modifications
+
+**Example:**
+
+```bash
+# Safe: Only allows file edits
+echo "Refactor the code in src/" | gemini --approval-mode=auto_edit
+
+# Dangerous: Allows shell commands (use with caution)
+echo "Refactor the code in src/" | gemini --yolo
+```
 
 ### Policy-Based Automation
 
