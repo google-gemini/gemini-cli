@@ -244,6 +244,10 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Show the model name in the chat for each model turn.
   - **Default:** `false`
 
+- **`ui.showUserIdentity`** (boolean):
+  - **Description:** Show the logged-in user's identity (e.g. email) in the UI.
+  - **Default:** `true`
+
 - **`ui.useAlternateBuffer`** (boolean):
   - **Description:** Use an alternate screen buffer for the UI, preserving shell
     history.

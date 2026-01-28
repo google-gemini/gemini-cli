@@ -207,7 +207,7 @@ export async function updateSetting(
   settingKey: string,
   requestSetting: (setting: ExtensionSetting) => Promise<string>,
   scope: ExtensionSettingScope,
-  workspaceDir?: string,
+  workspaceDir: string,
 ): Promise<void> {
   const { name: extensionName, settings } = extensionConfig;
   if (!settings || settings.length === 0) {
