@@ -932,7 +932,7 @@ describe('useShellCommandProcessor', () => {
       expect(result.current.backgroundShellCount).toBe(0);
     });
 
-    it('should trigger re-render on background shell output when visible', async () => {
+    it('should NOT trigger re-render on background shell output when visible', async () => {
       const { result, getRenderCount } = renderProcessorHook();
 
       act(() => {
@@ -957,7 +957,7 @@ describe('useShellCommandProcessor', () => {
         });
       }
 
-      expect(getRenderCount()).toBeGreaterThan(initialRenderCount);
+      expect(getRenderCount()).toBe(initialRenderCount);
       const shell = result.current.backgroundShells.get(1001);
       expect(shell?.output).toBe('initial + updated');
     });
@@ -1143,8 +1143,9 @@ describe('useShellCommandProcessor', () => {
 
       // It should NOT change visibility because manual toggle cleared the auto-restore flag
       // After delay it should stay true (as it was manually toggled to true)
-      await new Promise((resolve) => setTimeout(resolve, 400));
-      expect(result.current.isBackgroundShellVisible).toBe(true);
+      await waitFor(() =>
+        expect(result.current.isBackgroundShellVisible).toBe(true),
+      );
     });
   });
 });

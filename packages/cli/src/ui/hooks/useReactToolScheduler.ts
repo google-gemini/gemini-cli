@@ -31,12 +31,15 @@ export type CancelAllFn = (signal: AbortSignal) => void;
 
 export type TrackedScheduledToolCall = ScheduledToolCall & {
   responseSubmittedToGemini?: boolean;
+  pid?: number;
 };
 export type TrackedValidatingToolCall = ValidatingToolCall & {
   responseSubmittedToGemini?: boolean;
+  pid?: number;
 };
 export type TrackedWaitingToolCall = WaitingToolCall & {
   responseSubmittedToGemini?: boolean;
+  pid?: number;
 };
 export type TrackedExecutingToolCall = ExecutingToolCall & {
   responseSubmittedToGemini?: boolean;

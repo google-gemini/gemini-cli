@@ -35,6 +35,7 @@ export type CancelAllFn = (signal: AbortSignal) => void;
  */
 export type TrackedToolCall = ToolCall & {
   responseSubmittedToGemini?: boolean;
+  pid?: number;
 };
 
 /**
@@ -217,6 +218,11 @@ function adaptToolCalls(
     const prev = prevMap.get(coreCall.request.callId);
     const responseSubmittedToGemini = prev?.responseSubmittedToGemini ?? false;
 
+    // Preserve PID if it existed in the previous state or is present in the new core state
+    const pid =
+      (coreCall as { pid?: number }).pid ??
+      (prev as { pid?: number } | undefined)?.pid;
+
     // Inject onConfirm adapter for tools awaiting approval.
     // The Core provides data-only (serializable) confirmationDetails. We must
     // inject the legacy callback function that proxies responses back to the
@@ -242,12 +248,14 @@ function adaptToolCalls(
           },
         },
         responseSubmittedToGemini,
+        pid,
       };
     }
 
     return {
       ...coreCall,
       responseSubmittedToGemini,
+      pid,
     };
   });
 }

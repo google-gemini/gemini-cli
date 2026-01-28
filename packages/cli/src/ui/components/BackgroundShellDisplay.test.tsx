@@ -157,9 +157,7 @@ describe('<BackgroundShellDisplay />', () => {
       await delay(0);
     });
 
-    expect(lastFrame()).toContain('Starting server...');
-    expect(lastFrame()).toContain('1: npm');
-    expect(lastFrame()).toContain('(PID: 1001)');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders tabs for multiple shells', async () => {
@@ -179,8 +177,7 @@ describe('<BackgroundShellDisplay />', () => {
       await delay(0);
     });
 
-    expect(lastFrame()).toContain('1: npm');
-    expect(lastFrame()).toContain('2: tail');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('highlights the focused state', async () => {
@@ -200,7 +197,7 @@ describe('<BackgroundShellDisplay />', () => {
       await delay(0);
     });
 
-    expect(lastFrame()).toContain('(Focused)');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('resizes the PTY on mount and when dimensions change', async () => {
@@ -266,14 +263,10 @@ describe('<BackgroundShellDisplay />', () => {
       await delay(0);
     });
 
-    const frame = lastFrame();
-    expect(frame).toContain('Select Process');
-    expect(frame).toContain('●');
-    expect(frame).toContain('1.'); // Numbering
-    expect(frame).toContain('npm start (PID: 1001)');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('selects the current process and closes the list when Ctrl+O is pressed in list view', async () => {
+  it('selects the current process and closes the list when Ctrl+L is pressed in list view', async () => {
     render(
       <ScrollProvider>
         <BackgroundShellDisplay
@@ -295,9 +288,9 @@ describe('<BackgroundShellDisplay />', () => {
       simulateKey({ name: 'down' });
     });
 
-    // Simulate Ctrl+O (handled by BackgroundShellDisplay)
+    // Simulate Ctrl+L (handled by BackgroundShellDisplay)
     act(() => {
-      simulateKey({ name: 'o', ctrl: true });
+      simulateKey({ name: 'l', ctrl: true });
     });
 
     expect(mockSetActiveBackgroundShellPid).toHaveBeenCalledWith(shell2.pid);
@@ -378,10 +371,7 @@ describe('<BackgroundShellDisplay />', () => {
       await delay(0);
     });
 
-    const frame = lastFrame();
-    // Verify shell2 is selected (● indicates selection)
-    expect(frame).toMatch(/●\s+2\./); // Rough check
-    expect(frame).toContain('tail -f log.txt (PID: 1002)');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('keeps exit code status color even when selected', async () => {
@@ -412,10 +402,7 @@ describe('<BackgroundShellDisplay />', () => {
       await delay(0);
     });
 
-    const frame = lastFrame();
-    expect(frame).toContain('(Exit Code: 0)');
-    // 3rd item, RadioButtonSelect uses "3." format
-    expect(frame).toContain('3. exit 0 (PID: 1003)');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('unfocuses the shell when Shift+Tab is pressed', async () => {

@@ -360,8 +360,8 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.TOGGLE_BACKGROUND_SHELL_LIST,
-      positive: [createKey('o', { ctrl: true })],
-      negative: [createKey('o')],
+      positive: [createKey('l', { ctrl: true })],
+      negative: [createKey('l')],
     },
   ];
 

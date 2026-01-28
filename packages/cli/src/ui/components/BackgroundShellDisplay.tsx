@@ -147,7 +147,7 @@ export const BackgroundShellDisplay = ({
       // Handle Shift+Tab to focus out
       if (key.name === 'tab' && (key.shift || isListOpenProp)) {
         setEmbeddedShellFocused(false);
-        return;
+        return true;
       }
 
       // Handle Tab to warn but propagate
@@ -163,7 +163,7 @@ export const BackgroundShellDisplay = ({
 
         if (key.name === 'escape') {
           setIsBackgroundShellListOpen(false);
-          return;
+          return true;
         }
 
         if (key.ctrl && key.name === 'k') {
@@ -171,31 +171,31 @@ export const BackgroundShellDisplay = ({
             dismissBackgroundShell(highlightedPid);
             // If we killed the active one, the list might update via props
           }
-          return;
+          return true;
         }
 
-        if (key.ctrl && key.name === 'o') {
+        if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL_LIST](key)) {
           if (highlightedPid) {
             setActiveBackgroundShellPid(highlightedPid);
           }
           setIsBackgroundShellListOpen(false);
-          return;
+          return true;
         }
-        return;
+        return false;
       }
 
       if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL](key)) {
-        return;
+        return true;
       }
 
       if (key.ctrl && key.name === 'k') {
         dismissBackgroundShell(activeShell.pid);
-        return;
+        return true;
       }
 
-      if (key.ctrl && key.name === 'o') {
+      if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL_LIST](key)) {
         setIsBackgroundShellListOpen(true);
-        return;
+        return true;
       }
 
       const checkAtBottom = () => {
@@ -219,16 +219,20 @@ export const BackgroundShellDisplay = ({
       ) {
         // Check if we are at the bottom after scrolling
         checkAtBottom();
-        return;
+        return true;
       }
 
       if (key.name === 'return') {
         ShellExecutionService.writeToPty(activeShell.pid, '\r');
+        return true;
       } else if (key.name === 'backspace') {
         ShellExecutionService.writeToPty(activeShell.pid, '\b');
+        return true;
       } else if (key.sequence) {
         ShellExecutionService.writeToPty(activeShell.pid, key.sequence);
+        return true;
       }
+      return false;
     },
     { isActive: isFocused && !!activeShell },
   );
@@ -283,7 +287,7 @@ export const BackgroundShellDisplay = ({
     if (overflow) {
       tabs.push(
         <Text key="overflow" color={theme.status.warning} bold>
-          {' ... (Ctrl+O) '}
+          {' ... (Ctrl+L) '}
         </Text>,
       );
     }
@@ -447,7 +451,7 @@ export const BackgroundShellDisplay = ({
             (PID: {activeShell?.pid}) {isFocused ? '(Focused)' : ''}
           </Text>
         </Box>
-        <Text color={theme.text.accent}>{RIGHT_TEXT} | Ctrl+O List</Text>
+        <Text color={theme.text.accent}>{RIGHT_TEXT} | Ctrl+L List</Text>
       </Box>
       <Box flexGrow={1} overflow="hidden" paddingX={CONTENT_PADDING_X}>
         {isListOpenProp ? renderProcessList() : renderOutput()}

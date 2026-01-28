@@ -260,7 +260,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.TOGGLE_YOLO]: [{ key: 'y', ctrl: true }],
   [Command.CYCLE_APPROVAL_MODE]: [{ key: 'tab', shift: true }],
   [Command.TOGGLE_BACKGROUND_SHELL]: [{ key: 'b', ctrl: true }],
-  [Command.TOGGLE_BACKGROUND_SHELL_LIST]: [{ key: 'o', ctrl: true }],
+  [Command.TOGGLE_BACKGROUND_SHELL_LIST]: [{ key: 'l', ctrl: true }],
   [Command.SHOW_MORE_LINES]: [
     { key: 'o', ctrl: true },
     { key: 's', ctrl: true },

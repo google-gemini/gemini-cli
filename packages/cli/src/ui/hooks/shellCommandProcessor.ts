@@ -239,6 +239,7 @@ export const useShellCommandProcessor = (
           } else {
             shell.output = event.chunk;
           }
+          return;
         } else if (event.type === 'binary_detected') {
           shell.isBinary = true;
         } else if (event.type === 'binary_progress') {
@@ -379,7 +380,6 @@ export const useShellCommandProcessor = (
                     binaryBytesReceived,
                   });
 
-                  notifyUpdate();
                   return;
                 }
 
@@ -525,7 +525,6 @@ export const useShellCommandProcessor = (
       terminalHeight,
       terminalWidth,
       registerBackgroundShell,
-      notifyUpdate,
     ],
   );
 

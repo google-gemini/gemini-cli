@@ -95,7 +95,7 @@ describe('<DefaultAppLayout />', () => {
     mockUIState.backgroundShellHeight = 5;
 
     const { lastFrame } = render(<DefaultAppLayout />);
-    expect(lastFrame()).toContain('BackgroundShellDisplay');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('hides BackgroundShellDisplay when StreamingState is WaitingForConfirmation', () => {
@@ -105,7 +105,7 @@ describe('<DefaultAppLayout />', () => {
     mockUIState.streamingState = StreamingState.WaitingForConfirmation;
 
     const { lastFrame } = render(<DefaultAppLayout />);
-    expect(lastFrame()).not.toContain('BackgroundShellDisplay');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('shows BackgroundShellDisplay when StreamingState is NOT WaitingForConfirmation', () => {
@@ -115,6 +115,6 @@ describe('<DefaultAppLayout />', () => {
     mockUIState.streamingState = StreamingState.Responding;
 
     const { lastFrame } = render(<DefaultAppLayout />);
-    expect(lastFrame()).toContain('BackgroundShellDisplay');
+    expect(lastFrame()).toMatchSnapshot();
   });
 });

@@ -419,9 +419,7 @@ export const useGeminiStream = (
       (tc) =>
         tc.status === 'executing' && tc.request.name === 'run_shell_command',
     );
-    return executingShellTool && 'pid' in executingShellTool
-      ? (executingShellTool as { pid: number }).pid
-      : undefined;
+    return executingShellTool?.pid;
   }, [toolCalls]);
 
   const lastQueryRef = useRef<PartListUnion | null>(null);
@@ -1444,7 +1442,7 @@ export const useGeminiStream = (
         const data = isShellToolData(rawData) ? rawData : undefined;
 
         // Use data.pid or fallback to t.pid (preserved from executing state)
-        const pid = data?.pid ?? (t as { pid?: number }).pid;
+        const pid = data?.pid ?? t.pid;
 
         if (isShell && pid) {
           const command = (data?.['command'] as string) ?? 'shell';
