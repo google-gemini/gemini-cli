@@ -7,53 +7,79 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Command } from './types.js';
 
-describe('CommandRegistry', () => {
-  const mockListExtensionsCommandInstance: Command = {
+const {
+  mockExtensionsCommand,
+  mockListExtensionsCommand,
+  mockExtensionsCommandInstance,
+  mockListExtensionsCommandInstance,
+} = vi.hoisted(() => {
+  const listInstance: Command = {
     name: 'extensions list',
     description: 'Lists all installed extensions.',
     execute: vi.fn(),
   };
-  const mockListExtensionsCommand = vi.fn(
-    () => mockListExtensionsCommandInstance,
-  );
 
-  const mockExtensionsCommandInstance: Command = {
+  const extInstance: Command = {
     name: 'extensions',
     description: 'Manage extensions.',
     execute: vi.fn(),
-    subCommands: [mockListExtensionsCommandInstance],
+    subCommands: [listInstance],
   };
-  const mockExtensionsCommand = vi.fn(() => mockExtensionsCommandInstance);
 
+  return {
+    mockListExtensionsCommandInstance: listInstance,
+    mockExtensionsCommandInstance: extInstance,
+    mockExtensionsCommand: vi.fn(() => extInstance),
+    mockListExtensionsCommand: vi.fn(() => listInstance),
+  };
+});
+
+vi.mock('./extensions.js', () => ({
+  ExtensionsCommand: mockExtensionsCommand,
+  ListExtensionsCommand: mockListExtensionsCommand,
+}));
+
+vi.mock('./init.js', () => ({
+  InitCommand: vi.fn(() => ({
+    name: 'init',
+    description: 'Initializes the server.',
+    execute: vi.fn(),
+  })),
+}));
+
+vi.mock('./restore.js', () => ({
+  RestoreCommand: vi.fn(() => ({
+    name: 'restore',
+    description: 'Restores the server.',
+    execute: vi.fn(),
+  })),
+}));
+
+import { commandRegistry } from './command-registry.js';
+
+describe('CommandRegistry', () => {
   beforeEach(async () => {
-    vi.resetModules();
-    vi.doMock('./extensions.js', () => ({
-      ExtensionsCommand: mockExtensionsCommand,
-      ListExtensionsCommand: mockListExtensionsCommand,
-    }));
+    vi.clearAllMocks();
+    commandRegistry.initialize();
   });
 
   it('should register ExtensionsCommand on initialization', async () => {
-    const { commandRegistry } = await import('./command-registry.js');
     expect(mockExtensionsCommand).toHaveBeenCalled();
     const command = commandRegistry.get('extensions');
     expect(command).toBe(mockExtensionsCommandInstance);
-  });
+  }, 20000);
 
   it('should register sub commands on initialization', async () => {
-    const { commandRegistry } = await import('./command-registry.js');
     const command = commandRegistry.get('extensions list');
     expect(command).toBe(mockListExtensionsCommandInstance);
   });
 
   it('get() should return undefined for a non-existent command', async () => {
-    const { commandRegistry } = await import('./command-registry.js');
     const command = commandRegistry.get('non-existent');
     expect(command).toBeUndefined();
   });
 
   it('register() should register a new command', async () => {
-    const { commandRegistry } = await import('./command-registry.js');
     const mockCommand: Command = {
       name: 'test-command',
       description: '',
@@ -65,7 +91,6 @@ describe('CommandRegistry', () => {
   });
 
   it('register() should register a nested command', async () => {
-    const { commandRegistry } = await import('./command-registry.js');
     const mockSubSubCommand: Command = {
       name: 'test-command-sub-sub',
       description: '',
@@ -95,8 +120,8 @@ describe('CommandRegistry', () => {
   });
 
   it('register() should not enter an infinite loop with a cyclic command', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { commandRegistry } = await import('./command-registry.js');
+    const { debugLogger } = await import('@google/gemini-cli-core');
+    const warnSpy = vi.spyOn(debugLogger, 'warn').mockImplementation(() => {});
     const mockCommand: Command = {
       name: 'cyclic-command',
       description: '',
@@ -112,7 +137,6 @@ describe('CommandRegistry', () => {
     expect(warnSpy).toHaveBeenCalledWith(
       'Command cyclic-command already registered. Skipping.',
     );
-    // If the test finishes, it means we didn't get into an infinite loop.
     warnSpy.mockRestore();
   });
 });

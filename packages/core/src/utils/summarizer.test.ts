@@ -19,6 +19,7 @@ import type {
   ResolvedModelConfig,
 } from '../services/modelConfigService.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
+import { debugLogger } from './debugLogger.js';
 
 // Mock GeminiClient and Config constructor
 vi.mock('../core/client.js');
@@ -58,11 +59,11 @@ describe('summarizers', () => {
     (mockGeminiClient.generateContent as Mock) = vi.fn();
 
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(debugLogger, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
-    (console.error as Mock).mockRestore();
+    vi.restoreAllMocks();
   });
 
   describe('summarizeToolOutput', () => {

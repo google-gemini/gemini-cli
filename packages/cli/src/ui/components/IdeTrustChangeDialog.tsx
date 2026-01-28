@@ -9,6 +9,7 @@ import { theme } from '../semantic-colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { relaunchApp } from '../../utils/processUtils.js';
 import { type RestartReason } from '../hooks/useIdeTrustListener.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 interface IdeTrustChangeDialogProps {
   reason: RestartReason;
@@ -20,7 +21,9 @@ export const IdeTrustChangeDialog = ({ reason }: IdeTrustChangeDialogProps) => {
       if (key.name === 'r' || key.name === 'R') {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         relaunchApp();
+        return true;
       }
+      return false;
     },
     { isActive: true },
   );
@@ -28,7 +31,7 @@ export const IdeTrustChangeDialog = ({ reason }: IdeTrustChangeDialogProps) => {
   let message = 'Workspace trust has changed.';
   if (reason === 'NONE') {
     // This should not happen, but provides a fallback and a debug log.
-    console.error(
+    debugLogger.warn(
       'IdeTrustChangeDialog rendered with unexpected reason "NONE"',
     );
   } else if (reason === 'CONNECTION_CHANGE') {

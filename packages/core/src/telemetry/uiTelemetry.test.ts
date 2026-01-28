@@ -173,6 +173,7 @@ describe('UiTelemetryService', () => {
           totalLatencyMs: 500,
         },
         tokens: {
+          input: 5,
           prompt: 10,
           candidates: 20,
           total: 30,
@@ -227,6 +228,7 @@ describe('UiTelemetryService', () => {
           totalLatencyMs: 1100,
         },
         tokens: {
+          input: 10,
           prompt: 25,
           candidates: 45,
           total: 70,
@@ -301,6 +303,7 @@ describe('UiTelemetryService', () => {
           totalLatencyMs: 300,
         },
         tokens: {
+          input: 0,
           prompt: 0,
           candidates: 0,
           total: 0,
@@ -345,6 +348,7 @@ describe('UiTelemetryService', () => {
           totalLatencyMs: 800,
         },
         tokens: {
+          input: 5,
           prompt: 10,
           candidates: 20,
           total: 30,

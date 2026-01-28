@@ -14,17 +14,16 @@ import {
   afterEach,
 } from 'vitest';
 import {
-  checkCommandPermissions,
   escapeShellArg,
   getCommandRoots,
   getShellConfiguration,
-  isCommandAllowed,
   initializeShellParsers,
+  parseCommandDetails,
   stripShellWrapper,
-  isShellInvocationAllowlisted,
+  hasRedirection,
+  resolveExecutable,
 } from './shell-utils.js';
-import type { Config } from '../config/config.js';
-import type { AnyToolInvocation } from '../index.js';
+import path from 'node:path';
 
 const mockPlatform = vi.hoisted(() => vi.fn());
 const mockHomedir = vi.hoisted(() => vi.fn());
@@ -37,12 +36,41 @@ vi.mock('os', () => ({
   homedir: mockHomedir,
 }));
 
+const mockAccess = vi.hoisted(() => vi.fn());
+vi.mock('node:fs', () => ({
+  default: {
+    promises: {
+      access: mockAccess,
+    },
+    constants: { X_OK: 1 },
+  },
+  promises: {
+    access: mockAccess,
+  },
+  constants: { X_OK: 1 },
+}));
+
+const mockSpawnSync = vi.hoisted(() => vi.fn());
+vi.mock('node:child_process', () => ({
+  spawnSync: mockSpawnSync,
+  spawn: vi.fn(),
+}));
+
 const mockQuote = vi.hoisted(() => vi.fn());
 vi.mock('shell-quote', () => ({
   quote: mockQuote,
 }));
 
-let config: Config;
+const mockDebugLogger = vi.hoisted(() => ({
+  error: vi.fn(),
+  debug: vi.fn(),
+  log: vi.fn(),
+  warn: vi.fn(),
+}));
+vi.mock('./debugLogger.js', () => ({
+  debugLogger: mockDebugLogger,
+}));
+
 const isWindowsRuntime = process.platform === 'win32';
 const describeWindowsOnly = isWindowsRuntime ? describe : describe.skip;
 
@@ -56,396 +84,35 @@ beforeEach(() => {
   mockQuote.mockImplementation((args: string[]) =>
     args.map((arg) => `'${arg}'`).join(' '),
   );
-  config = {
-    getCoreTools: () => [],
-    getExcludeTools: () => new Set([]),
-    getAllowedTools: () => [],
-  } as unknown as Config;
+  mockSpawnSync.mockReturnValue({
+    stdout: Buffer.from(''),
+    stderr: Buffer.from(''),
+    status: 0,
+    error: undefined,
+  });
 });
 
 afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('isCommandAllowed', () => {
-  it('should allow a command if no restrictions are provided', () => {
-    const result = isCommandAllowed('goodCommand --safe', config);
-    expect(result.allowed).toBe(true);
+const mockPowerShellResult = (
+  commands: Array<{ name: string; text: string }>,
+  hasRedirection: boolean,
+) => {
+  mockSpawnSync.mockReturnValue({
+    stdout: Buffer.from(
+      JSON.stringify({
+        success: true,
+        commands,
+        hasRedirection,
+      }),
+    ),
+    stderr: Buffer.from(''),
+    status: 0,
+    error: undefined,
   });
-
-  it('should allow a command if it is in the global allowlist', () => {
-    config.getCoreTools = () => ['ShellTool(goodCommand)'];
-    const result = isCommandAllowed('goodCommand --safe', config);
-    expect(result.allowed).toBe(true);
-  });
-
-  it('should block a command if it is not in a strict global allowlist', () => {
-    config.getCoreTools = () => ['ShellTool(goodCommand --safe)'];
-    const result = isCommandAllowed('badCommand --danger', config);
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      `Command(s) not in the allowed commands list. Disallowed commands: "badCommand --danger"`,
-    );
-  });
-
-  it('should block a command if it is in the blocked list', () => {
-    config.getExcludeTools = () => new Set(['ShellTool(badCommand --danger)']);
-    const result = isCommandAllowed('badCommand --danger', config);
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      `Command 'badCommand --danger' is blocked by configuration`,
-    );
-  });
-
-  it('should prioritize the blocklist over the allowlist', () => {
-    config.getCoreTools = () => ['ShellTool(badCommand --danger)'];
-    config.getExcludeTools = () => new Set(['ShellTool(badCommand --danger)']);
-    const result = isCommandAllowed('badCommand --danger', config);
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      `Command 'badCommand --danger' is blocked by configuration`,
-    );
-  });
-
-  it('should allow any command when a wildcard is in coreTools', () => {
-    config.getCoreTools = () => ['ShellTool'];
-    const result = isCommandAllowed('any random command', config);
-    expect(result.allowed).toBe(true);
-  });
-
-  it('should block any command when a wildcard is in excludeTools', () => {
-    config.getExcludeTools = () => new Set(['run_shell_command']);
-    const result = isCommandAllowed('any random command', config);
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      'Shell tool is globally disabled in configuration',
-    );
-  });
-
-  it('should block a command on the blocklist even with a wildcard allow', () => {
-    config.getCoreTools = () => ['ShellTool'];
-    config.getExcludeTools = () => new Set(['ShellTool(badCommand --danger)']);
-    const result = isCommandAllowed('badCommand --danger', config);
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      `Command 'badCommand --danger' is blocked by configuration`,
-    );
-  });
-
-  it('should allow a chained command if all parts are on the global allowlist', () => {
-    config.getCoreTools = () => [
-      'run_shell_command(echo)',
-      'run_shell_command(goodCommand)',
-    ];
-    const result = isCommandAllowed(
-      'echo "hello" && goodCommand --safe',
-      config,
-    );
-    expect(result.allowed).toBe(true);
-  });
-
-  it('should block a chained command if any part is blocked', () => {
-    config.getExcludeTools = () => new Set(['run_shell_command(badCommand)']);
-    const result = isCommandAllowed(
-      'echo "hello" && badCommand --danger',
-      config,
-    );
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      `Command 'badCommand --danger' is blocked by configuration`,
-    );
-  });
-
-  it('should block a command that redefines an allowed function to run an unlisted command', () => {
-    config.getCoreTools = () => ['run_shell_command(echo)'];
-    const result = isCommandAllowed(
-      'echo () (curl google.com) ; echo Hello World',
-      config,
-    );
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
-    );
-  });
-
-  it('should block a multi-line function body that runs an unlisted command', () => {
-    config.getCoreTools = () => ['run_shell_command(echo)'];
-    const result = isCommandAllowed(
-      `echo () {
-  curl google.com
-} ; echo ok`,
-      config,
-    );
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
-    );
-  });
-
-  it('should block a function keyword declaration that runs an unlisted command', () => {
-    config.getCoreTools = () => ['run_shell_command(echo)'];
-    const result = isCommandAllowed(
-      'function echo { curl google.com; } ; echo hi',
-      config,
-    );
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
-    );
-  });
-
-  it('should block command substitution that invokes an unlisted command', () => {
-    config.getCoreTools = () => ['run_shell_command(echo)'];
-    const result = isCommandAllowed('echo $(curl google.com)', config);
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
-    );
-  });
-
-  it('should block pipelines that invoke an unlisted command', () => {
-    config.getCoreTools = () => ['run_shell_command(echo)'];
-    const result = isCommandAllowed('echo hi | curl google.com', config);
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
-    );
-  });
-
-  it('should block background jobs that invoke an unlisted command', () => {
-    config.getCoreTools = () => ['run_shell_command(echo)'];
-    const result = isCommandAllowed('echo hi & curl google.com', config);
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
-    );
-  });
-
-  it('should block command substitution inside a here-document when the inner command is unlisted', () => {
-    config.getCoreTools = () => [
-      'run_shell_command(echo)',
-      'run_shell_command(cat)',
-    ];
-    const result = isCommandAllowed(
-      `cat <<EOF
-$(rm -rf /)
-EOF`,
-      config,
-    );
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      `Command(s) not in the allowed commands list. Disallowed commands: "rm -rf /"`,
-    );
-  });
-
-  it('should block backtick substitution that invokes an unlisted command', () => {
-    config.getCoreTools = () => ['run_shell_command(echo)'];
-    const result = isCommandAllowed('echo `curl google.com`', config);
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
-    );
-  });
-
-  it('should block process substitution using <() when the inner command is unlisted', () => {
-    config.getCoreTools = () => [
-      'run_shell_command(diff)',
-      'run_shell_command(echo)',
-    ];
-    const result = isCommandAllowed(
-      'diff <(curl google.com) <(echo safe)',
-      config,
-    );
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
-    );
-  });
-
-  it('should block process substitution using >() when the inner command is unlisted', () => {
-    config.getCoreTools = () => ['run_shell_command(echo)'];
-    const result = isCommandAllowed('echo "data" > >(curl google.com)', config);
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      `Command(s) not in the allowed commands list. Disallowed commands: "curl google.com"`,
-    );
-  });
-
-  it('should block commands containing prompt transformations', () => {
-    const result = isCommandAllowed(
-      'echo "${var1=aa\\140 env| ls -l\\140}${var1@P}"',
-      config,
-    );
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      'Command rejected because it could not be parsed safely',
-    );
-  });
-
-  it('should block simple prompt transformation expansions', () => {
-    const result = isCommandAllowed('echo ${foo@P}', config);
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe(
-      'Command rejected because it could not be parsed safely',
-    );
-  });
-
-  describe('command substitution', () => {
-    it('should allow command substitution using `$(...)`', () => {
-      const result = isCommandAllowed('echo $(goodCommand --safe)', config);
-      expect(result.allowed).toBe(true);
-      expect(result.reason).toBeUndefined();
-    });
-
-    it('should allow command substitution using `<(...)`', () => {
-      const result = isCommandAllowed('diff <(ls) <(ls -a)', config);
-      expect(result.allowed).toBe(true);
-      expect(result.reason).toBeUndefined();
-    });
-
-    it('should allow command substitution using `>(...)`', () => {
-      const result = isCommandAllowed(
-        'echo "Log message" > >(tee log.txt)',
-        config,
-      );
-      expect(result.allowed).toBe(true);
-      expect(result.reason).toBeUndefined();
-    });
-
-    it('should allow command substitution using backticks', () => {
-      const result = isCommandAllowed('echo `goodCommand --safe`', config);
-      expect(result.allowed).toBe(true);
-      expect(result.reason).toBeUndefined();
-    });
-
-    it('should allow substitution-like patterns inside single quotes', () => {
-      config.getCoreTools = () => ['ShellTool(echo)'];
-      const result = isCommandAllowed("echo '$(pwd)'", config);
-      expect(result.allowed).toBe(true);
-    });
-
-    it('should block a command when parsing fails', () => {
-      const result = isCommandAllowed('ls &&', config);
-      expect(result.allowed).toBe(false);
-      expect(result.reason).toBe(
-        'Command rejected because it could not be parsed safely',
-      );
-    });
-  });
-});
-
-describe('checkCommandPermissions', () => {
-  describe('in "Default Allow" mode (no sessionAllowlist)', () => {
-    it('should return a detailed success object for an allowed command', () => {
-      const result = checkCommandPermissions('goodCommand --safe', config);
-      expect(result).toEqual({
-        allAllowed: true,
-        disallowedCommands: [],
-      });
-    });
-
-    it('should block commands that cannot be parsed safely', () => {
-      const result = checkCommandPermissions('ls &&', config);
-      expect(result).toEqual({
-        allAllowed: false,
-        disallowedCommands: ['ls &&'],
-        blockReason: 'Command rejected because it could not be parsed safely',
-        isHardDenial: true,
-      });
-    });
-
-    it('should return a detailed failure object for a blocked command', () => {
-      config.getExcludeTools = () => new Set(['ShellTool(badCommand)']);
-      const result = checkCommandPermissions('badCommand --danger', config);
-      expect(result).toEqual({
-        allAllowed: false,
-        disallowedCommands: ['badCommand --danger'],
-        blockReason: `Command 'badCommand --danger' is blocked by configuration`,
-        isHardDenial: true,
-      });
-    });
-
-    it('should return a detailed failure object for a command not on a strict allowlist', () => {
-      config.getCoreTools = () => ['ShellTool(goodCommand)'];
-      const result = checkCommandPermissions(
-        'git status && goodCommand',
-        config,
-      );
-      expect(result).toEqual({
-        allAllowed: false,
-        disallowedCommands: ['git status'],
-        blockReason: `Command(s) not in the allowed commands list. Disallowed commands: "git status"`,
-        isHardDenial: false,
-      });
-    });
-  });
-
-  describe('in "Default Deny" mode (with sessionAllowlist)', () => {
-    it('should allow a command on the sessionAllowlist', () => {
-      const result = checkCommandPermissions(
-        'goodCommand --safe',
-        config,
-        new Set(['goodCommand --safe']),
-      );
-      expect(result.allAllowed).toBe(true);
-    });
-
-    it('should block a command not on the sessionAllowlist or global allowlist', () => {
-      const result = checkCommandPermissions(
-        'badCommand --danger',
-        config,
-        new Set(['goodCommand --safe']),
-      );
-      expect(result.allAllowed).toBe(false);
-      expect(result.blockReason).toContain(
-        'not on the global or session allowlist',
-      );
-      expect(result.disallowedCommands).toEqual(['badCommand --danger']);
-    });
-
-    it('should allow a command on the global allowlist even if not on the session allowlist', () => {
-      config.getCoreTools = () => ['ShellTool(git status)'];
-      const result = checkCommandPermissions(
-        'git status',
-        config,
-        new Set(['goodCommand --safe']),
-      );
-      expect(result.allAllowed).toBe(true);
-    });
-
-    it('should allow a chained command if parts are on different allowlists', () => {
-      config.getCoreTools = () => ['ShellTool(git status)'];
-      const result = checkCommandPermissions(
-        'git status && git commit',
-        config,
-        new Set(['git commit']),
-      );
-      expect(result.allAllowed).toBe(true);
-    });
-
-    it('should block a command on the sessionAllowlist if it is also globally blocked', () => {
-      config.getExcludeTools = () => new Set(['run_shell_command(badCommand)']);
-      const result = checkCommandPermissions(
-        'badCommand --danger',
-        config,
-        new Set(['badCommand --danger']),
-      );
-      expect(result.allAllowed).toBe(false);
-      expect(result.blockReason).toContain('is blocked by configuration');
-    });
-
-    it('should block a chained command if one part is not on any allowlist', () => {
-      config.getCoreTools = () => ['run_shell_command(echo)'];
-      const result = checkCommandPermissions(
-        'echo "hello" && badCommand --danger',
-        config,
-        new Set(['echo']),
-      );
-      expect(result.allAllowed).toBe(false);
-      expect(result.disallowedCommands).toEqual(['badCommand --danger']);
-    });
-  });
-});
+};
 
 describe('getCommandRoots', () => {
   it('should return a single command', () => {
@@ -496,6 +163,110 @@ describe('getCommandRoots', () => {
     const roots = getCommandRoots('echo ${foo@P}');
     expect(roots).toEqual([]);
   });
+
+  it('should include nested command substitutions in redirected statements', () => {
+    const result = getCommandRoots('echo $(cat secret) > output.txt');
+    expect(result).toEqual(['echo', 'cat']);
+  });
+
+  it('should correctly identify input redirection with explicit file descriptor', () => {
+    const result = parseCommandDetails('ls 2< input.txt');
+    const redirection = result?.details.find((d) =>
+      d.name.startsWith('redirection'),
+    );
+    expect(redirection?.name).toBe('redirection (<)');
+  });
+
+  it('should filter out all redirections from getCommandRoots', () => {
+    expect(getCommandRoots('cat < input.txt')).toEqual(['cat']);
+    expect(getCommandRoots('ls 2> error.log')).toEqual(['ls']);
+    expect(getCommandRoots('exec 3<&0')).toEqual(['exec']);
+  });
+
+  it('should handle parser initialization failures gracefully', async () => {
+    // Reset modules to clear singleton state
+    vi.resetModules();
+
+    // Mock fileUtils to fail Wasm loading
+    vi.doMock('./fileUtils.js', () => ({
+      loadWasmBinary: vi.fn().mockRejectedValue(new Error('Wasm load failed')),
+    }));
+
+    // Re-import shell-utils with mocked dependencies
+    const shellUtils = await import('./shell-utils.js');
+
+    // Should catch the error and not throw
+    await expect(shellUtils.initializeShellParsers()).resolves.not.toThrow();
+
+    // Fallback: splitting commands depends on parser, so if parser fails, it returns empty
+    const roots = shellUtils.getCommandRoots('ls -la');
+    expect(roots).toEqual([]);
+  });
+
+  it('should handle bash parser timeouts', () => {
+    const nowSpy = vi.spyOn(performance, 'now');
+    // Mock performance.now() to trigger timeout:
+    // 1st call: start time = 0. deadline = 0 + 1000ms.
+    // 2nd call (and onwards): inside progressCallback, return 2000ms.
+    nowSpy.mockReturnValueOnce(0).mockReturnValue(2000);
+
+    // Use a very complex command to ensure progressCallback is triggered at least once
+    const complexCommand =
+      'ls -la && ' + Array(100).fill('echo "hello"').join(' && ');
+    const roots = getCommandRoots(complexCommand);
+    expect(roots).toEqual([]);
+    expect(nowSpy).toHaveBeenCalled();
+
+    expect(mockDebugLogger.error).toHaveBeenCalledWith(
+      'Bash command parsing timed out for command:',
+      complexCommand,
+    );
+
+    nowSpy.mockRestore();
+  });
+});
+
+describe('hasRedirection', () => {
+  it('should detect output redirection', () => {
+    expect(hasRedirection('echo hello > world')).toBe(true);
+  });
+
+  it('should detect input redirection', () => {
+    expect(hasRedirection('cat < input')).toBe(true);
+  });
+
+  it('should detect redirection with explicit file descriptor', () => {
+    expect(hasRedirection('ls 2> error.log')).toBe(true);
+    expect(hasRedirection('exec 3<&0')).toBe(true);
+  });
+
+  it('should detect append redirection', () => {
+    expect(hasRedirection('echo hello >> world')).toBe(true);
+  });
+
+  it('should detect heredoc', () => {
+    expect(hasRedirection('cat <<EOF\nhello\nEOF')).toBe(true);
+  });
+
+  it('should detect herestring', () => {
+    expect(hasRedirection('cat <<< "hello"')).toBe(true);
+  });
+
+  it('should return false for simple commands', () => {
+    expect(hasRedirection('ls -la')).toBe(false);
+  });
+
+  it('should return false for pipes (pipes are not redirections in this context)', () => {
+    // Note: pipes are often handled separately by splitCommands, but checking here confirms they don't trigger "redirection" flag if we don't want them to.
+    // However, the current implementation checks for 'redirected_statement' nodes.
+    // A pipe is a 'pipeline' node.
+    expect(hasRedirection('echo hello | cat')).toBe(false);
+  });
+
+  it('should return false when redirection characters are inside quotes in bash', () => {
+    mockPlatform.mockReturnValue('linux');
+    expect(hasRedirection('echo "a > b"')).toBe(false);
+  });
 });
 
 describeWindowsOnly('PowerShell integration', () => {
@@ -517,17 +288,17 @@ describeWindowsOnly('PowerShell integration', () => {
   });
 
   it('should return command roots using PowerShell AST output', () => {
+    mockPowerShellResult(
+      [
+        { name: 'Get-ChildItem', text: 'Get-ChildItem' },
+        { name: 'Select-Object', text: 'Select-Object Name' },
+      ],
+      false,
+    );
+
     const roots = getCommandRoots('Get-ChildItem | Select-Object Name');
     expect(roots.length).toBeGreaterThan(0);
     expect(roots).toContain('Get-ChildItem');
-  });
-
-  it('should block commands when PowerShell parser reports errors', () => {
-    const { allowed, reason } = isCommandAllowed('Get-ChildItem |', config);
-    expect(allowed).toBe(false);
-    expect(reason).toBe(
-      'Command rejected because it could not be parsed safely',
-    );
   });
 });
 
@@ -565,53 +336,6 @@ describe('stripShellWrapper', () => {
 
   it('should not strip anything if no wrapper is present', () => {
     expect(stripShellWrapper('ls -l')).toEqual('ls -l');
-  });
-});
-
-describe('isShellInvocationAllowlisted', () => {
-  function createInvocation(command: string): AnyToolInvocation {
-    return { params: { command } } as unknown as AnyToolInvocation;
-  }
-
-  it('should return false when any chained command segment is not allowlisted', () => {
-    const invocation = createInvocation(
-      'git status && rm -rf /tmp/should-not-run',
-    );
-    expect(
-      isShellInvocationAllowlisted(invocation, ['run_shell_command(git)']),
-    ).toBe(false);
-  });
-
-  it('should return true when every segment is explicitly allowlisted', () => {
-    const invocation = createInvocation(
-      'git status && rm -rf /tmp/should-run && git diff',
-    );
-    expect(
-      isShellInvocationAllowlisted(invocation, [
-        'run_shell_command(git)',
-        'run_shell_command(rm -rf)',
-      ]),
-    ).toBe(true);
-  });
-
-  it('should return true when the allowlist contains a wildcard shell entry', () => {
-    const invocation = createInvocation('git status && rm -rf /tmp/should-run');
-    expect(
-      isShellInvocationAllowlisted(invocation, ['run_shell_command']),
-    ).toBe(true);
-  });
-
-  it('should treat piped commands as separate segments that must be allowlisted', () => {
-    const invocation = createInvocation('git status | tail -n 1');
-    expect(
-      isShellInvocationAllowlisted(invocation, ['run_shell_command(git)']),
-    ).toBe(false);
-    expect(
-      isShellInvocationAllowlisted(invocation, [
-        'run_shell_command(git)',
-        'run_shell_command(tail)',
-      ]),
-    ).toBe(true);
   });
 });
 
@@ -744,5 +468,101 @@ describe('getShellConfiguration', () => {
       expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
       expect(config.shell).toBe('powershell');
     });
+  });
+});
+
+describe('hasRedirection (PowerShell via mock)', () => {
+  beforeEach(() => {
+    mockPlatform.mockReturnValue('win32');
+    process.env['ComSpec'] = 'powershell.exe';
+  });
+
+  it('should return true when PowerShell parser detects redirection', () => {
+    mockPowerShellResult([{ name: 'echo', text: 'echo hello' }], true);
+    expect(hasRedirection('echo hello > file.txt')).toBe(true);
+  });
+
+  it('should return false when PowerShell parser does not detect redirection', () => {
+    mockPowerShellResult([{ name: 'echo', text: 'echo hello' }], false);
+    expect(hasRedirection('echo hello')).toBe(false);
+  });
+
+  it('should return false when quoted redirection chars are used but not actual redirection', () => {
+    mockPowerShellResult(
+      [{ name: 'echo', text: 'echo "-> arrow"' }],
+      false, // Parser says NO redirection
+    );
+    expect(hasRedirection('echo "-> arrow"')).toBe(false);
+  });
+
+  it('should fallback to regex if parsing fails (simulating safety)', () => {
+    mockSpawnSync.mockReturnValue({
+      stdout: Buffer.from('invalid json'),
+      status: 0,
+    });
+    // Fallback regex sees '>' in arrow
+    expect(hasRedirection('echo "-> arrow"')).toBe(true);
+  });
+});
+
+describe('resolveExecutable', () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+    mockAccess.mockReset();
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it('should return the absolute path if it exists and is executable', async () => {
+    const absPath = path.resolve('/usr/bin/git');
+    mockAccess.mockResolvedValue(undefined); // success
+    expect(await resolveExecutable(absPath)).toBe(absPath);
+    expect(mockAccess).toHaveBeenCalledWith(absPath, 1);
+  });
+
+  it('should return undefined for absolute path if it does not exist', async () => {
+    const absPath = path.resolve('/usr/bin/nonexistent');
+    mockAccess.mockRejectedValue(new Error('ENOENT'));
+    expect(await resolveExecutable(absPath)).toBeUndefined();
+  });
+
+  it('should resolve executable in PATH', async () => {
+    const binDir = path.resolve('/bin');
+    const usrBinDir = path.resolve('/usr/bin');
+    process.env['PATH'] = `${binDir}${path.delimiter}${usrBinDir}`;
+    mockPlatform.mockReturnValue('linux');
+
+    const targetPath = path.join(usrBinDir, 'ls');
+    mockAccess.mockImplementation(async (p: string) => {
+      if (p === targetPath) return undefined;
+      throw new Error('ENOENT');
+    });
+
+    expect(await resolveExecutable('ls')).toBe(targetPath);
+  });
+
+  it('should try extensions on Windows', async () => {
+    const sys32 = path.resolve('C:\\Windows\\System32');
+    process.env['PATH'] = sys32;
+    mockPlatform.mockReturnValue('win32');
+    mockAccess.mockImplementation(async (p: string) => {
+      // Use includes because on Windows path separators might differ
+      if (p.includes('cmd.exe')) return undefined;
+      throw new Error('ENOENT');
+    });
+
+    expect(await resolveExecutable('cmd')).toContain('cmd.exe');
+  });
+
+  it('should return undefined if not found in PATH', async () => {
+    process.env['PATH'] = path.resolve('/bin');
+    mockPlatform.mockReturnValue('linux');
+    mockAccess.mockRejectedValue(new Error('ENOENT'));
+
+    expect(await resolveExecutable('unknown')).toBeUndefined();
   });
 });

@@ -408,7 +408,7 @@ export class Logger {
     }
 
     // 2. Attempt to delete the old raw path for backward compatibility.
-    const oldPath = path.join(this.geminiDir!, `checkpoint-${tag}.json`);
+    const oldPath = path.join(this.geminiDir, `checkpoint-${tag}.json`);
     if (newPath !== oldPath) {
       try {
         await fs.unlink(oldPath);

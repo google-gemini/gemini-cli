@@ -27,6 +27,22 @@ class MockConfig {
   getDebugMode() {
     return true;
   }
+
+  getFileFilteringRespectGeminiIgnore() {
+    return true;
+  }
+
+  getFileFilteringOptions() {
+    return {
+      respectGitIgnore: true,
+      respectGeminiIgnore: true,
+      customIgnoreFilePaths: [],
+    };
+  }
+
+  validatePathAccess() {
+    return null;
+  }
 }
 
 describe('ripgrep-real-direct', () => {

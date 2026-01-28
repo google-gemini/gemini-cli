@@ -6,7 +6,8 @@
 
 import { spawn } from 'node:child_process';
 import type { HookConfig } from './types.js';
-import { HookEventName } from './types.js';
+import { HookEventName, ConfigSource } from './types.js';
+import type { Config } from '../config/config.js';
 import type {
   HookInput,
   HookOutput,
@@ -14,9 +15,16 @@ import type {
   BeforeAgentInput,
   BeforeModelInput,
   BeforeModelOutput,
+  BeforeToolInput,
 } from './types.js';
 import type { LLMRequest } from './hookTranslator.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { sanitizeEnvironment } from '../services/environmentSanitization.js';
+import {
+  escapeShellArg,
+  getShellConfiguration,
+  type ShellType,
+} from '../utils/shell-utils.js';
 
 /**
  * Default timeout for hook execution (60 seconds)
@@ -34,7 +42,11 @@ const EXIT_CODE_NON_BLOCKING_ERROR = 1;
  * Hook runner that executes command hooks
  */
 export class HookRunner {
-  constructor() {}
+  private readonly config: Config;
+
+  constructor(config: Config) {
+    this.config = config;
+  }
 
   /**
    * Execute a single hook
@@ -46,6 +58,23 @@ export class HookRunner {
   ): Promise<HookExecutionResult> {
     const startTime = Date.now();
 
+    // Secondary security check: Ensure project hooks are not executed in untrusted folders
+    if (
+      hookConfig.source === ConfigSource.Project &&
+      !this.config.isTrustedFolder()
+    ) {
+      const errorMessage =
+        'Security: Blocked execution of project hook in untrusted folder';
+      debugLogger.warn(errorMessage);
+      return {
+        hookConfig,
+        eventName,
+        success: false,
+        error: new Error(errorMessage),
+        duration: 0,
+      };
+    }
+
     try {
       return await this.executeCommandHook(
         hookConfig,
@@ -55,8 +84,8 @@ export class HookRunner {
       );
     } catch (error) {
       const duration = Date.now() - startTime;
-      const hookSource = hookConfig.command || 'unknown';
-      const errorMessage = `Hook execution failed for event '${eventName}' (source: ${hookSource}): ${error}`;
+      const hookId = hookConfig.name || hookConfig.command || 'unknown';
+      const errorMessage = `Hook execution failed for event '${eventName}' (hook: ${hookId}): ${error}`;
       debugLogger.warn(`Hook execution error (non-fatal): ${errorMessage}`);
 
       return {
@@ -76,10 +105,15 @@ export class HookRunner {
     hookConfigs: HookConfig[],
     eventName: HookEventName,
     input: HookInput,
+    onHookStart?: (config: HookConfig, index: number) => void,
+    onHookEnd?: (config: HookConfig, result: HookExecutionResult) => void,
   ): Promise<HookExecutionResult[]> {
-    const promises = hookConfigs.map((config) =>
-      this.executeHook(config, eventName, input),
-    );
+    const promises = hookConfigs.map(async (config, index) => {
+      onHookStart?.(config, index);
+      const result = await this.executeHook(config, eventName, input);
+      onHookEnd?.(config, result);
+      return result;
+    });
 
     return Promise.all(promises);
   }
@@ -91,12 +125,17 @@ export class HookRunner {
     hookConfigs: HookConfig[],
     eventName: HookEventName,
     input: HookInput,
+    onHookStart?: (config: HookConfig, index: number) => void,
+    onHookEnd?: (config: HookConfig, result: HookExecutionResult) => void,
   ): Promise<HookExecutionResult[]> {
     const results: HookExecutionResult[] = [];
     let currentInput = input;
 
-    for (const config of hookConfigs) {
+    for (let i = 0; i < hookConfigs.length; i++) {
+      const config = hookConfigs[i];
+      onHookStart?.(config, i);
       const result = await this.executeHook(config, eventName, currentInput);
+      onHookEnd?.(config, result);
       results.push(result);
 
       // If the hook succeeded and has output, use it to modify the input for the next hook
@@ -162,6 +201,20 @@ export class HookRunner {
           }
           break;
 
+        case HookEventName.BeforeTool:
+          if ('tool_input' in hookOutput.hookSpecificOutput) {
+            const newToolInput = hookOutput.hookSpecificOutput[
+              'tool_input'
+            ] as Record<string, unknown>;
+            if (newToolInput && 'tool_input' in modifiedInput) {
+              (modifiedInput as BeforeToolInput).tool_input = {
+                ...(modifiedInput as BeforeToolInput).tool_input,
+                ...newToolInput,
+              };
+            }
+          }
+          break;
+
         default:
           // For other events, no special input modification is needed
           break;
@@ -201,21 +254,32 @@ export class HookRunner {
       let stdout = '';
       let stderr = '';
       let timedOut = false;
-      const command = this.expandCommand(hookConfig.command, input);
+
+      const shellConfig = getShellConfiguration();
+      const command = this.expandCommand(
+        hookConfig.command,
+        input,
+        shellConfig.shell,
+      );
 
       // Set up environment variables
       const env = {
-        ...process.env,
+        ...sanitizeEnvironment(process.env, this.config.sanitizationConfig),
         GEMINI_PROJECT_DIR: input.cwd,
         CLAUDE_PROJECT_DIR: input.cwd, // For compatibility
+        ...hookConfig.env,
       };
 
-      const child = spawn(command, {
-        env,
-        cwd: input.cwd,
-        stdio: ['pipe', 'pipe', 'pipe'],
-        shell: true,
-      });
+      const child = spawn(
+        shellConfig.executable,
+        [...shellConfig.argsPrefix, command],
+        {
+          env,
+          cwd: input.cwd,
+          stdio: ['pipe', 'pipe', 'pipe'],
+          shell: false,
+        },
+      );
 
       // Set up timeout
       const timeoutHandle = setTimeout(() => {
@@ -235,7 +299,7 @@ export class HookRunner {
         child.stdin.on('error', (err: NodeJS.ErrnoException) => {
           // Ignore EPIPE errors which happen when the child process closes stdin early
           if (err.code !== 'EPIPE') {
-            debugLogger.warn(`Hook stdin error: ${err}`);
+            debugLogger.debug(`Hook stdin error: ${err}`);
           }
         });
 
@@ -247,7 +311,7 @@ export class HookRunner {
         } catch (err) {
           // Ignore EPIPE errors which happen when the child process closes stdin early
           if (err instanceof Error && 'code' in err && err.code !== 'EPIPE') {
-            debugLogger.warn(`Hook stdin write error: ${err}`);
+            debugLogger.debug(`Hook stdin write error: ${err}`);
           }
         }
       }
@@ -338,10 +402,16 @@ export class HookRunner {
   /**
    * Expand command with environment variables and input context
    */
-  private expandCommand(command: string, input: HookInput): string {
+  private expandCommand(
+    command: string,
+    input: HookInput,
+    shellType: ShellType,
+  ): string {
+    debugLogger.debug(`Expanding hook command: ${command} (cwd: ${input.cwd})`);
+    const escapedCwd = escapeShellArg(input.cwd, shellType);
     return command
-      .replace(/\$GEMINI_PROJECT_DIR/g, input.cwd)
-      .replace(/\$CLAUDE_PROJECT_DIR/g, input.cwd); // For compatibility
+      .replace(/\$GEMINI_PROJECT_DIR/g, () => escapedCwd)
+      .replace(/\$CLAUDE_PROJECT_DIR/g, () => escapedCwd); // For compatibility
   }
 
   /**

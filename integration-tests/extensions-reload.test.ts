@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { expect, it, describe } from 'vitest';
+import { expect, it, describe, beforeEach, afterEach } from 'vitest';
 import { TestRig } from './test-helper.js';
 import { TestMcpServer } from './test-mcp-server.js';
 import { writeFileSync } from 'node:fs';
@@ -18,6 +18,14 @@ import stripAnsi from 'strip-ansi';
 const itIf = (condition: boolean) => (condition ? it : it.skip);
 
 describe('extension reloading', () => {
+  let rig: TestRig;
+
+  beforeEach(() => {
+    rig = new TestRig();
+  });
+
+  afterEach(async () => await rig.cleanup());
+
   const sandboxEnv = env['GEMINI_SANDBOX'];
   // Fails in linux non-sandbox e2e tests
   // TODO(#14527): Re-enable this once fixed
@@ -43,7 +51,6 @@ describe('extension reloading', () => {
         },
       };
 
-      const rig = new TestRig();
       rig.setup('extension reload test', {
         settings: {
           experimental: { extensionReloading: true },
@@ -75,7 +82,7 @@ describe('extension reloading', () => {
       writeFileSync(testServerPath, safeJsonStringify(extension, 2));
 
       // Start the CLI.
-      const run = await rig.runInteractive('--debug');
+      const run = await rig.runInteractive({ args: '--debug' });
       await run.expectText('You have 1 extension with an update available');
       // See the outdated extension
       await run.sendText('/extensions list');
@@ -88,7 +95,10 @@ describe('extension reloading', () => {
 
       // Poll for the updated list
       await rig.pollCommand(
-        () => run.sendKeys('\u0015/mcp list\r'),
+        async () => {
+          await run.sendText('/mcp list');
+          await run.type('\r');
+        },
         () => {
           const output = stripAnsi(run.output);
           return (
@@ -103,9 +113,9 @@ describe('extension reloading', () => {
       // Update the extension, expect the list to update, and mcp servers as well.
       await run.sendKeys('\u0015/extensions update test-extension');
       await run.expectText('/extensions update test-extension');
-      await run.sendKeys('\r');
+      await run.type('\r');
       await new Promise((resolve) => setTimeout(resolve, 500));
-      await run.sendKeys('\r');
+      await run.type('\r');
       await run.expectText(
         ` * test-server (remote): http://localhost:${portB}/mcp`,
       );
@@ -116,7 +126,10 @@ describe('extension reloading', () => {
 
       // Poll for the updated extension version
       await rig.pollCommand(
-        () => run.sendKeys('\u0015/extensions list\r'),
+        async () => {
+          await run.sendText('/extensions list');
+          await run.type('\r');
+        },
         () =>
           stripAnsi(run.output).includes(
             'test-extension (v0.0.2) - active (updated)',
@@ -126,7 +139,10 @@ describe('extension reloading', () => {
 
       // Poll for the updated mcp tool
       await rig.pollCommand(
-        () => run.sendKeys('\u0015/mcp list\r'),
+        async () => {
+          await run.sendText('/mcp list');
+          await run.type('\r');
+        },
         () => {
           const output = stripAnsi(run.output);
           return (
@@ -139,13 +155,12 @@ describe('extension reloading', () => {
       );
 
       await run.sendText('/quit');
-      await run.sendKeys('\r');
+      await run.type('\r');
 
       // Clean things up.
       await serverA.stop();
       await serverB.stop();
       await rig.runCommand(['extensions', 'uninstall', 'test-extension']);
-      await rig.cleanup();
     },
   );
 });

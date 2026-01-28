@@ -16,6 +16,12 @@ import type {
   ClientMetadata,
   RetrieveUserQuotaRequest,
   RetrieveUserQuotaResponse,
+  FetchAdminControlsRequest,
+  FetchAdminControlsResponse,
+  ConversationOffered,
+  ConversationInteraction,
+  StreamingLatency,
+  RecordCodeAssistMetricsRequest,
 } from './types.js';
 import type {
   ListExperimentsRequest,
@@ -42,7 +48,11 @@ import {
   toCountTokenRequest,
   toGenerateContentRequest,
 } from './converter.js';
-
+import {
+  formatProtoJsonDuration,
+  recordConversationOffered,
+} from './telemetry.js';
+import { getClientMetadata } from './experiments/client_metadata.js';
 /** HTTP options to be used in each of the requests. */
 export interface HttpOptions {
   /** Additional HTTP headers to be sent with the request. */
@@ -59,34 +69,65 @@ export class CodeAssistServer implements ContentGenerator {
     readonly httpOptions: HttpOptions = {},
     readonly sessionId?: string,
     readonly userTier?: UserTierId,
+    readonly userTierName?: string,
   ) {}
 
   async generateContentStream(
     req: GenerateContentParameters,
     userPromptId: string,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
-    const resps = await this.requestStreamingPost<CaGenerateContentResponse>(
-      'streamGenerateContent',
-      toGenerateContentRequest(
-        req,
-        userPromptId,
-        this.projectId,
-        this.sessionId,
-      ),
-      req.config?.abortSignal,
-    );
-    return (async function* (): AsyncGenerator<GenerateContentResponse> {
-      for await (const resp of resps) {
-        yield fromGenerateContentResponse(resp);
+    const responses =
+      await this.requestStreamingPost<CaGenerateContentResponse>(
+        'streamGenerateContent',
+        toGenerateContentRequest(
+          req,
+          userPromptId,
+          this.projectId,
+          this.sessionId,
+        ),
+        req.config?.abortSignal,
+      );
+
+    const streamingLatency: StreamingLatency = {};
+    const start = Date.now();
+    let isFirst = true;
+
+    return (async function* (
+      server: CodeAssistServer,
+    ): AsyncGenerator<GenerateContentResponse> {
+      for await (const response of responses) {
+        if (isFirst) {
+          streamingLatency.firstMessageLatency = formatProtoJsonDuration(
+            Date.now() - start,
+          );
+          isFirst = false;
+        }
+
+        streamingLatency.totalLatency = formatProtoJsonDuration(
+          Date.now() - start,
+        );
+
+        const translatedResponse = fromGenerateContentResponse(response);
+
+        await recordConversationOffered(
+          server,
+          response.traceId,
+          translatedResponse,
+          streamingLatency,
+          req.config?.abortSignal,
+        );
+
+        yield translatedResponse;
       }
-    })();
+    })(this);
   }
 
   async generateContent(
     req: GenerateContentParameters,
     userPromptId: string,
   ): Promise<GenerateContentResponse> {
-    const resp = await this.requestPost<CaGenerateContentResponse>(
+    const start = Date.now();
+    const response = await this.requestPost<CaGenerateContentResponse>(
       'generateContent',
       toGenerateContentRequest(
         req,
@@ -96,13 +137,33 @@ export class CodeAssistServer implements ContentGenerator {
       ),
       req.config?.abortSignal,
     );
-    return fromGenerateContentResponse(resp);
+    const duration = formatProtoJsonDuration(Date.now() - start);
+    const streamingLatency: StreamingLatency = {
+      totalLatency: duration,
+      firstMessageLatency: duration,
+    };
+
+    const translatedResponse = fromGenerateContentResponse(response);
+
+    await recordConversationOffered(
+      this,
+      response.traceId,
+      translatedResponse,
+      streamingLatency,
+      req.config?.abortSignal,
+    );
+
+    return translatedResponse;
   }
 
   async onboardUser(
     req: OnboardUserRequest,
   ): Promise<LongRunningOperationResponse> {
     return this.requestPost<LongRunningOperationResponse>('onboardUser', req);
+  }
+
+  async getOperation(name: string): Promise<LongRunningOperationResponse> {
+    return this.requestGetOperation<LongRunningOperationResponse>(name);
   }
 
   async loadCodeAssist(
@@ -122,6 +183,15 @@ export class CodeAssistServer implements ContentGenerator {
         throw e;
       }
     }
+  }
+
+  async fetchAdminControls(
+    req: FetchAdminControlsRequest,
+  ): Promise<FetchAdminControlsResponse> {
+    return this.requestPost<FetchAdminControlsResponse>(
+      'fetchAdminControls',
+      req,
+    );
   }
 
   async getCodeAssistGlobalUserSetting(): Promise<CodeAssistGlobalUserSettingResponse> {
@@ -176,6 +246,45 @@ export class CodeAssistServer implements ContentGenerator {
     );
   }
 
+  async recordConversationOffered(
+    conversationOffered: ConversationOffered,
+  ): Promise<void> {
+    if (!this.projectId) {
+      return;
+    }
+
+    await this.recordCodeAssistMetrics({
+      project: this.projectId,
+      metadata: await getClientMetadata(),
+      metrics: [{ conversationOffered, timestamp: new Date().toISOString() }],
+    });
+  }
+
+  async recordConversationInteraction(
+    interaction: ConversationInteraction,
+  ): Promise<void> {
+    if (!this.projectId) {
+      return;
+    }
+
+    await this.recordCodeAssistMetrics({
+      project: this.projectId,
+      metadata: await getClientMetadata(),
+      metrics: [
+        {
+          conversationInteraction: interaction,
+          timestamp: new Date().toISOString(),
+        },
+      ],
+    });
+  }
+
+  async recordCodeAssistMetrics(
+    request: RecordCodeAssistMetricsRequest,
+  ): Promise<void> {
+    return this.requestPost<void>('recordCodeAssistMetrics', request);
+  }
+
   async requestPost<T>(
     method: string,
     req: object,
@@ -195,9 +304,12 @@ export class CodeAssistServer implements ContentGenerator {
     return res.data as T;
   }
 
-  async requestGet<T>(method: string, signal?: AbortSignal): Promise<T> {
+  private async makeGetRequest<T>(
+    url: string,
+    signal?: AbortSignal,
+  ): Promise<T> {
     const res = await this.client.request({
-      url: this.getMethodUrl(method),
+      url,
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -207,6 +319,14 @@ export class CodeAssistServer implements ContentGenerator {
       signal,
     });
     return res.data as T;
+  }
+
+  async requestGet<T>(method: string, signal?: AbortSignal): Promise<T> {
+    return this.makeGetRequest<T>(this.getMethodUrl(method), signal);
+  }
+
+  async requestGetOperation<T>(name: string, signal?: AbortSignal): Promise<T> {
+    return this.makeGetRequest<T>(this.getOperationUrl(name), signal);
   }
 
   async requestStreamingPost<T>(
@@ -251,10 +371,18 @@ export class CodeAssistServer implements ContentGenerator {
     })();
   }
 
-  getMethodUrl(method: string): string {
+  private getBaseUrl(): string {
     const endpoint =
       process.env['CODE_ASSIST_ENDPOINT'] ?? CODE_ASSIST_ENDPOINT;
-    return `${endpoint}/${CODE_ASSIST_API_VERSION}:${method}`;
+    return `${endpoint}/${CODE_ASSIST_API_VERSION}`;
+  }
+
+  getMethodUrl(method: string): string {
+    return `${this.getBaseUrl()}:${method}`;
+  }
+
+  getOperationUrl(name: string): string {
+    return `${this.getBaseUrl()}/${name}`;
   }
 }
 

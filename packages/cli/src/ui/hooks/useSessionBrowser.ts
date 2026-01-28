@@ -14,7 +14,7 @@ import type {
   ResumedSessionData,
 } from '@google/gemini-cli-core';
 import type { Part } from '@google/genai';
-import { partListUnionToString } from '@google/gemini-cli-core';
+import { partListUnionToString, coreEvents } from '@google/gemini-cli-core';
 import type { SessionInfo } from '../../utils/sessionUtils.js';
 import { MessageType, ToolCallStatus } from '../types.js';
 
@@ -24,7 +24,7 @@ export const useSessionBrowser = (
     uiHistory: HistoryItemWithoutId[],
     clientHistory: Array<{ role: 'user' | 'model'; parts: Part[] }>,
     resumedSessionData: ResumedSessionData,
-  ) => void,
+  ) => Promise<void>,
 ) => {
   const [isSessionBrowserOpen, setIsSessionBrowserOpen] = useState(false);
 
@@ -73,13 +73,13 @@ export const useSessionBrowser = (
           const historyData = convertSessionToHistoryFormats(
             conversation.messages,
           );
-          onLoadHistory(
+          await onLoadHistory(
             historyData.uiHistory,
             historyData.clientHistory,
             resumedSessionData,
           );
         } catch (error) {
-          console.error('Error resuming session:', error);
+          coreEvents.emitFeedback('error', 'Error resuming session:', error);
           setIsSessionBrowserOpen(false);
         }
       },
@@ -103,7 +103,7 @@ export const useSessionBrowser = (
             chatRecordingService.deleteSession(session.file);
           }
         } catch (error) {
-          console.error('Error deleting session:', error);
+          coreEvents.emitFeedback('error', 'Error deleting session:', error);
           throw error;
         }
       },

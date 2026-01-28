@@ -6,7 +6,7 @@
 
 import { Box, Text } from 'ink';
 import type React from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { theme } from '../semantic-colors.js';
 import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
@@ -33,27 +33,35 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
   isRestarting,
 }) => {
   const [exiting, setExiting] = useState(false);
+
   useEffect(() => {
-    const doRelaunch = async () => {
-      if (isRestarting) {
-        setTimeout(async () => {
-          await relaunchApp();
-        }, 250);
-      }
+    let timer: ReturnType<typeof setTimeout>;
+    if (isRestarting) {
+      timer = setTimeout(async () => {
+        await relaunchApp();
+      }, 250);
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
     };
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    doRelaunch();
   }, [isRestarting]);
+
+  const handleExit = useCallback(() => {
+    setExiting(true);
+    // Give time for the UI to render the exiting message
+    setTimeout(async () => {
+      await runExitCleanup();
+      process.exit(ExitCodes.FATAL_CANCELLATION_ERROR);
+    }, 100);
+  }, []);
 
   useKeypress(
     (key) => {
       if (key.name === 'escape') {
-        setExiting(true);
-        setTimeout(async () => {
-          await runExitCleanup();
-          process.exit(ExitCodes.FATAL_CANCELLATION_ERROR);
-        }, 100);
+        handleExit();
+        return true;
       }
+      return false;
     },
     { isActive: !isRestarting },
   );
@@ -80,14 +88,14 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
   ];
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" width="100%">
       <Box
         flexDirection="column"
         borderStyle="round"
         borderColor={theme.status.warning}
         padding={1}
-        width="100%"
         marginLeft={1}
+        marginRight={1}
       >
         <Box flexDirection="column" marginBottom={1}>
           <Text bold color={theme.text.primary}>

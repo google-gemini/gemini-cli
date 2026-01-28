@@ -150,6 +150,8 @@ describe('StreamJsonFormatter', () => {
           total_tokens: 100,
           input_tokens: 50,
           output_tokens: 50,
+          cached: 0,
+          input: 50,
           duration_ms: 1200,
           tool_calls: 2,
         },
@@ -174,6 +176,8 @@ describe('StreamJsonFormatter', () => {
           total_tokens: 100,
           input_tokens: 50,
           output_tokens: 50,
+          cached: 0,
+          input: 50,
           duration_ms: 1200,
           tool_calls: 0,
         },
@@ -247,41 +251,114 @@ describe('StreamJsonFormatter', () => {
   });
 
   describe('convertToStreamStats', () => {
+    const createMockMetrics = (): SessionMetrics => ({
+      models: {},
+      tools: {
+        totalCalls: 0,
+        totalSuccess: 0,
+        totalFail: 0,
+        totalDurationMs: 0,
+        totalDecisions: {
+          [ToolCallDecision.ACCEPT]: 0,
+          [ToolCallDecision.REJECT]: 0,
+          [ToolCallDecision.MODIFY]: 0,
+          [ToolCallDecision.AUTO_ACCEPT]: 0,
+        },
+        byName: {},
+      },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
+      },
+    });
+
     it('should aggregate token counts from single model', () => {
-      const metrics: SessionMetrics = {
-        models: {
-          'gemini-2.0-flash': {
-            api: {
-              totalRequests: 1,
-              totalErrors: 0,
-              totalLatencyMs: 1000,
-            },
-            tokens: {
-              prompt: 50,
-              candidates: 30,
-              total: 80,
-              cached: 0,
-              thoughts: 0,
-              tool: 0,
-            },
-          },
+      const metrics = createMockMetrics();
+      metrics.models['gemini-2.0-flash'] = {
+        api: {
+          totalRequests: 1,
+          totalErrors: 0,
+          totalLatencyMs: 1000,
         },
-        tools: {
-          totalCalls: 2,
-          totalSuccess: 2,
-          totalFail: 0,
-          totalDurationMs: 500,
-          totalDecisions: {
-            [ToolCallDecision.ACCEPT]: 0,
-            [ToolCallDecision.REJECT]: 0,
-            [ToolCallDecision.MODIFY]: 0,
-            [ToolCallDecision.AUTO_ACCEPT]: 2,
-          },
-          byName: {},
+        tokens: {
+          input: 50,
+          prompt: 50,
+          candidates: 30,
+          total: 80,
+          cached: 0,
+          thoughts: 0,
+          tool: 0,
         },
-        files: {
-          totalLinesAdded: 0,
-          totalLinesRemoved: 0,
+      };
+      metrics.tools.totalCalls = 2;
+      metrics.tools.totalDecisions[ToolCallDecision.AUTO_ACCEPT] = 2;
+
+      const result = formatter.convertToStreamStats(metrics, 1200);
+
+      expect(result).toEqual({
+        total_tokens: 80,
+        input_tokens: 50,
+        output_tokens: 30,
+        cached: 0,
+        input: 50,
+        duration_ms: 1200,
+        tool_calls: 2,
+      });
+    });
+
+    it('should aggregate token counts from multiple models', () => {
+      const metrics = createMockMetrics();
+      metrics.models['gemini-pro'] = {
+        api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 1000 },
+        tokens: {
+          input: 50,
+          prompt: 50,
+          candidates: 30,
+          total: 80,
+          cached: 0,
+          thoughts: 0,
+          tool: 0,
+        },
+      };
+      metrics.models['gemini-ultra'] = {
+        api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 2000 },
+        tokens: {
+          input: 100,
+          prompt: 100,
+          candidates: 70,
+          total: 170,
+          cached: 0,
+          thoughts: 0,
+          tool: 0,
+        },
+      };
+      metrics.tools.totalCalls = 5;
+
+      const result = formatter.convertToStreamStats(metrics, 3000);
+
+      expect(result).toEqual({
+        total_tokens: 250, // 80 + 170
+        input_tokens: 150, // 50 + 100
+        output_tokens: 100, // 30 + 70
+        cached: 0,
+        input: 150,
+        duration_ms: 3000,
+        tool_calls: 5,
+      });
+    });
+
+    it('should aggregate cached token counts correctly', () => {
+      const metrics = createMockMetrics();
+      metrics.models['gemini-pro'] = {
+        api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 1000 },
+        tokens: {
+          input: 20, // 50 prompt - 30 cached
+          prompt: 50,
+          candidates: 30,
+          total: 80,
+          cached: 30,
+          thoughts: 0,
+          tool: 0,
         },
       };
 
@@ -291,96 +368,15 @@ describe('StreamJsonFormatter', () => {
         total_tokens: 80,
         input_tokens: 50,
         output_tokens: 30,
+        cached: 30,
+        input: 20,
         duration_ms: 1200,
-        tool_calls: 2,
-      });
-    });
-
-    it('should aggregate token counts from multiple models', () => {
-      const metrics: SessionMetrics = {
-        models: {
-          'gemini-2.0-flash': {
-            api: {
-              totalRequests: 1,
-              totalErrors: 0,
-              totalLatencyMs: 1000,
-            },
-            tokens: {
-              prompt: 50,
-              candidates: 30,
-              total: 80,
-              cached: 0,
-              thoughts: 0,
-              tool: 0,
-            },
-          },
-          'gemini-1.5-pro': {
-            api: {
-              totalRequests: 1,
-              totalErrors: 0,
-              totalLatencyMs: 2000,
-            },
-            tokens: {
-              prompt: 100,
-              candidates: 70,
-              total: 170,
-              cached: 0,
-              thoughts: 0,
-              tool: 0,
-            },
-          },
-        },
-        tools: {
-          totalCalls: 5,
-          totalSuccess: 5,
-          totalFail: 0,
-          totalDurationMs: 1000,
-          totalDecisions: {
-            [ToolCallDecision.ACCEPT]: 0,
-            [ToolCallDecision.REJECT]: 0,
-            [ToolCallDecision.MODIFY]: 0,
-            [ToolCallDecision.AUTO_ACCEPT]: 5,
-          },
-          byName: {},
-        },
-        files: {
-          totalLinesAdded: 0,
-          totalLinesRemoved: 0,
-        },
-      };
-
-      const result = formatter.convertToStreamStats(metrics, 3000);
-
-      expect(result).toEqual({
-        total_tokens: 250, // 80 + 170
-        input_tokens: 150, // 50 + 100
-        output_tokens: 100, // 30 + 70
-        duration_ms: 3000,
-        tool_calls: 5,
+        tool_calls: 0,
       });
     });
 
     it('should handle empty metrics', () => {
-      const metrics: SessionMetrics = {
-        models: {},
-        tools: {
-          totalCalls: 0,
-          totalSuccess: 0,
-          totalFail: 0,
-          totalDurationMs: 0,
-          totalDecisions: {
-            [ToolCallDecision.ACCEPT]: 0,
-            [ToolCallDecision.REJECT]: 0,
-            [ToolCallDecision.MODIFY]: 0,
-            [ToolCallDecision.AUTO_ACCEPT]: 0,
-          },
-          byName: {},
-        },
-        files: {
-          totalLinesAdded: 0,
-          totalLinesRemoved: 0,
-        },
-      };
+      const metrics = createMockMetrics();
 
       const result = formatter.convertToStreamStats(metrics, 100);
 
@@ -388,6 +384,8 @@ describe('StreamJsonFormatter', () => {
         total_tokens: 0,
         input_tokens: 0,
         output_tokens: 0,
+        cached: 0,
+        input: 0,
         duration_ms: 100,
         tool_calls: 0,
       });
@@ -515,6 +513,8 @@ describe('StreamJsonFormatter', () => {
             total_tokens: 0,
             input_tokens: 0,
             output_tokens: 0,
+            cached: 0,
+            input: 0,
             duration_ms: 0,
             tool_calls: 0,
           },
@@ -536,6 +536,8 @@ describe('StreamJsonFormatter', () => {
           total_tokens: 100,
           input_tokens: 50,
           output_tokens: 50,
+          cached: 0,
+          input: 50,
           duration_ms: 1200,
           tool_calls: 2,
         },

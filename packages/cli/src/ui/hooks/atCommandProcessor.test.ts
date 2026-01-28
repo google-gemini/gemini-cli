@@ -15,8 +15,10 @@ import {
   StandardFileSystemService,
   ToolRegistry,
   COMMON_IGNORE_PATTERNS,
+  GEMINI_IGNORE_FILE_NAME,
   // DEFAULT_FILE_EXCLUDES,
 } from '@google/gemini-cli-core';
+import * as core from '@google/gemini-cli-core';
 import * as os from 'node:os';
 import { ToolCallStatus } from '../types.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -53,6 +55,12 @@ describe('handleAtCommand', () => {
 
     const getToolRegistry = vi.fn();
 
+    const mockMessageBus = {
+      publish: vi.fn(),
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+    } as unknown as core.MessageBus;
+
     mockConfig = {
       getToolRegistry,
       getTargetDir: () => testRootDir,
@@ -68,15 +76,46 @@ describe('handleAtCommand', () => {
       getFileSystemService: () => new StandardFileSystemService(),
       getEnableRecursiveFileSearch: vi.fn(() => true),
       getWorkspaceContext: () => ({
-        isPathWithinWorkspace: () => true,
+        isPathWithinWorkspace: (p: string) =>
+          p.startsWith(testRootDir) || p.startsWith('/private' + testRootDir),
         getDirectories: () => [testRootDir],
       }),
+      storage: {
+        getProjectTempDir: () => path.join(os.tmpdir(), 'gemini-cli-temp'),
+      },
+      isPathAllowed(this: Config, absolutePath: string): boolean {
+        if (this.interactive && path.isAbsolute(absolutePath)) {
+          return true;
+        }
+
+        const workspaceContext = this.getWorkspaceContext();
+        if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+          return true;
+        }
+
+        const projectTempDir = this.storage.getProjectTempDir();
+        const resolvedProjectTempDir = path.resolve(projectTempDir);
+        return (
+          absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
+          absolutePath === resolvedProjectTempDir
+        );
+      },
+      validatePathAccess(this: Config, absolutePath: string): string | null {
+        if (this.isPathAllowed(absolutePath)) {
+          return null;
+        }
+
+        const workspaceDirs = this.getWorkspaceContext().getDirectories();
+        const projectTempDir = this.storage.getProjectTempDir();
+        return `Path validation failed: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+      },
       getMcpServers: () => ({}),
       getMcpServerCommand: () => undefined,
       getPromptRegistry: () => ({
         getPromptsByServer: () => [],
       }),
       getDebugMode: () => false,
+      getWorkingDir: () => '/working/dir',
       getFileExclusions: () => ({
         getCoreIgnorePatterns: () => COMMON_IGNORE_PATTERNS,
         getDefaultExcludePatterns: () => [],
@@ -93,11 +132,12 @@ describe('handleAtCommand', () => {
       getMcpClientManager: () => ({
         getClient: () => undefined,
       }),
+      getMessageBus: () => mockMessageBus,
     } as unknown as Config;
 
-    const registry = new ToolRegistry(mockConfig);
-    registry.registerTool(new ReadManyFilesTool(mockConfig));
-    registry.registerTool(new GlobTool(mockConfig));
+    const registry = new ToolRegistry(mockConfig, mockMessageBus);
+    registry.registerTool(new ReadManyFilesTool(mockConfig, mockMessageBus));
+    registry.registerTool(new GlobTool(mockConfig, mockMessageBus));
     getToolRegistry.mockReturnValue(registry);
   });
 
@@ -120,7 +160,6 @@ describe('handleAtCommand', () => {
 
     expect(result).toEqual({
       processedQuery: [{ text: query }],
-      shouldProceed: true,
     });
   });
 
@@ -138,7 +177,6 @@ describe('handleAtCommand', () => {
 
     expect(result).toEqual({
       processedQuery: [{ text: queryWithSpaces }],
-      shouldProceed: true,
     });
     expect(mockOnDebugMessage).toHaveBeenCalledWith(
       'Lone @ detected, will be treated as text in the modified query.',
@@ -171,7 +209,6 @@ describe('handleAtCommand', () => {
         { text: fileContent },
         { text: '\n--- End of content ---' },
       ],
-      shouldProceed: true,
     });
     expect(mockAddItem).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -211,7 +248,6 @@ describe('handleAtCommand', () => {
         { text: fileContent },
         { text: '\n--- End of content ---' },
       ],
-      shouldProceed: true,
     });
     expect(mockOnDebugMessage).toHaveBeenCalledWith(
       `Path ${dirPath} resolved to directory, using glob: ${resolvedGlob}`,
@@ -246,7 +282,6 @@ describe('handleAtCommand', () => {
         { text: fileContent },
         { text: '\n--- End of content ---' },
       ],
-      shouldProceed: true,
     });
   });
 
@@ -276,7 +311,6 @@ describe('handleAtCommand', () => {
         { text: fileContent },
         { text: '\n--- End of content ---' },
       ],
-      shouldProceed: true,
     });
     expect(mockAddItem).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -321,7 +355,6 @@ describe('handleAtCommand', () => {
         { text: content2 },
         { text: '\n--- End of content ---' },
       ],
-      shouldProceed: true,
     });
   });
 
@@ -362,7 +395,6 @@ describe('handleAtCommand', () => {
         { text: content2 },
         { text: '\n--- End of content ---' },
       ],
-      shouldProceed: true,
     });
   });
 
@@ -401,7 +433,6 @@ describe('handleAtCommand', () => {
         { text: content1 },
         { text: '\n--- End of content ---' },
       ],
-      shouldProceed: true,
     });
     expect(mockOnDebugMessage).toHaveBeenCalledWith(
       `Path ${invalidFile} not found directly, attempting glob search.`,
@@ -428,7 +459,6 @@ describe('handleAtCommand', () => {
 
     expect(result).toEqual({
       processedQuery: [{ text: 'Check @nonexistent.txt and @ also' }],
-      shouldProceed: true,
     });
   });
 
@@ -462,7 +492,6 @@ describe('handleAtCommand', () => {
 
       expect(result).toEqual({
         processedQuery: [{ text: query }],
-        shouldProceed: true,
       });
       expect(mockOnDebugMessage).toHaveBeenCalledWith(
         `Path ${gitIgnoredFile} is git-ignored and will be skipped.`,
@@ -501,7 +530,6 @@ describe('handleAtCommand', () => {
           { text: 'console.log("Hello world");' },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
 
@@ -534,7 +562,6 @@ describe('handleAtCommand', () => {
           { text: '# Project README' },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
       expect(mockOnDebugMessage).toHaveBeenCalledWith(
         `Path ${gitIgnoredFile} is git-ignored and will be skipped.`,
@@ -562,7 +589,6 @@ describe('handleAtCommand', () => {
 
       expect(result).toEqual({
         processedQuery: [{ text: query }],
-        shouldProceed: true,
       });
       expect(mockOnDebugMessage).toHaveBeenCalledWith(
         `Path ${gitFile} is git-ignored and will be skipped.`,
@@ -595,14 +621,15 @@ describe('handleAtCommand', () => {
         `Glob tool not found. Path ${invalidFile} will be skipped.`,
       );
       expect(result.processedQuery).toEqual([{ text: query }]);
-      expect(result.shouldProceed).toBe(true);
+      expect(result.processedQuery).not.toBeNull();
+      expect(result.error).toBeUndefined();
     });
   });
 
   describe('gemini-ignore filtering', () => {
     it('should skip gemini-ignored files in @ commands', async () => {
       await createTestFile(
-        path.join(testRootDir, '.geminiignore'),
+        path.join(testRootDir, GEMINI_IGNORE_FILE_NAME),
         'build/output.js',
       );
       const geminiIgnoredFile = await createTestFile(
@@ -622,7 +649,6 @@ describe('handleAtCommand', () => {
 
       expect(result).toEqual({
         processedQuery: [{ text: query }],
-        shouldProceed: true,
       });
       expect(mockOnDebugMessage).toHaveBeenCalledWith(
         `Path ${geminiIgnoredFile} is gemini-ignored and will be skipped.`,
@@ -634,7 +660,7 @@ describe('handleAtCommand', () => {
   });
   it('should process non-ignored files when .geminiignore is present', async () => {
     await createTestFile(
-      path.join(testRootDir, '.geminiignore'),
+      path.join(testRootDir, GEMINI_IGNORE_FILE_NAME),
       'build/output.js',
     );
     const validFile = await createTestFile(
@@ -660,13 +686,12 @@ describe('handleAtCommand', () => {
         { text: 'console.log("Hello world");' },
         { text: '\n--- End of content ---' },
       ],
-      shouldProceed: true,
     });
   });
 
   it('should handle mixed gemini-ignored and valid files', async () => {
     await createTestFile(
-      path.join(testRootDir, '.geminiignore'),
+      path.join(testRootDir, GEMINI_IGNORE_FILE_NAME),
       'dist/bundle.js',
     );
     const validFile = await createTestFile(
@@ -696,7 +721,6 @@ describe('handleAtCommand', () => {
         { text: '// Main application entry' },
         { text: '\n--- End of content ---' },
       ],
-      shouldProceed: true,
     });
     expect(mockOnDebugMessage).toHaveBeenCalledWith(
       `Path ${geminiIgnoredFile} is gemini-ignored and will be skipped.`,
@@ -824,7 +848,6 @@ describe('handleAtCommand', () => {
             { text: fileContent },
             { text: '\n--- End of content ---' },
           ],
-          shouldProceed: true,
         });
       },
     );
@@ -863,7 +886,6 @@ describe('handleAtCommand', () => {
           { text: content2 },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
 
@@ -893,7 +915,6 @@ describe('handleAtCommand', () => {
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
 
@@ -924,7 +945,6 @@ describe('handleAtCommand', () => {
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
 
@@ -955,7 +975,6 @@ describe('handleAtCommand', () => {
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
 
@@ -986,11 +1005,10 @@ describe('handleAtCommand', () => {
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
 
-    it('should not terminate at period within file name', async () => {
+    it('should correctly handle file paths with multiple periods', async () => {
       const fileContent = 'Version info';
       const filePath = await createTestFile(
         path.join(testRootDir, 'version.1.2.3.txt'),
@@ -1017,7 +1035,6 @@ describe('handleAtCommand', () => {
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
 
@@ -1046,7 +1063,6 @@ describe('handleAtCommand', () => {
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
 
@@ -1075,7 +1091,6 @@ describe('handleAtCommand', () => {
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
 
@@ -1104,7 +1119,6 @@ describe('handleAtCommand', () => {
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
     });
   });
@@ -1136,7 +1150,6 @@ describe('handleAtCommand', () => {
           { text: fileContent },
           { text: '\n--- End of content ---' },
         ],
-        shouldProceed: true,
       });
 
       expect(mockOnDebugMessage).toHaveBeenCalledWith(
@@ -1165,7 +1178,8 @@ describe('handleAtCommand', () => {
         signal: abortController.signal,
       });
 
-      expect(result.shouldProceed).toBe(true);
+      expect(result.processedQuery).not.toBeNull();
+      expect(result.error).toBeUndefined();
       expect(result.processedQuery).toEqual(
         expect.arrayContaining([
           { text: `Check @${path.join(subDirPath, '**')} please.` },
@@ -1207,7 +1221,6 @@ describe('handleAtCommand', () => {
 
       expect(result).toEqual({
         processedQuery: [{ text: `Check @${outsidePath} please.` }],
-        shouldProceed: true,
       });
 
       expect(mockOnDebugMessage).toHaveBeenCalledWith(
@@ -1326,7 +1339,8 @@ describe('handleAtCommand', () => {
         signal: abortController.signal,
       });
 
-      expect(result.shouldProceed).toBe(false);
+      expect(result.processedQuery).toBeNull();
+      expect(result.error).toBeDefined();
       expect(mockAddItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'tool_group',
@@ -1341,5 +1355,52 @@ describe('handleAtCommand', () => {
         expect.any(Number),
       );
     });
+  });
+
+  it('should return error if the read_many_files tool is cancelled by user', async () => {
+    const fileContent = 'Some content';
+    const filePath = await createTestFile(
+      path.join(testRootDir, 'file.txt'),
+      fileContent,
+    );
+    const query = `@${filePath}`;
+
+    // Simulate user cancellation
+    const mockToolInstance = {
+      buildAndExecute: vi
+        .fn()
+        .mockRejectedValue(new Error('User cancelled operation')),
+      displayName: 'Read Many Files',
+      build: vi.fn(() => ({
+        execute: mockToolInstance.buildAndExecute,
+        getDescription: vi.fn(() => 'Mocked tool description'),
+      })),
+    };
+    const viSpy = vi.spyOn(core, 'ReadManyFilesTool');
+    viSpy.mockImplementation(
+      () => mockToolInstance as unknown as core.ReadManyFilesTool,
+    );
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 134,
+      signal: abortController.signal,
+    });
+
+    expect(result).toEqual({
+      processedQuery: null,
+      error: `Exiting due to an error processing the @ command: Error reading files (file.txt): User cancelled operation`,
+    });
+
+    expect(mockAddItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'tool_group',
+        tools: [expect.objectContaining({ status: ToolCallStatus.Error })],
+      }),
+      134,
+    );
   });
 });

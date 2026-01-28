@@ -14,7 +14,6 @@ describe('JSON output', () => {
 
   beforeEach(async () => {
     rig = new TestRig();
-    await rig.setup('json-output-test');
   });
 
   afterEach(async () => {
@@ -22,11 +21,15 @@ describe('JSON output', () => {
   });
 
   it('should return a valid JSON with response and stats', async () => {
-    const result = await rig.run(
-      'What is the capital of France?',
-      '--output-format',
-      'json',
-    );
+    await rig.setup('json-output-france', {
+      fakeResponsesPath: join(
+        import.meta.dirname,
+        'json-output.france.responses',
+      ),
+    });
+    const result = await rig.run({
+      args: ['What is the capital of France?', '--output-format', 'json'],
+    });
     const parsed = JSON.parse(result);
 
     expect(parsed).toHaveProperty('response');
@@ -38,7 +41,15 @@ describe('JSON output', () => {
   });
 
   it('should return a valid JSON with a session ID', async () => {
-    const result = await rig.run('Hello', '--output-format', 'json');
+    await rig.setup('json-output-session-id', {
+      fakeResponsesPath: join(
+        import.meta.dirname,
+        'json-output.session-id.responses',
+      ),
+    });
+    const result = await rig.run({
+      args: ['Hello', '--output-format', 'json'],
+    });
     const parsed = JSON.parse(result);
 
     expect(parsed).toHaveProperty('session_id');
@@ -47,7 +58,6 @@ describe('JSON output', () => {
   });
 
   it('should return a JSON error for sd auth mismatch before running', async () => {
-    process.env['GOOGLE_GENAI_USE_GCA'] = 'true';
     await rig.setup('json-output-auth-mismatch', {
       settings: {
         security: {
@@ -58,12 +68,13 @@ describe('JSON output', () => {
 
     let thrown: Error | undefined;
     try {
-      await rig.run('Hello', '--output-format', 'json');
+      await rig.run({
+        args: ['Hello', '--output-format', 'json'],
+        env: { GOOGLE_GENAI_USE_GCA: 'true' },
+      });
       expect.fail('Expected process to exit with error');
     } catch (e) {
       thrown = e as Error;
-    } finally {
-      delete process.env['GOOGLE_GENAI_USE_GCA'];
     }
 
     expect(thrown).toBeDefined();
@@ -102,18 +113,20 @@ describe('JSON output', () => {
   });
 
   it('should not exit on tool errors and allow model to self-correct in JSON mode', async () => {
-    rig.setup('json-output-error', {
+    await rig.setup('json-output-error', {
       fakeResponsesPath: join(
         import.meta.dirname,
         'json-output.error.responses',
       ),
     });
-    const result = await rig.run(
-      `Read the contents of ${rig.testDir}/path/to/nonexistent/file.txt and tell me what it says. ` +
-        'On error, respond to the user with exactly the text "File not found".',
-      '--output-format',
-      'json',
-    );
+    const result = await rig.run({
+      args: [
+        `Read the contents of ${rig.testDir}/path/to/nonexistent/file.txt and tell me what it says. ` +
+          'On error, respond to the user with exactly the text "File not found".',
+        '--output-format',
+        'json',
+      ],
+    });
 
     const parsed = JSON.parse(result);
 

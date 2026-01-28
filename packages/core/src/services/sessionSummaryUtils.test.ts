@@ -5,11 +5,15 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { generateAndSaveSummary } from './sessionSummaryUtils.js';
+import { generateSummary, getPreviousSession } from './sessionSummaryUtils.js';
 import type { Config } from '../config/config.js';
-import type { ChatRecordingService } from './chatRecordingService.js';
 import type { ContentGenerator } from '../core/contentGenerator.js';
-import type { GeminiClient } from '../core/client.js';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+
+// Mock fs/promises
+vi.mock('node:fs/promises');
+const mockReaddir = fs.readdir as unknown as ReturnType<typeof vi.fn>;
 
 // Mock the SessionSummaryService module
 vi.mock('./sessionSummaryService.js', () => ({
@@ -23,10 +27,24 @@ vi.mock('../core/baseLlmClient.js', () => ({
   BaseLlmClient: vi.fn(),
 }));
 
+// Helper to create a session with N user messages
+function createSessionWithUserMessages(
+  count: number,
+  options: { summary?: string; sessionId?: string } = {},
+) {
+  return JSON.stringify({
+    sessionId: options.sessionId ?? 'session-id',
+    summary: options.summary,
+    messages: Array.from({ length: count }, (_, i) => ({
+      id: String(i + 1),
+      type: 'user',
+      content: [{ text: `Message ${i + 1}` }],
+    })),
+  });
+}
+
 describe('sessionSummaryUtils', () => {
   let mockConfig: Config;
-  let mockChatRecordingService: ChatRecordingService;
-  let mockGeminiClient: GeminiClient;
   let mockContentGenerator: ContentGenerator;
   let mockGenerateSummary: ReturnType<typeof vi.fn>;
 
@@ -36,23 +54,12 @@ describe('sessionSummaryUtils', () => {
     // Setup mock content generator
     mockContentGenerator = {} as ContentGenerator;
 
-    // Setup mock chat recording service
-    mockChatRecordingService = {
-      getConversation: vi.fn(),
-      saveSummary: vi.fn(),
-    } as unknown as ChatRecordingService;
-
-    // Setup mock gemini client
-    mockGeminiClient = {
-      getChatRecordingService: vi
-        .fn()
-        .mockReturnValue(mockChatRecordingService),
-    } as unknown as GeminiClient;
-
     // Setup mock config
     mockConfig = {
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
-      getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+      },
     } as unknown as Config;
 
     // Setup mock generateSummary function
@@ -73,320 +80,138 @@ describe('sessionSummaryUtils', () => {
     vi.restoreAllMocks();
   });
 
-  describe('Integration Tests', () => {
-    it('should generate and save summary successfully', async () => {
-      const mockConversation = {
-        sessionId: 'test-session',
-        projectHash: 'test-hash',
-        startTime: '2025-12-03T00:00:00Z',
-        lastUpdated: '2025-12-03T00:10:00Z',
-        messages: [
-          {
-            id: '1',
-            timestamp: '2025-12-03T00:00:00Z',
-            type: 'user' as const,
-            content: [{ text: 'How do I add dark mode?' }],
-          },
-          {
-            id: '2',
-            timestamp: '2025-12-03T00:01:00Z',
-            type: 'gemini' as const,
-            content: [{ text: 'To add dark mode...' }],
-          },
-        ],
-      };
+  describe('getPreviousSession', () => {
+    it('should return null if chats directory does not exist', async () => {
+      vi.mocked(fs.access).mockRejectedValue(new Error('ENOENT'));
 
-      (
-        mockChatRecordingService.getConversation as ReturnType<typeof vi.fn>
-      ).mockReturnValue(mockConversation);
+      const result = await getPreviousSession(mockConfig);
 
-      await generateAndSaveSummary(mockConfig);
+      expect(result).toBeNull();
+    });
 
-      expect(mockChatRecordingService.getConversation).toHaveBeenCalledTimes(1);
-      expect(mockGenerateSummary).toHaveBeenCalledTimes(1);
-      expect(mockGenerateSummary).toHaveBeenCalledWith({
-        messages: mockConversation.messages,
-      });
-      expect(mockChatRecordingService.saveSummary).toHaveBeenCalledTimes(1);
-      expect(mockChatRecordingService.saveSummary).toHaveBeenCalledWith(
-        'Add dark mode to the app',
+    it('should return null if no session files exist', async () => {
+      vi.mocked(fs.access).mockResolvedValue(undefined);
+      mockReaddir.mockResolvedValue([]);
+
+      const result = await getPreviousSession(mockConfig);
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null if most recent session already has summary', async () => {
+      vi.mocked(fs.access).mockResolvedValue(undefined);
+      mockReaddir.mockResolvedValue(['session-2024-01-01T10-00-abc12345.json']);
+      vi.mocked(fs.readFile).mockResolvedValue(
+        createSessionWithUserMessages(5, { summary: 'Existing summary' }),
+      );
+
+      const result = await getPreviousSession(mockConfig);
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null if most recent session has 1 or fewer user messages', async () => {
+      vi.mocked(fs.access).mockResolvedValue(undefined);
+      mockReaddir.mockResolvedValue(['session-2024-01-01T10-00-abc12345.json']);
+      vi.mocked(fs.readFile).mockResolvedValue(
+        createSessionWithUserMessages(1),
+      );
+
+      const result = await getPreviousSession(mockConfig);
+
+      expect(result).toBeNull();
+    });
+
+    it('should return path if most recent session has more than 1 user message and no summary', async () => {
+      vi.mocked(fs.access).mockResolvedValue(undefined);
+      mockReaddir.mockResolvedValue(['session-2024-01-01T10-00-abc12345.json']);
+      vi.mocked(fs.readFile).mockResolvedValue(
+        createSessionWithUserMessages(2),
+      );
+
+      const result = await getPreviousSession(mockConfig);
+
+      expect(result).toBe(
+        path.join(
+          '/tmp/project',
+          'chats',
+          'session-2024-01-01T10-00-abc12345.json',
+        ),
       );
     });
 
-    it('should skip if no chat recording service is available', async () => {
-      (
-        mockGeminiClient.getChatRecordingService as ReturnType<typeof vi.fn>
-      ).mockReturnValue(undefined);
+    it('should select most recently created session by filename', async () => {
+      vi.mocked(fs.access).mockResolvedValue(undefined);
+      mockReaddir.mockResolvedValue([
+        'session-2024-01-01T10-00-older000.json',
+        'session-2024-01-02T10-00-newer000.json',
+      ]);
+      vi.mocked(fs.readFile).mockResolvedValue(
+        createSessionWithUserMessages(2),
+      );
 
-      await generateAndSaveSummary(mockConfig);
+      const result = await getPreviousSession(mockConfig);
 
-      expect(mockGeminiClient.getChatRecordingService).toHaveBeenCalledTimes(1);
-      expect(mockGenerateSummary).not.toHaveBeenCalled();
-      expect(mockChatRecordingService.saveSummary).not.toHaveBeenCalled();
+      expect(result).toBe(
+        path.join(
+          '/tmp/project',
+          'chats',
+          'session-2024-01-02T10-00-newer000.json',
+        ),
+      );
     });
 
-    it('should skip if no conversation exists', async () => {
-      (
-        mockChatRecordingService.getConversation as ReturnType<typeof vi.fn>
-      ).mockReturnValue(null);
+    it('should return null if most recent session file is corrupted', async () => {
+      vi.mocked(fs.access).mockResolvedValue(undefined);
+      mockReaddir.mockResolvedValue(['session-2024-01-01T10-00-abc12345.json']);
+      vi.mocked(fs.readFile).mockResolvedValue('invalid json');
 
-      await generateAndSaveSummary(mockConfig);
+      const result = await getPreviousSession(mockConfig);
 
-      expect(mockChatRecordingService.getConversation).toHaveBeenCalledTimes(1);
-      expect(mockGenerateSummary).not.toHaveBeenCalled();
-      expect(mockChatRecordingService.saveSummary).not.toHaveBeenCalled();
-    });
-
-    it('should skip if summary already exists', async () => {
-      const mockConversation = {
-        sessionId: 'test-session',
-        projectHash: 'test-hash',
-        startTime: '2025-12-03T00:00:00Z',
-        lastUpdated: '2025-12-03T00:10:00Z',
-        summary: 'Existing summary',
-        messages: [
-          {
-            id: '1',
-            timestamp: '2025-12-03T00:00:00Z',
-            type: 'user' as const,
-            content: [{ text: 'Hello' }],
-          },
-        ],
-      };
-
-      (
-        mockChatRecordingService.getConversation as ReturnType<typeof vi.fn>
-      ).mockReturnValue(mockConversation);
-
-      await generateAndSaveSummary(mockConfig);
-
-      expect(mockChatRecordingService.getConversation).toHaveBeenCalledTimes(1);
-      expect(mockGenerateSummary).not.toHaveBeenCalled();
-      expect(mockChatRecordingService.saveSummary).not.toHaveBeenCalled();
-    });
-
-    it('should skip if no messages present', async () => {
-      const mockConversation = {
-        sessionId: 'test-session',
-        projectHash: 'test-hash',
-        startTime: '2025-12-03T00:00:00Z',
-        lastUpdated: '2025-12-03T00:10:00Z',
-        messages: [],
-      };
-
-      (
-        mockChatRecordingService.getConversation as ReturnType<typeof vi.fn>
-      ).mockReturnValue(mockConversation);
-
-      await generateAndSaveSummary(mockConfig);
-
-      expect(mockChatRecordingService.getConversation).toHaveBeenCalledTimes(1);
-      expect(mockGenerateSummary).not.toHaveBeenCalled();
-      expect(mockChatRecordingService.saveSummary).not.toHaveBeenCalled();
-    });
-
-    it('should handle generateSummary failure gracefully', async () => {
-      const mockConversation = {
-        sessionId: 'test-session',
-        projectHash: 'test-hash',
-        startTime: '2025-12-03T00:00:00Z',
-        lastUpdated: '2025-12-03T00:10:00Z',
-        messages: [
-          {
-            id: '1',
-            timestamp: '2025-12-03T00:00:00Z',
-            type: 'user' as const,
-            content: [{ text: 'Hello' }],
-          },
-        ],
-      };
-
-      (
-        mockChatRecordingService.getConversation as ReturnType<typeof vi.fn>
-      ).mockReturnValue(mockConversation);
-      mockGenerateSummary.mockResolvedValue(null);
-
-      await generateAndSaveSummary(mockConfig);
-
-      expect(mockChatRecordingService.getConversation).toHaveBeenCalledTimes(1);
-      expect(mockGenerateSummary).toHaveBeenCalledTimes(1);
-      expect(mockChatRecordingService.saveSummary).not.toHaveBeenCalled();
-    });
-
-    it('should catch and log errors without throwing', async () => {
-      const mockConversation = {
-        sessionId: 'test-session',
-        projectHash: 'test-hash',
-        startTime: '2025-12-03T00:00:00Z',
-        lastUpdated: '2025-12-03T00:10:00Z',
-        messages: [
-          {
-            id: '1',
-            timestamp: '2025-12-03T00:00:00Z',
-            type: 'user' as const,
-            content: [{ text: 'Hello' }],
-          },
-        ],
-      };
-
-      (
-        mockChatRecordingService.getConversation as ReturnType<typeof vi.fn>
-      ).mockReturnValue(mockConversation);
-      mockGenerateSummary.mockRejectedValue(new Error('API Error'));
-
-      // Should not throw
-      await expect(generateAndSaveSummary(mockConfig)).resolves.not.toThrow();
-
-      expect(mockChatRecordingService.getConversation).toHaveBeenCalledTimes(1);
-      expect(mockGenerateSummary).toHaveBeenCalledTimes(1);
-      expect(mockChatRecordingService.saveSummary).not.toHaveBeenCalled();
+      expect(result).toBeNull();
     });
   });
 
-  describe('Mock Verification Tests', () => {
-    it('should call getConversation() once', async () => {
-      const mockConversation = {
-        sessionId: 'test-session',
-        projectHash: 'test-hash',
-        startTime: '2025-12-03T00:00:00Z',
-        lastUpdated: '2025-12-03T00:10:00Z',
-        messages: [
-          {
-            id: '1',
-            timestamp: '2025-12-03T00:00:00Z',
-            type: 'user' as const,
-            content: [{ text: 'Hello' }],
-          },
-        ],
-      };
+  describe('generateSummary', () => {
+    it('should not throw if getPreviousSession returns null', async () => {
+      vi.mocked(fs.access).mockRejectedValue(new Error('ENOENT'));
 
-      (
-        mockChatRecordingService.getConversation as ReturnType<typeof vi.fn>
-      ).mockReturnValue(mockConversation);
-
-      await generateAndSaveSummary(mockConfig);
-
-      expect(mockChatRecordingService.getConversation).toHaveBeenCalledTimes(1);
-      expect(mockChatRecordingService.getConversation).toHaveBeenCalledWith();
+      await expect(generateSummary(mockConfig)).resolves.not.toThrow();
     });
 
-    it('should call generateSummary() with correct messages', async () => {
-      const mockMessages = [
-        {
-          id: '1',
-          timestamp: '2025-12-03T00:00:00Z',
-          type: 'user' as const,
-          content: [{ text: 'How do I add dark mode?' }],
-        },
-        {
-          id: '2',
-          timestamp: '2025-12-03T00:01:00Z',
-          type: 'gemini' as const,
-          content: [{ text: 'To add dark mode...' }],
-        },
-      ];
+    it('should generate and save summary for session needing one', async () => {
+      const sessionPath = path.join(
+        '/tmp/project',
+        'chats',
+        'session-2024-01-01T10-00-abc12345.json',
+      );
 
-      const mockConversation = {
-        sessionId: 'test-session',
-        projectHash: 'test-hash',
-        startTime: '2025-12-03T00:00:00Z',
-        lastUpdated: '2025-12-03T00:10:00Z',
-        messages: mockMessages,
-      };
+      vi.mocked(fs.access).mockResolvedValue(undefined);
+      mockReaddir.mockResolvedValue(['session-2024-01-01T10-00-abc12345.json']);
+      vi.mocked(fs.readFile).mockResolvedValue(
+        createSessionWithUserMessages(2),
+      );
+      vi.mocked(fs.writeFile).mockResolvedValue(undefined);
 
-      (
-        mockChatRecordingService.getConversation as ReturnType<typeof vi.fn>
-      ).mockReturnValue(mockConversation);
-
-      await generateAndSaveSummary(mockConfig);
+      await generateSummary(mockConfig);
 
       expect(mockGenerateSummary).toHaveBeenCalledTimes(1);
-      expect(mockGenerateSummary).toHaveBeenCalledWith({
-        messages: mockMessages,
-      });
-    });
-
-    it('should call saveSummary() with generated summary', async () => {
-      const mockConversation = {
-        sessionId: 'test-session',
-        projectHash: 'test-hash',
-        startTime: '2025-12-03T00:00:00Z',
-        lastUpdated: '2025-12-03T00:10:00Z',
-        messages: [
-          {
-            id: '1',
-            timestamp: '2025-12-03T00:00:00Z',
-            type: 'user' as const,
-            content: [{ text: 'Hello' }],
-          },
-        ],
-      };
-
-      (
-        mockChatRecordingService.getConversation as ReturnType<typeof vi.fn>
-      ).mockReturnValue(mockConversation);
-      mockGenerateSummary.mockResolvedValue('Test summary');
-
-      await generateAndSaveSummary(mockConfig);
-
-      expect(mockChatRecordingService.saveSummary).toHaveBeenCalledTimes(1);
-      expect(mockChatRecordingService.saveSummary).toHaveBeenCalledWith(
-        'Test summary',
+      expect(fs.writeFile).toHaveBeenCalledTimes(1);
+      expect(fs.writeFile).toHaveBeenCalledWith(
+        sessionPath,
+        expect.stringContaining('Add dark mode to the app'),
       );
     });
 
-    it('should not call saveSummary() if generation fails', async () => {
-      const mockConversation = {
-        sessionId: 'test-session',
-        projectHash: 'test-hash',
-        startTime: '2025-12-03T00:00:00Z',
-        lastUpdated: '2025-12-03T00:10:00Z',
-        messages: [
-          {
-            id: '1',
-            timestamp: '2025-12-03T00:00:00Z',
-            type: 'user' as const,
-            content: [{ text: 'Hello' }],
-          },
-        ],
-      };
+    it('should handle errors gracefully without throwing', async () => {
+      vi.mocked(fs.access).mockResolvedValue(undefined);
+      mockReaddir.mockResolvedValue(['session-2024-01-01T10-00-abc12345.json']);
+      vi.mocked(fs.readFile).mockResolvedValue(
+        createSessionWithUserMessages(2),
+      );
+      mockGenerateSummary.mockRejectedValue(new Error('API Error'));
 
-      (
-        mockChatRecordingService.getConversation as ReturnType<typeof vi.fn>
-      ).mockReturnValue(mockConversation);
-      mockGenerateSummary.mockResolvedValue(null);
-
-      await generateAndSaveSummary(mockConfig);
-
-      expect(mockGenerateSummary).toHaveBeenCalledTimes(1);
-      expect(mockChatRecordingService.saveSummary).not.toHaveBeenCalled();
-    });
-
-    it('should not call saveSummary() if generateSummary throws', async () => {
-      const mockConversation = {
-        sessionId: 'test-session',
-        projectHash: 'test-hash',
-        startTime: '2025-12-03T00:00:00Z',
-        lastUpdated: '2025-12-03T00:10:00Z',
-        messages: [
-          {
-            id: '1',
-            timestamp: '2025-12-03T00:00:00Z',
-            type: 'user' as const,
-            content: [{ text: 'Hello' }],
-          },
-        ],
-      };
-
-      (
-        mockChatRecordingService.getConversation as ReturnType<typeof vi.fn>
-      ).mockReturnValue(mockConversation);
-      mockGenerateSummary.mockRejectedValue(new Error('Generation failed'));
-
-      await generateAndSaveSummary(mockConfig);
-
-      expect(mockGenerateSummary).toHaveBeenCalledTimes(1);
-      expect(mockChatRecordingService.saveSummary).not.toHaveBeenCalled();
+      await expect(generateSummary(mockConfig)).resolves.not.toThrow();
     });
   });
 });

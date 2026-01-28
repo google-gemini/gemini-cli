@@ -6,7 +6,6 @@
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { format } from 'node:util';
-import { type CommandModule } from 'yargs';
 import { handleList, listCommand } from './list.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { loadSettings, type LoadedSettings } from '../../config/settings.js';
@@ -79,6 +78,17 @@ describe('extensions list command', () => {
       mockCwd.mockRestore();
     });
 
+    it('should output empty JSON array if no extensions are installed and output-format is json', async () => {
+      const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      mockExtensionManager.prototype.loadExtensions = vi
+        .fn()
+        .mockResolvedValue([]);
+      await handleList({ outputFormat: 'json' });
+
+      expect(emitConsoleLog).toHaveBeenCalledWith('log', '[]');
+      mockCwd.mockRestore();
+    });
+
     it('should list all installed extensions', async () => {
       const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
       const extensions = [
@@ -96,6 +106,24 @@ describe('extensions list command', () => {
       expect(emitConsoleLog).toHaveBeenCalledWith(
         'log',
         'ext1@1.0.0\n\next2@2.0.0',
+      );
+      mockCwd.mockRestore();
+    });
+
+    it('should list all installed extensions in JSON format', async () => {
+      const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      const extensions = [
+        { name: 'ext1', version: '1.0.0' },
+        { name: 'ext2', version: '2.0.0' },
+      ];
+      mockExtensionManager.prototype.loadExtensions = vi
+        .fn()
+        .mockResolvedValue(extensions);
+      await handleList({ outputFormat: 'json' });
+
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        JSON.stringify(extensions, null, 2),
       );
       mockCwd.mockRestore();
     });
@@ -124,18 +152,42 @@ describe('extensions list command', () => {
   });
 
   describe('listCommand', () => {
-    const command = listCommand as CommandModule;
+    const command = listCommand;
 
     it('should have correct command and describe', () => {
       expect(command.command).toBe('list');
       expect(command.describe).toBe('Lists installed extensions.');
     });
 
-    it('handler should call handleList', async () => {
+    it('builder should have output-format option', () => {
+      const mockYargs = {
+        option: vi.fn().mockReturnThis(),
+      };
+      (
+        command.builder as unknown as (
+          yargs: typeof mockYargs,
+        ) => typeof mockYargs
+      )(mockYargs);
+      expect(mockYargs.option).toHaveBeenCalledWith('output-format', {
+        alias: 'o',
+        type: 'string',
+        describe: 'The format of the CLI output.',
+        choices: ['text', 'json'],
+        default: 'text',
+      });
+    });
+
+    it('handler should call handleList with parsed arguments', async () => {
       mockExtensionManager.prototype.loadExtensions = vi
         .fn()
         .mockResolvedValue([]);
-      await (command.handler as () => Promise<void>)();
+      await (
+        command.handler as unknown as (args: {
+          'output-format': string;
+        }) => Promise<void>
+      )({
+        'output-format': 'json',
+      });
       expect(mockExtensionManager.prototype.loadExtensions).toHaveBeenCalled();
     });
   });

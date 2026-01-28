@@ -33,19 +33,26 @@ describe('AboutBox', () => {
     expect(output).toContain('gemini-pro');
     expect(output).toContain('default');
     expect(output).toContain('macOS');
-    expect(output).toContain('OAuth');
+    expect(output).toContain('Logged in with Google');
   });
 
   it.each([
-    ['userEmail', 'test@example.com', 'User Email'],
     ['gcpProject', 'my-project', 'GCP Project'],
     ['ideClient', 'vscode', 'IDE Client'],
+    ['tier', 'Enterprise', 'Tier'],
   ])('renders optional prop %s', (prop, value, label) => {
     const props = { ...defaultProps, [prop]: value };
     const { lastFrame } = render(<AboutBox {...props} />);
     const output = lastFrame();
     expect(output).toContain(label);
     expect(output).toContain(value);
+  });
+
+  it('renders Auth Method with email when userEmail is provided', () => {
+    const props = { ...defaultProps, userEmail: 'test@example.com' };
+    const { lastFrame } = render(<AboutBox {...props} />);
+    const output = lastFrame();
+    expect(output).toContain('Logged in with Google (test@example.com)');
   });
 
   it('renders Auth Method correctly when not oauth', () => {

@@ -4,13 +4,29 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render } from 'ink-testing-library';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import { render } from '../test-utils/render.js';
 import { act } from 'react';
 import { IdeIntegrationNudge } from './IdeIntegrationNudge.js';
 import { KeypressProvider } from './contexts/KeypressContext.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Mock debugLogger
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    debugLogger: {
+      log: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+    },
+  };
+});
 
 describe('IdeIntegrationNudge', () => {
   const defaultProps = {
@@ -21,24 +37,20 @@ describe('IdeIntegrationNudge', () => {
     onComplete: vi.fn(),
   };
 
-  const originalError = console.error;
-
   afterEach(() => {
-    console.error = originalError;
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
   });
 
   beforeEach(() => {
-    console.error = (...args) => {
+    vi.mocked(debugLogger.warn).mockImplementation((...args) => {
       if (
         typeof args[0] === 'string' &&
         /was not wrapped in act/.test(args[0])
       ) {
         return;
       }
-      originalError.call(console, ...args);
-    };
+    });
     vi.stubEnv('GEMINI_CLI_IDE_SERVER_PORT', '');
     vi.stubEnv('GEMINI_CLI_IDE_WORKSPACE_PATH', '');
   });

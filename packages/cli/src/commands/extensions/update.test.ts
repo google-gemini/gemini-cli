@@ -14,7 +14,7 @@ import {
   type Mock,
 } from 'vitest';
 import { format } from 'node:util';
-import { type CommandModule, type Argv } from 'yargs';
+import { type Argv } from 'yargs';
 import { handleUpdate, updateCommand } from './update.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { loadSettings, type LoadedSettings } from '../../config/settings.js';
@@ -155,7 +155,7 @@ describe('extensions update command', () => {
   });
 
   describe('updateCommand', () => {
-    const command = updateCommand as CommandModule;
+    const command = updateCommand;
 
     it('should have correct command and describe', () => {
       expect(command.command).toBe('update [<name>] [--all]');

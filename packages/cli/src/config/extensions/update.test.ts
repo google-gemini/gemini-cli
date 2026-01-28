@@ -145,10 +145,12 @@ describe('Extension Update Logic', () => {
     });
 
     it('should successfully update extension and set state to UPDATED_NEEDS_RESTART by default', async () => {
-      vi.mocked(mockExtensionManager.loadExtensionConfig).mockReturnValue({
-        name: 'test-extension',
-        version: '1.0.0',
-      });
+      vi.mocked(mockExtensionManager.loadExtensionConfig).mockReturnValue(
+        Promise.resolve({
+          name: 'test-extension',
+          version: '1.0.0',
+        }),
+      );
       vi.mocked(
         mockExtensionManager.installOrUpdateExtension,
       ).mockResolvedValue({
@@ -183,10 +185,12 @@ describe('Extension Update Logic', () => {
     });
 
     it('should set state to UPDATED if enableExtensionReloading is true', async () => {
-      vi.mocked(mockExtensionManager.loadExtensionConfig).mockReturnValue({
-        name: 'test-extension',
-        version: '1.0.0',
-      });
+      vi.mocked(mockExtensionManager.loadExtensionConfig).mockReturnValue(
+        Promise.resolve({
+          name: 'test-extension',
+          version: '1.0.0',
+        }),
+      );
       vi.mocked(
         mockExtensionManager.installOrUpdateExtension,
       ).mockResolvedValue({
@@ -212,10 +216,12 @@ describe('Extension Update Logic', () => {
     });
 
     it('should rollback and set state to ERROR if installation fails', async () => {
-      vi.mocked(mockExtensionManager.loadExtensionConfig).mockReturnValue({
-        name: 'test-extension',
-        version: '1.0.0',
-      });
+      vi.mocked(mockExtensionManager.loadExtensionConfig).mockReturnValue(
+        Promise.resolve({
+          name: 'test-extension',
+          version: '1.0.0',
+        }),
+      );
       vi.mocked(
         mockExtensionManager.installOrUpdateExtension,
       ).mockRejectedValue(new Error('Install failed'));
@@ -257,10 +263,12 @@ describe('Extension Update Logic', () => {
         ['ext3', { status: ExtensionUpdateState.UPDATE_AVAILABLE }],
       ]);
 
-      vi.mocked(mockExtensionManager.loadExtensionConfig).mockReturnValue({
-        name: 'ext',
-        version: '1.0.0',
-      });
+      vi.mocked(mockExtensionManager.loadExtensionConfig).mockReturnValue(
+        Promise.resolve({
+          name: 'ext',
+          version: '1.0.0',
+        }),
+      );
       vi.mocked(
         mockExtensionManager.installOrUpdateExtension,
       ).mockResolvedValue({ ...mockExtension, version: '1.1.0' });

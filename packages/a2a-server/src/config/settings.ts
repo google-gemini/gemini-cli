@@ -6,7 +6,6 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { homedir } from 'node:os';
 
 import type { MCPServerConfig } from '@google/gemini-cli-core';
 import {
@@ -14,6 +13,7 @@ import {
   GEMINI_DIR,
   getErrorMessage,
   type TelemetrySettings,
+  homedir,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 
@@ -38,7 +38,9 @@ export interface Settings {
   // Git-aware file filtering settings
   fileFiltering?: {
     respectGitIgnore?: boolean;
+    respectGeminiIgnore?: boolean;
     enableRecursiveFileSearch?: boolean;
+    customIgnoreFilePaths?: string[];
   };
 }
 
@@ -123,7 +125,7 @@ function resolveEnvVarsInString(value: string): string {
   return value.replace(envVarRegex, (match, varName1, varName2) => {
     const varName = varName1 || varName2;
     if (process && process.env && typeof process.env[varName] === 'string') {
-      return process.env[varName]!;
+      return process.env[varName];
     }
     return match;
   });

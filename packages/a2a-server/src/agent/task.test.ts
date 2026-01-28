@@ -18,12 +18,26 @@ import {
   GeminiEventType,
   type Config,
   type ToolCallRequestInfo,
+  type GitService,
   type CompletedToolCall,
+  ApprovalMode,
+  ToolConfirmationOutcome,
 } from '@google/gemini-cli-core';
 import { createMockConfig } from '../utils/testing_utils.js';
 import type { ExecutionEventBus, RequestContext } from '@a2a-js/sdk/server';
 import { CoderAgentEvent } from '../types.js';
 import type { ToolCall } from '@google/gemini-cli-core';
+
+const mockProcessRestorableToolCalls = vi.hoisted(() => vi.fn());
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...original,
+    processRestorableToolCalls: mockProcessRestorableToolCalls,
+  };
+});
 
 describe('Task', () => {
   it('scheduleToolCalls should not modify the input requests array', async () => {
@@ -70,6 +84,141 @@ describe('Task', () => {
     await task.scheduleToolCalls(requests, abortController.signal);
 
     expect(requests).toEqual(originalRequests);
+  });
+
+  describe('scheduleToolCalls', () => {
+    const mockConfig = createMockConfig();
+    const mockEventBus: ExecutionEventBus = {
+      publish: vi.fn(),
+      on: vi.fn(),
+      off: vi.fn(),
+      once: vi.fn(),
+      removeAllListeners: vi.fn(),
+      finished: vi.fn(),
+    };
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should not create a checkpoint if no restorable tools are called', async () => {
+      // @ts-expect-error - Calling private constructor for test purposes.
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+      const requests: ToolCallRequestInfo[] = [
+        {
+          callId: '1',
+          name: 'run_shell_command',
+          args: { command: 'ls' },
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-1',
+        },
+      ];
+      const abortController = new AbortController();
+      await task.scheduleToolCalls(requests, abortController.signal);
+      expect(mockProcessRestorableToolCalls).not.toHaveBeenCalled();
+    });
+
+    it('should create a checkpoint if a restorable tool is called', async () => {
+      const mockConfig = createMockConfig({
+        getCheckpointingEnabled: () => true,
+        getGitService: () => Promise.resolve({} as GitService),
+      });
+      mockProcessRestorableToolCalls.mockResolvedValue({
+        checkpointsToWrite: new Map([['test.json', 'test content']]),
+        toolCallToCheckpointMap: new Map(),
+        errors: [],
+      });
+      // @ts-expect-error - Calling private constructor for test purposes.
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+      const requests: ToolCallRequestInfo[] = [
+        {
+          callId: '1',
+          name: 'replace',
+          args: {
+            file_path: 'test.txt',
+            old_string: 'old',
+            new_string: 'new',
+          },
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-1',
+        },
+      ];
+      const abortController = new AbortController();
+      await task.scheduleToolCalls(requests, abortController.signal);
+      expect(mockProcessRestorableToolCalls).toHaveBeenCalledOnce();
+    });
+
+    it('should process all restorable tools for checkpointing in a single batch', async () => {
+      const mockConfig = createMockConfig({
+        getCheckpointingEnabled: () => true,
+        getGitService: () => Promise.resolve({} as GitService),
+      });
+      mockProcessRestorableToolCalls.mockResolvedValue({
+        checkpointsToWrite: new Map([
+          ['test1.json', 'test content 1'],
+          ['test2.json', 'test content 2'],
+        ]),
+        toolCallToCheckpointMap: new Map([
+          ['1', 'test1'],
+          ['2', 'test2'],
+        ]),
+        errors: [],
+      });
+      // @ts-expect-error - Calling private constructor for test purposes.
+      const task = new Task(
+        'task-id',
+        'context-id',
+        mockConfig as Config,
+        mockEventBus,
+      );
+      const requests: ToolCallRequestInfo[] = [
+        {
+          callId: '1',
+          name: 'replace',
+          args: {
+            file_path: 'test.txt',
+            old_string: 'old',
+            new_string: 'new',
+          },
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-1',
+        },
+        {
+          callId: '2',
+          name: 'write_file',
+          args: { file_path: 'test2.txt', content: 'new content' },
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-2',
+        },
+        {
+          callId: '3',
+          name: 'not_restorable',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-3',
+        },
+      ];
+      const abortController = new AbortController();
+      await task.scheduleToolCalls(requests, abortController.signal);
+      expect(mockProcessRestorableToolCalls).toHaveBeenCalledExactlyOnceWith(
+        [
+          expect.objectContaining({ callId: '1' }),
+          expect.objectContaining({ callId: '2' }),
+        ],
+        expect.anything(),
+        expect.anything(),
+      );
+    });
   });
 
   describe('acceptAgentMessage', () => {
@@ -200,16 +349,56 @@ describe('Task', () => {
         }),
       );
     });
+
+    it.each([
+      { eventType: GeminiEventType.Retry, eventName: 'Retry' },
+      { eventType: GeminiEventType.InvalidStream, eventName: 'InvalidStream' },
+    ])(
+      'should handle $eventName event without triggering error handling',
+      async ({ eventType }) => {
+        const mockConfig = createMockConfig();
+        const mockEventBus: ExecutionEventBus = {
+          publish: vi.fn(),
+          on: vi.fn(),
+          off: vi.fn(),
+          once: vi.fn(),
+          removeAllListeners: vi.fn(),
+          finished: vi.fn(),
+        };
+
+        // @ts-expect-error - Calling private constructor
+        const task = new Task(
+          'task-id',
+          'context-id',
+          mockConfig as Config,
+          mockEventBus,
+        );
+
+        const cancelPendingToolsSpy = vi.spyOn(task, 'cancelPendingTools');
+        const setTaskStateSpy = vi.spyOn(task, 'setTaskStateAndPublishUpdate');
+
+        const event = {
+          type: eventType,
+        };
+
+        await task.acceptAgentMessage(event);
+
+        expect(cancelPendingToolsSpy).not.toHaveBeenCalled();
+        expect(setTaskStateSpy).not.toHaveBeenCalled();
+      },
+    );
   });
 
   describe('_schedulerToolCallsUpdate', () => {
     let task: Task;
     type SpyInstance = ReturnType<typeof vi.spyOn>;
     let setTaskStateAndPublishUpdateSpy: SpyInstance;
+    let mockConfig: Config;
+    let mockEventBus: ExecutionEventBus;
 
     beforeEach(() => {
-      const mockConfig = createMockConfig();
-      const mockEventBus: ExecutionEventBus = {
+      mockConfig = createMockConfig() as Config;
+      mockEventBus = {
         publish: vi.fn(),
         on: vi.fn(),
         off: vi.fn(),
@@ -219,12 +408,7 @@ describe('Task', () => {
       };
 
       // @ts-expect-error - Calling private constructor
-      task = new Task(
-        'task-id',
-        'context-id',
-        mockConfig as Config,
-        mockEventBus,
-      );
+      task = new Task('task-id', 'context-id', mockConfig, mockEventBus);
 
       // Spy on the method we want to check calls for
       setTaskStateAndPublishUpdateSpy = vi.spyOn(
@@ -317,6 +501,67 @@ describe('Task', () => {
         (call) => call[4] === true,
       );
       expect(finalCall).toBeUndefined();
+    });
+
+    describe('auto-approval', () => {
+      it('should auto-approve tool calls when autoExecute is true', () => {
+        task.autoExecute = true;
+        const onConfirmSpy = vi.fn();
+        const toolCalls = [
+          {
+            request: { callId: '1' },
+            status: 'awaiting_approval',
+            confirmationDetails: { onConfirm: onConfirmSpy },
+          },
+        ] as unknown as ToolCall[];
+
+        // @ts-expect-error - Calling private method
+        task._schedulerToolCallsUpdate(toolCalls);
+
+        expect(onConfirmSpy).toHaveBeenCalledWith(
+          ToolConfirmationOutcome.ProceedOnce,
+        );
+      });
+
+      it('should auto-approve tool calls when approval mode is YOLO', () => {
+        (mockConfig.getApprovalMode as Mock).mockReturnValue(ApprovalMode.YOLO);
+        task.autoExecute = false;
+        const onConfirmSpy = vi.fn();
+        const toolCalls = [
+          {
+            request: { callId: '1' },
+            status: 'awaiting_approval',
+            confirmationDetails: { onConfirm: onConfirmSpy },
+          },
+        ] as unknown as ToolCall[];
+
+        // @ts-expect-error - Calling private method
+        task._schedulerToolCallsUpdate(toolCalls);
+
+        expect(onConfirmSpy).toHaveBeenCalledWith(
+          ToolConfirmationOutcome.ProceedOnce,
+        );
+      });
+
+      it('should NOT auto-approve when autoExecute is false and mode is not YOLO', () => {
+        task.autoExecute = false;
+        (mockConfig.getApprovalMode as Mock).mockReturnValue(
+          ApprovalMode.DEFAULT,
+        );
+        const onConfirmSpy = vi.fn();
+        const toolCalls = [
+          {
+            request: { callId: '1' },
+            status: 'awaiting_approval',
+            confirmationDetails: { onConfirm: onConfirmSpy },
+          },
+        ] as unknown as ToolCall[];
+
+        // @ts-expect-error - Calling private method
+        task._schedulerToolCallsUpdate(toolCalls);
+
+        expect(onConfirmSpy).not.toHaveBeenCalled();
+      });
     });
   });
 

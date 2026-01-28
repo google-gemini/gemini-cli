@@ -66,12 +66,12 @@ async function create(dir: string, structure: FileSystemStructure) {
         if (typeof item === 'string') {
           await fs.writeFile(path.join(newPath, item), '');
         } else {
-          await create(newPath, item as FileSystemStructure);
+          await create(newPath, item);
         }
       }
     } else if (typeof content === 'object' && content !== null) {
       await fs.mkdir(newPath, { recursive: true });
-      await create(newPath, content as FileSystemStructure);
+      await create(newPath, content);
     }
   }
 }

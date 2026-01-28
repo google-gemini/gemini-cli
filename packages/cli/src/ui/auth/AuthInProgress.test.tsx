@@ -5,12 +5,27 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render } from 'ink-testing-library';
+import { render } from '../../test-utils/render.js';
 import { act } from 'react';
 import { AuthInProgress } from './AuthInProgress.js';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 // Mock dependencies
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    debugLogger: {
+      log: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+    },
+  };
+});
+
 vi.mock('../hooks/useKeypress.js', () => ({
   useKeypress: vi.fn(),
 }));
@@ -22,24 +37,20 @@ vi.mock('../components/CliSpinner.js', () => ({
 describe('AuthInProgress', () => {
   const onTimeout = vi.fn();
 
-  const originalError = console.error;
-
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
-    console.error = (...args) => {
+    vi.mocked(debugLogger.error).mockImplementation((...args) => {
       if (
         typeof args[0] === 'string' &&
         args[0].includes('was not wrapped in act')
       ) {
         return;
       }
-      originalError.call(console, ...args);
-    };
+    });
   });
 
   afterEach(() => {
-    console.error = originalError;
     vi.useRealTimers();
   });
 

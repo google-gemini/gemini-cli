@@ -62,7 +62,7 @@ export async function cleanupExpiredSessions(
     );
     if (validationErrorMessage) {
       // Log validation errors to console for visibility
-      console.error(`Session cleanup disabled: ${validationErrorMessage}`);
+      debugLogger.warn(`Session cleanup disabled: ${validationErrorMessage}`);
       return { ...result, disabled: true };
     }
 
@@ -85,6 +85,18 @@ export async function cleanupExpiredSessions(
       try {
         const sessionPath = path.join(chatsDir, sessionToDelete.fileName);
         await fs.unlink(sessionPath);
+
+        // ALSO cleanup Activity logs in the project logs directory
+        const sessionId = sessionToDelete.sessionInfo?.id;
+        if (sessionId) {
+          const logsDir = path.join(config.storage.getProjectTempDir(), 'logs');
+          const logPath = path.join(logsDir, `session-${sessionId}.jsonl`);
+          try {
+            await fs.unlink(logPath);
+          } catch {
+            /* ignore if log doesn't exist */
+          }
+        }
 
         if (config.getDebugMode()) {
           if (sessionToDelete.sessionInfo === null) {
@@ -114,7 +126,7 @@ export async function cleanupExpiredSessions(
               : sessionToDelete.sessionInfo.id;
           const errorMessage =
             error instanceof Error ? error.message : 'Unknown error';
-          console.error(
+          debugLogger.warn(
             `Failed to delete session ${sessionId}: ${errorMessage}`,
           );
           result.failed++;
@@ -133,7 +145,7 @@ export async function cleanupExpiredSessions(
     // Global error handler - don't let cleanup failures break startup
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
-    console.error(`Session cleanup failed: ${errorMessage}`);
+    debugLogger.warn(`Session cleanup failed: ${errorMessage}`);
     result.failed++;
   }
 
@@ -273,7 +285,7 @@ function validateRetentionConfig(
     } catch (error) {
       // If minRetention format is invalid, fall back to default
       if (config.getDebugMode()) {
-        console.error(`Failed to parse minRetention: ${error}`);
+        debugLogger.warn(`Failed to parse minRetention: ${error}`);
       }
       minRetentionMs = parseRetentionPeriod(DEFAULT_MIN_RETENTION);
     }

@@ -7,6 +7,44 @@
 import type { AnyDeclarativeTool, AnyToolInvocation } from '../index.js';
 import { isTool } from '../index.js';
 import { SHELL_TOOL_NAMES } from './shell-utils.js';
+import levenshtein from 'fast-levenshtein';
+
+/**
+ * Generates a suggestion string for a tool name that was not found in the registry.
+ * It finds the closest matches based on Levenshtein distance.
+ * @param unknownToolName The tool name that was not found.
+ * @param allToolNames The list of all available tool names.
+ * @param topN The number of suggestions to return. Defaults to 3.
+ * @returns A suggestion string like " Did you mean 'tool'?" or " Did you mean one of: 'tool1', 'tool2'?", or an empty string if no suggestions are found.
+ */
+export function getToolSuggestion(
+  unknownToolName: string,
+  allToolNames: string[],
+  topN = 3,
+): string {
+  const matches = allToolNames.map((toolName) => ({
+    name: toolName,
+    distance: levenshtein.get(unknownToolName, toolName),
+  }));
+
+  matches.sort((a, b) => a.distance - b.distance);
+
+  const topNResults = matches.slice(0, topN);
+
+  if (topNResults.length === 0) {
+    return '';
+  }
+
+  const suggestedNames = topNResults
+    .map((match) => `"${match.name}"`)
+    .join(', ');
+
+  if (topNResults.length > 1) {
+    return ` Did you mean one of: ${suggestedNames}?`;
+  } else {
+    return ` Did you mean ${suggestedNames}?`;
+  }
+}
 
 /**
  * Checks if a tool invocation matches any of a list of patterns.
@@ -29,7 +67,7 @@ export function doesToolInvocationMatch(
   if (isTool(toolOrToolName)) {
     toolNames = [toolOrToolName.name, toolOrToolName.constructor.name];
   } else {
-    toolNames = [toolOrToolName as string];
+    toolNames = [toolOrToolName];
   }
 
   if (toolNames.some((name) => SHELL_TOOL_NAMES.includes(name))) {

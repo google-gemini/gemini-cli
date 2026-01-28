@@ -9,11 +9,11 @@ import type {
   HistoryItem,
   ThoughtSummary,
   ConsoleMessageItem,
-  ShellConfirmationRequest,
   ConfirmationRequest,
   LoopDetectionConfirmationRequest,
   HistoryItemWithoutId,
   StreamingState,
+  ActiveHook,
 } from '../types.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
@@ -23,6 +23,8 @@ import type {
   UserTierId,
   IdeInfo,
   FallbackIntent,
+  ValidationIntent,
+  AgentDefinition,
 } from '@google/gemini-cli-core';
 import type { DOMElement } from 'ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
@@ -38,8 +40,16 @@ export interface ProQuotaDialogRequest {
   resolve: (intent: FallbackIntent) => void;
 }
 
+export interface ValidationDialogRequest {
+  validationLink?: string;
+  validationDescription?: string;
+  learnMoreUrl?: string;
+  resolve: (intent: ValidationIntent) => void;
+}
+
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import { type RestartReason } from '../hooks/useIdeTrustListener.js';
+import type { TerminalBackgroundColor } from '../utils/terminalCapabilityManager.js';
 
 export interface UIState {
   history: HistoryItem[];
@@ -61,12 +71,15 @@ export interface UIState {
   isSettingsDialogOpen: boolean;
   isSessionBrowserOpen: boolean;
   isModelDialogOpen: boolean;
+  isAgentConfigDialogOpen: boolean;
+  selectedAgentName?: string;
+  selectedAgentDisplayName?: string;
+  selectedAgentDefinition?: AgentDefinition;
   isPermissionsDialogOpen: boolean;
   permissionsDialogProps: { targetDirectory?: string } | null;
   slashCommands: readonly SlashCommand[] | undefined;
   pendingSlashCommandHistoryItems: HistoryItemWithoutId[];
   commandContext: CommandContext;
-  shellConfirmationRequest: ShellConfirmationRequest | null;
   confirmationRequest: ConfirmationRequest | null;
   confirmUpdateExtensionRequests: ConfirmationRequest[];
   loopDetectionConfirmationRequest: LoopDetectionConfirmationRequest | null;
@@ -81,6 +94,7 @@ export interface UIState {
   inputWidth: number;
   suggestionsWidth: number;
   isInputActive: boolean;
+  isResuming: boolean;
   shouldShowIdePrompt: boolean;
   isFolderTrustDialogOpen: boolean;
   isTrustedFolder: boolean | undefined;
@@ -95,12 +109,14 @@ export interface UIState {
   elapsedTime: number;
   currentLoadingPhrase: string;
   historyRemountKey: number;
+  activeHooks: ActiveHook[];
   messageQueue: string[];
   queueErrorMessage: string | null;
-  showAutoAcceptIndicator: ApprovalMode;
+  showApprovalModeIndicator: ApprovalMode;
   // Quota-related state
   userTier: UserTierId | undefined;
   proQuotaRequest: ProQuotaDialogRequest | null;
+  validationRequest: ValidationDialogRequest | null;
   currentModel: string;
   contextFileNames: string[];
   errorCount: number;
@@ -136,6 +152,10 @@ export interface UIState {
   };
   bannerVisible: boolean;
   customDialog: React.ReactNode | null;
+  terminalBackgroundColor: TerminalBackgroundColor;
+  settingsNonce: number;
+  adminSettingsChanged: boolean;
+  newAgents: AgentDefinition[] | null;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);

@@ -15,6 +15,9 @@ import { Text } from 'ink';
 import type React from 'react';
 
 vi.mock('../hooks/useTerminalSize.js');
+vi.mock('../hooks/useSnowfall.js', () => ({
+  useSnowfall: vi.fn((art) => art),
+}));
 vi.mock('../utils/terminalSetup.js', () => ({
   getTerminalProgram: vi.fn(),
 }));
@@ -159,7 +162,6 @@ describe('<Header />', () => {
     render(<Header version="1.0.0" nightly={false} />);
     expect(Gradient.default).not.toHaveBeenCalled();
     const textCalls = (Text as Mock).mock.calls;
-    console.log(JSON.stringify(textCalls, null, 2));
     expect(textCalls.length).toBe(1);
     expect(textCalls[0][0]).toHaveProperty('color', singleColor);
   });

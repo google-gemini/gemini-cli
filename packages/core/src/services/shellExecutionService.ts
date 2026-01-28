@@ -12,13 +12,21 @@ import { TextDecoder } from 'node:util';
 import os from 'node:os';
 import type { IPty } from '@lydell/node-pty';
 import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
-import { getShellConfiguration, type ShellType } from '../utils/shell-utils.js';
+import {
+  getShellConfiguration,
+  resolveExecutable,
+  type ShellType,
+} from '../utils/shell-utils.js';
 import { isBinary } from '../utils/textUtils.js';
 import pkg from '@xterm/headless';
 import {
   serializeTerminalToObject,
   type AnsiOutput,
 } from '../utils/terminalSerializer.js';
+import {
+  sanitizeEnvironment,
+  type EnvironmentSanitizationConfig,
+} from './environmentSanitization.js';
 const { Terminal } = pkg;
 
 const SIGKILL_TIMEOUT_MS = 200;
@@ -80,6 +88,7 @@ export interface ShellExecutionConfig {
   showColor?: boolean;
   defaultFg?: string;
   defaultBg?: string;
+  sanitizationConfig: EnvironmentSanitizationConfig;
   // Used for testing
   disableDynamicLineTrimming?: boolean;
   scrollback?: number;
@@ -148,58 +157,6 @@ const getFullBufferText = (terminal: pkg.Terminal): string => {
   return lines.join('\n');
 };
 
-function getSanitizedEnv(): NodeJS.ProcessEnv {
-  const isRunningInGithub =
-    process.env['GITHUB_SHA'] || process.env['SURFACE'] === 'Github';
-
-  if (!isRunningInGithub) {
-    // For local runs, we want to preserve the user's full environment.
-    return { ...process.env };
-  }
-
-  // For CI runs (GitHub), we sanitize the environment for security.
-  const env: NodeJS.ProcessEnv = {};
-  const essentialVars = [
-    // Cross-platform
-    'PATH',
-    // Windows specific
-    'Path',
-    'SYSTEMROOT',
-    'SystemRoot',
-    'COMSPEC',
-    'ComSpec',
-    'PATHEXT',
-    'WINDIR',
-    'TEMP',
-    'TMP',
-    'USERPROFILE',
-    'SYSTEMDRIVE',
-    'SystemDrive',
-    // Unix/Linux/macOS specific
-    'HOME',
-    'LANG',
-    'SHELL',
-    'TMPDIR',
-    'USER',
-    'LOGNAME',
-  ];
-
-  for (const key of essentialVars) {
-    if (process.env[key] !== undefined) {
-      env[key] = process.env[key];
-    }
-  }
-
-  // Always carry over test-specific variables for our own integration tests.
-  for (const key in process.env) {
-    if (key.startsWith('GEMINI_CLI_TEST')) {
-      env[key] = process.env[key];
-    }
-  }
-
-  return env;
-}
-
 /**
  * A centralized service for executing shell commands with robust process
  * management, cross-platform compatibility, and streaming output capabilities.
@@ -230,7 +187,7 @@ export class ShellExecutionService {
       const ptyInfo = await getPty();
       if (ptyInfo) {
         try {
-          return this.executeWithPty(
+          return await this.executeWithPty(
             commandToExecute,
             cwd,
             onOutputEvent,
@@ -249,6 +206,7 @@ export class ShellExecutionService {
       cwd,
       onOutputEvent,
       abortSignal,
+      shellExecutionConfig.sanitizationConfig,
     );
   }
 
@@ -287,6 +245,7 @@ export class ShellExecutionService {
     cwd: string,
     onOutputEvent: (event: ShellOutputEvent) => void,
     abortSignal: AbortSignal,
+    sanitizationConfig: EnvironmentSanitizationConfig,
   ): ShellExecutionHandle {
     try {
       const isWindows = os.platform() === 'win32';
@@ -301,7 +260,7 @@ export class ShellExecutionService {
         shell: false,
         detached: !isWindows,
         env: {
-          ...getSanitizedEnv(),
+          ...sanitizeEnvironment(process.env, sanitizationConfig),
           GEMINI_CLI: '1',
           TERM: 'xterm-256color',
           PAGER: 'cat',
@@ -490,14 +449,14 @@ export class ShellExecutionService {
     }
   }
 
-  private static executeWithPty(
+  private static async executeWithPty(
     commandToExecute: string,
     cwd: string,
     onOutputEvent: (event: ShellOutputEvent) => void,
     abortSignal: AbortSignal,
     shellExecutionConfig: ShellExecutionConfig,
     ptyInfo: PtyImplementation,
-  ): ShellExecutionHandle {
+  ): Promise<ShellExecutionHandle> {
     if (!ptyInfo) {
       // This should not happen, but as a safeguard...
       throw new Error('PTY implementation not found');
@@ -506,16 +465,27 @@ export class ShellExecutionService {
       const cols = shellExecutionConfig.terminalWidth ?? 80;
       const rows = shellExecutionConfig.terminalHeight ?? 30;
       const { executable, argsPrefix, shell } = getShellConfiguration();
+
+      const resolvedExecutable = await resolveExecutable(executable);
+      if (!resolvedExecutable) {
+        throw new Error(
+          `Shell executable "${executable}" not found in PATH or at absolute location. Please ensure the shell is installed and available in your environment.`,
+        );
+      }
+
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
       const args = [...argsPrefix, guardedCommand];
 
       const ptyProcess = ptyInfo.module.spawn(executable, args, {
         cwd,
-        name: 'xterm',
+        name: 'xterm-256color',
         cols,
         rows,
         env: {
-          ...getSanitizedEnv(),
+          ...sanitizeEnvironment(
+            process.env,
+            shellExecutionConfig.sanitizationConfig,
+          ),
           GEMINI_CLI: '1',
           TERM: 'xterm-256color',
           PAGER: shellExecutionConfig.pager ?? 'cat',
@@ -702,6 +672,12 @@ export class ShellExecutionService {
             exited = true;
             abortSignal.removeEventListener('abort', abortHandler);
             this.activePtys.delete(ptyProcess.pid);
+            // Attempt to destroy the PTY to ensure FD is closed
+            try {
+              (ptyProcess as IPty & { destroy?: () => void }).destroy?.();
+            } catch {
+              // Ignore errors during cleanup
+            }
 
             const finalize = () => {
               render(true);
@@ -715,9 +691,7 @@ export class ShellExecutionService {
                 error,
                 aborted: abortSignal.aborted,
                 pid: ptyProcess.pid,
-                executionMethod:
-                  (ptyInfo?.name as 'node-pty' | 'lydell-node-pty') ??
-                  'node-pty',
+                executionMethod: ptyInfo?.name ?? 'node-pty',
               });
             };
 

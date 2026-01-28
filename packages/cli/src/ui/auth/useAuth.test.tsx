@@ -40,8 +40,8 @@ vi.mock('../../config/auth.js', () => ({
 describe('useAuth', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    process.env['GEMINI_API_KEY'] = '';
-    process.env['GEMINI_DEFAULT_AUTH_TYPE'] = '';
+    delete process.env['GEMINI_API_KEY'];
+    delete process.env['GEMINI_DEFAULT_AUTH_TYPE'];
   });
 
   afterEach(() => {

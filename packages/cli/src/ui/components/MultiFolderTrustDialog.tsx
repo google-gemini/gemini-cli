@@ -13,6 +13,7 @@ import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { loadTrustedFolders, TrustLevel } from '../../config/trustedFolders.js';
 import { expandHomeDir } from '../utils/directoryUtils.js';
+import * as path from 'node:path';
 import { MessageType, type HistoryItem } from '../types.js';
 import type { Config } from '@google/gemini-cli-core';
 
@@ -31,13 +32,16 @@ export interface MultiFolderTrustDialogProps {
     config: Config,
     addItem: (
       itemData: Omit<HistoryItem, 'id'>,
-      baseTimestamp: number,
+      baseTimestamp?: number,
     ) => number,
     added: string[],
     errors: string[],
   ) => Promise<void>;
   config: Config;
-  addItem: (itemData: Omit<HistoryItem, 'id'>, baseTimestamp: number) => number;
+  addItem: (
+    itemData: Omit<HistoryItem, 'id'>,
+    baseTimestamp?: number,
+  ) => number;
 }
 
 export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
@@ -68,7 +72,9 @@ export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
       if (key.name === 'escape') {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleCancel();
+        return true;
       }
+      return false;
     },
     { isActive: !submitted },
   );
@@ -95,13 +101,10 @@ export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
     setSubmitted(true);
 
     if (!config) {
-      addItem(
-        {
-          type: MessageType.ERROR,
-          text: 'Configuration is not available.',
-        },
-        Date.now(),
-      );
+      addItem({
+        type: MessageType.ERROR,
+        text: 'Configuration is not available.',
+      });
       onComplete();
       return;
     }
@@ -120,7 +123,7 @@ export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
     } else {
       for (const dir of folders) {
         try {
-          const expandedPath = expandHomeDir(dir);
+          const expandedPath = path.resolve(expandHomeDir(dir));
           if (choice === MultiFolderTrustChoice.YES_AND_REMEMBER) {
             trustedFolders.setValue(expandedPath, TrustLevel.TRUST_FOLDER);
           }
@@ -138,14 +141,14 @@ export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
   };
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" width="100%">
       <Box
         flexDirection="column"
         borderStyle="round"
         borderColor={theme.status.warning}
         padding={1}
-        width="100%"
         marginLeft={1}
+        marginRight={1}
       >
         <Box flexDirection="column" marginBottom={1}>
           <Text bold color={theme.text.primary}>

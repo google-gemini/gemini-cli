@@ -722,7 +722,8 @@ The MCP integration tracks several states:
 
 ### Debugging tips
 
-1. **Enable debug mode:** Run the CLI with `--debug` for verbose output
+1. **Enable debug mode:** Run the CLI with `--debug` for verbose output (use F12
+   to open debug console in interactive mode)
 2. **Check stderr:** MCP server stderr is captured and logged (INFO messages
    filtered)
 3. **Test isolation:** Test your MCP server independently before integrating
@@ -732,7 +733,7 @@ The MCP integration tracks several states:
 
 ## Important notes
 
-### Security sonsiderations
+### Security considerations
 
 - **Trust settings:** The `trust` option bypasses all confirmation dialogs. Use
   cautiously and only for servers you completely control
@@ -1036,6 +1037,29 @@ gemini mcp remove my-server
 
 This will find and delete the "my-server" entry from the `mcpServers` object in
 the appropriate `settings.json` file based on the scope (`-s, --scope`).
+
+### Enabling/disabling a server (`gemini mcp enable`, `gemini mcp disable`)
+
+Temporarily disable an MCP server without removing its configuration, or
+re-enable a previously disabled server.
+
+**Commands:**
+
+```bash
+gemini mcp enable <name> [--session]
+gemini mcp disable <name> [--session]
+```
+
+**Options (flags):**
+
+- `--session`: Apply change only for this session (not persisted to file).
+
+Disabled servers appear in `/mcp` status as "Disabled" but won't connect or
+provide tools. Enablement state is stored in
+`~/.gemini/mcp-server-enablement.json`.
+
+The same commands are available as slash commands during an active session:
+`/mcp enable <name>` and `/mcp disable <name>`.
 
 ## Instructions
 

@@ -1,5 +1,77 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`Initial Theme Selection > should default to a dark theme when terminal background is dark and no theme is set 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                                      │
+│ > Select Theme                                        Preview                                                        │
+│ ▲                                                     ┌────────────────────────────────────────────────────────────┐ │
+│    1. ANSI Dark                                       │                                                            │ │
+│    2. Atom One Dark                                   │ 1 # function                                               │ │
+│    3. Ayu Dark                                        │ 2 def fibonacci(n):                                        │ │
+│ ●  4. Default Dark                                    │ 3     a, b = 0, 1                                          │ │
+│    5. Dracula Dark                                    │ 4     for _ in range(n):                                   │ │
+│    6. GitHub Dark                                     │ 5         a, b = b, a + b                                  │ │
+│    7. Holiday Dark                                    │ 6     return a                                             │ │
+│    8. Shades Of Purple Dark                           │                                                            │ │
+│    9. ANSI Light Light (Incompatible)                 │ 1 - print("Hello, " + name)                                │ │
+│   10. Ayu Light Light (Incompatible)                  │ 1 + print(f"Hello, {name}!")                               │ │
+│   11. Default Light Light (Incompatible)              │                                                            │ │
+│   12. GitHub Light Light (Incompatible)               └────────────────────────────────────────────────────────────┘ │
+│ ▼                                                                                                                    │
+│                                                                                                                      │
+│ (Use Enter to select, Tab to configure scope, Esc to close)                                                          │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`Initial Theme Selection > should default to a light theme when terminal background is light and no theme is set 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                                      │
+│ > Select Theme                                        Preview                                                        │
+│ ▲                                                     ┌────────────────────────────────────────────────────────────┐ │
+│    1. ANSI Light Light                                │                                                            │ │
+│    2. Ayu Light Light                                 │ 1 # function                                               │ │
+│ ●  3. Default Light Light                             │ 2 def fibonacci(n):                                        │ │
+│    4. GitHub Light Light                              │ 3     a, b = 0, 1                                          │ │
+│    5. Google Code Light                               │ 4     for _ in range(n):                                   │ │
+│    6. Xcode Light                                     │ 5         a, b = b, a + b                                  │ │
+│    7. ANSI Dark (Incompatible)                        │ 6     return a                                             │ │
+│    8. Atom One Dark (Incompatible)                    │                                                            │ │
+│    9. Ayu Dark (Incompatible)                         │ 1 - print("Hello, " + name)                                │ │
+│   10. Default Dark (Incompatible)                     │ 1 + print(f"Hello, {name}!")                               │ │
+│   11. Dracula Dark (Incompatible)                     │                                                            │ │
+│   12. GitHub Dark (Incompatible)                      └────────────────────────────────────────────────────────────┘ │
+│ ▼                                                                                                                    │
+│                                                                                                                      │
+│ (Use Enter to select, Tab to configure scope, Esc to close)                                                          │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`Initial Theme Selection > should use the theme from settings even if terminal background suggests a different theme type 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                                      │
+│ > Select Theme                                        Preview                                                        │
+│ ▲                                                     ┌────────────────────────────────────────────────────────────┐ │
+│ ●  1. ANSI Dark                                       │                                                            │ │
+│    2. Atom One Dark                                   │ 1 # function                                               │ │
+│    3. Ayu Dark                                        │ 2 def fibonacci(n):                                        │ │
+│    4. Default Dark                                    │ 3     a, b = 0, 1                                          │ │
+│    5. Dracula Dark                                    │ 4     for _ in range(n):                                   │ │
+│    6. GitHub Dark                                     │ 5         a, b = b, a + b                                  │ │
+│    7. Holiday Dark                                    │ 6     return a                                             │ │
+│    8. Shades Of Purple Dark                           │                                                            │ │
+│    9. ANSI Light Light (Incompatible)                 │ 1 - print("Hello, " + name)                                │ │
+│   10. Ayu Light Light (Incompatible)                  │ 1 + print(f"Hello, {name}!")                               │ │
+│   11. Default Light Light (Incompatible)              │                                                            │ │
+│   12. GitHub Light Light (Incompatible)               └────────────────────────────────────────────────────────────┘ │
+│ ▼                                                                                                                    │
+│                                                                                                                      │
+│ (Use Enter to select, Tab to configure scope, Esc to close)                                                          │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
 exports[`ThemeDialog Snapshots > should render correctly in scope selector mode 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                                      │
@@ -19,17 +91,17 @@ exports[`ThemeDialog Snapshots > should render correctly in theme selection mode
 │ > Select Theme                                        Preview                                                        │
 │ ▲                                                     ┌────────────────────────────────────────────────────────────┐ │
 │    1. ANSI Dark                                       │                                                            │ │
-│    2. Atom One Dark                                   │ 1 # function                                               │ │
-│    3. Ayu Dark                                        │ 2 def fibonacci(n):                                        │ │
-│ ●  4. Default Dark                                    │ 3     a, b = 0, 1                                          │ │
-│    5. Dracula Dark                                    │ 4     for _ in range(n):                                   │ │
-│    6. GitHub Dark                                     │ 5         a, b = b, a + b                                  │ │
-│    7. Holiday Dark                                    │ 6     return a                                             │ │
-│    8. Shades Of Purple Dark                           │                                                            │ │
-│    9. ANSI Light Light                                │ 1 - print("Hello, " + name)                                │ │
-│   10. Ayu Light Light                                 │ 1 + print(f"Hello, {name}!")                               │ │
-│   11. Default Light Light                             │                                                            │ │
-│   12. GitHub Light Light                              └────────────────────────────────────────────────────────────┘ │
+│    2. ANSI Light Light                                │ 1 # function                                               │ │
+│    3. Atom One Dark                                   │ 2 def fibonacci(n):                                        │ │
+│    4. Ayu Dark                                        │ 3     a, b = 0, 1                                          │ │
+│    5. Ayu Light Light                                 │ 4     for _ in range(n):                                   │ │
+│ ●  6. Default Dark                                    │ 5         a, b = b, a + b                                  │ │
+│    7. Default Light Light                             │ 6     return a                                             │ │
+│    8. Dracula Dark                                    │                                                            │ │
+│    9. GitHub Dark                                     │ 1 - print("Hello, " + name)                                │ │
+│   10. GitHub Light Light                              │ 1 + print(f"Hello, {name}!")                               │ │
+│   11. Google Code Light                               │                                                            │ │
+│   12. Holiday Dark                                    └────────────────────────────────────────────────────────────┘ │
 │ ▼                                                                                                                    │
 │                                                                                                                      │
 │ (Use Enter to select, Tab to configure scope, Esc to close)                                                          │

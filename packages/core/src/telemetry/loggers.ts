@@ -41,16 +41,18 @@ import type {
   ExtensionUninstallEvent,
   ExtensionInstallEvent,
   ModelSlashCommandEvent,
-  SmartEditStrategyEvent,
-  SmartEditCorrectionEvent,
+  EditStrategyEvent,
+  EditCorrectionEvent,
   AgentStartEvent,
   AgentFinishEvent,
   RecoveryAttemptEvent,
   WebFetchFallbackAttemptEvent,
   ExtensionUpdateEvent,
-  LlmLoopCheckEvent,
+  ApprovalModeSwitchEvent,
+  ApprovalModeDurationEvent,
   HookCallEvent,
   StartupStatsEvent,
+  LlmLoopCheckEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -79,7 +81,7 @@ export function logCliConfiguration(
   config: Config,
   event: StartSessionEvent,
 ): void {
-  ClearcutLogger.getInstance(config)?.logStartSessionEvent(event);
+  void ClearcutLogger.getInstance(config)?.logStartSessionEvent(event);
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
     const logRecord: LogRecord = {
@@ -568,11 +570,11 @@ export async function logExtensionDisable(
   });
 }
 
-export function logSmartEditStrategy(
+export function logEditStrategy(
   config: Config,
-  event: SmartEditStrategyEvent,
+  event: EditStrategyEvent,
 ): void {
-  ClearcutLogger.getInstance(config)?.logSmartEditStrategyEvent(event);
+  ClearcutLogger.getInstance(config)?.logEditStrategyEvent(event);
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
     const logRecord: LogRecord = {
@@ -583,11 +585,11 @@ export function logSmartEditStrategy(
   });
 }
 
-export function logSmartEditCorrectionEvent(
+export function logEditCorrectionEvent(
   config: Config,
-  event: SmartEditCorrectionEvent,
+  event: EditCorrectionEvent,
 ): void {
-  ClearcutLogger.getInstance(config)?.logSmartEditCorrectionEvent(event);
+  ClearcutLogger.getInstance(config)?.logEditCorrectionEvent(event);
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
     const logRecord: LogRecord = {
@@ -671,7 +673,34 @@ export function logLlmLoopCheck(
   });
 }
 
+export function logApprovalModeSwitch(
+  config: Config,
+  event: ApprovalModeSwitchEvent,
+) {
+  ClearcutLogger.getInstance(config)?.logApprovalModeSwitchEvent(event);
+  bufferTelemetryEvent(() => {
+    logs.getLogger(SERVICE_NAME).emit({
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    });
+  });
+}
+
+export function logApprovalModeDuration(
+  config: Config,
+  event: ApprovalModeDurationEvent,
+) {
+  ClearcutLogger.getInstance(config)?.logApprovalModeDurationEvent(event);
+  bufferTelemetryEvent(() => {
+    logs.getLogger(SERVICE_NAME).emit({
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    });
+  });
+}
+
 export function logHookCall(config: Config, event: HookCallEvent): void {
+  ClearcutLogger.getInstance(config)?.logHookCallEvent(event);
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
     const logRecord: LogRecord = {

@@ -8,6 +8,8 @@ import type { Part, Content } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { getFolderStructure } from './getFolderStructure.js';
 
+export const INITIAL_HISTORY_LENGTH = 1;
+
 /**
  * Generates a string describing the current workspace directories and their structures.
  * @param {Config} config - The runtime configuration and services.
@@ -60,6 +62,7 @@ export async function getEnvironmentContext(config: Config): Promise<Part[]> {
   const platform = process.platform;
   const directoryContext = await getDirectoryContextString(config);
   const tempDir = config.storage.getProjectTempDir();
+  const environmentMemory = config.getEnvironmentMemory();
 
   const context = `
 This is the Gemini CLI. We are setting up the context for our chat.
@@ -67,6 +70,8 @@ Today's date is ${today} (formatted according to the user's locale).
 My operating system is: ${platform}
 The project's temporary directory is: ${tempDir}
 ${directoryContext}
+
+${environmentMemory}
         `.trim();
 
   const initialParts: Part[] = [{ text: context }];

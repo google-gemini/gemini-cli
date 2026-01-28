@@ -27,7 +27,7 @@ export const useFolderTrust = (
   const [isRestarting, setIsRestarting] = useState(false);
   const startupMessageSent = useRef(false);
 
-  const folderTrust = settings.merged.security?.folderTrust?.enabled;
+  const folderTrust = settings.merged.security.folderTrust.enabled;
 
   useEffect(() => {
     const { isTrusted: trusted } = isWorkspaceTrusted(settings.merged);
@@ -49,25 +49,17 @@ export const useFolderTrust = (
 
   const handleFolderTrustSelect = useCallback(
     (choice: FolderTrustChoice) => {
-      const trustedFolders = loadTrustedFolders();
+      const trustLevelMap: Record<FolderTrustChoice, TrustLevel> = {
+        [FolderTrustChoice.TRUST_FOLDER]: TrustLevel.TRUST_FOLDER,
+        [FolderTrustChoice.TRUST_PARENT]: TrustLevel.TRUST_PARENT,
+        [FolderTrustChoice.DO_NOT_TRUST]: TrustLevel.DO_NOT_TRUST,
+      };
+
+      const trustLevel = trustLevelMap[choice];
+      if (!trustLevel) return;
+
       const cwd = process.cwd();
-      let trustLevel: TrustLevel;
-
-      const wasTrusted = isTrusted ?? true;
-
-      switch (choice) {
-        case FolderTrustChoice.TRUST_FOLDER:
-          trustLevel = TrustLevel.TRUST_FOLDER;
-          break;
-        case FolderTrustChoice.TRUST_PARENT:
-          trustLevel = TrustLevel.TRUST_PARENT;
-          break;
-        case FolderTrustChoice.DO_NOT_TRUST:
-          trustLevel = TrustLevel.DO_NOT_TRUST;
-          break;
-        default:
-          return;
-      }
+      const trustedFolders = loadTrustedFolders();
 
       try {
         trustedFolders.setValue(cwd, trustLevel);
@@ -86,11 +78,15 @@ export const useFolderTrust = (
       const currentIsTrusted =
         trustLevel === TrustLevel.TRUST_FOLDER ||
         trustLevel === TrustLevel.TRUST_PARENT;
-      setIsTrusted(currentIsTrusted);
-      onTrustChange(currentIsTrusted);
 
-      const needsRestart = wasTrusted !== currentIsTrusted;
-      if (needsRestart) {
+      onTrustChange(currentIsTrusted);
+      setIsTrusted(currentIsTrusted);
+
+      // logic: we restart if the trust state *effectively* changes from the previous state.
+      // previous state was `isTrusted`. If undefined, we assume false (untrusted).
+      const wasTrusted = isTrusted ?? false;
+
+      if (wasTrusted !== currentIsTrusted) {
         setIsRestarting(true);
         setIsFolderTrustDialogOpen(true);
       } else {

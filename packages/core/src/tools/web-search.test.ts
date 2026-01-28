@@ -11,6 +11,7 @@ import { WebSearchTool } from './web-search.js';
 import type { Config } from '../config/config.js';
 import { GeminiClient } from '../core/client.js';
 import { ToolErrorType } from './tool-error.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 // Mock GeminiClient and Config constructor
 vi.mock('../core/client.js');
@@ -33,7 +34,7 @@ describe('WebSearchTool', () => {
       },
     } as unknown as Config;
     mockGeminiClient = new GeminiClient(mockConfigInstance);
-    tool = new WebSearchTool(mockConfigInstance);
+    tool = new WebSearchTool(mockConfigInstance, createMockMessageBus());
   });
 
   afterEach(() => {

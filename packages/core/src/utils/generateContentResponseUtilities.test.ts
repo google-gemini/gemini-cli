@@ -13,13 +13,21 @@ import {
   getFunctionCallsFromPartsAsJson,
   getStructuredResponse,
   getStructuredResponseFromParts,
+  getCitations,
+  convertToFunctionResponse,
 } from './generateContentResponseUtilities.js';
 import type {
   GenerateContentResponse,
   Part,
   SafetyRating,
+  CitationMetadata,
+  PartListUnion,
 } from '@google/genai';
 import { FinishReason } from '@google/genai';
+import {
+  DEFAULT_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL,
+} from '../config/models.js';
 
 const mockTextPart = (text: string): Part => ({ text });
 const mockFunctionCallPart = (
@@ -33,6 +41,7 @@ const mockResponse = (
   parts: Part[],
   finishReason: FinishReason = FinishReason.STOP,
   safetyRatings: SafetyRating[] = [],
+  citationMetadata?: CitationMetadata,
 ): GenerateContentResponse => ({
   candidates: [
     {
@@ -43,6 +52,7 @@ const mockResponse = (
       index: 0,
       finishReason,
       safetyRatings,
+      citationMetadata,
     },
   ],
   promptFeedback: {
@@ -68,6 +78,388 @@ const minimalMockResponse = (
 });
 
 describe('generateContentResponseUtilities', () => {
+  describe('convertToFunctionResponse', () => {
+    const toolName = 'testTool';
+    const callId = 'call1';
+
+    it('should handle simple string llmContent', () => {
+      const llmContent = 'Simple text output';
+      const result = convertToFunctionResponse(
+        toolName,
+        callId,
+        llmContent,
+        DEFAULT_GEMINI_MODEL,
+      );
+      expect(result).toEqual([
+        {
+          functionResponse: {
+            name: toolName,
+            id: callId,
+            response: { output: 'Simple text output' },
+          },
+        },
+      ]);
+    });
+
+    it('should handle llmContent as a single Part with text', () => {
+      const llmContent: Part = { text: 'Text from Part object' };
+      const result = convertToFunctionResponse(
+        toolName,
+        callId,
+        llmContent,
+        DEFAULT_GEMINI_MODEL,
+      );
+      expect(result).toEqual([
+        {
+          functionResponse: {
+            name: toolName,
+            id: callId,
+            response: { output: 'Text from Part object' },
+          },
+        },
+      ]);
+    });
+
+    it('should handle llmContent as a PartListUnion array with a single text Part', () => {
+      const llmContent: PartListUnion = [{ text: 'Text from array' }];
+      const result = convertToFunctionResponse(
+        toolName,
+        callId,
+        llmContent,
+        DEFAULT_GEMINI_MODEL,
+      );
+      expect(result).toEqual([
+        {
+          functionResponse: {
+            name: toolName,
+            id: callId,
+            response: { output: 'Text from array' },
+          },
+        },
+      ]);
+    });
+
+    it('should handle llmContent as a PartListUnion array with multiple Parts', () => {
+      const llmContent: PartListUnion = [{ text: 'part1' }, { text: 'part2' }];
+      const result = convertToFunctionResponse(
+        toolName,
+        callId,
+        llmContent,
+        DEFAULT_GEMINI_MODEL,
+      );
+      expect(result).toEqual([
+        {
+          functionResponse: {
+            name: toolName,
+            id: callId,
+            response: { output: 'part1\npart2' },
+          },
+        },
+      ]);
+    });
+
+    it('should handle llmContent with fileData for Gemini 3 model (should be siblings)', () => {
+      const llmContent: Part = {
+        fileData: { mimeType: 'application/pdf', fileUri: 'gs://...' },
+      };
+      const result = convertToFunctionResponse(
+        toolName,
+        callId,
+        llmContent,
+        PREVIEW_GEMINI_MODEL,
+      );
+      expect(result).toEqual([
+        {
+          functionResponse: {
+            name: toolName,
+            id: callId,
+            response: { output: 'Binary content provided (1 item(s)).' },
+          },
+        },
+        llmContent,
+      ]);
+    });
+
+    it('should handle llmContent with inlineData for Gemini 3 model (should be nested)', () => {
+      const llmContent: Part = {
+        inlineData: { mimeType: 'image/png', data: 'base64...' },
+      };
+      const result = convertToFunctionResponse(
+        toolName,
+        callId,
+        llmContent,
+        PREVIEW_GEMINI_MODEL,
+      );
+      expect(result).toEqual([
+        {
+          functionResponse: {
+            name: toolName,
+            id: callId,
+            response: { output: 'Binary content provided (1 item(s)).' },
+            parts: [llmContent],
+          },
+        },
+      ]);
+    });
+
+    it('should handle llmContent with fileData for non-Gemini 3 models', () => {
+      const llmContent: Part = {
+        fileData: { mimeType: 'application/pdf', fileUri: 'gs://...' },
+      };
+      const result = convertToFunctionResponse(
+        toolName,
+        callId,
+        llmContent,
+        DEFAULT_GEMINI_MODEL,
+      );
+      expect(result).toEqual([
+        {
+          functionResponse: {
+            name: toolName,
+            id: callId,
+            response: { output: 'Binary content provided (1 item(s)).' },
+          },
+        },
+        llmContent,
+      ]);
+    });
+
+    it('should preserve existing functionResponse metadata', () => {
+      const innerId = 'inner-call-id';
+      const innerName = 'inner-tool-name';
+      const responseMetadata = {
+        flags: ['flag1'],
+        isError: false,
+        customData: { key: 'value' },
+      };
+      const input: Part = {
+        functionResponse: {
+          id: innerId,
+          name: innerName,
+          response: responseMetadata,
+        },
+      };
+
+      const result = convertToFunctionResponse(
+        toolName,
+        callId,
+        input,
+        DEFAULT_GEMINI_MODEL,
+      );
+
+      expect(result).toHaveLength(1);
+      expect(result[0].functionResponse).toEqual({
+        id: callId,
+        name: toolName,
+        response: responseMetadata,
+      });
+    });
+
+    it('should handle llmContent as an array of multiple Parts (text and inlineData)', () => {
+      const llmContent: PartListUnion = [
+        { text: 'Some textual description' },
+        { inlineData: { mimeType: 'image/jpeg', data: 'base64data...' } },
+        { text: 'Another text part' },
+      ];
+      const result = convertToFunctionResponse(
+        toolName,
+        callId,
+        llmContent,
+        PREVIEW_GEMINI_MODEL,
+      );
+      expect(result).toEqual([
+        {
+          functionResponse: {
+            name: toolName,
+            id: callId,
+            response: {
+              output: 'Some textual description\nAnother text part',
+            },
+            parts: [
+              {
+                inlineData: { mimeType: 'image/jpeg', data: 'base64data...' },
+              },
+            ],
+          },
+        },
+      ]);
+    });
+
+    it('should handle llmContent as an array with a single inlineData Part', () => {
+      const llmContent: PartListUnion = [
+        { inlineData: { mimeType: 'image/gif', data: 'gifdata...' } },
+      ];
+      const result = convertToFunctionResponse(
+        toolName,
+        callId,
+        llmContent,
+        PREVIEW_GEMINI_MODEL,
+      );
+      expect(result).toEqual([
+        {
+          functionResponse: {
+            name: toolName,
+            id: callId,
+            response: { output: 'Binary content provided (1 item(s)).' },
+            parts: llmContent,
+          },
+        },
+      ]);
+    });
+
+    it('should handle llmContent as a generic Part (not text, inlineData, or fileData)', () => {
+      const llmContent: Part = { functionCall: { name: 'test', args: {} } };
+      const result = convertToFunctionResponse(
+        toolName,
+        callId,
+        llmContent,
+        PREVIEW_GEMINI_MODEL,
+      );
+      expect(result).toEqual([
+        {
+          functionResponse: {
+            name: toolName,
+            id: callId,
+            response: {},
+          },
+        },
+      ]);
+    });
+
+    it('should handle empty string llmContent', () => {
+      const llmContent = '';
+      const result = convertToFunctionResponse(
+        toolName,
+        callId,
+        llmContent,
+        PREVIEW_GEMINI_MODEL,
+      );
+      expect(result).toEqual([
+        {
+          functionResponse: {
+            name: toolName,
+            id: callId,
+            response: { output: '' },
+          },
+        },
+      ]);
+    });
+
+    it('should handle llmContent as an empty array', () => {
+      const llmContent: PartListUnion = [];
+      const result = convertToFunctionResponse(
+        toolName,
+        callId,
+        llmContent,
+        PREVIEW_GEMINI_MODEL,
+      );
+      expect(result).toEqual([
+        {
+          functionResponse: {
+            name: toolName,
+            id: callId,
+            response: {},
+          },
+        },
+      ]);
+    });
+
+    it('should handle llmContent as a Part with undefined inlineData/fileData/text', () => {
+      const llmContent: Part = {}; // An empty part object
+      const result = convertToFunctionResponse(
+        toolName,
+        callId,
+        llmContent,
+        PREVIEW_GEMINI_MODEL,
+      );
+      expect(result).toEqual([
+        {
+          functionResponse: {
+            name: toolName,
+            id: callId,
+            response: {},
+          },
+        },
+      ]);
+    });
+  });
+
+  describe('getCitations', () => {
+    it('should return empty array for no candidates', () => {
+      expect(getCitations(minimalMockResponse(undefined))).toEqual([]);
+    });
+
+    it('should return empty array if no citationMetadata', () => {
+      const response = mockResponse([mockTextPart('Hello')]);
+      expect(getCitations(response)).toEqual([]);
+    });
+
+    it('should return citations with title and uri', () => {
+      const citationMetadata: CitationMetadata = {
+        citations: [
+          {
+            startIndex: 0,
+            endIndex: 10,
+            uri: 'https://example.com',
+            title: 'Example Title',
+          },
+        ],
+      };
+      const response = mockResponse(
+        [mockTextPart('Hello')],
+        undefined,
+        undefined,
+        citationMetadata,
+      );
+      expect(getCitations(response)).toEqual([
+        '(Example Title) https://example.com',
+      ]);
+    });
+
+    it('should return citations with uri only if no title', () => {
+      const citationMetadata: CitationMetadata = {
+        citations: [
+          {
+            startIndex: 0,
+            endIndex: 10,
+            uri: 'https://example.com',
+          },
+        ],
+      };
+      const response = mockResponse(
+        [mockTextPart('Hello')],
+        undefined,
+        undefined,
+        citationMetadata,
+      );
+      expect(getCitations(response)).toEqual(['https://example.com']);
+    });
+
+    it('should filter out citations without uri', () => {
+      const citationMetadata: CitationMetadata = {
+        citations: [
+          {
+            startIndex: 0,
+            endIndex: 10,
+            title: 'No URI',
+          },
+          {
+            startIndex: 10,
+            endIndex: 20,
+            uri: 'https://valid.com',
+          },
+        ],
+      };
+      const response = mockResponse(
+        [mockTextPart('Hello')],
+        undefined,
+        undefined,
+        citationMetadata,
+      );
+      expect(getCitations(response)).toEqual(['https://valid.com']);
+    });
+  });
+
   describe('getResponseTextFromParts', () => {
     it('should return undefined for no parts', () => {
       expect(getResponseTextFromParts([])).toBeUndefined();

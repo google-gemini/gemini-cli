@@ -24,7 +24,7 @@ const COLOR_YELLOW = '\u001b[33m';
 const COLOR_RED = '\u001b[31m';
 const RESET_COLOR = '\u001b[0m';
 
-async function getMcpServersFromConfig(): Promise<
+export async function getMcpServersFromConfig(): Promise<
   Record<string, MCPServerConfig>
 > {
   const settings = loadSettings();
@@ -35,7 +35,7 @@ async function getMcpServersFromConfig(): Promise<
     requestSetting: promptForSetting,
   });
   const extensions = await extensionManager.loadExtensions();
-  const mcpServers = { ...(settings.merged.mcpServers || {}) };
+  const mcpServers = { ...settings.merged.mcpServers };
   for (const extension of extensions) {
     Object.entries(extension.mcpServers || {}).forEach(([key, server]) => {
       if (mcpServers[key]) {
@@ -59,10 +59,22 @@ async function testMCPConnection(
     version: '0.0.1',
   });
 
+  const settings = loadSettings();
+  const sanitizationConfig = {
+    enableEnvironmentVariableRedaction: true,
+    allowedEnvironmentVariables: [],
+    blockedEnvironmentVariables: settings.merged.advanced.excludedEnvVars,
+  };
+
   let transport;
   try {
     // Use the same transport creation logic as core
-    transport = await createTransport(serverName, config, false);
+    transport = await createTransport(
+      serverName,
+      config,
+      false,
+      sanitizationConfig,
+    );
   } catch (_error) {
     await client.close();
     return MCPServerStatus.DISCONNECTED;
@@ -132,7 +144,8 @@ export async function listMcpServers(): Promise<void> {
     if (server.httpUrl) {
       serverInfo += `${server.httpUrl} (http)`;
     } else if (server.url) {
-      serverInfo += `${server.url} (sse)`;
+      const type = server.type || 'http';
+      serverInfo += `${server.url} (${type})`;
     } else if (server.command) {
       serverInfo += `${server.command} ${server.args?.join(' ') || ''} (stdio)`;
     }

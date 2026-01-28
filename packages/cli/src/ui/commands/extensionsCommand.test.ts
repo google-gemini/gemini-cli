@@ -26,13 +26,31 @@ import {
   type MockedFunction,
 } from 'vitest';
 import { type ExtensionUpdateAction } from '../state/extensions.js';
-import { ExtensionManager } from '../../config/extension-manager.js';
+import {
+  ExtensionManager,
+  inferInstallMetadata,
+} from '../../config/extension-manager.js';
 import { SettingScope } from '../../config/settings.js';
+import { stat } from 'node:fs/promises';
+
+vi.mock('../../config/extension-manager.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../config/extension-manager.js')>();
+  return {
+    ...actual,
+    inferInstallMetadata: vi.fn(),
+  };
+});
 
 import open from 'open';
+import type { Stats } from 'node:fs';
 
 vi.mock('open', () => ({
   default: vi.fn(),
+}));
+
+vi.mock('node:fs/promises', () => ({
+  stat: vi.fn(),
 }));
 
 vi.mock('../../config/extensions/update.js', () => ({
@@ -42,6 +60,8 @@ vi.mock('../../config/extensions/update.js', () => ({
 
 const mockDisableExtension = vi.fn();
 const mockEnableExtension = vi.fn();
+const mockInstallExtension = vi.fn();
+const mockUninstallExtension = vi.fn();
 const mockGetExtensions = vi.fn();
 
 const inactiveExt: GeminiCLIExtension = {
@@ -102,6 +122,8 @@ describe('extensionsCommand', () => {
             Object.assign(actual, {
               enableExtension: mockEnableExtension,
               disableExtension: mockDisableExtension,
+              installOrUpdateExtension: mockInstallExtension,
+              uninstallExtension: mockUninstallExtension,
               getExtensions: mockGetExtensions,
             });
             return actual;
@@ -126,13 +148,10 @@ describe('extensionsCommand', () => {
       if (!command.action) throw new Error('Action not defined');
       await command.action(mockContext, '');
 
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.EXTENSIONS_LIST,
-          extensions: expect.any(Array),
-        },
-        expect.any(Number),
-      );
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.EXTENSIONS_LIST,
+        extensions: expect.any(Array),
+      });
     });
 
     it('should show a message if no extensions are installed', async () => {
@@ -141,13 +160,10 @@ describe('extensionsCommand', () => {
       if (!command.action) throw new Error('Action not defined');
       await command.action(mockContext, '');
 
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.INFO,
-          text: 'No extensions installed. Run `/extensions explore` to check out the gallery.',
-        },
-        expect.any(Number),
-      );
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.INFO,
+        text: 'No extensions installed. Run `/extensions explore` to check out the gallery.',
+      });
     });
   });
 
@@ -222,26 +238,20 @@ describe('extensionsCommand', () => {
 
     it('should show usage if no args are provided', async () => {
       await updateAction(mockContext, '');
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.ERROR,
-          text: 'Usage: /extensions update <extension-names>|--all',
-        },
-        expect.any(Number),
-      );
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.ERROR,
+        text: 'Usage: /extensions update <extension-names>|--all',
+      });
     });
 
     it('should show a message if no extensions are installed', async () => {
       mockGetExtensions.mockReturnValue([]);
       await updateAction(mockContext, 'ext-one');
 
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.INFO,
-          text: 'No extensions installed. Run `/extensions explore` to check out the gallery.',
-        },
-        expect.any(Number),
-      );
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.INFO,
+        text: 'No extensions installed. Run `/extensions explore` to check out the gallery.',
+      });
     });
 
     it('should inform user if there are no extensions to update with --all', async () => {
@@ -254,13 +264,10 @@ describe('extensionsCommand', () => {
       );
 
       await updateAction(mockContext, '--all');
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.INFO,
-          text: 'No extensions to update.',
-        },
-        expect.any(Number),
-      );
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.INFO,
+        text: 'No extensions to update.',
+      });
     });
 
     it('should call setPendingItem and addItem in a finally block on success', async () => {
@@ -288,13 +295,10 @@ describe('extensionsCommand', () => {
         extensions: expect.any(Array),
       });
       expect(mockContext.ui.setPendingItem).toHaveBeenCalledWith(null);
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.EXTENSIONS_LIST,
-          extensions: expect.any(Array),
-        },
-        expect.any(Number),
-      );
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.EXTENSIONS_LIST,
+        extensions: expect.any(Array),
+      });
     });
 
     it('should call setPendingItem and addItem in a finally block on failure', async () => {
@@ -307,20 +311,14 @@ describe('extensionsCommand', () => {
         extensions: expect.any(Array),
       });
       expect(mockContext.ui.setPendingItem).toHaveBeenCalledWith(null);
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.EXTENSIONS_LIST,
-          extensions: expect.any(Array),
-        },
-        expect.any(Number),
-      );
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.ERROR,
-          text: 'Something went wrong',
-        },
-        expect.any(Number),
-      );
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.EXTENSIONS_LIST,
+        extensions: expect.any(Array),
+      });
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.ERROR,
+        text: 'Something went wrong',
+      });
     });
 
     it('should update a single extension by name', async () => {
@@ -381,13 +379,10 @@ describe('extensionsCommand', () => {
         extensions: expect.any(Array),
       });
       expect(mockContext.ui.setPendingItem).toHaveBeenCalledWith(null);
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.EXTENSIONS_LIST,
-          extensions: expect.any(Array),
-        },
-        expect.any(Number),
-      );
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.EXTENSIONS_LIST,
+        extensions: expect.any(Array),
+      });
     });
   });
 
@@ -408,13 +403,10 @@ describe('extensionsCommand', () => {
       await exploreAction(mockContext, '');
 
       const extensionsUrl = 'https://geminicli.com/extensions/';
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.INFO,
-          text: `Opening extensions page in your browser: ${extensionsUrl}`,
-        },
-        expect.any(Number),
-      );
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.INFO,
+        text: `Opening extensions page in your browser: ${extensionsUrl}`,
+      });
 
       expect(open).toHaveBeenCalledWith(extensionsUrl);
     });
@@ -427,13 +419,10 @@ describe('extensionsCommand', () => {
 
       await exploreAction(mockContext, '');
 
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.INFO,
-          text: `View available extensions at ${extensionsUrl}`,
-        },
-        expect.any(Number),
-      );
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.INFO,
+        text: `View available extensions at ${extensionsUrl}`,
+      });
 
       // Ensure 'open' was not called in the sandbox
       expect(open).not.toHaveBeenCalled();
@@ -446,13 +435,10 @@ describe('extensionsCommand', () => {
 
       await exploreAction(mockContext, '');
 
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.INFO,
-          text: `Would open extensions page in your browser: ${extensionsUrl} (skipped in test environment)`,
-        },
-        expect.any(Number),
-      );
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.INFO,
+        text: `Would open extensions page in your browser: ${extensionsUrl} (skipped in test environment)`,
+      });
 
       // Ensure 'open' was not called in test environment
       expect(open).not.toHaveBeenCalled();
@@ -466,40 +452,243 @@ describe('extensionsCommand', () => {
 
       await exploreAction(mockContext, '');
 
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.ERROR,
-          text: `Failed to open browser. Check out the extensions gallery at ${extensionsUrl}`,
-        },
-        expect.any(Number),
-      );
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.ERROR,
+        text: `Failed to open browser. Check out the extensions gallery at ${extensionsUrl}`,
+      });
     });
   });
 
   describe('when enableExtensionReloading is true', () => {
-    it('should include enable and disable subcommands', () => {
+    it('should include enable, disable, install, link, and uninstall subcommands', () => {
       const command = extensionsCommand(true);
       const subCommandNames = command.subCommands?.map((cmd) => cmd.name);
       expect(subCommandNames).toContain('enable');
       expect(subCommandNames).toContain('disable');
+      expect(subCommandNames).toContain('install');
+      expect(subCommandNames).toContain('link');
+      expect(subCommandNames).toContain('uninstall');
     });
   });
 
   describe('when enableExtensionReloading is false', () => {
-    it('should not include enable and disable subcommands', () => {
+    it('should not include enable, disable, install, link, and uninstall subcommands', () => {
       const command = extensionsCommand(false);
       const subCommandNames = command.subCommands?.map((cmd) => cmd.name);
       expect(subCommandNames).not.toContain('enable');
       expect(subCommandNames).not.toContain('disable');
+      expect(subCommandNames).not.toContain('install');
+      expect(subCommandNames).not.toContain('link');
+      expect(subCommandNames).not.toContain('uninstall');
     });
   });
 
   describe('when enableExtensionReloading is not provided', () => {
-    it('should not include enable and disable subcommands by default', () => {
+    it('should not include enable, disable, install, link, and uninstall subcommands by default', () => {
       const command = extensionsCommand();
       const subCommandNames = command.subCommands?.map((cmd) => cmd.name);
       expect(subCommandNames).not.toContain('enable');
       expect(subCommandNames).not.toContain('disable');
+      expect(subCommandNames).not.toContain('install');
+      expect(subCommandNames).not.toContain('link');
+      expect(subCommandNames).not.toContain('uninstall');
+    });
+  });
+
+  describe('install', () => {
+    let installAction: SlashCommand['action'];
+
+    beforeEach(() => {
+      installAction = extensionsCommand(true).subCommands?.find(
+        (cmd) => cmd.name === 'install',
+      )?.action;
+
+      expect(installAction).not.toBeNull();
+
+      mockContext.invocation!.name = 'install';
+    });
+
+    it('should show usage if no extension name is provided', async () => {
+      await installAction!(mockContext, '');
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.ERROR,
+        text: 'Usage: /extensions install <source>',
+      });
+      expect(mockInstallExtension).not.toHaveBeenCalled();
+    });
+
+    it('should call installExtension and show success message', async () => {
+      const packageName = 'test-extension-package';
+      vi.mocked(inferInstallMetadata).mockResolvedValue({
+        source: packageName,
+        type: 'git',
+      });
+      mockInstallExtension.mockResolvedValue({ name: packageName });
+      await installAction!(mockContext, packageName);
+      expect(inferInstallMetadata).toHaveBeenCalledWith(packageName);
+      expect(mockInstallExtension).toHaveBeenCalledWith({
+        source: packageName,
+        type: 'git',
+      });
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.INFO,
+        text: `Installing extension from "${packageName}"...`,
+      });
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.INFO,
+        text: `Extension "${packageName}" installed successfully.`,
+      });
+    });
+
+    it('should show error message on installation failure', async () => {
+      const packageName = 'failed-extension';
+      const errorMessage = 'install failed';
+      vi.mocked(inferInstallMetadata).mockResolvedValue({
+        source: packageName,
+        type: 'git',
+      });
+      mockInstallExtension.mockRejectedValue(new Error(errorMessage));
+
+      await installAction!(mockContext, packageName);
+      expect(inferInstallMetadata).toHaveBeenCalledWith(packageName);
+      expect(mockInstallExtension).toHaveBeenCalledWith({
+        source: packageName,
+        type: 'git',
+      });
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.ERROR,
+        text: `Failed to install extension from "${packageName}": ${errorMessage}`,
+      });
+    });
+
+    it('should show error message for invalid source', async () => {
+      const invalidSource = 'a;b';
+      await installAction!(mockContext, invalidSource);
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.ERROR,
+        text: `Invalid source: ${invalidSource}`,
+      });
+      expect(mockInstallExtension).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('link', () => {
+    let linkAction: SlashCommand['action'];
+
+    beforeEach(() => {
+      linkAction = extensionsCommand(true).subCommands?.find(
+        (cmd) => cmd.name === 'link',
+      )?.action;
+
+      expect(linkAction).not.toBeNull();
+      mockContext.invocation!.name = 'link';
+    });
+
+    it('should show usage if no extension is provided', async () => {
+      await linkAction!(mockContext, '');
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.ERROR,
+        text: 'Usage: /extensions link <source>',
+      });
+      expect(mockInstallExtension).not.toHaveBeenCalled();
+    });
+
+    it('should call installExtension and show success message', async () => {
+      const packageName = 'test-extension-package';
+      mockInstallExtension.mockResolvedValue({ name: packageName });
+      vi.mocked(stat).mockResolvedValue({
+        size: 100,
+      } as Stats);
+      await linkAction!(mockContext, packageName);
+      expect(mockInstallExtension).toHaveBeenCalledWith({
+        source: packageName,
+        type: 'link',
+      });
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.INFO,
+        text: `Linking extension from "${packageName}"...`,
+      });
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.INFO,
+        text: `Extension "${packageName}" linked successfully.`,
+      });
+    });
+
+    it('should show error message on linking failure', async () => {
+      const packageName = 'test-extension-package';
+      const errorMessage = 'link failed';
+      mockInstallExtension.mockRejectedValue(new Error(errorMessage));
+      vi.mocked(stat).mockResolvedValue({
+        size: 100,
+      } as Stats);
+
+      await linkAction!(mockContext, packageName);
+      expect(mockInstallExtension).toHaveBeenCalledWith({
+        source: packageName,
+        type: 'link',
+      });
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.ERROR,
+        text: `Failed to link extension from "${packageName}": ${errorMessage}`,
+      });
+    });
+
+    it('should show error message for invalid source', async () => {
+      const packageName = 'test-extension-package';
+      const errorMessage = 'invalid path';
+      vi.mocked(stat).mockRejectedValue(new Error(errorMessage));
+      await linkAction!(mockContext, packageName);
+      expect(mockInstallExtension).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('uninstall', () => {
+    let uninstallAction: SlashCommand['action'];
+
+    beforeEach(() => {
+      uninstallAction = extensionsCommand(true).subCommands?.find(
+        (cmd) => cmd.name === 'uninstall',
+      )?.action;
+
+      expect(uninstallAction).not.toBeNull();
+
+      mockContext.invocation!.name = 'uninstall';
+    });
+
+    it('should show usage if no extension name is provided', async () => {
+      await uninstallAction!(mockContext, '');
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.ERROR,
+        text: 'Usage: /extensions uninstall <extension-name>',
+      });
+      expect(mockUninstallExtension).not.toHaveBeenCalled();
+    });
+
+    it('should call uninstallExtension and show success message', async () => {
+      const extensionName = 'test-extension';
+      await uninstallAction!(mockContext, extensionName);
+      expect(mockUninstallExtension).toHaveBeenCalledWith(extensionName, false);
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.INFO,
+        text: `Uninstalling extension "${extensionName}"...`,
+      });
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.INFO,
+        text: `Extension "${extensionName}" uninstalled successfully.`,
+      });
+    });
+
+    it('should show error message on uninstallation failure', async () => {
+      const extensionName = 'failed-extension';
+      const errorMessage = 'uninstall failed';
+      mockUninstallExtension.mockRejectedValue(new Error(errorMessage));
+
+      await uninstallAction!(mockContext, extensionName);
+      expect(mockUninstallExtension).toHaveBeenCalledWith(extensionName, false);
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.ERROR,
+        text: `Failed to uninstall extension "${extensionName}": ${errorMessage}`,
+      });
     });
   });
 
@@ -518,13 +707,10 @@ describe('extensionsCommand', () => {
 
     it('should show usage if no extension name is provided', async () => {
       await enableAction!(mockContext, '');
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.ERROR,
-          text: 'Usage: /extensions enable <extension> [--scope=<user|workspace|session>]',
-        },
-        expect.any(Number),
-      );
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.ERROR,
+        text: 'Usage: /extensions enable <extension> [--scope=<user|workspace|session>]',
+      });
     });
 
     it('should call enableExtension with the provided scope', async () => {
@@ -573,13 +759,10 @@ describe('extensionsCommand', () => {
 
     it('should show usage if no extension name is provided', async () => {
       await disableAction!(mockContext, '');
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.ERROR,
-          text: 'Usage: /extensions disable <extension> [--scope=<user|workspace|session>]',
-        },
-        expect.any(Number),
-      );
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.ERROR,
+        text: 'Usage: /extensions disable <extension> [--scope=<user|workspace|session>]',
+      });
     });
 
     it('should call disableExtension with the provided scope', async () => {
@@ -645,13 +828,10 @@ describe('extensionsCommand', () => {
 
       await restartAction!(mockContext, '--all');
 
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.INFO,
-          text: 'No extensions installed. Run `/extensions explore` to check out the gallery.',
-        },
-        expect.any(Number),
-      );
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.INFO,
+        text: 'No extensions installed. Run `/extensions explore` to check out the gallery.',
+      });
     });
 
     it('restarts all active extensions when --all is provided', async () => {
@@ -672,14 +852,12 @@ describe('extensionsCommand', () => {
           type: MessageType.INFO,
           text: 'Restarting 2 extensions...',
         }),
-        expect.any(Number),
       );
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
           text: '2 extensions restarted successfully.',
         }),
-        expect.any(Number),
       );
       expect(mockContext.ui.dispatchExtensionStateUpdate).toHaveBeenCalledWith({
         type: 'RESTARTED',
@@ -719,7 +897,6 @@ describe('extensionsCommand', () => {
           type: MessageType.ERROR,
           text: "Extensions are not yet loaded, can't restart yet",
         }),
-        expect.any(Number),
       );
       expect(mockRestartExtension).not.toHaveBeenCalled();
     });
@@ -732,7 +909,6 @@ describe('extensionsCommand', () => {
           type: MessageType.ERROR,
           text: 'Usage: /extensions restart <extension-names>|--all',
         }),
-        expect.any(Number),
       );
       expect(mockRestartExtension).not.toHaveBeenCalled();
     });
@@ -752,7 +928,6 @@ describe('extensionsCommand', () => {
           type: MessageType.ERROR,
           text: 'Failed to restart some extensions:\n  ext1: Failed to restart',
         }),
-        expect.any(Number),
       );
     });
 
@@ -771,7 +946,6 @@ describe('extensionsCommand', () => {
           type: MessageType.WARNING,
           text: 'Extension(s) not found or not active: ext2',
         }),
-        expect.any(Number),
       );
     });
 
@@ -789,7 +963,6 @@ describe('extensionsCommand', () => {
           type: MessageType.WARNING,
           text: 'Extension(s) not found or not active: ext2, ext3',
         }),
-        expect.any(Number),
       );
     });
 

@@ -7,6 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Config } from '../config/config.js';
+import { bfsFileSearchSync } from './bfsFileSearch.js';
 
 type SuccessfulPathCorrection = {
   success: true;
@@ -41,9 +42,21 @@ export function correctPath(
 
   // If not found directly, search across all workspace directories for ambiguous matches.
   const workspaceContext = config.getWorkspaceContext();
-  const fileSystem = config.getFileSystemService();
   const searchPaths = workspaceContext.getDirectories();
-  const foundFiles = fileSystem.findFiles(filePath, searchPaths);
+  const basename = path.basename(filePath);
+  const normalizedTarget = filePath.replace(/\\/g, '/');
+
+  // Normalize path for matching and check if it ends with the provided relative path
+  const foundFiles = searchPaths
+    .flatMap((searchPath) =>
+      bfsFileSearchSync(searchPath, {
+        fileName: basename,
+        maxDirs: 50, // Capped to avoid deep hangs
+        fileService: config.getFileService(),
+        fileFilteringOptions: config.getFileFilteringOptions(),
+      }),
+    )
+    .filter((f) => f.replace(/\\/g, '/').endsWith(normalizedTarget));
 
   if (foundFiles.length === 0) {
     return {

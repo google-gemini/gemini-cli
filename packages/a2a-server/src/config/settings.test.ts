@@ -9,6 +9,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { loadSettings, USER_SETTINGS_PATH } from './settings.js';
+import { debugLogger } from '@google/gemini-cli-core';
 
 const mocks = vi.hoisted(() => {
   const suffix = Math.random().toString(36).slice(2);
@@ -26,13 +27,21 @@ vi.mock('node:os', async (importOriginal) => {
   };
 });
 
-vi.mock('@google/gemini-cli-core', () => ({
-  GEMINI_DIR: '.gemini',
-  debugLogger: {
-    error: vi.fn(),
-  },
-  getErrorMessage: (error: unknown) => String(error),
-}));
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  const path = await import('node:path');
+  const os = await import('node:os');
+  return {
+    ...actual,
+    GEMINI_DIR: '.gemini',
+    debugLogger: {
+      error: vi.fn(),
+    },
+    getErrorMessage: (error: unknown) => String(error),
+    homedir: () => path.join(os.tmpdir(), `gemini-home-${mocks.suffix}`),
+  };
+});
 
 describe('loadSettings', () => {
   const mockHomeDir = path.join(os.tmpdir(), `gemini-home-${mocks.suffix}`);
@@ -75,7 +84,7 @@ describe('loadSettings', () => {
         fs.rmSync(mockWorkspaceDir, { recursive: true, force: true });
       }
     } catch (e) {
-      console.error('Failed to cleanup temp dirs', e);
+      debugLogger.error('Failed to cleanup temp dirs', e);
     }
     vi.restoreAllMocks();
   });

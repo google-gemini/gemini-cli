@@ -21,8 +21,7 @@ import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
-
-export const DISCOVERED_TOOL_PREFIX = 'discovered_tool_';
+import { DISCOVERED_TOOL_PREFIX } from './tool-names.js';
 
 type ToolParams = Record<string, unknown>;
 
@@ -35,7 +34,7 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
     private readonly originalToolName: string,
     prefixedToolName: string,
     params: ToolParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ) {
     super(params, messageBus, prefixedToolName);
   }
@@ -136,7 +135,7 @@ export class DiscoveredTool extends BaseDeclarativeTool<
     prefixedName: string,
     description: string,
     override readonly parameterSchema: Record<string, unknown>,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ) {
     const discoveryCmd = config.getToolDiscoveryCommand()!;
     const callCommand = config.getToolCallCommand()!;
@@ -164,25 +163,25 @@ Signal: Signal number or \`(none)\` if no signal was received.
       fullDescription,
       Kind.Other,
       parameterSchema,
+      messageBus,
       false, // isOutputMarkdown
       false, // canUpdateOutput
-      messageBus,
     );
     this.originalName = originalName;
   }
 
   protected createInvocation(
     params: ToolParams,
-    _messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _displayName?: string,
   ): ToolInvocation<ToolParams, ToolResult> {
     return new DiscoveredToolInvocation(
       this.config,
       this.originalName,
-      this.name,
+      _toolName ?? this.name,
       params,
-      _messageBus,
+      messageBus,
     );
   }
 }
@@ -193,17 +192,14 @@ export class ToolRegistry {
   // and `isActive` to get only the active tools.
   private allKnownTools: Map<string, AnyDeclarativeTool> = new Map();
   private config: Config;
-  private messageBus?: MessageBus;
+  private messageBus: MessageBus;
 
-  constructor(config: Config) {
+  constructor(config: Config, messageBus: MessageBus) {
     this.config = config;
-  }
-
-  setMessageBus(messageBus: MessageBus): void {
     this.messageBus = messageBus;
   }
 
-  getMessageBus(): MessageBus | undefined {
+  getMessageBus(): MessageBus {
     return this.messageBus;
   }
 
@@ -227,6 +223,15 @@ export class ToolRegistry {
       }
     }
     this.allKnownTools.set(tool.name, tool);
+  }
+
+  /**
+   * Unregisters a tool definition by name.
+   *
+   * @param name - The name of the tool to unregister.
+   */
+  unregisterTool(name: string): void {
+    this.allKnownTools.delete(name);
   }
 
   /**
@@ -417,7 +422,7 @@ export class ToolRegistry {
         );
       }
     } catch (e) {
-      console.error(`Tool discovery command "${discoveryCmd}" failed:`, e);
+      debugLogger.error(`Tool discovery command "${discoveryCmd}" failed:`, e);
       throw e;
     }
   }
@@ -483,8 +488,8 @@ export class ToolRegistry {
   getFunctionDeclarationsFiltered(toolNames: string[]): FunctionDeclaration[] {
     const declarations: FunctionDeclaration[] = [];
     for (const name of toolNames) {
-      const tool = this.allKnownTools.get(name);
-      if (tool && this.isActiveTool(tool)) {
+      const tool = this.getTool(name);
+      if (tool) {
         declarations.push(tool.schema);
       }
     }
@@ -525,7 +530,18 @@ export class ToolRegistry {
    * Get the definition of a specific tool.
    */
   getTool(name: string): AnyDeclarativeTool | undefined {
-    const tool = this.allKnownTools.get(name);
+    let tool = this.allKnownTools.get(name);
+    if (!tool && name.includes('__')) {
+      for (const t of this.allKnownTools.values()) {
+        if (t instanceof DiscoveredMCPTool) {
+          if (t.getFullyQualifiedName() === name) {
+            tool = t;
+            break;
+          }
+        }
+      }
+    }
+
     if (tool && this.isActiveTool(tool)) {
       return tool;
     }

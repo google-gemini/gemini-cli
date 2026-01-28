@@ -125,4 +125,44 @@ describe('<ExtensionsList />', () => {
       unmount();
     });
   }
+
+  it('should render resolved settings for an extension', () => {
+    mockUIState(new Map());
+    const extensionWithSettings = {
+      ...mockExtensions[0],
+      resolvedSettings: [
+        {
+          name: 'sensitiveApiKey',
+          value: '***',
+          envVar: 'API_KEY',
+          sensitive: true,
+        },
+        {
+          name: 'maxTokens',
+          value: '1000',
+          envVar: 'MAX_TOKENS',
+          sensitive: false,
+          scope: 'user' as const,
+          source: '/path/to/.env',
+        },
+        {
+          name: 'model',
+          value: 'gemini-pro',
+          envVar: 'MODEL',
+          sensitive: false,
+          scope: 'workspace' as const,
+          source: 'Keychain',
+        },
+      ],
+    };
+    const { lastFrame, unmount } = render(
+      <ExtensionsList extensions={[extensionWithSettings]} />,
+    );
+    const output = lastFrame();
+    expect(output).toContain('settings:');
+    expect(output).toContain('- sensitiveApiKey: ***');
+    expect(output).toContain('- maxTokens: 1000 (User - /path/to/.env)');
+    expect(output).toContain('- model: gemini-pro (Workspace - Keychain)');
+    unmount();
+  });
 });

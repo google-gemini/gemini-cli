@@ -306,11 +306,15 @@ export async function detectFileType(
     if (lookedUpMimeType.startsWith('image/')) {
       return 'image';
     }
-    if (lookedUpMimeType.startsWith('audio/')) {
-      return 'audio';
-    }
-    if (lookedUpMimeType.startsWith('video/')) {
-      return 'video';
+    // Verify audio/video with content check to avoid MIME misidentification (#16888)
+    if (
+      lookedUpMimeType.startsWith('audio/') ||
+      lookedUpMimeType.startsWith('video/')
+    ) {
+      if (!(await isBinaryFile(filePath))) {
+        return 'text';
+      }
+      return lookedUpMimeType.startsWith('audio/') ? 'audio' : 'video';
     }
     if (lookedUpMimeType === 'application/pdf') {
       return 'pdf';
@@ -514,4 +518,73 @@ export async function fileExists(filePath: string): Promise<boolean> {
   } catch (_: unknown) {
     return false;
   }
+}
+
+const MAX_TRUNCATED_LINE_WIDTH = 1000;
+const MAX_TRUNCATED_CHARS = 4000;
+
+/**
+ * Formats a truncated message for tool output, handling multi-line and single-line (elephant) cases.
+ */
+export function formatTruncatedToolOutput(
+  contentStr: string,
+  outputFile: string,
+  truncateLines: number = 30,
+): string {
+  const physicalLines = contentStr.split('\n');
+  const totalPhysicalLines = physicalLines.length;
+
+  if (totalPhysicalLines > 1) {
+    // Multi-line case: show last N lines, but protect against "elephant" lines.
+    const lastLines = physicalLines.slice(-truncateLines);
+    let someLinesTruncatedInWidth = false;
+    const processedLines = lastLines.map((line) => {
+      if (line.length > MAX_TRUNCATED_LINE_WIDTH) {
+        someLinesTruncatedInWidth = true;
+        return (
+          line.substring(0, MAX_TRUNCATED_LINE_WIDTH) +
+          '... [LINE WIDTH TRUNCATED]'
+        );
+      }
+      return line;
+    });
+
+    const widthWarning = someLinesTruncatedInWidth
+      ? ' (some long lines truncated)'
+      : '';
+    return `Output too large. Showing the last ${processedLines.length} of ${totalPhysicalLines} lines${widthWarning}. For full output see: ${outputFile}
+...
+${processedLines.join('\n')}`;
+  } else {
+    // Single massive line case: use character-based truncation description.
+    const snippet = contentStr.slice(-MAX_TRUNCATED_CHARS);
+    return `Output too large. Showing the last ${MAX_TRUNCATED_CHARS.toLocaleString()} characters of the output. For full output see: ${outputFile}
+...${snippet}`;
+  }
+}
+
+/**
+ * Saves tool output to a temporary file for later retrieval.
+ */
+export async function saveTruncatedToolOutput(
+  content: string,
+  toolName: string,
+  id: string | number, // Accept string (callId) or number (truncationId)
+  projectTempDir: string,
+): Promise<{ outputFile: string; totalLines: number }> {
+  const safeToolName = toolName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+  const safeId = id
+    .toString()
+    .replace(/[^a-z0-9]/gi, '_')
+    .toLowerCase();
+  const fileName = `${safeToolName}_${safeId}.txt`;
+  const outputFile = path.join(projectTempDir, fileName);
+
+  await fsPromises.writeFile(outputFile, content);
+
+  const lines = content.split('\n');
+  return {
+    outputFile,
+    totalLines: lines.length,
+  };
 }

@@ -472,7 +472,9 @@ export class LoopDetectionService {
       return false;
     }
 
-    if (this.config.isInFallbackMode()) {
+    const availability = this.config.getModelAvailabilityService();
+
+    if (!availability.snapshot(doubleCheckModelName).available) {
       const flashModelName = this.config.modelConfigService.getResolvedConfig({
         model: 'loop-detection',
       }).model;
@@ -519,7 +521,7 @@ export class LoopDetectionService {
     signal: AbortSignal,
   ): Promise<Record<string, unknown> | null> {
     try {
-      const result = (await this.config.getBaseLlmClient().generateJson({
+      const result = await this.config.getBaseLlmClient().generateJson({
         modelConfigKey: { model },
         contents,
         schema: LOOP_DETECTION_SCHEMA,
@@ -527,7 +529,7 @@ export class LoopDetectionService {
         abortSignal: signal,
         promptId: this.promptId,
         maxAttempts: 2,
-      })) as Record<string, unknown>;
+      });
 
       if (
         result &&

@@ -184,11 +184,11 @@ export async function modifyWithEditor<ToolParams>(
     overrides !== undefined && 'proposedContent' in overrides;
 
   const currentContent = hasCurrentOverride
-    ? (overrides!.currentContent ?? '')
+    ? (overrides.currentContent ?? '')
     : await modifyContext.getCurrentContent(originalParams);
 
   const proposedContent = hasProposedOverride
-    ? (overrides!.proposedContent ?? '')
+    ? (overrides.proposedContent ?? '')
     : await modifyContext.getProposedContent(originalParams);
 
   const { oldPath, newPath, dirPath } = createTempFilesForModify(

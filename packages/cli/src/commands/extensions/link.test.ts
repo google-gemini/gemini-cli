@@ -14,7 +14,7 @@ import {
   type Mock,
 } from 'vitest';
 import { format } from 'node:util';
-import { type CommandModule, type Argv } from 'yargs';
+import { type Argv } from 'yargs';
 import { handleLink, linkCommand } from './link.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { loadSettings, type LoadedSettings } from '../../config/settings.js';
@@ -126,7 +126,7 @@ describe('extensions link command', () => {
   });
 
   describe('linkCommand', () => {
-    const command = linkCommand as CommandModule;
+    const command = linkCommand;
 
     it('should have correct command and describe', () => {
       expect(command.command).toBe('link <path>');
@@ -180,7 +180,9 @@ describe('extensions link command', () => {
         _: [],
         $0: '',
       };
-      await (command.handler as unknown as (args: TestArgv) => void)(argv);
+      await (command.handler as unknown as (args: TestArgv) => Promise<void>)(
+        argv,
+      );
 
       expect(
         mockExtensionManager.prototype.installOrUpdateExtension,

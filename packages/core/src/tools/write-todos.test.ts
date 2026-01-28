@@ -6,9 +6,10 @@
 
 import { describe, expect, it } from 'vitest';
 import { WriteTodosTool, type WriteTodosToolParams } from './write-todos.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 describe('WriteTodosTool', () => {
-  const tool = new WriteTodosTool();
+  const tool = new WriteTodosTool(createMockMessageBus());
   const signal = new AbortController().signal;
 
   describe('validation', () => {

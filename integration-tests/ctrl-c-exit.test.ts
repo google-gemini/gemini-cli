@@ -4,13 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as os from 'node:os';
 import { TestRig } from './test-helper.js';
 
 describe('Ctrl+C exit', () => {
+  let rig: TestRig;
+
+  beforeEach(() => {
+    rig = new TestRig();
+  });
+
+  afterEach(async () => await rig.cleanup());
+
   it('should exit gracefully on second Ctrl+C', async () => {
-    const rig = new TestRig();
     await rig.setup('should exit gracefully on second Ctrl+C', {
       settings: { tools: { useRipgrep: false } },
     });

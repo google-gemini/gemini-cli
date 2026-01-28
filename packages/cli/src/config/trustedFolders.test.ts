@@ -36,6 +36,15 @@ vi.mock('os', async (importOriginal) => {
     platform: vi.fn(() => 'linux'),
   };
 });
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    homedir: () => '/mock/home/user',
+  };
+});
 vi.mock('fs', async (importOriginal) => {
   const actualFs = await importOriginal<typeof fs>();
   return {
@@ -422,5 +431,54 @@ describe('Trusted Folders Caching', () => {
     // Third call should read the file again
     loadTrustedFolders();
     expect(readSpy).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('invalid trust levels', () => {
+  const mockCwd = '/user/folder';
+  const mockRules: Record<string, TrustLevel> = {};
+
+  beforeEach(() => {
+    resetTrustedFoldersForTesting();
+    vi.spyOn(process, 'cwd').mockImplementation(() => mockCwd);
+    vi.spyOn(fs, 'readFileSync').mockImplementation((p) => {
+      if (p === getTrustedFoldersPath()) {
+        return JSON.stringify(mockRules);
+      }
+      return '{}';
+    });
+    vi.spyOn(fs, 'existsSync').mockImplementation(
+      (p) => p === getTrustedFoldersPath(),
+    );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    // Clear the object
+    Object.keys(mockRules).forEach((key) => delete mockRules[key]);
+  });
+
+  it('should create a comprehensive error message for invalid trust level', () => {
+    mockRules[mockCwd] = 'INVALID_TRUST_LEVEL' as TrustLevel;
+
+    const { errors } = loadTrustedFolders();
+    const possibleValues = Object.values(TrustLevel).join(', ');
+    expect(errors.length).toBe(1);
+    expect(errors[0].message).toBe(
+      `Invalid trust level "INVALID_TRUST_LEVEL" for path "${mockCwd}". Possible values are: ${possibleValues}.`,
+    );
+  });
+
+  it('should throw a fatal error for invalid trust level', () => {
+    const mockSettings: Settings = {
+      security: {
+        folderTrust: {
+          enabled: true,
+        },
+      },
+    };
+    mockRules[mockCwd] = 'INVALID_TRUST_LEVEL' as TrustLevel;
+
+    expect(() => isWorkspaceTrusted(mockSettings)).toThrow(FatalConfigError);
   });
 });

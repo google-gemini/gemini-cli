@@ -32,6 +32,8 @@ import {
   readFileWithEncoding,
   fileExists,
   readWasmBinaryFromDisk,
+  saveTruncatedToolOutput,
+  formatTruncatedToolOutput,
 } from './fileUtils.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 
@@ -630,8 +632,6 @@ describe('fileUtils', () => {
       { type: 'image', file: 'file.png', mime: 'image/png' },
       { type: 'image', file: 'file.jpg', mime: 'image/jpeg' },
       { type: 'pdf', file: 'file.pdf', mime: 'application/pdf' },
-      { type: 'audio', file: 'song.mp3', mime: 'audio/mpeg' },
-      { type: 'video', file: 'movie.mp4', mime: 'video/mp4' },
       { type: 'binary', file: 'archive.zip', mime: 'application/zip' },
       { type: 'binary', file: 'app.exe', mime: 'application/octet-stream' },
     ])(
@@ -639,6 +639,25 @@ describe('fileUtils', () => {
       async ({ file, mime, type }) => {
         mockMimeGetType.mockReturnValueOnce(mime);
         expect(await detectFileType(file)).toBe(type);
+      },
+    );
+
+    it.each([
+      { type: 'audio', ext: '.mp3', mime: 'audio/mpeg' },
+      { type: 'video', ext: '.mp4', mime: 'video/mp4' },
+    ])(
+      'should detect $type type for binary files with $ext extension',
+      async ({ type, ext, mime }) => {
+        const filePath = path.join(tempRootDir, `test${ext}`);
+        const binaryContent = Buffer.from([
+          0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ]);
+        actualNodeFs.writeFileSync(filePath, binaryContent);
+
+        mockMimeGetType.mockReturnValueOnce(mime);
+        expect(await detectFileType(filePath)).toBe(type);
+
+        actualNodeFs.unlinkSync(filePath);
       },
     );
 
@@ -661,6 +680,24 @@ describe('fileUtils', () => {
       mockMimeGetType.mockReturnValueOnce(false); // Unknown mime type
       // filePathForDetectTest is already a text file by default from beforeEach
       expect(await detectFileType(filePathForDetectTest)).toBe('text');
+    });
+
+    it('should detect .adp files with XML content as text, not audio (#16888)', async () => {
+      const adpFilePath = path.join(tempRootDir, 'test.adp');
+      const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<AdapterType Name="ATimeOut" Comment="Adapter for timed events">
+  <InterfaceList>
+    <EventInputs>
+      <Event Name="TimeOut"/>
+    </EventInputs>
+  </InterfaceList>
+</AdapterType>`;
+      actualNodeFs.writeFileSync(adpFilePath, xmlContent);
+      mockMimeGetType.mockReturnValueOnce('audio/adpcm');
+
+      expect(await detectFileType(adpFilePath)).toBe('text');
+
+      actualNodeFs.unlinkSync(adpFilePath);
     });
   });
 
@@ -776,7 +813,10 @@ describe('fileUtils', () => {
     });
 
     it('should process an audio file', async () => {
-      const fakeMp3Data = Buffer.from('fake mp3 data');
+      const fakeMp3Data = Buffer.from([
+        0x49, 0x44, 0x33, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00,
+      ]);
       actualNodeFs.writeFileSync(testAudioFilePath, fakeMp3Data);
       mockMimeGetType.mockReturnValue('audio/mpeg');
       const result = await processSingleFileContent(
@@ -1020,6 +1060,110 @@ describe('fileUtils', () => {
       } finally {
         statSpy.mockRestore();
       }
+    });
+  });
+
+  describe('saveTruncatedToolOutput & formatTruncatedToolOutput', () => {
+    it('should save content to a file with safe name', async () => {
+      const content = 'some content';
+      const toolName = 'shell';
+      const id = '123';
+
+      const result = await saveTruncatedToolOutput(
+        content,
+        toolName,
+        id,
+        tempRootDir,
+      );
+
+      const expectedOutputFile = path.join(tempRootDir, 'shell_123.txt');
+      expect(result.outputFile).toBe(expectedOutputFile);
+      expect(result.totalLines).toBe(1);
+
+      const savedContent = await fsPromises.readFile(
+        expectedOutputFile,
+        'utf-8',
+      );
+      expect(savedContent).toBe(content);
+    });
+
+    it('should sanitize tool name in filename', async () => {
+      const content = 'content';
+      const toolName = '../../dangerous/tool';
+      const id = 1;
+
+      const result = await saveTruncatedToolOutput(
+        content,
+        toolName,
+        id,
+        tempRootDir,
+      );
+
+      // ../../dangerous/tool -> ______dangerous_tool
+      const expectedOutputFile = path.join(
+        tempRootDir,
+        '______dangerous_tool_1.txt',
+      );
+      expect(result.outputFile).toBe(expectedOutputFile);
+    });
+
+    it('should sanitize id in filename', async () => {
+      const content = 'content';
+      const toolName = 'shell';
+      const id = '../../etc/passwd';
+
+      const result = await saveTruncatedToolOutput(
+        content,
+        toolName,
+        id,
+        tempRootDir,
+      );
+
+      // ../../etc/passwd -> ______etc_passwd
+      const expectedOutputFile = path.join(
+        tempRootDir,
+        'shell_______etc_passwd.txt',
+      );
+      expect(result.outputFile).toBe(expectedOutputFile);
+    });
+
+    it('should format multi-line output correctly', () => {
+      const lines = Array.from({ length: 50 }, (_, i) => `line ${i}`);
+      const content = lines.join('\n');
+      const outputFile = '/tmp/out.txt';
+
+      const formatted = formatTruncatedToolOutput(content, outputFile, 10);
+
+      expect(formatted).toContain(
+        'Output too large. Showing the last 10 of 50 lines.',
+      );
+      expect(formatted).toContain('For full output see: /tmp/out.txt');
+      expect(formatted).toContain('line 49');
+      expect(formatted).not.toContain('line 0');
+    });
+
+    it('should truncate "elephant lines" (long single line in multi-line output)', () => {
+      const longLine = 'a'.repeat(2000);
+      const content = `line 1\n${longLine}\nline 3`;
+      const outputFile = '/tmp/out.txt';
+
+      const formatted = formatTruncatedToolOutput(content, outputFile, 3);
+
+      expect(formatted).toContain('(some long lines truncated)');
+      expect(formatted).toContain('... [LINE WIDTH TRUNCATED]');
+      expect(formatted.length).toBeLessThan(longLine.length);
+    });
+
+    it('should handle massive single-line string with character-based truncation', () => {
+      const content = 'a'.repeat(50000);
+      const outputFile = '/tmp/out.txt';
+
+      const formatted = formatTruncatedToolOutput(content, outputFile);
+
+      expect(formatted).toContain(
+        'Output too large. Showing the last 4,000 characters',
+      );
+      expect(formatted.endsWith(content.slice(-4000))).toBe(true);
     });
   });
 });

@@ -4,19 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { AnyToolInvocation } from '../index.js';
-import type { Config } from '../config/config.js';
 import os from 'node:os';
+import fs from 'node:fs';
+import path from 'node:path';
 import { quote } from 'shell-quote';
-import { doesToolInvocationMatch } from './tool-utils.js';
 import {
   spawn,
   spawnSync,
   type SpawnOptionsWithoutStdio,
 } from 'node:child_process';
-import type { Node } from 'web-tree-sitter';
-import { Language, Parser } from 'web-tree-sitter';
+import * as readline from 'node:readline';
+import type { Node, Tree } from 'web-tree-sitter';
+import { Language, Parser, Query } from 'web-tree-sitter';
 import { loadWasmBinary } from './fileUtils.js';
+import { debugLogger } from './debugLogger.js';
 
 export const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
 
@@ -37,6 +38,35 @@ export interface ShellConfiguration {
   argsPrefix: string[];
   /** An identifier for the shell type. */
   shell: ShellType;
+}
+
+export async function resolveExecutable(
+  exe: string,
+): Promise<string | undefined> {
+  if (path.isAbsolute(exe)) {
+    try {
+      await fs.promises.access(exe, fs.constants.X_OK);
+      return exe;
+    } catch {
+      return undefined;
+    }
+  }
+  const paths = (process.env['PATH'] || '').split(path.delimiter);
+  const extensions =
+    os.platform() === 'win32' ? ['.exe', '.cmd', '.bat', ''] : [''];
+
+  for (const p of paths) {
+    for (const ext of extensions) {
+      const fullPath = path.join(p, exe + ext);
+      try {
+        await fs.promises.access(fullPath, fs.constants.X_OK);
+        return fullPath;
+      } catch {
+        continue;
+      }
+    }
+  }
+  return undefined;
 }
 
 let bashLanguage: Language | null = null;
@@ -100,24 +130,29 @@ export async function initializeShellParsers(): Promise<void> {
   if (!treeSitterInitialization) {
     treeSitterInitialization = loadBashLanguage().catch((error) => {
       treeSitterInitialization = null;
-      throw error;
+      // Log the error but don't throw, allowing the application to fall back to safe defaults (ASK_USER)
+      // or regex checks where appropriate.
+      debugLogger.debug('Failed to initialize shell parsers:', error);
     });
   }
 
   await treeSitterInitialization;
 }
 
-interface ParsedCommandDetail {
+export interface ParsedCommandDetail {
   name: string;
   text: string;
+  startIndex: number;
 }
 
 interface CommandParseResult {
   details: ParsedCommandDetail[];
   hasError: boolean;
+  hasRedirection?: boolean;
 }
 
 const POWERSHELL_COMMAND_ENV = '__GCLI_POWERSHELL_COMMAND__';
+const PARSE_TIMEOUT_MICROS = 1000 * 1000; // 1 second
 
 // Encode the parser script as UTF-16LE base64 so we can pass it via PowerShell's -EncodedCommand flag;
 // this avoids brittle quoting/escaping when spawning PowerShell and ensures the script is received byte-for-byte.
@@ -138,7 +173,11 @@ if ($errors -and $errors.Count -gt 0) {
 }
 $commandAsts = $ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.CommandAst] }, $true)
 $commandObjects = @()
+$hasRedirection = $false
 foreach ($commandAst in $commandAsts) {
+  if ($commandAst.Redirections.Count -gt 0) {
+    $hasRedirection = $true
+  }
   $name = $commandAst.GetCommandName()
   if ([string]::IsNullOrWhiteSpace($name)) {
     continue
@@ -151,10 +190,18 @@ foreach ($commandAst in $commandAsts) {
 [PSCustomObject]@{
   success = $true
   commands = $commandObjects
+  hasRedirection = $hasRedirection
 } | ConvertTo-Json -Compress
 `,
   'utf16le',
 ).toString('base64');
+
+const REDIRECTION_NAMES = new Set([
+  'redirection (<)',
+  'redirection (>)',
+  'heredoc (<<)',
+  'herestring (<<<)',
+]);
 
 function createParser(): Parser | null {
   if (!bashLanguage) {
@@ -173,14 +220,35 @@ function createParser(): Parser | null {
   }
 }
 
-function parseCommandTree(command: string) {
+function parseCommandTree(
+  command: string,
+  timeoutMicros: number = PARSE_TIMEOUT_MICROS,
+): Tree | null {
   const parser = createParser();
   if (!parser || !command.trim()) {
     return null;
   }
 
+  const deadline = performance.now() + timeoutMicros / 1000;
+  let timedOut = false;
+
   try {
-    return parser.parse(command);
+    const tree = parser.parse(command, null, {
+      progressCallback: () => {
+        if (performance.now() > deadline) {
+          timedOut = true;
+          return true as unknown as void; // Returning true cancels parsing, but type says void
+        }
+      },
+    });
+
+    if (timedOut) {
+      debugLogger.error('Bash command parsing timed out for command:', command);
+      // Returning a partial tree could be risky so we return null to be safe.
+      return null;
+    }
+
+    return tree;
   } catch {
     return null;
   }
@@ -219,6 +287,24 @@ function extractNameFromNode(node: Node): string | null {
       }
       return normalizeCommandName(firstChild.text);
     }
+    case 'file_redirect': {
+      // The first child might be a file descriptor (e.g., '2>').
+      // We iterate to find the actual operator token.
+      for (let i = 0; i < node.childCount; i++) {
+        const child = node.child(i);
+        if (child && child.text.includes('<')) {
+          return 'redirection (<)';
+        }
+        if (child && child.text.includes('>')) {
+          return 'redirection (>)';
+        }
+      }
+      return 'redirection (>)';
+    }
+    case 'heredoc_redirect':
+      return 'heredoc (<<)';
+    case 'herestring_redirect':
+      return 'herestring (<<<)';
     default:
       return null;
   }
@@ -232,21 +318,20 @@ function collectCommandDetails(
   const details: ParsedCommandDetail[] = [];
 
   while (stack.length > 0) {
-    const current = stack.pop();
-    if (!current) {
-      continue;
-    }
+    const current = stack.pop()!;
 
-    const commandName = extractNameFromNode(current);
-    if (commandName) {
+    const name = extractNameFromNode(current);
+    if (name) {
       details.push({
-        name: commandName,
+        name,
         text: source.slice(current.startIndex, current.endIndex).trim(),
+        startIndex: current.startIndex,
       });
     }
 
-    for (let i = current.namedChildCount - 1; i >= 0; i -= 1) {
-      const child = current.namedChild(i);
+    // Traverse all children to find all sub-components (commands, redirections, etc.)
+    for (let i = current.childCount - 1; i >= 0; i -= 1) {
+      const child = current.child(i);
       if (child) {
         stack.push(child);
       }
@@ -292,7 +377,11 @@ function hasPromptCommandTransform(root: Node): boolean {
 
 function parseBashCommandDetails(command: string): CommandParseResult | null {
   if (treeSitterInitializationError) {
-    throw treeSitterInitializationError;
+    debugLogger.debug(
+      'Bash parser not initialized:',
+      treeSitterInitializationError,
+    );
+    return null;
   }
 
   if (!bashLanguage) {
@@ -308,12 +397,38 @@ function parseBashCommandDetails(command: string): CommandParseResult | null {
   }
 
   const details = collectCommandDetails(tree.rootNode, command);
+
+  const hasError =
+    tree.rootNode.hasError ||
+    details.length === 0 ||
+    hasPromptCommandTransform(tree.rootNode);
+
+  if (hasError) {
+    let query = null;
+    try {
+      query = new Query(bashLanguage, '(ERROR) @error (MISSING) @missing');
+      const captures = query.captures(tree.rootNode);
+      const syntaxErrors = captures.map((capture) => {
+        const { node, name } = capture;
+        const type = name === 'missing' ? 'Missing' : 'Error';
+        return `${type} node: "${node.text}" at ${node.startPosition.row}:${node.startPosition.column}`;
+      });
+
+      debugLogger.log(
+        'Bash command parsing error detected for command:',
+        command,
+        'Syntax Errors:',
+        syntaxErrors,
+      );
+    } catch (_e) {
+      // Ignore query errors
+    } finally {
+      query?.delete();
+    }
+  }
   return {
-    details,
-    hasError:
-      tree.rootNode.hasError ||
-      details.length === 0 ||
-      hasPromptCommandTransform(tree.rootNode),
+    details: details.sort((a, b) => a.startIndex - b.startIndex),
+    hasError,
   };
 }
 
@@ -360,6 +475,7 @@ function parsePowerShellCommandDetails(
     let parsed: {
       success?: boolean;
       commands?: Array<{ name?: string; text?: string }>;
+      hasRedirection?: boolean;
     } | null = null;
     try {
       parsed = JSON.parse(output);
@@ -386,6 +502,7 @@ function parsePowerShellCommandDetails(
         return {
           name,
           text,
+          startIndex: 0,
         };
       })
       .filter((detail): detail is ParsedCommandDetail => detail !== null);
@@ -393,13 +510,16 @@ function parsePowerShellCommandDetails(
     return {
       details,
       hasError: details.length === 0,
+      hasRedirection: parsed.hasRedirection,
     };
   } catch {
     return null;
   }
 }
 
-function parseCommandDetails(command: string): CommandParseResult | null {
+export function parseCommandDetails(
+  command: string,
+): CommandParseResult | null {
   const configuration = getShellConfiguration();
 
   if (configuration.shell === 'powershell') {
@@ -488,6 +608,56 @@ export function escapeShellArg(arg: string, shell: ShellType): string {
  * @param command The shell command string to parse
  * @returns An array of individual command strings
  */
+/**
+ * Checks if a command contains redirection operators.
+ * Uses shell-specific parsers where possible, falling back to a broad regex check.
+ */
+export function hasRedirection(command: string): boolean {
+  const fallbackCheck = () => /[><]/.test(command);
+
+  // If there are no redirection characters at all, we can skip parsing.
+  if (!fallbackCheck()) {
+    return false;
+  }
+
+  const configuration = getShellConfiguration();
+
+  if (configuration.shell === 'powershell') {
+    const parsed = parsePowerShellCommandDetails(
+      command,
+      configuration.executable,
+    );
+    return parsed && !parsed.hasError
+      ? !!parsed.hasRedirection
+      : fallbackCheck();
+  }
+
+  if (configuration.shell === 'bash' && bashLanguage) {
+    const tree = parseCommandTree(command);
+    if (!tree) return fallbackCheck();
+
+    const stack: Node[] = [tree.rootNode];
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      if (
+        current.type === 'redirected_statement' ||
+        current.type === 'file_redirect' ||
+        current.type === 'heredoc_redirect' ||
+        current.type === 'herestring_redirect'
+      ) {
+        return true;
+      }
+      for (let i = current.childCount - 1; i >= 0; i -= 1) {
+        const child = current.child(i);
+        if (child) stack.push(child);
+      }
+    }
+    return false;
+  }
+
+  return fallbackCheck();
+}
+
 export function splitCommands(command: string): string[] {
   const parsed = parseCommandDetails(command);
   if (!parsed || parsed.hasError) {
@@ -524,7 +694,10 @@ export function getCommandRoots(command: string): string[] {
     return [];
   }
 
-  return parsed.details.map((detail) => detail.name).filter(Boolean);
+  return parsed.details
+    .map((detail) => detail.name)
+    .filter((name) => !REDIRECTION_NAMES.has(name))
+    .filter(Boolean);
 }
 
 export function stripShellWrapper(command: string): string {
@@ -552,178 +725,6 @@ export function stripShellWrapper(command: string): string {
  * @param command The shell command string to check
  * @returns true if command substitution would be executed by bash
  */
-/**
- * Checks a shell command against security policies and allowlists.
- *
- * This function operates in one of two modes depending on the presence of
- * the `sessionAllowlist` parameter:
- *
- * 1.  **"Default Deny" Mode (sessionAllowlist is provided):** This is the
- *     strictest mode, used for user-defined scripts like custom commands.
- *     A command is only permitted if it is found on the global `coreTools`
- *     allowlist OR the provided `sessionAllowlist`. It must not be on the
- *     global `excludeTools` blocklist.
- *
- * 2.  **"Default Allow" Mode (sessionAllowlist is NOT provided):** This mode
- *     is used for direct tool invocations (e.g., by the model). If a strict
- *     global `coreTools` allowlist exists, commands must be on it. Otherwise,
- *     any command is permitted as long as it is not on the `excludeTools`
- *     blocklist.
- *
- * @param command The shell command string to validate.
- * @param config The application configuration.
- * @param sessionAllowlist A session-level list of approved commands. Its
- *   presence activates "Default Deny" mode.
- * @returns An object detailing which commands are not allowed.
- */
-export function checkCommandPermissions(
-  command: string,
-  config: Config,
-  sessionAllowlist?: Set<string>,
-): {
-  allAllowed: boolean;
-  disallowedCommands: string[];
-  blockReason?: string;
-  isHardDenial?: boolean;
-} {
-  const parseResult = parseCommandDetails(command);
-  if (!parseResult || parseResult.hasError) {
-    return {
-      allAllowed: false,
-      disallowedCommands: [command],
-      blockReason: 'Command rejected because it could not be parsed safely',
-      isHardDenial: true,
-    };
-  }
-
-  const normalize = (cmd: string): string => cmd.trim().replace(/\s+/g, ' ');
-  const commandsToValidate = parseResult.details
-    .map((detail) => normalize(detail.text))
-    .filter(Boolean);
-  const invocation: AnyToolInvocation & { params: { command: string } } = {
-    params: { command: '' },
-  } as AnyToolInvocation & { params: { command: string } };
-
-  // 1. Blocklist Check (Highest Priority)
-  const excludeTools = config.getExcludeTools() || new Set([]);
-  const isWildcardBlocked = SHELL_TOOL_NAMES.some((name) =>
-    excludeTools.has(name),
-  );
-
-  if (isWildcardBlocked) {
-    return {
-      allAllowed: false,
-      disallowedCommands: commandsToValidate,
-      blockReason: 'Shell tool is globally disabled in configuration',
-      isHardDenial: true,
-    };
-  }
-
-  for (const cmd of commandsToValidate) {
-    invocation.params['command'] = cmd;
-    if (
-      doesToolInvocationMatch('run_shell_command', invocation, [
-        ...excludeTools,
-      ])
-    ) {
-      return {
-        allAllowed: false,
-        disallowedCommands: [cmd],
-        blockReason: `Command '${cmd}' is blocked by configuration`,
-        isHardDenial: true,
-      };
-    }
-  }
-
-  const coreTools = config.getCoreTools() || [];
-  const isWildcardAllowed = SHELL_TOOL_NAMES.some((name) =>
-    coreTools.includes(name),
-  );
-
-  // If there's a global wildcard, all commands are allowed at this point
-  // because they have already passed the blocklist check.
-  if (isWildcardAllowed) {
-    return { allAllowed: true, disallowedCommands: [] };
-  }
-
-  const disallowedCommands: string[] = [];
-
-  if (sessionAllowlist) {
-    // "DEFAULT DENY" MODE: A session allowlist is provided.
-    // All commands must be in either the session or global allowlist.
-    const normalizedSessionAllowlist = new Set(
-      [...sessionAllowlist].flatMap((cmd) =>
-        SHELL_TOOL_NAMES.map((name) => `${name}(${cmd})`),
-      ),
-    );
-
-    for (const cmd of commandsToValidate) {
-      invocation.params['command'] = cmd;
-      const isSessionAllowed = doesToolInvocationMatch(
-        'run_shell_command',
-        invocation,
-        [...normalizedSessionAllowlist],
-      );
-      if (isSessionAllowed) continue;
-
-      const isGloballyAllowed = doesToolInvocationMatch(
-        'run_shell_command',
-        invocation,
-        coreTools,
-      );
-      if (isGloballyAllowed) continue;
-
-      disallowedCommands.push(cmd);
-    }
-
-    if (disallowedCommands.length > 0) {
-      return {
-        allAllowed: false,
-        disallowedCommands,
-        blockReason: `Command(s) not on the global or session allowlist. Disallowed commands: ${disallowedCommands
-          .map((c) => JSON.stringify(c))
-          .join(', ')}`,
-        isHardDenial: false, // This is a soft denial; confirmation is possible.
-      };
-    }
-  } else {
-    // "DEFAULT ALLOW" MODE: No session allowlist.
-    const hasSpecificAllowedCommands =
-      coreTools.filter((tool) =>
-        SHELL_TOOL_NAMES.some((name) => tool.startsWith(`${name}(`)),
-      ).length > 0;
-
-    if (hasSpecificAllowedCommands) {
-      for (const cmd of commandsToValidate) {
-        invocation.params['command'] = cmd;
-        const isGloballyAllowed = doesToolInvocationMatch(
-          'run_shell_command',
-          invocation,
-          coreTools,
-        );
-        if (!isGloballyAllowed) {
-          disallowedCommands.push(cmd);
-        }
-      }
-      if (disallowedCommands.length > 0) {
-        return {
-          allAllowed: false,
-          disallowedCommands,
-          blockReason: `Command(s) not in the allowed commands list. Disallowed commands: ${disallowedCommands
-            .map((c) => JSON.stringify(c))
-            .join(', ')}`,
-          isHardDenial: false, // This is a soft denial.
-        };
-      }
-    }
-    // If no specific global allowlist exists, and it passed the blocklist,
-    // the command is allowed by default.
-  }
-
-  // If all checks for the current mode pass, the command is allowed.
-  return { allAllowed: true, disallowedCommands: [] };
-}
-
 /**
  * Determines whether a given shell command is allowed to execute based on
  * the tool's configuration including allowlists and blocklists.
@@ -766,86 +767,122 @@ export const spawnAsync = (
     });
   });
 
-export function isCommandAllowed(
-  command: string,
-  config: Config,
-): { allowed: boolean; reason?: string } {
-  // By not providing a sessionAllowlist, we invoke "default allow" behavior.
-  const { allAllowed, blockReason } = checkCommandPermissions(command, config);
-  if (allAllowed) {
-    return { allowed: true };
-  }
-  return { allowed: false, reason: blockReason };
-}
-
 /**
- * Determines whether a shell invocation should be auto-approved based on an allowlist.
+ * Executes a command and yields lines of output as they appear.
+ * Use for large outputs where buffering is not feasible.
  *
- * This reuses the same parsing logic as command-permission enforcement so that
- * chained commands must be individually covered by the allowlist.
- *
- * @param invocation The shell tool invocation being evaluated.
- * @param allowedPatterns The configured allowlist patterns (e.g. `run_shell_command(git)`).
- * @returns True if every parsed command segment is allowed by the patterns; false otherwise.
+ * @param command The executable to run
+ * @param args Arguments for the executable
+ * @param options Spawn options (cwd, env, etc.)
  */
-export function isShellInvocationAllowlisted(
-  invocation: AnyToolInvocation,
-  allowedPatterns: string[],
-): boolean {
-  if (!allowedPatterns.length) {
-    return false;
+export async function* execStreaming(
+  command: string,
+  args: string[],
+  options?: SpawnOptionsWithoutStdio & {
+    signal?: AbortSignal;
+    allowedExitCodes?: number[];
+  },
+): AsyncGenerator<string, void, void> {
+  const child = spawn(command, args, {
+    ...options,
+    // ensure we don't open a window on windows if possible/relevant
+    windowsHide: true,
+  });
+
+  const rl = readline.createInterface({
+    input: child.stdout,
+    terminal: false,
+  });
+
+  const errorChunks: Buffer[] = [];
+  let stderrTotalBytes = 0;
+  const MAX_STDERR_BYTES = 20 * 1024; // 20KB limit
+
+  child.stderr.on('data', (chunk) => {
+    if (stderrTotalBytes < MAX_STDERR_BYTES) {
+      errorChunks.push(chunk);
+      stderrTotalBytes += chunk.length;
+    }
+  });
+
+  let error: Error | null = null;
+  child.on('error', (err) => {
+    error = err;
+  });
+
+  const onAbort = () => {
+    // If manually aborted by signal, we kill immediately.
+    if (!child.killed) child.kill();
+  };
+
+  if (options?.signal?.aborted) {
+    onAbort();
+  } else {
+    options?.signal?.addEventListener('abort', onAbort);
   }
 
-  const hasShellWildcard = allowedPatterns.some((pattern) =>
-    SHELL_TOOL_NAMES.includes(pattern),
-  );
-  const hasShellSpecificPattern = allowedPatterns.some((pattern) =>
-    SHELL_TOOL_NAMES.some((name) => pattern.startsWith(`${name}(`)),
-  );
+  let finished = false;
+  try {
+    for await (const line of rl) {
+      if (options?.signal?.aborted) break;
+      yield line;
+    }
+    finished = true;
+  } finally {
+    rl.close();
+    options?.signal?.removeEventListener('abort', onAbort);
 
-  if (!hasShellWildcard && !hasShellSpecificPattern) {
-    return false;
+    // Ensure process is killed when the generator is closed (consumer breaks loop)
+    let killedByGenerator = false;
+    if (!finished && child.exitCode === null && !child.killed) {
+      try {
+        child.kill();
+      } catch (_e) {
+        // ignore error if process is already dead
+      }
+      killedByGenerator = true;
+    }
+
+    // Ensure we wait for the process to exit to check codes
+    await new Promise<void>((resolve, reject) => {
+      // If an error occurred before we got here (e.g. spawn failure), reject immediately.
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      function checkExit(code: number | null) {
+        // If we aborted or killed it manually, we treat it as success (stop waiting)
+        if (options?.signal?.aborted || killedByGenerator) {
+          resolve();
+          return;
+        }
+
+        const allowed = options?.allowedExitCodes ?? [0];
+        if (code !== null && allowed.includes(code)) {
+          resolve();
+        } else {
+          // If we have an accumulated error or explicit error event
+          if (error) reject(error);
+          else {
+            const stderr = Buffer.concat(errorChunks).toString('utf8');
+            const truncatedMsg =
+              stderrTotalBytes >= MAX_STDERR_BYTES ? '...[truncated]' : '';
+            reject(
+              new Error(
+                `Process exited with code ${code}: ${stderr}${truncatedMsg}`,
+              ),
+            );
+          }
+        }
+      }
+
+      if (child.exitCode !== null) {
+        checkExit(child.exitCode);
+      } else {
+        child.on('close', (code) => checkExit(code));
+        child.on('error', (err) => reject(err));
+      }
+    });
   }
-
-  if (hasShellWildcard) {
-    return true;
-  }
-
-  if (
-    !('params' in invocation) ||
-    typeof invocation.params !== 'object' ||
-    invocation.params === null ||
-    !('command' in invocation.params)
-  ) {
-    return false;
-  }
-
-  const commandValue = (invocation.params as { command?: unknown }).command;
-  if (typeof commandValue !== 'string' || !commandValue.trim()) {
-    return false;
-  }
-
-  const command = commandValue.trim();
-
-  const parseResult = parseCommandDetails(command);
-  if (!parseResult || parseResult.hasError) {
-    return false;
-  }
-
-  const normalize = (cmd: string): string => cmd.trim().replace(/\s+/g, ' ');
-  const commandsToValidate = parseResult.details
-    .map((detail) => normalize(detail.text))
-    .filter(Boolean);
-
-  if (commandsToValidate.length === 0) {
-    return false;
-  }
-
-  return commandsToValidate.every((commandSegment) =>
-    doesToolInvocationMatch(
-      SHELL_TOOL_NAMES[0],
-      { params: { command: commandSegment } } as AnyToolInvocation,
-      allowedPatterns,
-    ),
-  );
 }

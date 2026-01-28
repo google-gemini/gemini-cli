@@ -1,0 +1,31 @@
+# Priority system for policy rules:
+# - Higher priority numbers win over lower priority numbers
+# - When multiple rules match, the highest priority rule is applied
+# - Rules are evaluated in order of priority (highest first)
+#
+# Priority bands (tiers):
+# - Default policies (TOML): 1 + priority/1000 (e.g., priority 100 → 1.100)
+# - User policies (TOML): 2 + priority/1000 (e.g., priority 100 → 2.100)
+# - Admin policies (TOML): 3 + priority/1000 (e.g., priority 100 → 3.100)
+#
+# This ensures Admin > User > Default hierarchy is always preserved,
+# while allowing user-specified priorities to work within each tier.
+#
+# Settings-based and dynamic rules (all in user tier 2.x):
+#   2.95: Tools that the user has selected as "Always Allow" in the interactive UI
+#   2.9:  MCP servers excluded list (security: persistent server blocks)
+#   2.4:  Command line flag --exclude-tools (explicit temporary blocks)
+#   2.3:  Command line flag --allowed-tools (explicit temporary allows)
+#   2.2:  MCP servers with trust=true (persistent trusted servers)
+#   2.1:  MCP servers allowed list (persistent general server allows)
+#
+# TOML policy priorities (before transformation):
+#   10: Write tools default to ASK_USER (becomes 1.010 in default tier)
+#   15: Auto-edit tool override (becomes 1.015 in default tier)
+#   50: Read-only tools (becomes 1.050 in default tier)
+#   999: YOLO mode allow-all (becomes 1.999 in default tier)
+
+[[rule]]
+toolName = "delegate_to_agent"
+decision = "ask_user"
+priority = 50

@@ -28,6 +28,8 @@ import type { SlashCommand } from '../commands/types.js';
 import { ExtensionsList } from './views/ExtensionsList.js';
 import { getMCPServerStatus } from '@google/gemini-cli-core';
 import { ToolsList } from './views/ToolsList.js';
+import { SkillsList } from './views/SkillsList.js';
+import { AgentsStatus } from './views/AgentsStatus.js';
 import { McpStatus } from './views/McpStatus.js';
 import { ChatList } from './views/ChatList.js';
 import { HooksList } from './views/HooksList.js';
@@ -65,7 +67,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         <UserMessage text={itemForDisplay.text} width={terminalWidth} />
       )}
       {itemForDisplay.type === 'user_shell' && (
-        <UserShellMessage text={itemForDisplay.text} />
+        <UserShellMessage text={itemForDisplay.text} width={terminalWidth} />
       )}
       {itemForDisplay.type === 'gemini' && (
         <GeminiMessage
@@ -110,6 +112,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           gcpProject={itemForDisplay.gcpProject}
           ideClient={itemForDisplay.ideClient}
           userEmail={itemForDisplay.userEmail}
+          tier={itemForDisplay.tier}
         />
       )}
       {itemForDisplay.type === 'help' && commands && (
@@ -138,6 +141,8 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           isFocused={isFocused}
           activeShellPtyId={activeShellPtyId}
           embeddedShellFocused={embeddedShellFocused}
+          borderTop={itemForDisplay.borderTop}
+          borderBottom={itemForDisplay.borderBottom}
         />
       )}
       {itemForDisplay.type === 'compression' && (
@@ -151,6 +156,18 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           terminalWidth={terminalWidth}
           tools={itemForDisplay.tools}
           showDescriptions={itemForDisplay.showDescriptions}
+        />
+      )}
+      {itemForDisplay.type === 'skills_list' && (
+        <SkillsList
+          skills={itemForDisplay.skills}
+          showDescriptions={itemForDisplay.showDescriptions}
+        />
+      )}
+      {itemForDisplay.type === 'agents_list' && (
+        <AgentsStatus
+          agents={itemForDisplay.agents}
+          terminalWidth={terminalWidth}
         />
       )}
       {itemForDisplay.type === 'mcp_status' && (

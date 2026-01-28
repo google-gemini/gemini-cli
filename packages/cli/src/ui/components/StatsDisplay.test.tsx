@@ -76,8 +76,6 @@ describe('<StatsDisplay />', () => {
 
     expect(output).toContain('Performance');
     expect(output).toContain('Interaction Summary');
-    expect(output).not.toContain('Efficiency & Optimizations');
-    expect(output).not.toContain('Model'); // The table header
     expect(output).toMatchSnapshot();
   });
 
@@ -87,6 +85,7 @@ describe('<StatsDisplay />', () => {
         'gemini-2.5-pro': {
           api: { totalRequests: 3, totalErrors: 0, totalLatencyMs: 15000 },
           tokens: {
+            input: 500,
             prompt: 1000,
             candidates: 2000,
             total: 43234,
@@ -98,6 +97,7 @@ describe('<StatsDisplay />', () => {
         'gemini-2.5-flash': {
           api: { totalRequests: 5, totalErrors: 1, totalLatencyMs: 4500 },
           tokens: {
+            input: 15000,
             prompt: 25000,
             candidates: 15000,
             total: 150000000,
@@ -114,8 +114,8 @@ describe('<StatsDisplay />', () => {
 
     expect(output).toContain('gemini-2.5-pro');
     expect(output).toContain('gemini-2.5-flash');
-    expect(output).toContain('1,000');
-    expect(output).toContain('25,000');
+    expect(output).toContain('15,000');
+    expect(output).toContain('10,000');
     expect(output).toMatchSnapshot();
   });
 
@@ -125,6 +125,7 @@ describe('<StatsDisplay />', () => {
         'gemini-2.5-pro': {
           api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
           tokens: {
+            input: 50,
             prompt: 100,
             candidates: 100,
             total: 250,
@@ -168,7 +169,6 @@ describe('<StatsDisplay />', () => {
     expect(output).toContain('Performance');
     expect(output).toContain('Interaction Summary');
     expect(output).toContain('User Agreement');
-    expect(output).toContain('Savings Highlight');
     expect(output).toContain('gemini-2.5-pro');
     expect(output).toMatchSnapshot();
   });
@@ -219,6 +219,7 @@ describe('<StatsDisplay />', () => {
           'gemini-2.5-pro': {
             api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
             tokens: {
+              input: 100,
               prompt: 100,
               candidates: 100,
               total: 200,
@@ -233,7 +234,6 @@ describe('<StatsDisplay />', () => {
       const { lastFrame } = renderWithMockedStats(metrics);
       const output = lastFrame();
 
-      expect(output).not.toContain('Efficiency & Optimizations');
       expect(output).toMatchSnapshot();
     });
   });
@@ -402,6 +402,7 @@ describe('<StatsDisplay />', () => {
           'gemini-2.5-pro': {
             api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
             tokens: {
+              input: 50,
               prompt: 100,
               candidates: 100,
               total: 250,
@@ -443,9 +444,55 @@ describe('<StatsDisplay />', () => {
       );
       const output = lastFrame();
 
-      expect(output).toContain('Usage limit remaining');
+      expect(output).toContain('Usage left');
       expect(output).toContain('75.0%');
       expect(output).toContain('(Resets in 1h 30m)');
+      expect(output).toMatchSnapshot();
+
+      vi.useRealTimers();
+    });
+
+    it('renders quota information for unused models', () => {
+      const now = new Date('2025-01-01T12:00:00Z');
+      vi.useFakeTimers();
+      vi.setSystemTime(now);
+
+      // No models in metrics, but a quota for gemini-2.5-flash
+      const metrics = createTestMetrics();
+
+      const resetTime = new Date(now.getTime() + 1000 * 60 * 120).toISOString(); // 2 hours from now
+
+      const quotas: RetrieveUserQuotaResponse = {
+        buckets: [
+          {
+            modelId: 'gemini-2.5-flash',
+            remainingFraction: 0.5,
+            resetTime,
+          },
+        ],
+      };
+
+      useSessionStatsMock.mockReturnValue({
+        stats: {
+          sessionId: 'test-session-id',
+          sessionStartTime: new Date(),
+          metrics,
+          lastPromptTokenCount: 0,
+          promptCount: 5,
+        },
+        getPromptCount: () => 5,
+        startNewPrompt: vi.fn(),
+      });
+
+      const { lastFrame } = render(
+        <StatsDisplay duration="1s" quotas={quotas} />,
+      );
+      const output = lastFrame();
+
+      expect(output).toContain('gemini-2.5-flash');
+      expect(output).toContain('-'); // for requests
+      expect(output).toContain('50.0%');
+      expect(output).toContain('(Resets in 2h)');
       expect(output).toMatchSnapshot();
 
       vi.useRealTimers();
