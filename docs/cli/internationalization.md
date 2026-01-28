@@ -54,14 +54,22 @@ locales/
 │   ├── commands.json
 │   ├── dialogs.json
 │   ├── help.json
-│   └── loading.json
+│   ├── loading.json
+│   ├── auth.json
+│   ├── messages.json
+│   ├── privacy.json
+│   └── ui.json
 └── ja/
     ├── manifest.json
     ├── common.json
     ├── commands.json
     ├── dialogs.json
     ├── help.json
-    └── loading.json
+    ├── loading.json
+    ├── auth.json
+    ├── messages.json
+    ├── privacy.json
+    └── ui.json
 ```
 
 ### manifest.json
@@ -86,10 +94,14 @@ Translations are split into namespaces, each in its own JSON file:
 | File            | Purpose                                     |
 | --------------- | ------------------------------------------- |
 | `common.json`   | Shared UI strings (buttons, status, labels) |
-| `commands.json` | Slash command descriptions (76 commands)    |
-| `dialogs.json`  | Auth dialog and settings dialog strings     |
+| `commands.json` | Slash command descriptions and responses    |
+| `dialogs.json`  | Complex UI dialogs and settings             |
 | `help.json`     | Help overlay content and keyboard shortcuts |
-| `loading.json`  | Loading tips and waiting phrases (152 tips) |
+| `loading.json`  | Loading tips and waiting phrases            |
+| `auth.json`     | Authentication flow and API key dialogs     |
+| `messages.json` | Tool results, diffs, and chat messages      |
+| `privacy.json`  | Legal notices and privacy agreements        |
+| `ui.json`       | Main application UI elements and indicators |
 
 ## Adding a new language
 
@@ -106,7 +118,7 @@ To add a new language, no code changes are required:
    }
    ```
 
-3. Copy the five namespace JSON files from `en/` and translate the values. Keep
+3. Copy the nine namespace JSON files from `en/` and translate the values. Keep
    all keys identical — only translate the string values.
 
 4. Build and run. The new language appears automatically in the Settings dialog.
@@ -185,14 +197,14 @@ When adding user-facing strings to the CLI:
    }
    ```
 
-    ```typescript
-    t('common:connectedServers', { count: 5 });
-    ```
+   ```typescript
+   t('common:connectedServers', { count: 5 });
+   ```
 
 5. **Use format strings, not sentence fragments.** Different languages order
-   words differently. Never split a sentence across multiple translation keys
-   or concatenate translated fragments. Instead, put the entire sentence in one
-   key and use interpolation variables for dynamic parts:
+   words differently. Never split a sentence across multiple translation keys or
+   concatenate translated fragments. Instead, put the entire sentence in one key
+   and use interpolation variables for dynamic parts:
 
    ```json
    // ✗ Bad — forces English word order on all languages
@@ -204,8 +216,11 @@ When adding user-facing strings to the CLI:
    ```
 
    In Japanese, the natural phrasing puts the subject first:
+
    ```json
-   { "cacheSavings": "入力トークンのうち {{tokens}}（{{percent}}）がキャッシュから提供され、コストが削減されました。" }
+   {
+     "cacheSavings": "入力トークンのうち {{tokens}}（{{percent}}）がキャッシュから提供され、コストが削減されました。"
+   }
    ```
 
 ## Settings reference
