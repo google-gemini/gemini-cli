@@ -95,9 +95,9 @@
     "loaderNotReady": "拡張機能がまだ読み込まれていないため、再起動できません",
     "usageRestart": "使用法: /extensions restart <拡張機能名>|--all",
     "notFoundOrActive": "拡張機能が見つからないか、有効ではありません: {{names}}",
-    "restarting": "{{count}} 個の拡張機能を再起動中...",
+    "restarting_other": "{{count}} 個の拡張機能を再起動中...",
     "restartFailed": "一部の拡張機能の再起動に失敗しました:\n  {{errors}}",
-    "restartSuccess": "{{count}} 個の拡張機能が正常に再起動されました。",
+    "restartSuccess_other": "{{count}} 個の拡張機能が正常に再起動されました。",
     "exploreTest": "ブラウザで拡張機能ページを開きます: {{url}} (テスト環境のためスキップ)",
     "exploreSandbox": "利用可能な拡張機能を確認: {{url}}",
     "exploreOpening": "ブラウザで拡張機能ページを開いています: {{url}}",
@@ -171,10 +171,10 @@
     "disableFailed": "フックの無効化に失敗しました: {{error}}",
     "noHooks": "設定されているフックはありません。",
     "allEnabled": "すべてのフックは既に有効です。",
-    "enableAllSuccess": "{{count}} 個のフックを有効にしました。",
+    "enableAllSuccess_other": "{{count}} 個のフックを有効にしました。",
     "enableAllFailed": "フックの一括有効化に失敗しました: {{error}}",
     "allDisabled": "すべてのフックは既に無効です。",
-    "disableAllSuccess": "{{count}} 個のフックを無効にしました。",
+    "disableAllSuccess_other": "{{count}} 個のフックを無効にしました。",
     "disableAllFailed": "フックの一括無効化に失敗しました: {{error}}"
   },
   "skills.responses": {
@@ -187,8 +187,8 @@
     "configFailed": "設定を取得できませんでした。",
     "reloading": "エージェントスキルを再読み込み中...",
     "reloadSuccess": "エージェントスキルの再読み込みに成功しました。",
-    "newlyAvailable": "{{count}} 個のスキルが新しく利用可能になりました。",
-    "noLongerAvailable": "{{count}} 個のスキルが利用できなくなりました。",
+    "newlyAvailable_other": "{{count}} 個のスキルが新しく利用可能になりました。",
+    "noLongerAvailable_other": "{{count}} 個のスキルが利用できなくなりました。",
     "reloadFailed": "スキルの再読み込みに失敗しました: {{error}}"
   },
   "ide.responses": {

@@ -320,8 +320,8 @@
   },
   "askUser": {
     "reviewAnswers": "Review your answers:",
-    "unansweredQuestions": "You have {{count}} unanswered question",
-    "unansweredQuestions_plural": "You have {{count}} unanswered questions",
+    "unansweredQuestions_one": "You have {{count}} unanswered question",
+    "unansweredQuestions_other": "You have {{count}} unanswered questions",
     "notAnswered": "(not answered)",
     "hintsReviewEnterConfirm": "Enter to confirm",
     "hintsReviewEnterSubmit": "Enter to submit",

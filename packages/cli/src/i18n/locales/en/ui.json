@@ -41,23 +41,23 @@
     "waitingFor": " - Waiting for: {{servers}}"
   },
   "consoleSummary": {
-    "errorCount": "{{count}} error",
-    "errorCount_plural": "{{count}} errors",
+    "errorCount_one": "{{count}} error",
+    "errorCount_other": "{{count}} errors",
     "detailsHint": "(F12 for details)"
   },
   "contextSummary": {
-    "openFiles": "{{count}} open file (ctrl+g to view)",
-    "openFiles_plural": "{{count}} open files (ctrl+g to view)",
-    "contextFiles": "{{count}} {{name}} file",
-    "contextFiles_plural": "{{count}} {{name}} files",
+    "openFiles_one": "{{count}} open file (ctrl+g to view)",
+    "openFiles_other": "{{count}} open files (ctrl+g to view)",
+    "contextFiles_one": "{{count}} {{name}} file",
+    "contextFiles_other": "{{count}} {{name}} files",
     "contextGenericName": "context",
-    "mcpServers": "{{count}} MCP server",
-    "mcpServers_plural": "{{count}} MCP servers",
+    "mcpServers_one": "{{count}} MCP server",
+    "mcpServers_other": "{{count}} MCP servers",
     "blockedOnly": "{{count}} Blocked",
-    "blockedMcpServers": "{{count}} Blocked MCP server",
-    "blockedMcpServers_plural": "{{count}} Blocked MCP servers",
-    "skills": "{{count}} skill",
-    "skills_plural": "{{count}} skills"
+    "blockedMcpServers_one": "{{count}} Blocked MCP server",
+    "blockedMcpServers_other": "{{count}} Blocked MCP servers",
+    "skills_one": "{{count}} skill",
+    "skills_other": "{{count}} skills"
   },
   "footer": {
     "untrusted": "untrusted",
@@ -67,8 +67,8 @@
     "modelCmd": " /model"
   },
   "hookStatus": {
-    "executing": "Executing Hook",
-    "executing_plural": "Executing Hooks"
+    "executing_one": "Executing Hook",
+    "executing_other": "Executing Hooks"
   },
   "detailedMessages": {
     "title": "Debug Console",
@@ -101,10 +101,10 @@
     "ctrlD": "Press Ctrl+D again to exit."
   },
   "maxSizedBox": {
-    "firstLinesHidden": "... first {{count}} line hidden ...",
-    "firstLinesHidden_plural": "... first {{count}} lines hidden ...",
-    "lastLinesHidden": "... last {{count}} line hidden ...",
-    "lastLinesHidden_plural": "... last {{count}} lines hidden ..."
+    "firstLinesHidden_one": "... first {{count}} line hidden ...",
+    "firstLinesHidden_other": "... first {{count}} lines hidden ...",
+    "lastLinesHidden_one": "... last {{count}} line hidden ...",
+    "lastLinesHidden_other": "... last {{count}} lines hidden ..."
   },
   "mcpStatus": {
     "noServers": "No MCP servers configured.",
@@ -123,12 +123,12 @@
       "blocked": "Blocked"
     },
     "counts": {
-      "tool": "{{count}} tool",
-      "tool_plural": "{{count}} tools",
-      "prompt": "{{count}} prompt",
-      "prompt_plural": "{{count}} prompts",
-      "resource": "{{count}} resource",
-      "resource_plural": "{{count}} resources"
+      "tool_one": "{{count}} tool",
+      "tool_other": "{{count}} tools",
+      "prompt_one": "{{count}} prompt",
+      "prompt_other": "{{count}} prompts",
+      "resource_one": "{{count}} resource",
+      "resource_other": "{{count}} resources"
     },
     "auth": {
       "oauth": " (OAuth)",

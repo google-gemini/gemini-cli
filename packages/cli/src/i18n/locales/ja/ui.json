@@ -41,17 +41,17 @@
     "waitingFor": " - 待機中: {{servers}}"
   },
   "consoleSummary": {
-    "errorCount": "{{count}} 個のエラー",
+    "errorCount_other": "{{count}} 個のエラー",
     "detailsHint": "(F12で詳細を表示)"
   },
   "contextSummary": {
-    "openFiles": "{{count}} 個の開いているファイル (Ctrl+Gで表示)",
-    "contextFiles": "{{count}} 個の {{name}} ファイル",
+    "openFiles_other": "{{count}} 個の開いているファイル (Ctrl+Gで表示)",
+    "contextFiles_other": "{{count}} 個の {{name}} ファイル",
     "contextGenericName": "コンテキスト",
-    "mcpServers": "{{count}} 台の MCP サーバー",
+    "mcpServers_other": "{{count}} 台の MCP サーバー",
     "blockedOnly": "{{count}} 個がブロック済み",
-    "blockedMcpServers": "{{count}} 台のブロック済み MCP サーバー",
-    "skills": "{{count}} 個のスキル"
+    "blockedMcpServers_other": "{{count}} 台のブロック済み MCP サーバー",
+    "skills_other": "{{count}} 個のスキル"
   },
   "footer": {
     "untrusted": "信頼されていない",
@@ -61,7 +61,7 @@
     "modelCmd": " /model"
   },
   "hookStatus": {
-    "executing": "フックを実行中"
+    "executing_other": "フックを実行中"
   },
   "detailedMessages": {
     "title": "デバッグコンソール",
@@ -94,8 +94,8 @@
     "ctrlD": "終了するにはもう一度 Ctrl+D を押してください。"
   },
   "maxSizedBox": {
-    "firstLinesHidden": "... 最初の {{count}} 行を非表示 ...",
-    "lastLinesHidden": "... 最後の {{count}} 行を非表示 ..."
+    "firstLinesHidden_other": "... 最初の {{count}} 行を非表示 ...",
+    "lastLinesHidden_other": "... 最後の {{count}} 行を非表示 ..."
   },
   "mcpStatus": {
     "noServers": "設定されている MCP サーバーはありません。",
@@ -114,9 +114,9 @@
       "blocked": "ブロック済み"
     },
     "counts": {
-      "tool": "{{count}} 個のツール",
-      "prompt": "{{count}} 個のプロンプト",
-      "resource": "{{count}} 個のリソース"
+      "tool_other": "{{count}} 個のツール",
+      "prompt_other": "{{count}} 個のプロンプト",
+      "resource_other": "{{count}} 個のリソース"
     },
     "auth": {
       "oauth": " (OAuth)",

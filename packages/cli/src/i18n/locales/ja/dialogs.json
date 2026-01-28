@@ -320,7 +320,7 @@
   },
   "askUser": {
     "reviewAnswers": "回答内容を確認してください:",
-    "unansweredQuestions": "未回答の質問が {{count}} 件あります",
+    "unansweredQuestions_other": "未回答の質問が {{count}} 件あります",
     "notAnswered": "(未回答)",
     "hintsReviewEnterConfirm": "Enter で確定",
     "hintsReviewEnterSubmit": "Enter で送信",
