@@ -2212,11 +2212,11 @@ describe('Settings Loading and Merging', () => {
       expect(loadedSettings.merged.ui?.theme).toBe('initial-theme');
 
       // Verify that calling setRemoteAdminSettings with partial data overwrites previous remote settings
-      // and missing properties revert to schema defaults.
+      // and missing properties use secure defaults (false).
       loadedSettings.setRemoteAdminSettings({ secureModeEnabled: false });
       expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true); // Reverts to default: true
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true); // Reverts to default: true
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false); // Secure default: false
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false); // Secure default: false
     });
 
     it('should correctly handle undefined remote admin settings', () => {
@@ -2242,10 +2242,10 @@ describe('Settings Loading and Merging', () => {
 
       loadedSettings.setRemoteAdminSettings({}); // Set empty remote settings
 
-      // Admin settings should revert to defaults because there are no remote overrides
+      // Admin settings should use secure defaults (false) because remote admin is active
       expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
     });
 
     it('should correctly handle missing properties in remote admin settings', () => {
@@ -2276,29 +2276,29 @@ describe('Settings Loading and Merging', () => {
         secureModeEnabled: true,
       });
 
-      // Verify secureModeEnabled is updated, others remain defaults
+      // Verify secureModeEnabled is updated, others use secure defaults (false)
       expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
 
       // Set remote settings with only mcpSetting.mcpEnabled
       loadedSettings.setRemoteAdminSettings({
         mcpSetting: { mcpEnabled: false },
       });
 
-      // Verify mcpEnabled is updated, others remain defaults (secureModeEnabled reverts to default:false)
+      // Verify mcpEnabled is updated, others use secure defaults (secureModeEnabled reverts to false)
       expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
       expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
 
       // Set remote settings with only cliFeatureSetting.extensionsSetting.extensionsEnabled
       loadedSettings.setRemoteAdminSettings({
         cliFeatureSetting: { extensionsSetting: { extensionsEnabled: false } },
       });
 
-      // Verify extensionsEnabled is updated, others remain defaults
+      // Verify extensionsEnabled is updated, others use secure defaults
       expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
     });
 
@@ -2317,6 +2317,32 @@ describe('Settings Loading and Merging', () => {
         },
       });
       expect(loadedSettings.merged.admin.skills?.enabled).toBe(false);
+    });
+
+    it('should use secure defaults (false) for all features when remote admin settings are empty', () => {
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      // When remote admin provides empty object, all features should be disabled (secure by default)
+      loadedSettings.setRemoteAdminSettings({});
+
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
+      expect(loadedSettings.merged.admin?.skills?.enabled).toBe(false);
+    });
+
+    it('should only enable explicitly provided features (secure by default)', () => {
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      // Only enable MCP, everything else should remain disabled
+      loadedSettings.setRemoteAdminSettings({
+        mcpSetting: { mcpEnabled: true },
+      });
+
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
+      expect(loadedSettings.merged.admin?.skills?.enabled).toBe(false);
     });
   });
 

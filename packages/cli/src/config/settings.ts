@@ -346,10 +346,28 @@ export class LoadedSettings {
     coreEvents.emitSettingsChanged();
   }
 
+  /**
+   * Sets remote admin settings from an admin control server.
+   *
+   * SECURITY NOTE: When remote admin settings are provided, any missing fields
+   * default to false (secure by default). This ensures that features like MCP
+   * and extensions are disabled unless explicitly enabled by the admin server.
+   *
+   * This differs from schema defaults which may have permissive defaults for
+   * local usage. Remote admin control requires explicit opt-in for security.
+   */
   setRemoteAdminSettings(remoteSettings: FetchAdminControlsResponse): void {
-    const admin: Settings['admin'] = {};
+    // Secure defaults: all features disabled unless explicitly enabled
+    const admin: Settings['admin'] = {
+      secureModeEnabled: false,
+      mcp: { enabled: false },
+      extensions: { enabled: false },
+      skills: { enabled: false },
+    };
+
     const { secureModeEnabled, mcpSetting, cliFeatureSetting } = remoteSettings;
 
+    // Override with explicitly provided values
     if (secureModeEnabled !== undefined) {
       admin.secureModeEnabled = secureModeEnabled;
     }
