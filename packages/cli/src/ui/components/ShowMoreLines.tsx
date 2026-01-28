@@ -5,6 +5,7 @@
  */
 
 import { Box, Text } from 'ink';
+import { useTranslation } from 'react-i18next';
 import { useOverflowState } from '../contexts/OverflowContext.js';
 import { useStreamingContext } from '../contexts/StreamingContext.js';
 import { StreamingState } from '../types.js';
@@ -15,6 +16,7 @@ interface ShowMoreLinesProps {
 }
 
 export const ShowMoreLines = ({ constrainHeight }: ShowMoreLinesProps) => {
+  const { t } = useTranslation('ui');
   const overflowState = useOverflowState();
   const streamingState = useStreamingContext();
 
@@ -33,7 +35,7 @@ export const ShowMoreLines = ({ constrainHeight }: ShowMoreLinesProps) => {
   return (
     <Box>
       <Text color={theme.text.secondary} wrap="truncate">
-        Press ctrl-o to show more lines
+        {t('showMoreLines.hint')}
       </Text>
     </Box>
   );

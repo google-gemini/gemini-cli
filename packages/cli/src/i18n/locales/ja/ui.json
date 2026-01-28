@@ -15,7 +15,7 @@
     "toggleHint": " ({{modKey}} で切り替え) "
   },
   "showMoreLines": {
-    "hint": "ctrl-s を押してさらに行を表示"
+    "hint": "ctrl-o を押してさらに行を表示"
   },
   "about": {
     "title": "Gemini CLI について",

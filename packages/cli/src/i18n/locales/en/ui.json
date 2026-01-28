@@ -15,7 +15,7 @@
     "toggleHint": " ({{modKey}} to toggle) "
   },
   "showMoreLines": {
-    "hint": "Press ctrl-s to show more lines"
+    "hint": "Press ctrl-o to show more lines"
   },
   "about": {
     "title": "About Gemini CLI",
