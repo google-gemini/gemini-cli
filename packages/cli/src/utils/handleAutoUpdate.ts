@@ -12,6 +12,7 @@ import type { HistoryItem } from '../ui/types.js';
 import { MessageType } from '../ui/types.js';
 import { spawnWrapper } from './spawnWrapper.js';
 import type { spawn } from 'node:child_process';
+import { t } from '../i18n/index.js';
 
 export function handleAutoUpdate(
   info: UpdateObject | null,
@@ -25,7 +26,7 @@ export function handleAutoUpdate(
 
   if (settings.merged.tools.sandbox || process.env['GEMINI_SANDBOX']) {
     updateEventEmitter.emit('update-info', {
-      message: `${info.message}\nAutomatic update is not available in sandbox mode.`,
+      message: `${info.message}\n${t('common:update.sandboxNotAvailable')}`,
     });
     return;
   }
@@ -80,18 +81,18 @@ export function handleAutoUpdate(
     if (code === 0) {
       updateEventEmitter.emit('update-success', {
         message:
-          'Update successful! The new version will be used on your next run.',
+          t('common:update.updateSuccess'),
       });
     } else {
       updateEventEmitter.emit('update-failed', {
-        message: `Automatic update failed. Please try updating manually. (command: ${updateCommand})`,
+        message: t('common:update.autoUpdateFailedCommand', { command: updateCommand }),
       });
     }
   });
 
   updateProcess.on('error', (err) => {
     updateEventEmitter.emit('update-failed', {
-      message: `Automatic update failed. Please try updating manually. (error: ${err.message})`,
+      message: t('common:update.autoUpdateFailedError', { error: err.message }),
     });
   });
   return updateProcess;
@@ -124,7 +125,7 @@ export function setUpdateHandler(
     addItem(
       {
         type: MessageType.ERROR,
-        text: `Automatic update failed. Please try updating manually`,
+        text: t('common:update.autoUpdateFailed'),
       },
       Date.now(),
     );
@@ -136,7 +137,7 @@ export function setUpdateHandler(
     addItem(
       {
         type: MessageType.INFO,
-        text: `Update successful! The new version will be used on your next run.`,
+        text: t('common:update.updateSuccess'),
       },
       Date.now(),
     );
