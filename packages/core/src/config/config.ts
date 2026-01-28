@@ -328,6 +328,7 @@ export interface ConfigParameters {
     enableFuzzySearch?: boolean;
     maxFileCount?: number;
     searchTimeout?: number;
+    customIgnoreFilePaths?: string[];
   };
   checkpointing?: boolean;
   proxy?: string;
@@ -465,6 +466,7 @@ export class Config {
     enableFuzzySearch: boolean;
     maxFileCount: number;
     searchTimeout: number;
+    customIgnoreFilePaths: string[];
   };
   private fileDiscoveryService: FileDiscoveryService | null = null;
   private gitService: GitService | undefined = undefined;
@@ -631,6 +633,7 @@ export class Config {
         params.fileFiltering?.searchTimeout ??
         DEFAULT_FILE_FILTERING_OPTIONS.searchTimeout ??
         5000,
+      customIgnoreFilePaths: params.fileFiltering?.customIgnoreFilePaths ?? [],
     };
     this.checkpointing = params.checkpointing ?? false;
     this.proxy = params.proxy;
@@ -644,7 +647,7 @@ export class Config {
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? false;
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
-    this.skillsSupport = params.skillsSupport ?? false;
+    this.skillsSupport = params.skillsSupport ?? true;
     this.disabledSkills = params.disabledSkills ?? [];
     this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
     this.modelAvailabilityService = new ModelAvailabilityService();
@@ -1528,8 +1531,13 @@ export class Config {
   getFileFilteringRespectGitIgnore(): boolean {
     return this.fileFiltering.respectGitIgnore;
   }
+
   getFileFilteringRespectGeminiIgnore(): boolean {
     return this.fileFiltering.respectGeminiIgnore;
+  }
+
+  getCustomIgnoreFilePaths(): string[] {
+    return this.fileFiltering.customIgnoreFilePaths;
   }
 
   getFileFilteringOptions(): FileFilteringOptions {
@@ -1538,6 +1546,7 @@ export class Config {
       respectGeminiIgnore: this.fileFiltering.respectGeminiIgnore,
       maxFileCount: this.fileFiltering.maxFileCount,
       searchTimeout: this.fileFiltering.searchTimeout,
+      customIgnoreFilePaths: this.fileFiltering.customIgnoreFilePaths,
     };
   }
 
@@ -1574,7 +1583,11 @@ export class Config {
 
   getFileService(): FileDiscoveryService {
     if (!this.fileDiscoveryService) {
-      this.fileDiscoveryService = new FileDiscoveryService(this.targetDir);
+      this.fileDiscoveryService = new FileDiscoveryService(this.targetDir, {
+        respectGitIgnore: this.fileFiltering.respectGitIgnore,
+        respectGeminiIgnore: this.fileFiltering.respectGeminiIgnore,
+        customIgnoreFilePaths: this.fileFiltering.customIgnoreFilePaths,
+      });
     }
     return this.fileDiscoveryService;
   }

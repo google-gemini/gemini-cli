@@ -15,6 +15,7 @@ import {
   StandardFileSystemService,
   ToolRegistry,
   COMMON_IGNORE_PATTERNS,
+  GEMINI_IGNORE_FILE_NAME,
   // DEFAULT_FILE_EXCLUDES,
 } from '@google/gemini-cli-core';
 import * as core from '@google/gemini-cli-core';
@@ -628,7 +629,7 @@ describe('handleAtCommand', () => {
   describe('gemini-ignore filtering', () => {
     it('should skip gemini-ignored files in @ commands', async () => {
       await createTestFile(
-        path.join(testRootDir, '.geminiignore'),
+        path.join(testRootDir, GEMINI_IGNORE_FILE_NAME),
         'build/output.js',
       );
       const geminiIgnoredFile = await createTestFile(
@@ -659,7 +660,7 @@ describe('handleAtCommand', () => {
   });
   it('should process non-ignored files when .geminiignore is present', async () => {
     await createTestFile(
-      path.join(testRootDir, '.geminiignore'),
+      path.join(testRootDir, GEMINI_IGNORE_FILE_NAME),
       'build/output.js',
     );
     const validFile = await createTestFile(
@@ -690,7 +691,7 @@ describe('handleAtCommand', () => {
 
   it('should handle mixed gemini-ignored and valid files', async () => {
     await createTestFile(
-      path.join(testRootDir, '.geminiignore'),
+      path.join(testRootDir, GEMINI_IGNORE_FILE_NAME),
       'dist/bundle.js',
     );
     const validFile = await createTestFile(

@@ -21,6 +21,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import type { Config } from '../config/config.js';
 import { Storage } from '../config/storage.js';
+import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import type { ChildProcess } from 'node:child_process';
 import { spawn } from 'node:child_process';
@@ -247,7 +248,17 @@ describe('RipGrepTool', () => {
   let ripgrepBinaryPath: string;
   let grepTool: RipGrepTool;
   const abortSignal = new AbortController().signal;
-  let mockConfig: Config;
+
+  let mockConfig = {
+    getTargetDir: () => tempRootDir,
+    getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
+    getDebugMode: () => false,
+    getFileFilteringRespectGeminiIgnore: () => true,
+    getFileFilteringOptions: () => ({
+      respectGitIgnore: true,
+      respectGeminiIgnore: true,
+    }),
+  } as unknown as Config;
 
   beforeEach(async () => {
     downloadRipGrepMock.mockReset();
@@ -267,6 +278,10 @@ describe('RipGrepTool', () => {
       getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
       getDebugMode: () => false,
       getFileFilteringRespectGeminiIgnore: () => true,
+      getFileFilteringOptions: () => ({
+        respectGitIgnore: true,
+        respectGeminiIgnore: true,
+      }),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
       },
@@ -668,6 +683,57 @@ describe('RipGrepTool', () => {
       expect(result.returnDisplay).toContain('(limited)');
     }, 10000);
 
+    it('should filter out files based on FileDiscoveryService even if ripgrep returns them', async () => {
+      // Create .geminiignore to ignore 'ignored.txt'
+      await fs.writeFile(
+        path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME),
+        'ignored.txt',
+      );
+
+      // Re-initialize tool so FileDiscoveryService loads the new .geminiignore
+      const toolWithIgnore = new RipGrepTool(
+        mockConfig,
+        createMockMessageBus(),
+      );
+
+      // Mock ripgrep returning both an ignored file and an allowed file
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'ignored.txt' },
+                line_number: 1,
+                lines: { text: 'should be ignored\n' },
+              },
+            }) +
+            '\n' +
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'allowed.txt' },
+                line_number: 1,
+                lines: { text: 'should be kept\n' },
+              },
+            }) +
+            '\n',
+          exitCode: 0,
+        }),
+      );
+
+      const params: RipGrepToolParams = { pattern: 'should' };
+      const invocation = toolWithIgnore.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      // Verify ignored file is filtered out
+      expect(result.llmContent).toContain('allowed.txt');
+      expect(result.llmContent).toContain('should be kept');
+      expect(result.llmContent).not.toContain('ignored.txt');
+      expect(result.llmContent).not.toContain('should be ignored');
+      expect(result.returnDisplay).toContain('Found 1 match');
+    });
+
     it('should handle regex special characters correctly', async () => {
       // Setup specific mock for this test - regex pattern 'foo.*bar' should match 'const foo = "bar";'
       mockSpawn.mockImplementationOnce(
@@ -779,6 +845,10 @@ describe('RipGrepTool', () => {
           createMockWorkspaceContext(tempRootDir, [secondDir]),
         getDebugMode: () => false,
         getFileFilteringRespectGeminiIgnore: () => true,
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+        }),
         storage: {
           getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
         },
@@ -887,6 +957,10 @@ describe('RipGrepTool', () => {
           createMockWorkspaceContext(tempRootDir, [secondDir]),
         getDebugMode: () => false,
         getFileFilteringRespectGeminiIgnore: () => true,
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+        }),
         storage: {
           getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
         },
@@ -1404,13 +1478,17 @@ describe('RipGrepTool', () => {
     });
 
     it('should add .geminiignore when enabled and patterns exist', async () => {
-      const geminiIgnorePath = path.join(tempRootDir, '.geminiignore');
+      const geminiIgnorePath = path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME);
       await fs.writeFile(geminiIgnorePath, 'ignored.log');
       const configWithGeminiIgnore = {
         getTargetDir: () => tempRootDir,
         getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
         getDebugMode: () => false,
         getFileFilteringRespectGeminiIgnore: () => true,
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+        }),
         storage: {
           getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
         },
@@ -1465,13 +1543,17 @@ describe('RipGrepTool', () => {
     });
 
     it('should skip .geminiignore when disabled', async () => {
-      const geminiIgnorePath = path.join(tempRootDir, '.geminiignore');
+      const geminiIgnorePath = path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME);
       await fs.writeFile(geminiIgnorePath, 'ignored.log');
       const configWithoutGeminiIgnore = {
         getTargetDir: () => tempRootDir,
         getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
         getDebugMode: () => false,
         getFileFilteringRespectGeminiIgnore: () => false,
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: false,
+        }),
         storage: {
           getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
         },
@@ -1618,6 +1700,10 @@ describe('RipGrepTool', () => {
         getWorkspaceContext: () =>
           createMockWorkspaceContext(tempRootDir, ['/another/dir']),
         getDebugMode: () => false,
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+        }),
         storage: {
           getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
         },

@@ -7,7 +7,8 @@
       { "label": "Installation", "slug": "docs/get-started/installation" },
       { "label": "Authentication", "slug": "docs/get-started/authentication" },
       { "label": "Examples", "slug": "docs/get-started/examples" },
-      { "label": "Gemini 3 (preview)", "slug": "docs/get-started/gemini-3" }
+      { "label": "Gemini 3 (preview)", "slug": "docs/get-started/gemini-3" },
+      { "label": "CLI Reference", "slug": "docs/cli/cli-reference" }
     ]
   },
   {
@@ -77,7 +78,7 @@
   {
     "label": "Ecosystem and extensibility",
     "items": [
-      { "label": "Agent skills (experimental)", "slug": "docs/cli/skills" },
+      { "label": "Agent skills", "slug": "docs/cli/skills" },
       {
         "label": "Sub-agents (experimental)",
         "slug": "docs/core/subagents"
@@ -86,7 +87,7 @@
         "label": "Remote subagents (experimental)",
         "slug": "docs/core/remote-agents"
       },
-      { "label": "Hooks (experimental)", "slug": "docs/hooks" },
+      { "label": "Hooks", "slug": "docs/hooks" },
       { "label": "IDE integration", "slug": "docs/ide-integration" },
       { "label": "MCP servers", "slug": "docs/tools/mcp-server" }
     ]
