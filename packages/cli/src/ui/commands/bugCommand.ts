@@ -11,6 +11,7 @@ import {
   type SlashCommand,
   CommandKind,
 } from './types.js';
+import { t } from '../../i18n/index.js';
 import { MessageType } from '../types.js';
 import { GIT_COMMIT_INFO } from '../../generated/git-commit.js';
 import { formatBytes } from '../utils/formatters.js';
@@ -35,42 +36,45 @@ export const bugCommand: SlashCommand = {
     const { config } = context.services;
 
     const osVersion = `${process.platform} ${process.version}`;
-    let sandboxEnv = 'no sandbox';
+    let sandboxEnv = t('commands:bug.responses.noSandbox');
     if (process.env['SANDBOX'] && process.env['SANDBOX'] !== 'sandbox-exec') {
       sandboxEnv = process.env['SANDBOX'].replace(/^gemini-(?:code-)?/, '');
     } else if (process.env['SANDBOX'] === 'sandbox-exec') {
       sandboxEnv = `sandbox-exec (${
-        process.env['SEATBELT_PROFILE'] || 'unknown'
+        process.env['SEATBELT_PROFILE'] || t('commands:bug.responses.unknown')
       })`;
     }
-    const modelVersion = config?.getModel() || 'Unknown';
+    const modelVersion =
+      config?.getModel() || t('commands:bug.responses.unknown');
     const cliVersion = await getVersion();
     const memoryUsage = formatBytes(process.memoryUsage().rss);
     const ideClient = await getIdeClientName(context);
     const terminalName =
-      terminalCapabilityManager.getTerminalName() || 'Unknown';
+      terminalCapabilityManager.getTerminalName() ||
+      t('commands:bug.responses.unknown');
     const terminalBgColor =
-      terminalCapabilityManager.getTerminalBackgroundColor() || 'Unknown';
+      terminalCapabilityManager.getTerminalBackgroundColor() ||
+      t('commands:bug.responses.unknown');
     const kittyProtocol = terminalCapabilityManager.isKittyProtocolEnabled()
-      ? 'Supported'
-      : 'Unsupported';
+      ? t('commands:bug.responses.supported')
+      : t('commands:bug.responses.unsupported');
     const authType = config?.getContentGeneratorConfig()?.authType || 'Unknown';
 
-    let info = `
-* **CLI Version:** ${cliVersion}
-* **Git Commit:** ${GIT_COMMIT_INFO}
-* **Session ID:** ${sessionId}
-* **Operating System:** ${osVersion}
-* **Sandbox Environment:** ${sandboxEnv}
-* **Model Version:** ${modelVersion}
-* **Auth Type:** ${authType}
-* **Memory Usage:** ${memoryUsage}
-* **Terminal Name:** ${terminalName}
-* **Terminal Background:** ${terminalBgColor}
-* **Kitty Keyboard Protocol:** ${kittyProtocol}
-`;
+    let info = t('commands:bug.responses.info', {
+      cliVersion,
+      gitCommit: GIT_COMMIT_INFO,
+      sessionId,
+      os: osVersion,
+      sandbox: sandboxEnv,
+      model: modelVersion,
+      authType: authType,
+      memory: memoryUsage,
+      terminalName,
+      terminalBg: terminalBgColor,
+      kitty: kittyProtocol,
+    });
     if (ideClient) {
-      info += `* **IDE Client:** ${ideClient}\n`;
+      info += t('commands:bug.responses.ideClient', { client: ideClient });
     }
 
     const chat = config?.getGeminiClient()?.getChat();
@@ -85,8 +89,11 @@ export const bugCommand: SlashCommand = {
         const historyFilePath = path.join(tempDir, historyFileName);
         try {
           await exportHistoryToFile({ history, filePath: historyFilePath });
-          historyFileMessage = `\n\n--------------------------------------------------------------------------------\n\n📄 **Chat History Exported**\nTo help us debug, we've exported your current chat history to:\n${historyFilePath}\n\nPlease consider attaching this file to your GitHub issue if you feel comfortable doing so.\n\n**Privacy Disclaimer:** Please do not upload any logs containing sensitive or private information that you are not comfortable sharing publicly.`;
-          problemValue += `\n\n[ACTION REQUIRED] 📎 PLEASE ATTACH THE EXPORTED CHAT HISTORY JSON FILE TO THIS ISSUE IF YOU FEEL COMFORTABLE SHARING IT.`;
+          historyFileMessage =
+            t('commands:bug.responses.historyHeader', {
+              path: historyFilePath,
+            }) + t('commands:bug.responses.historyFooter');
+          problemValue += t('commands:bug.responses.actionRequired');
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : String(err);
           debugLogger.error(
@@ -112,7 +119,10 @@ export const bugCommand: SlashCommand = {
     context.ui.addItem(
       {
         type: MessageType.INFO,
-        text: `To submit your bug report, please open the following URL in your browser:\n${bugReportUrl}${historyFileMessage}`,
+        text: t('commands:bug.responses.submitUrl', {
+          url: bugReportUrl,
+          message: historyFileMessage,
+        }),
       },
       Date.now(),
     );
@@ -125,7 +135,7 @@ export const bugCommand: SlashCommand = {
       context.ui.addItem(
         {
           type: MessageType.ERROR,
-          text: `Could not open URL in browser: ${errorMessage}`,
+          text: t('commands:bug.responses.openFailed', { error: errorMessage }),
         },
         Date.now(),
       );

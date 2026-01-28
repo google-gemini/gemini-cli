@@ -236,5 +236,18 @@
     "accessError": "パスへのアクセス中にエラーが発生しました: {{path}}。{{error}}",
     "missingSubcommand": "/permissions のサブコマンドを指定してください。使用法: /permissions trust [<ディレクトリパス>]",
     "invalidSubcommand": "/permissions のサブコマンドが無効です: {{subcommand}}。使用法: /permissions trust [<ディレクトリパス>]"
+  },
+  "bug.responses": {
+    "noSandbox": "サンドボックスなし",
+    "unknown": "不明",
+    "supported": "対応",
+    "unsupported": "未対応",
+    "info": "\n* **CLI バージョン:** {{cliVersion}}\n* **Git コミット:** {{gitCommit}}\n* **セッション ID:** {{sessionId}}\n* **OS:** {{os}}\n* **サンドボックス環境:** {{sandbox}}\n* **モデル バージョン:** {{model}}\n* **認証方式:** {{authType}}\n* **メモリ使用量:** {{memory}}\n* **ターミナル名:** {{terminalName}}\n* **ターミナル背景色:** {{terminalBg}}\n* **Kitty キーボードプロトコル:** {{kitty}}",
+    "ideClient": "\n* **IDE クライアント:** {{client}}",
+    "historyHeader": "\n\n--------------------------------------------------------------------------------\n\n📄 **チャット履歴をエクスポートしました**\nデバッグに役立てるため、現在のチャット履歴を以下にエクスポートしました:\n{{path}}",
+    "historyFooter": "\n\nGitHub の issue を作成する際、差し支えなければこのファイルを添付してください。\n\n**プライバシーに関する免責事項:** 公開したくない機密情報や個人情報を含むログはアップロードしないでください。",
+    "actionRequired": "\n\n[要対応] 📎 差し支えなければ、エクスポートされたチャット履歴の JSON ファイルをこの issue に添付してください。",
+    "submitUrl": "バグレポートを送信するには、ブラウザで以下の URL を開いてください:\n{{url}}{{message}}",
+    "openFailed": "ブラウザで URL を開けませんでした: {{error}}"
   }
 }

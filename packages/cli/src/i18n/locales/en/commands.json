@@ -241,5 +241,18 @@
     "accessError": "Error accessing path: {{path}}. {{error}}",
     "missingSubcommand": "Please provide a subcommand for /permissions. Usage: /permissions trust [<directory-path>]",
     "invalidSubcommand": "Invalid subcommand for /permissions: {{subcommand}}. Usage: /permissions trust [<directory-path>]"
+  },
+  "bug.responses": {
+    "noSandbox": "no sandbox",
+    "unknown": "Unknown",
+    "supported": "Supported",
+    "unsupported": "Unsupported",
+    "info": "\n* **CLI Version:** {{cliVersion}}\n* **Git Commit:** {{gitCommit}}\n* **Session ID:** {{sessionId}}\n* **Operating System:** {{os}}\n* **Sandbox Environment:** {{sandbox}}\n* **Model Version:** {{model}}\n* **Auth Type:** {{authType}}\n* **Memory Usage:** {{memory}}\n* **Terminal Name:** {{terminalName}}\n* **Terminal Background:** {{terminalBg}}\n* **Kitty Keyboard Protocol:** {{kitty}}",
+    "ideClient": "\n* **IDE Client:** {{client}}",
+    "historyHeader": "\n\n--------------------------------------------------------------------------------\n\n📄 **Chat History Exported**\nTo help us debug, we've exported your current chat history to:\n{{path}}",
+    "historyFooter": "\n\nPlease consider attaching this file to your GitHub issue if you feel comfortable doing so.\n\n**Privacy Disclaimer:** Please do not upload any logs containing sensitive or private information that you are not comfortable sharing publicly.",
+    "actionRequired": "\n\n[ACTION REQUIRED] 📎 PLEASE ATTACH THE EXPORTED CHAT HISTORY JSON FILE TO THIS ISSUE IF YOU FEEL COMFORTABLE SHARING IT.",
+    "submitUrl": "To submit your bug report, please open the following URL in your browser:\n{{url}}{{message}}",
+    "openFailed": "Could not open URL in browser: {{error}}"
   }
 }
