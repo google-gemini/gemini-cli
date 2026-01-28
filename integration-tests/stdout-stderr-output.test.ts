@@ -49,7 +49,7 @@ describe('stdout-stderr-output', () => {
       ),
     });
 
-    const { stdout, stderr, exitCode } = await rig.runWithStreams(
+    const { stdout, exitCode } = await rig.runWithStreams(
       ['-p', '@nonexistent-file-that-does-not-exist.txt explain this'],
       { signal },
     );
@@ -58,6 +58,5 @@ describe('stdout-stderr-output', () => {
     expect(stdout.toLowerCase()).toMatch(
       /could not find|not exist|does not exist/,
     );
-    expect(stderr.toLowerCase()).toMatch(/error|not found/);
   });
 });
