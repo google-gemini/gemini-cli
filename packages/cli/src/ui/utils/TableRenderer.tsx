@@ -124,14 +124,16 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
 
     return (
       <Text color={theme.text.primary}>
-        │{' '}
+        <Text color={theme.border.default}>│</Text>{' '}
         {renderedCells.map((cell, index) => (
           <React.Fragment key={index}>
             {cell}
-            {index < renderedCells.length - 1 ? ' │ ' : ''}
+            {index < renderedCells.length - 1 && (
+              <Text color={theme.border.default}>{' │ '}</Text>
+            )}
           </React.Fragment>
         ))}{' '}
-        │
+        <Text color={theme.border.default}>│</Text>
       </Text>
     );
   };
