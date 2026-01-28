@@ -281,5 +281,21 @@
   "init.responses": {
     "configFailed": "設定を利用できません。",
     "created": "空の GEMINI.md を作成しました。プロジェクトを分析して内容を生成しています。"
+  },
+  "policies.responses": {
+    "configFailed": "エラー: 設定が読み込まれていません。",
+    "noPolicies": "アクティブなポリシーはありません。",
+    "activePoliciesTitle": "**アクティブなポリシー**\n\n",
+    "normalModeTitle": "通常モードのポリシー",
+    "autoEditModeTitle": "自動編集モードのポリシー（通常モードのポリシーも適用されます）",
+    "yoloModeTitle": "YOLO モードのポリシー（通常モードのポリシーも適用されます）",
+    "noPoliciesLabel": "_ポリシーなし_",
+    "labels": {
+      "allTools": "すべてのツール",
+      "tool": "ツール: `{{name}}`",
+      "argsMatch": " (引数一致: `{{pattern}}`)",
+      "priority": " [優先度: {{priority}}]",
+      "source": " [ソース: {{source}}]"
+    }
   }
 }

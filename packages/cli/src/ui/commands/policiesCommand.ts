@@ -6,6 +6,7 @@
 
 import { ApprovalMode, type PolicyRule } from '@google/gemini-cli-core';
 import { CommandKind, type SlashCommand } from './types.js';
+import { t } from '../../i18n/index.js';
 import { MessageType } from '../types.js';
 
 interface CategorizedRules {
@@ -33,14 +34,36 @@ const categorizeRulesByMode = (
   return result;
 };
 
-const formatRule = (rule: PolicyRule, i: number) =>
-  `${i + 1}. **${rule.decision.toUpperCase()}** ${rule.toolName ? `tool: \`${rule.toolName}\`` : 'all tools'}` +
-  (rule.argsPattern ? ` (args match: \`${rule.argsPattern.source}\`)` : '') +
-  (rule.priority !== undefined ? ` [Priority: ${rule.priority}]` : '') +
-  (rule.source ? ` [Source: ${rule.source}]` : '');
+const formatRule = (rule: PolicyRule, i: number) => {
+  let ruleText = `${i + 1}. **${rule.decision.toUpperCase()}** `;
+  ruleText += rule.toolName
+    ? t('commands:policies.responses.labels.tool', { name: rule.toolName })
+    : t('commands:policies.responses.labels.allTools');
+
+  if (rule.argsPattern) {
+    ruleText += t('commands:policies.responses.labels.argsMatch', {
+      pattern: rule.argsPattern.source,
+    });
+  }
+  if (rule.priority !== undefined) {
+    ruleText += t('commands:policies.responses.labels.priority', {
+      priority: rule.priority,
+    });
+  }
+  if (rule.source) {
+    ruleText += t('commands:policies.responses.labels.source', {
+      source: rule.source,
+    });
+  }
+  return ruleText;
+};
 
 const formatSection = (title: string, rules: PolicyRule[]) =>
-  `### ${title}\n${rules.length ? rules.map(formatRule).join('\n') : '_No policies._'}\n\n`;
+  `### ${title}\n${
+    rules.length
+      ? rules.map(formatRule).join('\n')
+      : t('commands:policies.responses.noPoliciesLabel')
+  }\n\n`;
 
 const listPoliciesCommand: SlashCommand = {
   name: 'list',
@@ -53,7 +76,7 @@ const listPoliciesCommand: SlashCommand = {
       context.ui.addItem(
         {
           type: MessageType.ERROR,
-          text: 'Error: Config not available.',
+          text: t('commands:policies.responses.configFailed'),
         },
         Date.now(),
       );
@@ -67,7 +90,7 @@ const listPoliciesCommand: SlashCommand = {
       context.ui.addItem(
         {
           type: MessageType.INFO,
-          text: 'No active policies.',
+          text: t('commands:policies.responses.noPolicies'),
         },
         Date.now(),
       );
@@ -83,14 +106,17 @@ const listPoliciesCommand: SlashCommand = {
       (rule) => !normalRulesSet.has(rule),
     );
 
-    let content = '**Active Policies**\n\n';
-    content += formatSection('Normal Mode Policies', categorized.normal);
+    let content = t('commands:policies.responses.activePoliciesTitle');
     content += formatSection(
-      'Auto Edit Mode Policies (combined with normal mode policies)',
+      t('commands:policies.responses.normalModeTitle'),
+      categorized.normal,
+    );
+    content += formatSection(
+      t('commands:policies.responses.autoEditModeTitle'),
       uniqueAutoEdit,
     );
     content += formatSection(
-      'Yolo Mode Policies (combined with normal mode policies)',
+      t('commands:policies.responses.yoloModeTitle'),
       uniqueYolo,
     );
 

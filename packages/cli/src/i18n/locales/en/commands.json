@@ -287,5 +287,21 @@
   "init.responses": {
     "configFailed": "Configuration not available.",
     "created": "Empty GEMINI.md created. Now analyzing the project to populate it."
+  },
+  "policies.responses": {
+    "configFailed": "Error: Config not available.",
+    "noPolicies": "No active policies.",
+    "activePoliciesTitle": "**Active Policies**\n\n",
+    "normalModeTitle": "Normal Mode Policies",
+    "autoEditModeTitle": "Auto Edit Mode Policies (combined with normal mode policies)",
+    "yoloModeTitle": "Yolo Mode Policies (combined with normal mode policies)",
+    "noPoliciesLabel": "_No policies._",
+    "labels": {
+      "allTools": "all tools",
+      "tool": "tool: `{{name}}`",
+      "argsMatch": " (args match: `{{pattern}}`)",
+      "priority": " [Priority: {{priority}}]",
+      "source": " [Source: {{source}}]"
+    }
   }
 }
