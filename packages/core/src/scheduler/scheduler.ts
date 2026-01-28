@@ -510,3 +510,21 @@ export class Scheduler {
     }
   }
 }
+
+/**
+ * A convenience function to execute a single tool call using the Scheduler.
+ */
+export async function executeToolCall(
+  config: Config,
+  request: ToolCallRequestInfo,
+  signal: AbortSignal,
+): Promise<CompletedToolCall> {
+  const scheduler = new Scheduler({
+    config,
+    messageBus: config.getMessageBus(),
+    getPreferredEditor: () => undefined,
+    schedulerId: 'root-non-interactive',
+  });
+  const results = await scheduler.schedule(request, signal);
+  return results[0];
+}
