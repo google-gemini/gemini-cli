@@ -5,6 +5,7 @@
  */
 
 import { Box, Text } from 'ink';
+import { useTranslation } from 'react-i18next';
 import { IdeIntegrationNudge } from '../IdeIntegrationNudge.js';
 import { LoopDetectionConfirmation } from './LoopDetectionConfirmation.js';
 import { FolderTrustDialog } from './FolderTrustDialog.js';
@@ -47,6 +48,7 @@ export const DialogManager = ({
   addItem,
   terminalWidth,
 }: DialogManagerProps) => {
+  const { t } = useTranslation('dialogs');
   const config = useConfig();
   const settings = useSettings();
 
@@ -222,7 +224,7 @@ export const DialogManager = ({
     return (
       <AuthInProgress
         onTimeout={() => {
-          uiActions.onAuthError('Authentication cancelled.');
+          uiActions.onAuthError(t('auth.errors.cancelled'));
         }}
       />
     );

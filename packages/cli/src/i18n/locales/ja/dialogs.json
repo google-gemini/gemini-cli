@@ -14,7 +14,8 @@
       "vertexAI": "Vertex AI"
     },
     "errors": {
-      "authRequired": "続行するには認証方法を選択してください。Ctrl+Cを2回押すと終了します。"
+      "authRequired": "続行するには認証方法を選択してください。Ctrl+Cを2回押すと終了します。",
+      "cancelled": "認証がキャンセルされました。"
     }
   },
   "settings": {
