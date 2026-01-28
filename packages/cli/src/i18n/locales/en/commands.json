@@ -208,5 +208,19 @@
     "noInstaller": "No installer is available for {{name}}. Please install the '{{extension}}' extension manually from the marketplace.",
     "installing": "Installing IDE companion...",
     "autoEnableFailed": "Failed to automatically enable IDE integration. To fix this, run the CLI in a new terminal window."
+  },
+  "agents.responses": {
+    "configNotLoaded": "Config not loaded.",
+    "registryNotFound": "Agent registry not found.",
+    "usageEnable": "Usage: /agents enable <agent-name>",
+    "alreadyEnabled": "Agent '{{name}}' is already enabled.",
+    "notFound": "Agent '{{name}}' not found.",
+    "enabling": "Enabling {{name}}...",
+    "usageDisable": "Usage: /agents disable <agent-name>",
+    "alreadyDisabled": "Agent '{{name}}' is already disabled.",
+    "disabling": "Disabling {{name}}...",
+    "usageConfig": "Usage: /agents config <agent-name>",
+    "refreshing": "Refreshing agent registry...",
+    "refreshSuccess": "Agents refreshed successfully."
   }
 }

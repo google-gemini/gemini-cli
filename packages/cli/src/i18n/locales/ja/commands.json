@@ -203,5 +203,19 @@
     "noInstaller": "{{name}} 用のインストーラーは利用できません。マーケットプレイスから '{{extension}}' 拡張機能を手動でインストールしてください。",
     "installing": "IDE コンパニオンをインストール中...",
     "autoEnableFailed": "IDE 連携の自動有効化に失敗しました。これを修正するには、新しいターミナルウィンドウで CLI を実行してください。"
+  },
+  "agents.responses": {
+    "configNotLoaded": "設定が読み込まれていません。",
+    "registryNotFound": "エージェントレジストリが見つかりませんでした。",
+    "usageEnable": "使用法: /agents enable <エージェント名>",
+    "alreadyEnabled": "エージェント '{{name}}' は既に有効です。",
+    "notFound": "エージェント '{{name}}' が見つかりませんでした。",
+    "enabling": "{{name}} を有効にしています...",
+    "usageDisable": "使用法: /agents disable <エージェント名>",
+    "alreadyDisabled": "エージェント '{{name}}' は既に無効です。",
+    "disabling": "{{name}} を無効にしています...",
+    "usageConfig": "使用法: /agents config <エージェント名>",
+    "refreshing": "エージェントレジストリを更新中...",
+    "refreshSuccess": "エージェントを正常に更新しました。"
   }
 }

@@ -10,6 +10,7 @@ import type {
   SlashCommandActionReturn,
 } from './types.js';
 import { CommandKind } from './types.js';
+import { t } from '../../i18n/index.js';
 import { MessageType, type HistoryItemAgentsList } from '../types.js';
 import { SettingScope } from '../../config/settings.js';
 import { disableAgent, enableAgent } from '../../utils/agentSettings.js';
@@ -26,7 +27,7 @@ const agentsListCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Config not loaded.',
+        content: t('commands:agents.responses.configNotLoaded'),
       };
     }
 
@@ -35,7 +36,7 @@ const agentsListCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Agent registry not found.',
+        content: t('commands:agents.responses.registryNotFound'),
       };
     }
 
@@ -66,7 +67,7 @@ async function enableAction(
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Config not loaded.',
+      content: t('commands:agents.responses.configNotLoaded'),
     };
   }
 
@@ -75,7 +76,7 @@ async function enableAction(
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Usage: /agents enable <agent-name>',
+      content: t('commands:agents.responses.usageEnable'),
     };
   }
 
@@ -84,7 +85,7 @@ async function enableAction(
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Agent registry not found.',
+      content: t('commands:agents.responses.registryNotFound'),
     };
   }
 
@@ -98,7 +99,9 @@ async function enableAction(
     return {
       type: 'message',
       messageType: 'info',
-      content: `Agent '${agentName}' is already enabled.`,
+      content: t('commands:agents.responses.alreadyEnabled', {
+        name: agentName,
+      }),
     };
   }
 
@@ -106,7 +109,7 @@ async function enableAction(
     return {
       type: 'message',
       messageType: 'error',
-      content: `Agent '${agentName}' not found.`,
+      content: t('commands:agents.responses.notFound', { name: agentName }),
     };
   }
 
@@ -122,7 +125,7 @@ async function enableAction(
 
   context.ui.addItem({
     type: MessageType.INFO,
-    text: `Enabling ${agentName}...`,
+    text: t('commands:agents.responses.enabling', { name: agentName }),
   });
   await agentRegistry.reload();
 
@@ -142,7 +145,7 @@ async function disableAction(
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Config not loaded.',
+      content: t('commands:agents.responses.configNotLoaded'),
     };
   }
 
@@ -151,7 +154,7 @@ async function disableAction(
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Usage: /agents disable <agent-name>',
+      content: t('commands:agents.responses.usageDisable'),
     };
   }
 
@@ -160,7 +163,7 @@ async function disableAction(
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Agent registry not found.',
+      content: t('commands:agents.responses.registryNotFound'),
     };
   }
 
@@ -174,7 +177,9 @@ async function disableAction(
     return {
       type: 'message',
       messageType: 'info',
-      content: `Agent '${agentName}' is already disabled.`,
+      content: t('commands:agents.responses.alreadyDisabled', {
+        name: agentName,
+      }),
     };
   }
 
@@ -182,7 +187,7 @@ async function disableAction(
     return {
       type: 'message',
       messageType: 'error',
-      content: `Agent '${agentName}' not found.`,
+      content: t('commands:agents.responses.notFound', { name: agentName }),
     };
   }
 
@@ -201,7 +206,7 @@ async function disableAction(
 
   context.ui.addItem({
     type: MessageType.INFO,
-    text: `Disabling ${agentName}...`,
+    text: t('commands:agents.responses.disabling', { name: agentName }),
   });
   await agentRegistry.reload();
 
@@ -221,7 +226,7 @@ async function configAction(
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Config not loaded.',
+      content: t('commands:agents.responses.configNotLoaded'),
     };
   }
 
@@ -230,7 +235,7 @@ async function configAction(
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Usage: /agents config <agent-name>',
+      content: t('commands:agents.responses.usageConfig'),
     };
   }
 
@@ -239,7 +244,7 @@ async function configAction(
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Agent registry not found.',
+      content: t('commands:agents.responses.registryNotFound'),
     };
   }
 
@@ -248,7 +253,7 @@ async function configAction(
     return {
       type: 'message',
       messageType: 'error',
-      content: `Agent '${agentName}' not found.`,
+      content: t('commands:agents.responses.notFound', { name: agentName }),
     };
   }
 
@@ -333,13 +338,13 @@ const agentsRefreshCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Agent registry not found.',
+        content: t('commands:agents.responses.registryNotFound'),
       };
     }
 
     context.ui.addItem({
       type: MessageType.INFO,
-      text: 'Refreshing agent registry...',
+      text: t('commands:agents.responses.refreshing'),
     });
 
     await agentRegistry.reload();
@@ -347,7 +352,7 @@ const agentsRefreshCommand: SlashCommand = {
     return {
       type: 'message',
       messageType: 'info',
-      content: 'Agents refreshed successfully.',
+      content: t('commands:agents.responses.refreshSuccess'),
     };
   },
 };
