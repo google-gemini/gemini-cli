@@ -6,6 +6,7 @@
 
 import { Box, Text } from 'ink';
 import type React from 'react';
+import { useTranslation } from 'react-i18next';
 import { theme } from '../../semantic-colors.js';
 import type { AgentDefinitionJson } from '../../types.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
@@ -19,13 +20,14 @@ export const AgentsStatus: React.FC<AgentsStatusProps> = ({
   agents,
   terminalWidth,
 }) => {
+  const { t } = useTranslation('ui');
   const localAgents = agents.filter((a) => a.kind === 'local');
   const remoteAgents = agents.filter((a) => a.kind === 'remote');
 
   if (agents.length === 0) {
     return (
       <Box flexDirection="column" marginBottom={1}>
-        <Text>No agents available.</Text>
+        <Text>{t('agentsStatus.noAgents')}</Text>
       </Box>
     );
   }
@@ -65,9 +67,9 @@ export const AgentsStatus: React.FC<AgentsStatusProps> = ({
 
   return (
     <Box flexDirection="column" marginBottom={1}>
-      {renderAgentList('Local Agents', localAgents)}
+      {renderAgentList(t('agentsStatus.localAgents'), localAgents)}
       {localAgents.length > 0 && remoteAgents.length > 0 && <Box height={1} />}
-      {renderAgentList('Remote Agents', remoteAgents)}
+      {renderAgentList(t('agentsStatus.remoteAgents'), remoteAgents)}
     </Box>
   );
 };

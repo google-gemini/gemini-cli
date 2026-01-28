@@ -127,6 +127,11 @@
       "hidden": "  ... {{count}} 個の{{name}}を非表示"
     }
   },
+  "agentsStatus": {
+    "noAgents": "利用可能なエージェントはありません。",
+    "localAgents": "ローカルエージェント",
+    "remoteAgents": "リモートエージェント"
+  },
   "screenReader": {
     "userPrefix": "ユーザー: ",
     "modelPrefix": "モデル: ",

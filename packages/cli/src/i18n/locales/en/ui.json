@@ -139,6 +139,11 @@
       "hidden": "  ... {{count}} {{name}} hidden"
     }
   },
+  "agentsStatus": {
+    "noAgents": "No agents available.",
+    "localAgents": "Local Agents",
+    "remoteAgents": "Remote Agents"
+  },
   "screenReader": {
     "userPrefix": "User: ",
     "modelPrefix": "Model: ",
