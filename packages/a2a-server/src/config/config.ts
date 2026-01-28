@@ -62,22 +62,6 @@ export async function loadConfig(
     }
   }
 
-  // Admin settings should be able to override existing mcpEnablement settings
-  // and extensionEnabled settings.
-  // By default, these should be undefined if not set by an admin so as to not
-  // override any existing defaults.
-  const getAdminBooleanOverride = (envVar: string): boolean | undefined => {
-    const value = process.env[envVar];
-    return value !== undefined ? value === 'true' : undefined;
-  };
-
-  const mcpEnabledAdminOverride = getAdminBooleanOverride('MCP_ADMIN_ENABLED');
-  const extensionsEnabledAdminOverride = getAdminBooleanOverride(
-    'EXTENSIONS_ADMIN_ENABLED',
-  );
-  const secureModeAdminEnabled =
-    getAdminBooleanOverride('SECURE_MODE_ADMIN_ENABLED') === true;
-
   const configParams: ConfigParameters = {
     sessionId: taskId,
     model: settings.general?.previewFeatures
@@ -93,11 +77,9 @@ export async function loadConfig(
     excludeTools: settings.excludeTools || undefined,
     showMemoryUsage: settings.showMemoryUsage || false,
     approvalMode:
-      process.env['GEMINI_YOLO_MODE'] === 'true' && !secureModeAdminEnabled
+      process.env['GEMINI_YOLO_MODE'] === 'true'
         ? ApprovalMode.YOLO
         : ApprovalMode.DEFAULT,
-    mcpEnabled: mcpEnabledAdminOverride,
-    extensionsEnabled: extensionsEnabledAdminOverride,
     mcpServers: settings.mcpServers,
     cwd: workspaceDir,
     telemetry: {
