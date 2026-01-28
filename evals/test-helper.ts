@@ -104,7 +104,7 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
 }
 
 async function prepareLogDir(name: string) {
-  const logDir = 'evals/logs';
+  const logDir = path.resolve(process.cwd(), 'evals/logs');
   await fs.promises.mkdir(logDir, { recursive: true });
   const sanitizedName = name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
   return { logDir, sanitizedName };
