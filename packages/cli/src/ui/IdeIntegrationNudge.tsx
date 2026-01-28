@@ -6,6 +6,7 @@
 
 import type { IdeInfo } from '@google/gemini-cli-core';
 import { Box, Text } from 'ink';
+import { useTranslation } from 'react-i18next';
 import type { RadioSelectItem } from './components/shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from './components/shared/RadioButtonSelect.js';
 import { useKeypress } from './hooks/useKeypress.js';
@@ -25,6 +26,8 @@ export function IdeIntegrationNudge({
   ide,
   onComplete,
 }: IdeIntegrationNudgeProps) {
+  const { t } = useTranslation('dialogs');
+
   useKeypress(
     (key) => {
       if (key.name === 'escape') {
@@ -47,7 +50,7 @@ export function IdeIntegrationNudge({
 
   const OPTIONS: Array<RadioSelectItem<IdeIntegrationNudgeResult>> = [
     {
-      label: 'Yes',
+      label: t('ideIntegrationNudge.yes'),
       value: {
         userSelection: 'yes',
         isExtensionPreInstalled,
@@ -55,7 +58,7 @@ export function IdeIntegrationNudge({
       key: 'Yes',
     },
     {
-      label: 'No (esc)',
+      label: t('ideIntegrationNudge.noEsc'),
       value: {
         userSelection: 'no',
         isExtensionPreInstalled,
@@ -63,7 +66,7 @@ export function IdeIntegrationNudge({
       key: 'No (esc)',
     },
     {
-      label: "No, don't ask again",
+      label: t('ideIntegrationNudge.noDontAsk'),
       value: {
         userSelection: 'dismiss',
         isExtensionPreInstalled,
@@ -73,12 +76,12 @@ export function IdeIntegrationNudge({
   ];
 
   const installText = isExtensionPreInstalled
-    ? `If you select Yes, the CLI will have access to your open files and display diffs directly in ${
-        ideName ?? 'your editor'
-      }.`
-    : `If you select Yes, we'll install an extension that allows the CLI to access your open files and display diffs directly in ${
-        ideName ?? 'your editor'
-      }.`;
+    ? t('ideIntegrationNudge.installTextPreInstalled', {
+        ideName: ideName ?? t('ideIntegrationNudge.yourEditor'),
+      })
+    : t('ideIntegrationNudge.installTextNew', {
+        ideName: ideName ?? t('ideIntegrationNudge.yourEditor'),
+      });
 
   return (
     <Box
@@ -92,7 +95,9 @@ export function IdeIntegrationNudge({
       <Box marginBottom={1} flexDirection="column">
         <Text>
           <Text color={theme.status.warning}>{'> '}</Text>
-          {`Do you want to connect ${ideName ?? 'your editor'} to Gemini CLI?`}
+          {t('ideIntegrationNudge.connectPrompt', {
+            ideName: ideName ?? t('ideIntegrationNudge.yourEditor'),
+          })}
         </Text>
         <Text color={theme.text.secondary}>{installText}</Text>
       </Box>
