@@ -8,14 +8,14 @@ Phase 1: Review
 Follow these steps to conduct a thorough review:
 
 1.  **Gather Context**:
-    *   If `{{args}}` is 'staged':
+    *   If `{{args}}` is 'staged' or `{{args}}` is empty:
         *   Use `git diff --staged` to view the changes.
         *   Use `git status` to see the state of the repository.
     *   Otherwise:
         *   Use `gh pr view {{args}}` to pull the information of the PR.
         *   Use `gh pr diff {{args}}` to view the diff of the PR.
 2.  **Understand Intent**:
-    *   If `{{args}}` is 'staged', infer the intent from the changes and the current task.
+    *   If `{{args}}` is 'staged' or `{{args}}` is empty, infer the intent from the changes and the current task.
     *   Otherwise, use the PR description. If it's not detailed enough, note it in your review.
 3.  **Check Commit Style**:
     *   Ensure the PR title (or intended commit message) follows Conventional Commits. Examples of recent commits: !{git log --pretty=format:"%s" -n 5}
