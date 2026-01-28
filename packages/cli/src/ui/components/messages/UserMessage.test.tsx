@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../../test-utils/render.js';
+import { renderWithProviders } from '../../../test-utils/render.js';
 import { UserMessage } from './UserMessage.js';
 import { describe, it, expect, vi } from 'vitest';
 
@@ -15,8 +15,9 @@ vi.mock('../../utils/commandUtils.js', () => ({
 
 describe('UserMessage', () => {
   it('renders normal user message with correct prefix', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <UserMessage text="Hello Gemini" width={80} />,
+      { width: 80 },
     );
     const output = lastFrame();
 
@@ -24,7 +25,10 @@ describe('UserMessage', () => {
   });
 
   it('renders slash command message', () => {
-    const { lastFrame } = render(<UserMessage text="/help" width={80} />);
+    const { lastFrame } = renderWithProviders(
+      <UserMessage text="/help" width={80} />,
+      { width: 80 },
+    );
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();
@@ -32,9 +36,24 @@ describe('UserMessage', () => {
 
   it('renders multiline user message', () => {
     const message = 'Line 1\nLine 2';
-    const { lastFrame } = render(<UserMessage text={message} width={80} />);
+    const { lastFrame } = renderWithProviders(
+      <UserMessage text={message} width={80} />,
+      { width: 80 },
+    );
     const output = lastFrame();
 
+    expect(output).toMatchSnapshot();
+  });
+
+  it('transforms image paths in user message', () => {
+    const message = 'Check out this image: @/path/to/my-image.png';
+    const { lastFrame } = renderWithProviders(
+      <UserMessage text={message} width={80} />,
+      { width: 80 },
+    );
+    const output = lastFrame();
+
+    expect(output).toContain('[Image my-image.png]');
     expect(output).toMatchSnapshot();
   });
 });

@@ -356,21 +356,54 @@ describe('ScrollableList Demo Behavior', () => {
         expect(listRef?.getScrollState()?.scrollTop).toBeLessThan(2);
       });
 
-      // End -> \x1b[F
+      // End -> \x1b[1;5F (Ctrl+End)
       await act(async () => {
-        stdin.write('\x1b[F');
+        stdin.write('\x1b[1;5F');
       });
       await waitFor(() => {
         // Total 50 items, height 10. Max scroll ~40.
         expect(listRef?.getScrollState()?.scrollTop).toBeGreaterThan(30);
       });
 
-      // Home -> \x1b[H
+      // Home -> \x1b[1;5H (Ctrl+Home)
       await act(async () => {
-        stdin.write('\x1b[H');
+        stdin.write('\x1b[1;5H');
       });
       await waitFor(() => {
         expect(listRef?.getScrollState()?.scrollTop).toBe(0);
+      });
+    });
+  });
+
+  describe('Width Prop', () => {
+    it('should apply the width prop to the container', async () => {
+      const items = [{ id: '1', title: 'Item 1' }];
+      let lastFrame: () => string | undefined;
+
+      await act(async () => {
+        const result = render(
+          <MouseProvider mouseEventsEnabled={false}>
+            <KeypressProvider>
+              <ScrollProvider>
+                <Box width={100} height={20}>
+                  <ScrollableList
+                    data={items}
+                    renderItem={({ item }) => <Text>{item.title}</Text>}
+                    estimatedItemHeight={() => 1}
+                    keyExtractor={(item) => item.id}
+                    hasFocus={true}
+                    width={50}
+                  />
+                </Box>
+              </ScrollProvider>
+            </KeypressProvider>
+          </MouseProvider>,
+        );
+        lastFrame = result.lastFrame;
+      });
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain('Item 1');
       });
     });
   });

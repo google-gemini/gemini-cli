@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../test-utils/render.js';
+import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { MainContent } from './MainContent.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -12,30 +12,38 @@ import { Box, Text } from 'ink';
 import type React from 'react';
 
 // Mock dependencies
-vi.mock('../contexts/AppContext.js', () => ({
-  useAppContext: () => ({
-    version: '1.0.0',
-  }),
-}));
+vi.mock('../contexts/AppContext.js', async () => {
+  const actual = await vi.importActual('../contexts/AppContext.js');
+  return {
+    ...actual,
+    useAppContext: () => ({
+      version: '1.0.0',
+    }),
+  };
+});
 
-vi.mock('../contexts/UIStateContext.js', () => ({
-  useUIState: () => ({
-    history: [
-      { id: 1, role: 'user', content: 'Hello' },
-      { id: 2, role: 'model', content: 'Hi there' },
-    ],
-    pendingHistoryItems: [],
-    mainAreaWidth: 80,
-    staticAreaMaxItemHeight: 20,
-    availableTerminalHeight: 24,
-    slashCommands: [],
-    constrainHeight: false,
-    isEditorDialogOpen: false,
-    activePtyId: undefined,
-    embeddedShellFocused: false,
-    historyRemountKey: 0,
-  }),
-}));
+vi.mock('../contexts/UIStateContext.js', async () => {
+  const actual = await vi.importActual('../contexts/UIStateContext.js');
+  return {
+    ...actual,
+    useUIState: () => ({
+      history: [
+        { id: 1, role: 'user', content: 'Hello' },
+        { id: 2, role: 'model', content: 'Hi there' },
+      ],
+      pendingHistoryItems: [],
+      mainAreaWidth: 80,
+      staticAreaMaxItemHeight: 20,
+      availableTerminalHeight: 24,
+      slashCommands: [],
+      constrainHeight: false,
+      isEditorDialogOpen: false,
+      activePtyId: undefined,
+      embeddedShellFocused: false,
+      historyRemountKey: 0,
+    }),
+  };
+});
 
 vi.mock('../hooks/useAlternateBuffer.js', () => ({
   useAlternateBuffer: vi.fn(),
@@ -95,7 +103,7 @@ describe('MainContent', () => {
   });
 
   it('renders in normal buffer mode', async () => {
-    const { lastFrame } = render(<MainContent />);
+    const { lastFrame } = renderWithProviders(<MainContent />);
     await waitFor(() => expect(lastFrame()).toContain('AppHeader'));
     const output = lastFrame();
 
@@ -105,7 +113,7 @@ describe('MainContent', () => {
 
   it('renders in alternate buffer mode', async () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(true);
-    const { lastFrame } = render(<MainContent />);
+    const { lastFrame } = renderWithProviders(<MainContent />);
     await waitFor(() => expect(lastFrame()).toContain('ScrollableList'));
     const output = lastFrame();
 
@@ -116,7 +124,7 @@ describe('MainContent', () => {
 
   it('does not constrain height in alternate buffer mode', async () => {
     vi.mocked(useAlternateBuffer).mockReturnValue(true);
-    const { lastFrame } = render(<MainContent />);
+    const { lastFrame } = renderWithProviders(<MainContent />);
     await waitFor(() => expect(lastFrame()).toContain('HistoryItem: Hello'));
     const output = lastFrame();
 

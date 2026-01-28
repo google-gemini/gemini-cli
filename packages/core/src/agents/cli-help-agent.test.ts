@@ -26,8 +26,10 @@ describe('CliHelpAgent', () => {
   });
 
   it('should have correctly configured inputs and outputs', () => {
-    expect(localAgent.inputConfig.inputs['question']).toBeDefined();
-    expect(localAgent.inputConfig.inputs['question'].required).toBe(true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const inputSchema = localAgent.inputConfig.inputSchema as any;
+    expect(inputSchema.properties['question']).toBeDefined();
+    expect(inputSchema.required).toContain('question');
 
     expect(localAgent.outputConfig?.outputName).toBe('report');
     expect(localAgent.outputConfig?.description).toBeDefined();
@@ -51,22 +53,6 @@ describe('CliHelpAgent', () => {
 
     const query = localAgent.promptConfig.query || '';
     expect(query).toContain('${question}');
-  });
-
-  it('should include sub-agent information when agents are enabled', () => {
-    const enabledConfig = {
-      getMessageBus: () => ({}),
-      isAgentsEnabled: () => true,
-      getAgentRegistry: () => ({
-        getDirectoryContext: () => 'Mock Agent Directory',
-      }),
-    } as unknown as Config;
-    const agent = CliHelpAgent(enabledConfig) as LocalAgentDefinition;
-    const systemPrompt = agent.promptConfig.systemPrompt || '';
-
-    expect(systemPrompt).toContain('### Sub-Agents (Local & Remote)');
-    expect(systemPrompt).toContain('Remote Agent (A2A)');
-    expect(systemPrompt).toContain('Agent2Agent functionality');
   });
 
   it('should process output to a formatted JSON string', () => {

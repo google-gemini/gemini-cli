@@ -31,7 +31,9 @@ export const CloudFreePrivacyNotice = ({
         key.name === 'escape'
       ) {
         onExit();
+        return true;
       }
+      return false;
     },
     { isActive: true },
   );
