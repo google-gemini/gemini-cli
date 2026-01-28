@@ -42,6 +42,7 @@ describe('AskUserDialog', () => {
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
       />,
+      { width: 120 },
     );
 
     expect(lastFrame()).toMatchSnapshot();
@@ -105,6 +106,7 @@ describe('AskUserDialog', () => {
           onSubmit={onSubmit}
           onCancel={vi.fn()}
         />,
+        { width: 120 },
       );
 
       actions(stdin);
@@ -123,6 +125,7 @@ describe('AskUserDialog', () => {
         onSubmit={onSubmit}
         onCancel={vi.fn()}
       />,
+      { width: 120 },
     );
 
     // Move down to custom option
@@ -157,6 +160,7 @@ describe('AskUserDialog', () => {
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
       />,
+      { width: 120 },
     );
 
     // Type a character without navigating down
@@ -206,6 +210,7 @@ describe('AskUserDialog', () => {
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
       />,
+      { width: 120 },
     );
 
     expect(lastFrame()).toMatchSnapshot();
@@ -218,6 +223,7 @@ describe('AskUserDialog', () => {
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
       />,
+      { width: 120 },
     );
 
     expect(lastFrame()).toMatchSnapshot();
@@ -230,6 +236,7 @@ describe('AskUserDialog', () => {
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
       />,
+      { width: 120 },
     );
 
     expect(lastFrame()).toMatchSnapshot();
@@ -259,6 +266,7 @@ describe('AskUserDialog', () => {
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
       />,
+      { width: 120 },
     );
 
     expect(lastFrame()).toContain('Which testing framework?');
@@ -299,6 +307,7 @@ describe('AskUserDialog', () => {
         onSubmit={onSubmit}
         onCancel={vi.fn()}
       />,
+      { width: 120 },
     );
 
     // Answer first question (should auto-advance)
@@ -365,6 +374,7 @@ describe('AskUserDialog', () => {
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
       />,
+      { width: 120 },
     );
 
     expect(lastFrame()).toMatchSnapshot();
@@ -392,6 +402,7 @@ describe('AskUserDialog', () => {
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
       />,
+      { width: 120 },
     );
 
     writeKey(stdin, '\x1b[C'); // Right arrow
@@ -435,6 +446,7 @@ describe('AskUserDialog', () => {
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
       />,
+      { width: 120 },
     );
 
     // Navigate directly to Review tab without answering
@@ -469,6 +481,7 @@ describe('AskUserDialog', () => {
         onSubmit={onSubmit}
         onCancel={vi.fn()}
       />,
+      { width: 120 },
     );
 
     // Answer only first question
@@ -500,6 +513,7 @@ describe('AskUserDialog', () => {
           onSubmit={vi.fn()}
           onCancel={vi.fn()}
         />,
+        { width: 120 },
       );
 
       expect(lastFrame()).toMatchSnapshot();
@@ -520,6 +534,7 @@ describe('AskUserDialog', () => {
           onSubmit={vi.fn()}
           onCancel={vi.fn()}
         />,
+        { width: 120 },
       );
 
       expect(lastFrame()).toMatchSnapshot();
@@ -540,6 +555,7 @@ describe('AskUserDialog', () => {
           onSubmit={vi.fn()}
           onCancel={vi.fn()}
         />,
+        { width: 120 },
       );
 
       for (const char of 'abc') {
@@ -573,6 +589,7 @@ describe('AskUserDialog', () => {
           onSubmit={vi.fn()}
           onCancel={vi.fn()}
         />,
+        { width: 120 },
       );
 
       expect(lastFrame()).toMatchSnapshot();
@@ -602,6 +619,7 @@ describe('AskUserDialog', () => {
           onSubmit={vi.fn()}
           onCancel={vi.fn()}
         />,
+        { width: 120 },
       );
 
       for (const char of 'useAuth') {
@@ -615,9 +633,6 @@ describe('AskUserDialog', () => {
       });
 
       writeKey(stdin, '\x1b[D'); // Left arrow should work when NOT focusing a text input
-      // Wait, Async question is a CHOICE question, so Left arrow SHOULD work.
-      // But ChoiceQuestionView also captures editing custom option state?
-      // No, only if it is FOCUSING the custom option.
 
       await waitFor(() => {
         expect(lastFrame()).toContain('useAuth');
@@ -650,6 +665,7 @@ describe('AskUserDialog', () => {
           onSubmit={onSubmit}
           onCancel={vi.fn()}
         />,
+        { width: 120 },
       );
 
       for (const char of 'DataTable') {
@@ -698,6 +714,7 @@ describe('AskUserDialog', () => {
           onSubmit={onSubmit}
           onCancel={vi.fn()}
         />,
+        { width: 120 },
       );
 
       writeKey(stdin, '\r');
@@ -722,6 +739,7 @@ describe('AskUserDialog', () => {
           onSubmit={vi.fn()}
           onCancel={onCancel}
         />,
+        { width: 120 },
       );
 
       for (const char of 'SomeText') {
@@ -766,6 +784,7 @@ describe('AskUserDialog', () => {
           onSubmit={vi.fn()}
           onCancel={vi.fn()}
         />,
+        { width: 120 },
       );
 
       // 1. Move to Text Q (Right arrow works for Choice Q)
@@ -823,6 +842,7 @@ describe('AskUserDialog', () => {
           onSubmit={onSubmit}
           onCancel={vi.fn()}
         />,
+        { width: 120 },
       );
 
       // Answer Q1 and Q2 sequentialy
