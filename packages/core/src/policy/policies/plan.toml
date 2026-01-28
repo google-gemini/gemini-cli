@@ -64,6 +64,12 @@ decision = "allow"
 priority = 50
 modes = ["plan"]
 
+[[rule]]
+toolName = "ask_user"
+decision = "allow"
+priority = 50
+modes = ["plan"]
+
 # Allow write_file for .md files in plans directory
 [[rule]]
 toolName = "write_file"
