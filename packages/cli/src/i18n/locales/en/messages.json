@@ -49,5 +49,8 @@
   "diff": {
     "noContent": "No diff content.",
     "noChanges": "No changes detected."
+  },
+  "model": {
+    "respondingWith": "Responding with {{model}}"
   }
 }
