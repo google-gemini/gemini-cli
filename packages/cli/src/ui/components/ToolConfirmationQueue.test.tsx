@@ -5,9 +5,11 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
+import { Box } from 'ink';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
-import { ToolCallStatus } from '../types.js';
+import { ToolCallStatus, StreamingState } from '../types.js';
 import { renderWithProviders } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import type { Config } from '@google/gemini-cli-core';
 import type { ConfirmingToolState } from '../hooks/useConfirmingTool.js';
 
@@ -85,5 +87,96 @@ describe('ToolConfirmationQueue', () => {
     );
 
     expect(lastFrame()).toBe('');
+  });
+
+  it('renders expansion hint when content is long and constrained', async () => {
+    const longDiff = '@@ -1,1 +1,50 @@\n' + '+line\n'.repeat(50);
+    const confirmingTool = {
+      tool: {
+        callId: 'call-1',
+        name: 'replace',
+        description: 'edit file',
+        status: ToolCallStatus.Confirming,
+        confirmationDetails: {
+          type: 'edit' as const,
+          title: 'Confirm edit',
+          fileName: 'test.ts',
+          filePath: '/test.ts',
+          fileDiff: longDiff,
+          originalContent: 'old',
+          newContent: 'new',
+          onConfirm: vi.fn(),
+        },
+      },
+      index: 1,
+      total: 1,
+    };
+
+    const { lastFrame } = renderWithProviders(
+      <Box flexDirection="column" height={30}>
+        <ToolConfirmationQueue
+          confirmingTool={confirmingTool as unknown as ConfirmingToolState}
+        />
+      </Box>,
+      {
+        config: mockConfig,
+        useAlternateBuffer: false,
+        uiState: {
+          terminalWidth: 80,
+          terminalHeight: 20,
+          constrainHeight: true,
+          streamingState: StreamingState.WaitingForConfirmation,
+        },
+      },
+    );
+
+    await waitFor(() =>
+      expect(lastFrame()).toContain('Press ctrl-o to show more lines'),
+    );
+    expect(lastFrame()).toMatchSnapshot();
+    expect(lastFrame()).toContain('Press ctrl-o to show more lines');
+  });
+
+  it('does not render expansion hint when constrainHeight is false', () => {
+    const longDiff = 'line\n'.repeat(50);
+    const confirmingTool = {
+      tool: {
+        callId: 'call-1',
+        name: 'replace',
+        description: 'edit file',
+        status: ToolCallStatus.Confirming,
+        confirmationDetails: {
+          type: 'edit' as const,
+          title: 'Confirm edit',
+          fileName: 'test.ts',
+          filePath: '/test.ts',
+          fileDiff: longDiff,
+          originalContent: 'old',
+          newContent: 'new',
+          onConfirm: vi.fn(),
+        },
+      },
+      index: 1,
+      total: 1,
+    };
+
+    const { lastFrame } = renderWithProviders(
+      <ToolConfirmationQueue
+        confirmingTool={confirmingTool as unknown as ConfirmingToolState}
+      />,
+      {
+        config: mockConfig,
+        uiState: {
+          terminalWidth: 80,
+          terminalHeight: 40,
+          constrainHeight: false,
+          streamingState: StreamingState.WaitingForConfirmation,
+        },
+      },
+    );
+
+    const output = lastFrame();
+    expect(output).not.toContain('Press ctrl-o to show more lines');
+    expect(output).toMatchSnapshot();
   });
 });

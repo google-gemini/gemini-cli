@@ -56,6 +56,9 @@ vi.mock('../../contexts/OverflowContext.js', () => ({
     addOverflowingId: vi.fn(),
     removeOverflowingId: vi.fn(),
   }),
+  useOverflowState: () => ({
+    overflowingIds: new Set(),
+  }),
 }));
 
 describe('ToolResultDisplay', () => {
