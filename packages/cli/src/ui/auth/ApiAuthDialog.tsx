@@ -7,6 +7,7 @@
 import type React from 'react';
 import { useRef, useEffect } from 'react';
 import { Box, Text } from 'ink';
+import { useTranslation } from 'react-i18next';
 import { theme } from '../semantic-colors.js';
 import { TextInput } from '../components/shared/TextInput.js';
 import { useTextBuffer } from '../components/shared/text-buffer.js';
@@ -28,6 +29,7 @@ export function ApiAuthDialog({
   error,
   defaultValue = '',
 }: ApiAuthDialogProps): React.JSX.Element {
+  const { t } = useTranslation('auth');
   const { terminalWidth } = useUIState();
   const viewportWidth = terminalWidth - 8;
 
@@ -105,15 +107,12 @@ export function ApiAuthDialog({
       width="100%"
     >
       <Text bold color={theme.text.primary}>
-        Enter Gemini API Key
+        {t('apiAuth.title')}
       </Text>
       <Box marginTop={1} flexDirection="column">
-        <Text color={theme.text.primary}>
-          Please enter your Gemini API key. It will be securely stored in your
-          system keychain.
-        </Text>
+        <Text color={theme.text.primary}>{t('apiAuth.description')}</Text>
         <Text color={theme.text.secondary}>
-          You can get an API key from{' '}
+          {t('apiAuth.getKeyPrefix')}{' '}
           <Text color={theme.text.link}>
             https://aistudio.google.com/app/apikey
           </Text>
@@ -130,7 +129,7 @@ export function ApiAuthDialog({
             buffer={buffer}
             onSubmit={handleSubmit}
             onCancel={onCancel}
-            placeholder="Paste your API key here"
+            placeholder={t('apiAuth.placeholder')}
           />
         </Box>
       </Box>
@@ -140,9 +139,7 @@ export function ApiAuthDialog({
         </Box>
       )}
       <Box marginTop={1}>
-        <Text color={theme.text.secondary}>
-          (Press Enter to submit, Esc to cancel, Ctrl+C to clear stored key)
-        </Text>
+        <Text color={theme.text.secondary}>{t('apiAuth.instructions')}</Text>
       </Box>
     </Box>
   );
