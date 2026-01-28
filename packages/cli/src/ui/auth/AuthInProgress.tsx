@@ -7,6 +7,7 @@
 import type React from 'react';
 import { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
+import { useTranslation } from 'react-i18next';
 import { CliSpinner } from '../components/CliSpinner.js';
 import { theme } from '../semantic-colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';
@@ -18,6 +19,7 @@ interface AuthInProgressProps {
 export function AuthInProgress({
   onTimeout,
 }: AuthInProgressProps): React.JSX.Element {
+  const { t } = useTranslation('auth');
   const [timedOut, setTimedOut] = useState(false);
 
   useKeypress(
@@ -47,14 +49,11 @@ export function AuthInProgress({
       width="100%"
     >
       {timedOut ? (
-        <Text color={theme.status.error}>
-          Authentication timed out. Please try again.
-        </Text>
+        <Text color={theme.status.error}>{t('authInProgress.timedOut')}</Text>
       ) : (
         <Box>
           <Text>
-            <CliSpinner type="dots" /> Waiting for auth... (Press ESC or CTRL+C
-            to cancel)
+            <CliSpinner type="dots" /> {t('authInProgress.waiting')}
           </Text>
         </Box>
       )}
