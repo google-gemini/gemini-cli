@@ -21,15 +21,29 @@ async function loadTranslationFile(
   lang: string,
   namespace: string,
 ): Promise<Record<string, unknown>> {
+  let resources: Record<string, unknown> = {};
+
+  // 1. Load built-in resources
   try {
-    const filePath = path.join(__dirname, 'locales', lang, `${namespace}.json`);
-    const content = await fs.readFile(filePath, 'utf8');
-    return JSON.parse(content) as Record<string, unknown>;
+    const builtInPath = path.join(localesDir, lang, `${namespace}.json`);
+    const content = await fs.readFile(builtInPath, 'utf8');
+    resources = JSON.parse(content) as Record<string, unknown>;
   } catch {
-    // Silently return empty object if translation file not found.
-    // This allows graceful fallback to default language.
-    return {};
+    // Ignore missing built-in files
   }
+
+  // 2. Load and merge user-provided WIP resources
+  try {
+    const userPath = path.join(userLocalesDir, lang, `${namespace}.json`);
+    const content = await fs.readFile(userPath, 'utf8');
+    const userResources = JSON.parse(content) as Record<string, unknown>;
+    // Simple shallow merge for now, should be enough for flat translation files
+    resources = { ...resources, ...userResources };
+  } catch {
+    // Ignore missing user files
+  }
+
+  return resources;
 }
 
 const namespaces = [
@@ -44,6 +58,9 @@ const namespaces = [
   'auth',
 ];
 const localesDir = path.join(__dirname, 'locales');
+const homeDir =
+  process.env['HOME'] ?? process.env['USERPROFILE'] ?? os.homedir();
+const userLocalesDir = path.join(homeDir, '.gemini', 'locales');
 
 interface LocaleManifest {
   displayName: string;
@@ -64,6 +81,36 @@ function readLocaleManifest(langDir: string): LocaleManifest | null {
 }
 
 /**
+ * Synchronously scan a directory to find available language packs.
+ */
+function scanLocalesDir(
+  dirPath: string,
+  labels: Map<string, string>,
+): Map<string, string> {
+  try {
+    if (!fsSync.existsSync(dirPath)) return labels;
+    const entries = fsSync.readdirSync(dirPath, { withFileTypes: true });
+    const dirs = entries
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .filter((name) => !name.startsWith('.')); // Exclude hidden directories
+
+    for (const dir of dirs) {
+      const manifest = readLocaleManifest(path.join(dirPath, dir));
+      if (manifest?.displayName) {
+        labels.set(dir, manifest.displayName);
+      } else if (!labels.has(dir)) {
+        // Locale folder without manifest — use the folder name as-is
+        labels.set(dir, dir.toUpperCase());
+      }
+    }
+  } catch {
+    // Ignore errors
+  }
+  return labels;
+}
+
+/**
  * Synchronously scan the locales directory to find available language packs.
  * Each locale folder must contain a manifest.json with a displayName field.
  * This runs at module load time so the schema can access the options.
@@ -72,36 +119,19 @@ function detectAvailableLanguagesSync(): {
   codes: string[];
   labels: Map<string, string>;
 } {
-  const labels = new Map<string, string>();
-  try {
-    const entries = fsSync.readdirSync(localesDir, { withFileTypes: true });
-    const dirs = entries
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => entry.name)
-      .filter((name) => !name.startsWith('.')); // Exclude hidden directories
+  let labels = new Map<string, string>();
+  // 1. Scan built-in locales
+  labels = scanLocalesDir(localesDir, labels);
+  // 2. Scan user-provided WIP locales (overriding or adding)
+  labels = scanLocalesDir(userLocalesDir, labels);
 
-    for (const dir of dirs) {
-      const manifest = readLocaleManifest(path.join(localesDir, dir));
-      if (manifest?.displayName) {
-        labels.set(dir, manifest.displayName);
-      } else {
-        // Locale folder without manifest — use the folder name as-is
-        labels.set(dir, dir.toUpperCase());
-      }
-    }
-
-    // Ensure 'en' is always first (default/fallback language)
-    const codes = [...labels.keys()];
-    if (codes.includes('en')) {
-      const sorted = ['en', ...codes.filter((l) => l !== 'en')];
-      return { codes: sorted, labels };
-    }
-    return { codes: codes.length > 0 ? codes : ['en'], labels };
-  } catch {
-    // If we can't read the directory, fall back to English only
-    labels.set('en', 'English');
-    return { codes: ['en'], labels };
+  // Ensure 'en' is always first (default/fallback language)
+  const codes = [...labels.keys()];
+  if (codes.includes('en')) {
+    const sorted = ['en', ...codes.filter((l) => l !== 'en')];
+    return { codes: sorted, labels };
   }
+  return { codes: codes.length > 0 ? codes : ['en'], labels };
 }
 
 // Detect available languages synchronously at module load
@@ -145,11 +175,6 @@ export function getLanguageOptions(): ReadonlyArray<{
 }
 
 /**
- * Detect the system language from environment variables or Intl API.
- * Priority: GEMINI_LANG > LANG > Intl > 'en' (fallback)
- * Only returns languages that have available locale packs.
- */
-/**
  * Read the saved language preference directly from ~/.gemini/settings.json.
  * This avoids a circular dependency: the settings schema imports from this
  * module (for getLanguageOptions()), so we cannot import the settings module
@@ -175,6 +200,11 @@ function getSavedLanguagePreference(): string | null {
   return null;
 }
 
+/**
+ * Detect the system language from environment variables or Intl API.
+ * Priority: GEMINI_LANG > LANG > Intl > 'en' (fallback)
+ * Only returns languages that have available locale packs.
+ */
 function getSystemLanguage(): string {
   const checkLang = (locale: string | undefined): string | null => {
     if (!locale) return null;
