@@ -9,6 +9,7 @@ import {
   listExtensions,
   type ExtensionInstallMetadata,
 } from '@google/gemini-cli-core';
+import { t } from '../../i18n/index.js';
 import type { ExtensionUpdateInfo } from '../../config/extension.js';
 import { getErrorMessage } from '../../utils/errors.js';
 import {
@@ -40,7 +41,7 @@ function showMessageIfNoExtensions(
   if (extensions.length === 0) {
     context.ui.addItem({
       type: MessageType.INFO,
-      text: 'No extensions installed. Run `/extensions explore` to check out the gallery.',
+      text: t('commands:extensions.responses.noExtensions'),
     });
     return true;
   }
@@ -72,7 +73,7 @@ function updateAction(context: CommandContext, args: string): Promise<void> {
   if (!all && names?.length === 0) {
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: 'Usage: /extensions update <extension-names>|--all',
+      text: t('commands:extensions.responses.usageUpdate'),
     });
     return Promise.resolve();
   }
@@ -100,7 +101,7 @@ function updateAction(context: CommandContext, args: string): Promise<void> {
     if (updateInfos.length === 0) {
       context.ui.addItem({
         type: MessageType.INFO,
-        text: 'No extensions to update.',
+        text: t('commands:extensions.responses.noUpdates'),
       });
     }
 
@@ -130,7 +131,7 @@ function updateAction(context: CommandContext, args: string): Promise<void> {
         if (!extension) {
           context.ui.addItem({
             type: MessageType.ERROR,
-            text: `Extension ${name} not found.`,
+            text: t('commands:extensions.responses.notFound', { name }),
           });
           continue;
         }
@@ -154,7 +155,7 @@ async function restartAction(
   if (!extensionLoader) {
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: "Extensions are not yet loaded, can't restart yet",
+      text: t('commands:extensions.responses.loaderNotReady'),
     });
     return;
   }
@@ -170,7 +171,7 @@ async function restartAction(
   if (!all && names?.length === 0) {
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: 'Usage: /extensions restart <extension-names>|--all',
+      text: t('commands:extensions.responses.usageRestart'),
     });
     return Promise.resolve();
   }
@@ -190,7 +191,9 @@ async function restartAction(
       if (notFound.length > 0) {
         context.ui.addItem({
           type: MessageType.WARNING,
-          text: `Extension(s) not found or not active: ${notFound.join(', ')}`,
+          text: t('commands:extensions.responses.notFoundOrActive', {
+            names: notFound.join(', '),
+          }),
         });
       }
     }
@@ -200,11 +203,11 @@ async function restartAction(
     return;
   }
 
-  const s = extensionsToRestart.length > 1 ? 's' : '';
-
   const restartingMessage = {
     type: MessageType.INFO,
-    text: `Restarting ${extensionsToRestart.length} extension${s}...`,
+    text: t('commands:extensions.responses.restarting', {
+      count: extensionsToRestart.length,
+    }),
     color: theme.text.primary,
   };
   context.ui.addItem(restartingMessage);
@@ -236,12 +239,16 @@ async function restartAction(
       .join('\n  ');
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: `Failed to restart some extensions:\n  ${errorMessages}`,
+      text: t('commands:extensions.responses.restartFailed', {
+        errors: errorMessages,
+      }),
     });
   } else {
     const infoItem: HistoryItemInfo = {
       type: MessageType.INFO,
-      text: `${extensionsToRestart.length} extension${s} restarted successfully.`,
+      text: t('commands:extensions.responses.restartSuccess', {
+        count: extensionsToRestart.length,
+      }),
       icon: emptyIcon,
       color: theme.text.primary,
     };
@@ -256,7 +263,9 @@ async function exploreAction(context: CommandContext) {
   if (process.env['NODE_ENV'] === 'test') {
     context.ui.addItem({
       type: MessageType.INFO,
-      text: `Would open extensions page in your browser: ${extensionsUrl} (skipped in test environment)`,
+      text: t('commands:extensions.responses.exploreTest', {
+        url: extensionsUrl,
+      }),
     });
   } else if (
     process.env['SANDBOX'] &&
@@ -264,19 +273,25 @@ async function exploreAction(context: CommandContext) {
   ) {
     context.ui.addItem({
       type: MessageType.INFO,
-      text: `View available extensions at ${extensionsUrl}`,
+      text: t('commands:extensions.responses.exploreSandbox', {
+        url: extensionsUrl,
+      }),
     });
   } else {
     context.ui.addItem({
       type: MessageType.INFO,
-      text: `Opening extensions page in your browser: ${extensionsUrl}`,
+      text: t('commands:extensions.responses.exploreOpening', {
+        url: extensionsUrl,
+      }),
     });
     try {
       await open(extensionsUrl);
     } catch (_error) {
       context.ui.addItem({
         type: MessageType.ERROR,
-        text: `Failed to open browser. Check out the extensions gallery at ${extensionsUrl}`,
+        text: t('commands:extensions.responses.exploreFailed', {
+          url: extensionsUrl,
+        }),
       });
     }
   }
@@ -308,7 +323,9 @@ function getEnableDisableContext(
   ) {
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: `Usage: /extensions ${context.invocation?.name} <extension> [--scope=<user|workspace|session>]`,
+      text: t('commands:extensions.responses.usageEnableDisable', {
+        command: context.invocation?.name,
+      }),
     });
     return null;
   }
@@ -331,7 +348,9 @@ function getEnableDisableContext(
     default:
       context.ui.addItem({
         type: MessageType.ERROR,
-        text: `Unsupported scope ${parts[2]}, should be one of "user", "workspace", or "session"`,
+        text: t('commands:extensions.responses.unsupportedScope', {
+          scope: parts[2],
+        }),
       });
       debugLogger.error();
       return null;
@@ -366,7 +385,7 @@ async function disableAction(context: CommandContext, args: string) {
     await extensionManager.disableExtension(name, scope);
     context.ui.addItem({
       type: MessageType.INFO,
-      text: `Extension "${name}" disabled for the scope "${scope}"`,
+      text: t('commands:extensions.responses.disabled', { name, scope }),
     });
   }
 }
@@ -380,7 +399,7 @@ async function enableAction(context: CommandContext, args: string) {
     await extensionManager.enableExtension(name, scope);
     context.ui.addItem({
       type: MessageType.INFO,
-      text: `Extension "${name}" enabled for the scope "${scope}"`,
+      text: t('commands:extensions.responses.enabled', { name, scope }),
     });
 
     // Auto-enable any disabled MCP servers for this extension
@@ -430,7 +449,7 @@ async function installAction(context: CommandContext, args: string) {
   if (!source) {
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: `Usage: /extensions install <source>`,
+      text: t('commands:extensions.responses.usageInstall'),
     });
     return;
   }
@@ -452,14 +471,14 @@ async function installAction(context: CommandContext, args: string) {
   if (!isValid) {
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: `Invalid source: ${source}`,
+      text: t('commands:extensions.responses.invalidSource', { source }),
     });
     return;
   }
 
   context.ui.addItem({
     type: MessageType.INFO,
-    text: `Installing extension from "${source}"...`,
+    text: t('commands:extensions.responses.installing', { source }),
   });
 
   try {
@@ -468,14 +487,17 @@ async function installAction(context: CommandContext, args: string) {
       await extensionLoader.installOrUpdateExtension(installMetadata);
     context.ui.addItem({
       type: MessageType.INFO,
-      text: `Extension "${extension.name}" installed successfully.`,
+      text: t('commands:extensions.responses.installSuccess', {
+        name: extension.name,
+      }),
     });
   } catch (error) {
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: `Failed to install extension from "${source}": ${getErrorMessage(
-        error,
-      )}`,
+      text: t('commands:extensions.responses.installFailed', {
+        source,
+        error: getErrorMessage(error),
+      }),
     });
   }
 }
@@ -493,14 +515,16 @@ async function linkAction(context: CommandContext, args: string) {
   if (!sourceFilepath) {
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: `Usage: /extensions link <source>`,
+      text: t('commands:extensions.responses.usageLink'),
     });
     return;
   }
   if (/[;&|`'"]/.test(sourceFilepath)) {
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: `Source file path contains disallowed characters: ${sourceFilepath}`,
+      text: t('commands:extensions.responses.invalidLinkSource', {
+        source: sourceFilepath,
+      }),
     });
     return;
   }
@@ -510,7 +534,9 @@ async function linkAction(context: CommandContext, args: string) {
   } catch (error) {
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: `Invalid source: ${sourceFilepath}`,
+      text: t('commands:extensions.responses.invalidLinkSource', {
+        source: sourceFilepath,
+      }),
     });
     debugLogger.error(
       `Failed to stat path "${sourceFilepath}": ${getErrorMessage(error)}`,
@@ -520,7 +546,9 @@ async function linkAction(context: CommandContext, args: string) {
 
   context.ui.addItem({
     type: MessageType.INFO,
-    text: `Linking extension from "${sourceFilepath}"...`,
+    text: t('commands:extensions.responses.linking', {
+      source: sourceFilepath,
+    }),
   });
 
   try {
@@ -532,14 +560,17 @@ async function linkAction(context: CommandContext, args: string) {
       await extensionLoader.installOrUpdateExtension(installMetadata);
     context.ui.addItem({
       type: MessageType.INFO,
-      text: `Extension "${extension.name}" linked successfully.`,
+      text: t('commands:extensions.responses.linkSuccess', {
+        name: extension.name,
+      }),
     });
   } catch (error) {
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: `Failed to link extension from "${sourceFilepath}": ${getErrorMessage(
-        error,
-      )}`,
+      text: t('commands:extensions.responses.linkFailed', {
+        source: sourceFilepath,
+        error: getErrorMessage(error),
+      }),
     });
   }
 }
@@ -557,28 +588,29 @@ async function uninstallAction(context: CommandContext, args: string) {
   if (!name) {
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: `Usage: /extensions uninstall <extension-name>`,
+      text: t('commands:extensions.responses.usageUninstall'),
     });
     return;
   }
 
   context.ui.addItem({
     type: MessageType.INFO,
-    text: `Uninstalling extension "${name}"...`,
+    text: t('commands:extensions.responses.uninstalling', { name }),
   });
 
   try {
     await extensionLoader.uninstallExtension(name, false);
     context.ui.addItem({
       type: MessageType.INFO,
-      text: `Extension "${name}" uninstalled successfully.`,
+      text: t('commands:extensions.responses.uninstallSuccess', { name }),
     });
   } catch (error) {
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: `Failed to uninstall extension "${name}": ${getErrorMessage(
-        error,
-      )}`,
+      text: t('commands:extensions.responses.uninstallFailed', {
+        name,
+        error: getErrorMessage(error),
+      }),
     });
   }
 }
