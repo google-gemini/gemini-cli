@@ -6,13 +6,17 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
+import { useTranslation } from 'react-i18next';
 import { theme } from '../semantic-colors.js';
 
-export const ShellModeIndicator: React.FC = () => (
-  <Box>
-    <Text color={theme.ui.symbol}>
-      shell mode enabled
-      <Text color={theme.text.secondary}> (esc to disable)</Text>
-    </Text>
-  </Box>
-);
+export const ShellModeIndicator: React.FC = () => {
+  const { t } = useTranslation('ui');
+  return (
+    <Box>
+      <Text color={theme.ui.symbol}>
+        {t('shellMode.enabled')}
+        <Text color={theme.text.secondary}>{t('shellMode.disableHint')}</Text>
+      </Text>
+    </Box>
+  );
+};
