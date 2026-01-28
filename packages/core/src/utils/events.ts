@@ -290,8 +290,8 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   emitConsentRequest(payload: ConsentRequestPayload): void {
     this._emitOrQueue(CoreEvent.ConsentRequest, payload);
   }
-  
-/**
+
+  /**
    * Notifies subscribers that new unacknowledged agents have been discovered.
    */
   emitAgentsDiscovered(agents: AgentDefinition[]): void {
