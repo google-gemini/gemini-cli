@@ -6,6 +6,7 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
+import { useTranslation } from 'react-i18next';
 import { theme } from '../semantic-colors.js';
 import { ApprovalMode } from '@google/gemini-cli-core';
 
@@ -16,6 +17,7 @@ interface ApprovalModeIndicatorProps {
 export const ApprovalModeIndicator: React.FC<ApprovalModeIndicatorProps> = ({
   approvalMode,
 }) => {
+  const { t } = useTranslation('ui');
   let textColor = '';
   let textContent = '';
   let subText = '';
@@ -23,18 +25,18 @@ export const ApprovalModeIndicator: React.FC<ApprovalModeIndicatorProps> = ({
   switch (approvalMode) {
     case ApprovalMode.AUTO_EDIT:
       textColor = theme.status.warning;
-      textContent = 'accepting edits';
-      subText = ' (shift + tab to cycle)';
+      textContent = t('approvalMode.acceptingEdits');
+      subText = t('approvalMode.cycleHint');
       break;
     case ApprovalMode.PLAN:
       textColor = theme.status.success;
-      textContent = 'plan mode';
-      subText = ' (shift + tab to cycle)';
+      textContent = t('approvalMode.planMode');
+      subText = t('approvalMode.cycleHint');
       break;
     case ApprovalMode.YOLO:
       textColor = theme.status.error;
-      textContent = 'YOLO mode';
-      subText = ' (ctrl + y to toggle)';
+      textContent = t('approvalMode.yoloMode');
+      subText = t('approvalMode.toggleHint');
       break;
     case ApprovalMode.DEFAULT:
     default:
