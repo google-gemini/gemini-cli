@@ -338,10 +338,10 @@ export function registerActivityLogger(config: Config) {
       fs.mkdirSync(logsDir, { recursive: true });
     }
 
-    const logFile = path.join(
-      logsDir,
-      `session-${config.getSessionId()}.jsonl`,
-    );
+    const logFile =
+      process.env['GEMINI_CLI_ACTIVITY_LOG_FILE'] ||
+      path.join(logsDir, `session-${config.getSessionId()}.jsonl`);
+
     const writeToLog = (type: 'console' | 'network', payload: unknown) => {
       try {
         const entry =

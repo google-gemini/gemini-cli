@@ -59,11 +59,15 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
         execSync('git commit --allow-empty -m "Initial commit"', execOptions);
       }
 
+      const { logDir, sanitizedName } = await prepareLogDir(evalCase.name);
+      const activityLogFile = path.resolve(`${logDir}/${sanitizedName}.jsonl`);
+
       const result = await rig.run({
         args: evalCase.prompt,
         approvalMode: evalCase.approvalMode ?? 'yolo',
         env: {
           GEMINI_CLI_ENABLE_ACTIVITY_LOG: 'true',
+          GEMINI_CLI_ACTIVITY_LOG_FILE: activityLogFile,
         },
       });
 
@@ -76,12 +80,11 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
       }
 
       await evalCase.assert(rig, result);
-    } catch (e) {
-      await copyActivityLogs(rig, evalCase.name);
-      throw e;
     } finally {
-      await logToFile(
-        evalCase.name,
+      const { logDir, sanitizedName } = await prepareLogDir(evalCase.name);
+      const logFile = `${logDir}/${sanitizedName}.log`;
+      await fs.promises.writeFile(
+        logFile,
         JSON.stringify(rig.readToolLogs(), null, 2),
       );
       await rig.cleanup();
@@ -95,39 +98,11 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
   }
 }
 
-async function copyActivityLogs(rig: TestRig, name: string) {
+async function prepareLogDir(name: string) {
   const logDir = 'evals/logs';
   await fs.promises.mkdir(logDir, { recursive: true });
   const sanitizedName = name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-
-  // Find all .jsonl files recursively
-  const findJsonl = (dir: string): string[] => {
-    let results: string[] = [];
-    if (!dir || !fs.existsSync(dir)) {
-      return results;
-    }
-    const list = fs.readdirSync(dir);
-    for (const file of list) {
-      const fullPath = path.join(dir, file);
-      const stat = fs.statSync(fullPath);
-      if (stat.isDirectory()) {
-        results = results.concat(findJsonl(fullPath));
-      } else if (file.endsWith('.jsonl')) {
-        results.push(fullPath);
-      }
-    }
-    return results;
-  };
-
-  const searchPaths = [rig.homeDir, rig.testDir].filter(
-    (p): p is string => !!p,
-  );
-  const jsonlFiles = searchPaths.flatMap((p) => findJsonl(p));
-
-  for (let i = 0; i < jsonlFiles.length; i++) {
-    const dest = `${logDir}/${sanitizedName}${i > 0 ? `_${i}` : ''}.jsonl`;
-    await fs.promises.copyFile(jsonlFiles[i], dest);
-  }
+  return { logDir, sanitizedName };
 }
 
 export interface EvalCase {
@@ -137,12 +112,4 @@ export interface EvalCase {
   files?: Record<string, string>;
   approvalMode?: 'default' | 'auto_edit' | 'yolo' | 'plan';
   assert: (rig: TestRig, result: string) => Promise<void>;
-}
-
-async function logToFile(name: string, content: string) {
-  const logDir = 'evals/logs';
-  await fs.promises.mkdir(logDir, { recursive: true });
-  const sanitizedName = name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-  const logFile = `${logDir}/${sanitizedName}.log`;
-  await fs.promises.writeFile(logFile, content);
 }
