@@ -93,6 +93,9 @@
       "default": "  Type your message or @path/to/file"
     }
   },
+  "copyMode": {
+    "message": "In Copy Mode. Press any key to exit."
+  },
   "maxSizedBox": {
     "firstLinesHidden": "... first {{count}} line hidden ...",
     "firstLinesHidden_plural": "... first {{count}} lines hidden ...",

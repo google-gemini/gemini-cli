@@ -6,10 +6,12 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
+import { useTranslation } from 'react-i18next';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { theme } from '../semantic-colors.js';
 
 export const CopyModeWarning: React.FC = () => {
+  const { t } = useTranslation('ui');
   const { copyModeEnabled } = useUIState();
 
   if (!copyModeEnabled) {
@@ -18,9 +20,7 @@ export const CopyModeWarning: React.FC = () => {
 
   return (
     <Box>
-      <Text color={theme.status.warning}>
-        In Copy Mode. Press any key to exit.
-      </Text>
+      <Text color={theme.status.warning}>{t('copyMode.message')}</Text>
     </Box>
   );
 };

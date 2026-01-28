@@ -86,6 +86,9 @@
       "default": "  メッセージを入力するか、@path/to/file でファイルを参照します"
     }
   },
+  "copyMode": {
+    "message": "コピーモードです。任意のキーを押して終了します。"
+  },
   "maxSizedBox": {
     "firstLinesHidden": "... 最初の {{count}} 行を非表示 ...",
     "lastLinesHidden": "... 最後の {{count}} 行を非表示 ..."
