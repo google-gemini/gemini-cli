@@ -14,6 +14,7 @@ export const IDE_DEFINITIONS = {
   trae: { name: 'trae', displayName: 'Trae' },
   vscode: { name: 'vscode', displayName: 'VS Code' },
   vscodefork: { name: 'vscodefork', displayName: 'IDE' },
+  positron: { name: 'positron', displayName: 'Positron' },
   antigravity: { name: 'antigravity', displayName: 'Antigravity' },
   sublimetext: { name: 'sublimetext', displayName: 'Sublime Text' },
   jetbrains: { name: 'jetbrains', displayName: 'JetBrains IDE' },
@@ -67,6 +68,9 @@ export function detectIdeFromEnv(): IdeInfo {
   }
   if (process.env['MONOSPACE_ENV']) {
     return IDE_DEFINITIONS.firebasestudio;
+  }
+  if (process.env['POSITRON'] === '1') {
+    return IDE_DEFINITIONS.positron;
   }
   if (process.env['TERM_PROGRAM'] === 'sublime') {
     return IDE_DEFINITIONS.sublimetext;
