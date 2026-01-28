@@ -12,6 +12,7 @@ import {
   IdeConnectionEvent,
   IdeConnectionType,
 } from '@google/gemini-cli-core';
+import { t } from '../../i18n/index.js';
 import {
   getIdeInstaller,
   IDEConnectionStatus,
@@ -36,15 +37,17 @@ function getIdeStatusMessage(ideClient: IdeClient): {
     case IDEConnectionStatus.Connected:
       return {
         messageType: 'info',
-        content: `🟢 Connected to ${ideClient.getDetectedIdeDisplayName()}`,
+        content: t('commands:ide.responses.connected', {
+          name: ideClient.getDetectedIdeDisplayName(),
+        }),
       };
     case IDEConnectionStatus.Connecting:
       return {
         messageType: 'info',
-        content: `🟡 Connecting...`,
+        content: t('commands:ide.responses.connecting'),
       };
     default: {
-      let content = `🔴 Disconnected`;
+      let content = t('commands:ide.responses.disconnected');
       if (connection?.details) {
         content += `: ${connection.details}`;
       }
@@ -72,14 +75,13 @@ function formatFileList(openFiles: File[]): string {
         ? `${basename} (/${parentDir})`
         : basename;
 
-      return `  - ${displayName}${file.isActive ? ' (active)' : ''}`;
+      return `  - ${displayName}${file.isActive ? t('commands:ide.responses.active') : ''}`;
     })
     .join('\n');
 
-  const infoMessage = `
-(Note: The file list is limited to a number of recently accessed files within your workspace and only includes local files on disk)`;
+  const infoMessage = t('commands:ide.responses.openFilesNote');
 
-  return `\n\nOpen files:\n${fileList}\n${infoMessage}`;
+  return `${t('commands:ide.responses.openFilesTitle')}${fileList}\n${infoMessage}`;
 }
 
 async function getIdeStatusMessageWithFiles(ideClient: IdeClient): Promise<{
@@ -89,7 +91,9 @@ async function getIdeStatusMessageWithFiles(ideClient: IdeClient): Promise<{
   const connection = ideClient.getConnectionStatus();
   switch (connection.status) {
     case IDEConnectionStatus.Connected: {
-      let content = `🟢 Connected to ${ideClient.getDetectedIdeDisplayName()}`;
+      let content = t('commands:ide.responses.connected', {
+        name: ideClient.getDetectedIdeDisplayName(),
+      });
       const context = ideContextStore.get();
       const openFiles = context?.workspaceState?.openFiles;
       if (openFiles && openFiles.length > 0) {
@@ -103,10 +107,10 @@ async function getIdeStatusMessageWithFiles(ideClient: IdeClient): Promise<{
     case IDEConnectionStatus.Connecting:
       return {
         messageType: 'info',
-        content: `🟡 Connecting...`,
+        content: t('commands:ide.responses.connecting'),
       };
     default: {
-      let content = `🔴 Disconnected`;
+      let content = t('commands:ide.responses.disconnected');
       if (connection?.details) {
         content += `: ${connection.details}`;
       }
@@ -146,7 +150,7 @@ export const ideCommand = async (): Promise<SlashCommand> => {
         ({
           type: 'message',
           messageType: 'error',
-          content: `IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: Antigravity, VS Code, or VS Code forks.`,
+          content: t('commands:ide.responses.notSupported'),
         }) as const,
     };
   }
@@ -186,7 +190,10 @@ export const ideCommand = async (): Promise<SlashCommand> => {
         context.ui.addItem(
           {
             type: 'error',
-            text: `No installer is available for ${ideClient.getDetectedIdeDisplayName()}. Please install the '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' extension manually from the marketplace.`,
+            text: t('commands:ide.responses.noInstaller', {
+              name: ideClient.getDetectedIdeDisplayName(),
+              extension: GEMINI_CLI_COMPANION_EXTENSION_NAME,
+            }),
           },
           Date.now(),
         );
@@ -196,7 +203,7 @@ export const ideCommand = async (): Promise<SlashCommand> => {
       context.ui.addItem(
         {
           type: 'info',
-          text: `Installing IDE companion...`,
+          text: t('commands:ide.responses.installing'),
         },
         Date.now(),
       );
@@ -234,7 +241,7 @@ export const ideCommand = async (): Promise<SlashCommand> => {
           context.ui.addItem(
             {
               type: messageType,
-              text: `Failed to automatically enable IDE integration. To fix this, run the CLI in a new terminal window.`,
+              text: t('commands:ide.responses.autoEnableFailed'),
             },
             Date.now(),
           );

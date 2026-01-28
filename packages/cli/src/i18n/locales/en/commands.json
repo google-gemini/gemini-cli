@@ -196,5 +196,17 @@
     "noLongerAvailable": "{{count}} skill no longer available",
     "noLongerAvailable_plural": "{{count}} skills no longer available",
     "reloadFailed": "Failed to reload skills: {{error}}"
+  },
+  "ide.responses": {
+    "connected": "🟢 Connected to {{name}}",
+    "connecting": "🟡 Connecting...",
+    "disconnected": "🔴 Disconnected",
+    "active": " (active)",
+    "openFilesNote": "\n(Note: The file list is limited to a number of recently accessed files within your workspace and only includes local files on disk)",
+    "openFilesTitle": "\n\nOpen files:\n",
+    "notSupported": "IDE integration is not supported in your current environment. To use this feature, run Gemini CLI in one of these supported IDEs: Antigravity, VS Code, or VS Code forks.",
+    "noInstaller": "No installer is available for {{name}}. Please install the '{{extension}}' extension manually from the marketplace.",
+    "installing": "Installing IDE companion...",
+    "autoEnableFailed": "Failed to automatically enable IDE integration. To fix this, run the CLI in a new terminal window."
   }
 }

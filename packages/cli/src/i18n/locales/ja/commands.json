@@ -191,5 +191,17 @@
     "newlyAvailable": "{{count}} 個のスキルが新しく利用可能になりました。",
     "noLongerAvailable": "{{count}} 個のスキルが利用できなくなりました。",
     "reloadFailed": "スキルの再読み込みに失敗しました: {{error}}"
+  },
+  "ide.responses": {
+    "connected": "🟢 {{name}} に接続済み",
+    "connecting": "🟡 接続中...",
+    "disconnected": "🔴 切断済み",
+    "active": " (アクティブ)",
+    "openFilesNote": "\n(注：ファイル一覧は、ワークスペース内で最近アクセスされた一部のファイルに限定されており、ディスク上のローカルファイルのみが含まれます)",
+    "openFilesTitle": "\n\n開いているファイル:\n",
+    "notSupported": "現在の環境では IDE 連携はサポートされていません。この機能を使用するには、サポートされている IDE（Antigravity、VS Code、または VS Code のフォーク）のいずれかで Gemini CLI を実行してください。",
+    "noInstaller": "{{name}} 用のインストーラーは利用できません。マーケットプレイスから '{{extension}}' 拡張機能を手動でインストールしてください。",
+    "installing": "IDE コンパニオンをインストール中...",
+    "autoEnableFailed": "IDE 連携の自動有効化に失敗しました。これを修正するには、新しいターミナルウィンドウで CLI を実行してください。"
   }
 }
