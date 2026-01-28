@@ -526,5 +526,8 @@ export async function executeToolCall(
     schedulerId: 'root-non-interactive',
   });
   const results = await scheduler.schedule(request, signal);
+  if (results.length === 0) {
+    throw new Error('Tool call execution did not produce a result.');
+  }
   return results[0];
 }
