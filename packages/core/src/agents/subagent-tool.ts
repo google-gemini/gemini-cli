@@ -10,7 +10,6 @@ import {
   type ToolInvocation,
   type ToolResult,
   BaseToolInvocation,
-  type ToolCallConfirmationDetails,
 } from '../tools/tools.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import type { Config } from '../config/config.js';
@@ -83,18 +82,6 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
 
   getDescription(): string {
     return `Delegating to agent '${this.definition.name}'`;
-  }
-
-  override async shouldConfirmExecute(
-    abortSignal: AbortSignal,
-  ): Promise<ToolCallConfirmationDetails | false> {
-    if (this.definition.kind !== 'remote') {
-      // Local agents should execute without confirmation. Inner tool calls will bubble up their own confirmations to the user.
-      return false;
-    }
-
-    const invocation = this.buildSubInvocation(this.definition, this.params);
-    return invocation.shouldConfirmExecute(abortSignal);
   }
 
   async execute(
