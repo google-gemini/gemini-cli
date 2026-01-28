@@ -10,6 +10,7 @@ import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { AskUserDialog } from './AskUserDialog.js';
 import { QuestionType, type Question } from '@google/gemini-cli-core';
+import chalk from 'chalk';
 
 // Helper to write to stdin with proper act() wrapping
 const writeKey = (stdin: { write: (data: string) => void }, key: string) => {
@@ -869,6 +870,62 @@ describe('AskUserDialog', () => {
           '0': 'A1',
           '1': 'A2',
         });
+      });
+    });
+  });
+
+  describe('Markdown rendering', () => {
+    it('renders bold markdown in question', async () => {
+      const questions: Question[] = [
+        {
+          question: 'Is **this** working?',
+          header: 'Test',
+          options: [{ label: 'Yes', description: '' }],
+          multiSelect: false,
+        },
+      ];
+
+      const { lastFrame } = renderWithProviders(
+        <AskUserDialog
+          questions={questions}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+        { width: 120 },
+      );
+
+      await waitFor(() => {
+        const frame = lastFrame();
+        // Check for chalk.bold('this') - asterisks should be gone, text should be bold
+        expect(frame).toContain(chalk.bold('this'));
+        expect(frame).not.toContain('**this**');
+      });
+    });
+
+    it('renders inline code markdown in question', async () => {
+      const questions: Question[] = [
+        {
+          question: 'Run `npm start`?',
+          header: 'Test',
+          options: [{ label: 'Yes', description: '' }],
+          multiSelect: false,
+        },
+      ];
+
+      const { lastFrame } = renderWithProviders(
+        <AskUserDialog
+          questions={questions}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+        />,
+        { width: 120 },
+      );
+
+      await waitFor(() => {
+        const frame = lastFrame();
+        // Backticks should be removed
+        expect(frame).toContain('npm start');
+        expect(frame).not.toContain('`npm start`');
       });
     });
   });

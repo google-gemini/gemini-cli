@@ -28,6 +28,7 @@ import { UIStateContext } from '../contexts/UIStateContext.js';
 import { getCachedStringWidth } from '../utils/textUtils.js';
 import { useTabbedNavigation } from '../hooks/useTabbedNavigation.js';
 import { DialogFooter } from './shared/DialogFooter.js';
+import { MarkdownDisplay } from '../utils/MarkdownDisplay.js';
 
 interface AskUserDialogState {
   answers: { [key: string]: string };
@@ -278,10 +279,12 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
       borderColor={theme.border.default}
     >
       {progressHeader}
-      <Box marginBottom={1}>
-        <Text bold color={theme.text.primary}>
-          {question.question}
-        </Text>
+      <Box flexDirection="column" marginBottom={1}>
+        <MarkdownDisplay
+          text={question.question}
+          terminalWidth={availableWidth - 4}
+          isPending={false}
+        />
       </Box>
 
       <Box flexDirection="row" marginBottom={1}>
@@ -391,14 +394,11 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
   onAnswer,
   onSelectionChange,
   onEditingCustomOption,
+  availableWidth,
   initialAnswer,
   progressHeader,
   keyboardHints,
 }) => {
-  const uiState = useContext(UIStateContext);
-  const terminalWidth = uiState?.terminalWidth ?? 80;
-  const availableWidth = terminalWidth;
-
   const numOptions =
     (question.options?.length ?? 0) + (question.type !== 'yesno' ? 1 : 0);
   const numLen = String(numOptions).length;
@@ -706,10 +706,12 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       borderColor={theme.border.default}
     >
       {progressHeader}
-      <Box marginBottom={1}>
-        <Text bold color={theme.text.primary}>
-          {question.question}
-        </Text>
+      <Box flexDirection="column" marginBottom={1}>
+        <MarkdownDisplay
+          text={question.question}
+          terminalWidth={availableWidth - 4}
+          isPending={false}
+        />
       </Box>
       {question.multiSelect && (
         <Text color={theme.text.secondary} italic>
