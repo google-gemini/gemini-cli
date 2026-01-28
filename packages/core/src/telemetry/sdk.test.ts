@@ -32,6 +32,11 @@ import * as path from 'node:path';
 
 import { authEvents } from '../code_assist/oauth2.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import {
+  detectResources,
+  envDetector,
+  resourceFromAttributes,
+} from '@opentelemetry/resources';
 
 vi.mock('@opentelemetry/exporter-trace-otlp-grpc');
 vi.mock('@opentelemetry/exporter-logs-otlp-grpc');
@@ -41,6 +46,18 @@ vi.mock('@opentelemetry/exporter-logs-otlp-http');
 vi.mock('@opentelemetry/exporter-metrics-otlp-http');
 vi.mock('@opentelemetry/sdk-trace-node');
 vi.mock('@opentelemetry/sdk-node');
+vi.mock('@opentelemetry/resources', () => {
+  const mockMerge = vi.fn().mockReturnThis();
+  const mockResource = { attributes: {}, merge: mockMerge };
+  return {
+    detectResources: vi.fn(() => mockResource),
+    envDetector: { detect: vi.fn() },
+    resourceFromAttributes: vi.fn(() => ({
+      ...mockResource,
+      merge: mockMerge,
+    })),
+  };
+});
 vi.mock('./gcp-exporters.js');
 vi.mock('google-auth-library');
 vi.mock('../utils/debugLogger.js', () => ({
@@ -401,5 +418,42 @@ describe('Telemetry SDK', () => {
     expect(debugLogger.error).not.toHaveBeenCalledWith(
       expect.stringContaining('Telemetry credentials have changed'),
     );
+  });
+
+  describe('OTEL_RESOURCE_ATTRIBUTES support', () => {
+    it('should call detectResources with envDetector', async () => {
+      await initializeTelemetry(mockConfig);
+
+      expect(detectResources).toHaveBeenCalledWith({
+        detectors: [envDetector],
+      });
+    });
+
+    it('should merge env resource with base resource', async () => {
+      const mockMerge = vi.fn().mockReturnThis();
+      const mockEnvResource = { attributes: {}, merge: mockMerge };
+      vi.mocked(detectResources).mockReturnValue(mockEnvResource);
+
+      await initializeTelemetry(mockConfig);
+
+      // Verify detectResources was called
+      expect(detectResources).toHaveBeenCalledWith({
+        detectors: [envDetector],
+      });
+
+      // Verify merge was called (env resource merges with base resource)
+      expect(mockMerge).toHaveBeenCalled();
+    });
+
+    it('should create base resource with required attributes', async () => {
+      await initializeTelemetry(mockConfig);
+
+      expect(resourceFromAttributes).toHaveBeenCalledWith(
+        expect.objectContaining({
+          'service.name': 'gemini-cli',
+          'session.id': 'test-session',
+        }),
+      );
+    });
   });
 });
