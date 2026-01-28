@@ -14,6 +14,7 @@ import type { IndividualToolCallDisplay } from '../../types.js';
 import { ToolCallStatus } from '../../types.js';
 import { Scrollable } from '../shared/Scrollable.js';
 import type { Config } from '@google/gemini-cli-core';
+import { ASK_USER_DISPLAY_NAME } from '@google/gemini-cli-core';
 
 describe('<ToolGroupMessage />', () => {
   const createToolCall = (
@@ -655,6 +656,81 @@ describe('<ToolGroupMessage />', () => {
       expect(output).not.toContain('confirm-tool');
       expect(output).not.toContain('Do you want to proceed?');
       expect(output).toMatchSnapshot();
+      unmount();
+    });
+  });
+
+  describe('Ask User Filtering', () => {
+    it('filters out ask_user when status is Pending, Executing, or Confirming', () => {
+      const statuses = [
+        ToolCallStatus.Pending,
+        ToolCallStatus.Executing,
+        ToolCallStatus.Confirming,
+      ];
+
+      for (const status of statuses) {
+        const toolCalls = [
+          createToolCall({
+            callId: `ask-user-${status}`,
+            name: ASK_USER_DISPLAY_NAME,
+            status,
+          }),
+        ];
+
+        const { lastFrame, unmount } = renderWithProviders(
+          <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+          { config: baseMockConfig },
+        );
+
+        expect(lastFrame()).toBe('');
+        unmount();
+      }
+    });
+
+    it('does NOT filter out ask_user when status is Success or Error', () => {
+      const statuses = [ToolCallStatus.Success, ToolCallStatus.Error];
+
+      for (const status of statuses) {
+        const toolCalls = [
+          createToolCall({
+            callId: `ask-user-${status}`,
+            name: ASK_USER_DISPLAY_NAME,
+            status,
+          }),
+        ];
+
+        const { lastFrame, unmount } = renderWithProviders(
+          <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+          { config: baseMockConfig },
+        );
+
+        expect(lastFrame()).toContain(ASK_USER_DISPLAY_NAME);
+        unmount();
+      }
+    });
+
+    it('shows other tools when ask_user is filtered out', () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'other-tool',
+          name: 'other-tool',
+          status: ToolCallStatus.Success,
+        }),
+        createToolCall({
+          callId: 'ask-user-pending',
+          name: ASK_USER_DISPLAY_NAME,
+          status: ToolCallStatus.Pending,
+        }),
+      ];
+
+      const { lastFrame, unmount } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        { config: baseMockConfig },
+      );
+
+      const output = lastFrame();
+      expect(output).toContain('other-tool');
+      expect(output).not.toContain(ASK_USER_DISPLAY_NAME);
       unmount();
     });
   });
