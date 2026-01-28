@@ -191,7 +191,7 @@ export function BaseSettingsDialog({
   }, [showScopeSelector, focusSection]);
 
   // Scope selector items
-  const scopeItems = getScopeItems().map((item) => ({
+  const scopeItems = getScopeItems(t).map((item) => ({
     ...item,
     key: item.value,
   }));

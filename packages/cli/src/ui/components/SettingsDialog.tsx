@@ -45,7 +45,7 @@ import {
   BaseSettingsDialog,
   type SettingsDialogItem,
 } from './shared/BaseSettingsDialog.js';
-import { useTranslation } from '../../i18n/useTranslation.js';
+import { useTranslation } from 'react-i18next';
 
 interface FzfResult {
   item: string;
@@ -197,6 +197,7 @@ export function SettingsDialog({
         key,
         selectedScope,
         settings,
+        t,
       );
       const label = def.label || key;
       const labelFull = label + (scopeMessage ? ` ${scopeMessage}` : '');
@@ -208,7 +209,7 @@ export function SettingsDialog({
       max = Math.max(max, lWidth, dWidth);
     }
     return max;
-  }, [selectedScope, settings]);
+  }, [selectedScope, settings, t]);
 
   // Get mainAreaWidth for search buffer viewport
   const { mainAreaWidth } = useUIState();
@@ -256,6 +257,7 @@ export function SettingsDialog({
         key,
         selectedScope,
         settings,
+        t,
       );
 
       // Check if the value is at default (grey it out)
@@ -275,7 +277,14 @@ export function SettingsDialog({
         rawValue: rawValue as string | number | boolean | undefined,
       };
     });
-  }, [settingKeys, selectedScope, settings, modifiedSettings, pendingSettings]);
+  }, [
+    settingKeys,
+    selectedScope,
+    settings,
+    modifiedSettings,
+    pendingSettings,
+    t,
+  ]);
 
   // Scope selection handler
   const handleScopeChange = useCallback((scope: LoadableSettingScope) => {

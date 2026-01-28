@@ -199,6 +199,7 @@ export function ThemeDialog({
     'ui.theme',
     selectedScope,
     settings,
+    t,
   );
 
   // Constants for calculating preview pane layout.

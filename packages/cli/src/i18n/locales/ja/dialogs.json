@@ -298,5 +298,12 @@
       "tabChangeFocus": "、Tabでフォーカス切替",
       "full": "(Enterで選択、Ctrl+Lでリセット{{scopeHelp}}、Escで閉じる)"
     }
+  },
+  "scopes": {
+    "user": "ユーザー設定",
+    "workspace": "ワークスペース設定",
+    "system": "システム設定",
+    "alsoModifiedIn": "({{scopes}} でも変更されています)",
+    "modifiedIn": "({{scopes}} で変更されています)"
   }
 }

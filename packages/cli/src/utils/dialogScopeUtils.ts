@@ -12,28 +12,19 @@ import { isLoadableSettingScope, SettingScope } from '../config/settings.js';
 import { settingExistsInScope } from './settingsUtils.js';
 
 /**
- * Shared scope labels for dialog components that need to display setting scopes
- */
-export const SCOPE_LABELS = {
-  [SettingScope.User]: 'User Settings',
-  [SettingScope.Workspace]: 'Workspace Settings',
-  [SettingScope.System]: 'System Settings',
-} as const;
-
-/**
  * Helper function to get scope items for radio button selects
  */
-export function getScopeItems(): Array<{
+export function getScopeItems(t: (key: string) => string): Array<{
   label: string;
   value: LoadableSettingScope;
 }> {
   return [
-    { label: SCOPE_LABELS[SettingScope.User], value: SettingScope.User },
+    { label: t('scopes.user'), value: SettingScope.User },
     {
-      label: SCOPE_LABELS[SettingScope.Workspace],
+      label: t('scopes.workspace'),
       value: SettingScope.Workspace,
     },
-    { label: SCOPE_LABELS[SettingScope.System], value: SettingScope.System },
+    { label: t('scopes.system'), value: SettingScope.System },
   ];
 }
 
@@ -44,6 +35,7 @@ export function getScopeMessageForSetting(
   settingKey: string,
   selectedScope: LoadableSettingScope,
   settings: LoadedSettings,
+  t: (key: string, options?: Record<string, unknown>) => string,
 ): string {
   const otherScopes = Object.values(SettingScope)
     .filter(isLoadableSettingScope)
@@ -58,7 +50,9 @@ export function getScopeMessageForSetting(
     return '';
   }
 
-  const modifiedScopesStr = modifiedInOtherScopes.join(', ');
+  const modifiedScopesStr = modifiedInOtherScopes
+    .map((s) => t(`scopes.${s.toLowerCase()}`))
+    .join(', ');
   const currentScopeSettings = settings.forScope(selectedScope).settings;
   const existsInCurrentScope = settingExistsInScope(
     settingKey,
@@ -66,6 +60,6 @@ export function getScopeMessageForSetting(
   );
 
   return existsInCurrentScope
-    ? `(Also modified in ${modifiedScopesStr})`
-    : `(Modified in ${modifiedScopesStr})`;
+    ? t('scopes.alsoModifiedIn', { scopes: modifiedScopesStr })
+    : t('scopes.modifiedIn', { scopes: modifiedScopesStr });
 }

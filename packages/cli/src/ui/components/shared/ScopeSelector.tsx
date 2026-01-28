@@ -6,6 +6,7 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
+import { useTranslation } from 'react-i18next';
 import type { LoadableSettingScope } from '../../../config/settings.js';
 import { getScopeItems } from '../../../utils/dialogScopeUtils.js';
 import { RadioButtonSelect } from './RadioButtonSelect.js';
@@ -27,7 +28,8 @@ export function ScopeSelector({
   isFocused,
   initialScope,
 }: ScopeSelectorProps): React.JSX.Element {
-  const scopeItems = getScopeItems().map((item) => ({
+  const { t } = useTranslation('dialogs');
+  const scopeItems = getScopeItems(t).map((item) => ({
     ...item,
     key: item.value,
   }));
@@ -40,7 +42,8 @@ export function ScopeSelector({
   return (
     <Box flexDirection="column">
       <Text bold={isFocused} wrap="truncate">
-        {isFocused ? '> ' : '  '}Apply To
+        {isFocused ? '> ' : '  '}
+        {t('baseSettings.applyTo')}
       </Text>
       <RadioButtonSelect
         items={scopeItems}

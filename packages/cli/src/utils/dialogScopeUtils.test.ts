@@ -28,13 +28,24 @@ vi.mock('./settingsUtils', () => ({
 }));
 
 describe('dialogScopeUtils', () => {
+  const mockT = vi.fn((key: string, options?: Record<string, unknown>) => {
+    if (key === 'scopes.user') return 'User Settings';
+    if (key === 'scopes.workspace') return 'Workspace Settings';
+    if (key === 'scopes.system') return 'System Settings';
+    if (key === 'scopes.alsoModifiedIn')
+      return `(Also modified in ${options?.['scopes']})`;
+    if (key === 'scopes.modifiedIn')
+      return `(Modified in ${options?.['scopes']})`;
+    return key;
+  });
+
   beforeEach(() => {
     vi.resetAllMocks();
   });
 
   describe('getScopeItems', () => {
     it('should return scope items with correct labels and values', () => {
-      const items = getScopeItems();
+      const items = getScopeItems(mockT);
       expect(items).toEqual([
         { label: 'User Settings', value: SettingScope.User },
         { label: 'Workspace Settings', value: SettingScope.Workspace },
@@ -58,6 +69,7 @@ describe('dialogScopeUtils', () => {
         'key',
         SettingScope.User,
         mockSettings as unknown as LoadedSettings,
+        mockT,
       );
       expect(message).toBe('');
     });
@@ -69,10 +81,11 @@ describe('dialogScopeUtils', () => {
         'key',
         SettingScope.User,
         mockSettings as unknown as LoadedSettings,
+        mockT,
       );
       expect(message).toMatch(/Also modified in/);
-      expect(message).toMatch(/workspace/);
-      expect(message).toMatch(/system/);
+      expect(message).toMatch(/Workspace Settings/);
+      expect(message).toMatch(/System Settings/);
     });
 
     it('should return message indicating modification in other scopes but not current', () => {
@@ -101,8 +114,9 @@ describe('dialogScopeUtils', () => {
         'key',
         SettingScope.User,
         mockSettings as unknown as LoadedSettings,
+        mockT,
       );
-      expect(message).toBe('(Modified in workspace)');
+      expect(message).toBe('(Modified in Workspace Settings)');
     });
   });
 });
