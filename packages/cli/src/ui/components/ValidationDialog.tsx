@@ -15,6 +15,7 @@ import {
   shouldLaunchBrowser,
   type ValidationIntent,
 } from '@google/gemini-cli-core';
+import { useTranslation } from 'react-i18next';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 
@@ -32,17 +33,18 @@ export function ValidationDialog({
   learnMoreUrl,
   onChoice,
 }: ValidationDialogProps): React.JSX.Element {
+  const { t } = useTranslation('dialogs');
   const [state, setState] = useState<DialogState>('choosing');
   const [errorMessage, setErrorMessage] = useState<string>('');
 
   const items = [
     {
-      label: 'Verify your account',
+      label: t('validation.verifyAccount'),
       value: 'verify' as const,
       key: 'verify',
     },
     {
-      label: 'Change authentication',
+      label: t('validation.changeAuth'),
       value: 'change_auth' as const,
       key: 'change_auth',
     },
@@ -82,9 +84,7 @@ export function ValidationDialog({
           // Check if we're in an environment where we can launch a browser
           if (!shouldLaunchBrowser()) {
             // In headless mode, show the link and wait for user to manually verify
-            setErrorMessage(
-              `Please open this URL in a browser: ${validationLink}`,
-            );
+            setErrorMessage(t('validation.openUrl', { url: validationLink }));
             setState('waiting');
             return;
           }
@@ -94,7 +94,9 @@ export function ValidationDialog({
             setState('waiting');
           } catch (error) {
             setErrorMessage(
-              error instanceof Error ? error.message : 'Failed to open browser',
+              error instanceof Error
+                ? error.message
+                : t('validation.failedOpenBrowser'),
             );
             setState('error');
           }
@@ -114,8 +116,7 @@ export function ValidationDialog({
     return (
       <Box borderStyle="round" flexDirection="column" padding={1}>
         <Text color={theme.status.error}>
-          {errorMessage ||
-            'Failed to open verification link. Please try again or change authentication.'}
+          {errorMessage || t('validation.failedOpenLink')}
         </Text>
         <Box marginTop={1}>
           <RadioButtonSelect
@@ -132,10 +133,7 @@ export function ValidationDialog({
       <Box borderStyle="round" flexDirection="column" padding={1}>
         <Box>
           <CliSpinner />
-          <Text>
-            {' '}
-            Waiting for verification... (Press ESC or CTRL+C to cancel)
-          </Text>
+          <Text> {t('validation.waiting')}</Text>
         </Box>
         {errorMessage && (
           <Box marginTop={1}>
@@ -143,7 +141,7 @@ export function ValidationDialog({
           </Box>
         )}
         <Box marginTop={1}>
-          <Text dimColor>Press Enter when verification is complete.</Text>
+          <Text dimColor>{t('validation.pressEnter')}</Text>
         </Box>
       </Box>
     );
@@ -152,7 +150,7 @@ export function ValidationDialog({
   if (state === 'complete') {
     return (
       <Box borderStyle="round" flexDirection="column" padding={1}>
-        <Text color={theme.status.success}>Verification complete</Text>
+        <Text color={theme.status.success}>{t('validation.complete')}</Text>
       </Box>
     );
   }
@@ -160,7 +158,7 @@ export function ValidationDialog({
   return (
     <Box borderStyle="round" flexDirection="column" padding={1}>
       <Box marginBottom={1}>
-        <Text>Further action is required to use this service.</Text>
+        <Text>{t('validation.actionRequired')}</Text>
       </Box>
       <Box marginTop={1} marginBottom={1}>
         <RadioButtonSelect
@@ -171,7 +169,8 @@ export function ValidationDialog({
       {learnMoreUrl && (
         <Box marginTop={1}>
           <Text dimColor>
-            Learn more: <Text color={theme.text.accent}>{learnMoreUrl}</Text>
+            {t('validation.learnMore')}{' '}
+            <Text color={theme.text.accent}>{learnMoreUrl}</Text>
           </Text>
         </Box>
       )}
