@@ -1446,13 +1446,6 @@
           "default": false,
           "type": "boolean"
         },
-        "skills": {
-          "title": "Agent Skills (Deprecated)",
-          "description": "[Deprecated] Enable Agent Skills (experimental).",
-          "markdownDescription": "[Deprecated] Enable Agent Skills (experimental).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
-          "type": "boolean"
-        },
         "useOSC52Paste": {
           "title": "Use OSC 52 Paste",
           "description": "Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).",

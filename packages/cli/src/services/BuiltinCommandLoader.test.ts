@@ -119,11 +119,12 @@ describe('BuiltinCommandLoader', () => {
       getEnableHooks: () => false,
       getEnableHooksUI: () => false,
       getExtensionsEnabled: vi.fn().mockReturnValue(true),
-      isSkillsSupportEnabled: vi.fn().mockReturnValue(false),
+      isSkillsSupportEnabled: vi.fn().mockReturnValue(true),
       isAgentsEnabled: vi.fn().mockReturnValue(false),
       getMcpEnabled: vi.fn().mockReturnValue(true),
       getSkillManager: vi.fn().mockReturnValue({
         getAllSkills: vi.fn().mockReturnValue([]),
+        isAdminEnabled: vi.fn().mockReturnValue(true),
       }),
     } as unknown as Config;
 
@@ -260,11 +261,12 @@ describe('BuiltinCommandLoader profile', () => {
       getEnableHooks: () => false,
       getEnableHooksUI: () => false,
       getExtensionsEnabled: vi.fn().mockReturnValue(true),
-      isSkillsSupportEnabled: vi.fn().mockReturnValue(false),
+      isSkillsSupportEnabled: vi.fn().mockReturnValue(true),
       isAgentsEnabled: vi.fn().mockReturnValue(false),
       getMcpEnabled: vi.fn().mockReturnValue(true),
       getSkillManager: vi.fn().mockReturnValue({
         getAllSkills: vi.fn().mockReturnValue([]),
+        isAdminEnabled: vi.fn().mockReturnValue(true),
       }),
     } as unknown as Config;
   });
