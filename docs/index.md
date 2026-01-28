@@ -102,10 +102,10 @@ This documentation is organized into the following sections:
 
 - **[Introduction: Extensions](./extensions/index.md):** How to extend the CLI
   with new functionality.
-- **[Get Started with extensions](./extensions/getting-started-extensions.md):**
-  Learn how to build your own extension.
-- **[Extension releasing](./extensions/extension-releasing.md):** How to release
-  Gemini CLI extensions.
+- **[Writing extensions](./extensions/writing-extensions.md):** Learn how to
+  build your own extension.
+- **[Extension releasing](./extensions/releasing.md):** How to release Gemini
+  CLI extensions.
 
 ### Hooks
 

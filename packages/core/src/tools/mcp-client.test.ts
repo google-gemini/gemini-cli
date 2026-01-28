@@ -223,7 +223,7 @@ describe('mcp-client', () => {
       consoleWarnSpy.mockRestore();
     });
 
-    it('should handle errors when discovering prompts', async () => {
+    it('should propagate errors when discovering prompts', async () => {
       const mockedClient = {
         connect: vi.fn(),
         discover: vi.fn(),
@@ -269,9 +269,7 @@ describe('mcp-client', () => {
         '0.0.1',
       );
       await client.connect();
-      await expect(client.discover({} as Config)).rejects.toThrow(
-        'No prompts, tools, or resources found on the server.',
-      );
+      await expect(client.discover({} as Config)).rejects.toThrow('Test error');
       expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
         'error',
         `Error discovering prompts from test-server: Test error`,
@@ -637,6 +635,89 @@ describe('mcp-client', () => {
       expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
         'info',
         'Resources updated for server: test-server',
+      );
+    });
+
+    it('refreshes prompts when prompt list change notification is received', async () => {
+      let listCallCount = 0;
+      let promptListHandler:
+        | ((notification: unknown) => Promise<void> | void)
+        | undefined;
+      const mockedClient = {
+        connect: vi.fn(),
+        discover: vi.fn(),
+        disconnect: vi.fn(),
+        getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        setNotificationHandler: vi.fn((_, handler) => {
+          promptListHandler = handler;
+        }),
+        getServerCapabilities: vi
+          .fn()
+          .mockReturnValue({ prompts: { listChanged: true } }),
+        listPrompts: vi.fn().mockImplementation(() => {
+          listCallCount += 1;
+          if (listCallCount === 1) {
+            return Promise.resolve({
+              prompts: [{ name: 'one', description: 'first' }],
+            });
+          }
+          return Promise.resolve({
+            prompts: [{ name: 'two', description: 'second' }],
+          });
+        }),
+        request: vi.fn().mockResolvedValue({ prompts: [] }),
+      } as unknown as ClientLib.Client;
+      vi.mocked(ClientLib.Client).mockReturnValue(mockedClient);
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+      const mockedToolRegistry = {
+        registerTool: vi.fn(),
+        sortTools: vi.fn(),
+        getMessageBus: vi.fn().mockReturnValue(undefined),
+      } as unknown as ToolRegistry;
+      const promptRegistry = {
+        registerPrompt: vi.fn(),
+        removePromptsByServer: vi.fn(),
+      } as unknown as PromptRegistry;
+      const resourceRegistry = {
+        setResourcesForServer: vi.fn(),
+        removeResourcesByServer: vi.fn(),
+      } as unknown as ResourceRegistry;
+      const client = new McpClient(
+        'test-server',
+        {
+          command: 'test-command',
+        },
+        mockedToolRegistry,
+        promptRegistry,
+        resourceRegistry,
+        workspaceContext,
+        { sanitizationConfig: EMPTY_CONFIG } as Config,
+        false,
+        '0.0.1',
+      );
+      await client.connect();
+      await client.discover({ sanitizationConfig: EMPTY_CONFIG } as Config);
+
+      expect(mockedClient.setNotificationHandler).toHaveBeenCalledOnce();
+      expect(promptListHandler).toBeDefined();
+
+      await promptListHandler?.({
+        method: 'notifications/prompts/list_changed',
+      });
+
+      expect(promptRegistry.removePromptsByServer).toHaveBeenCalledWith(
+        'test-server',
+      );
+      expect(promptRegistry.registerPrompt).toHaveBeenLastCalledWith(
+        expect.objectContaining({ name: 'two' }),
+      );
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'info',
+        'Prompts updated for server: test-server',
       );
     });
 

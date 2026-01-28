@@ -8,7 +8,19 @@ file.
 ## Prerequisites
 
 Before you start, make sure you have the Gemini CLI installed and a basic
-understanding of Node.js and TypeScript.
+understanding of Node.js.
+
+## When to use what
+
+Extensions offer a variety of ways to customize Gemini CLI.
+
+| Feature                                                        | What it is                                                                                                         | When to use it                                                                                                                                                                                                                                                                                 | Invoked by            |
+| :------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------- |
+| **[MCP server](reference.md#mcp-servers)**                     | A standard way to expose new tools and data sources to the model.                                                  | Use this when you want the model to be able to _do_ new things, like fetching data from an internal API, querying a database, or controlling a local application. We also support MCP resources (which can replace custom commands) and system instructions (which can replace custom context) | Model                 |
+| **[Custom commands](../cli/custom-commands.md)**               | A shortcut (like `/my-cmd`) that executes a pre-defined prompt or shell command.                                   | Use this for repetitive tasks or to save long, complex prompts that you use frequently. Great for automation.                                                                                                                                                                                  | User                  |
+| **[Context file (`GEMINI.md`)](reference.md#contextfilename)** | A markdown file containing instructions that are loaded into the model's context at the start of every session.    | Use this to define the "personality" of your extension, set coding standards, or provide essential knowledge that the model should always have.                                                                                                                                                | CLI provides to model |
+| **[Agent skills](../cli/skills.md)**                           | A specialized set of instructions and workflows that the model activates only when needed.                         | Use this for complex, occasional tasks (like "create a PR" or "audit security") to avoid cluttering the main context window when the skill isn't being used.                                                                                                                                   | Model                 |
+| **[Hooks](../hooks/index.md)**                                 | A way to intercept and customize the CLI's behavior at specific lifecycle events (e.g., before/after a tool call). | Use this when you want to automate actions based on what the model is doing, like validating tool arguments, logging activity, or modifying the model's input/output.                                                                                                                          | CLI                   |
 
 ## Step 1: Create a new extension
 
@@ -26,10 +38,9 @@ This will create a new directory with the following structure:
 
 ```
 my-first-extension/
-├── example.ts
+├── example.js
 ├── gemini-extension.json
-├── package.json
-└── tsconfig.json
+└── package.json
 ```
 
 ## Step 2: Understand the extension files
@@ -43,12 +54,12 @@ and use your extension.
 
 ```json
 {
-  "name": "my-first-extension",
+  "name": "mcp-server-example",
   "version": "1.0.0",
   "mcpServers": {
     "nodeServer": {
       "command": "node",
-      "args": ["${extensionPath}${/}dist${/}example.js"],
+      "args": ["${extensionPath}${/}example.js"],
       "cwd": "${extensionPath}"
     }
   }
@@ -64,12 +75,12 @@ and use your extension.
     with the absolute path to your extension's installation directory. This
     allows your extension to work regardless of where it's installed.
 
-### `example.ts`
+### `example.js`
 
 This file contains the source code for your MCP server. It's a simple Node.js
 server that uses the `@modelcontextprotocol/sdk`.
 
-```typescript
+```javascript
 /**
  * @license
  * Copyright 2025 Google LLC
@@ -118,16 +129,15 @@ await server.connect(transport);
 This server defines a single tool called `fetch_posts` that fetches data from a
 public API.
 
-### `package.json` and `tsconfig.json`
+### `package.json`
 
-These are standard configuration files for a TypeScript project. The
-`package.json` file defines dependencies and a `build` script, and
-`tsconfig.json` configures the TypeScript compiler.
+This is the standard configuration file for a Node.js project. It defines
+dependencies and scripts.
 
-## Step 3: Build and link your extension
+## Step 3: Link your extension
 
-Before you can use the extension, you need to compile the TypeScript code and
-link the extension to your Gemini CLI installation for local development.
+Before you can use the extension, you need to link it to your Gemini CLI
+installation for local development.
 
 1.  **Install dependencies:**
 
@@ -136,16 +146,7 @@ link the extension to your Gemini CLI installation for local development.
     npm install
     ```
 
-2.  **Build the server:**
-
-    ```bash
-    npm run build
-    ```
-
-    This will compile `example.ts` into `dist/example.js`, which is the file
-    referenced in your `gemini-extension.json`.
-
-3.  **Link the extension:**
+2.  **Link the extension:**
 
     The `link` command creates a symbolic link from the Gemini CLI extensions
     directory to your development directory. This means any changes you make
@@ -212,7 +213,7 @@ need this for extensions built to expose commands and prompts.
       "mcpServers": {
         "nodeServer": {
           "command": "node",
-          "args": ["${extensionPath}${/}dist${/}example.js"],
+          "args": ["${extensionPath}${/}example.js"],
           "cwd": "${extensionPath}"
         }
       }
@@ -265,7 +266,7 @@ primary ways of releasing extensions are via a Git repository or through GitHub
 Releases. Using a public Git repository is the simplest method.
 
 For detailed instructions on both methods, please refer to the
-[Extension Releasing Guide](./extension-releasing.md).
+[Extension Releasing Guide](./releasing.md).
 
 ## Conclusion
 

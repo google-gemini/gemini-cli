@@ -14,7 +14,7 @@ import {
   escapeAnsiCtrlCodes,
   stripUnsafeCharacters,
   getCachedStringWidth,
-  sanitizeForListDisplay,
+  sanitizeForDisplay,
   pruneShellOutput,
 } from './textUtils.js';
 
@@ -87,24 +87,27 @@ describe('textUtils', () => {
   describe('sanitizeForListDisplay', () => {
     it('should strip ANSI codes and replace newlines/tabs with spaces', () => {
       const input = '\u001b[31mLine 1\nLine 2\tTabbed\r\nEnd\u001b[0m';
-      expect(sanitizeForListDisplay(input)).toBe('Line 1 Line 2 Tabbed End');
+      expect(sanitizeForDisplay(input)).toBe('Line 1 Line 2 Tabbed End');
     });
 
     it('should collapse multiple consecutive whitespace characters into a single space', () => {
       const input = 'Multiple \n\n newlines and \t\t tabs';
-      expect(sanitizeForListDisplay(input)).toBe('Multiple newlines and tabs');
+      expect(sanitizeForDisplay(input)).toBe('Multiple newlines and tabs');
     });
 
     it('should truncate long strings', () => {
       const longInput = 'a'.repeat(50);
-      expect(sanitizeForListDisplay(longInput, 20)).toBe(
-        'a'.repeat(17) + '...',
-      );
+      expect(sanitizeForDisplay(longInput, 20)).toBe('a'.repeat(17) + '...');
     });
 
     it('should handle empty or null input', () => {
-      expect(sanitizeForListDisplay('')).toBe('');
-      expect(sanitizeForListDisplay(null as unknown as string)).toBe('');
+      expect(sanitizeForDisplay('')).toBe('');
+      expect(sanitizeForDisplay(null as unknown as string)).toBe('');
+    });
+
+    it('should strip control characters like backspace', () => {
+      const input = 'Hello\x08 World';
+      expect(sanitizeForDisplay(input)).toBe('Hello World');
     });
   });
 

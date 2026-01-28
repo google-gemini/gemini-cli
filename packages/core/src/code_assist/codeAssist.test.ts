@@ -35,7 +35,10 @@ describe('codeAssist', () => {
 
   describe('createCodeAssistContentGenerator', () => {
     const httpOptions = {};
-    const mockConfig = {} as Config;
+    const mockValidationHandler = vi.fn();
+    const mockConfig = {
+      getValidationHandler: () => mockValidationHandler,
+    } as unknown as Config;
     const mockAuthClient = { a: 'client' };
     const mockUserData = {
       projectId: 'test-project',
@@ -57,7 +60,10 @@ describe('codeAssist', () => {
         AuthType.LOGIN_WITH_GOOGLE,
         mockConfig,
       );
-      expect(setupUser).toHaveBeenCalledWith(mockAuthClient);
+      expect(setupUser).toHaveBeenCalledWith(
+        mockAuthClient,
+        mockValidationHandler,
+      );
       expect(MockedCodeAssistServer).toHaveBeenCalledWith(
         mockAuthClient,
         'test-project',
@@ -83,7 +89,10 @@ describe('codeAssist', () => {
         AuthType.COMPUTE_ADC,
         mockConfig,
       );
-      expect(setupUser).toHaveBeenCalledWith(mockAuthClient);
+      expect(setupUser).toHaveBeenCalledWith(
+        mockAuthClient,
+        mockValidationHandler,
+      );
       expect(MockedCodeAssistServer).toHaveBeenCalledWith(
         mockAuthClient,
         'test-project',

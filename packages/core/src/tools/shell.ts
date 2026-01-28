@@ -32,7 +32,7 @@ import type {
   ShellOutputEvent,
 } from '../services/shellExecutionService.js';
 import { ShellExecutionService } from '../services/shellExecutionService.js';
-import { formatMemoryUsage } from '../utils/formatters.js';
+import { formatBytes } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
   getCommandRoots,
@@ -231,7 +231,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
                 break;
               case 'binary_progress':
                 isBinaryStream = true;
-                cumulativeOutput = `[Receiving binary output... ${formatMemoryUsage(
+                cumulativeOutput = `[Receiving binary output... ${formatBytes(
                   event.bytesReceived,
                 )} received]`;
                 if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
@@ -308,22 +308,31 @@ export class ShellToolInvocation extends BaseToolInvocation<
       } else {
         // Create a formatted error string for display, replacing the wrapper command
         // with the user-facing command.
-        const finalError = result.error
-          ? result.error.message.replace(commandToExecute, this.params.command)
-          : '(none)';
+        const llmContentParts = [`Output: ${result.output || '(empty)'}`];
 
-        llmContent = [
-          `Command: ${this.params.command}`,
-          `Directory: ${this.params.dir_path || '(root)'}`,
-          `Output: ${result.output || '(empty)'}`,
-          `Error: ${finalError}`,
-          `Exit Code: ${result.exitCode ?? '(none)'}`,
-          `Signal: ${result.signal ?? '(none)'}`,
-          `Background PIDs: ${
-            backgroundPIDs.length ? backgroundPIDs.join(', ') : '(none)'
-          }`,
-          `Process Group PGID: ${result.pid ?? '(none)'}`,
-        ].join('\n');
+        if (result.error) {
+          const finalError = result.error.message.replaceAll(
+            commandToExecute,
+            this.params.command,
+          );
+          llmContentParts.push(`Error: ${finalError}`);
+        }
+
+        if (result.exitCode !== null && result.exitCode !== 0) {
+          llmContentParts.push(`Exit Code: ${result.exitCode}`);
+        }
+
+        if (result.signal) {
+          llmContentParts.push(`Signal: ${result.signal}`);
+        }
+        if (backgroundPIDs.length) {
+          llmContentParts.push(`Background PIDs: ${backgroundPIDs.join(', ')}`);
+        }
+        if (result.pid) {
+          llmContentParts.push(`Process Group PGID: ${result.pid}`);
+        }
+
+        llmContent = llmContentParts.join('\n');
       }
 
       let returnDisplayMessage = '';
@@ -398,15 +407,12 @@ function getShellToolDescription(): string {
 
       The following information is returned:
 
-      Command: Executed command.
-      Directory: Directory where command was executed, or \`(root)\`.
-      Stdout: Output on stdout stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
-      Stderr: Output on stderr stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
-      Error: Error or \`(none)\` if no error was reported for the subprocess.
-      Exit Code: Exit code or \`(none)\` if terminated by signal.
-      Signal: Signal number or \`(none)\` if no signal was received.
-      Background PIDs: List of background processes started or \`(none)\`.
-      Process Group PGID: Process group started or \`(none)\``;
+      Output: Combined stdout/stderr. Can be \`(empty)\` or partial on error and for any unwaited background processes.
+      Exit Code: Only included if non-zero (command failed).
+      Error: Only included if a process-level error occurred (e.g., spawn failure).
+      Signal: Only included if process was terminated by a signal.
+      Background PIDs: Only included if background processes were started.
+      Process Group PGID: Only included if available.`;
 
   if (os.platform() === 'win32') {
     return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. Command can start background processes using PowerShell constructs such as \`Start-Process -NoNewWindow\` or \`Start-Job\`.${returnedInfo}`;
