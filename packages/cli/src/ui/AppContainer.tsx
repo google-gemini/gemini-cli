@@ -1443,6 +1443,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       if (keyMatchers[Command.SHOW_ERROR_DETAILS](key)) {
         setShowErrorDetails((prev) => !prev);
         return true;
+      } else if (keyMatchers[Command.SUSPEND_APP](key)) {
+        handleWarning('Undo has been moved to Cmd + Z or Alt/Opt + Z');
+        return true;
       } else if (keyMatchers[Command.SHOW_FULL_TODOS](key)) {
         setShowFullTodos((prev) => !prev);
         return true;
