@@ -30,6 +30,18 @@ exports[`TableRenderer > handles rows with missing cells 1`] = `
 "
 `;
 
+exports[`TableRenderer > renders a 3x3 table correctly 1`] = `
+"
+┌──────────────┬──────────────┬──────────────┐
+│ Header 1     │ Header 2     │ Header 3     │
+├──────────────┼──────────────┼──────────────┤
+│ Row 1, Col 1 │ Row 1, Col 2 │ Row 1, Col 3 │
+│ Row 2, Col 1 │ Row 2, Col 2 │ Row 2, Col 3 │
+│ Row 3, Col 1 │ Row 3, Col 2 │ Row 3, Col 3 │
+└──────────────┴──────────────┴──────────────┘
+"
+`;
+
 exports[`TableRenderer > renders a simple table correctly 1`] = `
 "
 ┌─────────┬──────────┬──────────┐
