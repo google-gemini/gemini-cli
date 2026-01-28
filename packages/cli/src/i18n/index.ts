@@ -32,7 +32,17 @@ async function loadTranslationFile(
   }
 }
 
-const namespaces = ['common', 'help', 'dialogs', 'loading', 'commands'];
+const namespaces = [
+  'common',
+  'help',
+  'dialogs',
+  'loading',
+  'commands',
+  'ui',
+  'messages',
+  'privacy',
+  'auth',
+];
 const localesDir = path.join(__dirname, 'locales');
 
 interface LocaleManifest {
