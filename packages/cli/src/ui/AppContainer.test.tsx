@@ -29,7 +29,13 @@ import {
   type ResumedSessionData,
   AuthType,
   type AgentDefinition,
+  MessageBusType,
+  QuestionType,
 } from '@google/gemini-cli-core';
+import {
+  AskUserActionsContext,
+  type AskUserState,
+} from './contexts/AskUserActionsContext.js';
 
 // Mock coreEvents
 const mockCoreEvents = vi.hoisted(() => ({
@@ -107,9 +113,11 @@ vi.mock('ink', async (importOriginal) => {
 // so we can assert against them in our tests.
 let capturedUIState: UIState;
 let capturedUIActions: UIActions;
+let capturedAskUserRequest: AskUserState | null;
 function TestContextConsumer() {
   capturedUIState = useContext(UIStateContext)!;
   capturedUIActions = useContext(UIActionsContext)!;
+  capturedAskUserRequest = useContext(AskUserActionsContext)?.request ?? null;
   return null;
 }
 
@@ -185,6 +193,7 @@ import {
   disableMouseEvents,
 } from '@google/gemini-cli-core';
 import { type ExtensionManager } from '../config/extension-manager.js';
+import { WARNING_PROMPT_DURATION_MS } from './constants.js';
 
 describe('AppContainer State Management', () => {
   let mockConfig: Config;
@@ -259,6 +268,7 @@ describe('AppContainer State Management', () => {
     mocks.mockStdout.write.mockClear();
 
     capturedUIState = null!;
+    capturedAskUserRequest = null;
 
     // **Provide a default return value for EVERY mocked hook.**
     mockedUseQuotaAndFallback.mockReturnValue({
@@ -1891,7 +1901,7 @@ describe('AppContainer State Management', () => {
 
         // Advance timer past the reset threshold
         act(() => {
-          vi.advanceTimersByTime(1001);
+          vi.advanceTimersByTime(WARNING_PROMPT_DURATION_MS + 1);
         });
 
         pressKey({ name: 'c', ctrl: true });
@@ -1936,7 +1946,7 @@ describe('AppContainer State Management', () => {
 
         // Advance timer past the reset threshold
         act(() => {
-          vi.advanceTimersByTime(1001);
+          vi.advanceTimersByTime(WARNING_PROMPT_DURATION_MS + 1);
         });
 
         pressKey({ name: 'd', ctrl: true });
@@ -2495,6 +2505,41 @@ describe('AppContainer State Management', () => {
       // (it should not be affected by clearing conversation history)
       expect(capturedUIState.userMessages).toContain('first prompt');
       expect(capturedUIState.userMessages).toContain('second prompt');
+
+      unmount!();
+    });
+
+    it('should show ask user dialog when request is received', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+
+      const questions = [
+        {
+          question: 'What is your favorite color?',
+          header: 'Color Preference',
+          type: QuestionType.TEXT,
+        },
+      ];
+
+      await act(async () => {
+        await mockConfig.getMessageBus().publish({
+          type: MessageBusType.ASK_USER_REQUEST,
+          questions,
+          correlationId: 'test-id',
+        });
+      });
+
+      await waitFor(
+        () => {
+          expect(capturedAskUserRequest).not.toBeNull();
+          expect(capturedAskUserRequest?.questions).toEqual(questions);
+          expect(capturedAskUserRequest?.correlationId).toBe('test-id');
+        },
+        { timeout: 2000 },
+      );
 
       unmount!();
     });

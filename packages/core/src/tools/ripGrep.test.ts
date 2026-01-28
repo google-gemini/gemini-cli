@@ -16,10 +16,12 @@ import {
 import type { RipGrepToolParams } from './ripGrep.js';
 import { canUseRipgrep, RipGrepTool, ensureRgPath } from './ripGrep.js';
 import path from 'node:path';
+import { isSubpath } from '../utils/paths.js';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import type { Config } from '../config/config.js';
 import { Storage } from '../config/storage.js';
+import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import type { ChildProcess } from 'node:child_process';
 import { spawn } from 'node:child_process';
@@ -247,11 +249,15 @@ describe('RipGrepTool', () => {
   let grepTool: RipGrepTool;
   const abortSignal = new AbortController().signal;
 
-  const mockConfig = {
+  let mockConfig = {
     getTargetDir: () => tempRootDir,
     getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
     getDebugMode: () => false,
     getFileFilteringRespectGeminiIgnore: () => true,
+    getFileFilteringOptions: () => ({
+      respectGitIgnore: true,
+      respectGeminiIgnore: true,
+    }),
   } as unknown as Config;
 
   beforeEach(async () => {
@@ -266,6 +272,39 @@ describe('RipGrepTool', () => {
     await fs.writeFile(ripgrepBinaryPath, '');
     storageSpy.mockImplementation(() => binDir);
     tempRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'grep-tool-root-'));
+
+    mockConfig = {
+      getTargetDir: () => tempRootDir,
+      getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
+      getDebugMode: () => false,
+      getFileFilteringRespectGeminiIgnore: () => true,
+      getFileFilteringOptions: () => ({
+        respectGitIgnore: true,
+        respectGeminiIgnore: true,
+      }),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+      },
+      isPathAllowed(this: Config, absolutePath: string): boolean {
+        const workspaceContext = this.getWorkspaceContext();
+        if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+          return true;
+        }
+
+        const projectTempDir = this.storage.getProjectTempDir();
+        return isSubpath(path.resolve(projectTempDir), absolutePath);
+      },
+      validatePathAccess(this: Config, absolutePath: string): string | null {
+        if (this.isPathAllowed(absolutePath)) {
+          return null;
+        }
+
+        const workspaceDirs = this.getWorkspaceContext().getDirectories();
+        const projectTempDir = this.storage.getProjectTempDir();
+        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+      },
+    } as unknown as Config;
+
     grepTool = new RipGrepTool(mockConfig, createMockMessageBus());
 
     // Create some test files and directories
@@ -311,17 +350,19 @@ describe('RipGrepTool', () => {
         params: { pattern: 'hello', dir_path: '.', include: '*.txt' },
         expected: null,
       },
-      {
-        name: 'invalid regex pattern',
-        params: { pattern: '[[' },
-        expected: null,
-      },
     ])(
       'should return null for valid params ($name)',
       ({ params, expected }) => {
         expect(grepTool.validateToolParams(params)).toBe(expected);
       },
     );
+
+    it('should throw error for invalid regex pattern', () => {
+      const params: RipGrepToolParams = { pattern: '[[' };
+      expect(grepTool.validateToolParams(params)).toMatch(
+        /Invalid regular expression pattern provided/,
+      );
+    });
 
     it('should return error if pattern is missing', () => {
       const params = { dir_path: '.' } as unknown as RipGrepToolParams;
@@ -336,10 +377,9 @@ describe('RipGrepTool', () => {
         dir_path: 'nonexistent',
       };
       // Check for the core error message, as the full path might vary
-      expect(grepTool.validateToolParams(params)).toContain(
-        'Path does not exist',
-      );
-      expect(grepTool.validateToolParams(params)).toContain('nonexistent');
+      const result = grepTool.validateToolParams(params);
+      expect(result).toMatch(/Path does not exist/);
+      expect(result).toMatch(/nonexistent/);
     });
 
     it('should allow path to be a file', async () => {
@@ -550,19 +590,10 @@ describe('RipGrepTool', () => {
       expect(result.returnDisplay).toBe('No matches found');
     });
 
-    it('should return an error from ripgrep for invalid regex pattern', async () => {
-      mockSpawn.mockImplementationOnce(
-        createMockSpawn({
-          exitCode: 2,
-        }),
-      );
-
+    it('should throw error for invalid regex pattern during build', async () => {
       const params: RipGrepToolParams = { pattern: '[[' };
-      const invocation = grepTool.build(params);
-      const result = await invocation.execute(abortSignal);
-      expect(result.llmContent).toContain('Process exited with code 2');
-      expect(result.returnDisplay).toContain(
-        'Error: Process exited with code 2',
+      expect(() => grepTool.build(params)).toThrow(
+        /Invalid regular expression pattern provided/,
       );
     });
 
@@ -651,6 +682,57 @@ describe('RipGrepTool', () => {
 
       expect(result.returnDisplay).toContain('(limited)');
     }, 10000);
+
+    it('should filter out files based on FileDiscoveryService even if ripgrep returns them', async () => {
+      // Create .geminiignore to ignore 'ignored.txt'
+      await fs.writeFile(
+        path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME),
+        'ignored.txt',
+      );
+
+      // Re-initialize tool so FileDiscoveryService loads the new .geminiignore
+      const toolWithIgnore = new RipGrepTool(
+        mockConfig,
+        createMockMessageBus(),
+      );
+
+      // Mock ripgrep returning both an ignored file and an allowed file
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'ignored.txt' },
+                line_number: 1,
+                lines: { text: 'should be ignored\n' },
+              },
+            }) +
+            '\n' +
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'allowed.txt' },
+                line_number: 1,
+                lines: { text: 'should be kept\n' },
+              },
+            }) +
+            '\n',
+          exitCode: 0,
+        }),
+      );
+
+      const params: RipGrepToolParams = { pattern: 'should' };
+      const invocation = toolWithIgnore.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      // Verify ignored file is filtered out
+      expect(result.llmContent).toContain('allowed.txt');
+      expect(result.llmContent).toContain('should be kept');
+      expect(result.llmContent).not.toContain('ignored.txt');
+      expect(result.llmContent).not.toContain('should be ignored');
+      expect(result.returnDisplay).toContain('Found 1 match');
+    });
 
     it('should handle regex special characters correctly', async () => {
       // Setup specific mock for this test - regex pattern 'foo.*bar' should match 'const foo = "bar";'
@@ -763,6 +845,31 @@ describe('RipGrepTool', () => {
           createMockWorkspaceContext(tempRootDir, [secondDir]),
         getDebugMode: () => false,
         getFileFilteringRespectGeminiIgnore: () => true,
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+        }),
+        storage: {
+          getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+        },
+        isPathAllowed(this: Config, absolutePath: string): boolean {
+          const workspaceContext = this.getWorkspaceContext();
+          if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+            return true;
+          }
+
+          const projectTempDir = this.storage.getProjectTempDir();
+          return isSubpath(path.resolve(projectTempDir), absolutePath);
+        },
+        validatePathAccess(this: Config, absolutePath: string): string | null {
+          if (this.isPathAllowed(absolutePath)) {
+            return null;
+          }
+
+          const workspaceDirs = this.getWorkspaceContext().getDirectories();
+          const projectTempDir = this.storage.getProjectTempDir();
+          return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+        },
       } as unknown as Config;
 
       // Setup specific mock for this test - multi-directory search for 'world'
@@ -850,6 +957,31 @@ describe('RipGrepTool', () => {
           createMockWorkspaceContext(tempRootDir, [secondDir]),
         getDebugMode: () => false,
         getFileFilteringRespectGeminiIgnore: () => true,
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+        }),
+        storage: {
+          getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+        },
+        isPathAllowed(this: Config, absolutePath: string): boolean {
+          const workspaceContext = this.getWorkspaceContext();
+          if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+            return true;
+          }
+
+          const projectTempDir = this.storage.getProjectTempDir();
+          return isSubpath(path.resolve(projectTempDir), absolutePath);
+        },
+        validatePathAccess(this: Config, absolutePath: string): string | null {
+          if (this.isPathAllowed(absolutePath)) {
+            return null;
+          }
+
+          const workspaceDirs = this.getWorkspaceContext().getDirectories();
+          const projectTempDir = this.storage.getProjectTempDir();
+          return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+        },
       } as unknown as Config;
 
       // Setup specific mock for this test - searching in 'sub' should only return matches from that directory
@@ -931,7 +1063,7 @@ describe('RipGrepTool', () => {
         pattern: 'test',
         dir_path: '../outside',
       };
-      expect(() => grepTool.build(params)).toThrow(/Path validation failed/);
+      expect(() => grepTool.build(params)).toThrow(/Path not in workspace/);
     });
 
     it.each([
@@ -1346,13 +1478,38 @@ describe('RipGrepTool', () => {
     });
 
     it('should add .geminiignore when enabled and patterns exist', async () => {
-      const geminiIgnorePath = path.join(tempRootDir, '.geminiignore');
+      const geminiIgnorePath = path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME);
       await fs.writeFile(geminiIgnorePath, 'ignored.log');
       const configWithGeminiIgnore = {
         getTargetDir: () => tempRootDir,
         getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
         getDebugMode: () => false,
         getFileFilteringRespectGeminiIgnore: () => true,
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+        }),
+        storage: {
+          getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+        },
+        isPathAllowed(this: Config, absolutePath: string): boolean {
+          const workspaceContext = this.getWorkspaceContext();
+          if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+            return true;
+          }
+
+          const projectTempDir = this.storage.getProjectTempDir();
+          return isSubpath(path.resolve(projectTempDir), absolutePath);
+        },
+        validatePathAccess(this: Config, absolutePath: string): string | null {
+          if (this.isPathAllowed(absolutePath)) {
+            return null;
+          }
+
+          const workspaceDirs = this.getWorkspaceContext().getDirectories();
+          const projectTempDir = this.storage.getProjectTempDir();
+          return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+        },
       } as unknown as Config;
       const geminiIgnoreTool = new RipGrepTool(
         configWithGeminiIgnore,
@@ -1386,13 +1543,38 @@ describe('RipGrepTool', () => {
     });
 
     it('should skip .geminiignore when disabled', async () => {
-      const geminiIgnorePath = path.join(tempRootDir, '.geminiignore');
+      const geminiIgnorePath = path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME);
       await fs.writeFile(geminiIgnorePath, 'ignored.log');
       const configWithoutGeminiIgnore = {
         getTargetDir: () => tempRootDir,
         getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
         getDebugMode: () => false,
         getFileFilteringRespectGeminiIgnore: () => false,
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: false,
+        }),
+        storage: {
+          getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+        },
+        isPathAllowed(this: Config, absolutePath: string): boolean {
+          const workspaceContext = this.getWorkspaceContext();
+          if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+            return true;
+          }
+
+          const projectTempDir = this.storage.getProjectTempDir();
+          return isSubpath(path.resolve(projectTempDir), absolutePath);
+        },
+        validatePathAccess(this: Config, absolutePath: string): string | null {
+          if (this.isPathAllowed(absolutePath)) {
+            return null;
+          }
+
+          const workspaceDirs = this.getWorkspaceContext().getDirectories();
+          const projectTempDir = this.storage.getProjectTempDir();
+          return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+        },
       } as unknown as Config;
       const geminiIgnoreTool = new RipGrepTool(
         configWithoutGeminiIgnore,
@@ -1518,6 +1700,31 @@ describe('RipGrepTool', () => {
         getWorkspaceContext: () =>
           createMockWorkspaceContext(tempRootDir, ['/another/dir']),
         getDebugMode: () => false,
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+        }),
+        storage: {
+          getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+        },
+        isPathAllowed(this: Config, absolutePath: string): boolean {
+          const workspaceContext = this.getWorkspaceContext();
+          if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+            return true;
+          }
+
+          const projectTempDir = this.storage.getProjectTempDir();
+          return isSubpath(path.resolve(projectTempDir), absolutePath);
+        },
+        validatePathAccess(this: Config, absolutePath: string): string | null {
+          if (this.isPathAllowed(absolutePath)) {
+            return null;
+          }
+
+          const workspaceDirs = this.getWorkspaceContext().getDirectories();
+          const projectTempDir = this.storage.getProjectTempDir();
+          return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+        },
       } as unknown as Config;
 
       const multiDirGrepTool = new RipGrepTool(

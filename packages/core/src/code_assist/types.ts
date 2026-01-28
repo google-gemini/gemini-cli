@@ -308,7 +308,7 @@ const ExtensionsSettingSchema = z.object({
 
 const CliFeatureSettingSchema = z.object({
   extensionsSetting: ExtensionsSettingSchema.optional(),
-  advancedFeaturesEnabled: z.boolean().optional(),
+  unmanagedCapabilitiesEnabled: z.boolean().optional(),
 });
 
 const McpSettingSchema = z.object({
