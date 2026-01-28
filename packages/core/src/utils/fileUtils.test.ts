@@ -632,8 +632,6 @@ describe('fileUtils', () => {
       { type: 'image', file: 'file.png', mime: 'image/png' },
       { type: 'image', file: 'file.jpg', mime: 'image/jpeg' },
       { type: 'pdf', file: 'file.pdf', mime: 'application/pdf' },
-      { type: 'audio', file: 'song.mp3', mime: 'audio/mpeg' },
-      { type: 'video', file: 'movie.mp4', mime: 'video/mp4' },
       { type: 'binary', file: 'archive.zip', mime: 'application/zip' },
       { type: 'binary', file: 'app.exe', mime: 'application/octet-stream' },
     ])(
@@ -641,6 +639,25 @@ describe('fileUtils', () => {
       async ({ file, mime, type }) => {
         mockMimeGetType.mockReturnValueOnce(mime);
         expect(await detectFileType(file)).toBe(type);
+      },
+    );
+
+    it.each([
+      { type: 'audio', ext: '.mp3', mime: 'audio/mpeg' },
+      { type: 'video', ext: '.mp4', mime: 'video/mp4' },
+    ])(
+      'should detect $type type for binary files with $ext extension',
+      async ({ type, ext, mime }) => {
+        const filePath = path.join(tempRootDir, `test${ext}`);
+        const binaryContent = Buffer.from([
+          0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ]);
+        actualNodeFs.writeFileSync(filePath, binaryContent);
+
+        mockMimeGetType.mockReturnValueOnce(mime);
+        expect(await detectFileType(filePath)).toBe(type);
+
+        actualNodeFs.unlinkSync(filePath);
       },
     );
 
@@ -663,6 +680,24 @@ describe('fileUtils', () => {
       mockMimeGetType.mockReturnValueOnce(false); // Unknown mime type
       // filePathForDetectTest is already a text file by default from beforeEach
       expect(await detectFileType(filePathForDetectTest)).toBe('text');
+    });
+
+    it('should detect .adp files with XML content as text, not audio (#16888)', async () => {
+      const adpFilePath = path.join(tempRootDir, 'test.adp');
+      const xmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<AdapterType Name="ATimeOut" Comment="Adapter for timed events">
+  <InterfaceList>
+    <EventInputs>
+      <Event Name="TimeOut"/>
+    </EventInputs>
+  </InterfaceList>
+</AdapterType>`;
+      actualNodeFs.writeFileSync(adpFilePath, xmlContent);
+      mockMimeGetType.mockReturnValueOnce('audio/adpcm');
+
+      expect(await detectFileType(adpFilePath)).toBe('text');
+
+      actualNodeFs.unlinkSync(adpFilePath);
     });
   });
 
@@ -778,7 +813,10 @@ describe('fileUtils', () => {
     });
 
     it('should process an audio file', async () => {
-      const fakeMp3Data = Buffer.from('fake mp3 data');
+      const fakeMp3Data = Buffer.from([
+        0x49, 0x44, 0x33, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00,
+      ]);
       actualNodeFs.writeFileSync(testAudioFilePath, fakeMp3Data);
       mockMimeGetType.mockReturnValue('audio/mpeg');
       const result = await processSingleFileContent(
