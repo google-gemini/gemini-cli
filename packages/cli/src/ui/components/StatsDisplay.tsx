@@ -364,12 +364,14 @@ interface StatsDisplayProps {
   duration: string;
   title?: string;
   quotas?: RetrieveUserQuotaResponse;
+  footer?: string;
 }
 
 export const StatsDisplay: React.FC<StatsDisplayProps> = ({
   duration,
   title,
   quotas,
+  footer,
 }) => {
   const { stats } = useSessionStats();
   const { metrics } = stats;
@@ -399,6 +401,13 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
         Session Stats
       </Text>
     );
+  };
+
+  const renderFooter = () => {
+    if (!footer) {
+      return null;
+    }
+    return <ThemedGradient bold>{footer}</ThemedGradient>;
   };
 
   return (
@@ -484,6 +493,7 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
         cacheEfficiency={computed.cacheEfficiency}
         totalCachedTokens={computed.totalCachedTokens}
       />
+      {renderFooter()}
     </Box>
   );
 };

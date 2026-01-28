@@ -5,7 +5,6 @@
  */
 
 import type React from 'react';
-import { Box, Text } from 'ink';
 import { StatsDisplay } from './StatsDisplay.js';
 
 interface SessionSummaryDisplayProps {
@@ -15,13 +14,9 @@ interface SessionSummaryDisplayProps {
 export const SessionSummaryDisplay: React.FC<SessionSummaryDisplayProps> = ({
   duration,
 }) => (
-  <Box flexDirection="column">
-    <StatsDisplay title="Agent powering down. Goodbye!" duration={duration} />
-    <Box marginTop={1} paddingX={2}>
-      <Text>
-        Resume this session by running{' '}
-        <Text color="magenta">`gemini --resume`</Text>
-      </Text>
-    </Box>
-  </Box>
+  <StatsDisplay
+    title="Agent powering down. Goodbye!"
+    duration={duration}
+    footer="Tip: Resume a previous session using gemini --resume or /resume"
+  />
 );
