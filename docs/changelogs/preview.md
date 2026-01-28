@@ -346,7 +346,7 @@ npm install -g @google/gemini-cli@preview
   (regression) by @gsquared94 in
   [#17581](https://github.com/google-gemini/gemini-cli/pull/17581)
 - chore(core): delete legacy nonInteractiveToolExecutor by @abhipatel12 in
-  [#17573](https://github.com.google.com/google-gemini/gemini-cli/pull/17573)
+  [#17573](https://github.com/google-gemini/gemini-cli/pull/17573)
 - feat(core): enforce server prefixes for MCP tools in agent definitions by
   @abhipatel12 in
   [#17574](https://github.com/google-gemini/gemini-cli/pull/17574)

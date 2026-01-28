@@ -336,3 +336,6 @@ npm install -g @google/gemini-cli
   [#17174](https://github.com/google-gemini/gemini-cli/pull/17174)
 - Fix mcp tool lookup in tool registry by @werdnum in
   [#17054](https://github.com/google-gemini/gemini-cli/pull/17054)
+
+**Full changelog**:
+https://github.com/google-gemini/gemini-cli/compare/v0.25.2...v0.26.0
