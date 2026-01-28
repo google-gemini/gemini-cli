@@ -405,24 +405,17 @@ export class Scheduler {
     const callId = toolCall.request.callId;
 
     // Policy & Security
-    const decision = await checkPolicy(toolCall, this.config);
+    const { decision, rule } = await checkPolicy(toolCall, this.config);
 
     if (decision === PolicyDecision.DENY) {
-      let errorMessage = 'Tool execution denied by policy.';
-      let errorType = ToolErrorType.POLICY_VIOLATION;
-
-      if (this.config.getApprovalMode() === ApprovalMode.PLAN) {
-        errorMessage = PLAN_MODE_DENIAL_MESSAGE;
-        errorType = ToolErrorType.STOP_EXECUTION;
-      }
-
+      const denyMessage = rule?.denyMessage ? ` ${rule.denyMessage}` : '';
       this.state.updateStatus(
         callId,
         'error',
         createErrorResponse(
           toolCall.request,
-          new Error(errorMessage),
-          errorType,
+          new Error(`Tool execution denied by policy.${denyMessage}`),
+          ToolErrorType.POLICY_VIOLATION,
         ),
       );
       this.state.finalizeCall(callId);

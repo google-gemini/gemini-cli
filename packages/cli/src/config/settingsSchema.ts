@@ -9,19 +9,17 @@
 // to regenerate the settings reference in `docs/get-started/configuration.md`.
 // --------------------------------------------------------------------------
 
-import type {
-  MCPServerConfig,
-  BugCommandSettings,
-  TelemetrySettings,
-  AuthType,
-  AgentOverride,
-} from '@google/gemini-cli-core';
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   DEFAULT_MODEL_CONFIGS,
+  type MCPServerConfig,
+  type BugCommandSettings,
+  type TelemetrySettings,
+  type AuthType,
+  type AgentOverride,
+  type CustomTheme,
 } from '@google/gemini-cli-core';
-import type { CustomTheme } from '../ui/themes/theme.js';
 import type { SessionRetentionSettings } from './settings.js';
 import { DEFAULT_MIN_RETENTION } from '../utils/sessionCleanup.js';
 
@@ -1488,15 +1486,6 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description: 'Enable Just-In-Time (JIT) context loading.',
-        showInDialog: false,
-      },
-      skills: {
-        type: 'boolean',
-        label: 'Agent Skills (Deprecated)',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: false,
-        description: '[Deprecated] Enable Agent Skills (experimental).',
         showInDialog: false,
       },
       useOSC52Paste: {

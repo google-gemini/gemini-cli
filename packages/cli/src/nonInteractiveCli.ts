@@ -70,6 +70,14 @@ export async function runNonInteractive({
         coreEvents.emitConsoleLog(msg.type, msg.content);
       },
     });
+
+    if (config.storage && process.env['GEMINI_CLI_ACTIVITY_LOG_FILE']) {
+      const { registerActivityLogger } = await import(
+        './utils/activityLogger.js'
+      );
+      registerActivityLogger(config);
+    }
+
     const { stdout: workingStdout } = createWorkingStdio();
     const textOutput = new TextOutput(workingStdout);
 
