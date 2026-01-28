@@ -57,7 +57,9 @@ vi.mock('fs', async (importOriginal) => {
 
   return {
     ...actualFs,
-    mkdirSync: vi.fn(),
+    mkdirSync: vi.fn((p) => {
+      mockPaths.add(p.toString());
+    }),
     writeFileSync: vi.fn(),
     existsSync: vi.fn((p) => mockPaths.has(p.toString())),
     statSync: vi.fn((p) => {
@@ -124,10 +126,12 @@ vi.mock('@google/gemini-cli-core', async () => {
     DEFAULT_MEMORY_FILE_FILTERING_OPTIONS: {
       respectGitIgnore: false,
       respectGeminiIgnore: true,
+      customIgnoreFilePaths: [],
     },
     DEFAULT_FILE_FILTERING_OPTIONS: {
       respectGitIgnore: true,
       respectGeminiIgnore: true,
+      customIgnoreFilePaths: [],
     },
     createPolicyEngineConfig: vi.fn(async () => ({
       rules: [],
@@ -584,7 +588,7 @@ describe('parseArguments', () => {
     process.argv = ['node', 'script.js', 'skills', 'list'];
     // Skills command enabled by default or via experimental
     const settings = createTestMergedSettings({
-      experimental: { skills: true },
+      skills: { enabled: true },
     });
     const argv = await parseArguments(settings);
     expect(argv.isCommand).toBe(true);
@@ -701,6 +705,9 @@ describe('loadCliConfig', () => {
     );
     expect(config.getFileFilteringRespectGeminiIgnore()).toBe(
       DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
+    );
+    expect(config.getCustomIgnoreFilePaths()).toEqual(
+      DEFAULT_FILE_FILTERING_OPTIONS.customIgnoreFilePaths,
     );
     expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
   });

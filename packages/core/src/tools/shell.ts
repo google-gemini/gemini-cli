@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import fs from 'node:fs';
+import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import os, { EOL } from 'node:os';
 import crypto from 'node:crypto';
@@ -32,7 +32,7 @@ import type {
   ShellOutputEvent,
 } from '../services/shellExecutionService.js';
 import { ShellExecutionService } from '../services/shellExecutionService.js';
-import { formatMemoryUsage } from '../utils/formatters.js';
+import { formatBytes } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
   getCommandRoots,
@@ -183,6 +183,17 @@ export class ShellToolInvocation extends BaseToolInvocation<
         ? path.resolve(this.config.getTargetDir(), this.params.dir_path)
         : this.config.getTargetDir();
 
+      const validationError = this.config.validatePathAccess(cwd);
+      if (validationError) {
+        return {
+          llmContent: validationError,
+          returnDisplay: 'Path not in workspace.',
+          error: {
+            message: validationError,
+            type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+          },
+        };
+      }
       let cumulativeOutput: string | AnsiOutput = '';
       let lastUpdateTime = Date.now();
       let isBinaryStream = false;
@@ -231,7 +242,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
                 break;
               case 'binary_progress':
                 isBinaryStream = true;
-                cumulativeOutput = `[Receiving binary output... ${formatMemoryUsage(
+                cumulativeOutput = `[Receiving binary output... ${formatBytes(
                   event.bytesReceived,
                 )} received]`;
                 if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
@@ -267,11 +278,17 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
       const backgroundPIDs: number[] = [];
       if (os.platform() !== 'win32') {
-        if (fs.existsSync(tempFilePath)) {
-          const pgrepLines = fs
-            .readFileSync(tempFilePath, 'utf8')
-            .split(EOL)
-            .filter(Boolean);
+        let tempFileExists = false;
+        try {
+          await fsPromises.access(tempFilePath);
+          tempFileExists = true;
+        } catch {
+          tempFileExists = false;
+        }
+
+        if (tempFileExists) {
+          const pgrepContent = await fsPromises.readFile(tempFilePath, 'utf8');
+          const pgrepLines = pgrepContent.split(EOL).filter(Boolean);
           for (const line of pgrepLines) {
             if (!/^\d+$/.test(line)) {
               debugLogger.error(`pgrep: ${line}`);
@@ -395,8 +412,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
       if (timeoutTimer) clearTimeout(timeoutTimer);
       signal.removeEventListener('abort', onAbort);
       timeoutController.signal.removeEventListener('abort', onAbort);
-      if (fs.existsSync(tempFilePath)) {
-        fs.unlinkSync(tempFilePath);
+      try {
+        await fsPromises.unlink(tempFilePath);
+      } catch {
+        // Ignore errors during unlink
       }
     }
   }
@@ -485,10 +504,7 @@ export class ShellTool extends BaseDeclarativeTool<
         this.config.getTargetDir(),
         params.dir_path,
       );
-      const workspaceContext = this.config.getWorkspaceContext();
-      if (!workspaceContext.isPathWithinWorkspace(resolvedPath)) {
-        return `Directory '${resolvedPath}' is not within any of the registered workspace directories.`;
-      }
+      return this.config.validatePathAccess(resolvedPath);
     }
     return null;
   }

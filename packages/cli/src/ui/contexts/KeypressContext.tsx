@@ -215,7 +215,9 @@ function bufferBackslashEnter(
 
   bufferer.next(); // prime the generator so it starts listening.
 
-  return (key: Key) => bufferer.next(key);
+  return (key: Key) => {
+    bufferer.next(key);
+  };
 }
 
 /**
@@ -267,7 +269,9 @@ function bufferPaste(keypressHandler: KeypressHandler): KeypressHandler {
   })();
   bufferer.next(); // prime the generator so it starts listening.
 
-  return (key: Key) => bufferer.next(key);
+  return (key: Key) => {
+    bufferer.next(key);
+  };
 }
 
 /**
@@ -565,7 +569,9 @@ function* emitKeys(
       shift = /^[A-Z]$/.exec(ch) !== null;
       alt = escaped;
       insertable = true;
-    } else if (MAC_ALT_KEY_CHARACTER_MAP[ch] && process.platform === 'darwin') {
+    } else if (MAC_ALT_KEY_CHARACTER_MAP[ch]) {
+      // Note: we do this even if we are not on Mac, because mac users may
+      // remotely connect to non-Mac systems.
       name = MAC_ALT_KEY_CHARACTER_MAP[ch];
       alt = true;
     } else if (sequence === `${ESC}${ESC}`) {
@@ -620,10 +626,10 @@ export interface Key {
   sequence: string;
 }
 
-export type KeypressHandler = (key: Key) => void;
+export type KeypressHandler = (key: Key) => boolean | void;
 
 interface KeypressContextValue {
-  subscribe: (handler: KeypressHandler) => void;
+  subscribe: (handler: KeypressHandler, priority?: boolean) => void;
   unsubscribe: (handler: KeypressHandler) => void;
 }
 
@@ -652,18 +658,44 @@ export function KeypressProvider({
 }) {
   const { stdin, setRawMode } = useStdin();
 
-  const subscribers = useRef<Set<KeypressHandler>>(new Set()).current;
+  const prioritySubscribers = useRef<Set<KeypressHandler>>(new Set()).current;
+  const normalSubscribers = useRef<Set<KeypressHandler>>(new Set()).current;
+
   const subscribe = useCallback(
-    (handler: KeypressHandler) => subscribers.add(handler),
-    [subscribers],
+    (handler: KeypressHandler, priority = false) => {
+      const set = priority ? prioritySubscribers : normalSubscribers;
+      set.add(handler);
+    },
+    [prioritySubscribers, normalSubscribers],
   );
+
   const unsubscribe = useCallback(
-    (handler: KeypressHandler) => subscribers.delete(handler),
-    [subscribers],
+    (handler: KeypressHandler) => {
+      prioritySubscribers.delete(handler);
+      normalSubscribers.delete(handler);
+    },
+    [prioritySubscribers, normalSubscribers],
   );
+
   const broadcast = useCallback(
-    (key: Key) => subscribers.forEach((handler) => handler(key)),
-    [subscribers],
+    (key: Key) => {
+      // Process priority subscribers first, in reverse order (stack behavior: last subscribed is first to handle)
+      const priorityHandlers = Array.from(prioritySubscribers).reverse();
+      for (const handler of priorityHandlers) {
+        if (handler(key) === true) {
+          return;
+        }
+      }
+
+      // Then process normal subscribers, also in reverse order
+      const normalHandlers = Array.from(normalSubscribers).reverse();
+      for (const handler of normalHandlers) {
+        if (handler(key) === true) {
+          return;
+        }
+      }
+    },
+    [prioritySubscribers, normalSubscribers],
   );
 
   useEffect(() => {

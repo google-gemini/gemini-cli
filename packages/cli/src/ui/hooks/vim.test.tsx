@@ -68,6 +68,7 @@ const createMockTextBufferState = (
       visualToTransformedMap: [],
     },
     pastedContent: {},
+    expandedPaste: null,
     ...partial,
   };
 };

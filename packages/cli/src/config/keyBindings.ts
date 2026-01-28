@@ -56,6 +56,8 @@ export enum Command {
   NAVIGATION_DOWN = 'nav.down',
   DIALOG_NAVIGATION_UP = 'nav.dialog.up',
   DIALOG_NAVIGATION_DOWN = 'nav.dialog.down',
+  DIALOG_NEXT = 'nav.dialog.next',
+  DIALOG_PREV = 'nav.dialog.previous',
 
   // Suggestions & Completions
   ACCEPT_SUGGESTION = 'suggest.accept',
@@ -206,6 +208,8 @@ export const defaultKeyBindings: KeyBindingConfig = {
     { key: 'down', shift: false },
     { key: 'j', shift: false },
   ],
+  [Command.DIALOG_NEXT]: [{ key: 'tab', shift: false }],
+  [Command.DIALOG_PREV]: [{ key: 'tab', shift: true }],
 
   // Suggestions & Completions
   [Command.ACCEPT_SUGGESTION]: [{ key: 'tab' }, { key: 'return', ctrl: false }],
@@ -253,7 +257,10 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.TOGGLE_COPY_MODE]: [{ key: 's', ctrl: true }],
   [Command.TOGGLE_YOLO]: [{ key: 'y', ctrl: true }],
   [Command.CYCLE_APPROVAL_MODE]: [{ key: 'tab', shift: true }],
-  [Command.SHOW_MORE_LINES]: [{ key: 's', ctrl: true }],
+  [Command.SHOW_MORE_LINES]: [
+    { key: 'o', ctrl: true },
+    { key: 's', ctrl: true },
+  ],
   [Command.FOCUS_SHELL_INPUT]: [{ key: 'tab', shift: false }],
   [Command.UNFOCUS_SHELL_INPUT]: [{ key: 'tab' }],
   [Command.CLEAR_SCREEN]: [{ key: 'l', ctrl: true }],
@@ -329,6 +336,8 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.NAVIGATION_DOWN,
       Command.DIALOG_NAVIGATION_UP,
       Command.DIALOG_NAVIGATION_DOWN,
+      Command.DIALOG_NEXT,
+      Command.DIALOG_PREV,
     ],
   },
   {
@@ -423,6 +432,8 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.NAVIGATION_DOWN]: 'Move selection down in lists.',
   [Command.DIALOG_NAVIGATION_UP]: 'Move up within dialog options.',
   [Command.DIALOG_NAVIGATION_DOWN]: 'Move down within dialog options.',
+  [Command.DIALOG_NEXT]: 'Move to the next item or question in a dialog.',
+  [Command.DIALOG_PREV]: 'Move to the previous item or question in a dialog.',
 
   // Suggestions & Completions
   [Command.ACCEPT_SUGGESTION]: 'Accept the inline suggestion.',

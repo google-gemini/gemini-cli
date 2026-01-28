@@ -84,7 +84,11 @@ describe('doesToolInvocationMatch', () => {
   });
 
   describe('for non-shell tools', () => {
-    const readFileTool = new ReadFileTool({} as Config, createMockMessageBus());
+    const mockConfig = {
+      getTargetDir: () => '/tmp',
+      getFileFilteringOptions: () => ({}),
+    } as unknown as Config;
+    const readFileTool = new ReadFileTool(mockConfig, createMockMessageBus());
     const invocation = {
       params: { file: 'test.txt' },
     } as AnyToolInvocation;

@@ -13,7 +13,9 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { ApprovalMode } from '../policy/types.js';
 import type { HookDefinition } from '../hooks/types.js';
 import { HookType, HookEventName } from '../hooks/types.js';
+import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryTool.js';
 import {
   DEFAULT_TELEMETRY_TARGET,
@@ -136,6 +138,8 @@ vi.mock('../services/gitService.js', () => {
   GitServiceMock.prototype.initialize = vi.fn();
   return { GitService: GitServiceMock };
 });
+
+vi.mock('../services/fileDiscoveryService.js');
 
 vi.mock('../ide/ide-client.js', () => ({
   IdeClient: {
@@ -622,6 +626,30 @@ describe('Server Config (config.ts)', () => {
     expect(config.getFileFilteringRespectGitIgnore()).toBe(false);
   });
 
+  it('should set customIgnoreFilePaths from params', () => {
+    const params: ConfigParameters = {
+      ...baseParams,
+      fileFiltering: {
+        customIgnoreFilePaths: ['/path/to/ignore/file'],
+      },
+    };
+    const config = new Config(params);
+    expect(config.getCustomIgnoreFilePaths()).toStrictEqual([
+      '/path/to/ignore/file',
+    ]);
+  });
+
+  it('should set customIgnoreFilePaths to empty array if not provided', () => {
+    const params: ConfigParameters = {
+      ...baseParams,
+      fileFiltering: {
+        respectGitIgnore: true,
+      },
+    };
+    const config = new Config(params);
+    expect(config.getCustomIgnoreFilePaths()).toStrictEqual([]);
+  });
+
   it('should initialize WorkspaceContext with includeDirectories', () => {
     const includeDirectories = ['dir1', 'dir2'];
     const paramsWithIncludeDirs: ConfigParameters = {
@@ -696,6 +724,29 @@ describe('Server Config (config.ts)', () => {
     const config = new Config(baseParams);
     const fileService = config.getFileService();
     expect(fileService).toBeDefined();
+  });
+
+  it('should pass file filtering options to FileDiscoveryService', () => {
+    const configParams = {
+      ...baseParams,
+      fileFiltering: {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+        customIgnoreFilePaths: ['.myignore'],
+      },
+    };
+
+    const config = new Config(configParams);
+    config.getFileService();
+
+    expect(FileDiscoveryService).toHaveBeenCalledWith(
+      path.resolve(TARGET_DIR),
+      {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+        customIgnoreFilePaths: ['.myignore'],
+      },
+    );
   });
 
   describe('Usage Statistics', () => {
@@ -1266,6 +1317,39 @@ describe('setApprovalMode with folder trust', () => {
     expect(() => config.setApprovalMode(ApprovalMode.YOLO)).not.toThrow();
     expect(() => config.setApprovalMode(ApprovalMode.AUTO_EDIT)).not.toThrow();
     expect(() => config.setApprovalMode(ApprovalMode.DEFAULT)).not.toThrow();
+  });
+
+  it('should update system instruction when entering Plan mode', () => {
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+    const updateSpy = vi.spyOn(config, 'updateSystemInstructionIfInitialized');
+
+    config.setApprovalMode(ApprovalMode.PLAN);
+
+    expect(updateSpy).toHaveBeenCalled();
+  });
+
+  it('should update system instruction when leaving Plan mode', () => {
+    const config = new Config({
+      ...baseParams,
+      approvalMode: ApprovalMode.PLAN,
+    });
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+    const updateSpy = vi.spyOn(config, 'updateSystemInstructionIfInitialized');
+
+    config.setApprovalMode(ApprovalMode.DEFAULT);
+
+    expect(updateSpy).toHaveBeenCalled();
+  });
+
+  it('should not update system instruction when switching between non-Plan modes', () => {
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+    const updateSpy = vi.spyOn(config, 'updateSystemInstructionIfInitialized');
+
+    config.setApprovalMode(ApprovalMode.AUTO_EDIT);
+
+    expect(updateSpy).not.toHaveBeenCalled();
   });
 
   describe('registerCoreTools', () => {
@@ -2230,5 +2314,57 @@ describe('Config JIT Initialization', () => {
 
       expect(skillManager.setAdminSettings).toHaveBeenCalledWith(false);
     });
+  });
+});
+
+describe('Plans Directory Initialization', () => {
+  const baseParams: ConfigParameters = {
+    sessionId: 'test-session',
+    targetDir: '/tmp/test',
+    debugMode: false,
+    model: 'test-model',
+    cwd: '/tmp/test',
+  };
+
+  beforeEach(() => {
+    vi.spyOn(fs.promises, 'mkdir').mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.mocked(fs.promises.mkdir).mockRestore();
+  });
+
+  it('should create plans directory and add it to workspace context when plan is enabled', async () => {
+    const config = new Config({
+      ...baseParams,
+      plan: true,
+    });
+
+    await config.initialize();
+
+    const plansDir = config.storage.getProjectTempPlansDir();
+    expect(fs.promises.mkdir).toHaveBeenCalledWith(plansDir, {
+      recursive: true,
+    });
+
+    const context = config.getWorkspaceContext();
+    expect(context.getDirectories()).toContain(plansDir);
+  });
+
+  it('should NOT create plans directory or add it to workspace context when plan is disabled', async () => {
+    const config = new Config({
+      ...baseParams,
+      plan: false,
+    });
+
+    await config.initialize();
+
+    const plansDir = config.storage.getProjectTempPlansDir();
+    expect(fs.promises.mkdir).not.toHaveBeenCalledWith(plansDir, {
+      recursive: true,
+    });
+
+    const context = config.getWorkspaceContext();
+    expect(context.getDirectories()).not.toContain(plansDir);
   });
 });

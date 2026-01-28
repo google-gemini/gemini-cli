@@ -12,7 +12,7 @@ import { useKeypress } from '../../hooks/useKeypress.js';
 import chalk from 'chalk';
 import { theme } from '../../semantic-colors.js';
 import type { TextBuffer } from './text-buffer.js';
-import { cpSlice } from '../../utils/textUtils.js';
+import { cpSlice, cpIndexToOffset } from '../../utils/textUtils.js';
 
 export interface TextInputProps {
   buffer: TextBuffer;
@@ -40,22 +40,23 @@ export function TextInput({
 
   const handleKeyPress = useCallback(
     (key: Key) => {
-      if (key.name === 'escape') {
-        onCancel?.();
-        return;
+      if (key.name === 'escape' && onCancel) {
+        onCancel();
+        return true;
       }
 
-      if (key.name === 'return') {
-        onSubmit?.(text);
-        return;
+      if (key.name === 'return' && onSubmit) {
+        onSubmit(text);
+        return true;
       }
 
-      handleInput(key);
+      const handled = handleInput(key);
+      return handled;
     },
     [handleInput, onCancel, onSubmit, text],
   );
 
-  useKeypress(handleKeyPress, { isActive: focus });
+  useKeypress(handleKeyPress, { isActive: focus, priority: true });
 
   const showPlaceholder = text.length === 0 && placeholder;
 
@@ -63,7 +64,7 @@ export function TextInput({
     return (
       <Box>
         {focus ? (
-          <Text>
+          <Text terminalCursorFocus={focus} terminalCursorPosition={0}>
             {chalk.inverse(placeholder[0] || ' ')}
             <Text color={theme.text.secondary}>{placeholder.slice(1)}</Text>
           </Text>
@@ -95,7 +96,15 @@ export function TextInput({
 
         return (
           <Box key={idx} height={1}>
-            <Text>{lineDisplay}</Text>
+            <Text
+              terminalCursorFocus={isCursorLine}
+              terminalCursorPosition={cpIndexToOffset(
+                lineText,
+                cursorVisualColAbsolute,
+              )}
+            >
+              {lineDisplay}
+            </Text>
           </Box>
         );
       })}
