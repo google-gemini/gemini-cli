@@ -62,10 +62,12 @@ export const TriageIssues = ({
   config,
   onExit,
   initialLimit = 100,
+  since,
 }: {
   config: Config;
   onExit: () => void;
   initialLimit?: number;
+  since?: string;
 }) => {
   const [state, setState] = useState<TriageState>({
     status: 'loading',
@@ -103,41 +105,55 @@ export const TriageIssues = ({
     }
   }, [analysis, commentBuffer, isEditingComment]);
 
-  const fetchIssues = useCallback(async (limit: number) => {
-    try {
-      const { stdout } = await spawnAsync('gh', [
-        'issue',
-        'list',
-        '--search',
-        'is:issue state:open label:status/need-triage -type:Task,Workstream,Feature,Epic -label:workstream-rollup',
-        '--json',
-        'number,title,body,author,url,comments,labels,reactionGroups',
-        '--limit',
-        String(limit),
-      ]);
-      const issues: Issue[] = JSON.parse(stdout);
-      if (issues.length === 0) {
+  const fetchIssues = useCallback(
+    async (limit: number) => {
+      try {
+        const searchParts = [
+          'is:issue',
+          'state:open',
+          'label:status/need-triage',
+          '-type:Task,Workstream,Feature,Epic',
+          '-label:workstream-rollup',
+        ];
+        if (since) {
+          searchParts.push(`created:>=${since}`);
+        }
+
+        const { stdout } = await spawnAsync('gh', [
+          'issue',
+          'list',
+          '--search',
+          searchParts.join(' '),
+          '--json',
+          'number,title,body,author,url,comments,labels,reactionGroups',
+          '--limit',
+          String(limit),
+        ]);
+        const issues: Issue[] = JSON.parse(stdout);
+        if (issues.length === 0) {
+          setState((s) => ({
+            ...s,
+            status: 'completed',
+            message: 'No issues found matching triage criteria.',
+          }));
+          return;
+        }
         setState((s) => ({
           ...s,
-          status: 'completed',
-          message: 'No issues found matching triage criteria.',
+          issues,
+          status: 'analyzing',
+          message: `Found ${issues.length} issues. Starting analysis...`,
         }));
-        return;
+      } catch (error) {
+        setState((s) => ({
+          ...s,
+          status: 'error',
+          message: `Error fetching issues: ${error instanceof Error ? error.message : String(error)}`,
+        }));
       }
-      setState((s) => ({
-        ...s,
-        issues,
-        status: 'analyzing',
-        message: `Found ${issues.length} issues. Starting analysis...`,
-      }));
-    } catch (error) {
-      setState((s) => ({
-        ...s,
-        status: 'error',
-        message: `Error fetching issues: ${error instanceof Error ? error.message : String(error)}`,
-      }));
-    }
-  }, []);
+    },
+    [since],
+  );
 
   useEffect(() => {
     void fetchIssues(initialLimit);

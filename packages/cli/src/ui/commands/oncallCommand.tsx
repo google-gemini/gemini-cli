@@ -62,11 +62,21 @@ export const oncallCommand: SlashCommand = {
         }
 
         let limit = 100;
+        let since: string | undefined;
+
         if (args && args.trim().length > 0) {
           const argArray = args.trim().split(/\s+/);
-          const parsedLimit = parseInt(argArray[0], 10);
-          if (!isNaN(parsedLimit) && parsedLimit > 0) {
-            limit = parsedLimit;
+          for (let i = 0; i < argArray.length; i++) {
+            const arg = argArray[i];
+            if (arg === '--since' && i + 1 < argArray.length) {
+              since = argArray[i + 1];
+              i++;
+            } else {
+              const parsedLimit = parseInt(arg, 10);
+              if (!isNaN(parsedLimit) && parsedLimit > 0) {
+                limit = parsedLimit;
+              }
+            }
           }
         }
 
@@ -76,6 +86,7 @@ export const oncallCommand: SlashCommand = {
             <TriageIssues
               config={config}
               initialLimit={limit}
+              since={since}
               onExit={() => context.ui.removeComponent()}
             />
           ),
