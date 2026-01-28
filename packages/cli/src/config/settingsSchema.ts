@@ -9,19 +9,17 @@
 // to regenerate the settings reference in `docs/get-started/configuration.md`.
 // --------------------------------------------------------------------------
 
-import type {
-  MCPServerConfig,
-  BugCommandSettings,
-  TelemetrySettings,
-  AuthType,
-  AgentOverride,
-} from '@google/gemini-cli-core';
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   DEFAULT_MODEL_CONFIGS,
+  type MCPServerConfig,
+  type BugCommandSettings,
+  type TelemetrySettings,
+  type AuthType,
+  type AgentOverride,
+  type CustomTheme,
 } from '@google/gemini-cli-core';
-import type { CustomTheme } from '../ui/themes/theme.js';
 import type { SessionRetentionSettings } from './settings.js';
 import { DEFAULT_MIN_RETENTION } from '../utils/sessionCleanup.js';
 

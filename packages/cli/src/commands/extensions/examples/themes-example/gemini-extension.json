@@ -1,0 +1,29 @@
+{
+  "name": "themes-example",
+  "version": "1.0.0",
+  "themes": [
+    {
+      "name": "shades-of-green-theme",
+      "type": "custom",
+      "background": {
+        "primary": "#1a362a"
+      },
+      "text": {
+        "primary": "#a6e3a1",
+        "secondary": "#6e8e7a",
+        "link": "#89e689"
+      },
+      "status": {
+        "success": "#76c076",
+        "warning": "#d9e689",
+        "error": "#b34e4e"
+      },
+      "border": {
+        "default": "#4a6c5a"
+      },
+      "ui": {
+        "comment": "#6e8e7a"
+      }
+    }
+  ]
+}
