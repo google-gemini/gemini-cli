@@ -1490,15 +1490,6 @@ const SETTINGS_SCHEMA = {
         description: 'Enable Just-In-Time (JIT) context loading.',
         showInDialog: false,
       },
-      skills: {
-        type: 'boolean',
-        label: 'Agent Skills (Deprecated)',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: false,
-        description: '[Deprecated] Enable Agent Skills (experimental).',
-        showInDialog: false,
-      },
       useOSC52Paste: {
         type: 'boolean',
         label: 'Use OSC 52 Paste',
