@@ -883,7 +883,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** The language for the CLI interface. Auto-detect uses system
     locale.
   - **Default:** `"auto"`
-  - **Values:** `"auto"`, `"en"`, `"ja"`, `"ja-ks"`
+  - **Values:** `"auto"`, `"en"`, `"ja"`
   - **Requires restart:** Yes
 
 #### `skills`

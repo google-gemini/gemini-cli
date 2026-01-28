@@ -60,7 +60,9 @@ const namespaces = [
 const localesDir = path.join(__dirname, 'locales');
 const homeDir =
   process.env['HOME'] ?? process.env['USERPROFILE'] ?? os.homedir();
-const userLocalesDir = path.join(homeDir, '.gemini', 'locales');
+const userLocalesDir = process.env['GEMINI_SKIP_USER_LOCALES']
+  ? path.join(__dirname, 'no-locales') // Use a non-existent path within the package
+  : path.join(homeDir, '.gemini', 'locales');
 
 interface LocaleManifest {
   displayName: string;
@@ -128,10 +130,10 @@ function detectAvailableLanguagesSync(): {
   // Ensure 'en' is always first (default/fallback language)
   const codes = [...labels.keys()];
   if (codes.includes('en')) {
-    const sorted = ['en', ...codes.filter((l) => l !== 'en')];
+    const sorted = ['en', ...codes.filter((l) => l !== 'en').sort()];
     return { codes: sorted, labels };
   }
-  return { codes: codes.length > 0 ? codes : ['en'], labels };
+  return { codes: codes.length > 0 ? codes.sort() : ['en'], labels };
 }
 
 // Detect available languages synchronously at module load
