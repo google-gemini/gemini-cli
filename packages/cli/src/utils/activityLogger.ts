@@ -326,6 +326,10 @@ export class ActivityLogger extends EventEmitter {
  * Registers the activity logger.
  * Captures network and console logs to a session-specific JSONL file.
  *
+ * The log file location can be overridden via the GEMINI_CLI_ACTIVITY_LOG_FILE
+ * environment variable. If not set, defaults to logs/session-{sessionId}.jsonl
+ * in the project's temp directory.
+ *
  * @param config The CLI configuration
  */
 export function registerActivityLogger(config: Config) {

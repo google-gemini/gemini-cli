@@ -35,6 +35,8 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
   const fn = async () => {
     const rig = new TestRig();
     const { logDir, sanitizedName } = await prepareLogDir(evalCase.name);
+    const activityLogFile = path.join(logDir, `${sanitizedName}.jsonl`);
+    const logFile = path.join(logDir, `${sanitizedName}.log`);
     let isSuccess = false;
     try {
       rig.setup(evalCase.name, evalCase.params);
@@ -61,8 +63,6 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
         execSync('git commit --allow-empty -m "Initial commit"', execOptions);
       }
 
-      const activityLogFile = path.join(logDir, `${sanitizedName}.jsonl`);
-
       const result = await rig.run({
         args: evalCase.prompt,
         approvalMode: evalCase.approvalMode ?? 'yolo',
@@ -82,9 +82,6 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
       await evalCase.assert(rig, result);
       isSuccess = true;
     } finally {
-      const logFile = path.join(logDir, `${sanitizedName}.log`);
-      const activityLogFile = path.join(logDir, `${sanitizedName}.jsonl`);
-
       if (isSuccess) {
         await fs.promises.unlink(activityLogFile).catch((err) => {
           if (err.code !== 'ENOENT') throw err;
