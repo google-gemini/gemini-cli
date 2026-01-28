@@ -48,7 +48,7 @@ interface TriageState {
 
 const VISIBLE_LINES_COLLAPSED = 8;
 const VISIBLE_LINES_EXPANDED = 20;
-const MAX_CONCURRENT_ANALYSIS = 3;
+const MAX_CONCURRENT_ANALYSIS = 10;
 
 const getReactionCount = (issue: Issue | undefined) => {
   if (!issue || !issue.reactionGroups) return 0;
@@ -169,6 +169,7 @@ I am triaging GitHub issues for the Gemini CLI project. I need to identify issue
 - Abusive or offensive
 - Gibberish (nonsense text)
 - Clearly out of scope for this project
+- Non-deterministic model output (e.g., "it gave me a wrong answer once", complaints about model quality without a reproducible test case)
 
 <issue>
 ID: #${issue.number}
@@ -187,10 +188,12 @@ ${issue.comments
 
 INSTRUCTIONS:
 1. Analyze the issue above.
-2. If it meets any of the "close" criteria (bogus, unreproducible, abusive, gibberish), recommend "close".
+2. If it meets any of the "close" criteria (bogus, unreproducible, abusive, gibberish, non-deterministic), recommend "close".
 3. If it seems like a legitimate bug or feature request that needs triage by a human, recommend "keep".
 4. Provide a brief reason for your recommendation.
 5. If recommending "close", provide a polite, professional, and helpful 'suggested_comment' explaining why it's being closed and what the user can do (e.g., provide more logs, follow contributing guidelines).
+6. CRITICAL: If the reason for closing is "Non-deterministic model output", you MUST use the following text EXACTLY as the 'suggested_comment':
+"Thank you for the report. Model outputs are non-deterministic, and we are unable to troubleshoot isolated quality issues that lack a repeatable test case. We are closing this issue while we continue to work on overall model performance and reliability. If you find a way to consistently reproduce this specific issue, please let us know and we can take another look."
 
 Return a JSON object with:
 - "recommendation": "close" or "keep"
@@ -198,7 +201,7 @@ Return a JSON object with:
 - "suggested_comment": "polite closing comment"
 `;
       const response = await client.generateJson({
-        modelConfigKey: { model: 'gemini-3-pro-preview' },
+        modelConfigKey: { model: 'gemini-3-flash-preview' },
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         schema: {
           type: 'object',
@@ -226,7 +229,7 @@ Return a JSON object with:
       const issuesToAnalyze = state.issues
         .slice(
           state.currentIndex,
-          state.currentIndex + MAX_CONCURRENT_ANALYSIS + 5,
+          state.currentIndex + MAX_CONCURRENT_ANALYSIS + 20,
         )
         .filter(
           (issue) =>
@@ -521,10 +524,17 @@ Return a JSON object with:
   return (
     <Box flexDirection="column">
       <Box flexDirection="row" justifyContent="space-between">
-        <Text bold color="cyan">
-          Triage Potential Candidates ({state.currentIndex + 1}/
-          {state.issues.length})
-        </Text>
+        <Box flexDirection="column">
+          <Text bold color="cyan">
+            Triage Potential Candidates ({state.currentIndex + 1}/
+            {state.issues.length}){until ? ` (until ${until})` : ''}
+          </Text>
+          {!until && (
+            <Text color="gray" dimColor>
+              Tip: use --until YYYY-MM-DD to triage older issues.
+            </Text>
+          )}
+        </Box>
         <Text color="gray">[h] History | [q] Quit</Text>
       </Box>
 
