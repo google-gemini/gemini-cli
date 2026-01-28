@@ -396,7 +396,7 @@ describe('Admin Controls', () => {
       const message = getAdminErrorMessage('Code Completion', mockConfig);
 
       expect(message).toBe(
-        'Code Completion is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
+        'Code Completion is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli?project=test-project-123',
       );
     });
 
