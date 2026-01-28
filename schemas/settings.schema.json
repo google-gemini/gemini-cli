@@ -101,6 +101,13 @@
           "default": false,
           "type": "boolean"
         },
+        "language": {
+          "title": "Language",
+          "description": "The language for the CLI interface. Auto-detect uses system locale.",
+          "markdownDescription": "The language for the CLI interface. Auto-detect uses system locale.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `auto`",
+          "default": "auto",
+          "type": "string"
+        },
         "sessionRetention": {
           "title": "Session Retention",
           "description": "Settings for automatic session cleanup.",
@@ -1459,13 +1466,6 @@
           "markdownDescription": "Enable planning features (Plan Mode and tools).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
-        },
-        "language": {
-          "title": "Language (Experimental)",
-          "description": "The language for the CLI interface. Auto-detect uses system locale.",
-          "markdownDescription": "The language for the CLI interface. Auto-detect uses system locale.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `auto`",
-          "default": "auto",
-          "type": "string"
         }
       },
       "additionalProperties": false

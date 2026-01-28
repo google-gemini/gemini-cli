@@ -22,14 +22,15 @@ they appear in the UI.
 
 ### General
 
-| UI Label                        | Setting                            | Description                                                   | Default |
-| ------------------------------- | ---------------------------------- | ------------------------------------------------------------- | ------- |
-| Preview Features (e.g., models) | `general.previewFeatures`          | Enable preview features (e.g., preview models).               | `false` |
-| Vim Mode                        | `general.vimMode`                  | Enable Vim keybindings                                        | `false` |
-| Enable Auto Update              | `general.enableAutoUpdate`         | Enable automatic updates.                                     | `true`  |
-| Enable Prompt Completion        | `general.enablePromptCompletion`   | Enable AI-powered prompt completion suggestions while typing. | `false` |
-| Debug Keystroke Logging         | `general.debugKeystrokeLogging`    | Enable debug logging of keystrokes to the console.            | `false` |
-| Enable Session Cleanup          | `general.sessionRetention.enabled` | Enable automatic session cleanup                              | `false` |
+| UI Label                        | Setting                            | Description                                                         | Default  |
+| ------------------------------- | ---------------------------------- | ------------------------------------------------------------------- | -------- |
+| Preview Features (e.g., models) | `general.previewFeatures`          | Enable preview features (e.g., preview models).                     | `false`  |
+| Vim Mode                        | `general.vimMode`                  | Enable Vim keybindings                                              | `false`  |
+| Enable Auto Update              | `general.enableAutoUpdate`         | Enable automatic updates.                                           | `true`   |
+| Enable Prompt Completion        | `general.enablePromptCompletion`   | Enable AI-powered prompt completion suggestions while typing.       | `false`  |
+| Debug Keystroke Logging         | `general.debugKeystrokeLogging`    | Enable debug logging of keystrokes to the console.                  | `false`  |
+| Language                        | `general.language`                 | The language for the CLI interface. Auto-detect uses system locale. | `"auto"` |
+| Enable Session Cleanup          | `general.sessionRetention.enabled` | Enable automatic session cleanup                                    | `false`  |
 
 ### Output
 
@@ -116,11 +117,10 @@ they appear in the UI.
 
 ### Experimental
 
-| UI Label                | Setting                      | Description                                                                         | Default  |
-| ----------------------- | ---------------------------- | ----------------------------------------------------------------------------------- | -------- |
-| Use OSC 52 Paste        | `experimental.useOSC52Paste` | Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions). | `false`  |
-| Plan                    | `experimental.plan`          | Enable planning features (Plan Mode and tools).                                     | `false`  |
-| Language (Experimental) | `experimental.language`      | The language for the CLI interface. Auto-detect uses system locale.                 | `"auto"` |
+| UI Label         | Setting                      | Description                                                                         | Default |
+| ---------------- | ---------------------------- | ----------------------------------------------------------------------------------- | ------- |
+| Use OSC 52 Paste | `experimental.useOSC52Paste` | Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions). | `false` |
+| Plan             | `experimental.plan`          | Enable planning features (Plan Mode and tools).                                     | `false` |
 
 ### Skills
 
