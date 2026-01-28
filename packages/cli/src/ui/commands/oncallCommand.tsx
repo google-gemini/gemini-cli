@@ -10,6 +10,7 @@ import {
   type OpenCustomDialogActionReturn,
 } from './types.js';
 import { TriageDuplicates } from '../components/triage/TriageDuplicates.js';
+import { TriageIssues } from '../components/triage/TriageIssues.js';
 
 export const oncallCommand: SlashCommand = {
   name: 'oncall',
@@ -41,6 +42,38 @@ export const oncallCommand: SlashCommand = {
           type: 'custom_dialog',
           component: (
             <TriageDuplicates
+              config={config}
+              initialLimit={limit}
+              onExit={() => context.ui.removeComponent()}
+            />
+          ),
+        };
+      },
+    },
+    {
+      name: 'audit',
+      description: 'Triage issues labeled as status/need-triage',
+      kind: CommandKind.BUILT_IN,
+      autoExecute: true,
+      action: async (context, args): Promise<OpenCustomDialogActionReturn> => {
+        const { config } = context.services;
+        if (!config) {
+          throw new Error('Config not available');
+        }
+
+        let limit = 100;
+        if (args && args.trim().length > 0) {
+          const argArray = args.trim().split(/\s+/);
+          const parsedLimit = parseInt(argArray[0], 10);
+          if (!isNaN(parsedLimit) && parsedLimit > 0) {
+            limit = parsedLimit;
+          }
+        }
+
+        return {
+          type: 'custom_dialog',
+          component: (
+            <TriageIssues
               config={config}
               initialLimit={limit}
               onExit={() => context.ui.removeComponent()}
