@@ -7,7 +7,8 @@
       { "label": "Installation", "slug": "docs/get-started/installation" },
       { "label": "Authentication", "slug": "docs/get-started/authentication" },
       { "label": "Examples", "slug": "docs/get-started/examples" },
-      { "label": "Gemini 3 (preview)", "slug": "docs/get-started/gemini-3" }
+      { "label": "Gemini 3 (preview)", "slug": "docs/get-started/gemini-3" },
+      { "label": "CLI Reference", "slug": "docs/cli/cli-reference" }
     ]
   },
   {
@@ -77,8 +78,16 @@
   {
     "label": "Ecosystem and extensibility",
     "items": [
-      { "label": "Agent skills (experimental)", "slug": "docs/cli/skills" },
-      { "label": "Hooks (experimental)", "slug": "docs/hooks" },
+      { "label": "Agent skills", "slug": "docs/cli/skills" },
+      {
+        "label": "Sub-agents (experimental)",
+        "slug": "docs/core/subagents"
+      },
+      {
+        "label": "Remote subagents (experimental)",
+        "slug": "docs/core/remote-agents"
+      },
+      { "label": "Hooks", "slug": "docs/hooks" },
       { "label": "IDE integration", "slug": "docs/ide-integration" },
       { "label": "MCP servers", "slug": "docs/tools/mcp-server" }
     ]
@@ -88,7 +97,7 @@
     "items": [
       {
         "label": "Get started with extensions",
-        "slug": "docs/extensions/getting-started-extensions"
+        "slug": "docs/extensions/writing-extensions"
       },
       { "label": "How to write hooks", "slug": "docs/hooks/writing-hooks" }
     ]
@@ -119,7 +128,7 @@
   {
     "label": "Development",
     "items": [
-      { "label": "Contribution guide", "slug": "docs/CONTRIBUTING" },
+      { "label": "Contribution guide", "slug": "docs/contributing" },
       { "label": "Integration testing", "slug": "docs/integration-tests" },
       {
         "label": "Issue and PR automation",

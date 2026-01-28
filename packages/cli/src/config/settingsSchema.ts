@@ -932,6 +932,18 @@ const SETTINGS_SCHEMA = {
             description: 'Enable fuzzy search when searching for files.',
             showInDialog: true,
           },
+          customIgnoreFilePaths: {
+            type: 'array',
+            label: 'Custom Ignore File Paths',
+            category: 'Context',
+            requiresRestart: true,
+            default: [] as string[],
+            description:
+              'Additional ignore file paths to respect. These files take precedence over .geminiignore and .gitignore. Files earlier in the array take precedence over files later in the array, e.g. the first file takes precedence over the second one.',
+            showInDialog: true,
+            items: { type: 'string' },
+            mergeStrategy: MergeStrategy.UNION,
+          },
         },
       },
     },
@@ -1480,12 +1492,12 @@ const SETTINGS_SCHEMA = {
       },
       skills: {
         type: 'boolean',
-        label: 'Agent Skills',
+        label: 'Agent Skills (Deprecated)',
         category: 'Experimental',
         requiresRestart: true,
         default: false,
-        description: 'Enable Agent Skills (experimental).',
-        showInDialog: true,
+        description: '[Deprecated] Enable Agent Skills (experimental).',
+        showInDialog: false,
       },
       useOSC52Paste: {
         type: 'boolean',
@@ -1561,7 +1573,6 @@ const SETTINGS_SCHEMA = {
         default: true,
         description: 'Enable Agent Skills.',
         showInDialog: true,
-        ignoreInDocs: true,
       },
       disabled: {
         type: 'array',

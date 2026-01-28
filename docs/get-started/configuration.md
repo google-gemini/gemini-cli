@@ -616,6 +616,14 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
+- **`context.fileFiltering.customIgnoreFilePaths`** (array):
+  - **Description:** Additional ignore file paths to respect. These files take
+    precedence over .geminiignore and .gitignore. Files earlier in the array
+    take precedence over files later in the array, e.g. the first file takes
+    precedence over the second one.
+  - **Default:** `[]`
+  - **Requires restart:** Yes
+
 #### `tools`
 
 - **`tools.sandbox`** (boolean | string):
@@ -862,7 +870,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`experimental.skills`** (boolean):
-  - **Description:** Enable Agent Skills (experimental).
+  - **Description:** [Deprecated] Enable Agent Skills (experimental).
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -877,6 +885,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 #### `skills`
+
+- **`skills.enabled`** (boolean):
+  - **Description:** Enable Agent Skills.
+  - **Default:** `true`
+  - **Requires restart:** Yes
 
 - **`skills.disabled`** (array):
   - **Description:** List of disabled skills.
