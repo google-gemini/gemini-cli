@@ -142,6 +142,27 @@
     "disabledTitle": "無効なスキル:",
     "noSkills": "利用可能なスキルはありません"
   },
+  "extensionsList": {
+    "noExtensions": "インストールされている拡張機能はありません。",
+    "installedTitle": "インストール済みの拡張機能: ",
+    "status": {
+      "active": "有効",
+      "disabled": "無効",
+      "unknown": "不明な状態"
+    },
+    "updateState": {
+      "checking": "更新を確認中",
+      "updatedNeedsRestart": "更新済み、再起動が必要",
+      "updated": "更新済み",
+      "updating": "更新中",
+      "updateAvailable": "更新が利用可能",
+      "upToDate": "最新の状態",
+      "error": "エラー",
+      "notUpdatable": "更新不可",
+      "unknown": "不明"
+    },
+    "settingsLabel": "設定:"
+  },
   "hooksList": {
     "noHooks": "設定されているフックはありません。",
     "securityWarning": {

@@ -154,6 +154,27 @@
     "disabledTitle": "Disabled Skills:",
     "noSkills": "No skills available"
   },
+  "extensionsList": {
+    "noExtensions": "No extensions installed.",
+    "installedTitle": "Installed extensions: ",
+    "status": {
+      "active": "active",
+      "disabled": "disabled",
+      "unknown": "unknown state"
+    },
+    "updateState": {
+      "checking": "checking for updates",
+      "updatedNeedsRestart": "updated, needs restart",
+      "updated": "updated",
+      "updating": "updating",
+      "updateAvailable": "update available",
+      "upToDate": "up to date",
+      "error": "error",
+      "notUpdatable": "not updatable",
+      "unknown": "unknown"
+    },
+    "settingsLabel": "settings:"
+  },
   "hooksList": {
     "noHooks": "No hooks configured.",
     "securityWarning": {
