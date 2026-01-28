@@ -107,7 +107,7 @@ available combinations.
 | Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only). | `Shift + Tab`              |
 | Expand a height-constrained response to show additional lines when not in alternate buffer mode.      | `Ctrl + O`<br />`Ctrl + S` |
 | Move current shell command to background or toggle background shell view.                             | `Ctrl + B`                 |
-| Toggle the list of background shell processes.                                                        | `Ctrl + O`                 |
+| Toggle the list of background shell processes.                                                        | `Ctrl + L`                 |
 | Focus the shell input from the gemini input.                                                          | `Tab (no Shift)`           |
 | Focus the Gemini input from the shell input.                                                          | `Tab`                      |
 | Clear the terminal screen and redraw the UI.                                                          | `Ctrl + L`                 |
