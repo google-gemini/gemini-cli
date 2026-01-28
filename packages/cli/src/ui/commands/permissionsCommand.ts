@@ -10,6 +10,7 @@ import type {
   SlashCommandActionReturn,
 } from './types.js';
 import { CommandKind } from './types.js';
+import { t } from '../../i18n/index.js';
 import * as process from 'node:process';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
@@ -42,7 +43,9 @@ export const permissionsCommand: SlashCommand = {
             return {
               type: 'message',
               messageType: 'error',
-              content: `Path is not a directory: ${targetDirectory}`,
+              content: t('commands:permissions.responses.notDirectory', {
+                path: targetDirectory,
+              }),
             };
           }
         } catch (e) {
@@ -50,7 +53,10 @@ export const permissionsCommand: SlashCommand = {
           return {
             type: 'message',
             messageType: 'error',
-            content: `Error accessing path: ${targetDirectory}. ${message}`,
+            content: t('commands:permissions.responses.accessError', {
+              path: targetDirectory,
+              error: message,
+            }),
           };
         }
 
@@ -72,14 +78,16 @@ export const permissionsCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: `Please provide a subcommand for /permissions. Usage: /permissions trust [<directory-path>]`,
+        content: t('commands:permissions.responses.missingSubcommand'),
       };
     }
 
     return {
       type: 'message',
       messageType: 'error',
-      content: `Invalid subcommand for /permissions: ${subcommand}. Usage: /permissions trust [<directory-path>]`,
+      content: t('commands:permissions.responses.invalidSubcommand', {
+        subcommand,
+      }),
     };
   },
 };

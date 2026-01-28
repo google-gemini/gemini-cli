@@ -230,5 +230,11 @@
     "fileNotFound": "ファイルが見つかりません: {{file}}",
     "invalidCheckpoint": "チェックポイントファイルが無効です: {{error}}",
     "readFailed": "復元可能なツール呼び出しを読み込めませんでした。エラー: {{error}}"
+  },
+  "permissions.responses": {
+    "notDirectory": "パスがディレクトリではありません: {{path}}",
+    "accessError": "パスへのアクセス中にエラーが発生しました: {{path}}。{{error}}",
+    "missingSubcommand": "/permissions のサブコマンドを指定してください。使用法: /permissions trust [<ディレクトリパス>]",
+    "invalidSubcommand": "/permissions のサブコマンドが無効です: {{subcommand}}。使用法: /permissions trust [<ディレクトリパス>]"
   }
 }

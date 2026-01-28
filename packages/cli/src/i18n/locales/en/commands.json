@@ -235,5 +235,11 @@
     "fileNotFound": "File not found: {{file}}",
     "invalidCheckpoint": "Checkpoint file is invalid: {{error}}",
     "readFailed": "Could not read restorable tool calls. This is the error: {{error}}"
+  },
+  "permissions.responses": {
+    "notDirectory": "Path is not a directory: {{path}}",
+    "accessError": "Error accessing path: {{path}}. {{error}}",
+    "missingSubcommand": "Please provide a subcommand for /permissions. Usage: /permissions trust [<directory-path>]",
+    "invalidSubcommand": "Invalid subcommand for /permissions: {{subcommand}}. Usage: /permissions trust [<directory-path>]"
   }
 }
