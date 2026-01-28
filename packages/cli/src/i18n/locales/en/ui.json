@@ -148,6 +148,12 @@
     "title": "Available Gemini CLI tools:",
     "noTools": "No tools available"
   },
+  "skillsList": {
+    "builtin": " [Built-in]",
+    "availableTitle": "Available Agent Skills:",
+    "disabledTitle": "Disabled Skills:",
+    "noSkills": "No skills available"
+  },
   "screenReader": {
     "userPrefix": "User: ",
     "modelPrefix": "Model: ",

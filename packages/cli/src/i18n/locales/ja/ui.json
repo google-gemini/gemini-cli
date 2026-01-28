@@ -136,6 +136,12 @@
     "title": "利用可能な Gemini CLI ツール:",
     "noTools": "利用可能なツールはありません"
   },
+  "skillsList": {
+    "builtin": " [組み込み]",
+    "availableTitle": "利用可能なエージェントスキル:",
+    "disabledTitle": "無効なスキル:",
+    "noSkills": "利用可能なスキルはありません"
+  },
   "screenReader": {
     "userPrefix": "ユーザー: ",
     "modelPrefix": "モデル: ",
