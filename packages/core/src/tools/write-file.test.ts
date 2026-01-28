@@ -1023,4 +1023,276 @@ describe('WriteFileTool', () => {
       expect(result.fileExists).toBe(true);
     });
   });
+
+  describe('fragment detection', () => {
+    const abortSignal = new AbortController().signal;
+
+    it('should reject write when proposed content is much smaller than original (30%)', async () => {
+      const filePath = path.join(rootDir, 'large_go_file.go');
+      const originalContent = `package core
+
+import "fmt"
+
+// GroupStatus represents the status of a group
+type GroupStatus string
+
+const (
+  GroupStatusInProgress GroupStatus = "IN_PROGRESS"
+  GroupStatusDone       GroupStatus = "DONE"
+  GroupStatusFailed     GroupStatus = "FAILED"
+)
+
+// ActionType represents different action types
+type ActionType string
+
+const (
+  ActionTypeCreate ActionType = "CREATE"
+  ActionTypeUpdate ActionType = "UPDATE"
+  ActionTypeDelete ActionType = "DELETE"
+)
+
+// IsValid returns true if the ActionType is known
+func (t ActionType) IsValid() bool {
+  switch t {
+  case ActionTypeCreate, ActionTypeUpdate, ActionTypeDelete:
+    return true
+  }
+  return false
+}`;
+
+      const fragmentContent = `// IsValid returns true if the ActionType is known
+func (t ActionType) IsValid() bool {
+  switch t {
+  case ActionTypeCreate, ActionTypeUpdate, ActionTypeDelete:
+    return true
+  }
+  return false
+}`;
+
+      fs.writeFileSync(filePath, originalContent, 'utf8');
+      mockEnsureCorrectEdit.mockResolvedValue({
+        params: {
+          file_path: filePath,
+          old_string: originalContent,
+          new_string: fragmentContent,
+        },
+        occurrences: 1,
+      });
+
+      const params = { file_path: filePath, content: fragmentContent };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.type).toBe(ToolErrorType.INVALID_TOOL_PARAMS);
+      expect(result.llmContent).toContain('REJECTED');
+      expect(result.llmContent).toContain('edit_file');
+      expect(result.llmContent).toContain('old_string');
+      expect(result.llmContent).toContain('new_string');
+    });
+
+    it('should reject write when proposed content has significantly fewer lines', async () => {
+      const filePath = path.join(rootDir, 'multi_function_file.ts');
+      const originalContent = `export function foo() {
+  return 'foo';
+}
+
+export function bar() {
+  return 'bar';
+}
+
+export function baz() {
+  return 'baz';
+}
+
+export function qux() {
+  return 'qux';
+}
+
+export function quux() {
+  return 'quux';
+}
+
+export function corge() {
+  return 'corge';
+}`;
+
+      const fragmentContent = `export function foo() {
+  return 'foo modified';
+}`;
+
+      fs.writeFileSync(filePath, originalContent, 'utf8');
+      mockEnsureCorrectEdit.mockResolvedValue({
+        params: {
+          file_path: filePath,
+          old_string: originalContent,
+          new_string: fragmentContent,
+        },
+        occurrences: 1,
+      });
+
+      const params = { file_path: filePath, content: fragmentContent };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.type).toBe(ToolErrorType.INVALID_TOOL_PARAMS);
+      expect(result.llmContent).toContain('lines');
+    });
+
+    it('should reject write when original has imports but proposed does not', async () => {
+      const filePath = path.join(rootDir, 'module_file.ts');
+      const originalContent = `import { foo } from './foo';
+import { bar } from './bar';
+
+export function processData() {
+  return foo() + bar();
+}
+
+export function helperFunction() {
+  return 'helper';
+}`;
+
+      const fragmentContent = `export function processData() {
+  return 'modified';
+}`;
+
+      fs.writeFileSync(filePath, originalContent, 'utf8');
+      mockEnsureCorrectEdit.mockResolvedValue({
+        params: {
+          file_path: filePath,
+          old_string: originalContent,
+          new_string: fragmentContent,
+        },
+        occurrences: 1,
+      });
+
+      const params = { file_path: filePath, content: fragmentContent };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.type).toBe(ToolErrorType.INVALID_TOOL_PARAMS);
+      expect(result.llmContent).toContain('import');
+    });
+
+    it('should reject write when content looks like a single function definition', async () => {
+      const filePath = path.join(rootDir, 'utils.py');
+      const originalContent = `def helper1():
+    return "helper1"
+
+def helper2():
+    return "helper2"
+
+def main_function():
+    return helper1() + helper2()`;
+
+      const fragmentContent = `def main_function():
+    return "modified"`;
+
+      fs.writeFileSync(filePath, originalContent, 'utf8');
+      mockEnsureCorrectEdit.mockResolvedValue({
+        params: {
+          file_path: filePath,
+          old_string: originalContent,
+          new_string: fragmentContent,
+        },
+        occurrences: 1,
+      });
+
+      const params = { file_path: filePath, content: fragmentContent };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.type).toBe(ToolErrorType.INVALID_TOOL_PARAMS);
+      // Either line count or function definition check can trigger
+      expect(result.llmContent).toMatch(/lines|function\/class definition/);
+    });
+
+    it('should allow write when user explicitly modified content', async () => {
+      const filePath = path.join(rootDir, 'user_modified.go');
+      const originalContent =
+        'package main\n\nfunc oldFunc() {}\nfunc anotherFunc() {}';
+      const fragmentContent = 'func newFunc() {}';
+
+      fs.writeFileSync(filePath, originalContent, 'utf8');
+      mockEnsureCorrectEdit.mockResolvedValue({
+        params: {
+          file_path: filePath,
+          old_string: originalContent,
+          new_string: fragmentContent,
+        },
+        occurrences: 1,
+      });
+
+      const params = {
+        file_path: filePath,
+        content: fragmentContent,
+        modified_by_user: true, // User explicitly confirmed
+      };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      // Should succeed because user explicitly confirmed
+      expect(result.error).toBeUndefined();
+      expect(result.llmContent).toContain('Successfully overwrote file');
+    });
+
+    it('should allow write for legitimate complete file replacement', async () => {
+      const filePath = path.join(rootDir, 'complete_rewrite.ts');
+      const originalContent = `export function old() {
+  return 'old';
+}`;
+
+      const completeNewContent = `import { helper } from './helper';
+
+export function newFunction1() {
+  return helper('new1');
+}
+
+export function newFunction2() {
+  return helper('new2');
+}
+
+export function newFunction3() {
+  return helper('new3');
+}`;
+
+      fs.writeFileSync(filePath, originalContent, 'utf8');
+      mockEnsureCorrectEdit.mockResolvedValue({
+        params: {
+          file_path: filePath,
+          old_string: originalContent,
+          new_string: completeNewContent,
+        },
+        occurrences: 1,
+      });
+
+      const params = { file_path: filePath, content: completeNewContent };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      // Should succeed - content is comprehensive enough
+      expect(result.error).toBeUndefined();
+      expect(result.llmContent).toContain('Successfully overwrote file');
+    });
+
+    it('should allow write for new files regardless of size', async () => {
+      const filePath = path.join(rootDir, 'new_small_file.ts');
+      const smallContent = `export function small() {
+  return 'ok';
+}`;
+
+      mockEnsureCorrectFileContent.mockResolvedValue(smallContent);
+
+      const params = { file_path: filePath, content: smallContent };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      // Should succeed - new files don't trigger detection
+      expect(result.error).toBeUndefined();
+      expect(result.llmContent).toContain('Successfully created and wrote');
+    });
+  });
 });
