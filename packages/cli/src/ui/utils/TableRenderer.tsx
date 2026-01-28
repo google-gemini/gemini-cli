@@ -35,17 +35,23 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
 
   // Ensure table fits within terminal width
   // We calculate scale based on content width vs available width (terminal - borders)
-  // Fixed overhead per column is 1 (separator/edge), plus 1 for the final edge
-  const fixedOverhead = headers.length + 1;
-  const totalColumnWidth = columnWidths.reduce((sum, width) => sum + width, 0);
+  // First, extract content widths by removing the 2-char padding.
+  const contentWidths = columnWidths.map((width) => Math.max(0, width - 2));
+  const totalContentWidth = contentWidths.reduce(
+    (sum, width) => sum + width,
+    0,
+  );
+
+  // Fixed overhead includes padding (2 per column) and separators (1 per column + 1 final).
+  const fixedOverhead = headers.length * 2 + (headers.length + 1);
 
   // Subtract 1 from available width to avoid edge-case wrapping on some terminals
   const availableWidth = Math.max(0, terminalWidth - fixedOverhead - 1);
 
   const scaleFactor =
-    totalColumnWidth > availableWidth ? availableWidth / totalColumnWidth : 1;
-  const adjustedWidths = columnWidths.map((width) =>
-    Math.floor(width * scaleFactor),
+    totalContentWidth > availableWidth ? availableWidth / totalContentWidth : 1;
+  const adjustedWidths = contentWidths.map(
+    (width) => Math.floor(width * scaleFactor) + 2,
   );
 
   // Helper function to render a cell with proper width
