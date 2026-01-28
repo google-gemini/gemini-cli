@@ -1480,12 +1480,12 @@ const SETTINGS_SCHEMA = {
       },
       skills: {
         type: 'boolean',
-        label: 'Agent Skills',
+        label: 'Agent Skills (Deprecated)',
         category: 'Experimental',
         requiresRestart: true,
         default: false,
-        description: 'Enable Agent Skills (experimental).',
-        showInDialog: true,
+        description: '[Deprecated] Enable Agent Skills (experimental).',
+        showInDialog: false,
       },
       useOSC52Paste: {
         type: 'boolean',
@@ -1561,7 +1561,6 @@ const SETTINGS_SCHEMA = {
         default: true,
         description: 'Enable Agent Skills.',
         showInDialog: true,
-        ignoreInDocs: true,
       },
       disabled: {
         type: 'array',
