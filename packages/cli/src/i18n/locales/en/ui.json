@@ -96,6 +96,10 @@
   "copyMode": {
     "message": "In Copy Mode. Press any key to exit."
   },
+  "exitWarning": {
+    "ctrlC": "Press Ctrl+C again to exit.",
+    "ctrlD": "Press Ctrl+D again to exit."
+  },
   "maxSizedBox": {
     "firstLinesHidden": "... first {{count}} line hidden ...",
     "firstLinesHidden_plural": "... first {{count}} lines hidden ...",

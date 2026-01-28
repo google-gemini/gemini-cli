@@ -89,6 +89,10 @@
   "copyMode": {
     "message": "コピーモードです。任意のキーを押して終了します。"
   },
+  "exitWarning": {
+    "ctrlC": "終了するにはもう一度 Ctrl+C を押してください。",
+    "ctrlD": "終了するにはもう一度 Ctrl+D を押してください。"
+  },
   "maxSizedBox": {
     "firstLinesHidden": "... 最初の {{count}} 行を非表示 ...",
     "lastLinesHidden": "... 最後の {{count}} 行を非表示 ..."
