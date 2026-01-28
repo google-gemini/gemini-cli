@@ -5,106 +5,127 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import * as path from 'node:path';
 import { loadConfig } from './config.js';
-import type { ExtensionLoader } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
+import {
+  type ExtensionLoader,
+  FileDiscoveryService,
+} from '@google/gemini-cli-core';
 
-const {
-  mockLoadServerHierarchicalMemory,
-  mockConfigConstructor,
-  mockVerifyGitAvailability,
-} = vi.hoisted(() => ({
-  mockLoadServerHierarchicalMemory: vi.fn().mockResolvedValue({
-    memoryContent: '',
-    fileCount: 0,
-    filePaths: [],
-  }),
-  mockConfigConstructor: vi.fn(),
-  mockVerifyGitAvailability: vi.fn(),
-}));
+// Mock dependencies
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    Config: vi.fn().mockImplementation((params) => ({
+      initialize: vi.fn(),
+      refreshAuth: vi.fn(),
+      ...params, // Expose params for assertion
+    })),
+    loadServerHierarchicalMemory: vi
+      .fn()
+      .mockResolvedValue({ memoryContent: '', fileCount: 0, filePaths: [] }),
+    startupProfiler: {
+      flush: vi.fn(),
+    },
+    FileDiscoveryService: vi.fn(),
+  };
+});
 
-vi.mock('@google/gemini-cli-core', async () => ({
-  Config: class MockConfig {
-    constructor(params: unknown) {
-      mockConfigConstructor(params);
-    }
-    initialize = vi.fn();
-    refreshAuth = vi.fn();
-  },
-  loadServerHierarchicalMemory: mockLoadServerHierarchicalMemory,
-  startupProfiler: {
-    flush: vi.fn(),
-  },
-  FileDiscoveryService: vi.fn(),
-  ApprovalMode: { DEFAULT: 'default', YOLO: 'yolo' },
-  AuthType: {
-    LOGIN_WITH_GOOGLE: 'login_with_google',
-    USE_GEMINI: 'use_gemini',
-  },
-  GEMINI_DIR: '.gemini',
-  DEFAULT_GEMINI_EMBEDDING_MODEL: 'models/embedding-001',
-  DEFAULT_GEMINI_MODEL: 'models/gemini-1.5-flash',
-  PREVIEW_GEMINI_MODEL: 'models/gemini-1.5-pro-latest',
-  homedir: () => '/tmp',
-  GitService: {
-    verifyGitAvailability: mockVerifyGitAvailability,
+vi.mock('../utils/logger.js', () => ({
+  logger: {
+    info: vi.fn(),
+    error: vi.fn(),
   },
 }));
 
 describe('loadConfig', () => {
-  const mockSettings = {
-    checkpointing: { enabled: true },
-  };
-  const mockExtensionLoader = {
-    start: vi.fn(),
-    getExtensions: vi.fn().mockReturnValue([]),
-  } as unknown as ExtensionLoader;
+  const mockSettings = {} as Settings;
+  const mockExtensionLoader = {} as ExtensionLoader;
+  const taskId = 'test-task-id';
 
   beforeEach(() => {
-    vi.resetAllMocks();
+    vi.clearAllMocks();
     process.env['GEMINI_API_KEY'] = 'test-key';
-    // Reset the mock return value just in case
-    mockLoadServerHierarchicalMemory.mockResolvedValue({
-      memoryContent: '',
-      fileCount: 0,
-      filePaths: [],
-    });
   });
 
   afterEach(() => {
+    delete process.env['CUSTOM_IGNORE_FILE_PATHS'];
     delete process.env['GEMINI_API_KEY'];
-    delete process.env['CHECKPOINTING'];
   });
 
-  it('should disable checkpointing if git is not installed', async () => {
-    mockVerifyGitAvailability.mockResolvedValue(false);
-
-    await loadConfig(
-      mockSettings as unknown as Settings,
-      mockExtensionLoader,
-      'test-task',
-    );
-
-    expect(mockConfigConstructor).toHaveBeenCalledWith(
-      expect.objectContaining({
-        checkpointing: false,
-      }),
-    );
+  it('should set customIgnoreFilePaths when CUSTOM_IGNORE_FILE_PATHS env var is present', async () => {
+    const testPath = '/tmp/ignore';
+    process.env['CUSTOM_IGNORE_FILE_PATHS'] = testPath;
+    const config = await loadConfig(mockSettings, mockExtensionLoader, taskId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((config as any).fileFiltering.customIgnoreFilePaths).toEqual([
+      testPath,
+    ]);
   });
 
-  it('should enable checkpointing if git is installed', async () => {
-    mockVerifyGitAvailability.mockResolvedValue(true);
+  it('should set customIgnoreFilePaths when settings.fileFiltering.customIgnoreFilePaths is present', async () => {
+    const testPath = '/settings/ignore';
+    const settings: Settings = {
+      fileFiltering: {
+        customIgnoreFilePaths: [testPath],
+      },
+    };
+    const config = await loadConfig(settings, mockExtensionLoader, taskId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((config as any).fileFiltering.customIgnoreFilePaths).toEqual([
+      testPath,
+    ]);
+  });
 
-    await loadConfig(
-      mockSettings as unknown as Settings,
-      mockExtensionLoader,
-      'test-task',
-    );
+  it('should merge customIgnoreFilePaths from settings and env var', async () => {
+    const envPath = '/env/ignore';
+    const settingsPath = '/settings/ignore';
+    process.env['CUSTOM_IGNORE_FILE_PATHS'] = envPath;
+    const settings: Settings = {
+      fileFiltering: {
+        customIgnoreFilePaths: [settingsPath],
+      },
+    };
+    const config = await loadConfig(settings, mockExtensionLoader, taskId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((config as any).fileFiltering.customIgnoreFilePaths).toEqual([
+      settingsPath,
+      envPath,
+    ]);
+  });
 
-    expect(mockConfigConstructor).toHaveBeenCalledWith(
-      expect.objectContaining({
-        checkpointing: true,
-      }),
-    );
+  it('should split CUSTOM_IGNORE_FILE_PATHS using system delimiter', async () => {
+    const paths = ['/path/one', '/path/two'];
+    process.env['CUSTOM_IGNORE_FILE_PATHS'] = paths.join(path.delimiter);
+    const config = await loadConfig(mockSettings, mockExtensionLoader, taskId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((config as any).fileFiltering.customIgnoreFilePaths).toEqual(paths);
+  });
+
+  it('should have empty customIgnoreFilePaths when both are missing', async () => {
+    const config = await loadConfig(mockSettings, mockExtensionLoader, taskId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((config as any).fileFiltering.customIgnoreFilePaths).toEqual([]);
+  });
+
+  it('should initialize FileDiscoveryService with correct options', async () => {
+    const testPath = '/tmp/ignore';
+    process.env['CUSTOM_IGNORE_FILE_PATHS'] = testPath;
+    const settings: Settings = {
+      fileFiltering: {
+        respectGitIgnore: false,
+      },
+    };
+
+    await loadConfig(settings, mockExtensionLoader, taskId);
+
+    expect(FileDiscoveryService).toHaveBeenCalledWith(expect.any(String), {
+      respectGitIgnore: false,
+      respectGeminiIgnore: undefined,
+      customIgnoreFilePaths: [testPath],
+    });
   });
 });
