@@ -1302,4 +1302,66 @@ describe('KeypressContext', () => {
       }
     });
   });
+
+  describe('Bug Regression Tests', () => {
+    it('should handle Shift+A in modifyOtherKeys mode (bug repro)', async () => {
+      const { keyHandler } = setupKeypressTest();
+
+      // Shift+A sent by xterm with modifyOtherKeys=2
+      // CSI 27 ; 2 ; 65 ~
+      const sequence = '\x1b[27;2;65~';
+
+      act(() => stdin.write(sequence));
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'A',
+          shift: true,
+        }),
+      );
+    });
+
+    it('should handle @ symbol (Shift+2) in modifyOtherKeys mode', async () => {
+      const { keyHandler } = setupKeypressTest();
+
+      // Shift+2 (@) -> code 64
+      const sequence = '\x1b[27;2;64~';
+
+      act(() => stdin.write(sequence));
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: '@',
+        }),
+      );
+    });
+
+    it.each([
+      { char: '!', code: 33 },
+      { char: '#', code: 35 },
+      { char: '&', code: 38 },
+      { char: '(', code: 40 },
+      { char: '_', code: 95 },
+      { char: '{', code: 123 },
+      { char: '?', code: 63 },
+      { char: '<', code: 60 },
+      { char: '>', code: 62 },
+      { char: '"', code: 34 },
+    ])(
+      'should handle special character "$char" (code $code) in modifyOtherKeys mode',
+      async ({ char, code }) => {
+        const { keyHandler } = setupKeypressTest();
+        // CSI 27 ; 2 ; <code> ~
+        const sequence = `\x1b[27;2;${code}~`;
+
+        act(() => stdin.write(sequence));
+
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: char,
+          }),
+        );
+      },
+    );
+  });
 });

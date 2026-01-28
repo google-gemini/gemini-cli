@@ -521,17 +521,17 @@ function* emitKeys(
         }
       } else {
         name = 'undefined';
-        if (
-          (ctrl || cmd || alt) &&
-          (code.endsWith('u') || code.endsWith('~'))
-        ) {
+        if (code.endsWith('u') || code.endsWith('~')) {
           // CSI-u or tilde-coded functional keys: ESC [ <code> ; <mods> (u|~)
           const codeNumber = parseInt(code.slice(1, -1), 10);
-          if (
-            codeNumber >= 'a'.charCodeAt(0) &&
-            codeNumber <= 'z'.charCodeAt(0)
-          ) {
+          if (codeNumber >= 33 && codeNumber <= 126) {
             name = String.fromCharCode(codeNumber);
+          } else if (
+            (ctrl || cmd || alt) &&
+            codeNumber >= 1 &&
+            codeNumber <= 26
+          ) {
+            name = String.fromCharCode(codeNumber + 96);
           }
         }
       }
