@@ -12,6 +12,7 @@ import { getFolderStructure } from './getFolderStructure.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import * as path from 'node:path';
 import { GEMINI_DIR } from './paths.js';
+import { GEMINI_IGNORE_FILE_NAME } from 'src/config/constants.js';
 
 describe('getFolderStructure', () => {
   let testRootDir: string;
@@ -285,6 +286,7 @@ ${testRootDir}${path.sep}
         fileFilteringOptions: {
           respectGeminiIgnore: false,
           respectGitIgnore: false,
+          customIgnoreFilePaths: [],
         },
       });
 
@@ -296,7 +298,7 @@ ${testRootDir}${path.sep}
   describe('with geminiignore', () => {
     it('should ignore geminiignore files by default', async () => {
       await fsPromises.writeFile(
-        nodePath.join(testRootDir, '.geminiignore'),
+        nodePath.join(testRootDir, GEMINI_IGNORE_FILE_NAME),
         'ignored.txt\nnode_modules/\n.gemini/\n!/.gemini/config.yaml',
       );
       await createTestFile('file1.txt');
@@ -316,7 +318,7 @@ ${testRootDir}${path.sep}
 
     it('should not ignore files if respectGeminiIgnore is false', async () => {
       await fsPromises.writeFile(
-        nodePath.join(testRootDir, '.geminiignore'),
+        nodePath.join(testRootDir, GEMINI_IGNORE_FILE_NAME),
         'ignored.txt\nnode_modules/\n.gemini/\n!/.gemini/config.yaml',
       );
       await createTestFile('file1.txt');
@@ -331,6 +333,7 @@ ${testRootDir}${path.sep}
         fileFilteringOptions: {
           respectGeminiIgnore: false,
           respectGitIgnore: true, // Explicitly disable gemini ignore only
+          customIgnoreFilePaths: [],
         },
       });
       expect(structure).toContain('ignored.txt');

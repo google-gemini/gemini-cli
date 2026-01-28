@@ -18,7 +18,10 @@ import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.j
 import { ToolErrorType } from './tool-error.js';
 import * as glob from 'glob';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
-import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
+import {
+  DEFAULT_FILE_FILTERING_OPTIONS,
+  GEMINI_IGNORE_FILE_NAME,
+} from '../config/constants.js';
 
 vi.mock('glob', { spy: true });
 
@@ -385,7 +388,7 @@ describe('GlobTool', () => {
 
     it('should respect .geminiignore files by default', async () => {
       await fs.writeFile(
-        path.join(tempRootDir, '.geminiignore'),
+        path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME),
         'gemini-ignored_test.txt',
       );
       await fs.writeFile(
@@ -423,7 +426,7 @@ describe('GlobTool', () => {
 
     it('should not respect .geminiignore when respect_gemini_ignore is false', async () => {
       await fs.writeFile(
-        path.join(tempRootDir, '.geminiignore'),
+        path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME),
         'gemini-ignored_test.txt',
       );
       await fs.writeFile(

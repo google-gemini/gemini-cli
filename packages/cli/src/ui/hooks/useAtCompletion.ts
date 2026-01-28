@@ -7,7 +7,11 @@
 import { useEffect, useReducer, useRef } from 'react';
 import { setTimeout as setTimeoutPromise } from 'node:timers/promises';
 import type { Config, FileSearch } from '@google/gemini-cli-core';
-import { FileSearchFactory, escapePath } from '@google/gemini-cli-core';
+import {
+  FileSearchFactory,
+  escapePath,
+  FileDiscoveryService,
+} from '@google/gemini-cli-core';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
 import { MAX_SUGGESTIONS_TO_SHOW } from '../components/SuggestionsDisplay.js';
 import { CommandKind } from '../commands/types.js';
@@ -250,10 +254,10 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
         const searcher = FileSearchFactory.create({
           projectRoot: cwd,
           ignoreDirs: [],
-          useGitignore:
-            config?.getFileFilteringOptions()?.respectGitIgnore ?? true,
-          useGeminiignore:
-            config?.getFileFilteringOptions()?.respectGeminiIgnore ?? true,
+          fileDiscoveryService: new FileDiscoveryService(
+            cwd,
+            config?.getFileFilteringOptions(),
+          ),
           cache: true,
           cacheTtl: 30, // 30 seconds
           enableRecursiveFileSearch:

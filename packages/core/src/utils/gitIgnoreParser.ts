@@ -175,7 +175,7 @@ export class GitIgnoreParser implements GitIgnoreFilter {
           const normalizedRelativeDir = relativeDir.replace(/\\/g, '/');
           const igPlusExtras = ignore()
             .add(ig)
-            .add(this.processedExtraPatterns);
+            .add(this.processedExtraPatterns); // takes priority over ig patterns
           if (igPlusExtras.ignores(normalizedRelativeDir)) {
             // This directory is ignored by an ancestor's .gitignore.
             // According to git behavior, we don't need to process this
