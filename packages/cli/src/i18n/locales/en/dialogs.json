@@ -341,5 +341,11 @@
     "reviewTab": "Review",
     "yes": "Yes",
     "no": "No"
+  },
+  "loopDetection": {
+    "title": "A potential loop was detected",
+    "description": "This can happen due to repetitive tool calls or other model behavior. Do you want to keep loop detection enabled or disable it for this session?",
+    "keepEnabled": "Keep loop detection enabled (esc)",
+    "disableForSession": "Disable loop detection for this session"
   }
 }
