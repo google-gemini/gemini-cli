@@ -689,8 +689,8 @@ describe('<ToolGroupMessage />', () => {
         />,
         { config: mockConfig },
       );
-
-      expect(lastFrame()).toBe('');
+      // AskUser tools in progress are rendered by AskUserDialog, so we expect nothing.
+      expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
   });
