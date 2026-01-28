@@ -8,10 +8,12 @@ import yaml from 'js-yaml';
 import * as fs from 'node:fs/promises';
 import { type Dirent } from 'node:fs';
 import * as path from 'node:path';
+import * as crypto from 'node:crypto';
 import { z } from 'zod';
 import type { AgentDefinition } from './types.js';
 import { isValidToolName } from '../tools/tool-names.js';
 import { FRONTMATTER_REGEX } from '../skills/skillLoader.js';
+import { getErrorMessage } from '../utils/errors.js';
 
 /**
  * DTO for Markdown parsing - represents the structure from frontmatter.
@@ -139,24 +141,30 @@ function formatZodError(error: z.ZodError, context: string): string {
  * Parses and validates an agent Markdown file with frontmatter.
  *
  * @param filePath Path to the Markdown file.
+ * @param content Optional pre-loaded content of the file.
  * @returns An array containing the single parsed agent definition.
  * @throws AgentLoadError if parsing or validation fails.
  */
 export async function parseAgentMarkdown(
   filePath: string,
+  content?: string,
 ): Promise<FrontmatterAgentDefinition[]> {
-  let content: string;
-  try {
-    content = await fs.readFile(filePath, 'utf-8');
-  } catch (error) {
-    throw new AgentLoadError(
-      filePath,
-      `Could not read file: ${(error as Error).message}`,
-    );
+  let fileContent: string;
+  if (content !== undefined) {
+    fileContent = content;
+  } else {
+    try {
+      fileContent = await fs.readFile(filePath, 'utf-8');
+    } catch (error) {
+      throw new AgentLoadError(
+        filePath,
+        `Could not read file: ${getErrorMessage(error)}`,
+      );
+    }
   }
 
   // Split frontmatter and body
-  const match = content.match(FRONTMATTER_REGEX);
+  const match = fileContent.match(FRONTMATTER_REGEX);
   if (!match) {
     throw new AgentLoadError(
       filePath,
@@ -229,10 +237,12 @@ export async function parseAgentMarkdown(
  * Converts a FrontmatterAgentDefinition DTO to the internal AgentDefinition structure.
  *
  * @param markdown The parsed Markdown/Frontmatter definition.
+ * @param metadata Optional metadata including hash and file path.
  * @returns The internal AgentDefinition.
  */
 export function markdownToAgentDefinition(
   markdown: FrontmatterAgentDefinition,
+  metadata?: { hash?: string; filePath?: string },
 ): AgentDefinition {
   const inputConfig = {
     inputSchema: {
@@ -256,6 +266,7 @@ export function markdownToAgentDefinition(
       displayName: markdown.display_name,
       agentCardUrl: markdown.agent_card_url,
       inputConfig,
+      metadata,
     };
   }
 
@@ -288,6 +299,7 @@ export function markdownToAgentDefinition(
         }
       : undefined,
     inputConfig,
+    metadata,
   };
 }
 
@@ -334,9 +346,11 @@ export async function loadAgentsFromDirectory(
   for (const entry of files) {
     const filePath = path.join(dir, entry.name);
     try {
-      const agentDefs = await parseAgentMarkdown(filePath);
+      const content = await fs.readFile(filePath, 'utf-8');
+      const hash = crypto.createHash('sha256').update(content).digest('hex');
+      const agentDefs = await parseAgentMarkdown(filePath, content);
       for (const def of agentDefs) {
-        const agent = markdownToAgentDefinition(def);
+        const agent = markdownToAgentDefinition(def, { hash, filePath });
         result.agents.push(agent);
       }
     } catch (error) {

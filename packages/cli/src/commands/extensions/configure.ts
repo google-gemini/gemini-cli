@@ -174,6 +174,7 @@ async function configureExtensionSettings(
     extensionConfig,
     extensionId,
     scope,
+    process.cwd(),
   );
 
   let workspaceSettings: Record<string, string> = {};
@@ -182,6 +183,7 @@ async function configureExtensionSettings(
       extensionConfig,
       extensionId,
       ExtensionSettingScope.WORKSPACE,
+      process.cwd(),
     );
   }
 

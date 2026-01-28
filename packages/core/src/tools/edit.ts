@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'node:fs';
+import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import * as crypto from 'node:crypto';
@@ -753,6 +753,22 @@ class EditToolInvocation
    * @returns Result of the edit operation
    */
   async execute(signal: AbortSignal): Promise<ToolResult> {
+    const resolvedPath = path.resolve(
+      this.config.getTargetDir(),
+      this.params.file_path,
+    );
+    const validationError = this.config.validatePathAccess(resolvedPath);
+    if (validationError) {
+      return {
+        llmContent: validationError,
+        returnDisplay: 'Error: Path not in workspace.',
+        error: {
+          message: validationError,
+          type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+        },
+      };
+    }
+
     let editData: CalculatedEdit;
     try {
       editData = await this.calculateEdit(this.params, signal);
@@ -783,7 +799,7 @@ class EditToolInvocation
     }
 
     try {
-      this.ensureParentDirectoriesExist(this.params.file_path);
+      await this.ensureParentDirectoriesExistAsync(this.params.file_path);
       let finalContent = editData.newContent;
 
       // Restore original line endings if they were CRLF, or use OS default for new files
@@ -862,10 +878,14 @@ class EditToolInvocation
   /**
    * Creates parent directories if they don't exist
    */
-  private ensureParentDirectoriesExist(filePath: string): void {
+  private async ensureParentDirectoriesExistAsync(
+    filePath: string,
+  ): Promise<void> {
     const dirName = path.dirname(filePath);
-    if (!fs.existsSync(dirName)) {
-      fs.mkdirSync(dirName, { recursive: true });
+    try {
+      await fsPromises.access(dirName);
+    } catch {
+      await fsPromises.mkdir(dirName, { recursive: true });
     }
   }
 }
@@ -972,13 +992,7 @@ A good instruction should concisely answer:
     }
     params.file_path = filePath;
 
-    const workspaceContext = this.config.getWorkspaceContext();
-    if (!workspaceContext.isPathWithinWorkspace(params.file_path)) {
-      const directories = workspaceContext.getDirectories();
-      return `File path must be within one of the workspace directories: ${directories.join(', ')}`;
-    }
-
-    return null;
+    return this.config.validatePathAccess(params.file_path);
   }
 
   protected createInvocation(
