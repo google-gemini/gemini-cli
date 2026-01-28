@@ -35,7 +35,10 @@ vi.mock('../telemetry/types.js', () => ({
   ToolCallEvent: vi.fn().mockImplementation((call) => ({ ...call })),
 }));
 
-import { SchedulerStateManager } from './state-manager.js';
+import {
+  SchedulerStateManager,
+  type TerminalCallHandler,
+} from './state-manager.js';
 import { resolveConfirmation } from './confirmation.js';
 import { checkPolicy, updatePolicy } from './policy.js';
 import { ToolExecutor } from './tool-executor.js';
@@ -64,6 +67,7 @@ import type {
   SuccessfulToolCall,
   ErroredToolCall,
   CancelledToolCall,
+  CompletedToolCall,
   ToolCallResponseInfo,
 } from './types.js';
 import { ROOT_SCHEDULER_ID } from './types.js';
@@ -190,6 +194,10 @@ describe('Scheduler (Orchestrator)', () => {
 
     vi.mocked(resolveConfirmation).mockReset();
     vi.mocked(checkPolicy).mockReset();
+    vi.mocked(checkPolicy).mockResolvedValue({
+      decision: PolicyDecision.ALLOW,
+      rule: undefined,
+    });
     vi.mocked(updatePolicy).mockReset();
 
     mockExecutor = {
@@ -201,10 +209,27 @@ describe('Scheduler (Orchestrator)', () => {
       applyInlineModify: vi.fn(),
     } as unknown as Mocked<ToolModificationHandler>;
 
-    // Wire up class constructors to return our mock instances
-    vi.mocked(SchedulerStateManager).mockReturnValue(
-      mockStateManager as unknown as Mocked<SchedulerStateManager>,
+    let capturedTerminalHandler: TerminalCallHandler | undefined;
+    vi.mocked(SchedulerStateManager).mockImplementation(
+      (_messageBus, _schedulerId, onTerminalCall) => {
+        capturedTerminalHandler = onTerminalCall;
+        return mockStateManager as unknown as SchedulerStateManager;
+      },
     );
+
+    mockStateManager.finalizeCall.mockImplementation((callId: string) => {
+      const call = mockStateManager.getToolCall(callId);
+      if (call) {
+        capturedTerminalHandler?.(call as CompletedToolCall);
+      }
+    });
+
+    mockStateManager.cancelAllQueued.mockImplementation((_reason: string) => {
+      // In tests, we usually mock the queue or completed batch.
+      // For the sake of telemetry tests, we manually trigger if needed,
+      // but most tests here check if finalizing is called.
+    });
+
     vi.mocked(ToolExecutor).mockReturnValue(
       mockExecutor as unknown as Mocked<ToolExecutor>,
     );
@@ -642,7 +667,10 @@ describe('Scheduler (Orchestrator)', () => {
     });
 
     it('should update state to error with POLICY_VIOLATION if Policy returns DENY', async () => {
-      vi.mocked(checkPolicy).mockResolvedValue(PolicyDecision.DENY);
+      vi.mocked(checkPolicy).mockResolvedValue({
+        decision: PolicyDecision.DENY,
+        rule: undefined,
+      });
 
       await scheduler.schedule(req1, signal);
 
@@ -655,6 +683,36 @@ describe('Scheduler (Orchestrator)', () => {
       );
       // Deny shouldn't throw, execution is just skipped, state is updated
       expect(mockExecutor.execute).not.toHaveBeenCalled();
+    });
+
+    it('should include denyMessage in error response if present', async () => {
+      vi.mocked(checkPolicy).mockResolvedValue({
+        decision: PolicyDecision.DENY,
+        rule: {
+          decision: PolicyDecision.DENY,
+          denyMessage: 'Custom denial reason',
+        },
+      });
+
+      await scheduler.schedule(req1, signal);
+
+      expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
+        'call-1',
+        'error',
+        expect.objectContaining({
+          errorType: ToolErrorType.POLICY_VIOLATION,
+          responseParts: expect.arrayContaining([
+            expect.objectContaining({
+              functionResponse: expect.objectContaining({
+                response: {
+                  error:
+                    'Tool execution denied by policy. Custom denial reason',
+                },
+              }),
+            }),
+          ]),
+        }),
+      );
     });
 
     it('should handle errors from checkPolicy (e.g. non-interactive ASK_USER)', async () => {
@@ -680,7 +738,10 @@ describe('Scheduler (Orchestrator)', () => {
     });
 
     it('should bypass confirmation and ProceedOnce if Policy returns ALLOW (YOLO/AllowedTools)', async () => {
-      vi.mocked(checkPolicy).mockResolvedValue(PolicyDecision.ALLOW);
+      vi.mocked(checkPolicy).mockResolvedValue({
+        decision: PolicyDecision.ALLOW,
+        rule: undefined,
+      });
 
       // Provide a mock execute to finish the loop
       mockExecutor.execute.mockResolvedValue({
@@ -733,8 +794,14 @@ describe('Scheduler (Orchestrator)', () => {
 
       // First call requires confirmation, second is auto-approved (simulating policy update)
       vi.mocked(checkPolicy)
-        .mockResolvedValueOnce(PolicyDecision.ASK_USER)
-        .mockResolvedValueOnce(PolicyDecision.ALLOW);
+        .mockResolvedValueOnce({
+          decision: PolicyDecision.ASK_USER,
+          rule: undefined,
+        })
+        .mockResolvedValueOnce({
+          decision: PolicyDecision.ALLOW,
+          rule: undefined,
+        });
 
       vi.mocked(resolveConfirmation).mockResolvedValue({
         outcome: ToolConfirmationOutcome.ProceedAlways,
@@ -756,7 +823,10 @@ describe('Scheduler (Orchestrator)', () => {
     });
 
     it('should call resolveConfirmation and updatePolicy when ASK_USER', async () => {
-      vi.mocked(checkPolicy).mockResolvedValue(PolicyDecision.ASK_USER);
+      vi.mocked(checkPolicy).mockResolvedValue({
+        decision: PolicyDecision.ASK_USER,
+        rule: undefined,
+      });
 
       const resolution = {
         outcome: ToolConfirmationOutcome.ProceedAlways,
@@ -799,7 +869,10 @@ describe('Scheduler (Orchestrator)', () => {
     });
 
     it('should cancel and NOT execute if resolveConfirmation returns Cancel', async () => {
-      vi.mocked(checkPolicy).mockResolvedValue(PolicyDecision.ASK_USER);
+      vi.mocked(checkPolicy).mockResolvedValue({
+        decision: PolicyDecision.ASK_USER,
+        rule: undefined,
+      });
 
       const resolution = {
         outcome: ToolConfirmationOutcome.Cancel,
@@ -821,7 +894,10 @@ describe('Scheduler (Orchestrator)', () => {
     });
 
     it('should mark as cancelled (not errored) when abort happens during confirmation error', async () => {
-      vi.mocked(checkPolicy).mockResolvedValue(PolicyDecision.ASK_USER);
+      vi.mocked(checkPolicy).mockResolvedValue({
+        decision: PolicyDecision.ASK_USER,
+        rule: undefined,
+      });
 
       // Simulate shouldConfirmExecute logic throwing while aborted
       vi.mocked(resolveConfirmation).mockImplementation(async () => {
@@ -844,7 +920,10 @@ describe('Scheduler (Orchestrator)', () => {
     });
 
     it('should preserve confirmation details (e.g. diff) in cancelled state', async () => {
-      vi.mocked(checkPolicy).mockResolvedValue(PolicyDecision.ASK_USER);
+      vi.mocked(checkPolicy).mockResolvedValue({
+        decision: PolicyDecision.ASK_USER,
+        rule: undefined,
+      });
 
       const confirmDetails = {
         type: 'edit' as const,

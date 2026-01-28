@@ -26,6 +26,7 @@ import {
 } from '../ui/contexts/UIActionsContext.js';
 import { type HistoryItemToolGroup, StreamingState } from '../ui/types.js';
 import { ToolActionsProvider } from '../ui/contexts/ToolActionsContext.js';
+import { AskUserActionsProvider } from '../ui/contexts/AskUserActionsContext.js';
 
 import { makeFakeConfig, type Config } from '@google/gemini-cli-core';
 import { FakePersistentState } from './persistentStateFake.js';
@@ -40,6 +41,7 @@ vi.mock('../utils/persistentState.js', () => ({
 vi.mock('../ui/utils/terminalUtils.js', () => ({
   isLowColorDepth: vi.fn(() => false),
   getColorDepth: vi.fn(() => 24),
+  isITerm2: vi.fn(() => false),
 }));
 
 // Wrapper around ink-testing-library's render that ensures act() is called
@@ -299,20 +301,28 @@ export const renderWithProviders = (
                       config={config}
                       toolCalls={allToolCalls}
                     >
-                      <KeypressProvider>
-                        <MouseProvider mouseEventsEnabled={mouseEventsEnabled}>
-                          <ScrollProvider>
-                            <Box
-                              width={terminalWidth}
-                              flexShrink={0}
-                              flexGrow={0}
-                              flexDirection="column"
-                            >
-                              {component}
-                            </Box>
-                          </ScrollProvider>
-                        </MouseProvider>
-                      </KeypressProvider>
+                      <AskUserActionsProvider
+                        request={null}
+                        onSubmit={vi.fn()}
+                        onCancel={vi.fn()}
+                      >
+                        <KeypressProvider>
+                          <MouseProvider
+                            mouseEventsEnabled={mouseEventsEnabled}
+                          >
+                            <ScrollProvider>
+                              <Box
+                                width={terminalWidth}
+                                flexShrink={0}
+                                flexGrow={0}
+                                flexDirection="column"
+                              >
+                                {component}
+                              </Box>
+                            </ScrollProvider>
+                          </MouseProvider>
+                        </KeypressProvider>
+                      </AskUserActionsProvider>
                     </ToolActionsProvider>
                   </UIActionsContext.Provider>
                 </StreamingContext.Provider>
@@ -406,10 +416,13 @@ export function renderHookWithProviders<Result, Props>(
   const result = { current: undefined as unknown as Result };
 
   let setPropsFn: ((props: Props) => void) | undefined;
+  let forceUpdateFn: (() => void) | undefined;
 
   function TestComponent({ initialProps }: { initialProps: Props }) {
     const [props, setProps] = useState(initialProps);
+    const [, forceUpdate] = useState(0);
     setPropsFn = setProps;
+    forceUpdateFn = () => forceUpdate((n) => n + 1);
     result.current = renderCallback(props);
     return null;
   }
@@ -429,8 +442,10 @@ export function renderHookWithProviders<Result, Props>(
 
   function rerender(newProps?: Props) {
     act(() => {
-      if (setPropsFn && newProps) {
-        setPropsFn(newProps);
+      if (arguments.length > 0 && setPropsFn) {
+        setPropsFn(newProps as Props);
+      } else if (forceUpdateFn) {
+        forceUpdateFn();
       }
     });
   }

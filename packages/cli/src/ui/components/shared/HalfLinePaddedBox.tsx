@@ -13,7 +13,7 @@ import {
   resolveColor,
   getSafeLowColorBackground,
 } from '../../themes/color-utils.js';
-import { isLowColorDepth } from '../../utils/terminalUtils.js';
+import { isLowColorDepth, isITerm2 } from '../../utils/terminalUtils.js';
 
 export interface HalfLinePaddedBoxProps {
   /**
@@ -75,6 +75,35 @@ const HalfLinePaddedBoxInternal: React.FC<HalfLinePaddedBoxProps> = ({
 
   if (!backgroundColor) {
     return <>{children}</>;
+  }
+
+  const isITerm = isITerm2();
+
+  if (isITerm) {
+    return (
+      <Box
+        width={terminalWidth}
+        flexDirection="column"
+        alignItems="stretch"
+        minHeight={1}
+        flexShrink={0}
+      >
+        <Box width={terminalWidth} flexDirection="row">
+          <Text color={backgroundColor}>{'▄'.repeat(terminalWidth)}</Text>
+        </Box>
+        <Box
+          width={terminalWidth}
+          flexDirection="column"
+          alignItems="stretch"
+          backgroundColor={backgroundColor}
+        >
+          {children}
+        </Box>
+        <Box width={terminalWidth} flexDirection="row">
+          <Text color={backgroundColor}>{'▀'.repeat(terminalWidth)}</Text>
+        </Box>
+      </Box>
+    );
   }
 
   return (

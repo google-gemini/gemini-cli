@@ -15,8 +15,7 @@ exports[`ToolResultDisplay > renders string result as markdown by default 1`] = 
 exports[`ToolResultDisplay > renders string result as plain text when renderOutputAsMarkdown is false 1`] = `"**Some result**"`;
 
 exports[`ToolResultDisplay > truncates very long string results 1`] = `
-"... first 251 lines hidden ...
-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+"... first 252 lines hidden ...
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa

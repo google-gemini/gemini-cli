@@ -101,7 +101,11 @@ export class Scheduler {
     this.getPreferredEditor = options.getPreferredEditor;
     this.schedulerId = options.schedulerId;
     this.parentCallId = options.parentCallId;
-    this.state = new SchedulerStateManager(this.messageBus, this.schedulerId);
+    this.state = new SchedulerStateManager(
+      this.messageBus,
+      this.schedulerId,
+      (call) => logToolCall(this.config, new ToolCallEvent(call)),
+    );
     this.executor = new ToolExecutor(this.config);
     this.modifier = new ToolModificationHandler();
 
@@ -388,16 +392,6 @@ export class Scheduler {
       }
     }
 
-    // Fetch the updated call from state before finalizing to capture the
-    // terminal status.
-    const terminalCall = this.state.getToolCall(active.request.callId);
-    if (terminalCall && this.isTerminal(terminalCall.status)) {
-      logToolCall(
-        this.config,
-        new ToolCallEvent(terminalCall as CompletedToolCall),
-      );
-    }
-
     this.state.finalizeCall(active.request.callId);
   }
 
@@ -410,18 +404,20 @@ export class Scheduler {
     const callId = toolCall.request.callId;
 
     // Policy & Security
-    const decision = await checkPolicy(toolCall, this.config);
+    const { decision, rule } = await checkPolicy(toolCall, this.config);
 
     if (decision === PolicyDecision.DENY) {
+      const denyMessage = rule?.denyMessage ? ` ${rule.denyMessage}` : '';
       this.state.updateStatus(
         callId,
         'error',
         createErrorResponse(
           toolCall.request,
-          new Error('Tool execution denied by policy.'),
+          new Error(`Tool execution denied by policy.${denyMessage}`),
           ToolErrorType.POLICY_VIOLATION,
         ),
       );
+      this.state.finalizeCall(callId);
       return;
     }
 
@@ -453,6 +449,7 @@ export class Scheduler {
     // Handle cancellation (cascades to entire batch)
     if (outcome === ToolConfirmationOutcome.Cancel) {
       this.state.updateStatus(callId, 'cancelled', 'User denied execution.');
+      this.state.finalizeCall(callId);
       this.state.cancelAllQueued('User cancelled operation');
       return; // Skip execution
     }

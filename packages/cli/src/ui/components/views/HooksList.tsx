@@ -28,10 +28,8 @@ interface HooksListProps {
 export const HooksList: React.FC<HooksListProps> = ({ hooks }) => {
   if (hooks.length === 0) {
     return (
-      <Box flexDirection="column" marginTop={1} marginBottom={1}>
-        <Box marginTop={1}>
-          <Text>No hooks configured.</Text>
-        </Box>
+      <Box flexDirection="column" marginBottom={1}>
+        <Text>No hooks configured.</Text>
       </Box>
     );
   }
@@ -49,8 +47,8 @@ export const HooksList: React.FC<HooksListProps> = ({ hooks }) => {
   );
 
   return (
-    <Box flexDirection="column" marginTop={1} marginBottom={1}>
-      <Box marginTop={1} flexDirection="column">
+    <Box flexDirection="column" marginBottom={1}>
+      <Box flexDirection="column">
         <Text color={theme.status.warning} bold underline>
           ⚠️ Security Warning:
         </Text>
