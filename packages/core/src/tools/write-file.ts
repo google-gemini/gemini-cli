@@ -79,6 +79,97 @@ interface GetCorrectedFileContentResult {
   error?: { message: string; code?: string };
 }
 
+interface SuspiciousEditResult {
+  isSuspicious: boolean;
+  reason: string;
+}
+
+/**
+ * Detects if proposed content appears to be a file fragment rather than complete file content.
+ * This prevents WriteTool from accidentally overwriting entire files with partial content.
+ *
+ * @param originalContent The current content of the existing file
+ * @param proposedContent The content the LLM wants to write
+ * @param filePath Path to the file being modified
+ * @returns Object indicating if the edit is suspicious and the reason
+ */
+function detectSuspiciousOverwrite(
+  originalContent: string,
+  proposedContent: string,
+  _filePath: string,
+): SuspiciousEditResult {
+  const originalLines = originalContent.split('\n');
+  const proposedLines = proposedContent.split('\n');
+
+  // 1. Size check: proposed is suspiciously smaller (less than 30% of original)
+  if (proposedContent.length < originalContent.length * 0.3) {
+    return {
+      isSuspicious: true,
+      reason: `Proposed content is only ${Math.round((proposedContent.length / originalContent.length) * 100)}% of original file size (${proposedContent.length} vs ${originalContent.length} bytes)`,
+    };
+  }
+
+  // 2. Line count check: proposed has significantly fewer lines
+  if (proposedLines.length < originalLines.length * 0.3) {
+    return {
+      isSuspicious: true,
+      reason: `Proposed content has only ${proposedLines.length} lines vs original ${originalLines.length} lines`,
+    };
+  }
+
+  // 3. Check for common file headers (imports, package declarations)
+  const commonHeaderPatterns = [
+    { pattern: /^package\s+\w+/m, name: 'package declaration' }, // Go package
+    { pattern: /^import\s+[({]/m, name: 'import block' }, // Go/Python imports
+    { pattern: /^#include\s+</m, name: 'include directive' }, // C/C++ includes
+    { pattern: /^from\s+\w+\s+import/m, name: 'import statement' }, // Python imports
+    { pattern: /^\/\*\*$/m, name: 'license/copyright header' }, // JSDoc/license headers
+  ];
+
+  const originalHasHeaders = commonHeaderPatterns.some((p) =>
+    p.pattern.test(originalContent),
+  );
+  const proposedHasHeaders = commonHeaderPatterns.some((p) =>
+    p.pattern.test(proposedContent),
+  );
+
+  if (originalHasHeaders && !proposedHasHeaders) {
+    const missingHeaders = commonHeaderPatterns
+      .filter((p) => p.pattern.test(originalContent))
+      .map((p) => p.name)
+      .join(', ');
+    return {
+      isSuspicious: true,
+      reason: `Original file has ${missingHeaders}, but proposed content does not`,
+    };
+  }
+
+  // 4. Check if proposed content looks like a single function/method/class definition
+  const functionOrClassPatterns = [
+    /^\s*(func|function|def|class|interface|type)\s+\w+/m,
+  ];
+
+  // Short content that looks like a single definition
+  if (
+    proposedLines.length < 50 &&
+    functionOrClassPatterns.some((p) => p.test(proposedContent))
+  ) {
+    // Count how many function/class definitions are in the content
+    const definitionCount = (
+      proposedContent.match(/^\s*(func|function|def|class)\s+\w+/gm) || []
+    ).length;
+
+    if (definitionCount <= 2) {
+      return {
+        isSuspicious: true,
+        reason: `Proposed content appears to be ${definitionCount} function/class definition(s) rather than a complete file`,
+      };
+    }
+  }
+
+  return { isSuspicious: false, reason: '' };
+}
+
 export async function getCorrectedFileContent(
   config: Config,
   filePath: string,
@@ -292,6 +383,47 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       !fileExists ||
       (correctedContentResult.error !== undefined &&
         !correctedContentResult.fileExists);
+
+    // 🆕 Detect potential fragment overwrite (only for existing files, not user-modified)
+    if (fileExists && !modified_by_user && originalContent.length > 0) {
+      const suspiciousEdit = detectSuspiciousOverwrite(
+        originalContent,
+        fileContent,
+        this.resolvedPath,
+      );
+
+      if (suspiciousEdit.isSuspicious) {
+        const relativePath = makeRelative(
+          this.resolvedPath,
+          this.config.getTargetDir(),
+        );
+        const errorMsg = `❌ REJECTED: WriteTool content appears to be a file fragment, not the complete file.
+
+File: ${shortenPath(relativePath)}
+Original file: ${originalContent.length} bytes (${originalContent.split('\n').length} lines)
+Proposed content: ${fileContent.length} bytes (${fileContent.split('\n').length} lines)
+Reason: ${suspiciousEdit.reason}
+
+💡 If you want to modify only a PART of this file, use the 'edit_file' tool instead:
+- old_string: <the specific section you want to replace>
+- new_string: <the new content for that section>
+
+If you really intend to REPLACE THE ENTIRE FILE contents, please provide the complete file content.`;
+
+        debugLogger.warn(
+          `WriteTool rejected suspicious overwrite for ${relativePath}: ${suspiciousEdit.reason}`,
+        );
+
+        return {
+          llmContent: errorMsg,
+          returnDisplay: `Error: Suspicious file overwrite detected - ${suspiciousEdit.reason}`,
+          error: {
+            message: suspiciousEdit.reason,
+            type: ToolErrorType.INVALID_TOOL_PARAMS,
+          },
+        };
+      }
+    }
 
     try {
       const dirName = path.dirname(this.resolvedPath);
