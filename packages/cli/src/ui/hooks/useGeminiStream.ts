@@ -25,6 +25,7 @@ import {
   debugLogger,
   runInDevTraceSpan,
   EDIT_TOOL_NAMES,
+  ASK_USER_TOOL_NAME,
   processRestorableToolCalls,
   recordToolCallInteractions,
   ToolErrorType,
@@ -368,11 +369,24 @@ export const useGeminiStream = (
     const anyVisibleInHistory = pushedToolCallIds.size > 0;
     const anyVisibleInPending = remainingTools.some((tc) => {
       if (!isEventDriven) return true;
-      return (
-        tc.status !== 'scheduled' &&
-        tc.status !== 'validating' &&
-        tc.status !== 'awaiting_approval'
-      );
+      // Skip tools that aren't visible in the pending UI
+      if (
+        tc.status === 'scheduled' ||
+        tc.status === 'validating' ||
+        tc.status === 'awaiting_approval'
+      ) {
+        return false;
+      }
+      // Skip in-progress AskUser tools - they're rendered by AskUserDialog,
+      // not by ToolGroupMessage, so we shouldn't count them as "visible"
+      const isTerminal =
+        tc.status === 'success' ||
+        tc.status === 'error' ||
+        tc.status === 'cancelled';
+      if (tc.request.name === ASK_USER_TOOL_NAME && !isTerminal) {
+        return false;
+      }
+      return true;
     });
 
     if (
