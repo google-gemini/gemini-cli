@@ -8,6 +8,8 @@ import { render } from '../../test-utils/render.js';
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { ModelStatsDisplay } from './ModelStatsDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
+import * as SettingsContext from '../contexts/SettingsContext.js';
+import type { LoadedSettings } from '../../config/settings.js';
 import type { SessionMetrics } from '../contexts/SessionContext.js';
 import { ToolCallDecision } from '@google/gemini-cli-core';
 
@@ -20,7 +22,16 @@ vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
   };
 });
 
+vi.mock('../contexts/SettingsContext.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof SettingsContext>();
+  return {
+    ...actual,
+    useSettings: vi.fn(),
+  };
+});
+
 const useSessionStatsMock = vi.mocked(SessionContext.useSessionStats);
+const useSettingsMock = vi.mocked(SettingsContext.useSettings);
 
 const renderWithMockedStats = (metrics: SessionMetrics, width?: number) => {
   useSessionStatsMock.mockReturnValue({
@@ -35,6 +46,14 @@ const renderWithMockedStats = (metrics: SessionMetrics, width?: number) => {
     getPromptCount: () => 5,
     startNewPrompt: vi.fn(),
   });
+
+  useSettingsMock.mockReturnValue({
+    merged: {
+      ui: {
+        showUserIdentity: true,
+      },
+    },
+  } as unknown as LoadedSettings);
 
   return render(<ModelStatsDisplay />, width);
 };
@@ -367,5 +386,75 @@ describe('<ModelStatsDisplay />', () => {
     expect(output).toContain('gemini-3-pro-');
     expect(output).toContain('gemini-3-flash-');
     expect(output).toMatchSnapshot();
+  });
+
+  it('should render user identity information when provided', () => {
+    useSettingsMock.mockReturnValue({
+      merged: {
+        ui: {
+          showUserIdentity: true,
+        },
+      },
+    } as unknown as LoadedSettings);
+
+    const { lastFrame } = render(
+      <ModelStatsDisplay
+        selectedAuthType="oauth"
+        userEmail="test@example.com"
+        tier="Pro"
+      />,
+    );
+
+    useSessionStatsMock.mockReturnValue({
+      stats: {
+        sessionId: 'test-session',
+        sessionStartTime: new Date(),
+        metrics: {
+          models: {
+            'gemini-2.5-pro': {
+              api: { totalRequests: 1, totalErrors: 0, totalLatencyMs: 100 },
+              tokens: {
+                input: 10,
+                prompt: 10,
+                candidates: 20,
+                total: 30,
+                cached: 0,
+                thoughts: 0,
+                tool: 0,
+              },
+            },
+          },
+          tools: {
+            totalCalls: 0,
+            totalSuccess: 0,
+            totalFail: 0,
+            totalDurationMs: 0,
+            totalDecisions: {
+              accept: 0,
+              reject: 0,
+              modify: 0,
+              [ToolCallDecision.AUTO_ACCEPT]: 0,
+            },
+            byName: {},
+          },
+          files: {
+            totalLinesAdded: 0,
+            totalLinesRemoved: 0,
+          },
+        },
+        lastPromptTokenCount: 0,
+        promptCount: 5,
+      },
+
+      getPromptCount: () => 5,
+      startNewPrompt: vi.fn(),
+    });
+
+    const output = lastFrame();
+    expect(output).toContain('Auth Method:');
+    expect(output).toContain('Logged in with Google');
+    expect(output).toContain('(test@example.com)');
+    expect(output).toContain('Tier:');
+    expect(output).toContain('Pro');
   });
 });
