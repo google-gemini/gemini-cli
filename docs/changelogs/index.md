@@ -26,9 +26,6 @@ on GitHub.
   to improve task routing
   ([#16638](https://github.com/google-gemini/gemini-cli/pull/16638) by
   @joshualitt).
-- **Experimental Plan Mode:** A new `plan` flag allows the agent to create a
-  plan for user approval before execution
-  ([#16650](https://github.com/google-gemini/gemini-cli/pull/16650) by @jerop).
 - **UI/UX Improvements:** You can now "Rewind" through your conversation history
   ([#15717](https://github.com/google-gemini/gemini-cli/pull/15717) by @Adib234)
   and use a new `/introspect` command for debugging.

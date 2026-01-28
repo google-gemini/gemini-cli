@@ -15,9 +15,6 @@ npm install -g @google/gemini-cli
   `skill-creator` built-in skill, enables Agent Skills by default, and adds a
   generalist agent to improve task routing. Security for skill installation has
   also been enhanced with new consent prompts.
-- **Experimental Plan Mode:** We've added an experimental `plan` flag and
-  approval mode, which allows Gemini CLI to propose a plan of execution for user
-  approval before making changes.
 - **Improved UI and UX:** A new "Rewind" feature lets you walk back through
   conversation history. We've also added an `/introspect` command for debugging
   and unified various shell confirmation dialogs for a more consistent user
