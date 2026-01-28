@@ -43,6 +43,75 @@ describe('createContentGenerator', () => {
     vi.unstubAllEnvs();
   });
 
+  it('should add X-Vertex-AI-LLM-Request-Type header when requestType is configured', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => false,
+      getPreviewFeatures: vi.fn().mockReturnValue(false),
+    } as unknown as Config;
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+
+    await createContentGenerator(
+      {
+        apiKey: 'test-api-key',
+        authType: AuthType.USE_VERTEX_AI,
+        vertexai: true,
+        requestType: 'dedicated',
+      },
+      mockConfig,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith({
+      apiKey: 'test-api-key',
+      vertexai: true,
+      httpOptions: {
+        headers: expect.objectContaining({
+          'User-Agent': expect.any(String),
+          'X-Vertex-AI-LLM-Request-Type': 'dedicated',
+        }),
+      },
+    });
+  });
+
+  it('should NOT add X-Vertex-AI-LLM-Request-Type header when using Gemini API', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => false,
+      getPreviewFeatures: vi.fn().mockReturnValue(false),
+    } as unknown as Config;
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+
+    await createContentGenerator(
+      {
+        apiKey: 'test-api-key',
+        authType: AuthType.USE_GEMINI,
+        vertexai: false,
+        requestType: 'dedicated',
+      },
+      mockConfig,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith({
+      apiKey: 'test-api-key',
+      vertexai: false,
+      httpOptions: {
+        headers: expect.not.objectContaining({
+          'X-Vertex-AI-LLM-Request-Type': 'dedicated',
+        }),
+      },
+    });
+  });
+
   it('should create a FakeContentGenerator', async () => {
     const mockGenerator = {} as unknown as ContentGenerator;
     vi.mocked(FakeContentGenerator.fromFile).mockResolvedValue(
@@ -346,6 +415,7 @@ describe('createContentGeneratorConfig', () => {
     setModel: vi.fn(),
     flashFallbackHandler: vi.fn(),
     getProxy: vi.fn(),
+    getVertexAiRequestType: vi.fn(),
   } as unknown as Config;
 
   beforeEach(() => {
@@ -421,5 +491,14 @@ describe('createContentGeneratorConfig', () => {
     );
     expect(config.apiKey).toBeUndefined();
     expect(config.vertexai).toBeUndefined();
+  });
+
+  it('should populate requestType from Config', async () => {
+    vi.mocked(mockConfig.getVertexAiRequestType).mockReturnValue('dedicated');
+    const config = await createContentGeneratorConfig(
+      mockConfig,
+      AuthType.USE_VERTEX_AI,
+    );
+    expect(config.requestType).toBe('dedicated');
   });
 });

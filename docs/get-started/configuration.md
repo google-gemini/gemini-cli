@@ -305,6 +305,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** The Gemini model to use for conversations.
   - **Default:** `undefined`
 
+- **`model.vertex.requestType`** (string):
+  - **Description:** The request type for Vertex AI LLM requests (e.g.
+    "dedicated"). Sets the X-Vertex-AI-LLM-Request-Type header.
+  - **Default:** `undefined`
+
 - **`model.maxSessionTurns`** (number):
   - **Description:** Maximum number of user/model/tool turns to keep in a
     session. -1 means unlimited.

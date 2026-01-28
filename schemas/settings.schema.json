@@ -427,6 +427,22 @@
           "markdownDescription": "The Gemini model to use for conversations.\n\n- Category: `Model`\n- Requires restart: `no`",
           "type": "string"
         },
+        "vertex": {
+          "title": "Vertex AI Settings",
+          "description": "Settings specific to Vertex AI.",
+          "markdownDescription": "Settings specific to Vertex AI.\n\n- Category: `Model`\n- Requires restart: `no`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "requestType": {
+              "title": "Request Type",
+              "description": "The request type for Vertex AI LLM requests (e.g. \"dedicated\"). Sets the X-Vertex-AI-LLM-Request-Type header.",
+              "markdownDescription": "The request type for Vertex AI LLM requests (e.g. \"dedicated\"). Sets the X-Vertex-AI-LLM-Request-Type header.\n\n- Category: `Model`\n- Requires restart: `no`",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
         "maxSessionTurns": {
           "title": "Max Session Turns",
           "description": "Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.",

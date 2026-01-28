@@ -354,6 +354,7 @@ export interface ConfigParameters {
   summarizeToolOutput?: Record<string, SummarizeToolOutputSettings>;
   folderTrust?: boolean;
   ideMode?: boolean;
+  vertexAiRequestType?: string;
   loadMemoryFromIncludeDirectories?: boolean;
   importFormat?: 'tree' | 'flat';
   discoveryMaxDirs?: number;
@@ -480,6 +481,7 @@ export class Config {
   private readonly noBrowser: boolean;
   private readonly folderTrust: boolean;
   private ideMode: boolean;
+  private readonly vertexAiRequestType: string | undefined;
 
   private _activeModel: string;
   private readonly maxSessionTurns: number;
@@ -666,6 +668,7 @@ export class Config {
     this.summarizeToolOutput = params.summarizeToolOutput;
     this.folderTrust = params.folderTrust ?? false;
     this.ideMode = params.ideMode ?? false;
+    this.vertexAiRequestType = params.vertexAiRequestType;
     this.loadMemoryFromIncludeDirectories =
       params.loadMemoryFromIncludeDirectories ?? false;
     this.importFormat = params.importFormat ?? 'tree';
@@ -1670,6 +1673,10 @@ export class Config {
 
   getIdeMode(): boolean {
     return this.ideMode;
+  }
+
+  getVertexAiRequestType(): string | undefined {
+    return this.vertexAiRequestType;
   }
 
   /**

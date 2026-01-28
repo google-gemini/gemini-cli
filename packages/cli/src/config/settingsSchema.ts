@@ -690,6 +690,27 @@ const SETTINGS_SCHEMA = {
         description: 'The Gemini model to use for conversations.',
         showInDialog: false,
       },
+      vertex: {
+        type: 'object',
+        label: 'Vertex AI Settings',
+        category: 'Model',
+        requiresRestart: false,
+        default: {},
+        description: 'Settings specific to Vertex AI.',
+        showInDialog: false,
+        properties: {
+          requestType: {
+            type: 'string',
+            label: 'Request Type',
+            category: 'Model',
+            requiresRestart: false,
+            default: undefined as string | undefined,
+            description:
+              'The request type for Vertex AI LLM requests (e.g. "dedicated"). Sets the X-Vertex-AI-LLM-Request-Type header.',
+            showInDialog: false,
+          },
+        },
+      },
       maxSessionTurns: {
         type: 'number',
         label: 'Max Session Turns',

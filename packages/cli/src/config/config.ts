@@ -761,6 +761,7 @@ export async function loadCliConfig(
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,
+    vertexAiRequestType: settings.model?.vertex?.requestType,
     compressionThreshold: settings.model?.compressionThreshold,
     folderTrust,
     interactive,

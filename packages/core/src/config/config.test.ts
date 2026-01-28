@@ -585,6 +585,15 @@ describe('Server Config (config.ts)', () => {
     expect(config.getTargetDir()).toBe(path.resolve(TARGET_DIR)); // Check resolved path
   });
 
+  it('Config constructor should store vertexAiRequestType correctly', () => {
+    const paramsWithVertexAiRequestType: ConfigParameters = {
+      ...baseParams,
+      vertexAiRequestType: 'dedicated',
+    };
+    const config = new Config(paramsWithVertexAiRequestType);
+    expect(config.getVertexAiRequestType()).toBe('dedicated');
+  });
+
   it('Config constructor should default userMemory to empty string if not provided', () => {
     const paramsWithoutMemory: ConfigParameters = { ...baseParams };
     delete paramsWithoutMemory.userMemory;

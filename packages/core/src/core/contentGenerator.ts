@@ -61,6 +61,7 @@ export type ContentGeneratorConfig = {
   vertexai?: boolean;
   authType?: AuthType;
   proxy?: string;
+  requestType?: string;
 };
 
 export async function createContentGeneratorConfig(
@@ -79,6 +80,7 @@ export async function createContentGeneratorConfig(
   const contentGeneratorConfig: ContentGeneratorConfig = {
     authType,
     proxy: config?.getProxy(),
+    requestType: config?.getVertexAiRequestType(),
   };
 
   // If we are using Google auth or we are in Cloud Shell, there is nothing else to validate for now
@@ -137,6 +139,10 @@ export async function createContentGenerator(
       ...customHeadersMap,
       'User-Agent': userAgent,
     };
+
+    if (config.vertexai && config.requestType) {
+      baseHeaders['X-Vertex-AI-LLM-Request-Type'] = config.requestType;
+    }
 
     if (
       apiKeyAuthMechanism === 'bearer' &&
