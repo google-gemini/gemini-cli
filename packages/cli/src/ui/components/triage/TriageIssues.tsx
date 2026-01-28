@@ -62,12 +62,12 @@ export const TriageIssues = ({
   config,
   onExit,
   initialLimit = 100,
-  since,
+  until,
 }: {
   config: Config;
   onExit: () => void;
   initialLimit?: number;
-  since?: string;
+  until?: string;
 }) => {
   const [state, setState] = useState<TriageState>({
     status: 'loading',
@@ -115,8 +115,8 @@ export const TriageIssues = ({
           '-type:Task,Workstream,Feature,Epic',
           '-label:workstream-rollup',
         ];
-        if (since) {
-          searchParts.push(`created:>=${since}`);
+        if (until) {
+          searchParts.push(`created:<=${until}`);
         }
 
         const { stdout } = await spawnAsync('gh', [
@@ -152,7 +152,7 @@ export const TriageIssues = ({
         }));
       }
     },
-    [since],
+    [until],
   );
 
   useEffect(() => {
