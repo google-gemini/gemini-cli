@@ -137,6 +137,56 @@ describe('ToolConfirmationQueue', () => {
     expect(lastFrame()).toContain('Press ctrl-o to show more lines');
   });
 
+  it('calculates availableContentHeight based on availableTerminalHeight from UI state', async () => {
+    const longDiff = '@@ -1,1 +1,50 @@\n' + '+line\n'.repeat(50);
+    const confirmingTool = {
+      tool: {
+        callId: 'call-1',
+        name: 'replace',
+        description: 'edit file',
+        status: ToolCallStatus.Confirming,
+        confirmationDetails: {
+          type: 'edit' as const,
+          title: 'Confirm edit',
+          fileName: 'test.ts',
+          filePath: '/test.ts',
+          fileDiff: longDiff,
+          originalContent: 'old',
+          newContent: 'new',
+          onConfirm: vi.fn(),
+        },
+      },
+      index: 1,
+      total: 1,
+    };
+
+    // Use a small availableTerminalHeight to force truncation
+    const { lastFrame } = renderWithProviders(
+      <ToolConfirmationQueue
+        confirmingTool={confirmingTool as unknown as ConfirmingToolState}
+      />,
+      {
+        config: mockConfig,
+        useAlternateBuffer: false,
+        uiState: {
+          terminalWidth: 80,
+          terminalHeight: 40,
+          availableTerminalHeight: 10,
+          constrainHeight: true,
+          streamingState: StreamingState.WaitingForConfirmation,
+        },
+      },
+    );
+
+    // With availableTerminalHeight = 10:
+    // maxHeight = Math.max(10 - 1, 4) = 9
+    // availableContentHeight = Math.max(9 - 6, 4) = 4
+    // MaxSizedBox in ToolConfirmationMessage will use 4
+    // It should show truncation message
+    await waitFor(() => expect(lastFrame()).toContain('first 49 lines hidden'));
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
   it('does not render expansion hint when constrainHeight is false', () => {
     const longDiff = 'line\n'.repeat(50);
     const confirmingTool = {
