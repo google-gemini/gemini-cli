@@ -44,6 +44,10 @@
       "mcpTool": "ツール: {{tool}}",
       "modifyInProgress": "修正中: ",
       "closeEditorToContinue": "外部エディタを保存して閉じると続行します"
+    },
+    "queue": {
+      "actionRequired": "アクションが必要",
+      "indexProgress": "{{total}} 中 {{index}}"
     }
   },
   "diff": {

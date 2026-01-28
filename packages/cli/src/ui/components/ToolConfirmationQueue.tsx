@@ -6,6 +6,7 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
+import { useTranslation } from 'react-i18next';
 import { theme } from '../semantic-colors.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { ToolConfirmationMessage } from './messages/ToolConfirmationMessage.js';
@@ -24,6 +25,7 @@ interface ToolConfirmationQueueProps {
 export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
   confirmingTool,
 }) => {
+  const { t } = useTranslation('messages');
   const config = useConfig();
   const isAlternateBuffer = useAlternateBuffer();
   const { mainAreaWidth, terminalHeight, constrainHeight } = useUIState();
@@ -63,10 +65,10 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
             {/* Header */}
             <Box marginBottom={1} justifyContent="space-between">
               <Text color={theme.status.warning} bold>
-                Action Required
+                {t('toolConfirmation.queue.actionRequired')}
               </Text>
               <Text color={theme.text.secondary}>
-                {index} of {total}
+                {t('toolConfirmation.queue.indexProgress', { index, total })}
               </Text>
             </Box>
 

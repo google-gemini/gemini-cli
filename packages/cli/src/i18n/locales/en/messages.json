@@ -44,6 +44,10 @@
       "mcpTool": "Tool: {{tool}}",
       "modifyInProgress": "Modify in progress: ",
       "closeEditorToContinue": "Save and close external editor to continue"
+    },
+    "queue": {
+      "actionRequired": "Action Required",
+      "indexProgress": "{{index}} of {{total}}"
     }
   },
   "diff": {
