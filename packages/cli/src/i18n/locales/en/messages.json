@@ -45,5 +45,9 @@
       "modifyInProgress": "Modify in progress: ",
       "closeEditorToContinue": "Save and close external editor to continue"
     }
+  },
+  "diff": {
+    "noContent": "No diff content.",
+    "noChanges": "No changes detected."
   }
 }

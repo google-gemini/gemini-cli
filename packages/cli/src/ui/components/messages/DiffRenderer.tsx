@@ -6,6 +6,7 @@
 
 import type React from 'react';
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import crypto from 'node:crypto';
 import { colorizeCode, colorizeLine } from '../../utils/CodeColorizer.js';
@@ -100,6 +101,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
   terminalWidth,
   theme,
 }) => {
+  const { t } = useTranslation('messages');
   const settings = useSettings();
 
   const screenReaderEnabled = useIsScreenReaderEnabled();
@@ -125,7 +127,9 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
 
   const renderedOutput = useMemo(() => {
     if (!diffContent || typeof diffContent !== 'string') {
-      return <Text color={semanticTheme.status.warning}>No diff content.</Text>;
+      return (
+        <Text color={semanticTheme.status.warning}>{t('diff.noContent')}</Text>
+      );
     }
 
     if (parsedLines.length === 0) {
@@ -135,7 +139,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
           borderColor={semanticTheme.border.default}
           padding={1}
         >
-          <Text dimColor>No changes detected.</Text>
+          <Text dimColor>{t('diff.noChanges')}</Text>
         </Box>
       );
     }
@@ -174,6 +178,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
       return renderDiffContent(
         parsedLines,
         filename,
+        t,
         tabWidth,
         availableTerminalHeight,
         terminalWidth,
@@ -190,6 +195,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
     theme,
     settings,
     tabWidth,
+    t,
   ]);
 
   return renderedOutput;
@@ -198,6 +204,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
 const renderDiffContent = (
   parsedLines: DiffLine[],
   filename: string | undefined,
+  t: (key: string) => string,
   tabWidth = DEFAULT_TAB_WIDTH,
   availableTerminalHeight: number | undefined,
   terminalWidth: number,
@@ -220,7 +227,7 @@ const renderDiffContent = (
         borderColor={semanticTheme.border.default}
         padding={1}
       >
-        <Text dimColor>No changes detected.</Text>
+        <Text dimColor>{t('diff.noChanges')}</Text>
       </Box>
     );
   }

@@ -45,5 +45,9 @@
       "modifyInProgress": "修正中: ",
       "closeEditorToContinue": "外部エディタを保存して閉じると続行します"
     }
+  },
+  "diff": {
+    "noContent": "差分内容がありません。",
+    "noChanges": "変更は検出されませんでした。"
   }
 }
