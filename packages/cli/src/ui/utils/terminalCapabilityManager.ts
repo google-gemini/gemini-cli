@@ -223,6 +223,20 @@ export class TerminalCapabilityManager {
     }
   }
 
+  disableKittyProtocol() {
+    if (this.kittyEnabled) {
+      disableKittyKeyboardProtocol();
+      this.kittyEnabled = false;
+    }
+  }
+
+  enableKittyProtocol() {
+    if (this.kittySupported) {
+      enableKittyKeyboardProtocol();
+      this.kittyEnabled = true;
+    }
+  }
+
   getTerminalBackgroundColor(): TerminalBackgroundColor {
     return this.terminalBackgroundColor;
   }

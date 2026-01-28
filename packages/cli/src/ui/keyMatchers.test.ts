@@ -131,13 +131,19 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.UNDO,
-      positive: [createKey('z', { shift: false, ctrl: true })],
-      negative: [createKey('z'), createKey('z', { shift: true, ctrl: true })],
+      positive: [createKey('z', { alt: true, shift: false })],
+      negative: [
+        createKey('z', { ctrl: true }),
+        createKey('z', { alt: true, shift: true }),
+      ],
     },
     {
       command: Command.REDO,
-      positive: [createKey('z', { shift: true, ctrl: true })],
-      negative: [createKey('z'), createKey('z', { shift: false, ctrl: true })],
+      positive: [createKey('z', { alt: true, shift: true })],
+      negative: [
+        createKey('z', { ctrl: true }),
+        createKey('z', { alt: true, shift: false }),
+      ],
     },
 
     // Screen control
@@ -305,6 +311,18 @@ describe('keyMatchers', () => {
       command: Command.EXIT,
       positive: [createKey('d', { ctrl: true })],
       negative: [createKey('d'), createKey('c', { ctrl: true })],
+    },
+    {
+      command: Command.SUSPEND,
+      positive: [
+        createKey('z', { ctrl: true }),
+        createKey('z', { ctrl: true, shift: true }),
+      ],
+      negative: [
+        createKey('z'),
+        createKey('y', { ctrl: true }),
+        createKey('z', { alt: true }),
+      ],
     },
     {
       command: Command.SHOW_MORE_LINES,

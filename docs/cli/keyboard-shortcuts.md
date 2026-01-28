@@ -39,8 +39,8 @@ available combinations.
 | Delete the next word.                            | `Ctrl + Delete`<br />`Alt + Delete`                       |
 | Delete the character to the left.                | `Backspace`<br />`Ctrl + H`                               |
 | Delete the character to the right.               | `Delete`<br />`Ctrl + D`                                  |
-| Undo the most recent text edit.                  | `Ctrl + Z (no Shift)`                                     |
-| Redo the most recent undone text edit.           | `Shift + Ctrl + Z`                                        |
+| Undo the most recent text edit.                  | `Alt + Z (no Shift)`                                      |
+| Redo the most recent undone text edit.           | `Shift + Alt + Z`                                         |
 
 #### Scrolling
 
@@ -110,6 +110,7 @@ available combinations.
 | Focus the Gemini input from the shell input.                                                          | `Tab`                      |
 | Clear the terminal screen and redraw the UI.                                                          | `Ctrl + L`                 |
 | Restart the application.                                                                              | `R`                        |
+| Suspend the CLI and move it to the background.                                                        | `Ctrl + Z`                 |
 
 <!-- KEYBINDINGS-AUTOGEN:END -->
 
