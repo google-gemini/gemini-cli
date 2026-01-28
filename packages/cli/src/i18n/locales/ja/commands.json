@@ -222,5 +222,13 @@
     "saving": "メモリへの保存を試行中: \"{{content}}\"",
     "refreshing": "ソースファイルからメモリを再読み込み中...",
     "refreshError": "メモリの再読み込み中にエラーが発生しました: {{error}}"
+  },
+  "restore.responses": {
+    "geminiDirFailed": ".gemini ディレクトリのパスを特定できませんでした。",
+    "noToolCalls": "復元可能なツール呼び出しが見つかりませんでした。",
+    "availableCalls": "復元可能なツール呼び出し一覧:\n\n{{list}}",
+    "fileNotFound": "ファイルが見つかりません: {{file}}",
+    "invalidCheckpoint": "チェックポイントファイルが無効です: {{error}}",
+    "readFailed": "復元可能なツール呼び出しを読み込めませんでした。エラー: {{error}}"
   }
 }

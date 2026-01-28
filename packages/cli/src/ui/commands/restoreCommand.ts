@@ -15,6 +15,7 @@ import {
   performRestore,
   type ToolCallData,
 } from '@google/gemini-cli-core';
+import { t } from '../../i18n/index.js';
 import {
   type CommandContext,
   type SlashCommand,
@@ -46,7 +47,7 @@ async function restoreAction(
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Could not determine the .gemini directory path.',
+      content: t('commands:restore.responses.geminiDirFailed'),
     };
   }
 
@@ -61,14 +62,16 @@ async function restoreAction(
         return {
           type: 'message',
           messageType: 'info',
-          content: 'No restorable tool calls found.',
+          content: t('commands:restore.responses.noToolCalls'),
         };
       }
       const fileList = formatCheckpointDisplayList(jsonFiles);
       return {
         type: 'message',
         messageType: 'info',
-        content: `Available tool calls to restore:\n\n${fileList}`,
+        content: t('commands:restore.responses.availableCalls', {
+          list: fileList,
+        }),
       };
     }
 
@@ -78,7 +81,9 @@ async function restoreAction(
       return {
         type: 'message',
         messageType: 'error',
-        content: `File not found: ${selectedFile}`,
+        content: t('commands:restore.responses.fileNotFound', {
+          file: selectedFile,
+        }),
       };
     }
 
@@ -90,7 +95,9 @@ async function restoreAction(
       return {
         type: 'message',
         messageType: 'error',
-        content: `Checkpoint file is invalid: ${parseResult.error.message}`,
+        content: t('commands:restore.responses.invalidCheckpoint', {
+          error: parseResult.error.message,
+        }),
       };
     }
 
@@ -130,7 +137,7 @@ async function restoreAction(
     return {
       type: 'message',
       messageType: 'error',
-      content: `Could not read restorable tool calls. This is the error: ${error}`,
+      content: t('commands:restore.responses.readFailed', { error }),
     };
   }
 }
