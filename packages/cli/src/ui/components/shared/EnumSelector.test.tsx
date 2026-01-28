@@ -130,8 +130,8 @@ describe('<EnumSelector />', () => {
         onValueChange={() => {}}
       />,
     );
-    expect(lastFrame()).toContain('←');
-    expect(lastFrame()).toContain('→');
+    expect(lastFrame()).toContain('￩');
+    expect(lastFrame()).toContain('￫');
   });
 
   it('hides navigation arrows when single option available', () => {
@@ -146,7 +146,7 @@ describe('<EnumSelector />', () => {
         onValueChange={() => {}}
       />,
     );
-    expect(lastFrame()).not.toContain('←');
-    expect(lastFrame()).not.toContain('→');
+    expect(lastFrame()).not.toContain('￩');
+    expect(lastFrame()).not.toContain('￫');
   });
 });

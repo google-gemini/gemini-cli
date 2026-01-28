@@ -421,7 +421,7 @@ export async function cleanupOldClipboardImages(
  * Unescaped spaces act as separators between paths, while "\ " is preserved
  * as part of a filename.
  *
- * Example: "/img1.png /path/my\ image.png" → ["/img1.png", "/path/my\ image.png"]
+ * Example: "/img1.png /path/my\ image.png" ￫ ["/img1.png", "/path/my\ image.png"]
  *
  * @param text The text to split
  * @returns Array of path segments (still escaped)

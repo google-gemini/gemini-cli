@@ -58,7 +58,7 @@ describe('Key Bubbling Regression', () => {
     await waitFor(() => {
       expect(lastFrame()).toContain('j');
       // Verify we are still focusing the custom option (3rd item in list)
-      expect(lastFrame()).toMatch(/● 3\.\s+j/);
+      expect(lastFrame()).toMatch(/• 3\.\s+j/);
     });
 
     // 3. Type "k"
@@ -68,7 +68,7 @@ describe('Key Bubbling Regression', () => {
 
     await waitFor(() => {
       expect(lastFrame()).toContain('jk');
-      expect(lastFrame()).toMatch(/● 3\.\s+jk/);
+      expect(lastFrame()).toMatch(/• 3\.\s+jk/);
     });
   });
 });

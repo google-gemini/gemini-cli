@@ -76,7 +76,7 @@ export class FileCommandLoader implements ICommandLoader {
 
   /**
    * Loads all commands from user, project, and extension directories.
-   * Returns commands in order: user → project → extensions (alphabetically).
+   * Returns commands in order: user ￫ project ￫ extensions (alphabetically).
    *
    * Order is important for conflict resolution in CommandService:
    * - User/project commands (without extensionName) use "last wins" strategy
@@ -141,7 +141,7 @@ export class FileCommandLoader implements ICommandLoader {
 
   /**
    * Get all command directories in order for loading.
-   * User commands → Project commands → Extension commands
+   * User commands ￫ Project commands ￫ Extension commands
    * This order ensures extension commands can detect all conflicts.
    */
   private getCommandDirectories(): CommandDirectory[] {

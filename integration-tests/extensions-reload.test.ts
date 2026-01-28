@@ -121,7 +121,7 @@ describe('extension reloading', () => {
       );
       await run.type('\r'); // consent
       await run.expectText(
-        'Extension "test-extension" successfully updated: 0.0.1 → 0.0.2',
+        'Extension "test-extension" successfully updated: 0.0.1 ￫ 0.0.2',
       );
 
       // Poll for the updated extension version

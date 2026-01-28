@@ -18,6 +18,6 @@ exports[`StatusDisplay > renders HookStatusDisplay when hooks are active 1`] = `
 
 exports[`StatusDisplay > renders Queue Error Message 1`] = `"Queue Error"`;
 
-exports[`StatusDisplay > renders system md indicator if env var is set 1`] = `"|⌐■_■|"`;
+exports[`StatusDisplay > renders system md indicator if env var is set 1`] = `"|⌐▪_▪|"`;
 
 exports[`StatusDisplay > renders warning message 1`] = `"This is a warning"`;

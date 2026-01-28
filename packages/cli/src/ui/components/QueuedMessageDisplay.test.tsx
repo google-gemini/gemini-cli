@@ -24,7 +24,7 @@ describe('QueuedMessageDisplay', () => {
     );
 
     const output = lastFrame();
-    expect(output).toContain('Queued (press ↑ to edit):');
+    expect(output).toContain('Queued (press ￪ to edit):');
     expect(output).toContain('First message');
     unmount();
   });
@@ -41,7 +41,7 @@ describe('QueuedMessageDisplay', () => {
     );
 
     const output = lastFrame();
-    expect(output).toContain('Queued (press ↑ to edit):');
+    expect(output).toContain('Queued (press ￪ to edit):');
     expect(output).toContain('First queued message');
     expect(output).toContain('Second queued message');
     expect(output).toContain('Third queued message');
@@ -62,7 +62,7 @@ describe('QueuedMessageDisplay', () => {
     );
 
     const output = lastFrame();
-    expect(output).toContain('Queued (press ↑ to edit):');
+    expect(output).toContain('Queued (press ￪ to edit):');
     expect(output).toContain('Message 1');
     expect(output).toContain('Message 2');
     expect(output).toContain('Message 3');
@@ -80,7 +80,7 @@ describe('QueuedMessageDisplay', () => {
     );
 
     const output = lastFrame();
-    expect(output).toContain('Queued (press ↑ to edit):');
+    expect(output).toContain('Queued (press ￪ to edit):');
     expect(output).toContain('Message with multiple whitespace');
     unmount();
   });

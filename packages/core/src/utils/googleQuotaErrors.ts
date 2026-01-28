@@ -174,7 +174,7 @@ function classifyValidationRequiredError(
  * - 403 errors with `VALIDATION_REQUIRED` from cloudcode-pa domains are classified
  *   as `ValidationRequiredError`.
  * - 429 errors are classified as either `TerminalQuotaError` or `RetryableQuotaError`:
- *   - CloudCode API: `RATE_LIMIT_EXCEEDED` → `RetryableQuotaError`, `QUOTA_EXHAUSTED` → `TerminalQuotaError`.
+ *   - CloudCode API: `RATE_LIMIT_EXCEEDED` ￫ `RetryableQuotaError`, `QUOTA_EXHAUSTED` ￫ `TerminalQuotaError`.
  *   - If the error indicates a daily limit (in QuotaFailure), it's a `TerminalQuotaError`.
  *   - If the error has a retry delay, it's a `RetryableQuotaError`.
  *   - If the error indicates a per-minute limit, it's a `RetryableQuotaError`.

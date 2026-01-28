@@ -110,7 +110,7 @@ async function main() {
     console.log(`  - Original PR: ${originalPr}`);
     console.log(`  - Exit Code: ${exitCode}`);
     console.log(`  - Commit: ${commit}`);
-    console.log(`  - Channel: ${channel} → npm tag: ${npmTag}`);
+    console.log(`  - Channel: ${channel} ￫ npm tag: ${npmTag}`);
     console.log(`  - Repository: ${repository}`);
     console.log(`  - Run ID: ${runId}`);
   }
@@ -217,7 +217,7 @@ A patch branch [\`${branch}\`](https://github.com/${repository}/tree/${branch}) 
 
 **📋 Patch Details:**
 - **Environment**: \`${environment}\`
-- **Channel**: \`${channel}\` → will publish to npm tag \`${npmTag}\`
+- **Channel**: \`${channel}\` ￫ will publish to npm tag \`${npmTag}\`
 - **Commit**: \`${commit}\`
 - **Hotfix Branch**: [\`${branch}\`](https://github.com/${repository}/tree/${branch})
 - **Hotfix PR**: [#${mockPrNumber}](${mockPrUrl})${hasConflicts ? '\n- **⚠️ Status**: Cherry-pick conflicts detected - manual resolution required' : ''}
@@ -273,7 +273,7 @@ ${hasConflicts ? '4' : '3'}. You'll receive updates here when the release comple
 
 **📋 Patch Details:**
 - **Environment**: \`${environment}\`
-- **Channel**: \`${channel}\` → will publish to npm tag \`${npmTag}\`
+- **Channel**: \`${channel}\` ￫ will publish to npm tag \`${npmTag}\`
 - **Commit**: \`${commit}\`
 - **Hotfix Branch**: [\`${branch}\`](https://github.com/${repository}/tree/${branch})
 - **Hotfix PR**: [#${pr.number}](${pr.url})${hasConflicts ? '\n- **⚠️ Status**: Cherry-pick conflicts detected - manual resolution required' : ''}

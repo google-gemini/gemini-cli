@@ -22,7 +22,7 @@ export const QueuedMessageDisplay = ({
   return (
     <Box flexDirection="column" marginTop={1}>
       <Box paddingLeft={2}>
-        <Text dimColor>Queued (press ↑ to edit):</Text>
+        <Text dimColor>Queued (press ￪ to edit):</Text>
       </Box>
       {messageQueue
         .slice(0, MAX_DISPLAYED_QUEUED_MESSAGES)

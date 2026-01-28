@@ -1841,7 +1841,7 @@ describe('connectToMcpServer with OAuth', () => {
   });
 });
 
-describe('connectToMcpServer - HTTP→SSE fallback', () => {
+describe('connectToMcpServer - HTTP￫SSE fallback', () => {
   let mockedClient: ClientLib.Client;
   let workspaceContext: WorkspaceContext;
   let testWorkspace: string;
@@ -2035,7 +2035,7 @@ describe('connectToMcpServer - OAuth with transport fallback', () => {
     vi.unstubAllGlobals();
   });
 
-  it('should handle HTTP 404 → SSE 401 → OAuth → SSE+OAuth succeeds', async () => {
+  it('should handle HTTP 404 ￫ SSE 401 ￫ OAuth ￫ SSE+OAuth succeeds', async () => {
     // Tests that OAuth flow works when SSE (not HTTP) requires auth
     vi.mocked(mockedClient.connect)
       .mockRejectedValueOnce(new StreamableHTTPError(404, 'Not Found'))

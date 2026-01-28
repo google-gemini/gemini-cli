@@ -1112,7 +1112,7 @@ describe('SettingsDialog', () => {
 
       // Wait for navigation to complete
       await waitFor(() =>
-        expect(lastFrame()).toContain('● Enable Interactive Shell'),
+        expect(lastFrame()).toContain('• Enable Interactive Shell'),
       );
 
       // Toggle it to trigger restart required
@@ -1153,7 +1153,7 @@ describe('SettingsDialog', () => {
       });
 
       await waitFor(() =>
-        expect(lastFrame()).toContain('● Enable Interactive Shell'),
+        expect(lastFrame()).toContain('• Enable Interactive Shell'),
       );
 
       act(() => {

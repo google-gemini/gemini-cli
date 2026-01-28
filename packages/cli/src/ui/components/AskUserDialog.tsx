@@ -177,7 +177,7 @@ const ReviewView: React.FC<ReviewViewProps> = ({
       {questions.map((q, i) => (
         <Box key={i} marginBottom={0}>
           <Text color={theme.text.secondary}>{q.header}</Text>
-          <Text color={theme.text.secondary}> → </Text>
+          <Text color={theme.text.secondary}> ￫ </Text>
           <Text color={answers[i] ? theme.text.primary : theme.status.warning}>
             {answers[i] || '(not answered)'}
           </Text>
@@ -402,7 +402,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
   const numOptions =
     (question.options?.length ?? 0) + (question.type !== 'yesno' ? 1 : 0);
   const numLen = String(numOptions).length;
-  const radioWidth = 2; // "● "
+  const radioWidth = 2; // "• "
   const numberWidth = numLen + 2; // e.g., "1. "
   const checkboxWidth = question.multiSelect ? 4 : 1; // "[x] " or " "
   const checkmarkWidth = question.multiSelect ? 0 : 2; // "" or " ✓"
@@ -1005,10 +1005,10 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
         questions.length > 1
           ? currentQuestion.type === 'text' || isEditingCustomOption
             ? 'Tab/Shift+Tab to switch questions'
-            : '←/→ to switch questions'
+            : '￩/￫ to switch questions'
           : currentQuestion.type === 'text' || isEditingCustomOption
             ? undefined
-            : '↑/↓ to navigate'
+            : '￪/￬ to navigate'
       }
     />
   );

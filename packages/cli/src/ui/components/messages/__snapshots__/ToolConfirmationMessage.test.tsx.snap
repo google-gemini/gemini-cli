@@ -6,7 +6,7 @@ ls -la
 whoami
 Allow execution of 3 commands?
 
-● 1. Allow once
+• 1. Allow once
   2. Allow for this session
   3. No, suggest changes (esc)
 "
@@ -19,7 +19,7 @@ URLs to fetch:
  - https://raw.githubusercontent.com/google/gemini-react/main/README.md
 Do you want to proceed?
 
-● 1. Allow once
+• 1. Allow once
   2. Allow for this session
   3. No, suggest changes (esc)
 "
@@ -29,7 +29,7 @@ exports[`ToolConfirmationMessage > should not display urls if prompt and url are
 "https://example.com
 Do you want to proceed?
 
-● 1. Allow once
+• 1. Allow once
   2. Allow for this session
   3. No, suggest changes (esc)
 "
@@ -43,7 +43,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for edit confirmations' 
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Apply this change?
 
-● 1. Allow once
+• 1. Allow once
   2. Modify with external editor
   3. No, suggest changes (esc)
 "
@@ -57,7 +57,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for edit confirmations' 
 ╰──────────────────────────────────────────────────────────────────────────────╯
 Apply this change?
 
-● 1. Allow once
+• 1. Allow once
   2. Allow for this session
   3. Modify with external editor
   4. No, suggest changes (esc)
@@ -68,7 +68,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for exec confirmations' 
 "echo "hello"
 Allow execution of: 'echo'?
 
-● 1. Allow once
+• 1. Allow once
   2. No, suggest changes (esc)
 "
 `;
@@ -77,7 +77,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for exec confirmations' 
 "echo "hello"
 Allow execution of: 'echo'?
 
-● 1. Allow once
+• 1. Allow once
   2. Allow for this session
   3. No, suggest changes (esc)
 "
@@ -87,7 +87,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for info confirmations' 
 "https://example.com
 Do you want to proceed?
 
-● 1. Allow once
+• 1. Allow once
   2. No, suggest changes (esc)
 "
 `;
@@ -96,7 +96,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for info confirmations' 
 "https://example.com
 Do you want to proceed?
 
-● 1. Allow once
+• 1. Allow once
   2. Allow for this session
   3. No, suggest changes (esc)
 "
@@ -107,7 +107,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for mcp confirmations' >
 Tool: test-tool
 Allow execution of MCP tool "test-tool" from server "test-server"?
 
-● 1. Allow once
+• 1. Allow once
   2. No, suggest changes (esc)
 "
 `;
@@ -117,7 +117,7 @@ exports[`ToolConfirmationMessage > with folder trust > 'for mcp confirmations' >
 Tool: test-tool
 Allow execution of MCP tool "test-tool" from server "test-server"?
 
-● 1. Allow once
+• 1. Allow once
   2. Allow tool for this session
   3. Allow all server tools for this session
   4. No, suggest changes (esc)

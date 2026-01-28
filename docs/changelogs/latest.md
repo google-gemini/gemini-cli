@@ -117,7 +117,7 @@ npm install -g @google/gemini-cli
   [#16040](https://github.com/google-gemini/gemini-cli/pull/16040)
 - Update the page's title to be consistent and show in site. by @kschaab in
   [#16174](https://github.com/google-gemini/gemini-cli/pull/16174)
-- docs: correct typo in bufferFastReturn JSDoc ("accomodate" → "accommodate") by
+- docs: correct typo in bufferFastReturn JSDoc ("accomodate" ￫ "accommodate") by
   @minglu7 in [#16056](https://github.com/google-gemini/gemini-cli/pull/16056)
 - fix: typo in MCP servers settings description by @alphanota in
   [#15929](https://github.com/google-gemini/gemini-cli/pull/15929)

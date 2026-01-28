@@ -315,7 +315,7 @@ describe('createPolicyEngineConfig', () => {
       (r) => r.decision === PolicyDecision.ALLOW && !r.toolName,
     );
     expect(rule).toBeDefined();
-    // Priority 999 in default tier → 1.999
+    // Priority 999 in default tier ￫ 1.999
     expect(rule?.priority).toBeCloseTo(1.999, 5);
   });
 
@@ -330,7 +330,7 @@ describe('createPolicyEngineConfig', () => {
       (r) => r.toolName === 'replace' && r.decision === PolicyDecision.ALLOW,
     );
     expect(rule).toBeDefined();
-    // Priority 15 in default tier → 1.015
+    // Priority 15 in default tier ￫ 1.015
     expect(rule?.priority).toBeCloseTo(1.015, 5);
   });
 
@@ -577,7 +577,7 @@ describe('createPolicyEngineConfig', () => {
       (r) => !r.toolName && r.decision === PolicyDecision.ALLOW,
     );
     expect(wildcardRule).toBeDefined();
-    // Priority 999 in default tier → 1.999
+    // Priority 999 in default tier ￫ 1.999
     expect(wildcardRule?.priority).toBeCloseTo(1.999, 5);
 
     // Write tool ASK_USER rules are present (from write.toml)
@@ -681,7 +681,7 @@ priority = 150
         r.decision === PolicyDecision.ALLOW,
     );
     expect(rule).toBeDefined();
-    // Priority 150 in user tier → 2.150
+    // Priority 150 in user tier ￫ 2.150
     expect(rule?.priority).toBeCloseTo(2.15, 5);
     expect(rule?.argsPattern).toBeInstanceOf(RegExp);
     expect(rule?.argsPattern?.test('{"command":"git status"}')).toBe(true);
@@ -906,7 +906,7 @@ name = "invalid-name"
         r.decision === PolicyDecision.ASK_USER,
     );
     expect(discoveredRule).toBeDefined();
-    // Priority 10 in default tier → 1.010
+    // Priority 10 in default tier ￫ 1.010
     expect(discoveredRule?.priority).toBeCloseTo(1.01, 5);
   });
 

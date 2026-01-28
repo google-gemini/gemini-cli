@@ -13,7 +13,7 @@ exports[`ToolConfirmationQueue > does not render expansion hint when constrainHe
 │ ╰──────────────────────────────────────────────────────────────────────────╯ │
 │ Apply this change?                                                           │
 │                                                                              │
-│ ● 1. Allow once                                                              │
+│ • 1. Allow once                                                              │
 │   2. Allow for this session                                                  │
 │   3. Modify with external editor                                             │
 │   4. No, suggest changes (esc)                                               │
@@ -32,7 +32,7 @@ exports[`ToolConfirmationQueue > renders expansion hint when content is long and
 │ 50 line                                                                      │
 │ Apply this change?                                                           │
 │                                                                              │
-│ ● 1. Allow once                                                              │
+│ • 1. Allow once                                                              │
 │   2. Allow for this session                                                  │
 │   3. Modify with external editor                                             │
 │   4. No, suggest changes (esc)                                               │
@@ -64,7 +64,7 @@ exports[`ToolConfirmationQueue > renders the confirming tool with progress indic
 │ ls                                                                           │
 │ Allow execution of: 'ls'?                                                    │
 │                                                                              │
-│ ● 1. Allow once                                                              │
+│ • 1. Allow once                                                              │
 │   2. Allow for this session                                                  │
 │   3. No, suggest changes (esc)                                               │
 │                                                                              │

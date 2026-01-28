@@ -25,7 +25,7 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
   const config = useConfig();
 
   if (process.env['GEMINI_SYSTEM_MD']) {
-    return <Text color={theme.status.error}>|⌐■_■|</Text>;
+    return <Text color={theme.status.error}>|⌐▪_▪|</Text>;
   }
 
   if (uiState.ctrlCPressedOnce) {
