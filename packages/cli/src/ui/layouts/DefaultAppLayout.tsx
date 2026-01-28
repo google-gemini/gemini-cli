@@ -15,32 +15,19 @@ import { useUIState } from '../contexts/UIStateContext.js';
 import { useFlickerDetector } from '../hooks/useFlickerDetector.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { CopyModeWarning } from '../components/CopyModeWarning.js';
-import { ToolConfirmationQueue } from '../components/ToolConfirmationQueue.js';
-import { useConfirmingTool } from '../hooks/useConfirmingTool.js';
-import { useConfig } from '../contexts/ConfigContext.js';
 
 export const DefaultAppLayout: React.FC = () => {
   const uiState = useUIState();
-  const config = useConfig();
   const isAlternateBuffer = useAlternateBuffer();
-
-  // If the event-driven scheduler is enabled AND we have a tool waiting,
-  // we switch the footer mode to "Queue".
-  const confirmingTool = useConfirmingTool();
-  const showConfirmationQueue =
-    config.isEventDrivenSchedulerEnabled() && confirmingTool !== null;
 
   const { rootUiRef, terminalHeight } = uiState;
   useFlickerDetector(rootUiRef, terminalHeight);
   // If in alternate buffer mode, need to leave room to draw the scrollbar on
   // the right side of the terminal.
-  const width = isAlternateBuffer
-    ? uiState.terminalWidth
-    : uiState.mainAreaWidth;
   return (
     <Box
       flexDirection="column"
-      width={width}
+      width={uiState.terminalWidth}
       height={isAlternateBuffer ? terminalHeight : undefined}
       paddingBottom={isAlternateBuffer ? 1 : undefined}
       flexShrink={0}
@@ -55,6 +42,7 @@ export const DefaultAppLayout: React.FC = () => {
         ref={uiState.mainControlsRef}
         flexShrink={0}
         flexGrow={0}
+        width={uiState.terminalWidth}
       >
         <Notifications />
         <CopyModeWarning />
@@ -63,16 +51,11 @@ export const DefaultAppLayout: React.FC = () => {
           uiState.customDialog
         ) : uiState.dialogsVisible ? (
           <DialogManager
-            terminalWidth={uiState.mainAreaWidth}
+            terminalWidth={uiState.terminalWidth}
             addItem={uiState.historyManager.addItem}
           />
         ) : (
-          <>
-            {showConfirmationQueue && confirmingTool && (
-              <ToolConfirmationQueue confirmingTool={confirmingTool} />
-            )}
-            <Composer isFocused={!showConfirmationQueue} />
-          </>
+          <Composer isFocused={true} />
         )}
 
         <ExitWarning />

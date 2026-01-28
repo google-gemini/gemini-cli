@@ -74,6 +74,10 @@ export interface BaseAgentDefinition<
   experimental?: boolean;
   inputConfig: InputConfig;
   outputConfig?: OutputConfig<TOutput>;
+  metadata?: {
+    hash?: string;
+    filePath?: string;
+  };
 }
 
 export interface LocalAgentDefinition<

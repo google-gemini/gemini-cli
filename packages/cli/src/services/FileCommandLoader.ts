@@ -33,7 +33,7 @@ import {
   ShellProcessor,
 } from './prompt-processors/shellProcessor.js';
 import { AtFileProcessor } from './prompt-processors/atFileProcessor.js';
-import { sanitizeForListDisplay } from '../ui/utils/textUtils.js';
+import { sanitizeForDisplay } from '../ui/utils/textUtils.js';
 
 interface CommandDirectory {
   path: string;
@@ -248,7 +248,7 @@ export class FileCommandLoader implements ICommandLoader {
     const defaultDescription = `Custom command from ${path.basename(filePath)}`;
     let description = validDef.description || defaultDescription;
 
-    description = sanitizeForListDisplay(description, 100);
+    description = sanitizeForDisplay(description, 100);
 
     if (extensionName) {
       description = `[${extensionName}] ${description}`;

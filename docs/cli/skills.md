@@ -1,9 +1,5 @@
 # Agent Skills
 
-_Note: This is an experimental feature enabled via `experimental.skills`. You
-can also search for "Skills" within the `/settings` interactive UI to toggle
-this and manage other skill-related settings._
-
 Agent Skills allow you to extend Gemini CLI with specialized expertise,
 procedural workflows, and task-specific resources. Based on the
 [Agent Skills](https://agentskills.io) open standard, a "skill" is a
@@ -95,8 +91,9 @@ gemini skills disable my-expertise --scope workspace
 
 ## Creating a Skill
 
-A skill is a directory containing a `SKILL.md` file at its root. This file uses
-YAML frontmatter for metadata and Markdown for instructions.
+A skill is a directory containing a `SKILL.md` file at its root. This file
+serves as the entry point for your skill and uses YAML frontmatter for metadata
+and Markdown for instructions.
 
 ### Folder Structure
 
