@@ -181,4 +181,107 @@ describe('calculateRequestTokenCount', () => {
     // PDF estimate: 25800 tokens (~100 pages at 258 tokens/page)
     expect(count).toBe(25800);
   });
+
+  describe('Gemini 3.0 Preview Logic', () => {
+    const gemini3Model = 'gemini-3-pro-preview';
+
+    it('should SKIP countTokens API and use local estimation for Gemini 3 models with media', async () => {
+      vi.mocked(mockContentGenerator.countTokens).mockClear();
+      const request = [
+        { inlineData: { mimeType: 'image/png', data: 'data' } },
+      ];
+
+      const count = await calculateRequestTokenCount(
+        request,
+        mockContentGenerator,
+        gemini3Model,
+      );
+
+      // Should find 3000 (fixed estimate for image)
+      expect(count).toBe(3000);
+      // Crucially, it should NOT have called the API
+      expect(mockContentGenerator.countTokens).not.toHaveBeenCalled();
+    });
+
+    it('should SKIP countTokens API and use local estimate for PDFs on Gemini 3', async () => {
+      vi.mocked(mockContentGenerator.countTokens).mockClear();
+      const request = [
+        { inlineData: { mimeType: 'application/pdf', data: 'data' } },
+      ];
+
+      const count = await calculateRequestTokenCount(
+        request,
+        mockContentGenerator,
+        gemini3Model,
+      );
+
+      // Should find 25800 (fixed estimate for PDF)
+      expect(count).toBe(25800);
+      expect(mockContentGenerator.countTokens).not.toHaveBeenCalled();
+    });
+
+    it('should STILL use countTokens API for non-Gemini-3 models (regression check)', async () => {
+      vi.mocked(mockContentGenerator.countTokens).mockResolvedValue({
+        totalTokens: 123,
+      });
+      const oldModel = 'gemini-2.5-pro';
+      const request = [
+        { inlineData: { mimeType: 'image/png', data: 'data' } },
+      ];
+
+      const count = await calculateRequestTokenCount(
+        request,
+        mockContentGenerator,
+        oldModel,
+      );
+
+      expect(count).toBe(123);
+      expect(mockContentGenerator.countTokens).toHaveBeenCalled();
+    });
+  });
+
+  describe('FunctionResponse with Media (Gemini 3 Compatibility)', () => {
+    // Mock a large PDF in a function response (~4MB base64 string)
+    // 4MB string -> 1M tokens by string length heuristic
+    const largeBase64 = 'a'.repeat(4 * 1024 * 1024);
+    const functionResponsePart = {
+      functionResponse: {
+          name: 'readFile',
+          response: {
+            name: 'readFile',
+            content: { output: 'Binary content provided' },
+          },
+      },
+    };
+    // Simulate the hidden 'parts' property used by Gemini 3 tools
+    (functionResponsePart.functionResponse as any).parts = [
+      {
+        inlineData: {
+          mimeType: 'application/pdf',
+          data: largeBase64,
+        },
+      },
+    ];
+
+    it('should correctly estimate tokens for functionResponse with heavy media avoiding valid overestimation', async () => {
+      // This regression test verifies correct estimation for Gemini 3 tools:
+      // The current code doesn't see "inlineData" at the top level, so it falls back to
+      // JSON.stringify().length / 4.
+      // 4 million chars / 4 = 1 million tokens.
+      // Expected (Fixed): Should be ~25800 (PDF estimate).
+
+      // Current buggy behavior: Count is roughly 1 million
+      // Expected (Fixed): Should be ~25800 (PDF estimate).
+
+      const count = await calculateRequestTokenCount(
+        [functionResponsePart],
+        mockContentGenerator,
+        'gemini-3-flash-preview',
+      );
+
+      // Verify fix: Should use PDF estimate (25800) + small JSON overhead
+      expect(count).toBeGreaterThanOrEqual(25800);
+      expect(count).toBeLessThan(26000);
+    });
+  });
 });

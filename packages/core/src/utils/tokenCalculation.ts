@@ -6,6 +6,7 @@
 
 import type { PartListUnion, Part } from '@google/genai';
 import type { ContentGenerator } from '../core/contentGenerator.js';
+import { isGemini3Model } from '../config/models.js';
 import { debugLogger } from './debugLogger.js';
 
 // Token estimation constants
@@ -52,21 +53,159 @@ export function estimateTokenCountSync(parts: Part[]): number {
       // See: https://ai.google.dev/gemini-api/docs/document-processing
       const inlineData = 'inlineData' in part ? part.inlineData : undefined;
       const fileData = 'fileData' in part ? part.fileData : undefined;
-      const mimeType = inlineData?.mimeType || fileData?.mimeType;
 
-      if (mimeType?.startsWith('image/')) {
-        totalTokens += IMAGE_TOKEN_ESTIMATE;
-      } else if (mimeType?.startsWith('application/pdf')) {
-        totalTokens += PDF_TOKEN_ESTIMATE;
+      if (inlineData || fileData) {
+        const mimeType = inlineData?.mimeType || fileData?.mimeType;
+        if (mimeType?.startsWith('image/') || mimeType?.startsWith('application/pdf')) {
+          totalTokens += estimateMediaTokenCount(mimeType);
+        } else {
+          totalTokens += JSON.stringify(part).length / 4;
+        }
+      } else if ('functionResponse' in part && part.functionResponse) {
+        // Iterate through function responses to check for nested media content
+        // This is critical for Gemini 3 tools which may return heavy media payload
+        // that shouldn't be stringified as JSON.
+        
+        // Check for hidden 'parts' property (Gemini 3 specific structure for media compatibility)
+        const frParts = (part.functionResponse as any).parts;
+        let handledMediaByKey = false;
+        if (frParts && Array.isArray(frParts)) {
+           totalTokens += estimateTokenCountSync(frParts);
+           handledMediaByKey = true;
+        }
+
+        const response = part.functionResponse.response as Record<string, any>;
+        if (response && typeof response === 'object') {
+          // Check for standard Gemini multimodal structure in response
+          // or flattened structure if tools return it that way
+          if (response['content'] && Array.isArray(response['content'])) {
+            // Recurse into content parts
+            totalTokens += estimateTokenCountSync(response['content']);
+          } else if (
+            response['content'] &&
+            typeof response['content'] === 'object'
+          ) {
+            // Handle single part content
+            const content = response['content'] as Part;
+            if (content.inlineData || content.fileData) {
+              totalTokens += estimateTokenCountSync([content]);
+            } else {
+               if (!handledMediaByKey) {
+                  totalTokens += JSON.stringify(part).length / 4;
+               } else {
+                  // Only count the response JSON overhead, not the heavy parts
+                  totalTokens += JSON.stringify(response).length / 4;
+               }
+            }
+          } else if (
+            response['llmContent'] &&
+            typeof response['llmContent'] === 'object'
+          ) {
+            // Support for 'llmContent' used by tools like readFile
+            if (Array.isArray(response['llmContent'])) {
+              totalTokens += estimateTokenCountSync(response['llmContent']);
+            } else {
+              const content = response['llmContent'] as Part;
+              if (content.inlineData || content.fileData) {
+                totalTokens += estimateTokenCountSync([content]);
+              } else {
+                if (!handledMediaByKey) {
+                   totalTokens += JSON.stringify(part).length / 4;
+                } else {
+                   totalTokens += JSON.stringify(response).length / 4;
+                }
+              }
+            }
+          } else if (response['inlineData']) {
+            // Handle direct inlineData in response (non-standard but possible)
+            const mimeType = response['inlineData'].mimeType;
+            if (
+              mimeType?.startsWith('image/') ||
+              mimeType?.startsWith('application/pdf')
+            ) {
+              totalTokens += estimateMediaTokenCount(mimeType);
+            } else {
+               if (!handledMediaByKey) {
+                  totalTokens += JSON.stringify(part).length / 4;
+               } else {
+                  totalTokens += JSON.stringify(response).length / 4;
+               }
+            }
+          } else {
+            // Fallback for text-only tool responses
+            if (!handledMediaByKey) {
+               totalTokens += JSON.stringify(part).length / 4;
+            } else {
+               totalTokens += JSON.stringify(response).length / 4;
+            }
+          }
+        } else {
+           if (!handledMediaByKey) {
+              totalTokens += JSON.stringify(part).length / 4;
+           } else {
+               // If response is missing or not an object, just add small constant
+               totalTokens += 10;
+           }
+        }
       } else {
-        // For other non-text parts (functionCall, functionResponse, etc.),
-        // we fallback to the JSON string length heuristic.
-        // Note: This is an approximation.
+        // For other non-text parts (functionCall, etc.) fallback to JSON length
         totalTokens += JSON.stringify(part).length / 4;
       }
     }
   }
   return Math.floor(totalTokens);
+}
+
+function estimateMediaTokenCount(mimeType: string): number {
+  if (mimeType.startsWith('image/')) {
+    return IMAGE_TOKEN_ESTIMATE;
+  }
+  if (mimeType.startsWith('application/pdf')) {
+    return PDF_TOKEN_ESTIMATE;
+  }
+  return 0;
+}
+
+/**
+ * Checks recursively if a part or list of parts contains media (inlineData or fileData).
+ * This is important for tool responses that might nest media deep within their results.
+ */
+function hasRecursiveMedia(parts: Part[]): boolean {
+  return parts.some((p) => {
+    if ('inlineData' in p || 'fileData' in p) return true;
+    if ('functionResponse' in p && p.functionResponse) {
+      // Check for hidden 'parts' property used by Gemini 3
+      // This is where convertToFunctionResponse attaches media
+      const frParts = (p.functionResponse as any).parts;
+      if (frParts && Array.isArray(frParts)) {
+        if (hasRecursiveMedia(frParts)) return true;
+      }
+
+      const resp = p.functionResponse.response as Record<string, any>;
+      if (!resp || typeof resp !== 'object') return false;
+
+      // Check standard 'content' array
+      if (Array.isArray(resp['content'])) {
+        return hasRecursiveMedia(resp['content']);
+      }
+      // Check Standard 'content' single part
+      if (resp['content'] && typeof resp['content'] === 'object') {
+        const content = resp['content'] as Part;
+        if ('inlineData' in content || 'fileData' in content) return true;
+      }
+      // Check 'llmContent' (used by some tools like readFile)
+      if (resp['llmContent'] && typeof resp['llmContent'] === 'object') {
+        const llmContent = resp['llmContent'] as Part;
+        if ('inlineData' in llmContent || 'fileData' in llmContent) return true;
+        if (Array.isArray(resp['llmContent'])) {
+          return hasRecursiveMedia(resp['llmContent']);
+        }
+      }
+      // Check direct nested inlineData
+      if (resp['inlineData']) return true;
+    }
+    return false;
+  });
 }
 
 /**
@@ -86,12 +225,14 @@ export async function calculateRequestTokenCount(
       : [request];
 
   // Use countTokens API only for heavy media parts that are hard to estimate.
-  const hasMedia = parts.some((p) => {
-    const isMedia = 'inlineData' in p || 'fileData' in p;
-    return isMedia;
-  });
+  // We use recursive check to find nested media in tool responses.
+  const hasMedia = hasRecursiveMedia(parts);
 
-  if (hasMedia) {
+  // For Gemini 3 models, the countTokens API returns inflated values for base64 media
+  // (counting characters instead of image tokens). We skip the API for these models
+  // and use our local estimation (fixed values) instead.
+  // See: https://github.com/google/gemini-cli/issues/15672
+  if (hasMedia && !isGemini3Model(model)) {
     try {
       const response = await contentGenerator.countTokens({
         model,
