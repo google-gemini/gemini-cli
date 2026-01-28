@@ -15,8 +15,6 @@ npm install -g @google/gemini-cli@preview
 
 - **Event-Driven Architecture:** The tool execution scheduler is now
   event-driven, improving performance and reliability.
-- **Plan Mode Enhancements:** Approval mode cycling now includes Plan Mode, and
-  the UI has been updated.
 - **System Prompt Override:** Now supports dynamic variable substitution.
 - **Rewind Command:** The `/rewind` command has been implemented.
 - **Linux Clipboard:** Image pasting capabilities for Wayland and X11 on Linux.
