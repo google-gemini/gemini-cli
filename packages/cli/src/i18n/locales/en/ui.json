@@ -249,5 +249,10 @@
       "modified": " » Modified:",
       "agreementRate": " Overall Agreement Rate:"
     }
+  },
+  "editor": {
+    "none": "None",
+    "notAvailableInSandbox": " (Not available in sandbox)",
+    "notInstalled": " (Not installed)"
   }
 }

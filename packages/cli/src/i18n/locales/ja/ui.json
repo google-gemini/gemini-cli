@@ -237,5 +237,10 @@
       "modified": " » 修正:",
       "agreementRate": " 全体の合意率:"
     }
+  },
+  "editor": {
+    "none": "なし",
+    "notAvailableInSandbox": " (サンドボックスでは利用不可)",
+    "notInstalled": " (未インストール)"
   }
 }
