@@ -217,5 +217,10 @@
     "usageConfig": "使用法: /agents config <エージェント名>",
     "refreshing": "エージェントレジストリを更新中...",
     "refreshSuccess": "エージェントを正常に更新しました。"
+  },
+  "memory.responses": {
+    "saving": "メモリへの保存を試行中: \"{{content}}\"",
+    "refreshing": "ソースファイルからメモリを再読み込み中...",
+    "refreshError": "メモリの再読み込み中にエラーが発生しました: {{error}}"
   }
 }

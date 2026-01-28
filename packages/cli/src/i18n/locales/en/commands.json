@@ -222,5 +222,10 @@
     "usageConfig": "Usage: /agents config <agent-name>",
     "refreshing": "Refreshing agent registry...",
     "refreshSuccess": "Agents refreshed successfully."
+  },
+  "memory.responses": {
+    "saving": "Attempting to save to memory: \"{{content}}\"",
+    "refreshing": "Refreshing memory from source files...",
+    "refreshError": "Error refreshing memory: {{error}}"
   }
 }

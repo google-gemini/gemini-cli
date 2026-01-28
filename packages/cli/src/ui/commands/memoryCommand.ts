@@ -10,6 +10,7 @@ import {
   refreshMemory,
   showMemory,
 } from '@google/gemini-cli-core';
+import { t } from '../../i18n/index.js';
 import { MessageType } from '../types.js';
 import type { SlashCommand, SlashCommandActionReturn } from './types.js';
 import { CommandKind } from './types.js';
@@ -54,7 +55,9 @@ export const memoryCommand: SlashCommand = {
         context.ui.addItem(
           {
             type: MessageType.INFO,
-            text: `Attempting to save to memory: "${args.trim()}"`,
+            text: t('commands:memory.responses.saving', {
+              content: args.trim(),
+            }),
           },
           Date.now(),
         );
@@ -71,7 +74,7 @@ export const memoryCommand: SlashCommand = {
         context.ui.addItem(
           {
             type: MessageType.INFO,
-            text: 'Refreshing memory from source files...',
+            text: t('commands:memory.responses.refreshing'),
           },
           Date.now(),
         );
@@ -93,7 +96,9 @@ export const memoryCommand: SlashCommand = {
           context.ui.addItem(
             {
               type: MessageType.ERROR,
-              text: `Error refreshing memory: ${(error as Error).message}`,
+              text: t('commands:memory.responses.refreshError', {
+                error: (error as Error).message,
+              }),
             },
             Date.now(),
           );
