@@ -111,6 +111,7 @@ async function configureSpecificSetting(
     settingKey,
     promptForSetting,
     scope,
+    process.cwd(),
   );
 }
 
@@ -218,6 +219,7 @@ async function configureExtensionSettings(
       setting.envVar,
       promptForSetting,
       scope,
+      process.cwd(),
     );
   }
 }
