@@ -416,10 +416,13 @@ export function renderHookWithProviders<Result, Props>(
   const result = { current: undefined as unknown as Result };
 
   let setPropsFn: ((props: Props) => void) | undefined;
+  let forceUpdateFn: (() => void) | undefined;
 
   function TestComponent({ initialProps }: { initialProps: Props }) {
     const [props, setProps] = useState(initialProps);
+    const [, forceUpdate] = useState(0);
     setPropsFn = setProps;
+    forceUpdateFn = () => forceUpdate((n) => n + 1);
     result.current = renderCallback(props);
     return null;
   }
@@ -439,8 +442,10 @@ export function renderHookWithProviders<Result, Props>(
 
   function rerender(newProps?: Props) {
     act(() => {
-      if (setPropsFn && newProps) {
-        setPropsFn(newProps);
+      if (arguments.length > 0 && setPropsFn) {
+        setPropsFn(newProps as Props);
+      } else if (forceUpdateFn) {
+        forceUpdateFn();
       }
     });
   }

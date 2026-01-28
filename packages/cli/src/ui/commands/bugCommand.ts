@@ -54,6 +54,7 @@ export const bugCommand: SlashCommand = {
     const kittyProtocol = terminalCapabilityManager.isKittyProtocolEnabled()
       ? 'Supported'
       : 'Unsupported';
+    const authType = config?.getContentGeneratorConfig()?.authType || 'Unknown';
 
     let info = `
 * **CLI Version:** ${cliVersion}
@@ -62,6 +63,7 @@ export const bugCommand: SlashCommand = {
 * **Operating System:** ${osVersion}
 * **Sandbox Environment:** ${sandboxEnv}
 * **Model Version:** ${modelVersion}
+* **Auth Type:** ${authType}
 * **Memory Usage:** ${memoryUsage}
 * **Terminal Name:** ${terminalName}
 * **Terminal Background:** ${terminalBgColor}
