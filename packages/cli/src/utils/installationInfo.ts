@@ -9,6 +9,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as childProcess from 'node:child_process';
 import process from 'node:process';
+import { t } from '../i18n/index.js';
 
 export const isDevelopment = process.env['NODE_ENV'] === 'development';
 
@@ -56,8 +57,7 @@ export function getInstallationInfo(
       return {
         packageManager: PackageManager.UNKNOWN, // Not managed by a package manager in this sense
         isGlobal: false,
-        updateMessage:
-          'Running from a local git clone. Please update with "git pull".',
+        updateMessage: t('common:update.gitClone'),
       };
     }
 
@@ -66,7 +66,7 @@ export function getInstallationInfo(
       return {
         packageManager: PackageManager.NPX,
         isGlobal: false,
-        updateMessage: 'Running via npx, update not applicable.',
+        updateMessage: t('common:update.npxNotApplicable'),
       };
     }
     if (
@@ -76,7 +76,7 @@ export function getInstallationInfo(
       return {
         packageManager: PackageManager.PNPX,
         isGlobal: false,
-        updateMessage: 'Running via pnpx, update not applicable.',
+        updateMessage: t('common:update.pnpxNotApplicable'),
       };
     }
 
@@ -95,8 +95,7 @@ export function getInstallationInfo(
           return {
             packageManager: PackageManager.HOMEBREW,
             isGlobal: true,
-            updateMessage:
-              'Installed via Homebrew. Please update with "brew upgrade gemini-cli".',
+            updateMessage: t('common:update.homebrew'),
           };
         }
       } catch (_error) {
@@ -116,8 +115,8 @@ export function getInstallationInfo(
         isGlobal: true,
         updateCommand,
         updateMessage: isAutoUpdateEnabled
-          ? 'Installed with pnpm. Attempting to automatically update now...'
-          : `Please run ${updateCommand} to update`,
+          ? t('common:update.autoUpdating', { pm: 'pnpm' })
+          : t('common:update.manualUpdate', { command: updateCommand }),
       };
     }
 
@@ -129,8 +128,8 @@ export function getInstallationInfo(
         isGlobal: true,
         updateCommand,
         updateMessage: isAutoUpdateEnabled
-          ? 'Installed with yarn. Attempting to automatically update now...'
-          : `Please run ${updateCommand} to update`,
+          ? t('common:update.autoUpdating', { pm: 'yarn' })
+          : t('common:update.manualUpdate', { command: updateCommand }),
       };
     }
 
@@ -139,7 +138,7 @@ export function getInstallationInfo(
       return {
         packageManager: PackageManager.BUNX,
         isGlobal: false,
-        updateMessage: 'Running via bunx, update not applicable.',
+        updateMessage: t('common:update.bunxNotApplicable'),
       };
     }
     if (realPath.includes('/.bun/bin')) {
@@ -149,8 +148,8 @@ export function getInstallationInfo(
         isGlobal: true,
         updateCommand,
         updateMessage: isAutoUpdateEnabled
-          ? 'Installed with bun. Attempting to automatically update now...'
-          : `Please run ${updateCommand} to update`,
+          ? t('common:update.autoUpdating', { pm: 'bun' })
+          : t('common:update.manualUpdate', { command: updateCommand }),
       };
     }
 
@@ -170,8 +169,7 @@ export function getInstallationInfo(
       return {
         packageManager: pm,
         isGlobal: false,
-        updateMessage:
-          "Locally installed. Please update via your project's package.json.",
+        updateMessage: t('common:update.localInstall'),
       };
     }
 
@@ -182,8 +180,8 @@ export function getInstallationInfo(
       isGlobal: true,
       updateCommand,
       updateMessage: isAutoUpdateEnabled
-        ? 'Installed with npm. Attempting to automatically update now...'
-        : `Please run ${updateCommand} to update`,
+        ? t('common:update.autoUpdating', { pm: 'npm' })
+        : t('common:update.manualUpdate', { command: updateCommand }),
     };
   } catch (error) {
     debugLogger.log(error);
