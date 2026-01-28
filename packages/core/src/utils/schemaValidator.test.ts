@@ -161,9 +161,7 @@ describe('SchemaValidator', () => {
       // Valid data should pass
       expect(SchemaValidator.validate(schema, { message: 'hello' })).toBeNull();
       // Invalid data should fail (proves validation actually works)
-      expect(
-        SchemaValidator.validate(schema, { message: 123 }),
-      ).not.toBeNull();
+      expect(SchemaValidator.validate(schema, { message: 123 })).not.toBeNull();
     });
 
     it('validates draft-2020-12 schema with prefixItems', () => {
