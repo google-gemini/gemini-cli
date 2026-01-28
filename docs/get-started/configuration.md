@@ -661,11 +661,6 @@ their corresponding top-level category object in your `settings.json` file.
     performance.
   - **Default:** `true`
 
-- **`tools.autoAccept`** (boolean):
-  - **Description:** Automatically accept and execute tool calls that are
-    considered safe (e.g., read-only operations).
-  - **Default:** `false`
-
 - **`tools.approvalMode`** (enum):
   - **Description:** The default approval mode for tool execution. 'default'
     prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is
