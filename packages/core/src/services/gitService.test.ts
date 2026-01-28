@@ -295,6 +295,12 @@ describe('GitService', () => {
           GIT_CONFIG_SYSTEM: path.join(repoDir, '.gitconfig_system_empty'),
         }),
       );
+
+      const systemConfigContent = await fs.readFile(
+        path.join(repoDir, '.gitconfig_system_empty'),
+        'utf-8',
+      );
+      expect(systemConfigContent).toBe('');
     });
   });
 
