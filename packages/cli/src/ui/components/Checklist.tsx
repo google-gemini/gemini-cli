@@ -53,8 +53,12 @@ const ChecklistListDisplay: React.FC<{ items: ChecklistItemData[] }> = ({
   items,
 }) => (
   <Box flexDirection="column" aria-role="list">
-    {items.map((item) => (
-      <ChecklistItem item={item} key={item.label} role="listitem" />
+    {items.map((item, index) => (
+      <ChecklistItem
+        item={item}
+        key={`${index}-${item.label}`}
+        role="listitem"
+      />
     ))}
   </Box>
 );
