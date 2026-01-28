@@ -15,6 +15,7 @@ import type {
   RetrieveUserQuotaResponse,
   SkillDefinition,
   AgentDefinition,
+  SessionMetrics,
 } from '@google/gemini-cli-core';
 import type { PartListUnion } from '@google/genai';
 import { type ReactNode } from 'react';
@@ -161,10 +162,12 @@ export type HistoryItemStats = HistoryItemBase & {
 
 export type HistoryItemModelStats = HistoryItemBase & {
   type: 'model_stats';
+  stats: SessionMetrics;
 };
 
 export type HistoryItemToolStats = HistoryItemBase & {
   type: 'tool_stats';
+  stats: SessionMetrics;
 };
 
 export type HistoryItemModel = HistoryItemBase & {
@@ -389,11 +392,13 @@ export type Message =
       type: MessageType.MODEL_STATS;
       timestamp: Date;
       content?: string;
+      stats?: SessionMetrics;
     }
   | {
       type: MessageType.TOOL_STATS;
       timestamp: Date;
       content?: string;
+      stats?: SessionMetrics;
     }
   | {
       type: MessageType.QUIT;

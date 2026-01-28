@@ -31,6 +31,27 @@ describe('<HistoryItemDisplay />', () => {
     config: mockConfig,
   };
 
+  const dummyMetrics = {
+    models: {},
+    tools: {
+      totalCalls: 0,
+      totalSuccess: 0,
+      totalFail: 0,
+      totalDurationMs: 0,
+      totalDecisions: {
+        accept: 0,
+        reject: 0,
+        modify: 0,
+        auto_accept: 0,
+      },
+      byName: {},
+    },
+    files: {
+      totalLinesAdded: 0,
+      totalLinesRemoved: 0,
+    },
+  };
+
   it('renders UserMessage for "user" type', () => {
     const item: HistoryItem = {
       ...baseItem,
@@ -131,7 +152,8 @@ describe('<HistoryItemDisplay />', () => {
     const item: HistoryItem = {
       ...baseItem,
       type: 'model_stats',
-    };
+      stats: dummyMetrics,
+    } as HistoryItem;
     const { lastFrame } = renderWithProviders(
       <SessionStatsProvider>
         <HistoryItemDisplay {...baseItem} item={item} />
@@ -146,7 +168,8 @@ describe('<HistoryItemDisplay />', () => {
     const item: HistoryItem = {
       ...baseItem,
       type: 'tool_stats',
-    };
+      stats: dummyMetrics,
+    } as HistoryItem;
     const { lastFrame } = renderWithProviders(
       <SessionStatsProvider>
         <HistoryItemDisplay {...baseItem} item={item} />

@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { HistoryItemStats } from '../types.js';
+import type {
+  HistoryItemStats,
+  HistoryItemModelStats,
+  HistoryItemToolStats,
+} from '../types.js';
 import { MessageType } from '../types.js';
 import { formatDuration } from '../utils/formatters.js';
 import {
@@ -66,8 +70,9 @@ export const statsCommand: SlashCommand = {
       autoExecute: true,
       action: (context: CommandContext) => {
         context.ui.addItem({
-          type: MessageType.MODEL_STATS,
-        });
+          type: 'model_stats',
+          stats: context.session.stats.metrics,
+        } as HistoryItemModelStats);
       },
     },
     {
@@ -77,8 +82,9 @@ export const statsCommand: SlashCommand = {
       autoExecute: true,
       action: (context: CommandContext) => {
         context.ui.addItem({
-          type: MessageType.TOOL_STATS,
-        });
+          type: 'tool_stats',
+          stats: context.session.stats.metrics,
+        } as HistoryItemToolStats);
       },
     },
   ],

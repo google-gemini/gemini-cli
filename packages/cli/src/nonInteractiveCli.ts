@@ -247,10 +247,11 @@ export async function runNonInteractive({
           settings,
         );
         // If a slash command is found and returns a prompt, use it.
-        // Otherwise, slashCommandResult falls through to the default prompt
-        // handling.
-        if (slashCommandResult) {
-          query = slashCommandResult as Part[];
+        if (slashCommandResult?.type === 'submit_prompt') {
+          query = slashCommandResult.content as Part[];
+        } else if (slashCommandResult?.type === 'handled') {
+          // Command was handled locally (e.g. /stats).
+          return;
         }
       }
 

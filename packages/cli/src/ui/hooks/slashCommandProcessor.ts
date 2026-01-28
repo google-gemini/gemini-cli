@@ -177,10 +177,12 @@ export const useSlashCommandProcessor = (
       } else if (message.type === MessageType.MODEL_STATS) {
         historyItemContent = {
           type: 'model_stats',
+          stats: message.stats || session.stats.metrics,
         };
       } else if (message.type === MessageType.TOOL_STATS) {
         historyItemContent = {
           type: 'tool_stats',
+          stats: message.stats || session.stats.metrics,
         };
       } else if (message.type === MessageType.QUIT) {
         historyItemContent = {
@@ -200,7 +202,7 @@ export const useSlashCommandProcessor = (
       }
       addItem(historyItemContent, message.timestamp.getTime());
     },
-    [addItem],
+    [addItem, session.stats.metrics],
   );
   const commandContext = useMemo(
     (): CommandContext => ({
