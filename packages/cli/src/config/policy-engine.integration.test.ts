@@ -588,6 +588,59 @@ describe('Policy Engine Integration Tests', () => {
       ).toBe(PolicyDecision.DENY);
     });
 
+    it('should allow tools in non-interactive mode with YOLO approval mode', async () => {
+      const settings: Settings = {};
+
+      const config = await createPolicyEngineConfig(
+        settings,
+        ApprovalMode.YOLO,
+      );
+      // Enable non-interactive mode with YOLO
+      const engineConfig = { ...config, nonInteractive: true };
+      const engine = new PolicyEngine(engineConfig);
+
+      // ASK_USER should become ALLOW in non-interactive YOLO mode
+      expect(
+        (await engine.check({ name: 'unknown_tool' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (
+          await engine.check(
+            { name: 'run_shell_command', args: { command: 'ls' } },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'write_file' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should allow tools in non-interactive mode with AUTO_EDIT approval mode', async () => {
+      const settings: Settings = {};
+
+      const config = await createPolicyEngineConfig(
+        settings,
+        ApprovalMode.AUTO_EDIT,
+      );
+      // Enable non-interactive mode with AUTO_EDIT
+      const engineConfig = { ...config, nonInteractive: true };
+      const engine = new PolicyEngine(engineConfig);
+
+      // ASK_USER should become ALLOW in non-interactive AUTO_EDIT mode
+      expect(
+        (await engine.check({ name: 'write_file' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (
+          await engine.check(
+            { name: 'run_shell_command', args: { command: 'ls' } },
+            undefined,
+          )
+        ).decision,
+      ).toBe(PolicyDecision.ALLOW);
+    });
+
     it('should handle empty settings gracefully', async () => {
       const settings: Settings = {};
 
