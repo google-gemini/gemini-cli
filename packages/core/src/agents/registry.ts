@@ -21,6 +21,7 @@ import {
   type ModelConfig,
   ModelConfigService,
 } from '../services/modelConfigService.js';
+import { PolicyDecision } from '../policy/types.js';
 
 /**
  * Returns the model config alias for a given agent definition.
@@ -266,6 +267,22 @@ export class AgentRegistry {
     this.agents.set(mergedDefinition.name, mergedDefinition);
 
     this.registerModelConfigs(mergedDefinition);
+    this.addAgentPolicy(mergedDefinition);
+  }
+
+  private addAgentPolicy(definition: AgentDefinition<z.ZodTypeAny>): void {
+    const policyEngine = this.config.getPolicyEngine();
+    if (policyEngine && !policyEngine.hasRuleForTool(definition.name)) {
+      policyEngine.addRule({
+        toolName: definition.name,
+        decision:
+          definition.kind === 'local'
+            ? PolicyDecision.ALLOW
+            : PolicyDecision.ASK_USER,
+        priority: 1.05,
+        source: 'AgentRegistry (Dynamic)',
+      });
+    }
   }
 
   private isAgentEnabled<TOutput extends z.ZodTypeAny>(
@@ -342,6 +359,7 @@ export class AgentRegistry {
         );
       }
       this.agents.set(definition.name, definition);
+      this.addAgentPolicy(definition);
     } catch (e) {
       debugLogger.warn(
         `[AgentRegistry] Error loading A2A agent "${definition.name}":`,

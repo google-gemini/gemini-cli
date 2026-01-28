@@ -26,6 +26,7 @@ import type { ConfigParameters } from '../config/config.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
 import { ThinkingLevel } from '@google/genai';
 import type { AcknowledgedAgentsService } from './acknowledgedAgents.js';
+import { PolicyDecision } from '../policy/types.js';
 
 vi.mock('./agentLoader.js', () => ({
   loadAgentsFromDirectory: vi
@@ -656,6 +657,66 @@ describe('AgentRegistry', () => {
 
       await Promise.all(promises);
       expect(registry.getAllDefinitions()).toHaveLength(100);
+    });
+
+    it('should dynamically register an ALLOW policy for local agents', async () => {
+      const agent: AgentDefinition = {
+        ...MOCK_AGENT_V1,
+        name: 'PolicyTestAgent',
+      };
+      const policyEngine = mockConfig.getPolicyEngine();
+      const addRuleSpy = vi.spyOn(policyEngine, 'addRule');
+
+      await registry.testRegisterAgent(agent);
+
+      expect(addRuleSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toolName: 'PolicyTestAgent',
+          decision: PolicyDecision.ALLOW,
+          priority: 1.05,
+        }),
+      );
+    });
+
+    it('should dynamically register an ASK_USER policy for remote agents', async () => {
+      const remoteAgent: AgentDefinition = {
+        kind: 'remote',
+        name: 'RemotePolicyAgent',
+        description: 'A remote agent',
+        agentCardUrl: 'https://example.com/card',
+        inputConfig: { inputSchema: { type: 'object' } },
+      };
+
+      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
+        loadAgent: vi.fn().mockResolvedValue({ name: 'RemotePolicyAgent' }),
+      } as unknown as A2AClientManager);
+
+      const policyEngine = mockConfig.getPolicyEngine();
+      const addRuleSpy = vi.spyOn(policyEngine, 'addRule');
+
+      await registry.testRegisterAgent(remoteAgent);
+
+      expect(addRuleSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toolName: 'RemotePolicyAgent',
+          decision: PolicyDecision.ASK_USER,
+          priority: 1.05,
+        }),
+      );
+    });
+
+    it('should not register a policy if one already exists', async () => {
+      const agent: AgentDefinition = {
+        ...MOCK_AGENT_V1,
+        name: 'ExistingPolicyAgent',
+      };
+      const policyEngine = mockConfig.getPolicyEngine();
+      vi.spyOn(policyEngine, 'hasRuleForTool').mockReturnValue(true);
+      const addRuleSpy = vi.spyOn(policyEngine, 'addRule');
+
+      await registry.testRegisterAgent(agent);
+
+      expect(addRuleSpy).not.toHaveBeenCalled();
     });
   });
 

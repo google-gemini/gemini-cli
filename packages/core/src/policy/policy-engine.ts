@@ -451,6 +451,13 @@ export class PolicyEngine {
     return this.rules;
   }
 
+  /**
+   * Check if a rule for a specific tool already exists.
+   */
+  hasRuleForTool(toolName: string): boolean {
+    return this.rules.some((rule) => rule.toolName === toolName);
+  }
+
   getCheckers(): readonly SafetyCheckerRule[] {
     return this.checkers;
   }
