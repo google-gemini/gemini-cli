@@ -313,5 +313,9 @@
     "loginButton": "Login",
     "exitButton": "Exit",
     "instructions": "(Use Enter to select, Esc to close)"
+  },
+  "adminSettings": {
+    "message": "Admin settings have changed. Please restart the session to apply new settings.",
+    "restartHint": "Press 'r' to restart, or 'Ctrl+C' twice to exit."
   }
 }

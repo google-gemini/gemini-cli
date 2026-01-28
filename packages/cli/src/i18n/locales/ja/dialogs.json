@@ -313,5 +313,9 @@
     "loginButton": "ログイン",
     "exitButton": "終了",
     "instructions": "(Enterで選択、Escで閉じる)"
+  },
+  "adminSettings": {
+    "message": "管理者設定が変更されました。新しい設定を適用するには、セッションを再起動してください。",
+    "restartHint": "'r'キーで再起動、または 'Ctrl+C' を2回押して終了します。"
   }
 }
