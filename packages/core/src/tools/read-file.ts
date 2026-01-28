@@ -9,6 +9,7 @@ import path from 'node:path';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import type { ToolInvocation, ToolLocation, ToolResult } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
+import { ToolErrorType } from './tool-error.js';
 
 import type { PartUnion } from '@google/genai';
 import {
@@ -21,6 +22,7 @@ import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
 import { logFileOperation } from '../telemetry/loggers.js';
 import { FileOperationEvent } from '../telemetry/types.js';
 import { READ_FILE_TOOL_NAME } from './tool-names.js';
+import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 
 /**
  * Parameters for the ReadFile tool
@@ -74,6 +76,18 @@ class ReadFileToolInvocation extends BaseToolInvocation<
   }
 
   async execute(): Promise<ToolResult> {
+    const validationError = this.config.validatePathAccess(this.resolvedPath);
+    if (validationError) {
+      return {
+        llmContent: validationError,
+        returnDisplay: 'Path not in workspace.',
+        error: {
+          message: validationError,
+          type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+        },
+      };
+    }
+
     const result = await processSingleFileContent(
       this.resolvedPath,
       this.config.getTargetDir(),
@@ -146,6 +160,7 @@ export class ReadFileTool extends BaseDeclarativeTool<
   ToolResult
 > {
   static readonly Name = READ_FILE_TOOL_NAME;
+  private readonly fileDiscoveryService: FileDiscoveryService;
 
   constructor(
     private config: Config,
@@ -180,6 +195,10 @@ export class ReadFileTool extends BaseDeclarativeTool<
       true,
       false,
     );
+    this.fileDiscoveryService = new FileDiscoveryService(
+      config.getTargetDir(),
+      config.getFileFilteringOptions(),
+    );
   }
 
   protected override validateToolParamValues(
@@ -189,24 +208,16 @@ export class ReadFileTool extends BaseDeclarativeTool<
       return "The 'file_path' parameter must be non-empty.";
     }
 
-    const workspaceContext = this.config.getWorkspaceContext();
-    const projectTempDir = this.config.storage.getProjectTempDir();
     const resolvedPath = path.resolve(
       this.config.getTargetDir(),
       params.file_path,
     );
-    const resolvedProjectTempDir = path.resolve(projectTempDir);
-    const isWithinTempDir =
-      resolvedPath.startsWith(resolvedProjectTempDir + path.sep) ||
-      resolvedPath === resolvedProjectTempDir;
 
-    if (
-      !workspaceContext.isPathWithinWorkspace(resolvedPath) &&
-      !isWithinTempDir
-    ) {
-      const directories = workspaceContext.getDirectories();
-      return `File path must be within one of the workspace directories: ${directories.join(', ')} or within the project temp directory: ${projectTempDir}`;
+    const validationError = this.config.validatePathAccess(resolvedPath);
+    if (validationError) {
+      return validationError;
     }
+
     if (params.offset !== undefined && params.offset < 0) {
       return 'Offset must be a non-negative number';
     }
@@ -214,9 +225,13 @@ export class ReadFileTool extends BaseDeclarativeTool<
       return 'Limit must be a positive number';
     }
 
-    const fileService = this.config.getFileService();
     const fileFilteringOptions = this.config.getFileFilteringOptions();
-    if (fileService.shouldIgnoreFile(resolvedPath, fileFilteringOptions)) {
+    if (
+      this.fileDiscoveryService.shouldIgnoreFile(
+        resolvedPath,
+        fileFilteringOptions,
+      )
+    ) {
       return `File path '${resolvedPath}' is ignored by configured ignore patterns.`;
     }
 
