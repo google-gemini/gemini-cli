@@ -6,6 +6,7 @@
 
 import type { SlashCommand, CommandContext } from './types.js';
 import { CommandKind } from './types.js';
+import { t } from '../../i18n/index.js';
 import { MessageType, type HistoryItemHooksList } from '../types.js';
 import type {
   HookRegistryEntry,
@@ -27,7 +28,7 @@ async function panelAction(
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Config not loaded.',
+      content: t('commands:hooks.responses.configNotLoaded'),
     };
   }
 
@@ -54,7 +55,7 @@ async function enableAction(
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Config not loaded.',
+      content: t('commands:hooks.responses.configNotLoaded'),
     };
   }
 
@@ -63,7 +64,7 @@ async function enableAction(
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Hook system is not enabled.',
+      content: t('commands:hooks.responses.systemNotEnabled'),
     };
   }
 
@@ -72,7 +73,7 @@ async function enableAction(
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Usage: /hooks enable <hook-name>',
+      content: t('commands:hooks.responses.usageEnable'),
     };
   }
 
@@ -107,7 +108,7 @@ async function disableAction(
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Config not loaded.',
+      content: t('commands:hooks.responses.configNotLoaded'),
     };
   }
 
@@ -116,7 +117,7 @@ async function disableAction(
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Hook system is not enabled.',
+      content: t('commands:hooks.responses.systemNotEnabled'),
     };
   }
 
@@ -125,7 +126,7 @@ async function disableAction(
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Usage: /hooks disable <hook-name>',
+      content: t('commands:hooks.responses.usageDisable'),
     };
   }
 
@@ -208,7 +209,7 @@ async function enableAllAction(
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Config not loaded.',
+      content: t('commands:hooks.responses.configNotLoaded'),
     };
   }
 
@@ -217,7 +218,7 @@ async function enableAllAction(
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Hook system is not enabled.',
+      content: t('commands:hooks.responses.systemNotEnabled'),
     };
   }
 
@@ -228,7 +229,7 @@ async function enableAllAction(
     return {
       type: 'message',
       messageType: 'info',
-      content: 'No hooks configured.',
+      content: t('commands:hooks.responses.noHooks'),
     };
   }
 
@@ -237,7 +238,7 @@ async function enableAllAction(
     return {
       type: 'message',
       messageType: 'info',
-      content: 'All hooks are already enabled.',
+      content: t('commands:hooks.responses.allEnabled'),
     };
   }
 
@@ -257,13 +258,17 @@ async function enableAllAction(
     return {
       type: 'message',
       messageType: 'info',
-      content: `Enabled ${disabledHooks.length} hook(s) successfully.`,
+      content: t('commands:hooks.responses.enableAllSuccess', {
+        count: disabledHooks.length,
+      }),
     };
   } catch (error) {
     return {
       type: 'message',
       messageType: 'error',
-      content: `Failed to enable hooks: ${getErrorMessage(error)}`,
+      content: t('commands:hooks.responses.enableAllFailed', {
+        error: getErrorMessage(error),
+      }),
     };
   }
 }
@@ -279,7 +284,7 @@ async function disableAllAction(
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Config not loaded.',
+      content: t('commands:hooks.responses.configNotLoaded'),
     };
   }
 
@@ -288,7 +293,7 @@ async function disableAllAction(
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Hook system is not enabled.',
+      content: t('commands:hooks.responses.systemNotEnabled'),
     };
   }
 
@@ -299,7 +304,7 @@ async function disableAllAction(
     return {
       type: 'message',
       messageType: 'info',
-      content: 'No hooks configured.',
+      content: t('commands:hooks.responses.noHooks'),
     };
   }
 
@@ -308,7 +313,7 @@ async function disableAllAction(
     return {
       type: 'message',
       messageType: 'info',
-      content: 'All hooks are already disabled.',
+      content: t('commands:hooks.responses.allDisabled'),
     };
   }
 
@@ -327,13 +332,17 @@ async function disableAllAction(
     return {
       type: 'message',
       messageType: 'info',
-      content: `Disabled ${enabledHooks.length} hook(s) successfully.`,
+      content: t('commands:hooks.responses.disableAllSuccess', {
+        count: enabledHooks.length,
+      }),
     };
   } catch (error) {
     return {
       type: 'message',
       messageType: 'error',
-      content: `Failed to disable hooks: ${getErrorMessage(error)}`,
+      content: t('commands:hooks.responses.disableAllFailed', {
+        error: getErrorMessage(error),
+      }),
     };
   }
 }

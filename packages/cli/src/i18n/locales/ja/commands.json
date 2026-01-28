@@ -162,5 +162,20 @@
     "noRequest": "エクスポートする最新の API リクエストが見つかりませんでした。",
     "debugSaveSuccess": "デバッグ API リクエストを {{file}} に保存しました。",
     "debugSaveError": "デバッグリクエストの保存中にエラーが発生しました: {{error}}"
+  },
+  "hooks.responses": {
+    "configNotLoaded": "設定が読み込まれていません。",
+    "systemNotEnabled": "フックシステムが有効ではありません。",
+    "usageEnable": "使用法: /hooks enable <フック名>",
+    "usageDisable": "使用法: /hooks disable <フック名>",
+    "disableSuccess": "フック \"{{name}}\" を無効にしました。",
+    "disableFailed": "フックの無効化に失敗しました: {{error}}",
+    "noHooks": "設定されているフックはありません。",
+    "allEnabled": "すべてのフックは既に有効です。",
+    "enableAllSuccess": "{{count}} 個のフックを有効にしました。",
+    "enableAllFailed": "フックの一括有効化に失敗しました: {{error}}",
+    "allDisabled": "すべてのフックは既に無効です。",
+    "disableAllSuccess": "{{count}} 個のフックを無効にしました。",
+    "disableAllFailed": "フックの一括無効化に失敗しました: {{error}}"
   }
 }

@@ -163,5 +163,22 @@
     "noRequest": "No recent API request found to export.",
     "debugSaveSuccess": "Debug API request saved to {{file}}",
     "debugSaveError": "Error saving debug request: {{error}}"
+  },
+  "hooks.responses": {
+    "configNotLoaded": "Config not loaded.",
+    "systemNotEnabled": "Hook system is not enabled.",
+    "usageEnable": "Usage: /hooks enable <hook-name>",
+    "usageDisable": "Usage: /hooks disable <hook-name>",
+    "disableSuccess": "Hook \"{{name}}\" disabled successfully.",
+    "disableFailed": "Failed to disable hook: {{error}}",
+    "noHooks": "No hooks configured.",
+    "allEnabled": "All hooks are already enabled.",
+    "enableAllSuccess": "Enabled {{count}} hook successfully.",
+    "enableAllSuccess_plural": "Enabled {{count}} hooks successfully.",
+    "enableAllFailed": "Failed to enable hooks: {{error}}",
+    "allDisabled": "All hooks are already disabled.",
+    "disableAllSuccess": "Disabled {{count}} hook successfully.",
+    "disableAllSuccess_plural": "Disabled {{count}} hooks successfully.",
+    "disableAllFailed": "Failed to disable hooks: {{error}}"
   }
 }
