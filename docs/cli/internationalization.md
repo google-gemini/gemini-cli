@@ -185,8 +185,27 @@ When adding user-facing strings to the CLI:
    }
    ```
 
-   ```typescript
-   t('common:connectedServers', { count: 5 });
+    ```typescript
+    t('common:connectedServers', { count: 5 });
+    ```
+
+5. **Use format strings, not sentence fragments.** Different languages order
+   words differently. Never split a sentence across multiple translation keys
+   or concatenate translated fragments. Instead, put the entire sentence in one
+   key and use interpolation variables for dynamic parts:
+
+   ```json
+   // ✗ Bad — forces English word order on all languages
+   { "savingsLabel": "Savings Highlight:" }
+   // (with code concatenating: label + tokens + "of input tokens...")
+
+   // ✓ Good — translators can reorder freely
+   { "cacheSavings": "{{tokens}} ({{percent}}) of input tokens were served from the cache, reducing costs." }
+   ```
+
+   In Japanese, the natural phrasing puts the subject first:
+   ```json
+   { "cacheSavings": "入力トークンのうち {{tokens}}（{{percent}}）がキャッシュから提供され、コストが削減されました。" }
    ```
 
 ## Settings reference
