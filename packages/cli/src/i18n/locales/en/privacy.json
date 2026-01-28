@@ -1,0 +1,7 @@
+{
+  "gemini": {
+    "title": "Gemini API Key Notice",
+    "body": "By using the Gemini API[1], Google AI Studio[2], and the other Google developer services that reference these terms (collectively, the \"APIs\" or \"Services\"), you are agreeing to Google APIs Terms of Service (the \"API Terms\")[3], and the Gemini API Additional Terms of Service (the \"Additional Terms\")[4].",
+    "exitHint": "Press Esc to exit."
+  }
+}
