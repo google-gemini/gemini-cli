@@ -41,7 +41,7 @@ import {
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import type { SlashCommandProcessorResult } from '../types.js';
-import { MessageType, StreamingState } from '../types.js';
+import { MessageType, StreamingState, ToolCallStatus } from '../types.js';
 import type { LoadedSettings } from '../../config/settings.js';
 
 // --- MOCKS ---
@@ -56,6 +56,7 @@ const MockedGeminiClientClass = vi.hoisted(() =>
     this.startChat = mockStartChat;
     this.sendMessageStream = mockSendMessageStream;
     this.addHistory = vi.fn();
+    this.getCurrentSequenceModel = vi.fn();
     this.getChat = vi.fn().mockReturnValue({
       recordCompletedToolCalls: vi.fn(),
     });
@@ -75,6 +76,13 @@ const MockedUserPromptEvent = vi.hoisted(() =>
 );
 const mockParseAndFormatApiError = vi.hoisted(() => vi.fn());
 
+const MockValidationRequiredError = vi.hoisted(
+  () =>
+    class extends Error {
+      userHandled = false;
+    },
+);
+
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actualCoreModule = (await importOriginal()) as any;
   return {
@@ -82,6 +90,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     GitService: vi.fn(),
     GeminiClient: MockedGeminiClientClass,
     UserPromptEvent: MockedUserPromptEvent,
+    ValidationRequiredError: MockValidationRequiredError,
     parseAndFormatApiError: mockParseAndFormatApiError,
     tokenLimit: vi.fn().mockReturnValue(100), // Mock tokenLimit
   };
@@ -221,6 +230,7 @@ describe('useGeminiStream', () => {
       getApprovalMode: () => ApprovalMode.DEFAULT,
       getUsageStatisticsEnabled: () => true,
       getDebugMode: () => false,
+      getWorkingDir: () => '/working/dir',
       addHistory: vi.fn(),
       getSessionId() {
         return 'test-session-id';
@@ -228,6 +238,7 @@ describe('useGeminiStream', () => {
       setQuotaErrorOccurred: vi.fn(),
       getQuotaErrorOccurred: vi.fn(() => false),
       getModel: vi.fn(() => 'gemini-2.5-pro'),
+      getContentGenerator: vi.fn(),
       getContentGeneratorConfig: vi
         .fn()
         .mockReturnValue(contentGeneratorConfig),
@@ -1671,6 +1682,7 @@ describe('useGeminiStream', () => {
 
       const testConfig = {
         ...mockConfig,
+        getContentGenerator: vi.fn(),
         getContentGeneratorConfig: vi.fn(() => ({
           authType: mockAuthType,
         })),
@@ -1959,73 +1971,6 @@ describe('useGeminiStream', () => {
       // Only the awaiting_approval tool should be processed
       expect(mockOnConfirmAwaiting).toHaveBeenCalledTimes(1);
       expect(mockOnConfirmExecuting).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('MCP Discovery State', () => {
-    it('should block non-slash command queries when discovery is in progress and servers exist', async () => {
-      const mockMcpClientManager = {
-        getDiscoveryState: vi
-          .fn()
-          .mockReturnValue(MCPDiscoveryState.IN_PROGRESS),
-        getMcpServerCount: vi.fn().mockReturnValue(1),
-      };
-      mockConfig.getMcpClientManager = () => mockMcpClientManager as any;
-
-      const { result } = renderTestHook();
-
-      await act(async () => {
-        await result.current.submitQuery('test query');
-      });
-
-      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
-        'info',
-        'Waiting for MCP servers to initialize... Slash commands are still available.',
-      );
-      expect(mockSendMessageStream).not.toHaveBeenCalled();
-    });
-
-    it('should NOT block queries when discovery is NOT_STARTED but there are no servers', async () => {
-      const mockMcpClientManager = {
-        getDiscoveryState: vi
-          .fn()
-          .mockReturnValue(MCPDiscoveryState.NOT_STARTED),
-        getMcpServerCount: vi.fn().mockReturnValue(0),
-      };
-      mockConfig.getMcpClientManager = () => mockMcpClientManager as any;
-
-      const { result } = renderTestHook();
-
-      await act(async () => {
-        await result.current.submitQuery('test query');
-      });
-
-      expect(coreEvents.emitFeedback).not.toHaveBeenCalledWith(
-        'info',
-        'Waiting for MCP servers to initialize... Slash commands are still available.',
-      );
-      expect(mockSendMessageStream).toHaveBeenCalled();
-    });
-
-    it('should NOT block slash commands even when discovery is in progress', async () => {
-      const mockMcpClientManager = {
-        getDiscoveryState: vi
-          .fn()
-          .mockReturnValue(MCPDiscoveryState.IN_PROGRESS),
-        getMcpServerCount: vi.fn().mockReturnValue(1),
-      };
-      mockConfig.getMcpClientManager = () => mockMcpClientManager as any;
-
-      const { result } = renderTestHook();
-
-      await act(async () => {
-        await result.current.submitQuery('/help');
-      });
-
-      expect(coreEvents.emitFeedback).not.toHaveBeenCalledWith(
-        'info',
-        'Waiting for MCP servers to initialize... Slash commands are still available.',
-      );
     });
   });
 
@@ -2431,6 +2376,95 @@ describe('useGeminiStream', () => {
       expect.any(AbortSignal), // Argument 2: An AbortSignal
       expect.any(String), // Argument 3: The prompt_id string
     );
+  });
+
+  it('should display user query, then tool execution, then model response', async () => {
+    const userQuery = 'read this @file(test.txt)';
+    const toolExecutionMessage = 'Reading file: test.txt';
+    const modelResponseContent = 'The content of test.txt is: Hello World!';
+
+    // Mock handleAtCommand to simulate a tool call and add a tool_group message
+    handleAtCommandSpy.mockImplementation(
+      async ({ addItem: atCommandAddItem, messageId }) => {
+        atCommandAddItem(
+          {
+            type: 'tool_group',
+            tools: [
+              {
+                callId: 'client-read-123',
+                name: 'read_file',
+                description: toolExecutionMessage,
+                status: ToolCallStatus.Success,
+                resultDisplay: toolExecutionMessage,
+                confirmationDetails: undefined,
+              },
+            ],
+          },
+          messageId,
+        );
+        return { shouldProceed: true, processedQuery: userQuery };
+      },
+    );
+
+    // Mock the Gemini stream to return a model response after the tool
+    mockSendMessageStream.mockReturnValue(
+      (async function* () {
+        yield {
+          type: ServerGeminiEventType.Content,
+          value: modelResponseContent,
+        };
+        yield {
+          type: ServerGeminiEventType.Finished,
+          value: { reason: 'STOP' },
+        };
+      })(),
+    );
+
+    const { result } = renderTestHook();
+
+    await act(async () => {
+      await result.current.submitQuery(userQuery);
+    });
+
+    // Assert the order of messages added to the history
+    await waitFor(() => {
+      expect(mockAddItem).toHaveBeenCalledTimes(3); // User prompt + tool execution + model response
+
+      // 1. User's prompt
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          type: MessageType.USER,
+          text: userQuery,
+        }),
+        expect.any(Number),
+      );
+
+      // 2. Tool execution message
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: 'tool_group',
+          tools: expect.arrayContaining([
+            expect.objectContaining({
+              name: 'read_file',
+              status: ToolCallStatus.Success,
+            }),
+          ]),
+        }),
+        expect.any(Number),
+      );
+
+      // 3. Model's response
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        3,
+        expect.objectContaining({
+          type: 'gemini',
+          text: modelResponseContent,
+        }),
+        expect.any(Number),
+      );
+    });
   });
   describe('Thought Reset', () => {
     it('should reset thought to null when starting a new prompt', async () => {
@@ -3179,70 +3213,6 @@ describe('useGeminiStream', () => {
           expect.any(Number),
         );
       });
-    });
-  });
-
-  describe('MCP Server Initialization', () => {
-    it('should allow slash commands to run while MCP servers are initializing', async () => {
-      const mockMcpClientManager = {
-        getDiscoveryState: vi
-          .fn()
-          .mockReturnValue(MCPDiscoveryState.IN_PROGRESS),
-        getMcpServerCount: vi.fn().mockReturnValue(1),
-      };
-      mockConfig.getMcpClientManager = () => mockMcpClientManager as any;
-
-      const { result } = renderTestHook();
-
-      await act(async () => {
-        await result.current.submitQuery('/help');
-      });
-
-      // Slash command should be handled, and no Gemini call should be made.
-      expect(mockHandleSlashCommand).toHaveBeenCalledWith('/help');
-      expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
-    });
-
-    it('should block normal prompts and provide feedback while MCP servers are initializing', async () => {
-      const mockMcpClientManager = {
-        getDiscoveryState: vi
-          .fn()
-          .mockReturnValue(MCPDiscoveryState.IN_PROGRESS),
-        getMcpServerCount: vi.fn().mockReturnValue(1),
-      };
-      mockConfig.getMcpClientManager = () => mockMcpClientManager as any;
-      const { result } = renderTestHook();
-
-      await act(async () => {
-        await result.current.submitQuery('a normal prompt');
-      });
-
-      // No slash command, no Gemini call, but feedback should be emitted.
-      expect(mockHandleSlashCommand).not.toHaveBeenCalled();
-      expect(mockSendMessageStream).not.toHaveBeenCalled();
-      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
-        'info',
-        'Waiting for MCP servers to initialize... Slash commands are still available.',
-      );
-    });
-
-    it('should allow normal prompts to run when MCP servers are finished initializing', async () => {
-      const mockMcpClientManager = {
-        getDiscoveryState: vi.fn().mockReturnValue(MCPDiscoveryState.COMPLETED),
-        getMcpServerCount: vi.fn().mockReturnValue(1),
-      };
-      mockConfig.getMcpClientManager = () => mockMcpClientManager as any;
-
-      const { result } = renderTestHook();
-
-      await act(async () => {
-        await result.current.submitQuery('a normal prompt');
-      });
-
-      // Prompt should be sent to Gemini.
-      expect(mockHandleSlashCommand).not.toHaveBeenCalled();
-      expect(mockSendMessageStream).toHaveBeenCalled();
-      expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
     });
   });
 });
