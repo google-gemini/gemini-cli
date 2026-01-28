@@ -5,6 +5,7 @@
  */
 
 import { Box, Text } from 'ink';
+import { useTranslation } from 'react-i18next';
 import { type AgentDefinition } from '@google/gemini-cli-core';
 import { theme } from '../semantic-colors.js';
 import {
@@ -26,14 +27,15 @@ export const NewAgentsNotification = ({
   agents,
   onSelect,
 }: NewAgentsNotificationProps) => {
+  const { t } = useTranslation('dialogs');
   const options: Array<RadioSelectItem<NewAgentsChoice>> = [
     {
-      label: 'Acknowledge and Enable',
+      label: t('newAgents.acknowledge'),
       value: NewAgentsChoice.ACKNOWLEDGE,
       key: 'acknowledge',
     },
     {
-      label: 'Do not enable (Ask again next time)',
+      label: t('newAgents.ignore'),
       value: NewAgentsChoice.IGNORE,
       key: 'ignore',
     },
@@ -56,11 +58,9 @@ export const NewAgentsNotification = ({
       >
         <Box flexDirection="column" marginBottom={1}>
           <Text bold color={theme.text.primary}>
-            New Agents Discovered
+            {t('newAgents.title')}
           </Text>
-          <Text color={theme.text.primary}>
-            The following agents were found in this project. Please review them:
-          </Text>
+          <Text color={theme.text.primary}>{t('newAgents.description')}</Text>
           <Box
             flexDirection="column"
             marginTop={1}
@@ -79,7 +79,7 @@ export const NewAgentsNotification = ({
             ))}
             {remaining > 0 && (
               <Text color={theme.text.secondary}>
-                ... and {remaining} more.
+                {t('newAgents.andMore', { count: remaining })}
               </Text>
             )}
           </Box>
