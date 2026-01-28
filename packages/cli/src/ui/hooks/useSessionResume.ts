@@ -71,6 +71,17 @@ export function useSessionResume({
         });
         refreshStaticRef.current(); // Force Static component to re-render with the updated history.
 
+        // Restore directories from the resumed session
+        if (
+          resumedData.conversation.directories &&
+          resumedData.conversation.directories.length > 0
+        ) {
+          const workspaceContext = config.getWorkspaceContext();
+          // Add back any directories that were saved in the session
+          // but filter out ones that no longer exist
+          workspaceContext.addDirectories(resumedData.conversation.directories);
+        }
+
         // Give the history to the Gemini client.
         await config.getGeminiClient()?.resumeChat(clientHistory, resumedData);
       } catch (error) {
