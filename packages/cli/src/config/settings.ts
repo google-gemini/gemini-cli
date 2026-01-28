@@ -348,8 +348,12 @@ export class LoadedSettings {
 
   setRemoteAdminSettings(remoteSettings: FetchAdminControlsResponse): void {
     const admin: Settings['admin'] = {};
-    const { strictModeDisabled, mcpSetting, cliFeatureSetting } =
-      remoteSettings;
+    const {
+      secureModeEnabled,
+      strictModeDisabled,
+      mcpSetting,
+      cliFeatureSetting,
+    } = remoteSettings;
 
     if (Object.keys(remoteSettings).length === 0) {
       this._remoteAdminSettings = { admin };
@@ -357,8 +361,13 @@ export class LoadedSettings {
       return;
     }
 
-    admin.secureModeEnabled =
-      strictModeDisabled === undefined ? true : !strictModeDisabled;
+    if (strictModeDisabled !== undefined) {
+      admin.secureModeEnabled = !strictModeDisabled;
+    } else if (secureModeEnabled !== undefined) {
+      admin.secureModeEnabled = secureModeEnabled;
+    } else {
+      admin.secureModeEnabled = true;
+    }
     admin.mcp = { enabled: mcpSetting?.mcpEnabled ?? false };
     admin.extensions = {
       enabled: cliFeatureSetting?.extensionsSetting?.extensionsEnabled ?? false,

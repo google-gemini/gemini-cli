@@ -2300,6 +2300,30 @@ describe('Settings Loading and Merging', () => {
       expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
       expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
+
+      // Verify that missing strictModeDisabled falls back to secureModeEnabled
+      loadedSettings.setRemoteAdminSettings({
+        secureModeEnabled: false,
+      });
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
+
+      loadedSettings.setRemoteAdminSettings({
+        secureModeEnabled: true,
+      });
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
+
+      // Verify strictModeDisabled takes precedence over secureModeEnabled
+      loadedSettings.setRemoteAdminSettings({
+        strictModeDisabled: false,
+        secureModeEnabled: false,
+      });
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
+
+      loadedSettings.setRemoteAdminSettings({
+        strictModeDisabled: true,
+        secureModeEnabled: true,
+      });
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
     });
 
     it('should set skills based on advancedFeaturesEnabled', () => {
