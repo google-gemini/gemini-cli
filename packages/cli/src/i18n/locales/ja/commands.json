@@ -269,5 +269,9 @@
     "createDirFailed": "{{path}} ディレクトリを作成できません。現在のディレクトリに書き込み権限がありますか？",
     "downloadSuccess": "{{workflows}} 個のワークフロー、{{commands}} 個のコマンドのダウンロードが完了し、.gitignore を更新しました。{{url}} の手順に従って（/setup-github のステップはスキップ）セットアップを完了してください。",
     "shellDescription": "Gemini を使用した issue のトリアージと PR レビューのための GitHub Actions を設定しています。"
+  },
+  "terminalSetup.responses": {
+    "restartRequired": "\n\n変更を有効にするには、ターミナルを再起動してください。",
+    "failed": "ターミナルの設定に失敗しました: {{error}}"
   }
 }

@@ -6,6 +6,7 @@
 
 import type { SlashCommand } from './types.js';
 import { CommandKind } from './types.js';
+import { t } from '../../i18n/index.js';
 import { terminalSetup } from '../utils/terminalSetup.js';
 import { type MessageActionReturn } from '@google/gemini-cli-core';
 
@@ -27,8 +28,7 @@ export const terminalSetupCommand: SlashCommand = {
 
       let content = result.message;
       if (result.requiresRestart) {
-        content +=
-          '\n\nPlease restart your terminal for the changes to take effect.';
+        content += t('commands:terminalSetup.responses.restartRequired');
       }
 
       return {
@@ -39,7 +39,7 @@ export const terminalSetupCommand: SlashCommand = {
     } catch (error) {
       return {
         type: 'message',
-        content: `Failed to configure terminal: ${error}`,
+        content: t('commands:terminalSetup.responses.failed', { error }),
         messageType: 'error',
       };
     }

@@ -275,5 +275,9 @@
     "createDirFailed": "Unable to create {{path}} directory. Do you have file permissions in the current directory?",
     "downloadSuccess": "Successfully downloaded {{workflows}} workflows , {{commands}} commands and updated .gitignore. Follow the steps in {{url}} (skipping the /setup-github step) to complete setup.",
     "shellDescription": "Setting up GitHub Actions to triage issues and review PRs with Gemini."
+  },
+  "terminalSetup.responses": {
+    "restartRequired": "\n\nPlease restart your terminal for the changes to take effect.",
+    "failed": "Failed to configure terminal: {{error}}"
   }
 }
