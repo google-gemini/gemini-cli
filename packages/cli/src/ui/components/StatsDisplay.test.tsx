@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../test-utils/render.js';
+import { renderWithProviders } from '../../test-utils/render.js';
 import { describe, it, expect, vi } from 'vitest';
 import { StatsDisplay } from './StatsDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
@@ -39,7 +39,7 @@ const renderWithMockedStats = (metrics: SessionMetrics) => {
     startNewPrompt: vi.fn(),
   });
 
-  return render(<StatsDisplay duration="1s" />);
+  return renderWithProviders(<StatsDisplay duration="1s" />, { width: 100 });
 };
 
 // Helper to create metrics with default zero values
@@ -381,8 +381,9 @@ describe('<StatsDisplay />', () => {
         startNewPrompt: vi.fn(),
       });
 
-      const { lastFrame } = render(
+      const { lastFrame } = renderWithProviders(
         <StatsDisplay duration="1s" title="Agent powering down. Goodbye!" />,
+        { width: 100 },
       );
       const output = lastFrame();
       expect(output).toContain('Agent powering down. Goodbye!');
@@ -439,8 +440,9 @@ describe('<StatsDisplay />', () => {
         startNewPrompt: vi.fn(),
       });
 
-      const { lastFrame } = render(
+      const { lastFrame } = renderWithProviders(
         <StatsDisplay duration="1s" quotas={quotas} />,
+        { width: 100 },
       );
       const output = lastFrame();
 
@@ -484,8 +486,9 @@ describe('<StatsDisplay />', () => {
         startNewPrompt: vi.fn(),
       });
 
-      const { lastFrame } = render(
+      const { lastFrame } = renderWithProviders(
         <StatsDisplay duration="1s" quotas={quotas} />,
+        { width: 100 },
       );
       const output = lastFrame();
 
@@ -496,6 +499,66 @@ describe('<StatsDisplay />', () => {
       expect(output).toMatchSnapshot();
 
       vi.useRealTimers();
+    });
+  });
+
+  describe('User Identity Display', () => {
+    it('renders User row with Auth Method and Tier', () => {
+      const metrics = createTestMetrics();
+
+      useSessionStatsMock.mockReturnValue({
+        stats: {
+          sessionId: 'test-session-id',
+          sessionStartTime: new Date(),
+          metrics,
+          lastPromptTokenCount: 0,
+          promptCount: 5,
+        },
+        getPromptCount: () => 5,
+        startNewPrompt: vi.fn(),
+      });
+
+      const { lastFrame } = renderWithProviders(
+        <StatsDisplay
+          duration="1s"
+          selectedAuthType="oauth"
+          userEmail="test@example.com"
+          tier="Pro"
+        />,
+        { width: 100 },
+      );
+      const output = lastFrame();
+
+      expect(output).toContain('Auth Method:');
+      expect(output).toContain('Logged in with Google (test@example.com)');
+      expect(output).toContain('Tier:');
+      expect(output).toContain('Pro');
+    });
+
+    it('renders User row with API Key and no Tier', () => {
+      const metrics = createTestMetrics();
+
+      useSessionStatsMock.mockReturnValue({
+        stats: {
+          sessionId: 'test-session-id',
+          sessionStartTime: new Date(),
+          metrics,
+          lastPromptTokenCount: 0,
+          promptCount: 5,
+        },
+        getPromptCount: () => 5,
+        startNewPrompt: vi.fn(),
+      });
+
+      const { lastFrame } = renderWithProviders(
+        <StatsDisplay duration="1s" selectedAuthType="Google API Key" />,
+        { width: 100 },
+      );
+      const output = lastFrame();
+
+      expect(output).toContain('Auth Method:');
+      expect(output).toContain('Google API Key');
+      expect(output).not.toContain('Tier:');
     });
   });
 });
