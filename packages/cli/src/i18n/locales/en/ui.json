@@ -99,6 +99,18 @@
     "lastLinesHidden": "... last {{count}} line hidden ...",
     "lastLinesHidden_plural": "... last {{count}} lines hidden ..."
   },
+  "screenReader": {
+    "userPrefix": "User: ",
+    "modelPrefix": "Model: ",
+    "loading": "loading",
+    "responding": "responding"
+  },
+  "redirectionWarning": {
+    "noteLabel": "Note: ",
+    "noteText": "Command contains redirection which can be undesirable.",
+    "tipLabel": "Tip:  ",
+    "tipText": "Toggle auto-edit (Shift+Tab) to allow redirection in the future."
+  },
   "modelStats": {
     "title": "Model Stats For Nerds",
     "noCalls": "No API calls have been made in this session.",

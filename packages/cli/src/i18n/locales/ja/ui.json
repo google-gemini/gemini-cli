@@ -90,6 +90,18 @@
     "firstLinesHidden": "... 最初の {{count}} 行を非表示 ...",
     "lastLinesHidden": "... 最後の {{count}} 行を非表示 ..."
   },
+  "screenReader": {
+    "userPrefix": "ユーザー: ",
+    "modelPrefix": "モデル: ",
+    "loading": "読み込み中",
+    "responding": "応答中"
+  },
+  "redirectionWarning": {
+    "noteLabel": "注記: ",
+    "noteText": "コマンドにリダイレクトが含まれています。これは望ましくない場合があります。",
+    "tipLabel": "ヒント: ",
+    "tipText": "自動編集（Shift+Tab）を切り替えると、将来的にリダイレクトを許可できます。"
+  },
   "modelStats": {
     "title": "モデル統計 (詳細)",
     "noCalls": "このセッションではまだAPI呼び出しが行われていません。",
