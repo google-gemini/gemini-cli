@@ -6,6 +6,7 @@
 
 import { isDevelopment } from '../../utils/installationInfo.js';
 import { CommandKind, type SlashCommand } from './types.js';
+import { t } from '../../i18n/index.js';
 
 export const profileCommand: SlashCommand | null = isDevelopment
   ? {
@@ -18,7 +19,7 @@ export const profileCommand: SlashCommand | null = isDevelopment
         return {
           type: 'message',
           messageType: 'info',
-          content: 'Toggled profile display.',
+          content: t('commands:profile.responses.toggled'),
         };
       },
     }
