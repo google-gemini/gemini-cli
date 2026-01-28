@@ -7,6 +7,7 @@
 import * as fsPromises from 'node:fs/promises';
 import React from 'react';
 import { Text } from 'ink';
+import { t } from '../../i18n/index.js';
 import { theme } from '../semantic-colors.js';
 import type {
   CommandContext,
@@ -97,7 +98,7 @@ const saveCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /chat save <tag>',
+        content: t('commands:chat.responses.missingTagSave'),
       };
     }
 
@@ -112,9 +113,9 @@ const saveCommand: SlashCommand = {
           prompt: React.createElement(
             Text,
             null,
-            'A checkpoint with the tag ',
+            t('commands:chat.responses.overwriteConfirmPrefix'),
             React.createElement(Text, { color: theme.text.accent }, tag),
-            ' already exists. Do you want to overwrite it?',
+            t('commands:chat.responses.overwriteConfirmSuffix'),
           ),
           originalInvocation: {
             raw: context.invocation?.raw || `/chat save ${tag}`,
@@ -128,7 +129,7 @@ const saveCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'No chat client available to save conversation.',
+        content: t('commands:chat.responses.noClient'),
       };
     }
 
@@ -139,15 +140,15 @@ const saveCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: `Conversation checkpoint saved with tag: ${decodeTagName(
-          tag,
-        )}.`,
+        content: t('commands:chat.responses.saveSuccess', {
+          tag: decodeTagName(tag),
+        }),
       };
     } else {
       return {
         type: 'message',
         messageType: 'info',
-        content: 'No conversation found to save.',
+        content: t('commands:chat.responses.noChatToSave'),
       };
     }
   },
@@ -166,7 +167,7 @@ const resumeCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /chat resume <tag>',
+        content: t('commands:chat.responses.missingTagResume'),
       };
     }
 
@@ -179,7 +180,9 @@ const resumeCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: `No saved checkpoint found with tag: ${decodeTagName(tag)}.`,
+        content: t('commands:chat.responses.notFound', {
+          tag: decodeTagName(tag),
+        }),
       };
     }
 
@@ -192,7 +195,10 @@ const resumeCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: `Cannot resume chat. It was saved with a different authentication method (${checkpoint.authType}) than the current one (${currentAuthType}).`,
+        content: t('commands:chat.responses.authMismatch', {
+          old: checkpoint.authType,
+          new: currentAuthType,
+        }),
       };
     }
 
@@ -243,7 +249,7 @@ const deleteCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /chat delete <tag>',
+        content: t('commands:chat.responses.missingTagDelete'),
       };
     }
 
@@ -255,13 +261,17 @@ const deleteCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: `Conversation checkpoint '${decodeTagName(tag)}' has been deleted.`,
+        content: t('commands:chat.responses.deleteSuccess', {
+          tag: decodeTagName(tag),
+        }),
       };
     } else {
       return {
         type: 'message',
         messageType: 'error',
-        content: `Error: No checkpoint found with tag '${decodeTagName(tag)}'.`,
+        content: t('commands:chat.responses.deleteError', {
+          tag: decodeTagName(tag),
+        }),
       };
     }
   },
@@ -291,7 +301,7 @@ const shareCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Invalid file format. Only .md and .json are supported.',
+        content: t('commands:chat.responses.invalidFormat'),
       };
     }
 
@@ -300,7 +310,7 @@ const shareCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'No chat client available to share conversation.',
+        content: t('commands:chat.responses.noClientShare'),
       };
     }
 
@@ -313,7 +323,7 @@ const shareCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: 'No conversation found to share.',
+        content: t('commands:chat.responses.noChatToShare'),
       };
     }
 
@@ -322,14 +332,16 @@ const shareCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: `Conversation shared to ${filePath}`,
+        content: t('commands:chat.responses.shareSuccess', { path: filePath }),
       };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       return {
         type: 'message',
         messageType: 'error',
-        content: `Error sharing conversation: ${errorMessage}`,
+        content: t('commands:chat.responses.shareError', {
+          error: errorMessage,
+        }),
       };
     }
   },
@@ -346,7 +358,7 @@ export const debugCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'No recent API request found to export.',
+        content: t('commands:chat.responses.noRequest'),
       };
     }
 
@@ -362,14 +374,18 @@ export const debugCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: `Debug API request saved to ${filename}`,
+        content: t('commands:chat.responses.debugSaveSuccess', {
+          file: filename,
+        }),
       };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       return {
         type: 'message',
         messageType: 'error',
-        content: `Error saving debug request: ${errorMessage}`,
+        content: t('commands:chat.responses.debugSaveError', {
+          error: errorMessage,
+        }),
       };
     }
   },

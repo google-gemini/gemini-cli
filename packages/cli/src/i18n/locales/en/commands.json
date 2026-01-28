@@ -141,5 +141,27 @@
     "blockedBySettings": "Blocked by settings.",
     "disabledByAdmin": "MCP disabled by admin. Will load when enabled.",
     "statusChanged": "MCP server '{{name}}' {{status}}{{session}}."
+  },
+  "chat.responses": {
+    "missingTagSave": "Missing tag. Usage: /chat save <tag>",
+    "missingTagResume": "Missing tag. Usage: /chat resume <tag>",
+    "missingTagDelete": "Missing tag. Usage: /chat delete <tag>",
+    "overwriteConfirmPrefix": "A checkpoint with the tag ",
+    "overwriteConfirmSuffix": " already exists. Do you want to overwrite it?",
+    "noClient": "No chat client available to save conversation.",
+    "saveSuccess": "Conversation checkpoint saved with tag: {{tag}}.",
+    "noChatToSave": "No conversation found to save.",
+    "notFound": "No saved checkpoint found with tag: {{tag}}.",
+    "authMismatch": "Cannot resume chat. It was saved with a different authentication method ({{old}}) than the current one ({{new}}).",
+    "deleteSuccess": "Conversation checkpoint '{{tag}}' has been deleted.",
+    "deleteError": "Error: No checkpoint found with tag '{{tag}}'.",
+    "invalidFormat": "Invalid file format. Only .md and .json are supported.",
+    "noClientShare": "No chat client available to share conversation.",
+    "noChatToShare": "No conversation found to share.",
+    "shareSuccess": "Conversation shared to {{path}}",
+    "shareError": "Error sharing conversation: {{error}}",
+    "noRequest": "No recent API request found to export.",
+    "debugSaveSuccess": "Debug API request saved to {{file}}",
+    "debugSaveError": "Error saving debug request: {{error}}"
   }
 }

@@ -138,6 +138,29 @@
     "serverNotFound": "サーバー '{{name}}' が見つかりませんでした。/mcp list を使用して利用可能なサーバーを確認してください。",
     "blockedBySettings": "設定によりブロックされました。",
     "disabledByAdmin": "管理者によって MCP が無効にされています。有効になると読み込まれます。",
-    "statusChanged": "MCP サーバー '{{name}}' を{{status}}にしました{{session}}。"
+    "statusChanged": "MCP サーバー '{{name}}' を{{status}}にしました{{session}}。",
+    "restartingAll": "MCP サーバーを再起動しています..."
+  },
+  "chat.responses": {
+    "missingTagSave": "タグがありません。使用法: /chat save <タグ>",
+    "missingTagResume": "タグがありません。使用法: /chat resume <タグ>",
+    "missingTagDelete": "タグがありません。使用法: /chat delete <タグ>",
+    "overwriteConfirmPrefix": "タグ ",
+    "overwriteConfirmSuffix": " のチェックポイントは既に存在します。上書きしますか？",
+    "noClient": "会話を保存するためのチャットクライアントが利用できません。",
+    "saveSuccess": "会話チェックポイントをタグ {{tag}} で保存しました。",
+    "noChatToSave": "保存する会話が見つかりませんでした。",
+    "notFound": "タグ {{tag}} の保存されたチェックポイントは見つかりませんでした。",
+    "authMismatch": "チャットを再開できません。現在の認証方法（{{new}}）とは異なる認証方法（{{old}}）で保存されています。",
+    "deleteSuccess": "会話チェックポイント '{{tag}}' を削除しました。",
+    "deleteError": "エラー: タグ '{{tag}}' のチェックポイントが見つかりませんでした。",
+    "invalidFormat": "無効なファイル形式です。.md と .json のみがサポートされています。",
+    "noClientShare": "会話を共有するためのチャットクライアントが利用できません。",
+    "noChatToShare": "共有する会話が見つかりませんでした。",
+    "shareSuccess": "会話を {{path}} に共有しました。",
+    "shareError": "会話の共有中にエラーが発生しました: {{error}}",
+    "noRequest": "エクスポートする最新の API リクエストが見つかりませんでした。",
+    "debugSaveSuccess": "デバッグ API リクエストを {{file}} に保存しました。",
+    "debugSaveError": "デバッグリクエストの保存中にエラーが発生しました: {{error}}"
   }
 }
