@@ -36,8 +36,8 @@ describe('policy.ts', () => {
         tool: { name: 'test-tool' },
       } as ValidatingToolCall;
 
-      const decision = await checkPolicy(toolCall, mockConfig);
-      expect(decision).toBe(PolicyDecision.ALLOW);
+      const result = await checkPolicy(toolCall, mockConfig);
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
       expect(mockPolicyEngine.check).toHaveBeenCalledWith(
         { name: 'test-tool', args: {} },
         undefined,
@@ -102,8 +102,8 @@ describe('policy.ts', () => {
         tool: { name: 'test-tool' },
       } as ValidatingToolCall;
 
-      const decision = await checkPolicy(toolCall, mockConfig);
-      expect(decision).toBe(PolicyDecision.DENY);
+      const result = await checkPolicy(toolCall, mockConfig);
+      expect(result.decision).toBe(PolicyDecision.DENY);
     });
 
     it('should return ASK_USER without throwing in interactive mode', async () => {
@@ -121,8 +121,8 @@ describe('policy.ts', () => {
         tool: { name: 'test-tool' },
       } as ValidatingToolCall;
 
-      const decision = await checkPolicy(toolCall, mockConfig);
-      expect(decision).toBe(PolicyDecision.ASK_USER);
+      const result = await checkPolicy(toolCall, mockConfig);
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
     });
   });
 
