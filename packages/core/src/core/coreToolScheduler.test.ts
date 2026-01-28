@@ -7,10 +7,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Mock } from 'vitest';
 import type { CallableTool } from '@google/genai';
-import {
-  CoreToolScheduler,
-  PLAN_MODE_DENIAL_MESSAGE,
-} from './coreToolScheduler.js';
+import { CoreToolScheduler } from './coreToolScheduler.js';
+import { PLAN_MODE_DENIAL_MESSAGE } from '../scheduler/policy.js';
 import type {
   ToolCall,
   WaitingToolCall,
