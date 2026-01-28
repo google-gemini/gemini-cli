@@ -7,7 +7,8 @@
       { "label": "Installation", "slug": "docs/get-started/installation" },
       { "label": "Authentication", "slug": "docs/get-started/authentication" },
       { "label": "Examples", "slug": "docs/get-started/examples" },
-      { "label": "Gemini 3 (preview)", "slug": "docs/get-started/gemini-3" }
+      { "label": "Gemini 3 (preview)", "slug": "docs/get-started/gemini-3" },
+      { "label": "CLI Reference", "slug": "docs/cli/cli-reference" }
     ]
   },
   {
