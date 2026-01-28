@@ -257,17 +257,6 @@ const SETTINGS_SCHEMA = {
         description: 'Enable debug logging of keystrokes to the console.',
         showInDialog: true,
       },
-      language: {
-        type: 'string',
-        label: 'Language',
-        category: 'General',
-        requiresRestart: true,
-        default: 'auto',
-        description:
-          'The language for the CLI interface. Auto-detect uses system locale.',
-        showInDialog: true,
-        options: getLanguageOptions(),
-      },
       sessionRetention: {
         type: 'object',
         label: 'Session Retention',
@@ -1518,6 +1507,17 @@ const SETTINGS_SCHEMA = {
         default: false,
         description: 'Enable planning features (Plan Mode and tools).',
         showInDialog: true,
+      },
+      language: {
+        type: 'string',
+        label: 'Language (Experimental)',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: 'auto',
+        description:
+          'The language for the CLI interface. Auto-detect uses system locale.',
+        showInDialog: true,
+        options: getLanguageOptions(),
       },
     },
   },

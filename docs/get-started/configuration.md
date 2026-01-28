@@ -138,13 +138,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable debug logging of keystrokes to the console.
   - **Default:** `false`
 
-- **`general.language`** (string):
-  - **Description:** The language for the CLI interface. Auto-detect uses system
-    locale.
-  - **Default:** `"auto"`
-  - **Values:** `"auto"`, `"en"`, `"ja"`
-  - **Requires restart:** Yes
-
 - **`general.sessionRetention.enabled`** (boolean):
   - **Description:** Enable automatic session cleanup
   - **Default:** `false`
@@ -884,6 +877,13 @@ their corresponding top-level category object in your `settings.json` file.
 - **`experimental.plan`** (boolean):
   - **Description:** Enable planning features (Plan Mode and tools).
   - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.language`** (string):
+  - **Description:** The language for the CLI interface. Auto-detect uses system
+    locale.
+  - **Default:** `"auto"`
+  - **Values:** `"auto"`, `"en"`, `"ja"`
   - **Requires restart:** Yes
 
 #### `skills`
