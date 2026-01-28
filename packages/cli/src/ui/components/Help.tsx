@@ -10,7 +10,7 @@ import { theme } from '../semantic-colors.js';
 import { type SlashCommand, CommandKind } from '../commands/types.js';
 import { KEYBOARD_SHORTCUTS_URL } from '../constants.js';
 import { sanitizeForDisplay } from '../utils/textUtils.js';
-import { useTranslation } from '../../i18n/useTranslation.js';
+import { useTranslation } from 'react-i18next';
 import { renderStyledText } from '../utils/styledText.js';
 import { getCommandDescription } from '../../i18n/index.js';
 
@@ -105,7 +105,7 @@ export const Help: React.FC<Help> = ({ commands }) => {
               )}
               {command.description &&
                 ' - ' +
-                  sanitizeForListDisplay(
+                  sanitizeForDisplay(
                     getCommandDescription(command.name, command.description),
                     100,
                   )}
@@ -121,7 +121,7 @@ export const Help: React.FC<Help> = ({ commands }) => {
                     </Text>
                     {subCommand.description &&
                       ' - ' +
-                        sanitizeForListDisplay(
+                        sanitizeForDisplay(
                           getCommandDescription(
                             subCommand.name,
                             subCommand.description,
