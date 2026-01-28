@@ -1,5 +1,35 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`<ToolGroupMessage /> > Ask User Filtering > does NOT filter out ask_user when status is Error 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ x  Ask User                                                                  │
+│                                                                              │
+│ Test result                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`<ToolGroupMessage /> > Ask User Filtering > does NOT filter out ask_user when status is Success 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ✓  Ask User                                                                  │
+│                                                                              │
+│ Test result                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`<ToolGroupMessage /> > Ask User Filtering > filters out ask_user when status is Confirming 1`] = `""`;
+
+exports[`<ToolGroupMessage /> > Ask User Filtering > filters out ask_user when status is Executing 1`] = `""`;
+
+exports[`<ToolGroupMessage /> > Ask User Filtering > filters out ask_user when status is Pending 1`] = `""`;
+
+exports[`<ToolGroupMessage /> > Ask User Filtering > shows other tools when ask_user is filtered out 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ✓  other-tool A tool for testing                                             │
+│                                                                              │
+│ Test result                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯"
+`;
+
 exports[`<ToolGroupMessage /> > Border Color Logic > uses gray border when all tools are successful and no shell commands 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ✓  test-tool A tool for testing                                              │

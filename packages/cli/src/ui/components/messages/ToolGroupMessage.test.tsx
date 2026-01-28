@@ -661,14 +661,31 @@ describe('<ToolGroupMessage />', () => {
   });
 
   describe('Ask User Filtering', () => {
-    it('filters out ask_user when status is Pending, Executing, or Confirming', () => {
-      const statuses = [
-        ToolCallStatus.Pending,
-        ToolCallStatus.Executing,
-        ToolCallStatus.Confirming,
+    it.each([
+      ToolCallStatus.Pending,
+      ToolCallStatus.Executing,
+      ToolCallStatus.Confirming,
+    ])('filters out ask_user when status is %s', (status) => {
+      const toolCalls = [
+        createToolCall({
+          callId: `ask-user-${status}`,
+          name: ASK_USER_DISPLAY_NAME,
+          status,
+        }),
       ];
 
-      for (const status of statuses) {
+      const { lastFrame, unmount } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        { config: baseMockConfig },
+      );
+
+      expect(lastFrame()).toMatchSnapshot();
+      unmount();
+    });
+
+    it.each([ToolCallStatus.Success, ToolCallStatus.Error])(
+      'does NOT filter out ask_user when status is %s',
+      (status) => {
         const toolCalls = [
           createToolCall({
             callId: `ask-user-${status}`,
@@ -682,32 +699,10 @@ describe('<ToolGroupMessage />', () => {
           { config: baseMockConfig },
         );
 
-        expect(lastFrame()).toBe('');
+        expect(lastFrame()).toMatchSnapshot();
         unmount();
-      }
-    });
-
-    it('does NOT filter out ask_user when status is Success or Error', () => {
-      const statuses = [ToolCallStatus.Success, ToolCallStatus.Error];
-
-      for (const status of statuses) {
-        const toolCalls = [
-          createToolCall({
-            callId: `ask-user-${status}`,
-            name: ASK_USER_DISPLAY_NAME,
-            status,
-          }),
-        ];
-
-        const { lastFrame, unmount } = renderWithProviders(
-          <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
-          { config: baseMockConfig },
-        );
-
-        expect(lastFrame()).toContain(ASK_USER_DISPLAY_NAME);
-        unmount();
-      }
-    });
+      },
+    );
 
     it('shows other tools when ask_user is filtered out', () => {
       const toolCalls = [
@@ -728,9 +723,7 @@ describe('<ToolGroupMessage />', () => {
         { config: baseMockConfig },
       );
 
-      const output = lastFrame();
-      expect(output).toContain('other-tool');
-      expect(output).not.toContain(ASK_USER_DISPLAY_NAME);
+      expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
   });
