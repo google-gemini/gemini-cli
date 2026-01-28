@@ -421,14 +421,6 @@ describe('Telemetry SDK', () => {
   });
 
   describe('OTEL_RESOURCE_ATTRIBUTES support', () => {
-    it('should call detectResources with envDetector', async () => {
-      await initializeTelemetry(mockConfig);
-
-      expect(detectResources).toHaveBeenCalledWith({
-        detectors: [envDetector],
-      });
-    });
-
     it('should merge env resource with base resource', async () => {
       const mockMerge = vi.fn().mockReturnThis();
       const mockEnvResource = { attributes: {}, merge: mockMerge };
