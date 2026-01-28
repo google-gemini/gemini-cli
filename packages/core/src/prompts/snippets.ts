@@ -368,13 +368,15 @@ function mandateContinueWork(interactive: boolean): string {
 
 function workflowStepUnderstand(options: PrimaryWorkflowsOptions): string {
   if (options.enableCodebaseInvestigator) {
-    return `1. **Understand & Strategize:** Think about the user's request and the relevant codebase context. When the task involves **complex refactoring, codebase exploration or system-wide analysis**, your **first and primary action** must be to delegate to the 'codebase_investigator' agent using the 'codebase_investigator' tool. Use it to build a comprehensive understanding of the code, its structure, and dependencies. For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), you should use '${GREP_TOOL_NAME}' or '${GLOB_TOOL_NAME}' directly.`;
+    return `1. **Understand & Strategize:** Think about the user's request and the relevant codebase context. When the task involves **complex refactoring, codebase exploration or system-wide analysis**, your **first and primary action** must be to delegate to the 'codebase_investigator' agent using the 'codebase_investigator' tool. Use it to build a comprehensive understanding of the code, its structure, and dependencies. For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), you should use '${GREP_TOOL_NAME}' or '${GLOB_TOOL_NAME}' directly.
+Use '${READ_FILE_TOOL_NAME}' to understand context and validate any assumptions you may have.
+IMPORTANT: extra context consumed by unnecessarily reading entire files will degrade the quality of your answer, so **ALWAYS** use ranged reads if you know approximately which lines you need. For example, when fixing a linter error at line 50, read ~20 lines around it (offset: 40, limit: 20) to get sufficient context for a replacement.`;
   }
   return `1. **Understand:** Think about the user's request and the relevant codebase context. Use '${GREP_TOOL_NAME}' and '${GLOB_TOOL_NAME}' search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions.
 Use '${READ_FILE_TOOL_NAME}' to understand context and validate any assumptions you may have. If you need to read multiple files, you should make multiple parallel calls to '${READ_FILE_TOOL_NAME}'.
 Keep in mind the following as you explore:
 - Search and/or read enough files to gain a thorough understanding of the problem.
-- However, irrelevant context consumed by unnecessarily reading entire files will degrade the quality of your answer, so use ranged reads if you know which lines you need.`;
+- IMPORTANT: extra context consumed by unnecessarily reading entire files will degrade the quality of your answer, so **ALWAYS** use ranged reads if you know approximately which lines you need. For example, when fixing a linter error at line 50, read ~20 lines around it (offset: 40, limit: 20) to get sufficient context for a replacement.`;
 }
 
 function workflowStepPlan(options: PrimaryWorkflowsOptions): string {
