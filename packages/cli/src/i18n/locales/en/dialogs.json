@@ -276,5 +276,18 @@
     "stop": "Stop",
     "switchTo": "Switch to {{model}}",
     "upgrade": "Upgrade for higher limits"
+  },
+  "theme": {
+    "title": "Select Theme",
+    "preview": "Preview",
+    "incompatible": " (Incompatible)",
+    "matchesTerminal": " (Matches terminal)",
+    "instructions": {
+      "select": "select",
+      "applyScope": "apply scope",
+      "configureScope": "configure scope",
+      "selectTheme": "select theme",
+      "full": "(Use Enter to {{action}}, Tab to {{toggle}}, Esc to close)"
+    }
   }
 }

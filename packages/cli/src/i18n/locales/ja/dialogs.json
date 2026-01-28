@@ -276,5 +276,18 @@
     "stop": "停止",
     "switchTo": "{{model}} に切り替える",
     "upgrade": "アップグレードして制限を増やす"
+  },
+  "theme": {
+    "title": "テーマを選択",
+    "preview": "プレビュー",
+    "incompatible": " (非互換)",
+    "matchesTerminal": " (端末と一致)",
+    "instructions": {
+      "select": "選択",
+      "applyScope": "スコープを適用",
+      "configureScope": "スコープを設定",
+      "selectTheme": "テーマを選択",
+      "full": "(Enterで{{action}}、Tabで{{toggle}}、Escで閉じる)"
+    }
   }
 }

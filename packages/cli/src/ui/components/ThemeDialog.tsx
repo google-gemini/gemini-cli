@@ -6,6 +6,7 @@
 
 import type React from 'react';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
@@ -52,6 +53,7 @@ function generateThemeItem(
   themeBackground: string | undefined,
   terminalBackgroundColor: string | undefined,
   terminalThemeType: 'light' | 'dark' | undefined,
+  t: (key: string) => string,
 ) {
   const isCompatible =
     themeType === 'custom' ||
@@ -69,8 +71,8 @@ function generateThemeItem(
     value: name,
     themeNameDisplay: name,
     themeTypeDisplay: typeDisplay,
-    themeWarning: isCompatible ? '' : ' (Incompatible)',
-    themeMatch: isBackgroundMatch ? ' (Matches terminal)' : '',
+    themeWarning: isCompatible ? '' : t('theme.incompatible'),
+    themeMatch: isBackgroundMatch ? t('theme.matchesTerminal') : '',
     key: name,
     isCompatible,
   };
@@ -84,6 +86,7 @@ export function ThemeDialog({
   availableTerminalHeight,
   terminalWidth,
 }: ThemeDialogProps): React.JSX.Element {
+  const { t } = useTranslation('dialogs');
   const isAlternateBuffer = useAlternateBuffer();
   const { refreshStatic } = useUIActions();
   const { terminalBackgroundColor } = useUIState();
@@ -131,6 +134,7 @@ export function ThemeDialog({
         themeBackground,
         terminalBackgroundColor,
         terminalThemeType,
+        t,
       );
     })
     .sort((a, b) => {
@@ -270,7 +274,8 @@ export function ThemeDialog({
           {/* Left Column: Selection */}
           <Box flexDirection="column" width="45%" paddingRight={2}>
             <Text bold={mode === 'theme'} wrap="truncate">
-              {mode === 'theme' ? '> ' : '  '}Select Theme{' '}
+              {mode === 'theme' ? '> ' : '  '}
+              {t('theme.title')}{' '}
               <Text color={theme.text.secondary}>
                 {otherScopeModifiedMessage}
               </Text>
@@ -335,7 +340,7 @@ export function ThemeDialog({
           {/* Right Column: Preview */}
           <Box flexDirection="column" width="55%" paddingLeft={2}>
             <Text bold color={theme.text.primary}>
-              Preview
+              {t('theme.preview')}
             </Text>
             {/* Get the Theme object for the highlighted theme, fall back to default if not found */}
             {(() => {
@@ -396,8 +401,16 @@ def fibonacci(n):
       )}
       <Box marginTop={1}>
         <Text color={theme.text.secondary} wrap="truncate">
-          (Use Enter to {mode === 'theme' ? 'select' : 'apply scope'}, Tab to{' '}
-          {mode === 'theme' ? 'configure scope' : 'select theme'}, Esc to close)
+          {t('theme.instructions.full', {
+            action:
+              mode === 'theme'
+                ? t('theme.instructions.select')
+                : t('theme.instructions.applyScope'),
+            toggle:
+              mode === 'theme'
+                ? t('theme.instructions.configureScope')
+                : t('theme.instructions.selectTheme'),
+          })}
         </Text>
       </Box>
     </Box>
