@@ -1,0 +1,14 @@
+{
+  "todo": {
+    "title": "Todo",
+    "ariaLabel": "Todo list",
+    "completed": "{{completed}}/{{total}} completed",
+    "toggleHint": "(ctrl+t to toggle)",
+    "status": {
+      "completed": "Completed",
+      "in_progress": "In Progress",
+      "pending": "Pending",
+      "cancelled": "Cancelled"
+    }
+  }
+}

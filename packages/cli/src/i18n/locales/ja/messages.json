@@ -1,0 +1,14 @@
+{
+  "todo": {
+    "title": "タスク",
+    "ariaLabel": "タスク一覧",
+    "completed": "{{completed}}/{{total}} 完了",
+    "toggleHint": "(Ctrl+Tで切り替え)",
+    "status": {
+      "completed": "完了",
+      "in_progress": "進行中",
+      "pending": "保留",
+      "cancelled": "キャンセル"
+    }
+  }
+}

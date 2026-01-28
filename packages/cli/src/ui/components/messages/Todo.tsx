@@ -6,6 +6,7 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
+import { useTranslation } from 'react-i18next';
 import {
   type Todo,
   type TodoList,
@@ -17,6 +18,7 @@ import { useMemo } from 'react';
 import type { HistoryItemToolGroup } from '../../types.js';
 
 const TodoTitleDisplay: React.FC<{ todos: TodoList }> = ({ todos }) => {
+  const { t } = useTranslation('messages');
   const score = useMemo(() => {
     let total = 0;
     let completed = 0;
@@ -28,43 +30,58 @@ const TodoTitleDisplay: React.FC<{ todos: TodoList }> = ({ todos }) => {
         }
       }
     }
-    return `${completed}/${total} completed`;
-  }, [todos]);
+    return t('todo.completed', { completed, total });
+  }, [todos, t]);
 
   return (
     <Box flexDirection="row" columnGap={2} height={1}>
-      <Text color={theme.text.primary} bold aria-label="Todo list">
-        Todo
+      <Text color={theme.text.primary} bold aria-label={t('todo.ariaLabel')}>
+        {t('todo.title')}
       </Text>
-      <Text color={theme.text.secondary}>{score} (ctrl+t to toggle)</Text>
+      <Text color={theme.text.secondary}>
+        {score} {t('todo.toggleHint')}
+      </Text>
     </Box>
   );
 };
 
 const TodoStatusDisplay: React.FC<{ status: TodoStatus }> = ({ status }) => {
+  const { t } = useTranslation('messages');
   switch (status) {
     case 'completed':
       return (
-        <Text color={theme.status.success} aria-label="Completed">
+        <Text
+          color={theme.status.success}
+          aria-label={t('todo.status.completed')}
+        >
           ✓
         </Text>
       );
     case 'in_progress':
       return (
-        <Text color={theme.text.accent} aria-label="In Progress">
+        <Text
+          color={theme.text.accent}
+          aria-label={t('todo.status.in_progress')}
+        >
           »
         </Text>
       );
     case 'pending':
       return (
-        <Text color={theme.text.secondary} aria-label="Pending">
+        <Text
+          color={theme.text.secondary}
+          aria-label={t('todo.status.pending')}
+        >
           ☐
         </Text>
       );
     case 'cancelled':
     default:
       return (
-        <Text color={theme.status.error} aria-label="Cancelled">
+        <Text
+          color={theme.status.error}
+          aria-label={t('todo.status.cancelled')}
+        >
           ✗
         </Text>
       );
