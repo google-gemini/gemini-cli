@@ -46,7 +46,7 @@
     "cacheReads": "Cache Reads",
     "outputTokens": "Output Tokens",
     "usageLeft": "Usage left",
-    "cacheSavings": "{{tokens}} ({{percent}}) of input tokens were served from the cache, reducing costs.",
+    "cacheSavings": "Savings Highlight: {{tokens}} ({{percent}}) of input tokens were served from the cache, reducing costs.",
     "usageLimits": "Usage limits span all sessions and reset daily.\n/auth to upgrade or switch to API key.",
     "statsTip": "» Tip: For a full token breakdown, run `/stats model`.",
     "resetsIn": "Resets in {{time}}"
@@ -201,6 +201,7 @@
     "unsupported": "Editor is not supported: {{preference}}",
     "userSettings": "User Settings",
     "workspaceSettings": "Workspace Settings",
+    "systemSettings": "System Settings",
     "alsoModifiedIn": "(Also modified in {{scope}})",
     "modifiedIn": "(Modified in {{scope}})",
     "none": "None",
@@ -209,10 +210,10 @@
     "instructions": "(Use Enter to select, Tab to change focus, Esc to close)",
     "preferenceTitle": "Editor Preference",
     "description": "These editors are currently supported. Please note that some editors cannot be used in sandbox mode.",
-    "currentPreference": "Your preferred editor is: "
+    "currentPreference": "Your preferred editor is:"
   },
   "sessionBrowser": {
-    "loading": "Loading sessions…",
+    "loading": "Loading sessions...",
     "error": "Error: {{message}}",
     "pressQToExit": "Press q to exit",
     "noSessions": "No auto-saved conversations found.",

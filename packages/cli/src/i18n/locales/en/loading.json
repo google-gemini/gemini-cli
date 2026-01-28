@@ -1,6 +1,6 @@
 {
-  "interactiveShellWaiting": "Interactive shell awaiting input… press tab to focus shell",
-  "waitingForConfirmation": "Waiting for user confirmation…",
+  "interactiveShellWaiting": "Interactive shell awaiting input... press tab to focus shell",
+  "waitingForConfirmation": "Waiting for user confirmation...",
   "tips": {
     "settings": [
       "Set your preferred editor for opening files (/settings)…",

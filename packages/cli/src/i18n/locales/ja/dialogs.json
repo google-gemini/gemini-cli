@@ -46,7 +46,7 @@
     "cacheReads": "キャッシュ読取",
     "outputTokens": "出力トークン",
     "usageLeft": "残り使用量",
-    "cacheSavings": "入力トークンのうち {{tokens}}（{{percent}}）がキャッシュから提供され、コストが削減されました。",
+    "cacheSavings": "節約ハイライト: 入力トークンのうち {{tokens}}（{{percent}}）がキャッシュから提供され、コストが削減されました。",
     "usageLimits": "使用量制限は全セッション共通で、毎日リセットされます。\n/auth でアップグレードまたはAPIキーに切り替えできます。",
     "statsTip": "» ヒント: 詳細なトークン内訳は `/stats model` で確認できます。",
     "resetsIn": "{{time}}後にリセット"
@@ -201,6 +201,7 @@
     "unsupported": "エディタはサポートされていません: {{preference}}",
     "userSettings": "ユーザー設定",
     "workspaceSettings": "ワークスペース設定",
+    "systemSettings": "システム設定",
     "alsoModifiedIn": "({{scope}} でも変更されています)",
     "modifiedIn": "({{scope}} で変更されています)",
     "none": "なし",
@@ -212,7 +213,7 @@
     "currentPreference": "現在の設定: "
   },
   "sessionBrowser": {
-    "loading": "セッションを読み込み中…",
+    "loading": "セッションを読み込み中...",
     "error": "エラー: {{message}}",
     "pressQToExit": "qキーで終了",
     "noSessions": "自動保存された会話は見つかりませんでした。",

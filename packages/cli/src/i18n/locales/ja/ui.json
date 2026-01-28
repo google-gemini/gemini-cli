@@ -41,17 +41,17 @@
     "waitingFor": " - 待機中: {{servers}}"
   },
   "consoleSummary": {
-    "errorCount_other": "{{count}} 個のエラー",
+    "errorCount": "{{count}} 個のエラー",
     "detailsHint": "(F12で詳細を表示)"
   },
   "contextSummary": {
-    "openFiles_other": "{{count}} 個の開いているファイル (Ctrl+Gで表示)",
-    "contextFiles_other": "{{count}} 個の {{name}} ファイル",
+    "openFiles": "{{count}} 個の開いているファイル (Ctrl+Gで表示)",
+    "contextFiles": "{{count}} 個の {{name}} ファイル",
     "contextGenericName": "コンテキスト",
-    "mcpServers_other": "{{count}} 台の MCP サーバー",
+    "mcpServers": "{{count}} 台の MCP サーバー",
     "blockedOnly": "{{count}} 個がブロック済み",
-    "blockedMcpServers_other": "{{count}} 台のブロック済み MCP サーバー",
-    "skills_other": "{{count}} 個のスキル"
+    "blockedMcpServers": "{{count}} 台のブロック済み MCP サーバー",
+    "skills": "{{count}} 個のスキル"
   },
   "footer": {
     "untrusted": "信頼されていない",
@@ -61,7 +61,7 @@
     "modelCmd": " /model"
   },
   "hookStatus": {
-    "executing_other": "フックを実行中"
+    "executing": "フックを実行中"
   },
   "detailedMessages": {
     "title": "デバッグコンソール",
@@ -94,8 +94,8 @@
     "ctrlD": "終了するにはもう一度 Ctrl+D を押してください。"
   },
   "maxSizedBox": {
-    "firstLinesHidden_other": "... 最初の {{count}} 行を非表示 ...",
-    "lastLinesHidden_other": "... 最後の {{count}} 行を非表示 ..."
+    "firstLinesHidden": "... 最初の {{count}} 行を非表示 ...",
+    "lastLinesHidden": "... 最後の {{count}} 行を非表示 ..."
   },
   "mcpStatus": {
     "noServers": "設定されている MCP サーバーはありません。",
@@ -114,9 +114,9 @@
       "blocked": "ブロック済み"
     },
     "counts": {
-      "tool_other": "{{count}} 個のツール",
-      "prompt_other": "{{count}} 個のプロンプト",
-      "resource_other": "{{count}} 個のリソース"
+      "tool": "{{count}} 個のツール",
+      "prompt": "{{count}} 個のプロンプト",
+      "resource": "{{count}} 個のリソース"
     },
     "auth": {
       "oauth": " (OAuth)",
@@ -131,7 +131,7 @@
       "resources": "リソース:",
       "parameters": "パラメータ:",
       "resource": "リソース",
-      "hidden": "  ... {{count}} 個の{{name}}を非表示"
+      "hidden_other": "{{count}} 個の{{name}}を非表示"
     }
   },
   "agentsStatus": {
@@ -147,7 +147,7 @@
     "title": "使い始めるためのヒント:",
     "tip1": "1. 質問、ファイルの編集、コマンドの実行ができます。",
     "tip2": "2. 最善の結果を得るために、具体的に指示してください。",
-    "tip3_geminiMd": "3. GEMINI.md ファイルを作成して、Gemini とのやり取りをカスタマイズできます。",
+    "tip3_geminiMd": "GEMINI.md ファイルを作成して、Gemini とのやり取りをカスタマイズできます。",
     "tip_help": "{{number}}. 詳細については /help を参照してください。"
   },
   "skillsList": {

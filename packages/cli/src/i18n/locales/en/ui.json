@@ -143,7 +143,8 @@
       "resources": "Resources:",
       "parameters": "Parameters:",
       "resource": "resource",
-      "hidden": "  ... {{count}} {{name}} hidden"
+      "hidden_one": "{{count}} resource hidden",
+      "hidden_other": "{{count}} resources hidden"
     }
   },
   "agentsStatus": {
@@ -159,7 +160,7 @@
     "title": "Tips for getting started:",
     "tip1": "1. Ask questions, edit files, or run commands.",
     "tip2": "2. Be specific for the best results.",
-    "tip3_geminiMd": "3. Create GEMINI.md files to customize your interactions with Gemini.",
+    "tip3_geminiMd": "Create GEMINI.md files to customize your interactions with Gemini.",
     "tip_help": "{{number}}. /help for more information."
   },
   "skillsList": {

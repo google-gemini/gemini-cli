@@ -83,7 +83,7 @@ export const ExtensionsList: React.FC<ExtensionsList> = ({ extensions }) => {
               <Text>
                 <Text color="cyan">{`${ext.name} (v${ext.version})`}</Text>
                 <Text color={activeColor}>{` - ${activeString}`}</Text>
-                {state && <Text color={stateColor}>{` (${stateText})`}</Text>}
+                <Text color={stateColor}>{` (${stateText})`}</Text>
               </Text>
               {ext.resolvedSettings && ext.resolvedSettings.length > 0 && (
                 <Box flexDirection="column" paddingLeft={2}>
@@ -94,7 +94,9 @@ export const ExtensionsList: React.FC<ExtensionsList> = ({ extensions }) => {
                       {setting.scope && (
                         <Text color="gray">
                           {' '}
-                          ({t(`dialogs:scopes.${setting.scope.toLowerCase()}`)}
+                          (
+                          {setting.scope.charAt(0).toUpperCase() +
+                            setting.scope.slice(1)}
                           {setting.source ? ` - ${setting.source}` : ''})
                         </Text>
                       )}
