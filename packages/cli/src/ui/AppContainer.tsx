@@ -134,6 +134,7 @@ import { useSettings } from './contexts/SettingsContext.js';
 import { terminalCapabilityManager } from './utils/terminalCapabilityManager.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { useBanner } from './hooks/useBanner.js';
+import { useNotification } from './hooks/useNotification.js';
 import { useHookDisplayState } from './hooks/useHookDisplayState.js';
 import {
   WARNING_PROMPT_DURATION_MS,
@@ -184,6 +185,9 @@ const SHELL_WIDTH_FRACTION = 0.89;
  */
 const SHELL_HEIGHT_PADDING = 10;
 
+/**
+ * The main application container that sets up contexts and manages global state.
+ */
 export const AppContainer = (props: AppContainerProps) => {
   const { config, initializationResult, resumedSessionData } = props;
   const historyManager = useHistory({
@@ -1127,6 +1131,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   });
 
   const isFocused = useFocus();
+  useNotification(streamingState, isFocused, settings.merged);
 
   // Context file names computation
   const contextFileNames = useMemo(() => {
