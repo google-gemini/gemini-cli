@@ -36,17 +36,26 @@ export const MainContent = () => {
     availableTerminalHeight,
   } = uiState;
 
-  const historyItems = uiState.history.map((h) => (
-    <HistoryItemDisplay
-      terminalWidth={mainAreaWidth}
-      availableTerminalHeight={staticAreaMaxItemHeight}
-      availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
-      key={h.id}
-      item={h}
-      isPending={false}
-      commands={uiState.slashCommands}
-    />
-  ));
+  const historyItems = useMemo(
+    () =>
+      uiState.history.map((h) => (
+        <MemoizedHistoryItemDisplay
+          terminalWidth={mainAreaWidth}
+          availableTerminalHeight={staticAreaMaxItemHeight}
+          availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
+          key={h.id}
+          item={h}
+          isPending={false}
+          commands={uiState.slashCommands}
+        />
+      )),
+    [
+      uiState.history,
+      mainAreaWidth,
+      staticAreaMaxItemHeight,
+      uiState.slashCommands,
+    ],
+  );
 
   const pendingItems = useMemo(
     () => (
@@ -56,7 +65,9 @@ export const MainContent = () => {
             <HistoryItemDisplay
               key={i}
               availableTerminalHeight={
-                uiState.constrainHeight ? availableTerminalHeight : undefined
+                uiState.constrainHeight && !isAlternateBuffer
+                  ? availableTerminalHeight
+                  : undefined
               }
               terminalWidth={mainAreaWidth}
               item={{ ...item, id: 0 }}
@@ -73,6 +84,7 @@ export const MainContent = () => {
     [
       pendingHistoryItems,
       uiState.constrainHeight,
+      isAlternateBuffer,
       availableTerminalHeight,
       mainAreaWidth,
       uiState.isEditorDialogOpen,
@@ -98,7 +110,7 @@ export const MainContent = () => {
         return (
           <MemoizedHistoryItemDisplay
             terminalWidth={mainAreaWidth}
-            availableTerminalHeight={staticAreaMaxItemHeight}
+            availableTerminalHeight={undefined}
             availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
             key={item.item.id}
             item={item.item}
@@ -110,13 +122,7 @@ export const MainContent = () => {
         return pendingItems;
       }
     },
-    [
-      version,
-      mainAreaWidth,
-      staticAreaMaxItemHeight,
-      uiState.slashCommands,
-      pendingItems,
-    ],
+    [version, mainAreaWidth, uiState.slashCommands, pendingItems],
   );
 
   if (isAlternateBuffer) {

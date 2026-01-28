@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { AgentRegistry, getModelConfigAlias } from './registry.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import type { AgentDefinition, LocalAgentDefinition } from './types.js';
-import type { Config } from '../config/config.js';
+import type { Config, GeminiCLIExtension } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 import { A2AClientManager } from './a2a-client-manager.js';
@@ -19,9 +19,12 @@ import {
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
 } from '../config/models.js';
-import * as tomlLoader from './toml-loader.js';
+import * as tomlLoader from './agentLoader.js';
+import { SimpleExtensionLoader } from '../utils/extensionLoader.js';
+import type { ConfigParameters } from '../config/config.js';
+import type { ToolRegistry } from '../tools/tool-registry.js';
 
-vi.mock('./toml-loader.js', () => ({
+vi.mock('./agentLoader.js', () => ({
   loadAgentsFromDirectory: vi
     .fn()
     .mockResolvedValue({ agents: [], errors: [] }),
@@ -32,6 +35,17 @@ vi.mock('./a2a-client-manager.js', () => ({
     getInstance: vi.fn(),
   },
 }));
+
+function makeMockedConfig(params?: Partial<ConfigParameters>): Config {
+  const config = makeFakeConfig(params);
+  vi.spyOn(config, 'getToolRegistry').mockReturnValue({
+    getAllToolNames: () => ['tool1', 'tool2'],
+  } as unknown as ToolRegistry);
+  vi.spyOn(config, 'getAgentRegistry').mockReturnValue({
+    getDirectoryContext: () => 'mock directory context',
+  } as unknown as AgentRegistry);
+  return config;
+}
 
 // A test-only subclass to expose the protected `registerAgent` method.
 class TestableAgentRegistry extends AgentRegistry {
@@ -46,8 +60,18 @@ const MOCK_AGENT_V1: AgentDefinition = {
   name: 'MockAgent',
   description: 'Mock Description V1',
   inputConfig: { inputs: {} },
-  modelConfig: { model: 'test', temp: 0, top_p: 1 },
-  runConfig: { max_time_minutes: 1 },
+  modelConfig: {
+    model: 'test',
+    generateContentConfig: {
+      temperature: 0,
+      topP: 1,
+      thinkingConfig: {
+        includeThoughts: true,
+        thinkingBudget: -1,
+      },
+    },
+  },
+  runConfig: { maxTimeMinutes: 1 },
   promptConfig: { systemPrompt: 'test' },
 };
 
@@ -62,7 +86,7 @@ describe('AgentRegistry', () => {
 
   beforeEach(() => {
     // Default configuration (debugMode: false)
-    mockConfig = makeFakeConfig();
+    mockConfig = makeMockedConfig();
     registry = new TestableAgentRegistry(mockConfig);
     vi.mocked(tomlLoader.loadAgentsFromDirectory).mockResolvedValue({
       agents: [],
@@ -86,7 +110,7 @@ describe('AgentRegistry', () => {
     // });
 
     it('should log the count of loaded agents in debug mode', async () => {
-      const debugConfig = makeFakeConfig({
+      const debugConfig = makeMockedConfig({
         debugMode: true,
         enableAgents: true,
       });
@@ -104,7 +128,7 @@ describe('AgentRegistry', () => {
     });
 
     it('should use preview flash model for codebase investigator if main model is preview pro', async () => {
-      const previewConfig = makeFakeConfig({
+      const previewConfig = makeMockedConfig({
         model: PREVIEW_GEMINI_MODEL,
         codebaseInvestigatorSettings: {
           enabled: true,
@@ -125,7 +149,7 @@ describe('AgentRegistry', () => {
     });
 
     it('should use preview flash model for codebase investigator if main model is preview auto', async () => {
-      const previewConfig = makeFakeConfig({
+      const previewConfig = makeMockedConfig({
         model: PREVIEW_GEMINI_MODEL_AUTO,
         codebaseInvestigatorSettings: {
           enabled: true,
@@ -146,7 +170,7 @@ describe('AgentRegistry', () => {
     });
 
     it('should use the model from the investigator settings', async () => {
-      const previewConfig = makeFakeConfig({
+      const previewConfig = makeMockedConfig({
         model: PREVIEW_GEMINI_MODEL,
         codebaseInvestigatorSettings: {
           enabled: true,
@@ -167,7 +191,7 @@ describe('AgentRegistry', () => {
     });
 
     it('should load agents from user and project directories with correct precedence', async () => {
-      mockConfig = makeFakeConfig({ enableAgents: true });
+      mockConfig = makeMockedConfig({ enableAgents: true });
       registry = new TestableAgentRegistry(mockConfig);
 
       const userAgent = {
@@ -206,7 +230,7 @@ describe('AgentRegistry', () => {
     });
 
     it('should NOT load TOML agents when enableAgents is false', async () => {
-      const disabledConfig = makeFakeConfig({
+      const disabledConfig = makeMockedConfig({
         enableAgents: false,
         codebaseInvestigatorSettings: { enabled: false },
         cliHelpAgentSettings: { enabled: false },
@@ -222,7 +246,7 @@ describe('AgentRegistry', () => {
     });
 
     it('should register CLI help agent by default', async () => {
-      const config = makeFakeConfig();
+      const config = makeMockedConfig();
       const registry = new TestableAgentRegistry(config);
 
       await registry.initialize();
@@ -230,8 +254,8 @@ describe('AgentRegistry', () => {
       expect(registry.getDefinition('cli_help')).toBeDefined();
     });
 
-    it('should NOT register CLI help agent if disabled', async () => {
-      const config = makeFakeConfig({
+    it('should register CLI help agent if disabled', async () => {
+      const config = makeMockedConfig({
         cliHelpAgentSettings: { enabled: false },
       });
       const registry = new TestableAgentRegistry(config);
@@ -239,6 +263,114 @@ describe('AgentRegistry', () => {
       await registry.initialize();
 
       expect(registry.getDefinition('cli_help')).toBeUndefined();
+    });
+
+    it('should NOT register generalist agent by default (because it is experimental)', async () => {
+      const config = makeMockedConfig();
+      const registry = new TestableAgentRegistry(config);
+
+      await registry.initialize();
+
+      expect(registry.getDefinition('generalist')).toBeUndefined();
+    });
+
+    it('should register generalist agent if explicitly enabled via override', async () => {
+      const config = makeMockedConfig({
+        agents: {
+          overrides: {
+            generalist: { enabled: true },
+          },
+        },
+      });
+      const registry = new TestableAgentRegistry(config);
+
+      await registry.initialize();
+
+      expect(registry.getDefinition('generalist')).toBeDefined();
+    });
+
+    it('should NOT register a non-experimental agent if enabled is false', async () => {
+      // CLI help is NOT experimental, but we explicitly disable it via enabled: false
+      const config = makeMockedConfig({
+        agents: {
+          overrides: {
+            cli_help: { enabled: false },
+          },
+        },
+      });
+      const registry = new TestableAgentRegistry(config);
+
+      await registry.initialize();
+
+      expect(registry.getDefinition('cli_help')).toBeUndefined();
+    });
+
+    it('should respect disabled override over enabled override', async () => {
+      const config = makeMockedConfig({
+        agents: {
+          overrides: {
+            generalist: { enabled: true, disabled: true },
+          },
+        },
+      });
+      const registry = new TestableAgentRegistry(config);
+
+      await registry.initialize();
+
+      expect(registry.getDefinition('generalist')).toBeUndefined();
+    });
+
+    it('should load agents from active extensions', async () => {
+      const extensionAgent = {
+        ...MOCK_AGENT_V1,
+        name: 'extension-agent',
+      };
+      const extensions: GeminiCLIExtension[] = [
+        {
+          name: 'test-extension',
+          isActive: true,
+          agents: [extensionAgent],
+          version: '1.0.0',
+          path: '/path/to/extension',
+          contextFiles: [],
+          id: 'test-extension-id',
+        },
+      ];
+      const mockConfig = makeMockedConfig({
+        extensionLoader: new SimpleExtensionLoader(extensions),
+        enableAgents: true,
+      });
+      const registry = new TestableAgentRegistry(mockConfig);
+
+      await registry.initialize();
+
+      expect(registry.getDefinition('extension-agent')).toEqual(extensionAgent);
+    });
+
+    it('should NOT load agents from inactive extensions', async () => {
+      const extensionAgent = {
+        ...MOCK_AGENT_V1,
+        name: 'extension-agent',
+      };
+      const extensions: GeminiCLIExtension[] = [
+        {
+          name: 'test-extension',
+          isActive: false,
+          agents: [extensionAgent],
+          version: '1.0.0',
+          path: '/path/to/extension',
+          contextFiles: [],
+          id: 'test-extension-id',
+        },
+      ];
+      const mockConfig = makeMockedConfig({
+        extensionLoader: new SimpleExtensionLoader(extensions),
+      });
+      const registry = new TestableAgentRegistry(mockConfig);
+
+      await registry.initialize();
+
+      expect(registry.getDefinition('extension-agent')).toBeUndefined();
     });
   });
 
@@ -265,8 +397,8 @@ describe('AgentRegistry', () => {
       ).toStrictEqual({
         model: 'auto',
         generateContentConfig: {
-          temperature: autoAgent.modelConfig.temp,
-          topP: autoAgent.modelConfig.top_p,
+          temperature: autoAgent.modelConfig.generateContentConfig?.temperature,
+          topP: autoAgent.modelConfig.generateContentConfig?.topP,
           thinkingConfig: {
             includeThoughts: true,
             thinkingBudget: -1,
@@ -298,8 +430,9 @@ describe('AgentRegistry', () => {
       ).toStrictEqual({
         model: MOCK_AGENT_V1.modelConfig.model,
         generateContentConfig: {
-          temperature: MOCK_AGENT_V1.modelConfig.temp,
-          topP: MOCK_AGENT_V1.modelConfig.top_p,
+          temperature:
+            MOCK_AGENT_V1.modelConfig.generateContentConfig?.temperature,
+          topP: MOCK_AGENT_V1.modelConfig.generateContentConfig?.topP,
           thinkingConfig: {
             includeThoughts: true,
             thinkingBudget: -1,
@@ -326,7 +459,7 @@ describe('AgentRegistry', () => {
     });
 
     it('should log remote agent registration in debug mode', async () => {
-      const debugConfig = makeFakeConfig({ debugMode: true });
+      const debugConfig = makeMockedConfig({ debugMode: true });
       const debugRegistry = new TestableAgentRegistry(debugConfig);
       const debugLogSpy = vi
         .spyOn(debugLogger, 'log')
@@ -404,7 +537,7 @@ describe('AgentRegistry', () => {
     });
 
     it('should log overwrites when in debug mode', async () => {
-      const debugConfig = makeFakeConfig({ debugMode: true });
+      const debugConfig = makeMockedConfig({ debugMode: true });
       const debugRegistry = new TestableAgentRegistry(debugConfig);
       const debugLogSpy = vi
         .spyOn(debugLogger, 'log')
@@ -446,7 +579,7 @@ describe('AgentRegistry', () => {
 
   describe('reload', () => {
     it('should clear existing agents and reload from directories', async () => {
-      const config = makeFakeConfig({ enableAgents: true });
+      const config = makeMockedConfig({ enableAgents: true });
       const registry = new TestableAgentRegistry(config);
 
       const initialAgent = { ...MOCK_AGENT_V1, name: 'InitialAgent' };
@@ -477,7 +610,7 @@ describe('AgentRegistry', () => {
 
   describe('inheritance and refresh', () => {
     it('should resolve "inherit" to the current model from configuration', async () => {
-      const config = makeFakeConfig({ model: 'current-model' });
+      const config = makeMockedConfig({ model: 'current-model' });
       const registry = new TestableAgentRegistry(config);
 
       const agent: AgentDefinition = {
@@ -494,7 +627,7 @@ describe('AgentRegistry', () => {
     });
 
     it('should update inherited models when the main model changes', async () => {
-      const config = makeFakeConfig({ model: 'initial-model' });
+      const config = makeMockedConfig({ model: 'initial-model' });
       const registry = new TestableAgentRegistry(config);
       await registry.initialize();
 
@@ -565,6 +698,161 @@ describe('AgentRegistry', () => {
       );
     });
   });
+
+  describe('overrides', () => {
+    it('should skip registration if agent is disabled in settings', async () => {
+      const config = makeMockedConfig({
+        agents: {
+          overrides: {
+            MockAgent: { disabled: true },
+          },
+        },
+      });
+      const registry = new TestableAgentRegistry(config);
+
+      await registry.testRegisterAgent(MOCK_AGENT_V1);
+
+      expect(registry.getDefinition('MockAgent')).toBeUndefined();
+    });
+
+    it('should skip remote agent registration if disabled in settings', async () => {
+      const config = makeMockedConfig({
+        agents: {
+          overrides: {
+            RemoteAgent: { disabled: true },
+          },
+        },
+      });
+      const registry = new TestableAgentRegistry(config);
+
+      const remoteAgent: AgentDefinition = {
+        kind: 'remote',
+        name: 'RemoteAgent',
+        description: 'A remote agent',
+        agentCardUrl: 'https://example.com/card',
+        inputConfig: { inputs: {} },
+      };
+
+      await registry.testRegisterAgent(remoteAgent);
+
+      expect(registry.getDefinition('RemoteAgent')).toBeUndefined();
+    });
+
+    it('should merge runConfig overrides', async () => {
+      const config = makeMockedConfig({
+        agents: {
+          overrides: {
+            MockAgent: {
+              runConfig: { maxTurns: 50 },
+            },
+          },
+        },
+      });
+      const registry = new TestableAgentRegistry(config);
+
+      await registry.testRegisterAgent(MOCK_AGENT_V1);
+
+      const def = registry.getDefinition('MockAgent') as LocalAgentDefinition;
+      expect(def.runConfig.maxTurns).toBe(50);
+      expect(def.runConfig.maxTimeMinutes).toBe(
+        MOCK_AGENT_V1.runConfig.maxTimeMinutes,
+      );
+    });
+
+    it('should apply modelConfig overrides', async () => {
+      const config = makeMockedConfig({
+        agents: {
+          overrides: {
+            MockAgent: {
+              modelConfig: {
+                model: 'overridden-model',
+                generateContentConfig: {
+                  temperature: 0.5,
+                },
+              },
+            },
+          },
+        },
+      });
+      const registry = new TestableAgentRegistry(config);
+
+      await registry.testRegisterAgent(MOCK_AGENT_V1);
+
+      const resolved = config.modelConfigService.getResolvedConfig({
+        model: getModelConfigAlias(MOCK_AGENT_V1),
+      });
+
+      expect(resolved.model).toBe('overridden-model');
+      expect(resolved.generateContentConfig.temperature).toBe(0.5);
+      // topP should still be MOCK_AGENT_V1.modelConfig.top_p (1) because we merged
+      expect(resolved.generateContentConfig.topP).toBe(1);
+    });
+
+    it('should deep merge generateContentConfig (e.g. thinkingConfig)', async () => {
+      const config = makeMockedConfig({
+        agents: {
+          overrides: {
+            MockAgent: {
+              modelConfig: {
+                generateContentConfig: {
+                  thinkingConfig: {
+                    thinkingBudget: 16384,
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      const registry = new TestableAgentRegistry(config);
+
+      await registry.testRegisterAgent(MOCK_AGENT_V1);
+
+      const resolved = config.modelConfigService.getResolvedConfig({
+        model: getModelConfigAlias(MOCK_AGENT_V1),
+      });
+
+      expect(resolved.generateContentConfig.thinkingConfig).toEqual({
+        includeThoughts: true, // Preserved from default
+        thinkingBudget: 16384, // Overridden
+      });
+    });
+
+    it('should preserve lazy getters when applying overrides', async () => {
+      let getterCalled = false;
+      const agentWithGetter: LocalAgentDefinition = {
+        ...MOCK_AGENT_V1,
+        name: 'GetterAgent',
+        get toolConfig() {
+          getterCalled = true;
+          return { tools: ['lazy-tool'] };
+        },
+      };
+
+      const config = makeMockedConfig({
+        agents: {
+          overrides: {
+            GetterAgent: {
+              runConfig: { maxTurns: 100 },
+            },
+          },
+        },
+      });
+      const registry = new TestableAgentRegistry(config);
+
+      await registry.testRegisterAgent(agentWithGetter);
+
+      const registeredDef = registry.getDefinition(
+        'GetterAgent',
+      ) as LocalAgentDefinition;
+
+      expect(registeredDef.runConfig.maxTurns).toBe(100);
+      expect(getterCalled).toBe(false); // Getter should not have been called yet
+      expect(registeredDef.toolConfig?.tools).toEqual(['lazy-tool']);
+      expect(getterCalled).toBe(true); // Getter should have been called now
+    });
+  });
+
   describe('getToolDescription', () => {
     it('should return default message when no agents are registered', () => {
       expect(registry.getToolDescription()).toContain(
