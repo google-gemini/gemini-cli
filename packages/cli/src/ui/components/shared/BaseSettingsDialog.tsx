@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Box, Text } from 'ink';
 import chalk from 'chalk';
 import { theme } from '../../semantic-colors.js';
@@ -17,6 +17,7 @@ import {
   cpSlice,
   cpLen,
   stripUnsafeCharacters,
+  cpIndexToOffset,
 } from '../../utils/textUtils.js';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../../keyMatchers.js';
@@ -137,12 +138,38 @@ export function BaseSettingsDialog({
   const [editCursorPos, setEditCursorPos] = useState(0);
   const [cursorVisible, setCursorVisible] = useState(true);
 
-  // Reset active index when items change (e.g., search filter)
+  const prevItemsRef = useRef(items);
+
+  // Preserve focus when items change (e.g., search filter)
   useEffect(() => {
-    if (activeIndex >= items.length) {
-      setActiveIndex(Math.max(0, items.length - 1));
+    const prevItems = prevItemsRef.current;
+    if (prevItems !== items) {
+      const prevActiveItem = prevItems[activeIndex];
+      if (prevActiveItem) {
+        const newIndex = items.findIndex((i) => i.key === prevActiveItem.key);
+        if (newIndex !== -1) {
+          // Item still exists in the filtered list, keep focus on it
+          setActiveIndex(newIndex);
+          // Adjust scroll offset to ensure the item is visible
+          let newScroll = scrollOffset;
+          if (newIndex < scrollOffset) newScroll = newIndex;
+          else if (newIndex >= scrollOffset + maxItemsToShow)
+            newScroll = newIndex - maxItemsToShow + 1;
+
+          const maxScroll = Math.max(0, items.length - maxItemsToShow);
+          setScrollOffset(Math.min(newScroll, maxScroll));
+        } else {
+          // Item was filtered out, reset to the top
+          setActiveIndex(0);
+          setScrollOffset(0);
+        }
+      } else {
+        setActiveIndex(0);
+        setScrollOffset(0);
+      }
+      prevItemsRef.current = items;
     }
-  }, [items.length, activeIndex]);
+  }, [items, activeIndex, scrollOffset, maxItemsToShow]);
 
   // Cursor blink effect
   useEffect(() => {
@@ -532,6 +559,13 @@ export function BaseSettingsDialog({
                                 ? theme.text.secondary
                                 : theme.text.primary
                           }
+                          terminalCursorFocus={
+                            editingKey === item.key && cursorVisible
+                          }
+                          terminalCursorPosition={cpIndexToOffset(
+                            editBuffer,
+                            editCursorPos,
+                          )}
                         >
                           {displayValue}
                         </Text>

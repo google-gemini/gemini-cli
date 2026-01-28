@@ -12,7 +12,7 @@ import { useKeypress } from '../../hooks/useKeypress.js';
 import chalk from 'chalk';
 import { theme } from '../../semantic-colors.js';
 import type { TextBuffer } from './text-buffer.js';
-import { cpSlice } from '../../utils/textUtils.js';
+import { cpSlice, cpIndexToOffset } from '../../utils/textUtils.js';
 
 export interface TextInputProps {
   buffer: TextBuffer;
@@ -64,7 +64,7 @@ export function TextInput({
     return (
       <Box>
         {focus ? (
-          <Text>
+          <Text terminalCursorFocus={focus} terminalCursorPosition={0}>
             {chalk.inverse(placeholder[0] || ' ')}
             <Text color={theme.text.secondary}>{placeholder.slice(1)}</Text>
           </Text>
@@ -96,7 +96,15 @@ export function TextInput({
 
         return (
           <Box key={idx} height={1}>
-            <Text>{lineDisplay}</Text>
+            <Text
+              terminalCursorFocus={isCursorLine}
+              terminalCursorPosition={cpIndexToOffset(
+                lineText,
+                cursorVisualColAbsolute,
+              )}
+            >
+              {lineDisplay}
+            </Text>
           </Box>
         );
       })}
