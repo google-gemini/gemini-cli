@@ -451,7 +451,7 @@ export const useShellCommandProcessor = (
           let finalOutput = mainContent;
           let finalStatus = ToolCallStatus.Success;
 
-          if (result.error) {
+          if (result.error || result.aborted) {
             finalStatus = ToolCallStatus.Canceled;
             finalOutput = `Command was cancelled.\n${finalOutput}`;
           } else if (result.backgrounded) {

@@ -59,8 +59,12 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.MOVE_LEFT,
-      positive: [createKey('left'), createKey('b', { ctrl: true })],
-      negative: [createKey('left', { ctrl: true }), createKey('b')],
+      positive: [createKey('left')],
+      negative: [
+        createKey('left', { ctrl: true }),
+        createKey('b'),
+        createKey('b', { ctrl: true }),
+      ],
     },
     {
       command: Command.MOVE_RIGHT,
