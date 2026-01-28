@@ -10,5 +10,14 @@
       "pending": "Pending",
       "cancelled": "Cancelled"
     }
+  },
+  "compression": {
+    "pending": "Compressing chat history",
+    "success": "Chat history compressed from {{original}} to {{new}} tokens.",
+    "failedSmall": "Compression was not beneficial for this history size.",
+    "failedLarge": "Chat history compression did not reduce size. This may indicate issues with the compression prompt.",
+    "tokenCountError": "Could not compress chat history due to a token counting error.",
+    "emptySummary": "Chat history compression failed: the model returned an empty summary.",
+    "noop": "Nothing to compress."
   }
 }
