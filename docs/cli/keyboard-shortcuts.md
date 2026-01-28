@@ -30,17 +30,17 @@ available combinations.
 
 #### Editing
 
-| Action                                           | Keys                                                      |
-| ------------------------------------------------ | --------------------------------------------------------- |
-| Delete from the cursor to the end of the line.   | `Ctrl + K`                                                |
-| Delete from the cursor to the start of the line. | `Ctrl + U`                                                |
-| Clear all text in the input field.               | `Ctrl + C`                                                |
-| Delete the previous word.                        | `Ctrl + Backspace`<br />`Alt + Backspace`<br />`Ctrl + W` |
-| Delete the next word.                            | `Ctrl + Delete`<br />`Alt + Delete`                       |
-| Delete the character to the left.                | `Backspace`<br />`Ctrl + H`                               |
-| Delete the character to the right.               | `Delete`<br />`Ctrl + D`                                  |
-| Undo the most recent text edit.                  | `Ctrl + Z (no Shift)`                                     |
-| Redo the most recent undone text edit.           | `Shift + Ctrl + Z`                                        |
+| Action                                           | Keys                                                             |
+| ------------------------------------------------ | ---------------------------------------------------------------- |
+| Delete from the cursor to the end of the line.   | `Ctrl + K`                                                       |
+| Delete from the cursor to the start of the line. | `Ctrl + U`                                                       |
+| Clear all text in the input field.               | `Ctrl + C`                                                       |
+| Delete the previous word.                        | `Ctrl + Backspace`<br />`Alt + Backspace`<br />`Ctrl + W`        |
+| Delete the next word.                            | `Ctrl + Delete`<br />`Alt + Delete`                              |
+| Delete the character to the left.                | `Backspace`<br />`Ctrl + H`                                      |
+| Delete the character to the right.               | `Delete`<br />`Ctrl + D`                                         |
+| Undo the most recent text edit.                  | `Cmd + Z (no Shift)`<br />`Alt + Z (no Shift)`                   |
+| Redo the most recent undone text edit.           | `Shift + Ctrl + Z`<br />`Shift + Cmd + Z`<br />`Shift + Alt + Z` |
 
 #### Scrolling
 
@@ -66,12 +66,14 @@ available combinations.
 
 #### Navigation
 
-| Action                           | Keys                                        |
-| -------------------------------- | ------------------------------------------- |
-| Move selection up in lists.      | `Up Arrow (no Shift)`                       |
-| Move selection down in lists.    | `Down Arrow (no Shift)`                     |
-| Move up within dialog options.   | `Up Arrow (no Shift)`<br />`K (no Shift)`   |
-| Move down within dialog options. | `Down Arrow (no Shift)`<br />`J (no Shift)` |
+| Action                                             | Keys                                        |
+| -------------------------------------------------- | ------------------------------------------- |
+| Move selection up in lists.                        | `Up Arrow (no Shift)`                       |
+| Move selection down in lists.                      | `Down Arrow (no Shift)`                     |
+| Move up within dialog options.                     | `Up Arrow (no Shift)`<br />`K (no Shift)`   |
+| Move down within dialog options.                   | `Down Arrow (no Shift)`<br />`J (no Shift)` |
+| Move to the next item or question in a dialog.     | `Tab (no Shift)`                            |
+| Move to the previous item or question in a dialog. | `Shift + Tab`                               |
 
 #### Suggestions & Completions
 
@@ -108,6 +110,7 @@ available combinations.
 | Focus the Gemini input from the shell input.                                                          | `Tab`                      |
 | Clear the terminal screen and redraw the UI.                                                          | `Ctrl + L`                 |
 | Restart the application.                                                                              | `R`                        |
+| Suspend the application (not yet implemented).                                                        | `Ctrl + Z`                 |
 
 <!-- KEYBINDINGS-AUTOGEN:END -->
 

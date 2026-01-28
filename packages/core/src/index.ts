@@ -8,6 +8,7 @@
 export * from './config/config.js';
 export * from './config/defaultModelConfigs.js';
 export * from './config/models.js';
+export * from './config/constants.js';
 export * from './output/types.js';
 export * from './output/json-formatter.js';
 export * from './output/stream-json-formatter.js';
@@ -49,6 +50,7 @@ export * from './code_assist/server.js';
 export * from './code_assist/setup.js';
 export * from './code_assist/types.js';
 export * from './code_assist/telemetry.js';
+export * from './code_assist/admin/admin_controls.js';
 export * from './core/apiKeyCredentialStorage.js';
 
 // Export utilities

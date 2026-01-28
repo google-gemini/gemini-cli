@@ -13,6 +13,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { ApprovalMode } from '../policy/types.js';
 import type { HookDefinition } from '../hooks/types.js';
 import { HookType, HookEventName } from '../hooks/types.js';
+import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryTool.js';
@@ -137,6 +138,8 @@ vi.mock('../services/gitService.js', () => {
   GitServiceMock.prototype.initialize = vi.fn();
   return { GitService: GitServiceMock };
 });
+
+vi.mock('../services/fileDiscoveryService.js');
 
 vi.mock('../ide/ide-client.js', () => ({
   IdeClient: {
@@ -623,6 +626,30 @@ describe('Server Config (config.ts)', () => {
     expect(config.getFileFilteringRespectGitIgnore()).toBe(false);
   });
 
+  it('should set customIgnoreFilePaths from params', () => {
+    const params: ConfigParameters = {
+      ...baseParams,
+      fileFiltering: {
+        customIgnoreFilePaths: ['/path/to/ignore/file'],
+      },
+    };
+    const config = new Config(params);
+    expect(config.getCustomIgnoreFilePaths()).toStrictEqual([
+      '/path/to/ignore/file',
+    ]);
+  });
+
+  it('should set customIgnoreFilePaths to empty array if not provided', () => {
+    const params: ConfigParameters = {
+      ...baseParams,
+      fileFiltering: {
+        respectGitIgnore: true,
+      },
+    };
+    const config = new Config(params);
+    expect(config.getCustomIgnoreFilePaths()).toStrictEqual([]);
+  });
+
   it('should initialize WorkspaceContext with includeDirectories', () => {
     const includeDirectories = ['dir1', 'dir2'];
     const paramsWithIncludeDirs: ConfigParameters = {
@@ -697,6 +724,29 @@ describe('Server Config (config.ts)', () => {
     const config = new Config(baseParams);
     const fileService = config.getFileService();
     expect(fileService).toBeDefined();
+  });
+
+  it('should pass file filtering options to FileDiscoveryService', () => {
+    const configParams = {
+      ...baseParams,
+      fileFiltering: {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+        customIgnoreFilePaths: ['.myignore'],
+      },
+    };
+
+    const config = new Config(configParams);
+    config.getFileService();
+
+    expect(FileDiscoveryService).toHaveBeenCalledWith(
+      path.resolve(TARGET_DIR),
+      {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+        customIgnoreFilePaths: ['.myignore'],
+      },
+    );
   });
 
   describe('Usage Statistics', () => {

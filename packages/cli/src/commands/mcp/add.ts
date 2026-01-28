@@ -128,6 +128,13 @@ async function addMcpServer(
 
   settings.setValue(settingsScope, 'mcpServers', mcpServers);
 
+  if (transport === 'stdio') {
+    debugLogger.warn(
+      'Security Warning: Running MCP servers with stdio transport can expose inherited environment variables. ' +
+        'While the Gemini CLI redacts common API keys and secrets by default, you should only run servers from trusted sources.',
+    );
+  }
+
   if (isExistingServer) {
     debugLogger.log(`MCP server "${name}" updated in ${scope} settings.`);
   } else {

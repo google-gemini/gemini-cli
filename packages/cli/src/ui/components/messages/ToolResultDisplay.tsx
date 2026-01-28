@@ -16,7 +16,7 @@ import { useUIState } from '../../contexts/UIStateContext.js';
 import { tryParseJSON } from '../../../utils/jsonoutput.js';
 
 const STATIC_HEIGHT = 1;
-const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
+const RESERVED_LINE_COUNT = 6; // for tool name, status, padding, and 'ShowMoreLines' hint
 const MIN_LINES_SHOWN = 2; // show at least this many lines
 
 // Large threshold to ensure we don't cause performance issues for very large

@@ -8,7 +8,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as dotenv from 'dotenv';
 
-import type { TelemetryTarget } from '@google/gemini-cli-core';
+import type {
+  FetchAdminControlsResponse,
+  TelemetryTarget,
+} from '@google/gemini-cli-core';
 import {
   AuthType,
   Config,
@@ -24,6 +27,10 @@ import {
   PREVIEW_GEMINI_MODEL,
   homedir,
   GitService,
+  coreEvents,
+  fetchAdminControls,
+  getCodeAssistServer,
+  ExperimentFlags,
 } from '@google/gemini-cli-core';
 
 import { logger } from '../utils/logger.js';
@@ -104,8 +111,15 @@ export async function loadConfig(
     // Git-aware file filtering settings
     fileFiltering: {
       respectGitIgnore: settings.fileFiltering?.respectGitIgnore,
+      respectGeminiIgnore: settings.fileFiltering?.respectGeminiIgnore,
       enableRecursiveFileSearch:
         settings.fileFiltering?.enableRecursiveFileSearch,
+      customIgnoreFilePaths: [
+        ...(settings.fileFiltering?.customIgnoreFilePaths || []),
+        ...(process.env['CUSTOM_IGNORE_FILE_PATHS']
+          ? process.env['CUSTOM_IGNORE_FILE_PATHS'].split(path.delimiter)
+          : []),
+      ],
     },
     ideMode: false,
     folderTrust,
@@ -118,7 +132,11 @@ export async function loadConfig(
     ptyInfo: 'auto',
   };
 
-  const fileService = new FileDiscoveryService(workspaceDir);
+  const fileService = new FileDiscoveryService(workspaceDir, {
+    respectGitIgnore: configParams?.fileFiltering?.respectGitIgnore,
+    respectGeminiIgnore: configParams?.fileFiltering?.respectGeminiIgnore,
+    customIgnoreFilePaths: configParams?.fileFiltering?.customIgnoreFilePaths,
+  });
   const { memoryContent, fileCount, filePaths } =
     await loadServerHierarchicalMemory(
       workspaceDir,
@@ -134,6 +152,21 @@ export async function loadConfig(
   const config = new Config({
     ...configParams,
   });
+  const codeAssistServer = getCodeAssistServer(config);
+  const adminControlsEnabled =
+    config.getExperiments()?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]
+      ?.boolValue ?? false;
+  const adminSettings = await fetchAdminControls(
+    codeAssistServer,
+    config.getRemoteAdminSettings(),
+    adminControlsEnabled,
+    (newSettings: FetchAdminControlsResponse) => {
+      config.setRemoteAdminSettings(newSettings);
+      coreEvents.emitAdminSettingsChanged();
+    },
+  );
+  config.setRemoteAdminSettings(adminSettings);
+
   // Needed to initialize ToolRegistry, and git checkpointing if enabled
   await config.initialize();
   startupProfiler.flush(config);
