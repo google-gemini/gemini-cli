@@ -361,10 +361,9 @@ export class LoadedSettings {
     admin.extensions = {
       enabled: cliFeatureSetting?.extensionsSetting?.extensionsEnabled ?? false,
     };
-
-    if (cliFeatureSetting?.advancedFeaturesEnabled !== undefined) {
-      admin.skills = { enabled: cliFeatureSetting.advancedFeaturesEnabled };
-    }
+    admin.skills = {
+      enabled: cliFeatureSetting?.unmanagedCapabilitiesEnabled ?? false,
+    };
 
     this._remoteAdminSettings = { admin };
     this._merged = this.computeMergedSettings();
