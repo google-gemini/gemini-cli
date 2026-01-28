@@ -279,5 +279,9 @@
   "terminalSetup.responses": {
     "restartRequired": "\n\nPlease restart your terminal for the changes to take effect.",
     "failed": "Failed to configure terminal: {{error}}"
+  },
+  "vim.responses": {
+    "entered": "Entered Vim mode. Run /vim again to exit.",
+    "exited": "Exited Vim mode."
   }
 }

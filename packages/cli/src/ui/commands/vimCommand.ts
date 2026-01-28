@@ -6,6 +6,7 @@
 
 import type { SlashCommand } from './types.js';
 import { CommandKind } from './types.js';
+import { t } from '../../i18n/index.js';
 
 export const vimCommand: SlashCommand = {
   name: 'vim',
@@ -16,8 +17,8 @@ export const vimCommand: SlashCommand = {
     const newVimState = await context.ui.toggleVimEnabled();
 
     const message = newVimState
-      ? 'Entered Vim mode. Run /vim again to exit.'
-      : 'Exited Vim mode.';
+      ? t('commands:vim.responses.entered')
+      : t('commands:vim.responses.exited');
     return {
       type: 'message',
       messageType: 'info',
