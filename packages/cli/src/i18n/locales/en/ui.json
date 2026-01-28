@@ -154,6 +154,27 @@
     "disabledTitle": "Disabled Skills:",
     "noSkills": "No skills available"
   },
+  "hooksList": {
+    "noHooks": "No hooks configured.",
+    "securityWarning": {
+      "title": "⚠️ Security Warning:",
+      "body": "Hooks can execute arbitrary commands on your system. Only use hooks from sources you trust. Review hook scripts carefully."
+    },
+    "learnMore": "Learn more: ",
+    "configuredHooks": "Configured Hooks:",
+    "status": {
+      "enabled": "enabled",
+      "disabled": "disabled"
+    },
+    "labels": {
+      "source": "Source: ",
+      "command": " | Command: ",
+      "matcher": " | Matcher: ",
+      "sequential": " | Sequential",
+      "timeout": " | Timeout: {{seconds}}s"
+    },
+    "tip": "Tip: Use /hooks enable <hook-name> or /hooks disable <hook-name> to toggle individual hooks. Use /hooks enable-all or /hooks disable-all to toggle all hooks at once."
+  },
   "screenReader": {
     "userPrefix": "User: ",
     "modelPrefix": "Model: ",

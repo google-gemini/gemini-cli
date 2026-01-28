@@ -142,6 +142,27 @@
     "disabledTitle": "無効なスキル:",
     "noSkills": "利用可能なスキルはありません"
   },
+  "hooksList": {
+    "noHooks": "設定されているフックはありません。",
+    "securityWarning": {
+      "title": "⚠️ セキュリティ警告:",
+      "body": "フックはシステム上で任意のコマンドを実行できます。信頼できるソースからのフックのみを使用してください。フックスクリプトを注意深く確認してください。"
+    },
+    "learnMore": "詳細: ",
+    "configuredHooks": "設定済みのフック:",
+    "status": {
+      "enabled": "有効",
+      "disabled": "無効"
+    },
+    "labels": {
+      "source": "ソース: ",
+      "command": " | コマンド: ",
+      "matcher": " | マッチャー: ",
+      "sequential": " | 逐次実行",
+      "timeout": " | タイムアウト: {{seconds}}秒"
+    },
+    "tip": "ヒント: /hooks enable <hook-name> または /hooks disable <hook-name> を使用して個別のフックを切り替えます。/hooks enable-all または /hooks disable-all を使用してすべてのフックを一括で切り替えます。"
+  },
   "screenReader": {
     "userPrefix": "ユーザー: ",
     "modelPrefix": "モデル: ",
