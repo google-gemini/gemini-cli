@@ -4,7 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as os from 'node:os';
 import { inspect } from 'node:util';
 import process from 'node:process';
 import type {
@@ -31,6 +33,7 @@ import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
+import { AskUserTool } from '../tools/ask-user.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { HookDefinition, HookEventName } from '../hooks/types.js';
@@ -100,6 +103,7 @@ import type { FetchAdminControlsResponse } from '../code_assist/types.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
+import { AcknowledgedAgentsService } from '../agents/acknowledgedAgents.js';
 import { setGlobalProxy } from '../utils/fetch.js';
 import { SubagentTool } from '../agents/subagent-tool.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
@@ -113,6 +117,7 @@ import {
   logApprovalModeDuration,
 } from '../telemetry/loggers.js';
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
+import { isSubpath } from '../utils/paths.js';
 
 export interface AccessibilitySettings {
   enableLoadingPhrases?: boolean;
@@ -323,6 +328,7 @@ export interface ConfigParameters {
     enableFuzzySearch?: boolean;
     maxFileCount?: number;
     searchTimeout?: number;
+    customIgnoreFilePaths?: string[];
   };
   checkpointing?: boolean;
   proxy?: string;
@@ -354,6 +360,7 @@ export interface ConfigParameters {
   compressionThreshold?: number;
   interactive?: boolean;
   trustedFolder?: boolean;
+  useBackgroundColor?: boolean;
   useRipgrep?: boolean;
   enableInteractiveShell?: boolean;
   skipNextSpeakerCheck?: boolean;
@@ -416,6 +423,7 @@ export class Config {
   private promptRegistry!: PromptRegistry;
   private resourceRegistry!: ResourceRegistry;
   private agentRegistry!: AgentRegistry;
+  private readonly acknowledgedAgentsService: AcknowledgedAgentsService;
   private skillManager!: SkillManager;
   private sessionId: string;
   private clientVersion: string;
@@ -458,6 +466,7 @@ export class Config {
     enableFuzzySearch: boolean;
     maxFileCount: number;
     searchTimeout: number;
+    customIgnoreFilePaths: string[];
   };
   private fileDiscoveryService: FileDiscoveryService | null = null;
   private gitService: GitService | undefined = undefined;
@@ -491,12 +500,14 @@ export class Config {
   private readonly importFormat: 'tree' | 'flat';
   private readonly discoveryMaxDirs: number;
   private readonly compressionThreshold: number | undefined;
-  private readonly interactive: boolean;
+  /** Public for testing only */
+  readonly interactive: boolean;
   private readonly ptyInfo: string;
   private readonly trustedFolder: boolean | undefined;
   private readonly useRipgrep: boolean;
   private readonly enableInteractiveShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
+  private readonly useBackgroundColor: boolean;
   private shellExecutionConfig: ShellExecutionConfig;
   private readonly extensionManagement: boolean = true;
   private readonly enablePromptCompletion: boolean = false;
@@ -622,6 +633,7 @@ export class Config {
         params.fileFiltering?.searchTimeout ??
         DEFAULT_FILE_FILTERING_OPTIONS.searchTimeout ??
         5000,
+      customIgnoreFilePaths: params.fileFiltering?.customIgnoreFilePaths ?? [],
     };
     this.checkpointing = params.checkpointing ?? false;
     this.proxy = params.proxy;
@@ -635,7 +647,7 @@ export class Config {
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? false;
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
-    this.skillsSupport = params.skillsSupport ?? false;
+    this.skillsSupport = params.skillsSupport ?? true;
     this.disabledSkills = params.disabledSkills ?? [];
     this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
     this.modelAvailabilityService = new ModelAvailabilityService();
@@ -663,6 +675,7 @@ export class Config {
     this.ptyInfo = params.ptyInfo ?? 'child_process';
     this.trustedFolder = params.trustedFolder;
     this.useRipgrep = params.useRipgrep ?? true;
+    this.useBackgroundColor = params.useBackgroundColor ?? true;
     this.enableInteractiveShell = params.enableInteractiveShell ?? false;
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? true;
     this.shellExecutionConfig = {
@@ -694,6 +707,7 @@ export class Config {
     this.extensionManagement = params.extensionManagement ?? true;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
     this.storage = new Storage(this.targetDir);
+
     this.fakeResponses = params.fakeResponses;
     this.recordResponses = params.recordResponses;
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
@@ -705,6 +719,7 @@ export class Config {
         params.approvalMode ?? params.policyEngineConfig?.approvalMode,
     });
     this.messageBus = new MessageBus(this.policyEngine, this.debugMode);
+    this.acknowledgedAgentsService = new AcknowledgedAgentsService();
     this.skillManager = new SkillManager();
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
@@ -791,6 +806,13 @@ export class Config {
       this.workspaceContext.addDirectory(dir);
     }
 
+    // Add plans directory to workspace context for plan file storage
+    if (this.planEnabled) {
+      const plansDir = this.storage.getProjectTempPlansDir();
+      await fs.promises.mkdir(plansDir, { recursive: true });
+      this.workspaceContext.addDirectory(plansDir);
+    }
+
     // Initialize centralized FileDiscoveryService
     const discoverToolsHandle = startupProfiler.start('discover_tools');
     this.getFileService();
@@ -815,12 +837,20 @@ export class Config {
     );
     // We do not await this promise so that the CLI can start up even if
     // MCP servers are slow to connect.
-    Promise.all([
+    const mcpInitialization = Promise.allSettled([
       this.mcpClientManager.startConfiguredMcpServers(),
       this.getExtensionLoader().start(this),
-    ]).catch((error) => {
-      debugLogger.error('Error initializing MCP clients:', error);
+    ]).then((results) => {
+      for (const result of results) {
+        if (result.status === 'rejected') {
+          debugLogger.error('Error initializing MCP clients:', result.reason);
+        }
+      }
     });
+
+    if (!this.interactive) {
+      await mcpInitialization;
+    }
 
     if (this.skillsSupport) {
       this.getSkillManager().setAdminSettings(this.adminSkillsEnabled);
@@ -953,6 +983,11 @@ export class Config {
 
   getUserTier(): UserTierId | undefined {
     return this.contentGenerator?.userTier;
+  }
+
+  getUserTierName(): string | undefined {
+    // TODO(#1275): Re-enable user tier display when ready.
+    return undefined;
   }
 
   /**
@@ -1123,6 +1158,10 @@ export class Config {
 
   getAgentRegistry(): AgentRegistry {
     return this.agentRegistry;
+  }
+
+  getAcknowledgedAgentsService(): AcknowledgedAgentsService {
+    return this.acknowledgedAgentsService;
   }
 
   getToolRegistry(): ToolRegistry {
@@ -1309,7 +1348,7 @@ export class Config {
     }
     if (this.geminiClient?.isInitialized()) {
       await this.geminiClient.setTools();
-      await this.geminiClient.updateSystemInstruction();
+      this.geminiClient.updateSystemInstruction();
     }
   }
 
@@ -1377,6 +1416,13 @@ export class Config {
     }
 
     this.policyEngine.setApprovalMode(mode);
+
+    const isPlanModeTransition =
+      currentMode !== mode &&
+      (currentMode === ApprovalMode.PLAN || mode === ApprovalMode.PLAN);
+    if (isPlanModeTransition) {
+      this.updateSystemInstructionIfInitialized();
+    }
   }
 
   /**
@@ -1459,10 +1505,10 @@ export class Config {
    * Updates the system instruction with the latest user memory.
    * Whenever the user memory (GEMINI.md files) is updated.
    */
-  async updateSystemInstructionIfInitialized(): Promise<void> {
+  updateSystemInstructionIfInitialized(): void {
     const geminiClient = this.getGeminiClient();
     if (geminiClient?.isInitialized()) {
-      await geminiClient.updateSystemInstruction();
+      geminiClient.updateSystemInstruction();
     }
   }
 
@@ -1485,8 +1531,13 @@ export class Config {
   getFileFilteringRespectGitIgnore(): boolean {
     return this.fileFiltering.respectGitIgnore;
   }
+
   getFileFilteringRespectGeminiIgnore(): boolean {
     return this.fileFiltering.respectGeminiIgnore;
+  }
+
+  getCustomIgnoreFilePaths(): string[] {
+    return this.fileFiltering.customIgnoreFilePaths;
   }
 
   getFileFilteringOptions(): FileFilteringOptions {
@@ -1495,6 +1546,7 @@ export class Config {
       respectGeminiIgnore: this.fileFiltering.respectGeminiIgnore,
       maxFileCount: this.fileFiltering.maxFileCount,
       searchTimeout: this.fileFiltering.searchTimeout,
+      customIgnoreFilePaths: this.fileFiltering.customIgnoreFilePaths,
     };
   }
 
@@ -1531,7 +1583,11 @@ export class Config {
 
   getFileService(): FileDiscoveryService {
     if (!this.fileDiscoveryService) {
-      this.fileDiscoveryService = new FileDiscoveryService(this.targetDir);
+      this.fileDiscoveryService = new FileDiscoveryService(this.targetDir, {
+        respectGitIgnore: this.fileFiltering.respectGitIgnore,
+        respectGeminiIgnore: this.fileFiltering.respectGeminiIgnore,
+        customIgnoreFilePaths: this.fileFiltering.customIgnoreFilePaths,
+      });
     }
     return this.fileDiscoveryService;
   }
@@ -1646,6 +1702,57 @@ export class Config {
    */
   getFileSystemService(): FileSystemService {
     return this.fileSystemService;
+  }
+
+  /**
+   * Checks if a given absolute path is allowed for file system operations.
+   * A path is allowed if it's within the workspace context or the project's temporary directory.
+   *
+   * @param absolutePath The absolute path to check.
+   * @returns true if the path is allowed, false otherwise.
+   */
+  isPathAllowed(absolutePath: string): boolean {
+    if (this.interactive && path.isAbsolute(absolutePath)) {
+      return true;
+    }
+
+    const realpath = (p: string) => {
+      let resolved: string;
+      try {
+        resolved = fs.realpathSync(p);
+      } catch {
+        resolved = path.resolve(p);
+      }
+      return os.platform() === 'win32' ? resolved.toLowerCase() : resolved;
+    };
+
+    const resolvedPath = realpath(absolutePath);
+
+    const workspaceContext = this.getWorkspaceContext();
+    if (workspaceContext.isPathWithinWorkspace(resolvedPath)) {
+      return true;
+    }
+
+    const projectTempDir = this.storage.getProjectTempDir();
+    const resolvedTempDir = realpath(projectTempDir);
+
+    return isSubpath(resolvedTempDir, resolvedPath);
+  }
+
+  /**
+   * Validates if a path is allowed and returns a detailed error message if not.
+   *
+   * @param absolutePath The absolute path to validate.
+   * @returns An error message string if the path is disallowed, null otherwise.
+   */
+  validatePathAccess(absolutePath: string): string | null {
+    if (this.isPathAllowed(absolutePath)) {
+      return null;
+    }
+
+    const workspaceDirs = this.getWorkspaceContext().getDirectories();
+    const projectTempDir = this.storage.getProjectTempDir();
+    return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
   }
 
   /**
@@ -1771,7 +1878,7 @@ export class Config {
     }
 
     // Notify the client that system instructions might need updating
-    await this.updateSystemInstructionIfInitialized();
+    this.updateSystemInstructionIfInitialized();
   }
 
   /**
@@ -1792,6 +1899,10 @@ export class Config {
 
   getUseRipgrep(): boolean {
     return this.useRipgrep;
+  }
+
+  getUseBackgroundColor(): boolean {
+    return this.useBackgroundColor;
   }
 
   getEnableInteractiveShell(): boolean {
@@ -1962,6 +2073,7 @@ export class Config {
     registerCoreTool(ShellTool, this);
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
+    registerCoreTool(AskUserTool);
     if (this.getUseWriteTodos()) {
       registerCoreTool(WriteTodosTool);
     }
@@ -2106,7 +2218,7 @@ export class Config {
     const client = this.getGeminiClient();
     if (client?.isInitialized()) {
       await client.setTools();
-      await client.updateSystemInstruction();
+      client.updateSystemInstruction();
     } else {
       debugLogger.debug(
         '[Config] GeminiClient not initialized; skipping live prompt/tool refresh.',

@@ -34,6 +34,10 @@ export type EvalPolicy = 'ALWAYS_PASSES' | 'USUALLY_PASSES';
 export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
   const fn = async () => {
     const rig = new TestRig();
+    const { logDir, sanitizedName } = await prepareLogDir(evalCase.name);
+    const activityLogFile = path.join(logDir, `${sanitizedName}.jsonl`);
+    const logFile = path.join(logDir, `${sanitizedName}.log`);
+    let isSuccess = false;
     try {
       rig.setup(evalCase.name, evalCase.params);
 
@@ -62,6 +66,9 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
       const result = await rig.run({
         args: evalCase.prompt,
         approvalMode: evalCase.approvalMode ?? 'yolo',
+        env: {
+          GEMINI_CLI_ACTIVITY_LOG_FILE: activityLogFile,
+        },
       });
 
       const unauthorizedErrorPrefix =
@@ -73,9 +80,16 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
       }
 
       await evalCase.assert(rig, result);
+      isSuccess = true;
     } finally {
-      await logToFile(
-        evalCase.name,
+      if (isSuccess) {
+        await fs.promises.unlink(activityLogFile).catch((err) => {
+          if (err.code !== 'ENOENT') throw err;
+        });
+      }
+
+      await fs.promises.writeFile(
+        logFile,
         JSON.stringify(rig.readToolLogs(), null, 2),
       );
       await rig.cleanup();
@@ -89,6 +103,13 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
   }
 }
 
+async function prepareLogDir(name: string) {
+  const logDir = 'evals/logs';
+  await fs.promises.mkdir(logDir, { recursive: true });
+  const sanitizedName = name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+  return { logDir, sanitizedName };
+}
+
 export interface EvalCase {
   name: string;
   params?: Record<string, any>;
@@ -96,12 +117,4 @@ export interface EvalCase {
   files?: Record<string, string>;
   approvalMode?: 'default' | 'auto_edit' | 'yolo' | 'plan';
   assert: (rig: TestRig, result: string) => Promise<void>;
-}
-
-async function logToFile(name: string, content: string) {
-  const logDir = 'evals/logs';
-  await fs.promises.mkdir(logDir, { recursive: true });
-  const sanitizedName = name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-  const logFile = `${logDir}/${sanitizedName}.log`;
-  await fs.promises.writeFile(logFile, content);
 }

@@ -454,4 +454,159 @@ describe('ChatRecordingService', () => {
       expect(writeFileSyncSpy).not.toHaveBeenCalled();
     });
   });
+
+  describe('ENOSPC (disk full) graceful degradation - issue #16266', () => {
+    it('should disable recording and not throw when ENOSPC occurs during initialize', () => {
+      const enospcError = new Error('ENOSPC: no space left on device');
+      (enospcError as NodeJS.ErrnoException).code = 'ENOSPC';
+
+      mkdirSyncSpy.mockImplementation(() => {
+        throw enospcError;
+      });
+
+      // Should not throw
+      expect(() => chatRecordingService.initialize()).not.toThrow();
+
+      // Recording should be disabled (conversationFile set to null)
+      expect(chatRecordingService.getConversationFilePath()).toBeNull();
+    });
+
+    it('should disable recording and not throw when ENOSPC occurs during writeConversation', () => {
+      chatRecordingService.initialize();
+
+      const enospcError = new Error('ENOSPC: no space left on device');
+      (enospcError as NodeJS.ErrnoException).code = 'ENOSPC';
+
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(
+        JSON.stringify({
+          sessionId: 'test-session-id',
+          projectHash: 'test-project-hash',
+          messages: [],
+        }),
+      );
+
+      writeFileSyncSpy.mockImplementation(() => {
+        throw enospcError;
+      });
+
+      // Should not throw when recording a message
+      expect(() =>
+        chatRecordingService.recordMessage({
+          type: 'user',
+          content: 'Hello',
+          model: 'gemini-pro',
+        }),
+      ).not.toThrow();
+
+      // Recording should be disabled (conversationFile set to null)
+      expect(chatRecordingService.getConversationFilePath()).toBeNull();
+    });
+
+    it('should skip recording operations when recording is disabled', () => {
+      chatRecordingService.initialize();
+
+      const enospcError = new Error('ENOSPC: no space left on device');
+      (enospcError as NodeJS.ErrnoException).code = 'ENOSPC';
+
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(
+        JSON.stringify({
+          sessionId: 'test-session-id',
+          projectHash: 'test-project-hash',
+          messages: [],
+        }),
+      );
+
+      // First call throws ENOSPC
+      writeFileSyncSpy.mockImplementationOnce(() => {
+        throw enospcError;
+      });
+
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'First message',
+        model: 'gemini-pro',
+      });
+
+      // Reset mock to track subsequent calls
+      writeFileSyncSpy.mockClear();
+
+      // Subsequent calls should be no-ops (not call writeFileSync)
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Second message',
+        model: 'gemini-pro',
+      });
+
+      chatRecordingService.recordThought({
+        subject: 'Test',
+        description: 'Test thought',
+      });
+
+      chatRecordingService.saveSummary('Test summary');
+
+      // writeFileSync should not have been called for any of these
+      expect(writeFileSyncSpy).not.toHaveBeenCalled();
+    });
+
+    it('should return null from getConversation when recording is disabled', () => {
+      chatRecordingService.initialize();
+
+      const enospcError = new Error('ENOSPC: no space left on device');
+      (enospcError as NodeJS.ErrnoException).code = 'ENOSPC';
+
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(
+        JSON.stringify({
+          sessionId: 'test-session-id',
+          projectHash: 'test-project-hash',
+          messages: [],
+        }),
+      );
+
+      writeFileSyncSpy.mockImplementation(() => {
+        throw enospcError;
+      });
+
+      // Trigger ENOSPC
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Hello',
+        model: 'gemini-pro',
+      });
+
+      // getConversation should return null when disabled
+      expect(chatRecordingService.getConversation()).toBeNull();
+      expect(chatRecordingService.getConversationFilePath()).toBeNull();
+    });
+
+    it('should still throw for non-ENOSPC errors', () => {
+      chatRecordingService.initialize();
+
+      const otherError = new Error('Permission denied');
+      (otherError as NodeJS.ErrnoException).code = 'EACCES';
+
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(
+        JSON.stringify({
+          sessionId: 'test-session-id',
+          projectHash: 'test-project-hash',
+          messages: [],
+        }),
+      );
+
+      writeFileSyncSpy.mockImplementation(() => {
+        throw otherError;
+      });
+
+      // Should throw for non-ENOSPC errors
+      expect(() =>
+        chatRecordingService.recordMessage({
+          type: 'user',
+          content: 'Hello',
+          model: 'gemini-pro',
+        }),
+      ).toThrow('Permission denied');
+
+      // Recording should NOT be disabled for non-ENOSPC errors (file path still exists)
+      expect(chatRecordingService.getConversationFilePath()).not.toBeNull();
+    });
+  });
 });

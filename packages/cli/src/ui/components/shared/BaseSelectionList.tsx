@@ -31,6 +31,8 @@ export interface BaseSelectionListProps<
   showScrollArrows?: boolean;
   maxItemsToShow?: number;
   wrapAround?: boolean;
+  focusKey?: string;
+  priority?: boolean;
   renderItem: (item: TItem, context: RenderItemContext) => React.ReactNode;
 }
 
@@ -61,6 +63,8 @@ export function BaseSelectionList<
   showScrollArrows = false,
   maxItemsToShow = 10,
   wrapAround = true,
+  focusKey,
+  priority,
   renderItem,
 }: BaseSelectionListProps<T, TItem>): React.JSX.Element {
   const { activeIndex } = useSelectionList({
@@ -71,6 +75,8 @@ export function BaseSelectionList<
     isFocused,
     showNumbers,
     wrapAround,
+    focusKey,
+    priority,
   });
 
   const [scrollOffset, setScrollOffset] = useState(0);
@@ -143,7 +149,7 @@ export function BaseSelectionList<
             </Box>
 
             {/* Item number */}
-            {showNumbers && (
+            {showNumbers && !item.hideNumber && (
               <Box
                 marginRight={1}
                 flexShrink={0}

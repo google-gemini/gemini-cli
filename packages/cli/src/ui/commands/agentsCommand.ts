@@ -252,10 +252,16 @@ async function configAction(
     };
   }
 
+  const displayName = definition.displayName || agentName;
+
   return {
-    type: 'message',
-    messageType: 'info',
-    content: `Configuration for '${agentName}' will be available in the next update.`,
+    type: 'dialog',
+    dialog: 'agentConfig',
+    props: {
+      name: agentName,
+      displayName,
+      definition,
+    },
   };
 }
 

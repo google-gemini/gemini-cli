@@ -57,7 +57,9 @@ vi.mock('fs', async (importOriginal) => {
 
   return {
     ...actualFs,
-    mkdirSync: vi.fn(),
+    mkdirSync: vi.fn((p) => {
+      mockPaths.add(p.toString());
+    }),
     writeFileSync: vi.fn(),
     existsSync: vi.fn((p) => mockPaths.has(p.toString())),
     statSync: vi.fn((p) => {
@@ -124,10 +126,12 @@ vi.mock('@google/gemini-cli-core', async () => {
     DEFAULT_MEMORY_FILE_FILTERING_OPTIONS: {
       respectGitIgnore: false,
       respectGeminiIgnore: true,
+      customIgnoreFilePaths: [],
     },
     DEFAULT_FILE_FILTERING_OPTIONS: {
       respectGitIgnore: true,
       respectGeminiIgnore: true,
+      customIgnoreFilePaths: [],
     },
     createPolicyEngineConfig: vi.fn(async () => ({
       rules: [],
@@ -584,7 +588,7 @@ describe('parseArguments', () => {
     process.argv = ['node', 'script.js', 'skills', 'list'];
     // Skills command enabled by default or via experimental
     const settings = createTestMergedSettings({
-      experimental: { skills: true },
+      skills: { enabled: true },
     });
     const argv = await parseArguments(settings);
     expect(argv.isCommand).toBe(true);
@@ -701,6 +705,9 @@ describe('loadCliConfig', () => {
     );
     expect(config.getFileFilteringRespectGeminiIgnore()).toBe(
       DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
+    );
+    expect(config.getCustomIgnoreFilePaths()).toEqual(
+      DEFAULT_FILE_FILTERING_OPTIONS.customIgnoreFilePaths,
     );
     expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
   });
@@ -2233,6 +2240,19 @@ describe('loadCliConfig approval mode', () => {
     expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.PLAN);
   });
 
+  it('should ignore "yolo" in settings.tools.approvalMode and fall back to DEFAULT', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings = createTestMergedSettings({
+      tools: {
+        // @ts-expect-error: testing invalid value
+        approvalMode: 'yolo',
+      },
+    });
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
+  });
+
   it('should throw error when --approval-mode=plan is used but experimental.plan is disabled', async () => {
     process.argv = ['node', 'script.js', '--approval-mode', 'plan'];
     const argv = await parseArguments(createTestMergedSettings());
@@ -2308,6 +2328,67 @@ describe('loadCliConfig approval mode', () => {
         argv,
       );
       expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
+    });
+  });
+
+  describe('Persistent approvalMode setting', () => {
+    it('should use approvalMode from settings when no CLI flags are set', async () => {
+      process.argv = ['node', 'script.js'];
+      const settings = createTestMergedSettings({
+        tools: { approvalMode: 'auto_edit' },
+      });
+      const argv = await parseArguments(settings);
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.getApprovalMode()).toBe(
+        ServerConfig.ApprovalMode.AUTO_EDIT,
+      );
+    });
+
+    it('should prioritize --approval-mode flag over settings', async () => {
+      process.argv = ['node', 'script.js', '--approval-mode', 'auto_edit'];
+      const settings = createTestMergedSettings({
+        tools: { approvalMode: 'default' },
+      });
+      const argv = await parseArguments(settings);
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.getApprovalMode()).toBe(
+        ServerConfig.ApprovalMode.AUTO_EDIT,
+      );
+    });
+
+    it('should prioritize --yolo flag over settings', async () => {
+      process.argv = ['node', 'script.js', '--yolo'];
+      const settings = createTestMergedSettings({
+        tools: { approvalMode: 'auto_edit' },
+      });
+      const argv = await parseArguments(settings);
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
+    });
+
+    it('should respect plan mode from settings when experimental.plan is enabled', async () => {
+      process.argv = ['node', 'script.js'];
+      const settings = createTestMergedSettings({
+        tools: { approvalMode: 'plan' },
+        experimental: { plan: true },
+      });
+      const argv = await parseArguments(settings);
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.PLAN);
+    });
+
+    it('should throw error if plan mode is in settings but experimental.plan is disabled', async () => {
+      process.argv = ['node', 'script.js'];
+      const settings = createTestMergedSettings({
+        tools: { approvalMode: 'plan' },
+        experimental: { plan: false },
+      });
+      const argv = await parseArguments(settings);
+      await expect(
+        loadCliConfig(settings, 'test-session', argv),
+      ).rejects.toThrow(
+        'Approval mode "plan" is only available when experimental.plan is enabled.',
+      );
     });
   });
 });

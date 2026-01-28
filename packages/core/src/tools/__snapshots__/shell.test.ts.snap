@@ -5,15 +5,12 @@ exports[`ShellTool > getDescription > should return the non-windows description 
 
       The following information is returned:
 
-      Command: Executed command.
-      Directory: Directory where command was executed, or \`(root)\`.
-      Stdout: Output on stdout stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
-      Stderr: Output on stderr stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
-      Error: Error or \`(none)\` if no error was reported for the subprocess.
-      Exit Code: Exit code or \`(none)\` if terminated by signal.
-      Signal: Signal number or \`(none)\` if no signal was received.
-      Background PIDs: List of background processes started or \`(none)\`.
-      Process Group PGID: Process group started or \`(none)\`"
+      Output: Combined stdout/stderr. Can be \`(empty)\` or partial on error and for any unwaited background processes.
+      Exit Code: Only included if non-zero (command failed).
+      Error: Only included if a process-level error occurred (e.g., spawn failure).
+      Signal: Only included if process was terminated by a signal.
+      Background PIDs: Only included if background processes were started.
+      Process Group PGID: Only included if available."
 `;
 
 exports[`ShellTool > getDescription > should return the windows description when on windows 1`] = `
@@ -21,13 +18,10 @@ exports[`ShellTool > getDescription > should return the windows description when
 
       The following information is returned:
 
-      Command: Executed command.
-      Directory: Directory where command was executed, or \`(root)\`.
-      Stdout: Output on stdout stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
-      Stderr: Output on stderr stream. Can be \`(empty)\` or partial on error and for any unwaited background processes.
-      Error: Error or \`(none)\` if no error was reported for the subprocess.
-      Exit Code: Exit code or \`(none)\` if terminated by signal.
-      Signal: Signal number or \`(none)\` if no signal was received.
-      Background PIDs: List of background processes started or \`(none)\`.
-      Process Group PGID: Process group started or \`(none)\`"
+      Output: Combined stdout/stderr. Can be \`(empty)\` or partial on error and for any unwaited background processes.
+      Exit Code: Only included if non-zero (command failed).
+      Error: Only included if a process-level error occurred (e.g., spawn failure).
+      Signal: Only included if process was terminated by a signal.
+      Background PIDs: Only included if background processes were started.
+      Process Group PGID: Only included if available."
 `;

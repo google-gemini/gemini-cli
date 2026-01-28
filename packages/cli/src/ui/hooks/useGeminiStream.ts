@@ -31,7 +31,6 @@ import {
   ValidationRequiredError,
   coreEvents,
   CoreEvent,
-  MCPDiscoveryState,
 } from '@google/gemini-cli-core';
 import type {
   Config,
@@ -52,6 +51,7 @@ import type {
   HistoryItem,
   HistoryItemWithoutId,
   HistoryItemToolGroup,
+  IndividualToolCallDisplay,
   SlashCommandProcessorResult,
   HistoryItemModel,
 } from '../types.js';
@@ -93,6 +93,48 @@ function showCitations(settings: LoadedSettings): boolean {
 }
 
 /**
+ * Calculates the current streaming state based on tool call status and responding flag.
+ */
+function calculateStreamingState(
+  isResponding: boolean,
+  toolCalls: TrackedToolCall[],
+): StreamingState {
+  if (toolCalls.some((tc) => tc.status === 'awaiting_approval')) {
+    return StreamingState.WaitingForConfirmation;
+  }
+
+  const isAnyToolActive = toolCalls.some((tc) => {
+    // These statuses indicate active processing
+    if (
+      tc.status === 'executing' ||
+      tc.status === 'scheduled' ||
+      tc.status === 'validating'
+    ) {
+      return true;
+    }
+
+    // Terminal statuses (success, error, cancelled) still count as "Responding"
+    // if the result hasn't been submitted back to Gemini yet.
+    if (
+      tc.status === 'success' ||
+      tc.status === 'error' ||
+      tc.status === 'cancelled'
+    ) {
+      return !(tc as TrackedCompletedToolCall | TrackedCancelledToolCall)
+        .responseSubmittedToGemini;
+    }
+
+    return false;
+  });
+
+  if (isResponding || isAnyToolActive) {
+    return StreamingState.Responding;
+  }
+
+  return StreamingState.Idle;
+}
+
+/**
  * Manages the Gemini stream, including user input, command processing,
  * API interaction, and tool call lifecycle.
  */
@@ -131,6 +173,10 @@ export const useGeminiStream = (
     useStateAndRef<HistoryItemWithoutId | null>(null);
   const [lastGeminiActivityTime, setLastGeminiActivityTime] =
     useState<number>(0);
+  const [pushedToolCallIds, pushedToolCallIdsRef, setPushedToolCallIds] =
+    useStateAndRef<Set<string>>(new Set());
+  const [_isFirstToolInGroup, isFirstToolInGroupRef, setIsFirstToolInGroup] =
+    useStateAndRef<boolean>(true);
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
   const { startNewPrompt, getPromptCount } = useSessionStats();
   const storage = config.storage;
@@ -163,12 +209,18 @@ export const useGeminiStream = (
     async (completedToolCallsFromScheduler) => {
       // This onComplete is called when ALL scheduled tools for a given batch are done.
       if (completedToolCallsFromScheduler.length > 0) {
-        // Add the final state of these tools to the history for display.
-        addItem(
-          mapTrackedToolCallsToDisplay(
-            completedToolCallsFromScheduler as TrackedToolCall[],
-          ),
+        // Add only the tools that haven't been pushed to history yet.
+        const toolsToPush = completedToolCallsFromScheduler.filter(
+          (tc) => !pushedToolCallIdsRef.current.has(tc.request.callId),
         );
+        if (toolsToPush.length > 0) {
+          addItem(
+            mapTrackedToolCallsToDisplay(toolsToPush as TrackedToolCall[], {
+              borderTop: isFirstToolInGroupRef.current,
+              borderBottom: true,
+            }),
+          );
+        }
 
         // Clear the live-updating display now that the final state is in history.
         setToolCallsForDisplay([]);
@@ -206,11 +258,138 @@ export const useGeminiStream = (
     getPreferredEditor,
   );
 
-  const pendingToolCallGroupDisplay = useMemo(
-    () =>
-      toolCalls.length ? mapTrackedToolCallsToDisplay(toolCalls) : undefined,
-    [toolCalls],
+  const streamingState = useMemo(
+    () => calculateStreamingState(isResponding, toolCalls),
+    [isResponding, toolCalls],
   );
+
+  // Reset tracking when a new batch of tools starts
+  useEffect(() => {
+    if (toolCalls.length > 0) {
+      const isNewBatch = !toolCalls.some((tc) =>
+        pushedToolCallIdsRef.current.has(tc.request.callId),
+      );
+      if (isNewBatch) {
+        setPushedToolCallIds(new Set());
+        setIsFirstToolInGroup(true);
+      }
+    } else if (streamingState === StreamingState.Idle) {
+      // Clear when idle to be ready for next turn
+      setPushedToolCallIds(new Set());
+      setIsFirstToolInGroup(true);
+    }
+  }, [
+    toolCalls,
+    pushedToolCallIdsRef,
+    setPushedToolCallIds,
+    setIsFirstToolInGroup,
+    streamingState,
+  ]);
+
+  // Push completed tools to history as they finish
+  useEffect(() => {
+    const toolsToPush: TrackedToolCall[] = [];
+    for (const tc of toolCalls) {
+      if (pushedToolCallIdsRef.current.has(tc.request.callId)) continue;
+
+      if (
+        tc.status === 'success' ||
+        tc.status === 'error' ||
+        tc.status === 'cancelled'
+      ) {
+        toolsToPush.push(tc);
+      } else {
+        // Stop at first non-terminal tool to preserve order
+        break;
+      }
+    }
+
+    if (toolsToPush.length > 0) {
+      const newPushed = new Set(pushedToolCallIdsRef.current);
+      let isFirst = isFirstToolInGroupRef.current;
+
+      for (const tc of toolsToPush) {
+        newPushed.add(tc.request.callId);
+        const isLastInBatch = tc === toolCalls[toolCalls.length - 1];
+
+        const historyItem = mapTrackedToolCallsToDisplay(tc, {
+          borderTop: isFirst,
+          borderBottom: isLastInBatch,
+        });
+        addItem(historyItem);
+        isFirst = false;
+      }
+
+      setPushedToolCallIds(newPushed);
+      setIsFirstToolInGroup(false);
+    }
+  }, [
+    toolCalls,
+    pushedToolCallIdsRef,
+    isFirstToolInGroupRef,
+    setPushedToolCallIds,
+    setIsFirstToolInGroup,
+    addItem,
+  ]);
+
+  const pendingToolGroupItems = useMemo((): HistoryItemWithoutId[] => {
+    const remainingTools = toolCalls.filter(
+      (tc) => !pushedToolCallIds.has(tc.request.callId),
+    );
+
+    const items: HistoryItemWithoutId[] = [];
+
+    if (remainingTools.length > 0) {
+      items.push(
+        mapTrackedToolCallsToDisplay(remainingTools, {
+          borderTop: pushedToolCallIds.size === 0,
+          borderBottom: false, // Stay open to connect with the slice below
+        }),
+      );
+    }
+
+    // Always show a bottom border slice if we have ANY tools in the batch
+    // and we haven't finished pushing the whole batch to history yet.
+    // Once all tools are terminal and pushed, the last history item handles the closing border.
+    const allTerminal =
+      toolCalls.length > 0 &&
+      toolCalls.every(
+        (tc) =>
+          tc.status === 'success' ||
+          tc.status === 'error' ||
+          tc.status === 'cancelled',
+      );
+
+    const allPushed =
+      toolCalls.length > 0 &&
+      toolCalls.every((tc) => pushedToolCallIds.has(tc.request.callId));
+
+    const isEventDriven = config.isEventDrivenSchedulerEnabled();
+    const anyVisibleInHistory = pushedToolCallIds.size > 0;
+    const anyVisibleInPending = remainingTools.some((tc) => {
+      if (!isEventDriven) return true;
+      return (
+        tc.status !== 'scheduled' &&
+        tc.status !== 'validating' &&
+        tc.status !== 'awaiting_approval'
+      );
+    });
+
+    if (
+      toolCalls.length > 0 &&
+      !(allTerminal && allPushed) &&
+      (anyVisibleInHistory || anyVisibleInPending)
+    ) {
+      items.push({
+        type: 'tool_group' as const,
+        tools: [] as IndividualToolCallDisplay[],
+        borderTop: false,
+        borderBottom: true,
+      });
+    }
+
+    return items;
+  }, [toolCalls, pushedToolCallIds, config]);
 
   const activeToolPtyId = useMemo(() => {
     const executingShellTool = toolCalls?.find(
@@ -271,29 +450,6 @@ export const useGeminiStream = (
     }
     prevActiveShellPtyIdRef.current = activeShellPtyId;
   }, [activeShellPtyId, addItem]);
-
-  const streamingState = useMemo(() => {
-    if (toolCalls.some((tc) => tc.status === 'awaiting_approval')) {
-      return StreamingState.WaitingForConfirmation;
-    }
-    if (
-      isResponding ||
-      toolCalls.some(
-        (tc) =>
-          tc.status === 'executing' ||
-          tc.status === 'scheduled' ||
-          tc.status === 'validating' ||
-          ((tc.status === 'success' ||
-            tc.status === 'error' ||
-            tc.status === 'cancelled') &&
-            !(tc as TrackedCompletedToolCall | TrackedCancelledToolCall)
-              .responseSubmittedToGemini),
-      )
-    ) {
-      return StreamingState.Responding;
-    }
-    return StreamingState.Idle;
-  }, [isResponding, toolCalls]);
 
   useEffect(() => {
     if (
@@ -491,6 +647,12 @@ export const useGeminiStream = (
 
         // Handle @-commands (which might involve tool calls)
         if (isAtCommand(trimmedQuery)) {
+          // Add user's turn before @ command processing for correct UI ordering.
+          addItem(
+            { type: MessageType.USER, text: trimmedQuery },
+            userMessageTimestamp,
+          );
+
           const atCommandResult = await handleAtCommand({
             query: trimmedQuery,
             config,
@@ -499,12 +661,6 @@ export const useGeminiStream = (
             messageId: userMessageTimestamp,
             signal: abortSignal,
           });
-
-          // Add user's turn after @ command processing is done.
-          addItem(
-            { type: MessageType.USER, text: trimmedQuery },
-            userMessageTimestamp,
-          );
 
           if (atCommandResult.error) {
             onDebugMessage(atCommandResult.error);
@@ -803,7 +959,12 @@ export const useGeminiStream = (
   );
 
   const handleAgentExecutionStoppedEvent = useCallback(
-    (reason: string, userMessageTimestamp: number, systemMessage?: string) => {
+    (
+      reason: string,
+      userMessageTimestamp: number,
+      systemMessage?: string,
+      contextCleared?: boolean,
+    ) => {
       if (pendingHistoryItemRef.current) {
         addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         setPendingHistoryItem(null);
@@ -815,13 +976,27 @@ export const useGeminiStream = (
         },
         userMessageTimestamp,
       );
+      if (contextCleared) {
+        addItem(
+          {
+            type: MessageType.INFO,
+            text: 'Conversation context has been cleared.',
+          },
+          userMessageTimestamp,
+        );
+      }
       setIsResponding(false);
     },
     [addItem, pendingHistoryItemRef, setPendingHistoryItem, setIsResponding],
   );
 
   const handleAgentExecutionBlockedEvent = useCallback(
-    (reason: string, userMessageTimestamp: number, systemMessage?: string) => {
+    (
+      reason: string,
+      userMessageTimestamp: number,
+      systemMessage?: string,
+      contextCleared?: boolean,
+    ) => {
       if (pendingHistoryItemRef.current) {
         addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         setPendingHistoryItem(null);
@@ -833,6 +1008,15 @@ export const useGeminiStream = (
         },
         userMessageTimestamp,
       );
+      if (contextCleared) {
+        addItem(
+          {
+            type: MessageType.INFO,
+            text: 'Conversation context has been cleared.',
+          },
+          userMessageTimestamp,
+        );
+      }
     },
     [addItem, pendingHistoryItemRef, setPendingHistoryItem],
   );
@@ -873,6 +1057,7 @@ export const useGeminiStream = (
               event.value.reason,
               userMessageTimestamp,
               event.value.systemMessage,
+              event.value.contextCleared,
             );
             break;
           case ServerGeminiEventType.AgentExecutionBlocked:
@@ -880,6 +1065,7 @@ export const useGeminiStream = (
               event.value.reason,
               userMessageTimestamp,
               event.value.systemMessage,
+              event.value.contextCleared,
             );
             break;
           case ServerGeminiEventType.ChatCompressed:
@@ -960,25 +1146,6 @@ export const useGeminiStream = (
         { name: 'submitQuery' },
         async ({ metadata: spanMetadata }) => {
           spanMetadata.input = query;
-
-          const discoveryState = config
-            .getMcpClientManager()
-            ?.getDiscoveryState();
-          const mcpServerCount =
-            config.getMcpClientManager()?.getMcpServerCount() ?? 0;
-          if (
-            !options?.isContinuation &&
-            typeof query === 'string' &&
-            !isSlashCommand(query.trim()) &&
-            mcpServerCount > 0 &&
-            discoveryState !== MCPDiscoveryState.COMPLETED
-          ) {
-            coreEvents.emitFeedback(
-              'info',
-              'Waiting for MCP servers to initialize... Slash commands are still available.',
-            );
-            return;
-          }
 
           const queryId = `${Date.now()}-${Math.random()}`;
           activeQueryIdRef.current = queryId;
@@ -1339,10 +1506,10 @@ export const useGeminiStream = (
 
   const pendingHistoryItems = useMemo(
     () =>
-      [pendingHistoryItem, pendingToolCallGroupDisplay].filter(
-        (i) => i !== undefined && i !== null,
+      [pendingHistoryItem, ...pendingToolGroupItems].filter(
+        (i): i is HistoryItemWithoutId => i !== undefined && i !== null,
       ),
-    [pendingHistoryItem, pendingToolCallGroupDisplay],
+    [pendingHistoryItem, pendingToolGroupItems],
   );
 
   useEffect(() => {

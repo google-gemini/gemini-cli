@@ -82,6 +82,11 @@ export interface IneligibleTier {
   reasonMessage: string;
   tierId: UserTierId;
   tierName: string;
+  validationErrorMessage?: string;
+  validationUrl?: string;
+  validationUrlLinkText?: string;
+  validationLearnMoreUrl?: string;
+  validationLearnMoreLinkText?: string;
 }
 
 /**
@@ -98,6 +103,7 @@ export enum IneligibleTierReasonCode {
   UNKNOWN = 'UNKNOWN',
   UNKNOWN_LOCATION = 'UNKNOWN_LOCATION',
   UNSUPPORTED_LOCATION = 'UNSUPPORTED_LOCATION',
+  VALIDATION_REQUIRED = 'VALIDATION_REQUIRED',
   // go/keep-sorted end
 }
 /**
@@ -302,7 +308,7 @@ const ExtensionsSettingSchema = z.object({
 
 const CliFeatureSettingSchema = z.object({
   extensionsSetting: ExtensionsSettingSchema.optional(),
-  advancedFeaturesEnabled: z.boolean().optional(),
+  unmanagedCapabilitiesEnabled: z.boolean().optional(),
 });
 
 const McpSettingSchema = z.object({
