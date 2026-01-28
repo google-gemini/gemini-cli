@@ -4,29 +4,61 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import AjvPkg, { type AnySchema } from 'ajv';
+import AjvPkg, { type AnySchema, type Ajv } from 'ajv';
+// Ajv2020 is the documented way to use draft-2020-12: https://ajv.js.org/json-schema.html#draft-2020-12
+// eslint-disable-next-line import/no-internal-modules
+import Ajv2020Pkg from 'ajv/dist/2020';
 import * as addFormats from 'ajv-formats';
+
 // Ajv's ESM/CJS interop: use 'any' for compatibility as recommended by Ajv docs
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const AjvClass = (AjvPkg as any).default || AjvPkg;
-const ajValidator = new AjvClass(
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const Ajv2020Class = (Ajv2020Pkg as any).default || Ajv2020Pkg;
+
+const ajvOptions = {
   // See: https://ajv.js.org/options.html#strict-mode-options
-  {
-    // strictSchema defaults to true and prevents use of JSON schemas that
-    // include unrecognized keywords. The JSON schema spec specifically allows
-    // for the use of non-standard keywords and the spec-compliant behavior
-    // is to ignore those keywords. Note that setting this to false also
-    // allows use of non-standard or custom formats (the unknown format value
-    // will be logged but the schema will still be considered valid).
-    strictSchema: false,
-  },
-);
+  // strictSchema defaults to true and prevents use of JSON schemas that
+  // include unrecognized keywords. The JSON schema spec specifically allows
+  // for the use of non-standard keywords and the spec-compliant behavior
+  // is to ignore those keywords. Note that setting this to false also
+  // allows use of non-standard or custom formats (the unknown format value
+  // will be logged but the schema will still be considered valid).
+  strictSchema: false,
+};
+
+// Draft-07 validator (default)
+const ajvDefault: Ajv = new AjvClass(ajvOptions);
+
+// Draft 2020-12 validator for MCP servers using rmcp
+const ajv2020: Ajv = new Ajv2020Class(ajvOptions);
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const addFormatsFunc = (addFormats as any).default || addFormats;
-addFormatsFunc(ajValidator);
+addFormatsFunc(ajvDefault);
+addFormatsFunc(ajv2020);
+
+// Canonical draft-2020-12 meta-schema URI (used by rmcp MCP servers)
+const DRAFT_2020_12_SCHEMA = 'https://json-schema.org/draft/2020-12/schema';
 
 /**
- * Simple utility to validate objects against JSON Schemas
+ * Returns the appropriate validator based on schema's $schema field.
+ */
+function getValidator(schema: AnySchema): Ajv {
+  if (
+    typeof schema === 'object' &&
+    schema !== null &&
+    '$schema' in schema &&
+    schema.$schema === DRAFT_2020_12_SCHEMA
+  ) {
+    return ajv2020;
+  }
+  return ajvDefault;
+}
+
+/**
+ * Simple utility to validate objects against JSON Schemas.
+ * Supports both draft-07 (default) and draft-2020-12 schemas.
  */
 export class SchemaValidator {
   /**
@@ -40,10 +72,12 @@ export class SchemaValidator {
     if (typeof data !== 'object' || data === null) {
       return 'Value of params must be an object';
     }
-    const validate = ajValidator.compile(schema);
+    const anySchema = schema as AnySchema;
+    const validator = getValidator(anySchema);
+    const validate = validator.compile(anySchema);
     const valid = validate(data);
     if (!valid && validate.errors) {
-      return ajValidator.errorsText(validate.errors, { dataVar: 'params' });
+      return validator.errorsText(validate.errors, { dataVar: 'params' });
     }
     return null;
   }
@@ -56,7 +90,8 @@ export class SchemaValidator {
     if (!schema) {
       return null;
     }
-    const isValid = ajValidator.validateSchema(schema);
-    return isValid ? null : ajValidator.errorsText(ajValidator.errors);
+    const validator = getValidator(schema);
+    const isValid = validator.validateSchema(schema);
+    return isValid ? null : validator.errorsText(validator.errors);
   }
 }

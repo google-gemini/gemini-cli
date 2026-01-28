@@ -122,4 +122,42 @@ describe('SchemaValidator', () => {
     };
     expect(SchemaValidator.validate(schema, params)).not.toBeNull();
   });
+
+  describe('JSON Schema draft-2020-12 support', () => {
+    it('validates params against draft-2020-12 schema', () => {
+      const schema = {
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        type: 'object',
+        properties: {
+          message: {
+            type: 'string',
+          },
+        },
+        required: ['message'],
+      };
+
+      expect(SchemaValidator.validate(schema, { message: 'hello' })).toBeNull();
+      expect(SchemaValidator.validate(schema, { message: 123 })).not.toBeNull();
+    });
+
+    it('validates draft-2020-12 schema with prefixItems', () => {
+      // prefixItems is a draft-2020-12 feature
+      const schema = {
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        type: 'object',
+        properties: {
+          coords: {
+            type: 'array',
+            prefixItems: [{ type: 'number' }, { type: 'number' }],
+            items: false,
+          },
+        },
+      };
+
+      expect(SchemaValidator.validate(schema, { coords: [1, 2] })).toBeNull();
+      expect(
+        SchemaValidator.validate(schema, { coords: [1, 2, 3] }),
+      ).not.toBeNull();
+    });
+  });
 });
