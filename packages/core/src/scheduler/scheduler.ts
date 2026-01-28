@@ -404,15 +404,16 @@ export class Scheduler {
     const callId = toolCall.request.callId;
 
     // Policy & Security
-    const decision = await checkPolicy(toolCall, this.config);
+    const { decision, rule } = await checkPolicy(toolCall, this.config);
 
     if (decision === PolicyDecision.DENY) {
+      const denyMessage = rule?.denyMessage ? ` ${rule.denyMessage}` : '';
       this.state.updateStatus(
         callId,
         'error',
         createErrorResponse(
           toolCall.request,
-          new Error('Tool execution denied by policy.'),
+          new Error(`Tool execution denied by policy.${denyMessage}`),
           ToolErrorType.POLICY_VIOLATION,
         ),
       );
