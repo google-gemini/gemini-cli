@@ -259,5 +259,11 @@
     "alreadyCompressing": "Already compressing, wait for previous request to complete",
     "failed": "Failed to compress chat history.",
     "failedWithError": "Failed to compress chat history: {{error}}"
+  },
+  "copy.responses": {
+    "noOutput": "No output in history",
+    "success": "Last output copied to the clipboard",
+    "failed": "Failed to copy to the clipboard. {{error}}",
+    "noText": "Last AI output contains no text to copy."
   }
 }
