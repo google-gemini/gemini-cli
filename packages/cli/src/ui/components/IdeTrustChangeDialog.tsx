@@ -5,6 +5,7 @@
  */
 
 import { Box, Text } from 'ink';
+import { useTranslation } from 'react-i18next';
 import { theme } from '../semantic-colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { relaunchApp } from '../../utils/processUtils.js';
@@ -16,6 +17,8 @@ interface IdeTrustChangeDialogProps {
 }
 
 export const IdeTrustChangeDialog = ({ reason }: IdeTrustChangeDialogProps) => {
+  const { t } = useTranslation('dialogs');
+
   useKeypress(
     (key) => {
       if (key.name === 'r' || key.name === 'R') {
@@ -28,23 +31,22 @@ export const IdeTrustChangeDialog = ({ reason }: IdeTrustChangeDialogProps) => {
     { isActive: true },
   );
 
-  let message = 'Workspace trust has changed.';
+  let message = t('ideTrustChange.changed');
   if (reason === 'NONE') {
     // This should not happen, but provides a fallback and a debug log.
     debugLogger.warn(
       'IdeTrustChangeDialog rendered with unexpected reason "NONE"',
     );
   } else if (reason === 'CONNECTION_CHANGE') {
-    message =
-      'Workspace trust has changed due to a change in the IDE connection.';
+    message = t('ideTrustChange.changedConnection');
   } else if (reason === 'TRUST_CHANGE') {
-    message = 'Workspace trust has changed due to a change in the IDE trust.';
+    message = t('ideTrustChange.changedTrust');
   }
 
   return (
     <Box borderStyle="round" borderColor={theme.status.warning} paddingX={1}>
       <Text color={theme.status.warning}>
-        {message} Press &apos;r&apos; to restart Gemini to apply the changes.
+        {message} {t('ideTrustChange.pressRestart')}
       </Text>
     </Box>
   );
