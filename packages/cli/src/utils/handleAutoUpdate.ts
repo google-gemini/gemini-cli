@@ -80,12 +80,13 @@ export function handleAutoUpdate(
   updateProcess.on('close', (code) => {
     if (code === 0) {
       updateEventEmitter.emit('update-success', {
-        message:
-          t('common:update.updateSuccess'),
+        message: t('common:update.updateSuccess'),
       });
     } else {
       updateEventEmitter.emit('update-failed', {
-        message: t('common:update.autoUpdateFailedCommand', { command: updateCommand }),
+        message: t('common:update.autoUpdateFailedCommand', {
+          command: updateCommand,
+        }),
       });
     }
   });

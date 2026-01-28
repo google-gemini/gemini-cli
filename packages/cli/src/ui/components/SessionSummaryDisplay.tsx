@@ -17,9 +17,6 @@ export const SessionSummaryDisplay: React.FC<SessionSummaryDisplayProps> = ({
 }) => {
   const { t } = useTranslation();
   return (
-    <StatsDisplay
-      title={t('dialogs:stats.goodbye')}
-      duration={duration}
-    />
+    <StatsDisplay title={t('dialogs:stats.goodbye')} duration={duration} />
   );
 };

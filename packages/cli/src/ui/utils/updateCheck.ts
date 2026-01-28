@@ -76,7 +76,10 @@ export async function checkForUpdates(
       const bestUpdate = getBestAvailableUpdate(nightlyUpdate, latestUpdate);
 
       if (bestUpdate && semver.gt(bestUpdate, currentVersion)) {
-        const message = t('common:update.newVersionAvailable', { current: currentVersion, latest: bestUpdate });
+        const message = t('common:update.newVersionAvailable', {
+          current: currentVersion,
+          latest: bestUpdate,
+        });
         const type = semver.diff(bestUpdate, currentVersion) || undefined;
         return {
           message,
@@ -92,7 +95,10 @@ export async function checkForUpdates(
       const latestUpdate = await latestVersion(name);
 
       if (latestUpdate && semver.gt(latestUpdate, currentVersion)) {
-        const message = t('common:update.updateAvailable', { current: currentVersion, latest: latestUpdate });
+        const message = t('common:update.updateAvailable', {
+          current: currentVersion,
+          latest: latestUpdate,
+        });
         const type = semver.diff(latestUpdate, currentVersion) || undefined;
         return {
           message,

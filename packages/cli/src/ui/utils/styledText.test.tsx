@@ -47,7 +47,7 @@ describe('I18n Styled Text Solution', () => {
 
   it('should apply correct styling attributes to interpolated components', () => {
     const translatedText = 'Use {symbol} to specify {example}';
-    
+
     const component = renderStyledText(
       translatedText,
       {
@@ -67,11 +67,11 @@ describe('I18n Styled Text Solution', () => {
 
     // Verify component structure contains correct styling attributes
     const componentString = JSON.stringify(component);
-    
+
     // Should contain Text components with correct props
     expect(componentString).toContain('"bold":true');
     expect(componentString).toContain('"color":"purple"');
-    
+
     // Should contain the correct text content
     expect(componentString).toContain('"@"');
     expect(componentString).toContain('"files"');
