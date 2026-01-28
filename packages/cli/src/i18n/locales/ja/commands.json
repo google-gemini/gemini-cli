@@ -249,5 +249,10 @@
     "actionRequired": "\n\n[要対応] 📎 差し支えなければ、エクスポートされたチャット履歴の JSON ファイルをこの issue に添付してください。",
     "submitUrl": "バグレポートを送信するには、ブラウザで以下の URL を開いてください:\n{{url}}{{message}}",
     "openFailed": "ブラウザで URL を開けませんでした: {{error}}"
+  },
+  "compress.responses": {
+    "alreadyCompressing": "現在圧縮中です。前のリクエストが完了するまでお待ちください。",
+    "failed": "チャット履歴の圧縮に失敗しました。",
+    "failedWithError": "チャット履歴の圧縮に失敗しました: {{error}}"
   }
 }

@@ -6,6 +6,7 @@
 
 import type { HistoryItemCompression } from '../types.js';
 import { MessageType } from '../types.js';
+import { t } from '../../i18n/index.js';
 import type { SlashCommand } from './types.js';
 import { CommandKind } from './types.js';
 
@@ -21,7 +22,7 @@ export const compressCommand: SlashCommand = {
       ui.addItem(
         {
           type: MessageType.ERROR,
-          text: 'Already compressing, wait for previous request to complete',
+          text: t('commands:compress.responses.alreadyCompressing'),
         },
         Date.now(),
       );
@@ -61,7 +62,7 @@ export const compressCommand: SlashCommand = {
         ui.addItem(
           {
             type: MessageType.ERROR,
-            text: 'Failed to compress chat history.',
+            text: t('commands:compress.responses.failed'),
           },
           Date.now(),
         );
@@ -70,9 +71,9 @@ export const compressCommand: SlashCommand = {
       ui.addItem(
         {
           type: MessageType.ERROR,
-          text: `Failed to compress chat history: ${
-            e instanceof Error ? e.message : String(e)
-          }`,
+          text: t('commands:compress.responses.failedWithError', {
+            error: e instanceof Error ? e.message : String(e),
+          }),
         },
         Date.now(),
       );

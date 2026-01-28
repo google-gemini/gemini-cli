@@ -254,5 +254,10 @@
     "actionRequired": "\n\n[ACTION REQUIRED] 📎 PLEASE ATTACH THE EXPORTED CHAT HISTORY JSON FILE TO THIS ISSUE IF YOU FEEL COMFORTABLE SHARING IT.",
     "submitUrl": "To submit your bug report, please open the following URL in your browser:\n{{url}}{{message}}",
     "openFailed": "Could not open URL in browser: {{error}}"
+  },
+  "compress.responses": {
+    "alreadyCompressing": "Already compressing, wait for previous request to complete",
+    "failed": "Failed to compress chat history.",
+    "failedWithError": "Failed to compress chat history: {{error}}"
   }
 }
