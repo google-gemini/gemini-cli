@@ -2286,8 +2286,8 @@ describe('Settings Loading and Merging', () => {
         mcpSetting: { mcpEnabled: false },
       });
 
-      // Verify mcpEnabled is updated, others remain defaults (secureModeEnabled reverts to default:false)
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
+      // Verify mcpEnabled is updated, others remain defaults (secureModeEnabled defaults to true if strictModeDisabled is missing)
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
       expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
 
@@ -2297,7 +2297,7 @@ describe('Settings Loading and Merging', () => {
       });
 
       // Verify extensionsEnabled is updated, others remain defaults
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
       expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
     });
@@ -2337,12 +2337,12 @@ describe('Settings Loading and Merging', () => {
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
     });
 
-    it('should force secureModeEnabled to false if undefined, overriding schema defaults', () => {
-      // Mock schema to have secureModeEnabled default to true to verify the override
+    it('should force secureModeEnabled to true if undefined, overriding schema defaults', () => {
+      // Mock schema to have secureModeEnabled default to false to verify the override
       const originalSchema = getSettingsSchema();
       const modifiedSchema = JSON.parse(JSON.stringify(originalSchema));
       if (modifiedSchema.admin?.properties?.secureModeEnabled) {
-        modifiedSchema.admin.properties.secureModeEnabled.default = true;
+        modifiedSchema.admin.properties.secureModeEnabled.default = false;
       }
       vi.mocked(getSettingsSchema).mockReturnValue(modifiedSchema);
 
@@ -2352,13 +2352,13 @@ describe('Settings Loading and Merging', () => {
 
         const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
 
-        // Pass a non-empty object that doesn't have secureModeEnabled
+        // Pass a non-empty object that doesn't have strictModeDisabled
         loadedSettings.setRemoteAdminSettings({
           mcpSetting: {},
         });
 
-        // It should be forced to false by the logic, overriding the mock default of true
-        expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
+        // It should be forced to true by the logic (default secure), overriding the mock default of false
+        expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
       } finally {
         vi.mocked(getSettingsSchema).mockReturnValue(originalSchema);
       }
