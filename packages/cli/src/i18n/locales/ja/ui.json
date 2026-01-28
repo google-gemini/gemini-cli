@@ -163,6 +163,12 @@
     },
     "settingsLabel": "設定:"
   },
+  "chatList": {
+    "noChats": "保存された会話チェックポイントは見つかりませんでした。",
+    "listTitle": "保存された会話の一覧:",
+    "invalidDate": "無効な日付",
+    "note": "注：新しい順に下に表示されています"
+  },
   "hooksList": {
     "noHooks": "設定されているフックはありません。",
     "securityWarning": {

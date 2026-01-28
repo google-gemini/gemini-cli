@@ -6,6 +6,7 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
+import { useTranslation } from 'react-i18next';
 import { theme } from '../../semantic-colors.js';
 import type { ChatDetail } from '../../types.js';
 
@@ -14,13 +15,14 @@ interface ChatListProps {
 }
 
 export const ChatList: React.FC<ChatListProps> = ({ chats }) => {
+  const { t } = useTranslation('ui');
   if (chats.length === 0) {
-    return <Text>No saved conversation checkpoints found.</Text>;
+    return <Text>{t('chatList.noChats')}</Text>;
   }
 
   return (
     <Box flexDirection="column">
-      <Text>List of saved conversations:</Text>
+      <Text>{t('chatList.listTitle')}</Text>
       <Box height={1} />
       {chats.map((chat) => {
         const isoString = chat.mtime;
@@ -29,7 +31,7 @@ export const ChatList: React.FC<ChatListProps> = ({ chats }) => {
         );
         const formattedDate = match
           ? `${match[1]} ${match[2]}`
-          : 'Invalid Date';
+          : t('chatList.invalidDate');
         return (
           <Box key={chat.name} flexDirection="row">
             <Text>
@@ -40,7 +42,7 @@ export const ChatList: React.FC<ChatListProps> = ({ chats }) => {
         );
       })}
       <Box height={1} />
-      <Text color={theme.text.secondary}>Note: Newest last, oldest first</Text>
+      <Text color={theme.text.secondary}>{t('chatList.note')}</Text>
     </Box>
   );
 };

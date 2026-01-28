@@ -175,6 +175,12 @@
     },
     "settingsLabel": "settings:"
   },
+  "chatList": {
+    "noChats": "No saved conversation checkpoints found.",
+    "listTitle": "List of saved conversations:",
+    "invalidDate": "Invalid Date",
+    "note": "Note: Newest last, oldest first"
+  },
   "hooksList": {
     "noHooks": "No hooks configured.",
     "securityWarning": {
