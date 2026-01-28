@@ -24,7 +24,7 @@ import { AuthState } from '../types.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
 import { validateAuthMethodWithSettings } from './useAuth.js';
 import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
-import { useTranslation } from '../../i18n/useTranslation.js';
+import { useTranslation } from 'react-i18next';
 
 interface AuthDialogProps {
   config: Config;
