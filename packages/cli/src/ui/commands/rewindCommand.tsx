@@ -9,6 +9,7 @@ import {
   type CommandContext,
   type SlashCommand,
 } from './types.js';
+import { t } from '../../i18n/index.js';
 import { RewindViewer } from '../components/RewindViewer.js';
 import { type HistoryItem } from '../types.js';
 import { convertSessionToHistoryFormats } from '../hooks/useSessionBrowser.js';
@@ -44,7 +45,7 @@ async function rewindConversation(
   try {
     const conversation = recordingService.rewindTo(messageId);
     if (!conversation) {
-      const errorMsg = 'Could not fetch conversation file';
+      const errorMsg = t('commands:rewind.responses.fetchFailed');
       debugLogger.error(errorMsg);
       context.ui.removeComponent();
       coreEvents.emitFeedback('error', errorMsg);
@@ -82,7 +83,9 @@ async function rewindConversation(
     context.ui.removeComponent();
     coreEvents.emitFeedback(
       'error',
-      error instanceof Error ? error.message : 'Unknown error during rewind',
+      error instanceof Error
+        ? error.message
+        : t('commands:rewind.responses.unknownError'),
     );
   }
 }
@@ -97,7 +100,7 @@ export const rewindCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Config not found',
+        content: t('commands:rewind.responses.configNotFound'),
       };
 
     const client = config.getGeminiClient();
@@ -105,7 +108,7 @@ export const rewindCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Client not initialized',
+        content: t('commands:rewind.responses.clientNotInitialized'),
       };
 
     const recordingService = client.getChatRecordingService();
@@ -113,7 +116,7 @@ export const rewindCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Recording service unavailable',
+        content: t('commands:rewind.responses.recordingServiceUnavailable'),
       };
 
     const conversation = recordingService.getConversation();
@@ -121,7 +124,7 @@ export const rewindCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: 'No conversation found.',
+        content: t('commands:rewind.responses.noConversationFound'),
       };
 
     const hasUserInteractions = conversation.messages.some(
@@ -131,7 +134,7 @@ export const rewindCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: 'Nothing to rewind to.',
+        content: t('commands:rewind.responses.nothingToRewind'),
       };
     }
 
@@ -154,7 +157,10 @@ export const rewindCommand: SlashCommand = {
                   await revertFileChanges(conversation, messageId);
                 }
                 context.ui.removeComponent();
-                coreEvents.emitFeedback('info', 'File changes reverted.');
+                coreEvents.emitFeedback(
+                  'info',
+                  t('commands:rewind.responses.fileChangesReverted'),
+                );
                 return;
 
               case RewindOutcome.RewindAndRevert:
