@@ -1081,6 +1081,14 @@
               "default": true,
               "type": "boolean"
             },
+            "ptyBackend": {
+              "title": "PTY Backend",
+              "description": "Select the PTY backend implementation.",
+              "markdownDescription": "Select the PTY backend implementation.\n\n- `auto`: Tries `node-pty`, falls back to `script`, then `none`.\n- `node-pty`: Native backend (best experience).\n- `script`: Uses the `script` command (Linux/macOS, good fallback).\n- `none`: Disables PTY, uses standard pipes.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `auto`",
+              "default": "auto",
+              "type": "string",
+              "enum": ["auto", "node-pty", "script", "none"]
+            },
             "pager": {
               "title": "Pager",
               "description": "The pager command to use for shell output. Defaults to `cat`.",

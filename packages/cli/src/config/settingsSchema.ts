@@ -1000,6 +1000,24 @@ const SETTINGS_SCHEMA = {
             `,
             showInDialog: true,
           },
+          ptyBackend: {
+            type: 'enum',
+            label: 'PTY Backend',
+            category: 'Tools',
+            requiresRestart: true,
+            default: 'auto',
+            description: oneLine`
+              Select the PTY backend implementation.
+              'auto' tries node-pty then script.
+            `,
+            showInDialog: true,
+            options: [
+              { value: 'auto', label: 'Auto' },
+              { value: 'node-pty', label: 'node-pty' },
+              { value: 'script', label: 'script' },
+              { value: 'none', label: 'None' },
+            ],
+          },
           pager: {
             type: 'string',
             label: 'Pager',

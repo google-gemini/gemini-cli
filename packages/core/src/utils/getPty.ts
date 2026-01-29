@@ -4,31 +4,68 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { createNodePtyModule } from './pty/NodePty.js';
+import { ScriptPtyModule } from './pty/ScriptPty.js';
+import type { PtyModule } from './pty/types.js';
+import { spawn } from 'node:child_process';
+
 export type PtyImplementation = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  module: any;
-  name: 'lydell-node-pty' | 'node-pty';
+  module: PtyModule;
+  name: 'lydell-node-pty' | 'node-pty' | 'script-pty';
 } | null;
 
-export interface PtyProcess {
-  readonly pid: number;
-  onData(callback: (data: string) => void): void;
-  onExit(callback: (e: { exitCode: number; signal?: number }) => void): void;
-  kill(signal?: string): void;
-}
+const checkScriptCommand = async (): Promise<boolean> =>
+  new Promise((resolve) => {
+    // Use POSIX 'command -v' to check if script exists
+    const check = spawn('sh', ['-c', 'command -v script'], { stdio: 'ignore' });
+    check.on('error', () => resolve(false));
+    check.on('exit', (code) => resolve(code === 0));
+  });
 
-export const getPty = async (): Promise<PtyImplementation> => {
+const getNodePty = async (): Promise<PtyImplementation> => {
   try {
     const lydell = '@lydell/node-pty';
     const module = await import(lydell);
-    return { module, name: 'lydell-node-pty' };
+    const rawModule = module.default || module;
+    return {
+      module: createNodePtyModule(rawModule),
+      name: 'lydell-node-pty',
+    };
   } catch (_e) {
     try {
       const nodePty = 'node-pty';
       const module = await import(nodePty);
-      return { module, name: 'node-pty' };
+      const rawModule = module.default || module;
+      return { module: createNodePtyModule(rawModule), name: 'node-pty' };
     } catch (_e2) {
       return null;
     }
   }
+};
+
+export const getPty = async (
+  backend: string = 'auto',
+): Promise<PtyImplementation> => {
+  if (backend === 'none') {
+    return null;
+  }
+
+  if (backend === 'auto' || backend === 'node-pty') {
+    const nodePty = await getNodePty();
+    if (nodePty) {
+      return nodePty;
+    }
+    if (backend === 'node-pty') {
+      return null;
+    }
+  }
+
+  if (backend === 'auto' || backend === 'script') {
+    const hasScript = await checkScriptCommand();
+    if (hasScript) {
+      return { module: ScriptPtyModule, name: 'script-pty' };
+    }
+  }
+
+  return null;
 };
