@@ -15,6 +15,7 @@ import {
 } from 'vitest';
 import {
   fetchAdminControls,
+  fetchAdminControlsOnce,
   sanitizeAdminSettings,
   stopAdminControlsPolling,
 } from './admin_controls.js';
@@ -238,6 +239,71 @@ describe('Admin Controls', () => {
       // Advance time by another 2 mins. Now it should fire.
       await vi.advanceTimersByTimeAsync(2 * 60 * 1000);
       expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(3); // Poll fires
+    });
+  });
+
+  describe('fetchAdminControlsOnce', () => {
+    it('should return empty object if server is missing', async () => {
+      const result = await fetchAdminControlsOnce(undefined, true);
+      expect(result).toEqual({});
+      expect(mockServer.fetchAdminControls).not.toHaveBeenCalled();
+    });
+
+    it('should return empty object if project ID is missing', async () => {
+      mockServer = {
+        fetchAdminControls: vi.fn(),
+      } as unknown as CodeAssistServer;
+      const result = await fetchAdminControlsOnce(mockServer, true);
+      expect(result).toEqual({});
+      expect(mockServer.fetchAdminControls).not.toHaveBeenCalled();
+    });
+
+    it('should return empty object if admin controls are disabled', async () => {
+      const result = await fetchAdminControlsOnce(mockServer, false);
+      expect(result).toEqual({});
+      expect(mockServer.fetchAdminControls).not.toHaveBeenCalled();
+    });
+
+    it('should fetch from server and sanitize the response', async () => {
+      const serverResponse = {
+        strictModeDisabled: true,
+        unknownField: 'should be removed',
+      };
+      (mockServer.fetchAdminControls as Mock).mockResolvedValue(serverResponse);
+
+      const result = await fetchAdminControlsOnce(mockServer, true);
+      expect(result).toEqual({ strictModeDisabled: true });
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return empty object on 403 fetch error', async () => {
+      const error403 = new Error('Forbidden');
+      Object.assign(error403, { status: 403 });
+      (mockServer.fetchAdminControls as Mock).mockRejectedValue(error403);
+
+      const result = await fetchAdminControlsOnce(mockServer, true);
+      expect(result).toEqual({});
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return empty object on any other fetch error', async () => {
+      (mockServer.fetchAdminControls as Mock).mockRejectedValue(
+        new Error('Network error'),
+      );
+      const result = await fetchAdminControlsOnce(mockServer, true);
+      expect(result).toEqual({});
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not start or stop any polling timers', async () => {
+      const setIntervalSpy = vi.spyOn(global, 'setInterval');
+      const clearIntervalSpy = vi.spyOn(global, 'clearInterval');
+
+      (mockServer.fetchAdminControls as Mock).mockResolvedValue({});
+      await fetchAdminControlsOnce(mockServer, true);
+
+      expect(setIntervalSpy).not.toHaveBeenCalled();
+      expect(clearIntervalSpy).not.toHaveBeenCalled();
     });
   });
 

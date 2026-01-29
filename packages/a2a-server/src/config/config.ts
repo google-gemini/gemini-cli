@@ -8,10 +8,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as dotenv from 'dotenv';
 
-import type {
-  FetchAdminControlsResponse,
-  TelemetryTarget,
-} from '@google/gemini-cli-core';
+import type { TelemetryTarget } from '@google/gemini-cli-core';
 import {
   AuthType,
   Config,
@@ -28,7 +25,7 @@ import {
   homedir,
   GitService,
   coreEvents,
-  fetchAdminControls,
+  fetchAdminControlsOnce,
   getCodeAssistServer,
   ExperimentFlags,
 } from '@google/gemini-cli-core';
@@ -143,16 +140,15 @@ export async function loadConfig(
   const adminControlsEnabled =
     config.getExperiments()?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]
       ?.boolValue ?? false;
-  const adminSettings = await fetchAdminControls(
-    codeAssistServer,
-    config.getRemoteAdminSettings(),
-    adminControlsEnabled,
-    (newSettings: FetchAdminControlsResponse) => {
-      config.setRemoteAdminSettings(newSettings);
-      coreEvents.emitAdminSettingsChanged();
-    },
-  );
-  config.setRemoteAdminSettings(adminSettings);
+
+  if (adminControlsEnabled) {
+    const adminSettings = await fetchAdminControlsOnce(
+      codeAssistServer,
+      adminControlsEnabled,
+    );
+    config.setRemoteAdminSettings(adminSettings);
+    coreEvents.emitAdminSettingsChanged();
+  }
   startupProfiler.flush(config);
 
   if (process.env['USE_CCPA']) {

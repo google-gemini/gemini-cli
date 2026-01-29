@@ -13,7 +13,7 @@ import {
   FileDiscoveryService,
   Config,
   ExperimentFlags,
-  fetchAdminControls,
+  fetchAdminControlsOnce,
   coreEvents,
 } from '@google/gemini-cli-core';
 
@@ -48,7 +48,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     },
     FileDiscoveryService: vi.fn(),
     getCodeAssistServer: vi.fn(),
-    fetchAdminControls: vi.fn(),
+    fetchAdminControlsOnce: vi.fn(),
     coreEvents: {
       emitAdminSettingsChanged: vi.fn(),
     },
@@ -78,14 +78,9 @@ describe('loadConfig', () => {
   });
 
   describe('admin settings overrides', () => {
-    it('should fetch admin controls with enabled=false if experiment is disabled', async () => {
+    it('should not fetch admin controls if experiment is disabled', async () => {
       await loadConfig(mockSettings, mockExtensionLoader, taskId);
-      expect(fetchAdminControls).toHaveBeenCalledWith(
-        undefined,
-        undefined,
-        false,
-        expect.any(Function),
-      );
+      expect(fetchAdminControlsOnce).not.toHaveBeenCalled();
     });
 
     describe('when admin controls experiment is enabled', () => {
@@ -111,9 +106,9 @@ describe('loadConfig', () => {
         });
       });
 
-      it('should fetch admin controls', async () => {
+      it('should fetch admin controls and apply them', async () => {
         const mockAdminSettings = { tool_allowlist: ['tool1'] };
-        vi.mocked(fetchAdminControls).mockResolvedValue(mockAdminSettings);
+        vi.mocked(fetchAdminControlsOnce).mockResolvedValue(mockAdminSettings);
 
         const config = await loadConfig(
           mockSettings,
@@ -121,39 +116,9 @@ describe('loadConfig', () => {
           taskId,
         );
 
-        expect(fetchAdminControls).toHaveBeenCalledWith(
-          undefined,
-          {},
-          true,
-          expect.any(Function),
-        );
+        expect(fetchAdminControlsOnce).toHaveBeenCalledWith(undefined, true);
         expect(config.setRemoteAdminSettings).toHaveBeenCalledWith(
           mockAdminSettings,
-        );
-      });
-
-      it('should call setRemoteAdminSettings and emit event on callback', async () => {
-        const newAdminSettings = { tool_allowlist: ['tool2'] };
-        vi.mocked(fetchAdminControls).mockImplementation(
-          async (
-            _server,
-            _currentSettings,
-            _enabled,
-            callback: (newSettings: object) => void,
-          ) => {
-            callback(newAdminSettings);
-            return {};
-          },
-        );
-
-        const config = await loadConfig(
-          mockSettings,
-          mockExtensionLoader,
-          taskId,
-        );
-
-        expect(config.setRemoteAdminSettings).toHaveBeenCalledWith(
-          newAdminSettings,
         );
         expect(coreEvents.emitAdminSettingsChanged).toHaveBeenCalled();
       });
