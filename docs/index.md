@@ -77,12 +77,25 @@ Explore powerful features for complex workflows and enterprise environments.
 - **[Enterprise](./cli/enterprise.md):** Manage configurations and policies for
   large teams.
 
+## Extensions
+
+Extend Gemini CLI's capabilities with new tools and behaviors using extensions.
+
+- **[Introduction](./extensions/index.md):** Learn about the extension system
+  and how to manage extensions.
+- **[Writing extensions](./extensions/writing-extensions.md):** Learn how to
+  create your first extension.
+- **[Extensions reference](./extensions/reference.md):** Deeply understand the
+  extension format, commands, and configuration.
+- **[Best practices](./extensions/best-practices.md):** Learn strategies for
+  building great extensions.
+- **[Extensions releasing](./extensions/releasing.md):** Learn how to share your
+  extensions with the world.
+
 ## Ecosystem and extensibility
 
-Extend Gemini CLI's capabilities with new tools and integrations.
+Connect Gemini CLI to external services and other development tools.
 
-- **[Extensions](./extensions/index.md):** Discover or build packages that add
-  new tools and behaviors.
 - **[MCP servers](./tools/mcp-server.md):** Connect to external services using
   the Model Context Protocol.
 - **[IDE integration](./ide-integration/index.md):** Use Gemini CLI alongside VS
