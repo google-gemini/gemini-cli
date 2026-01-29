@@ -11,7 +11,6 @@ export * from './config/models.js';
 export * from './config/constants.js';
 export * from './output/types.js';
 export * from './output/json-formatter.js';
-// Export error message helper
 export { getAdminErrorMessage } from './code_assist/admin/admin_controls.js';
 export * from './output/stream-json-formatter.js';
 
