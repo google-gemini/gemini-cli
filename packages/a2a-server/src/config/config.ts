@@ -134,6 +134,11 @@ export async function loadConfig(
   const config = new Config({
     ...configParams,
   });
+
+  // Needed to initialize ToolRegistry, and git checkpointing if enabled
+  await config.initialize();
+
+  // Override env settings when provided admin controls.
   const codeAssistServer = getCodeAssistServer(config);
   const adminControlsEnabled =
     config.getExperiments()?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]
@@ -148,9 +153,6 @@ export async function loadConfig(
     },
   );
   config.setRemoteAdminSettings(adminSettings);
-
-  // Needed to initialize ToolRegistry, and git checkpointing if enabled
-  await config.initialize();
   startupProfiler.flush(config);
 
   if (process.env['USE_CCPA']) {
