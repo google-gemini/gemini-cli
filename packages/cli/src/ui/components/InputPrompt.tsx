@@ -796,12 +796,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           inputHistory.navigateDown();
           return true;
         }
-        // Handle arrow-up/down for history on single-line or at edges
-        if (
-          keyMatchers[Command.NAVIGATION_UP](key) &&
-          (buffer.allVisualLines.length === 1 ||
-            (buffer.visualCursor[0] === 0 && buffer.visualScrollRow === 0))
-        ) {
+        const isOnFirstLine =
+          buffer.allVisualLines.length === 1 ||
+          (buffer.lines.length > 1
+            ? buffer.cursor[0] === 0
+            : buffer.visualCursor[0] === 0);
+        const isOnLastLine =
+          buffer.allVisualLines.length === 1 ||
+          (buffer.lines.length > 1
+            ? buffer.cursor[0] === buffer.lines.length - 1
+            : buffer.visualCursor[0] === buffer.allVisualLines.length - 1);
+        if (keyMatchers[Command.NAVIGATION_UP](key) && isOnFirstLine) {
           // Check for queued messages first when input is empty
           // If no queued messages, inputHistory.navigateUp() is called inside tryLoadQueuedMessages
           if (tryLoadQueuedMessages()) {
@@ -811,11 +816,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           inputHistory.navigateUp();
           return true;
         }
-        if (
-          keyMatchers[Command.NAVIGATION_DOWN](key) &&
-          (buffer.allVisualLines.length === 1 ||
-            buffer.visualCursor[0] === buffer.allVisualLines.length - 1)
-        ) {
+        if (keyMatchers[Command.NAVIGATION_DOWN](key) && isOnLastLine) {
           inputHistory.navigateDown();
           return true;
         }
