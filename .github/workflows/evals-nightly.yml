@@ -35,7 +35,7 @@ jobs:
         run_attempt: [1, 2, 3]
     steps:
       - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        uses: 'actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8' # ratchet:actions/checkout@v5
 
       - name: 'Set up Node.js'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions/setup-node@v4
@@ -88,7 +88,7 @@ jobs:
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
+        uses: 'actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8' # ratchet:actions/checkout@v5
 
       - name: 'Download Logs'
         uses: 'actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806' # ratchet:actions/download-artifact@v4
