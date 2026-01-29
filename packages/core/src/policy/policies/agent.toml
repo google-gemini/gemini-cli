@@ -25,7 +25,4 @@
 #   50: Read-only tools (becomes 1.050 in default tier)
 #   999: YOLO mode allow-all (becomes 1.999 in default tier)
 
-[[rule]]
-toolName = "delegate_to_agent"
-decision = "ask_user"
-priority = 50
+
