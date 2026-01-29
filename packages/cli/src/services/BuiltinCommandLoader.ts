@@ -40,6 +40,7 @@ import { privacyCommand } from '../ui/commands/privacyCommand.js';
 import { policiesCommand } from '../ui/commands/policiesCommand.js';
 import { profileCommand } from '../ui/commands/profileCommand.js';
 import { quitCommand } from '../ui/commands/quitCommand.js';
+import { restartCommand } from '../ui/commands/restartCommand.js';
 import { restoreCommand } from '../ui/commands/restoreCommand.js';
 import { resumeCommand } from '../ui/commands/resumeCommand.js';
 import { statsCommand } from '../ui/commands/statsCommand.js';
@@ -138,6 +139,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       policiesCommand,
       ...(isDevelopment ? [profileCommand] : []),
       quitCommand,
+      restartCommand,
       restoreCommand(this.config),
       resumeCommand,
       statsCommand,
