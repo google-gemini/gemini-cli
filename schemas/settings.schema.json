@@ -1052,6 +1052,13 @@
           "default": 200,
           "type": "number"
         },
+        "bfsFileSearchMaxDirs": {
+          "title": "@-Completion Max Dirs",
+          "description": "Maximum number of directories the @-completion looks at.",
+          "markdownDescription": "Maximum number of directories the @-completion looks at.",
+          "default": 50,
+          "type": "number"
+        },
         "includeDirectories": {
           "title": "Include Directories",
           "description": "Additional directories to include in the workspace context. Missing directories will be skipped with a warning.",

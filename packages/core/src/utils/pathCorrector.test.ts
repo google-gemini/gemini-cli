@@ -31,6 +31,7 @@ describe('pathCorrector', () => {
       getWorkspaceContext: () =>
         createMockWorkspaceContext(rootDir, [otherWorkspaceDir]),
       getFileService: () => new FileDiscoveryService(rootDir),
+      getBfsFileSearchMaxDirs: () => 50,
       getFileFilteringOptions: () => ({
         respectGitIgnore: true,
         respectGeminiIgnore: true,

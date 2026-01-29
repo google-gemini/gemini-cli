@@ -51,7 +51,7 @@ export function correctPath(
     .flatMap((searchPath) =>
       bfsFileSearchSync(searchPath, {
         fileName: basename,
-        maxDirs: 50, // Capped to avoid deep hangs
+        maxDirs: config.getBfsFileSearchMaxDirs(), // Capped to avoid deep hangs
         fileService: config.getFileService(),
         fileFilteringOptions: config.getFileFilteringOptions(),
       }),
