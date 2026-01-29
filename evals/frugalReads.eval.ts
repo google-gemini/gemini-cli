@@ -8,7 +8,12 @@ import { describe, expect } from 'vitest';
 import { evalTest } from './test-helper.js';
 import { READ_FILE_TOOL_NAME } from '@google/gemini-cli-core';
 
-describe('optimization_evals', () => {
+describe('Frugal reads eval', () => {
+  /**
+   * Ensures that the agent is frugal in its use of context by relying
+   * primarily on ranged reads when the line number is known. Smaller
+   * context generally helps the agent to work more reliably for longer.
+   */
   evalTest('ALWAYS_PASSES', {
     name: 'should use ranged read when specific line is targeted',
     files: {
