@@ -13,6 +13,7 @@ import type { AnyDeclarativeTool } from '../tools/tools.js';
 import { type z } from 'zod';
 import type { ModelConfig } from '../services/modelConfigService.js';
 import type { AnySchema } from 'ajv';
+import type { A2AAuthConfig } from './auth-provider/types.js';
 
 /**
  * Describes the possible termination modes for an agent.
@@ -108,6 +109,13 @@ export interface RemoteAgentDefinition<
 > extends BaseAgentDefinition<TOutput> {
   kind: 'remote';
   agentCardUrl: string;
+
+  /**
+   * Optional authentication configuration for the remote agent.
+   * If not specified, the agent will try to use defaults based on the AgentCard's
+   * security requirements.
+   */
+  auth?: A2AAuthConfig;
 }
 
 export type AgentDefinition<TOutput extends z.ZodTypeAny = z.ZodUnknown> =
