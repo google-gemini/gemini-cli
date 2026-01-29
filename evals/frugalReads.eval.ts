@@ -6,7 +6,7 @@
 
 import { describe, expect } from 'vitest';
 import { evalTest } from './test-helper.js';
-import { READ_FILE_TOOL_NAME } from '@google/gemini-cli-core';
+import { READ_FILE_TOOL_NAME, GREP_TOOL_NAME } from '@google/gemini-cli-core';
 
 describe('Frugal reads eval', () => {
   /**
@@ -110,6 +110,77 @@ describe('Frugal reads eval', () => {
           true,
         );
       }
+    },
+  });
+
+  /**
+   * Ensures that the agent uses search_file_content effectively when searching
+   * through large files, and refines its search or uses context to find the
+   * correct match among many.
+   */
+  evalTest('ALWAYS_PASSES', {
+    name: 'should use search_file_content with context and limits to find a needle in a haystack',
+    files: (() => {
+      const files: Record<string, string> = {};
+      for (let f = 1; f <= 5; f++) {
+        const lines = [];
+        for (let i = 0; i < 2000; i++) {
+          if (f === 3 && i === 1500) {
+            lines.push('Pattern: TargetMatch');
+            lines.push('Metadata: CORRECT_VALUE_42');
+          } else if (i % 50 === 0) {
+            lines.push('Pattern: TargetMatch');
+            lines.push('Metadata: WRONG_VALUE');
+          } else {
+            lines.push(`Noise line ${i} in file ${f}`);
+          }
+        }
+        files[`large_file_${f}.txt`] = lines.join('\n');
+      }
+      return files;
+    })(),
+    prompt:
+      'Find the "Metadata" value associated with the "Pattern: TargetMatch" in the large_file_*.txt files. There are many such patterns, so you MUST set the "limit" parameter of search_file_content to 10 to avoid returning too many results. If you do not find the correct metadata (CORRECT_VALUE_42) in the first batch, refine your search or search file-by-file.',
+    assert: async (rig) => {
+      const logs = rig.readToolLogs();
+
+      const grepCalls = logs.filter(
+        (log) => log.toolRequest?.name === GREP_TOOL_NAME,
+      );
+
+      expect(
+        grepCalls.length,
+        'Agent should have used search_file_content to find the pattern',
+      ).toBeGreaterThan(0);
+
+      // Check that the agent used the limit parameter
+      const usedLimit = grepCalls.some((call) => {
+        const args = JSON.parse(call.toolRequest.args);
+        return args.limit !== undefined && args.limit <= 20;
+      });
+      expect(usedLimit, 'Agent should have used the limit parameter').toBe(
+        true,
+      );
+
+      // We expect the agent to eventually use context or refine the search.
+      const usedContext = grepCalls.some((call) => {
+        const args = JSON.parse(call.toolRequest.args);
+        return (args.after ?? 0) > 0 || (args.context ?? 0) > 0;
+      });
+
+      const usedReadForContext = logs.some((log) => {
+        if (log.toolRequest?.name !== READ_FILE_TOOL_NAME) return false;
+        const args = JSON.parse(log.toolRequest.args);
+        return (
+          args.file_path.includes('large_file_3.txt') &&
+          args.offset !== undefined
+        );
+      });
+
+      expect(
+        usedContext || usedReadForContext,
+        'Agent should have used context (either via grep "after/context" or read_file) to find the metadata',
+      ).toBe(true);
     },
   });
 });

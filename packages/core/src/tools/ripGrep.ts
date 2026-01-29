@@ -131,6 +131,11 @@ export interface RipGrepToolParams {
    * If true, does not respect .gitignore or default ignores (like build/dist).
    */
   no_ignore?: boolean;
+
+  /**
+   * Max number of matches to return. Defaults to 20,000.
+   */
+  limit?: number;
 }
 
 /**
@@ -204,7 +209,7 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       const searchDirDisplay = pathParam;
 
-      const totalMaxMatches = DEFAULT_TOTAL_MAX_MATCHES;
+      const totalMaxMatches = this.params.limit ?? DEFAULT_TOTAL_MAX_MATCHES;
       if (this.config.getDebugMode()) {
         debugLogger.log(`[GrepTool] Total result limit: ${totalMaxMatches}`);
       }
@@ -529,6 +534,10 @@ export class RipGrepTool extends BaseDeclarativeTool<
             description:
               'If true, searches all files including those usually ignored (like in .gitignore, build/, dist/, etc). Defaults to false if omitted.',
             type: 'boolean',
+          },
+          limit: {
+            description: 'Max number of matches to return. Defaults to 20,000.',
+            type: 'integer',
           },
         },
         required: ['pattern'],
