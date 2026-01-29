@@ -194,6 +194,7 @@ describe('useSlashCommandProcessor', () => {
           mockAddItem,
           mockClearItems,
           mockLoadHistory,
+          [], // history
           refreshStatic,
           vi.fn(), // toggleVimEnabled
           setIsProcessing,

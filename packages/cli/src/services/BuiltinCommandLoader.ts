@@ -19,6 +19,7 @@ import { authCommand } from '../ui/commands/authCommand.js';
 import { bugCommand } from '../ui/commands/bugCommand.js';
 import { chatCommand, debugCommand } from '../ui/commands/chatCommand.js';
 import { clearCommand } from '../ui/commands/clearCommand.js';
+import { checkpointCommand } from '../ui/commands/checkpointCommand.js';
 import { compressCommand } from '../ui/commands/compressCommand.js';
 import { copyCommand } from '../ui/commands/copyCommand.js';
 import { corgiCommand } from '../ui/commands/corgiCommand.js';
@@ -42,9 +43,11 @@ import { profileCommand } from '../ui/commands/profileCommand.js';
 import { quitCommand } from '../ui/commands/quitCommand.js';
 import { restoreCommand } from '../ui/commands/restoreCommand.js';
 import { resumeCommand } from '../ui/commands/resumeCommand.js';
+import { revertCommand } from '../ui/commands/revertCommand.js';
 import { statsCommand } from '../ui/commands/statsCommand.js';
 import { themeCommand } from '../ui/commands/themeCommand.js';
 import { toolsCommand } from '../ui/commands/toolsCommand.js';
+import { undoCommand } from '../ui/commands/undoCommand.js';
 import { skillsCommand } from '../ui/commands/skillsCommand.js';
 import { settingsCommand } from '../ui/commands/settingsCommand.js';
 import { vimCommand } from '../ui/commands/vimCommand.js';
@@ -82,6 +85,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
           : chatCommand.subCommands,
       },
       clearCommand,
+      checkpointCommand,
       compressCommand,
       copyCommand,
       corgiCommand,
@@ -139,10 +143,12 @@ export class BuiltinCommandLoader implements ICommandLoader {
       ...(isDevelopment ? [profileCommand] : []),
       quitCommand,
       restoreCommand(this.config),
+      revertCommand,
       resumeCommand,
       statsCommand,
       themeCommand,
       toolsCommand,
+      undoCommand,
       ...(this.config?.isSkillsSupportEnabled()
         ? this.config?.getSkillManager()?.isAdminEnabled() === false
           ? [

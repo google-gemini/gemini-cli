@@ -15,6 +15,7 @@ import type { ExtensionUpdateAction } from '../state/extensions.js';
 export function createNonInteractiveUI(): CommandContext['ui'] {
   return {
     addItem: (_item, _timestamp) => 0,
+    getHistory: () => [],
     clear: () => {},
     setDebugMessage: (_message) => {},
     loadHistory: (_newHistory) => {},

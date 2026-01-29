@@ -9,6 +9,7 @@ import {
   useMemo,
   useEffect,
   useState,
+  useRef,
   createElement,
 } from 'react';
 import { type PartListUnion } from '@google/genai';
@@ -94,6 +95,7 @@ export const useSlashCommandProcessor = (
   addItem: UseHistoryManagerReturn['addItem'],
   clearItems: UseHistoryManagerReturn['clearItems'],
   loadHistory: UseHistoryManagerReturn['loadHistory'],
+  history: UseHistoryManagerReturn['history'],
   refreshStatic: () => void,
   toggleVimEnabled: () => Promise<boolean>,
   setIsProcessing: (isProcessing: boolean) => void,
@@ -104,6 +106,9 @@ export const useSlashCommandProcessor = (
   setCustomDialog: (dialog: React.ReactNode | null) => void,
 ) => {
   const session = useSessionStats();
+  const historyRef = useRef(history);
+  historyRef.current = history;
+
   const [commands, setCommands] = useState<readonly SlashCommand[] | undefined>(
     undefined,
   );
@@ -212,6 +217,7 @@ export const useSlashCommandProcessor = (
       },
       ui: {
         addItem,
+        getHistory: () => historyRef.current,
         clear: () => {
           clearItems();
           refreshStatic();

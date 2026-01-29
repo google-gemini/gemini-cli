@@ -16,6 +16,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 export class GitService {
   private projectRoot: string;
   private storage: Storage;
+  private isInitialized = false;
 
   constructor(projectRoot: string, storage: Storage) {
     this.projectRoot = path.resolve(projectRoot);
@@ -27,6 +28,7 @@ export class GitService {
   }
 
   async initialize(): Promise<void> {
+    if (this.isInitialized) return;
     const gitAvailable = await GitService.verifyGitAvailability();
     if (!gitAvailable) {
       throw new Error(
@@ -35,10 +37,17 @@ export class GitService {
     }
     try {
       await this.setupShadowGitRepository();
+      this.isInitialized = true;
     } catch (error) {
       throw new Error(
         `Failed to initialize checkpointing: ${error instanceof Error ? error.message : 'Unknown error'}. Please check that Git is working properly or disable checkpointing.`,
       );
+    }
+  }
+
+  private async ensureInitialized(): Promise<void> {
+    if (!this.isInitialized) {
+      await this.initialize();
     }
   }
 
@@ -114,11 +123,13 @@ export class GitService {
   }
 
   async getCurrentCommitHash(): Promise<string> {
+    await this.ensureInitialized();
     const hash = await this.shadowGitRepository.raw('rev-parse', 'HEAD');
     return hash.trim();
   }
 
   async createFileSnapshot(message: string): Promise<string> {
+    await this.ensureInitialized();
     try {
       const repo = this.shadowGitRepository;
       await repo.add('.');
@@ -139,6 +150,7 @@ export class GitService {
   }
 
   async restoreProjectFromSnapshot(commitHash: string): Promise<void> {
+    await this.ensureInitialized();
     const repo = this.shadowGitRepository;
     await repo.raw(['restore', '--source', commitHash, '.']);
     // Removes any untracked files that were introduced post snapshot.

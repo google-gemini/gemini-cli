@@ -13,10 +13,11 @@ import type { Content } from '@google/genai';
 import type { ToolCallRequestInfo } from '../scheduler/types.js';
 
 export interface ToolCallData<HistoryType = unknown, ArgsType = unknown> {
+  name?: string;
   history?: HistoryType;
   clientHistory?: Content[];
   commitHash?: string;
-  toolCall: {
+  toolCall?: {
     name: string;
     args: ArgsType;
   };
@@ -34,13 +35,16 @@ export function getToolCallDataSchema(historyItemSchema?: z.ZodTypeAny) {
   const schema = historyItemSchema ?? z.any();
 
   return z.object({
+    name: z.string().optional(),
     history: z.array(schema).optional(),
     clientHistory: z.array(ContentSchema).optional(),
     commitHash: z.string().optional(),
-    toolCall: z.object({
-      name: z.string(),
-      args: z.record(z.unknown()),
-    }),
+    toolCall: z
+      .object({
+        name: z.string(),
+        args: z.record(z.unknown()),
+      })
+      .optional(),
     messageId: z.string().optional(),
   });
 }
@@ -153,6 +157,50 @@ export async function processRestorableToolCalls<HistoryType>(
   }
 
   return { checkpointsToWrite, toolCallToCheckpointMap, errors };
+}
+
+export async function createManualCheckpoint<HistoryType>(
+  name: string,
+  gitService: GitService,
+  geminiClient: GeminiClient,
+  history?: HistoryType,
+): Promise<{ fileName: string; content: string }> {
+  let commitHash: string | undefined;
+  try {
+    commitHash = await gitService.createFileSnapshot(`Checkpoint: ${name}`);
+  } catch (_error) {
+    commitHash = await gitService.getCurrentCommitHash();
+  }
+
+  if (!commitHash) {
+    throw new Error('Failed to create snapshot for checkpoint.');
+  }
+
+  const timestamp = new Date()
+    .toISOString()
+    .replace(/:/g, '-')
+    .replace(/\./g, '_');
+  const safeName = name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+  const fileName = `${timestamp}-${safeName}.json`;
+
+  const clientHistory = geminiClient.getHistory();
+  // Find the last user message ID to anchor the rewind
+  const lastUserMessage = [...clientHistory]
+    .reverse()
+    .find((m) => m.role === 'user');
+
+  const checkpointData: ToolCallData<HistoryType> = {
+    name,
+    history,
+    clientHistory,
+    commitHash,
+    messageId: lastUserMessage ? 'last_user_turn' : undefined,
+  };
+
+  return {
+    fileName,
+    content: JSON.stringify(checkpointData, null, 2),
+  };
 }
 
 export interface CheckpointInfo {

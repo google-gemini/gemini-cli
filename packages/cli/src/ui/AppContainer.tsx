@@ -892,6 +892,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     historyManager.addItem,
     historyManager.clearItems,
     historyManager.loadHistory,
+    historyManager.history,
     refreshStatic,
     toggleVimEnabled,
     setIsProcessing,

@@ -12,6 +12,7 @@ import {
   formatCheckpointDisplayList,
   getTruncatedCheckpointNames,
   processRestorableToolCalls,
+  createManualCheckpoint,
   getCheckpointInfoList,
 } from './checkpointUtils.js';
 import type { GitService } from '../services/gitService.js';
@@ -261,6 +262,52 @@ describe('checkpoint utils', () => {
       expect(errors[0]).toContain('Failed to create new snapshot');
       expect(errors[1]).toContain('Failed to create snapshot for replace');
       expect(checkpointsToWrite.size).toBe(0);
+    });
+  });
+
+  describe('createManualCheckpoint', () => {
+    const mockGitService = {
+      createFileSnapshot: vi.fn(),
+      getCurrentCommitHash: vi.fn(),
+    } as unknown as GitService;
+
+    const mockGeminiClient = {
+      getHistory: vi.fn(),
+      getChat: vi.fn(),
+    } as unknown as GeminiClient;
+
+    const mockChat = {
+      getHistory: vi.fn(),
+    };
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+      (mockGeminiClient.getChat as Mock).mockReturnValue(mockChat);
+    });
+
+    it('should create a named checkpoint', async () => {
+      (mockGitService.createFileSnapshot as Mock).mockResolvedValue(
+        'named-hash',
+      );
+      (mockGeminiClient.getHistory as Mock).mockReturnValue([
+        { role: 'user', parts: [] },
+      ]);
+      (mockChat.getHistory).mockReturnValue([
+        { role: 'user', parts: [] },
+      ]);
+
+      const { fileName, content } = await createManualCheckpoint(
+        'my-named-checkpoint',
+        mockGitService,
+        mockGeminiClient,
+        'ui-history',
+      );
+
+      expect(fileName).toContain('my_named_checkpoint');
+      const data = JSON.parse(content);
+      expect(data.name).toBe('my-named-checkpoint');
+      expect(data.commitHash).toBe('named-hash');
+      expect(data.history).toBe('ui-history');
     });
   });
 

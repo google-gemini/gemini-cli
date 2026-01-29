@@ -48,6 +48,8 @@ export interface CommandContext {
   ui: {
     /** Adds a new item to the history display. */
     addItem: UseHistoryManagerReturn['addItem'];
+    /** Returns the current chat history. */
+    getHistory: () => HistoryItem[];
     /** Clears all history items and the console screen. */
     clear: () => void;
     /**

@@ -8,8 +8,6 @@ import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
 import {
-  type Config,
-  formatCheckpointDisplayList,
   getToolCallDataSchema,
   getTruncatedCheckpointNames,
   performRestore,
@@ -32,7 +30,7 @@ const HistoryItemSchema = z
 
 const ToolCallDataSchema = getToolCallDataSchema(HistoryItemSchema);
 
-async function restoreAction(
+async function revertAction(
   context: CommandContext,
   args: string,
 ): Promise<void | SlashCommandActionReturn> {
@@ -46,39 +44,83 @@ async function restoreAction(
     return {
       type: 'message',
       messageType: 'error',
-      content: 'Could not determine the .gemini directory path.',
+      content: 'Could not determine the checkpoints directory path.',
     };
   }
 
   try {
-    // Ensure the directory exists before trying to read it.
     await fs.mkdir(checkpointDir, { recursive: true });
     const files = await fs.readdir(checkpointDir);
-    const jsonFiles = files.filter((file) => file.endsWith('.json'));
+    const jsonFiles = files
+      .filter((file) => file.endsWith('.json'))
+      .sort()
+      .reverse();
 
     if (!args) {
       if (jsonFiles.length === 0) {
         return {
           type: 'message',
           messageType: 'info',
-          content: 'No restorable tool calls found.',
+          content:
+            'No checkpoints found. Use /checkpoint <name> to create one.',
         };
       }
-      const fileList = formatCheckpointDisplayList(jsonFiles);
+
+      // Read all files to find named ones
+      const namedCheckpoints: string[] = [];
+      for (const file of jsonFiles) {
+        try {
+          const content = await fs.readFile(
+            path.join(checkpointDir, file),
+            'utf-8',
+          );
+          const data = JSON.parse(content) as ToolCallData;
+          const displayName = data.name ? `${data.name} (${file})` : file;
+          namedCheckpoints.push(displayName);
+        } catch (_e) {
+          namedCheckpoints.push(file);
+        }
+      }
+
       return {
         type: 'message',
         messageType: 'info',
-        content: `Available tool calls to restore:\n\n${fileList}`,
+        content: `Available checkpoints:\n\n${namedCheckpoints.join('\n')}\n\nUse /revert <name_or_filename> to restore.`,
       };
     }
 
-    const selectedFile = args.endsWith('.json') ? args : `${args}.json`;
+    const searchTerm = args.trim();
+    let selectedFile: string | undefined;
 
-    if (!jsonFiles.includes(selectedFile)) {
+    // Try to find by name first, then by exact filename
+    for (const file of jsonFiles) {
+      try {
+        const content = await fs.readFile(
+          path.join(checkpointDir, file),
+          'utf-8',
+        );
+        const data = JSON.parse(content) as ToolCallData;
+        if (
+          data.name === searchTerm ||
+          file === searchTerm ||
+          file === `${searchTerm}.json`
+        ) {
+          selectedFile = file;
+          break;
+        }
+      } catch (_e) {
+        if (file === searchTerm || file === `${searchTerm}.json`) {
+          selectedFile = file;
+          break;
+        }
+      }
+    }
+
+    if (!selectedFile) {
       return {
         type: 'message',
         messageType: 'error',
-        content: `File not found: ${selectedFile}`,
+        content: `Checkpoint "${searchTerm}" not found.`,
       };
     }
 
@@ -94,9 +136,6 @@ async function restoreAction(
       };
     }
 
-    // We safely cast here because:
-    // 1. ToolCallDataSchema strictly validates the existence of 'history' as an array and 'id'/'type' on each item.
-    // 2. We trust that files valid according to this schema (written by useGeminiStream) contain the full HistoryItem structure.
     const toolCallData = parseResult.data as ToolCallData<
       HistoryItem[],
       Record<string, unknown>
@@ -121,6 +160,9 @@ async function restoreAction(
       }
     }
 
+    // CRITICAL: Refresh the context manager so the AI doesn't see stale file content
+    await config?.getContextManager()?.refresh();
+
     if (toolCallData.toolCall) {
       return {
         type: 'tool',
@@ -132,13 +174,13 @@ async function restoreAction(
     return {
       type: 'message',
       messageType: 'info',
-      content: 'Restored project and conversation history.',
+      content: `Successfully reverted to checkpoint "${toolCallData.name || selectedFile}".`,
     };
   } catch (error) {
     return {
       type: 'message',
       messageType: 'error',
-      content: `Could not read restorable tool calls. This is the error: ${error}`,
+      content: `Error during revert: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
 }
@@ -156,24 +198,32 @@ async function completion(
   try {
     const files = await fs.readdir(checkpointDir);
     const jsonFiles = files.filter((file) => file.endsWith('.json'));
-    return getTruncatedCheckpointNames(jsonFiles);
+
+    const names: string[] = [];
+    for (const file of jsonFiles) {
+      try {
+        const content = await fs.readFile(
+          path.join(checkpointDir, file),
+          'utf-8',
+        );
+        const data = JSON.parse(content) as ToolCallData;
+        if (data.name) names.push(data.name);
+      } catch (_e) {
+        // Ignore errors reading individual checkpoint files during completion
+      }
+    }
+
+    return [...names, ...getTruncatedCheckpointNames(jsonFiles)];
   } catch (_err) {
     return [];
   }
 }
 
-export const restoreCommand = (config: Config | null): SlashCommand | null => {
-  if (!config?.getCheckpointingEnabled()) {
-    return null;
-  }
-
-  return {
-    name: 'restore',
-    description:
-      'Restore a tool call. This will reset the conversation and file history to the state it was in when the tool call was suggested',
-    kind: CommandKind.BUILT_IN,
-    autoExecute: true,
-    action: restoreAction,
-    completion,
-  };
+export const revertCommand: SlashCommand = {
+  name: 'revert',
+  description: 'Revert the project and conversation to a previous checkpoint',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: revertAction,
+  completion,
 };

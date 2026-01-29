@@ -27,6 +27,7 @@ import {
   EDIT_TOOL_NAMES,
   ASK_USER_TOOL_NAME,
   processRestorableToolCalls,
+  createManualCheckpoint,
   recordToolCallInteractions,
   ToolErrorType,
   ValidationRequiredError,
@@ -174,6 +175,8 @@ export const useGeminiStream = (
     useStateAndRef<HistoryItemWithoutId | null>(null);
   const [lastGeminiActivityTime, setLastGeminiActivityTime] =
     useState<number>(0);
+  const historyRef = useRef(history);
+  historyRef.current = history;
   const [pushedToolCallIds, pushedToolCallIdsRef, setPushedToolCallIds] =
     useStateAndRef<Set<string>>(new Set());
   const [_isFirstToolInGroup, isFirstToolInGroupRef, setIsFirstToolInGroup] =
@@ -1210,6 +1213,31 @@ export const useGeminiStream = (
               setThought(null); // Reset thought when starting a new prompt
             }
 
+            if (
+              !options?.isContinuation &&
+              config.getCheckpointingEnabled() &&
+              gitService
+            ) {
+              try {
+                const { fileName, content } = await createManualCheckpoint(
+                  `Auto-checkpoint before: ${
+                    typeof queryToSend === 'string'
+                      ? queryToSend.slice(0, 50)
+                      : 'tool response'
+                  }`,
+                  gitService,
+                  geminiClient,
+                  history,
+                );
+                const checkpointDir =
+                  config.storage.getProjectTempCheckpointsDir();
+                await fs.mkdir(checkpointDir, { recursive: true });
+                await fs.writeFile(path.join(checkpointDir, fileName), content);
+              } catch (e) {
+                onDebugMessage(`Failed to create auto-checkpoint: ${e}`);
+              }
+            }
+
             setIsResponding(true);
             setInitError(null);
 
@@ -1320,6 +1348,9 @@ export const useGeminiStream = (
       config,
       startNewPrompt,
       getPromptCount,
+      gitService,
+      history,
+      onDebugMessage,
     ],
   );
 
@@ -1546,7 +1577,7 @@ export const useGeminiStream = (
           restorableToolCalls.map((call) => call.request),
           gitService,
           geminiClient,
-          history,
+          historyRef.current,
         );
 
         if (errors.length > 0) {
@@ -1571,15 +1602,7 @@ export const useGeminiStream = (
     };
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     saveRestorableToolCalls();
-  }, [
-    toolCalls,
-    config,
-    onDebugMessage,
-    gitService,
-    history,
-    geminiClient,
-    storage,
-  ]);
+  }, [toolCalls, config, onDebugMessage, gitService, geminiClient, storage]);
 
   const lastOutputTime = Math.max(
     lastToolOutputTime,
