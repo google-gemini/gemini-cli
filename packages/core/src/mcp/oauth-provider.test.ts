@@ -1154,6 +1154,55 @@ describe('MCPOAuthProvider', () => {
         expect.any(Function),
       );
     });
+    it('should include server name in the authentication message', async () => {
+      // Mock HTTP server callback
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        // Simulate OAuth callback
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          };
+          const mockRes = {
+            writeHead: vi.fn(),
+            end: vi.fn(),
+          };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+
+      // Mock token exchange
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockTokenResponse),
+          json: mockTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+
+      await authProvider.authenticate(
+        'production-server',
+        mockConfig,
+        undefined,
+      );
+
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'info',
+        expect.stringContaining('production-server'),
+      );
+    });
   });
 
   describe('refreshAccessToken', () => {

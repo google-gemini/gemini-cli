@@ -8,13 +8,11 @@ import type {
   Config,
   ToolCallRequestInfo,
   ResumedSessionData,
-  CompletedToolCall,
   UserFeedbackPayload,
 } from '@google/gemini-cli-core';
 import { isSlashCommand } from './ui/utils/commandUtils.js';
 import type { LoadedSettings } from './config/settings.js';
 import {
-  executeToolCall,
   GeminiEventType,
   FatalInputError,
   promptIdContext,
@@ -29,6 +27,8 @@ import {
   createWorkingStdio,
   recordToolCallInteractions,
   ToolErrorType,
+  Scheduler,
+  ROOT_SCHEDULER_ID,
 } from '@google/gemini-cli-core';
 
 import type { Content, Part } from '@google/genai';
@@ -70,6 +70,14 @@ export async function runNonInteractive({
         coreEvents.emitConsoleLog(msg.type, msg.content);
       },
     });
+
+    if (config.storage && process.env['GEMINI_CLI_ACTIVITY_LOG_FILE']) {
+      const { registerActivityLogger } = await import(
+        './utils/activityLogger.js'
+      );
+      registerActivityLogger(config);
+    }
+
     const { stdout: workingStdout } = createWorkingStdio();
     const textOutput = new TextOutput(workingStdout);
 
@@ -202,6 +210,12 @@ export async function runNonInteractive({
       });
 
       const geminiClient = config.getGeminiClient();
+      const scheduler = new Scheduler({
+        config,
+        messageBus: config.getMessageBus(),
+        getPreferredEditor: () => undefined,
+        schedulerId: ROOT_SCHEDULER_ID,
+      });
 
       // Initialize chat.  Resume if resume data is passed.
       if (resumedSessionData) {
@@ -375,25 +389,23 @@ export async function runNonInteractive({
 
         if (toolCallRequests.length > 0) {
           textOutput.ensureTrailingNewline();
+          const completedToolCalls = await scheduler.schedule(
+            toolCallRequests,
+            abortController.signal,
+          );
           const toolResponseParts: Part[] = [];
-          const completedToolCalls: CompletedToolCall[] = [];
 
-          for (const requestInfo of toolCallRequests) {
-            const completedToolCall = await executeToolCall(
-              config,
-              requestInfo,
-              abortController.signal,
-            );
+          for (const completedToolCall of completedToolCalls) {
             const toolResponse = completedToolCall.response;
-
-            completedToolCalls.push(completedToolCall);
+            const requestInfo = completedToolCall.request;
 
             if (streamFormatter) {
               streamFormatter.emitEvent({
                 type: JsonStreamEventType.TOOL_RESULT,
                 timestamp: new Date().toISOString(),
                 tool_id: requestInfo.callId,
-                status: toolResponse.error ? 'error' : 'success',
+                status:
+                  completedToolCall.status === 'error' ? 'error' : 'success',
                 output:
                   typeof toolResponse.resultDisplay === 'string'
                     ? toolResponse.resultDisplay

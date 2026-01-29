@@ -31,6 +31,7 @@ import type { ContentGenerator } from './contentGenerator.js';
 import { LoggingContentGenerator } from './loggingContentGenerator.js';
 import type { Config } from '../config/config.js';
 import { ApiRequestEvent } from '../telemetry/types.js';
+import { UserTierId } from '../code_assist/types.js';
 
 describe('LoggingContentGenerator', () => {
   let wrapped: ContentGenerator;
@@ -300,6 +301,18 @@ describe('LoggingContentGenerator', () => {
 
       expect(wrapped.embedContent).toHaveBeenCalledWith(req);
       expect(result).toBe(response);
+    });
+  });
+
+  describe('delegation', () => {
+    it('should delegate userTier to wrapped', () => {
+      wrapped.userTier = UserTierId.STANDARD;
+      expect(loggingContentGenerator.userTier).toBe(UserTierId.STANDARD);
+    });
+
+    it('should delegate userTierName to wrapped', () => {
+      wrapped.userTierName = 'Standard Tier';
+      expect(loggingContentGenerator.userTierName).toBe('Standard Tier');
     });
   });
 });

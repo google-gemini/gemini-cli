@@ -59,7 +59,7 @@ export async function refreshMemory(
     fileCount = result.fileCount;
   }
 
-  await config.updateSystemInstructionIfInitialized();
+  config.updateSystemInstructionIfInitialized();
   let content: string;
 
   if (memoryContent.length > 0) {

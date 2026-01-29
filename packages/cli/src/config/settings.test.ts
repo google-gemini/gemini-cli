@@ -2012,6 +2012,56 @@ describe('Settings Loading and Merging', () => {
       // Merged should also reflect it (system overrides defaults, but both are migrated)
       expect(settings.merged.general?.enableAutoUpdateNotification).toBe(false);
     });
+
+    it('should migrate experimental agent settings to agents overrides', () => {
+      const userSettingsContent = {
+        experimental: {
+          codebaseInvestigatorSettings: {
+            enabled: true,
+            maxNumTurns: 15,
+            maxTimeMinutes: 5,
+            thinkingBudget: 16384,
+            model: 'gemini-1.5-pro',
+          },
+          cliHelpAgentSettings: {
+            enabled: false,
+          },
+        },
+      };
+
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      // Verify migration to agents.overrides
+      expect(settings.user.settings.agents?.overrides).toMatchObject({
+        codebase_investigator: {
+          enabled: true,
+          runConfig: {
+            maxTurns: 15,
+            maxTimeMinutes: 5,
+          },
+          modelConfig: {
+            model: 'gemini-1.5-pro',
+            generateContentConfig: {
+              thinkingConfig: {
+                thinkingBudget: 16384,
+              },
+            },
+          },
+        },
+        cli_help: {
+          enabled: false,
+        },
+      });
+    });
   });
 
   describe('saveSettings', () => {
@@ -2106,7 +2156,7 @@ describe('Settings Loading and Merging', () => {
 
       // 2. Now, set remote admin settings.
       loadedSettings.setRemoteAdminSettings({
-        secureModeEnabled: true,
+        strictModeDisabled: false,
         mcpSetting: { mcpEnabled: false },
         cliFeatureSetting: { extensionsSetting: { extensionsEnabled: false } },
       });
@@ -2147,7 +2197,7 @@ describe('Settings Loading and Merging', () => {
       expect(loadedSettings.merged.ui?.theme).toBe('initial-theme');
 
       const newRemoteSettings = {
-        secureModeEnabled: true,
+        strictModeDisabled: false,
         mcpSetting: { mcpEnabled: false },
         cliFeatureSetting: { extensionsSetting: { extensionsEnabled: false } },
       };
@@ -2163,10 +2213,10 @@ describe('Settings Loading and Merging', () => {
 
       // Verify that calling setRemoteAdminSettings with partial data overwrites previous remote settings
       // and missing properties revert to schema defaults.
-      loadedSettings.setRemoteAdminSettings({ secureModeEnabled: false });
+      loadedSettings.setRemoteAdminSettings({ strictModeDisabled: true });
       expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true); // Reverts to default: true
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true); // Reverts to default: true
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false); // Defaulting to false if missing
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false); // Defaulting to false if missing
     });
 
     it('should correctly handle undefined remote admin settings', () => {
@@ -2221,25 +2271,25 @@ describe('Settings Loading and Merging', () => {
       expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
 
-      // Set remote settings with only secureModeEnabled
+      // Set remote settings with only strictModeDisabled (false -> secureModeEnabled: true)
       loadedSettings.setRemoteAdminSettings({
-        secureModeEnabled: true,
+        strictModeDisabled: false,
       });
 
-      // Verify secureModeEnabled is updated, others remain defaults
+      // Verify secureModeEnabled is updated, others default to false
       expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
 
       // Set remote settings with only mcpSetting.mcpEnabled
       loadedSettings.setRemoteAdminSettings({
         mcpSetting: { mcpEnabled: false },
       });
 
-      // Verify mcpEnabled is updated, others remain defaults (secureModeEnabled reverts to default:false)
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
+      // Verify mcpEnabled is updated, others remain defaults (secureModeEnabled defaults to true if strictModeDisabled is missing)
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
       expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
 
       // Set remote settings with only cliFeatureSetting.extensionsSetting.extensionsEnabled
       loadedSettings.setRemoteAdminSettings({
@@ -2247,26 +2297,106 @@ describe('Settings Loading and Merging', () => {
       });
 
       // Verify extensionsEnabled is updated, others remain defaults
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
+
+      // Verify that missing strictModeDisabled falls back to secureModeEnabled
+      loadedSettings.setRemoteAdminSettings({
+        secureModeEnabled: false,
+      });
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
+
+      loadedSettings.setRemoteAdminSettings({
+        secureModeEnabled: true,
+      });
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
+
+      // Verify strictModeDisabled takes precedence over secureModeEnabled
+      loadedSettings.setRemoteAdminSettings({
+        strictModeDisabled: false,
+        secureModeEnabled: false,
+      });
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
+
+      loadedSettings.setRemoteAdminSettings({
+        strictModeDisabled: true,
+        secureModeEnabled: true,
+      });
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
     });
 
-    it('should set skills based on advancedFeaturesEnabled', () => {
+    it('should set skills based on unmanagedCapabilitiesEnabled', () => {
       const loadedSettings = loadSettings();
       loadedSettings.setRemoteAdminSettings({
         cliFeatureSetting: {
-          advancedFeaturesEnabled: true,
+          unmanagedCapabilitiesEnabled: true,
         },
       });
       expect(loadedSettings.merged.admin.skills?.enabled).toBe(true);
 
       loadedSettings.setRemoteAdminSettings({
         cliFeatureSetting: {
-          advancedFeaturesEnabled: false,
+          unmanagedCapabilitiesEnabled: false,
         },
       });
       expect(loadedSettings.merged.admin.skills?.enabled).toBe(false);
+    });
+
+    it('should default mcp.enabled to false if mcpSetting is present but mcpEnabled is undefined', () => {
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      loadedSettings.setRemoteAdminSettings({
+        mcpSetting: {},
+      });
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
+    });
+
+    it('should default extensions.enabled to false if extensionsSetting is present but extensionsEnabled is undefined', () => {
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      loadedSettings.setRemoteAdminSettings({
+        cliFeatureSetting: {
+          extensionsSetting: {},
+        },
+      });
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
+    });
+
+    it('should force secureModeEnabled to true if undefined, overriding schema defaults', () => {
+      // Mock schema to have secureModeEnabled default to false to verify the override
+      const originalSchema = getSettingsSchema();
+      const modifiedSchema = JSON.parse(JSON.stringify(originalSchema));
+      if (modifiedSchema.admin?.properties?.secureModeEnabled) {
+        modifiedSchema.admin.properties.secureModeEnabled.default = false;
+      }
+      vi.mocked(getSettingsSchema).mockReturnValue(modifiedSchema);
+
+      try {
+        (mockFsExistsSync as Mock).mockReturnValue(true);
+        (fs.readFileSync as Mock).mockImplementation(() => '{}');
+
+        const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+
+        // Pass a non-empty object that doesn't have strictModeDisabled
+        loadedSettings.setRemoteAdminSettings({
+          mcpSetting: {},
+        });
+
+        // It should be forced to true by the logic (default secure), overriding the mock default of false
+        expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
+      } finally {
+        vi.mocked(getSettingsSchema).mockReturnValue(originalSchema);
+      }
+    });
+
+    it('should handle completely empty remote admin settings response', () => {
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      loadedSettings.setRemoteAdminSettings({});
+
+      // Should default to schema defaults (standard defaults)
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
     });
   });
 

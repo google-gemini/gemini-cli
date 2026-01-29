@@ -8,7 +8,6 @@ import { z } from 'zod';
 import type { Config } from '../config/config.js';
 import { getCoreSystemPrompt } from '../core/prompts.js';
 import type { LocalAgentDefinition } from './types.js';
-import { DELEGATE_TO_AGENT_TOOL_NAME } from '../tools/tool-names.js';
 
 const GeneralistAgentSchema = z.object({
   response: z.string().describe('The final response from the agent.'),
@@ -28,12 +27,15 @@ export const GeneralistAgent = (
     "A general-purpose AI agent with access to all tools. Use it for complex tasks that don't fit into other specialized agents.",
   experimental: true,
   inputConfig: {
-    inputs: {
-      request: {
-        description: 'The task or question for the generalist agent.',
-        type: 'string',
-        required: true,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        request: {
+          type: 'string',
+          description: 'The task or question for the generalist agent.',
+        },
       },
+      required: ['request'],
     },
   },
   outputConfig: {
@@ -45,11 +47,7 @@ export const GeneralistAgent = (
     model: 'inherit',
   },
   get toolConfig() {
-    // TODO(15179): Support recursive agent invocation.
-    const tools = config
-      .getToolRegistry()
-      .getAllToolNames()
-      .filter((name) => name !== DELEGATE_TO_AGENT_TOOL_NAME);
+    const tools = config.getToolRegistry().getAllToolNames();
     return {
       tools,
     };

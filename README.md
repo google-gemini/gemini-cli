@@ -4,7 +4,7 @@
 [![Gemini CLI E2E (Chained)](https://github.com/google-gemini/gemini-cli/actions/workflows/chained_e2e.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/chained_e2e.yml)
 [![Version](https://img.shields.io/npm/v/@google/gemini-cli)](https://www.npmjs.com/package/@google/gemini-cli)
 [![License](https://img.shields.io/github/license/google-gemini/gemini-cli)](https://github.com/google-gemini/gemini-cli/blob/main/LICENSE)
-[![View Code Wiki](https://www.gstatic.com/_/boq-sdlc-agents-ui/_/r/YUi5dj2UWvE.svg)](https://codewiki.google/github.com/google-gemini/gemini-cli)
+[![View Code Wiki](https://assets.codewiki.google/readme-badge/static.svg)](https://codewiki.google/github.com/google-gemini/gemini-cli?utm_source=badge&utm_medium=github&utm_campaign=github.com/google-gemini/gemini-cli)
 
 ![Gemini CLI Screenshot](./docs/assets/gemini-screenshot.png)
 
@@ -53,6 +53,23 @@ npm install -g @google/gemini-cli
 
 ```bash
 brew install gemini-cli
+```
+
+#### Install globally with MacPorts (macOS)
+
+```bash
+sudo port install gemini-cli
+```
+
+#### Install with Anaconda (for restricted environments)
+
+```bash
+# Create and activate a new environment
+conda create -y -n gemini_env -c conda-forge nodejs
+conda activate gemini_env
+
+# Install Gemini CLI globally via npm (inside the environment)
+npm install -g @google/gemini-cli
 ```
 
 ## Release Cadence and Tags

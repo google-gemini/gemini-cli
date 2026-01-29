@@ -69,7 +69,10 @@ export function getInstallationInfo(
         updateMessage: 'Running via npx, update not applicable.',
       };
     }
-    if (realPath.includes('/.pnpm/_pnpx')) {
+    if (
+      realPath.includes('/.pnpm/_pnpx') ||
+      realPath.includes('/.cache/pnpm/dlx')
+    ) {
       return {
         packageManager: PackageManager.PNPX,
         isGlobal: false,
@@ -103,7 +106,10 @@ export function getInstallationInfo(
     }
 
     // Check for pnpm
-    if (realPath.includes('/.pnpm/global')) {
+    if (
+      realPath.includes('/.pnpm/global') ||
+      realPath.includes('/.local/share/pnpm')
+    ) {
       const updateCommand = 'pnpm add -g @google/gemini-cli@latest';
       return {
         packageManager: PackageManager.PNPM,
@@ -136,7 +142,7 @@ export function getInstallationInfo(
         updateMessage: 'Running via bunx, update not applicable.',
       };
     }
-    if (realPath.includes('/.bun/bin')) {
+    if (realPath.includes('/.bun/install/global')) {
       const updateCommand = 'bun add -g @google/gemini-cli@latest';
       return {
         packageManager: PackageManager.BUN,

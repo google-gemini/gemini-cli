@@ -62,11 +62,18 @@ powerful tool for developers.
 - **Imports:** Use specific imports and avoid restricted relative imports
   between packages (enforced by ESLint).
 
+## Testing Conventions
+
+- **Environment Variables:** When testing code that depends on environment
+  variables, use `vi.stubEnv('NAME', 'value')` in `beforeEach` and
+  `vi.unstubAllEnvs()` in `afterEach`. Avoid modifying `process.env` directly as
+  it can lead to test leakage and is less reliable. To "unset" a variable, use
+  an empty string `vi.stubEnv('NAME', '')`.
+
 ## Documentation
 
-- Located in the `docs/` directory.
-- Architecture overview: `docs/architecture.md`.
-- Contribution guide: `CONTRIBUTING.md`.
-- Documentation is organized via `docs/sidebar.json`.
-- Follows the
-  [Google Developer Documentation Style Guide](https://developers.google.com/style).
+- Always use the `docs-writer` skill when you are asked to write, edit, or
+  review any documentation.
+- Documentation is located in the `docs/` directory.
+- Suggest documentation updates when code changes render existing documentation
+  obsolete or incomplete.

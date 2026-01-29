@@ -6,7 +6,6 @@
 
 import {
   isFolderTrustEnabled,
-  isWorkspaceTrusted,
   loadTrustedFolders,
 } from '../../config/trustedFolders.js';
 import { MultiFolderTrustDialog } from '../components/MultiFolderTrustDialog.js';
@@ -20,6 +19,8 @@ import {
   batchAddDirectories,
 } from '../utils/directoryUtils.js';
 import type { Config } from '@google/gemini-cli-core';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
 
 async function finishAddingDirectories(
   config: Config,
@@ -38,22 +39,31 @@ async function finishAddingDirectories(
     return;
   }
 
-  try {
-    if (config.shouldLoadMemoryFromIncludeDirectories()) {
-      await refreshServerHierarchicalMemory(config);
+  if (added.length > 0) {
+    try {
+      if (config.shouldLoadMemoryFromIncludeDirectories()) {
+        await refreshServerHierarchicalMemory(config);
+      }
+      addItem({
+        type: MessageType.INFO,
+        text: `Successfully added GEMINI.md files from the following directories if there are:\n- ${added.join('\n- ')}`,
+      });
+    } catch (error) {
+      errors.push(`Error refreshing memory: ${(error as Error).message}`);
     }
-    addItem({
-      type: MessageType.INFO,
-      text: `Successfully added GEMINI.md files from the following directories if there are:\n- ${added.join('\n- ')}`,
-    });
-  } catch (error) {
-    errors.push(`Error refreshing memory: ${(error as Error).message}`);
   }
 
   if (added.length > 0) {
     const gemini = config.getGeminiClient();
     if (gemini) {
       await gemini.addDirectoryContext();
+
+      // Persist directories to session file for resume support
+      const chatRecordingService = gemini.getChatRecordingService();
+      const workspaceContext = config.getWorkspaceContext();
+      chatRecordingService?.recordDirectories(
+        workspaceContext.getDirectories(),
+      );
     }
     addItem({
       type: MessageType.INFO,
@@ -92,12 +102,38 @@ export const directoryCommand: SlashCommand = {
 
         const suggestions = await getDirectorySuggestions(trimmedLastPart);
 
-        if (parts.length > 1) {
-          const prefix = parts.slice(0, -1).join(',') + ',';
-          return suggestions.map((s) => prefix + leadingWhitespace + s);
+        // Filter out existing directories
+        let filteredSuggestions = suggestions;
+        if (context.services.config) {
+          const workspaceContext =
+            context.services.config.getWorkspaceContext();
+          const existingDirs = new Set(
+            workspaceContext.getDirectories().map((dir) => path.resolve(dir)),
+          );
+
+          filteredSuggestions = suggestions.filter((s) => {
+            const expanded = expandHomeDir(s);
+            const absolute = path.resolve(expanded);
+
+            if (existingDirs.has(absolute)) {
+              return false;
+            }
+            if (
+              absolute.endsWith(path.sep) &&
+              existingDirs.has(absolute.slice(0, -1))
+            ) {
+              return false;
+            }
+            return true;
+          });
         }
 
-        return suggestions.map((s) => leadingWhitespace + s);
+        if (parts.length > 1) {
+          const prefix = parts.slice(0, -1).join(',') + ',';
+          return filteredSuggestions.map((s) => prefix + leadingWhitespace + s);
+        }
+
+        return filteredSuggestions.map((s) => leadingWhitespace + s);
       },
       action: async (context: CommandContext, args: string) => {
         const {
@@ -144,12 +180,23 @@ export const directoryCommand: SlashCommand = {
         const pathsToProcess: string[] = [];
 
         for (const pathToAdd of pathsToAdd) {
-          const expandedPath = expandHomeDir(pathToAdd.trim());
-          if (currentWorkspaceDirs.includes(expandedPath)) {
-            alreadyAdded.push(pathToAdd.trim());
-          } else {
-            pathsToProcess.push(pathToAdd.trim());
+          const trimmedPath = pathToAdd.trim();
+          const expandedPath = expandHomeDir(trimmedPath);
+          try {
+            const absolutePath = path.resolve(
+              workspaceContext.targetDir,
+              expandedPath,
+            );
+            const resolvedPath = fs.realpathSync(absolutePath);
+            if (currentWorkspaceDirs.includes(resolvedPath)) {
+              alreadyAdded.push(trimmedPath);
+              continue;
+            }
+          } catch (_e) {
+            // Path might not exist or be inaccessible.
+            // We'll let batchAddDirectories handle it later.
           }
+          pathsToProcess.push(trimmedPath);
         }
 
         if (alreadyAdded.length > 0) {
@@ -165,33 +212,22 @@ export const directoryCommand: SlashCommand = {
           return;
         }
 
-        if (
-          isFolderTrustEnabled(settings.merged) &&
-          isWorkspaceTrusted(settings.merged).isTrusted
-        ) {
+        if (isFolderTrustEnabled(settings.merged)) {
           const trustedFolders = loadTrustedFolders();
-          const untrustedDirs: string[] = [];
-          const undefinedTrustDirs: string[] = [];
+          const dirsToConfirm: string[] = [];
           const trustedDirs: string[] = [];
 
           for (const pathToAdd of pathsToProcess) {
-            const expandedPath = expandHomeDir(pathToAdd.trim());
+            const expandedPath = path.resolve(expandHomeDir(pathToAdd.trim()));
             const isTrusted = trustedFolders.isPathTrusted(expandedPath);
-            if (isTrusted === false) {
-              untrustedDirs.push(pathToAdd.trim());
-            } else if (isTrusted === undefined) {
-              undefinedTrustDirs.push(pathToAdd.trim());
-            } else {
+            // If explicitly trusted, add immediately.
+            // If undefined or explicitly untrusted (DO_NOT_TRUST), prompt for confirmation.
+            // This allows users to "upgrade" a DO_NOT_TRUST folder to trusted via the dialog.
+            if (isTrusted === true) {
               trustedDirs.push(pathToAdd.trim());
+            } else {
+              dirsToConfirm.push(pathToAdd.trim());
             }
-          }
-
-          if (untrustedDirs.length > 0) {
-            errors.push(
-              `The following directories are explicitly untrusted and cannot be added to a trusted workspace:\n- ${untrustedDirs.join(
-                '\n- ',
-              )}\nPlease use the permissions command to modify their trust level.`,
-            );
           }
 
           if (trustedDirs.length > 0) {
@@ -200,12 +236,12 @@ export const directoryCommand: SlashCommand = {
             errors.push(...result.errors);
           }
 
-          if (undefinedTrustDirs.length > 0) {
+          if (dirsToConfirm.length > 0) {
             return {
               type: 'custom_dialog',
               component: (
                 <MultiFolderTrustDialog
-                  folders={undefinedTrustDirs}
+                  folders={dirsToConfirm}
                   onComplete={context.ui.removeComponent}
                   trustedDirs={added}
                   errors={errors}

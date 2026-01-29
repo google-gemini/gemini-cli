@@ -34,6 +34,13 @@ import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
 import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../../constants.js';
 
+const LARGE_PASTE_LINE_THRESHOLD = 5;
+const LARGE_PASTE_CHAR_THRESHOLD = 500;
+
+// Regex to match paste placeholders like [Pasted Text: 6 lines] or [Pasted Text: 501 chars #2]
+export const PASTED_TEXT_PLACEHOLDER_REGEX =
+  /\[Pasted Text: \d+ (?:lines|chars)(?: #\d+)?\]/g;
+
 export type Direction =
   | 'left'
   | 'right'
@@ -578,6 +585,8 @@ interface UndoHistoryEntry {
   lines: string[];
   cursorRow: number;
   cursorCol: number;
+  pastedContent: Record<string, string>;
+  expandedPaste: ExpandedPasteInfo | null;
 }
 
 function calculateInitialCursorPosition(
@@ -693,6 +702,8 @@ export interface Transformation {
   logEnd: number;
   logicalText: string;
   collapsedText: string;
+  type: 'image' | 'paste';
+  id?: string; // For paste placeholders
 }
 export const imagePathRegex =
   /@((?:\\.|[^\s\r\n\\])+?\.(?:png|jpg|jpeg|gif|webp|svg|bmp))\b/gi;
@@ -741,11 +752,10 @@ export function calculateTransformationsForLine(
   }
 
   const transformations: Transformation[] = [];
-  let match: RegExpExecArray | null;
 
-  // Reset regex state to ensure clean matching from start of line
+  // 1. Detect image paths
   imagePathRegex.lastIndex = 0;
-
+  let match: RegExpExecArray | null;
   while ((match = imagePathRegex.exec(line)) !== null) {
     const logicalText = match[0];
     const logStart = cpLen(line.substring(0, match.index));
@@ -756,8 +766,29 @@ export function calculateTransformationsForLine(
       logEnd,
       logicalText,
       collapsedText: getTransformedImagePath(logicalText),
+      type: 'image',
     });
   }
+
+  // 2. Detect paste placeholders
+  const pasteRegex = new RegExp(PASTED_TEXT_PLACEHOLDER_REGEX.source, 'g');
+  while ((match = pasteRegex.exec(line)) !== null) {
+    const logicalText = match[0];
+    const logStart = cpLen(line.substring(0, match.index));
+    const logEnd = logStart + cpLen(logicalText);
+
+    transformations.push({
+      logStart,
+      logEnd,
+      logicalText,
+      collapsedText: logicalText,
+      type: 'paste',
+      id: logicalText,
+    });
+  }
+
+  // Sort transformations by logStart to maintain consistency
+  transformations.sort((a, b) => a.logStart - b.logStart);
 
   transformationsCache.set(line, transformations);
 
@@ -776,11 +807,165 @@ export function getTransformUnderCursor(
   const spans = spansByLine[row];
   if (!spans || spans.length === 0) return null;
   for (const span of spans) {
-    if (col >= span.logStart && col <= span.logEnd) {
+    if (col >= span.logStart && col < span.logEnd) {
       return span;
     }
     if (col < span.logStart) break;
   }
+  return null;
+}
+
+export interface ExpandedPasteInfo {
+  id: string;
+  startLine: number;
+  lineCount: number;
+  prefix: string;
+  suffix: string;
+}
+
+/**
+ * Check if a line index falls within an expanded paste region.
+ * Returns the paste placeholder ID if found, null otherwise.
+ */
+export function getExpandedPasteAtLine(
+  lineIndex: number,
+  expandedPaste: ExpandedPasteInfo | null,
+): string | null {
+  if (
+    expandedPaste &&
+    lineIndex >= expandedPaste.startLine &&
+    lineIndex < expandedPaste.startLine + expandedPaste.lineCount
+  ) {
+    return expandedPaste.id;
+  }
+  return null;
+}
+
+/**
+ * Surgery for expanded paste regions when lines are added or removed.
+ * Adjusts startLine indices and detaches any region that is partially or fully deleted.
+ */
+export function shiftExpandedRegions(
+  expandedPaste: ExpandedPasteInfo | null,
+  changeStartLine: number,
+  lineDelta: number,
+  changeEndLine?: number, // Inclusive
+): {
+  newInfo: ExpandedPasteInfo | null;
+  isDetached: boolean;
+} {
+  if (!expandedPaste) return { newInfo: null, isDetached: false };
+
+  const effectiveEndLine = changeEndLine ?? changeStartLine;
+  const infoEndLine = expandedPaste.startLine + expandedPaste.lineCount - 1;
+
+  // 1. Check for overlap/intersection with the changed range
+  const isOverlapping =
+    changeStartLine <= infoEndLine &&
+    effectiveEndLine >= expandedPaste.startLine;
+
+  if (isOverlapping) {
+    // If the change is a deletion (lineDelta < 0) that touches this region, we detach.
+    // If it's an insertion, we only detach if it's a multi-line insertion (lineDelta > 0)
+    // that isn't at the very start of the region (which would shift it).
+    // Regular character typing (lineDelta === 0) does NOT detach.
+    if (
+      lineDelta < 0 ||
+      (lineDelta > 0 &&
+        changeStartLine > expandedPaste.startLine &&
+        changeStartLine <= infoEndLine)
+    ) {
+      return { newInfo: null, isDetached: true };
+    }
+  }
+
+  // 2. Shift regions that start at or after the change point
+  if (expandedPaste.startLine >= changeStartLine) {
+    return {
+      newInfo: {
+        ...expandedPaste,
+        startLine: expandedPaste.startLine + lineDelta,
+      },
+      isDetached: false,
+    };
+  }
+
+  return { newInfo: expandedPaste, isDetached: false };
+}
+
+/**
+ * Detach any expanded paste region if the cursor is within it.
+ * This converts the expanded content to regular text that can no longer be collapsed.
+ * Returns the state unchanged if cursor is not in an expanded region.
+ */
+export function detachExpandedPaste(state: TextBufferState): TextBufferState {
+  const expandedId = getExpandedPasteAtLine(
+    state.cursorRow,
+    state.expandedPaste,
+  );
+  if (!expandedId) return state;
+
+  const { [expandedId]: _, ...newPastedContent } = state.pastedContent;
+  return {
+    ...state,
+    expandedPaste: null,
+    pastedContent: newPastedContent,
+  };
+}
+
+/**
+ * Represents an atomic placeholder that should be deleted as a unit.
+ * Extensible to support future placeholder types.
+ */
+interface AtomicPlaceholder {
+  start: number; // Start position in logical text
+  end: number; // End position in logical text
+  type: 'paste' | 'image'; // Type for cleanup logic
+  id?: string; // For paste placeholders: the pastedContent key
+}
+
+/**
+ * Find atomic placeholder at cursor for backspace (cursor at end).
+ * Checks all placeholder types in priority order.
+ */
+function findAtomicPlaceholderForBackspace(
+  line: string,
+  cursorCol: number,
+  transformations: Transformation[],
+): AtomicPlaceholder | null {
+  for (const transform of transformations) {
+    if (cursorCol === transform.logEnd) {
+      return {
+        start: transform.logStart,
+        end: transform.logEnd,
+        type: transform.type,
+        id: transform.id,
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Find atomic placeholder at cursor for delete (cursor at start).
+ */
+function findAtomicPlaceholderForDelete(
+  line: string,
+  cursorCol: number,
+  transformations: Transformation[],
+): AtomicPlaceholder | null {
+  for (const transform of transformations) {
+    if (cursorCol === transform.logStart) {
+      return {
+        start: transform.logStart,
+        end: transform.logEnd,
+        type: transform.type,
+        id: transform.id,
+      };
+    }
+  }
+
   return null;
 }
 
@@ -809,6 +994,7 @@ export function calculateTransformedLine(
     }
 
     const isExpanded =
+      transform.type === 'image' &&
       cursorIsOnThisLine &&
       cursorCol >= transform.logStart &&
       cursorCol <= transform.logEnd;
@@ -1184,15 +1370,21 @@ export interface TextBufferState {
   viewportWidth: number;
   viewportHeight: number;
   visualLayout: VisualLayout;
+  pastedContent: Record<string, string>;
+  expandedPaste: ExpandedPasteInfo | null;
 }
 
 const historyLimit = 100;
 
 export const pushUndo = (currentState: TextBufferState): TextBufferState => {
-  const snapshot = {
+  const snapshot: UndoHistoryEntry = {
     lines: [...currentState.lines],
     cursorRow: currentState.cursorRow,
     cursorCol: currentState.cursorCol,
+    pastedContent: { ...currentState.pastedContent },
+    expandedPaste: currentState.expandedPaste
+      ? { ...currentState.expandedPaste }
+      : null,
   };
   const newStack = [...currentState.undoStack, snapshot];
   if (newStack.length > historyLimit) {
@@ -1201,9 +1393,29 @@ export const pushUndo = (currentState: TextBufferState): TextBufferState => {
   return { ...currentState, undoStack: newStack, redoStack: [] };
 };
 
+function generatePastedTextId(
+  content: string,
+  lineCount: number,
+  pastedContent: Record<string, string>,
+): string {
+  const base =
+    lineCount > LARGE_PASTE_LINE_THRESHOLD
+      ? `[Pasted Text: ${lineCount} lines]`
+      : `[Pasted Text: ${content.length} chars]`;
+
+  let id = base;
+  let suffix = 2;
+  while (pastedContent[id]) {
+    id = base.replace(']', ` #${suffix}]`);
+    suffix++;
+  }
+  return id;
+}
+
 export type TextBufferAction =
   | { type: 'set_text'; payload: string; pushToUndo?: boolean }
-  | { type: 'insert'; payload: string }
+  | { type: 'insert'; payload: string; isPaste?: boolean }
+  | { type: 'add_pasted_content'; payload: { id: string; text: string } }
   | { type: 'backspace' }
   | {
       type: 'move';
@@ -1274,7 +1486,11 @@ export type TextBufferAction =
   | { type: 'vim_move_to_first_line' }
   | { type: 'vim_move_to_last_line' }
   | { type: 'vim_move_to_line'; payload: { lineNumber: number } }
-  | { type: 'vim_escape_insert_mode' };
+  | { type: 'vim_escape_insert_mode' }
+  | {
+      type: 'toggle_paste_expansion';
+      payload: { id: string; row: number; col: number };
+    };
 
 export interface TextBufferOptions {
   inputFilter?: (text: string) => string;
@@ -1308,11 +1524,12 @@ function textBufferReducerLogic(
         cursorRow: lastNewLineIndex,
         cursorCol: cpLen(lines[lastNewLineIndex] ?? ''),
         preferredCol: null,
+        pastedContent: action.payload === '' ? {} : nextState.pastedContent,
       };
     }
 
     case 'insert': {
-      const nextState = pushUndoLocal(state);
+      const nextState = detachExpandedPaste(pushUndoLocal(state));
       const newLines = [...nextState.lines];
       let newCursorRow = nextState.cursorRow;
       let newCursorCol = nextState.cursorCol;
@@ -1320,6 +1537,25 @@ function textBufferReducerLogic(
       const currentLine = (r: number) => newLines[r] ?? '';
 
       let payload = action.payload;
+      let newPastedContent = nextState.pastedContent;
+
+      if (action.isPaste) {
+        // Normalize line endings for pastes
+        payload = payload.replace(/\r\n|\r/g, '\n');
+        const lineCount = payload.split('\n').length;
+        if (
+          lineCount > LARGE_PASTE_LINE_THRESHOLD ||
+          payload.length > LARGE_PASTE_CHAR_THRESHOLD
+        ) {
+          const id = generatePastedTextId(payload, lineCount, newPastedContent);
+          newPastedContent = {
+            ...newPastedContent,
+            [id]: payload,
+          };
+          payload = id;
+        }
+      }
+
       if (options.singleLine) {
         payload = payload.replace(/[\r\n]/g, '');
       }
@@ -1339,6 +1575,7 @@ function textBufferReducerLogic(
       const before = cpSlice(lineContent, 0, newCursorCol);
       const after = cpSlice(lineContent, newCursorCol);
 
+      let lineDelta = 0;
       if (parts.length > 1) {
         newLines[newCursorRow] = before + parts[0];
         const remainingParts = parts.slice(1);
@@ -1349,11 +1586,22 @@ function textBufferReducerLogic(
           0,
           lastPartOriginal + after,
         );
+        lineDelta = parts.length - 1;
         newCursorRow = newCursorRow + parts.length - 1;
         newCursorCol = cpLen(lastPartOriginal);
       } else {
         newLines[newCursorRow] = before + parts[0] + after;
         newCursorCol = cpLen(before) + cpLen(parts[0]);
+      }
+
+      const { newInfo: newExpandedPaste, isDetached } = shiftExpandedRegions(
+        nextState.expandedPaste,
+        nextState.cursorRow,
+        lineDelta,
+      );
+
+      if (isDetached && newExpandedPaste === null && nextState.expandedPaste) {
+        delete newPastedContent[nextState.expandedPaste.id];
       }
 
       return {
@@ -1362,19 +1610,78 @@ function textBufferReducerLogic(
         cursorRow: newCursorRow,
         cursorCol: newCursorCol,
         preferredCol: null,
+        pastedContent: newPastedContent,
+        expandedPaste: newExpandedPaste,
+      };
+    }
+
+    case 'add_pasted_content': {
+      const { id, text } = action.payload;
+      return {
+        ...state,
+        pastedContent: {
+          ...state.pastedContent,
+          [id]: text,
+        },
       };
     }
 
     case 'backspace': {
-      const nextState = pushUndoLocal(state);
+      const stateWithUndo = pushUndoLocal(state);
+      const currentState = detachExpandedPaste(stateWithUndo);
+      const { cursorRow, cursorCol, lines, transformationsByLine } =
+        currentState;
+
+      // Early return if at start of buffer
+      if (cursorCol === 0 && cursorRow === 0) return currentState;
+
+      // Check if cursor is at end of an atomic placeholder
+      const transformations = transformationsByLine[cursorRow] ?? [];
+      const placeholder = findAtomicPlaceholderForBackspace(
+        lines[cursorRow],
+        cursorCol,
+        transformations,
+      );
+
+      if (placeholder) {
+        const nextState = currentState;
+        const newLines = [...nextState.lines];
+        newLines[cursorRow] =
+          cpSlice(newLines[cursorRow], 0, placeholder.start) +
+          cpSlice(newLines[cursorRow], placeholder.end);
+
+        // Recalculate transformations for the modified line
+        const newTransformations = [...nextState.transformationsByLine];
+        newTransformations[cursorRow] = calculateTransformationsForLine(
+          newLines[cursorRow],
+        );
+
+        // Clean up pastedContent if this was a paste placeholder
+        let newPastedContent = nextState.pastedContent;
+        if (placeholder.type === 'paste' && placeholder.id) {
+          const { [placeholder.id]: _, ...remaining } = nextState.pastedContent;
+          newPastedContent = remaining;
+        }
+
+        return {
+          ...nextState,
+          lines: newLines,
+          cursorCol: placeholder.start,
+          preferredCol: null,
+          transformationsByLine: newTransformations,
+          pastedContent: newPastedContent,
+        };
+      }
+
+      // Standard backspace logic
+      const nextState = currentState;
       const newLines = [...nextState.lines];
       let newCursorRow = nextState.cursorRow;
       let newCursorCol = nextState.cursorCol;
 
       const currentLine = (r: number) => newLines[r] ?? '';
 
-      if (newCursorCol === 0 && newCursorRow === 0) return state;
-
+      let lineDelta = 0;
       if (newCursorCol > 0) {
         const lineContent = currentLine(newCursorRow);
         newLines[newCursorRow] =
@@ -1387,8 +1694,21 @@ function textBufferReducerLogic(
         const newCol = cpLen(prevLineContent);
         newLines[newCursorRow - 1] = prevLineContent + currentLineContentVal;
         newLines.splice(newCursorRow, 1);
+        lineDelta = -1;
         newCursorRow--;
         newCursorCol = newCol;
+      }
+
+      const { newInfo: newExpandedPaste, isDetached } = shiftExpandedRegions(
+        nextState.expandedPaste,
+        nextState.cursorRow + lineDelta, // shift based on the line that was removed
+        lineDelta,
+        nextState.cursorRow,
+      );
+
+      const newPastedContent = { ...nextState.pastedContent };
+      if (isDetached && nextState.expandedPaste) {
+        delete newPastedContent[nextState.expandedPaste.id];
       }
 
       return {
@@ -1397,6 +1717,8 @@ function textBufferReducerLogic(
         cursorRow: newCursorRow,
         cursorCol: newCursorCol,
         preferredCol: null,
+        pastedContent: newPastedContent,
+        expandedPaste: newExpandedPaste,
       };
     }
 
@@ -1584,39 +1906,96 @@ function textBufferReducerLogic(
     }
 
     case 'delete': {
-      const { cursorRow, cursorCol, lines } = state;
-      const lineContent = currentLine(cursorRow);
-      if (cursorCol < currentLineLen(cursorRow)) {
-        const nextState = pushUndoLocal(state);
+      const stateWithUndo = pushUndoLocal(state);
+      const currentState = detachExpandedPaste(stateWithUndo);
+      const { cursorRow, cursorCol, lines, transformationsByLine } =
+        currentState;
+
+      // Check if cursor is at start of an atomic placeholder
+      const transformations = transformationsByLine[cursorRow] ?? [];
+      const placeholder = findAtomicPlaceholderForDelete(
+        lines[cursorRow],
+        cursorCol,
+        transformations,
+      );
+
+      if (placeholder) {
+        const nextState = currentState;
         const newLines = [...nextState.lines];
+        newLines[cursorRow] =
+          cpSlice(newLines[cursorRow], 0, placeholder.start) +
+          cpSlice(newLines[cursorRow], placeholder.end);
+
+        // Recalculate transformations for the modified line
+        const newTransformations = [...nextState.transformationsByLine];
+        newTransformations[cursorRow] = calculateTransformationsForLine(
+          newLines[cursorRow],
+        );
+
+        // Clean up pastedContent if this was a paste placeholder
+        let newPastedContent = nextState.pastedContent;
+        if (placeholder.type === 'paste' && placeholder.id) {
+          const { [placeholder.id]: _, ...remaining } = nextState.pastedContent;
+          newPastedContent = remaining;
+        }
+
+        return {
+          ...nextState,
+          lines: newLines,
+          // cursorCol stays the same
+          preferredCol: null,
+          transformationsByLine: newTransformations,
+          pastedContent: newPastedContent,
+        };
+      }
+
+      // Standard delete logic
+      const lineContent = currentLine(cursorRow);
+      let lineDelta = 0;
+      const nextState = currentState;
+      const newLines = [...nextState.lines];
+
+      if (cursorCol < currentLineLen(cursorRow)) {
         newLines[cursorRow] =
           cpSlice(lineContent, 0, cursorCol) +
           cpSlice(lineContent, cursorCol + 1);
-        return {
-          ...nextState,
-          lines: newLines,
-          preferredCol: null,
-        };
       } else if (cursorRow < lines.length - 1) {
-        const nextState = pushUndoLocal(state);
         const nextLineContent = currentLine(cursorRow + 1);
-        const newLines = [...nextState.lines];
         newLines[cursorRow] = lineContent + nextLineContent;
         newLines.splice(cursorRow + 1, 1);
-        return {
-          ...nextState,
-          lines: newLines,
-          preferredCol: null,
-        };
+        lineDelta = -1;
+      } else {
+        return currentState;
       }
-      return state;
+
+      const { newInfo: newExpandedPaste, isDetached } = shiftExpandedRegions(
+        nextState.expandedPaste,
+        nextState.cursorRow,
+        lineDelta,
+        nextState.cursorRow + (lineDelta < 0 ? 1 : 0),
+      );
+
+      const newPastedContent = { ...nextState.pastedContent };
+      if (isDetached && nextState.expandedPaste) {
+        delete newPastedContent[nextState.expandedPaste.id];
+      }
+
+      return {
+        ...nextState,
+        lines: newLines,
+        preferredCol: null,
+        pastedContent: newPastedContent,
+        expandedPaste: newExpandedPaste,
+      };
     }
 
     case 'delete_word_left': {
-      const { cursorRow, cursorCol } = state;
-      if (cursorCol === 0 && cursorRow === 0) return state;
+      const stateWithUndo = pushUndoLocal(state);
+      const currentState = detachExpandedPaste(stateWithUndo);
+      const { cursorRow, cursorCol } = currentState;
+      if (cursorCol === 0 && cursorRow === 0) return currentState;
 
-      const nextState = pushUndoLocal(state);
+      const nextState = currentState;
       const newLines = [...nextState.lines];
       let newCursorRow = cursorRow;
       let newCursorCol = cursorCol;
@@ -1652,15 +2031,17 @@ function textBufferReducerLogic(
     }
 
     case 'delete_word_right': {
-      const { cursorRow, cursorCol, lines } = state;
+      const stateWithUndo = pushUndoLocal(state);
+      const currentState = detachExpandedPaste(stateWithUndo);
+      const { cursorRow, cursorCol, lines } = currentState;
       const lineContent = currentLine(cursorRow);
       const lineLen = cpLen(lineContent);
 
       if (cursorCol >= lineLen && cursorRow === lines.length - 1) {
-        return state;
+        return currentState;
       }
 
-      const nextState = pushUndoLocal(state);
+      const nextState = currentState;
       const newLines = [...nextState.lines];
 
       if (cursorCol >= lineLen) {
@@ -1683,10 +2064,12 @@ function textBufferReducerLogic(
     }
 
     case 'kill_line_right': {
-      const { cursorRow, cursorCol, lines } = state;
+      const stateWithUndo = pushUndoLocal(state);
+      const currentState = detachExpandedPaste(stateWithUndo);
+      const { cursorRow, cursorCol, lines } = currentState;
       const lineContent = currentLine(cursorRow);
       if (cursorCol < currentLineLen(cursorRow)) {
-        const nextState = pushUndoLocal(state);
+        const nextState = currentState;
         const newLines = [...nextState.lines];
         newLines[cursorRow] = cpSlice(lineContent, 0, cursorCol);
         return {
@@ -1695,7 +2078,7 @@ function textBufferReducerLogic(
         };
       } else if (cursorRow < lines.length - 1) {
         // Act as a delete
-        const nextState = pushUndoLocal(state);
+        const nextState = currentState;
         const nextLineContent = currentLine(cursorRow + 1);
         const newLines = [...nextState.lines];
         newLines[cursorRow] = lineContent + nextLineContent;
@@ -1706,13 +2089,15 @@ function textBufferReducerLogic(
           preferredCol: null,
         };
       }
-      return state;
+      return currentState;
     }
 
     case 'kill_line_left': {
-      const { cursorRow, cursorCol } = state;
+      const stateWithUndo = pushUndoLocal(state);
+      const currentState = detachExpandedPaste(stateWithUndo);
+      const { cursorRow, cursorCol } = currentState;
       if (cursorCol > 0) {
-        const nextState = pushUndoLocal(state);
+        const nextState = currentState;
         const lineContent = currentLine(cursorRow);
         const newLines = [...nextState.lines];
         newLines[cursorRow] = cpSlice(lineContent, cursorCol);
@@ -1723,17 +2108,19 @@ function textBufferReducerLogic(
           preferredCol: null,
         };
       }
-      return state;
+      return currentState;
     }
 
     case 'undo': {
       const stateToRestore = state.undoStack[state.undoStack.length - 1];
       if (!stateToRestore) return state;
 
-      const currentSnapshot = {
+      const currentSnapshot: UndoHistoryEntry = {
         lines: [...state.lines],
         cursorRow: state.cursorRow,
         cursorCol: state.cursorCol,
+        pastedContent: { ...state.pastedContent },
+        expandedPaste: state.expandedPaste ? { ...state.expandedPaste } : null,
       };
       return {
         ...state,
@@ -1747,10 +2134,12 @@ function textBufferReducerLogic(
       const stateToRestore = state.redoStack[state.redoStack.length - 1];
       if (!stateToRestore) return state;
 
-      const currentSnapshot = {
+      const currentSnapshot: UndoHistoryEntry = {
         lines: [...state.lines],
         cursorRow: state.cursorRow,
         cursorCol: state.cursorCol,
+        pastedContent: { ...state.pastedContent },
+        expandedPaste: state.expandedPaste ? { ...state.expandedPaste } : null,
       };
       return {
         ...state,
@@ -1763,7 +2152,7 @@ function textBufferReducerLogic(
     case 'replace_range': {
       const { startRow, startCol, endRow, endCol, text } = action.payload;
       const nextState = pushUndoLocal(state);
-      return replaceRangeInternal(
+      const newState = replaceRangeInternal(
         nextState,
         startRow,
         startCol,
@@ -1771,6 +2160,29 @@ function textBufferReducerLogic(
         endCol,
         text,
       );
+
+      const oldLineCount = endRow - startRow + 1;
+      const newLineCount =
+        newState.lines.length - (nextState.lines.length - oldLineCount);
+      const lineDelta = newLineCount - oldLineCount;
+
+      const { newInfo: newExpandedPaste, isDetached } = shiftExpandedRegions(
+        nextState.expandedPaste,
+        startRow,
+        lineDelta,
+        endRow,
+      );
+
+      const newPastedContent = { ...newState.pastedContent };
+      if (isDetached && nextState.expandedPaste) {
+        delete newPastedContent[nextState.expandedPaste.id];
+      }
+
+      return {
+        ...newState,
+        pastedContent: newPastedContent,
+        expandedPaste: newExpandedPaste,
+      };
     }
 
     case 'move_to_offset': {
@@ -1826,6 +2238,155 @@ function textBufferReducerLogic(
     case 'vim_escape_insert_mode':
       return handleVimAction(state, action as VimAction);
 
+    case 'toggle_paste_expansion': {
+      const { id, row, col } = action.payload;
+      const expandedPaste = state.expandedPaste;
+
+      if (expandedPaste && expandedPaste.id === id) {
+        const nextState = pushUndoLocal(state);
+        // COLLAPSE: Restore original line with placeholder
+        const newLines = [...nextState.lines];
+        newLines.splice(
+          expandedPaste.startLine,
+          expandedPaste.lineCount,
+          expandedPaste.prefix + id + expandedPaste.suffix,
+        );
+
+        // Move cursor to end of collapsed placeholder
+        const newCursorRow = expandedPaste.startLine;
+        const newCursorCol = cpLen(expandedPaste.prefix) + cpLen(id);
+
+        return {
+          ...nextState,
+          lines: newLines,
+          cursorRow: newCursorRow,
+          cursorCol: newCursorCol,
+          preferredCol: null,
+          expandedPaste: null,
+        };
+      } else {
+        // EXPAND: Replace placeholder with content
+
+        // Collapse any existing expanded paste first
+        let currentState = state;
+        let targetRow = row;
+        if (state.expandedPaste) {
+          const existingInfo = state.expandedPaste;
+          const lineDelta = 1 - existingInfo.lineCount;
+
+          if (targetRow !== undefined && targetRow > existingInfo.startLine) {
+            // If we collapsed something above our target, our target row shifted up
+            targetRow += lineDelta;
+          }
+
+          currentState = textBufferReducerLogic(state, {
+            type: 'toggle_paste_expansion',
+            payload: {
+              id: existingInfo.id,
+              row: existingInfo.startLine,
+              col: 0,
+            },
+          });
+          // Update transformations because they are needed for finding the next placeholder
+          currentState.transformationsByLine = calculateTransformations(
+            currentState.lines,
+          );
+        }
+
+        const content = currentState.pastedContent[id];
+        if (!content) return currentState;
+
+        // Find line and position containing exactly this placeholder
+        let lineIndex = -1;
+        let placeholderStart = -1;
+
+        const tryFindOnLine = (idx: number) => {
+          const transforms = currentState.transformationsByLine[idx] ?? [];
+
+          // Precise match by col
+          let transform = transforms.find(
+            (t) =>
+              t.type === 'paste' &&
+              t.id === id &&
+              col >= t.logStart &&
+              col <= t.logEnd,
+          );
+
+          if (!transform) {
+            // Fallback to first match on line
+            transform = transforms.find(
+              (t) => t.type === 'paste' && t.id === id,
+            );
+          }
+
+          if (transform) {
+            lineIndex = idx;
+            placeholderStart = transform.logStart;
+            return true;
+          }
+          return false;
+        };
+
+        // Try provided row first for precise targeting
+        if (targetRow >= 0 && targetRow < currentState.lines.length) {
+          tryFindOnLine(targetRow);
+        }
+
+        if (lineIndex === -1) {
+          for (let i = 0; i < currentState.lines.length; i++) {
+            if (tryFindOnLine(i)) break;
+          }
+        }
+
+        if (lineIndex === -1) return currentState;
+
+        const nextState = pushUndoLocal(currentState);
+
+        const line = nextState.lines[lineIndex];
+        const prefix = cpSlice(line, 0, placeholderStart);
+        const suffix = cpSlice(line, placeholderStart + cpLen(id));
+
+        // Split content into lines
+        const contentLines = content.split('\n');
+        const newLines = [...nextState.lines];
+
+        let expandedLines: string[];
+        if (contentLines.length === 1) {
+          // Single-line content
+          expandedLines = [prefix + contentLines[0] + suffix];
+        } else {
+          // Multi-line content
+          expandedLines = [
+            prefix + contentLines[0],
+            ...contentLines.slice(1, -1),
+            contentLines[contentLines.length - 1] + suffix,
+          ];
+        }
+
+        newLines.splice(lineIndex, 1, ...expandedLines);
+
+        // Move cursor to end of expanded content (before suffix)
+        const newCursorRow = lineIndex + expandedLines.length - 1;
+        const lastExpandedLine = expandedLines[expandedLines.length - 1];
+        const newCursorCol = cpLen(lastExpandedLine) - cpLen(suffix);
+
+        return {
+          ...nextState,
+          lines: newLines,
+          cursorRow: newCursorRow,
+          cursorCol: newCursorCol,
+          preferredCol: null,
+          expandedPaste: {
+            id,
+            startLine: lineIndex,
+            lineCount: expandedLines.length,
+            prefix,
+            suffix,
+          },
+        };
+      }
+    }
+
     default: {
       const exhaustiveCheck: never = action;
       debugLogger.error(`Unknown action encountered: ${exhaustiveCheck}`);
@@ -1870,6 +2431,7 @@ export function textBufferReducer(
   ) {
     const shouldResetPreferred =
       oldInside !== newInside || movedBetweenTransforms;
+
     return {
       ...newState,
       preferredCol: shouldResetPreferred ? null : newState.preferredCol,
@@ -1926,6 +2488,8 @@ export function useTextBuffer({
       viewportWidth: viewport.width,
       viewportHeight: viewport.height,
       visualLayout,
+      pastedContent: {},
+      expandedPaste: null,
     };
   }, [initialText, initialCursorOffset, viewport.width, viewport.height]);
 
@@ -1942,6 +2506,8 @@ export function useTextBuffer({
     selectionAnchor,
     visualLayout,
     transformationsByLine,
+    pastedContent,
+    expandedPaste,
   } = state;
 
   const text = useMemo(() => lines.join('\n'), [lines]);
@@ -1958,7 +2524,7 @@ export function useTextBuffer({
     visualToTransformedMap,
   } = visualLayout;
 
-  const [visualScrollRow, setVisualScrollRow] = useState<number>(0);
+  const [scrollRowState, setScrollRowState] = useState<number>(0);
 
   useEffect(() => {
     if (onChange) {
@@ -1978,11 +2544,11 @@ export function useTextBuffer({
     const { height } = viewport;
     const totalVisualLines = visualLines.length;
     const maxScrollStart = Math.max(0, totalVisualLines - height);
-    let newVisualScrollRow = visualScrollRow;
+    let newVisualScrollRow = scrollRowState;
 
-    if (visualCursor[0] < visualScrollRow) {
+    if (visualCursor[0] < scrollRowState) {
       newVisualScrollRow = visualCursor[0];
-    } else if (visualCursor[0] >= visualScrollRow + height) {
+    } else if (visualCursor[0] >= scrollRowState + height) {
       newVisualScrollRow = visualCursor[0] - height + 1;
     }
 
@@ -1990,18 +2556,18 @@ export function useTextBuffer({
     // ensure scroll never starts beyond the last valid start so we can render a full window.
     newVisualScrollRow = clamp(newVisualScrollRow, 0, maxScrollStart);
 
-    if (newVisualScrollRow !== visualScrollRow) {
-      setVisualScrollRow(newVisualScrollRow);
+    if (newVisualScrollRow !== scrollRowState) {
+      setScrollRowState(newVisualScrollRow);
     }
-  }, [visualCursor, visualScrollRow, viewport, visualLines.length]);
+  }, [visualCursor, scrollRowState, viewport, visualLines.length]);
 
   const insert = useCallback(
     (ch: string, { paste = false }: { paste?: boolean } = {}): void => {
-      if (!singleLine && /[\n\r]/.test(ch)) {
-        dispatch({ type: 'insert', payload: ch });
+      if (typeof ch !== 'string') {
         return;
       }
 
+      let textToInsert = ch;
       const minLengthToInferAsDragDrop = 3;
       if (
         ch.length >= minLengthToInferAsDragDrop &&
@@ -2018,15 +2584,15 @@ export function useTextBuffer({
 
         const processed = parsePastedPaths(potentialPath, isValidPath);
         if (processed) {
-          ch = processed;
+          textToInsert = processed;
         }
       }
 
       let currentText = '';
-      for (const char of toCodePoints(ch)) {
+      for (const char of toCodePoints(textToInsert)) {
         if (char.codePointAt(0) === 127) {
           if (currentText.length > 0) {
-            dispatch({ type: 'insert', payload: currentText });
+            dispatch({ type: 'insert', payload: currentText, isPaste: paste });
             currentText = '';
           }
           dispatch({ type: 'backspace' });
@@ -2035,10 +2601,10 @@ export function useTextBuffer({
         }
       }
       if (currentText.length > 0) {
-        dispatch({ type: 'insert', payload: currentText });
+        dispatch({ type: 'insert', payload: currentText, isPaste: paste });
       }
     },
-    [isValidPath, shellModeActive, singleLine],
+    [isValidPath, shellModeActive],
   );
 
   const newline = useCallback((): void => {
@@ -2227,7 +2793,12 @@ export function useTextBuffer({
   const openInExternalEditor = useCallback(async (): Promise<void> => {
     const tmpDir = fs.mkdtempSync(pathMod.join(os.tmpdir(), 'gemini-edit-'));
     const filePath = pathMod.join(tmpDir, 'buffer.txt');
-    fs.writeFileSync(filePath, text, 'utf8');
+    // Expand paste placeholders so user sees full content in editor
+    const expandedText = text.replace(
+      PASTED_TEXT_PLACEHOLDER_REGEX,
+      (match) => pastedContent[match] || match,
+    );
+    fs.writeFileSync(filePath, expandedText, 'utf8');
 
     let command: string | undefined = undefined;
     const args = [filePath];
@@ -2261,6 +2832,17 @@ export function useTextBuffer({
 
       let newText = fs.readFileSync(filePath, 'utf8');
       newText = newText.replace(/\r\n?/g, '\n');
+
+      // Attempt to re-collapse unchanged pasted content back into placeholders
+      const sortedPlaceholders = Object.entries(pastedContent).sort(
+        (a, b) => b[1].length - a[1].length,
+      );
+      for (const [id, content] of sortedPlaceholders) {
+        if (newText.includes(content)) {
+          newText = newText.replace(content, id);
+        }
+      }
+
       dispatch({ type: 'set_text', payload: newText, pushToUndo: false });
     } catch (err) {
       coreEvents.emitFeedback(
@@ -2282,30 +2864,101 @@ export function useTextBuffer({
         /* ignore */
       }
     }
-  }, [text, stdin, setRawMode, getPreferredEditor]);
+  }, [text, pastedContent, stdin, setRawMode, getPreferredEditor]);
 
   const handleInput = useCallback(
-    (key: Key): void => {
+    (key: Key): boolean => {
       const { sequence: input } = key;
 
-      if (key.name === 'paste') insert(input, { paste: true });
-      else if (keyMatchers[Command.RETURN](key)) newline();
-      else if (keyMatchers[Command.NEWLINE](key)) newline();
-      else if (keyMatchers[Command.MOVE_LEFT](key)) move('left');
-      else if (keyMatchers[Command.MOVE_RIGHT](key)) move('right');
-      else if (keyMatchers[Command.MOVE_UP](key)) move('up');
-      else if (keyMatchers[Command.MOVE_DOWN](key)) move('down');
-      else if (keyMatchers[Command.MOVE_WORD_LEFT](key)) move('wordLeft');
-      else if (keyMatchers[Command.MOVE_WORD_RIGHT](key)) move('wordRight');
-      else if (keyMatchers[Command.HOME](key)) move('home');
-      else if (keyMatchers[Command.END](key)) move('end');
-      else if (keyMatchers[Command.DELETE_WORD_BACKWARD](key)) deleteWordLeft();
-      else if (keyMatchers[Command.DELETE_WORD_FORWARD](key)) deleteWordRight();
-      else if (keyMatchers[Command.DELETE_CHAR_LEFT](key)) backspace();
-      else if (keyMatchers[Command.DELETE_CHAR_RIGHT](key)) del();
-      else if (keyMatchers[Command.UNDO](key)) undo();
-      else if (keyMatchers[Command.REDO](key)) redo();
-      else if (key.insertable) insert(input, { paste: false });
+      if (key.name === 'paste') {
+        insert(input, { paste: true });
+        return true;
+      }
+      if (keyMatchers[Command.RETURN](key)) {
+        if (singleLine) {
+          return false;
+        }
+        newline();
+        return true;
+      }
+      if (keyMatchers[Command.NEWLINE](key)) {
+        if (singleLine) {
+          return false;
+        }
+        newline();
+        return true;
+      }
+      if (keyMatchers[Command.MOVE_LEFT](key)) {
+        if (cursorRow === 0 && cursorCol === 0) return false;
+        move('left');
+        return true;
+      }
+      if (keyMatchers[Command.MOVE_RIGHT](key)) {
+        const lastLineIdx = lines.length - 1;
+        if (
+          cursorRow === lastLineIdx &&
+          cursorCol === cpLen(lines[lastLineIdx] ?? '')
+        ) {
+          return false;
+        }
+        move('right');
+        return true;
+      }
+      if (keyMatchers[Command.MOVE_UP](key)) {
+        if (cursorRow === 0) return false;
+        move('up');
+        return true;
+      }
+      if (keyMatchers[Command.MOVE_DOWN](key)) {
+        if (cursorRow === lines.length - 1) return false;
+        move('down');
+        return true;
+      }
+      if (keyMatchers[Command.MOVE_WORD_LEFT](key)) {
+        move('wordLeft');
+        return true;
+      }
+      if (keyMatchers[Command.MOVE_WORD_RIGHT](key)) {
+        move('wordRight');
+        return true;
+      }
+      if (keyMatchers[Command.HOME](key)) {
+        move('home');
+        return true;
+      }
+      if (keyMatchers[Command.END](key)) {
+        move('end');
+        return true;
+      }
+      if (keyMatchers[Command.DELETE_WORD_BACKWARD](key)) {
+        deleteWordLeft();
+        return true;
+      }
+      if (keyMatchers[Command.DELETE_WORD_FORWARD](key)) {
+        deleteWordRight();
+        return true;
+      }
+      if (keyMatchers[Command.DELETE_CHAR_LEFT](key)) {
+        backspace();
+        return true;
+      }
+      if (keyMatchers[Command.DELETE_CHAR_RIGHT](key)) {
+        del();
+        return true;
+      }
+      if (keyMatchers[Command.UNDO](key)) {
+        undo();
+        return true;
+      }
+      if (keyMatchers[Command.REDO](key)) {
+        redo();
+        return true;
+      }
+      if (key.insertable) {
+        insert(input, { paste: false });
+        return true;
+      }
+      return false;
     },
     [
       newline,
@@ -2317,8 +2970,20 @@ export function useTextBuffer({
       insert,
       undo,
       redo,
+      cursorRow,
+      cursorCol,
+      lines,
+      singleLine,
     ],
   );
+
+  const visualScrollRow = useMemo(() => {
+    const totalVisualLines = visualLines.length;
+    return Math.min(
+      scrollRowState,
+      Math.max(0, totalVisualLines - viewport.height),
+    );
+  }, [visualLines.length, scrollRowState, viewport.height]);
 
   const renderedVisualLines = useMemo(
     () => visualLines.slice(visualScrollRow, visualScrollRow + viewport.height),
@@ -2423,9 +3088,82 @@ export function useTextBuffer({
     [visualLayout, lines],
   );
 
+  const getLogicalPositionFromVisual = useCallback(
+    (visRow: number, visCol: number): { row: number; col: number } | null => {
+      const {
+        visualLines,
+        visualToLogicalMap,
+        transformedToLogicalMaps,
+        visualToTransformedMap,
+      } = visualLayout;
+
+      // Clamp visRow to valid range
+      const clampedVisRow = Math.max(
+        0,
+        Math.min(visRow, visualLines.length - 1),
+      );
+      const visualLine = visualLines[clampedVisRow] || '';
+
+      if (!visualToLogicalMap[clampedVisRow]) {
+        return null;
+      }
+
+      const [logRow] = visualToLogicalMap[clampedVisRow];
+      const transformedToLogicalMap = transformedToLogicalMaps?.[logRow] ?? [];
+
+      // Where does this visual line begin within the transformed line?
+      const startColInTransformed =
+        visualToTransformedMap?.[clampedVisRow] ?? 0;
+
+      // Handle wide characters: convert visual X position to character offset
+      const codePoints = toCodePoints(visualLine);
+      let currentVisX = 0;
+      let charOffset = 0;
+
+      for (const char of codePoints) {
+        const charWidth = getCachedStringWidth(char);
+        if (visCol < currentVisX + charWidth) {
+          if (charWidth > 1 && visCol >= currentVisX + charWidth / 2) {
+            charOffset++;
+          }
+          break;
+        }
+        currentVisX += charWidth;
+        charOffset++;
+      }
+
+      charOffset = Math.min(charOffset, codePoints.length);
+
+      const transformedCol = Math.min(
+        startColInTransformed + charOffset,
+        Math.max(0, transformedToLogicalMap.length - 1),
+      );
+
+      const row = logRow;
+      const col =
+        transformedToLogicalMap[transformedCol] ?? cpLen(lines[logRow] ?? '');
+
+      return { row, col };
+    },
+    [visualLayout, lines],
+  );
+
   const getOffset = useCallback(
     (): number => logicalPosToOffset(lines, cursorRow, cursorCol),
     [lines, cursorRow, cursorCol],
+  );
+
+  const togglePasteExpansion = useCallback(
+    (id: string, row: number, col: number): void => {
+      dispatch({ type: 'toggle_paste_expansion', payload: { id, row, col } });
+    },
+    [],
+  );
+
+  const getExpandedPasteAtLineCallback = useCallback(
+    (lineIndex: number): string | null =>
+      getExpandedPasteAtLine(lineIndex, expandedPaste),
+    [expandedPaste],
   );
 
   const returnValue: TextBuffer = useMemo(
@@ -2435,6 +3173,7 @@ export function useTextBuffer({
       cursor: [cursorRow, cursorCol],
       preferredCol,
       selectionAnchor,
+      pastedContent,
 
       allVisualLines: visualLines,
       viewportVisualLines: renderedVisualLines,
@@ -2458,6 +3197,10 @@ export function useTextBuffer({
       moveToOffset,
       getOffset,
       moveToVisualPosition,
+      getLogicalPositionFromVisual,
+      getExpandedPasteAtLine: getExpandedPasteAtLineCallback,
+      togglePasteExpansion,
+      expandedPaste,
       deleteWordLeft,
       deleteWordRight,
 
@@ -2506,6 +3249,7 @@ export function useTextBuffer({
       cursorCol,
       preferredCol,
       selectionAnchor,
+      pastedContent,
       visualLines,
       renderedVisualLines,
       visualCursor,
@@ -2528,6 +3272,10 @@ export function useTextBuffer({
       moveToOffset,
       getOffset,
       moveToVisualPosition,
+      getLogicalPositionFromVisual,
+      getExpandedPasteAtLineCallback,
+      togglePasteExpansion,
+      expandedPaste,
       deleteWordLeft,
       deleteWordRight,
       killLineRight,
@@ -2584,6 +3332,7 @@ export interface TextBuffer {
    */
   preferredCol: number | null; // Preferred visual column
   selectionAnchor: [number, number] | null; // Logical selection anchor
+  pastedContent: Record<string, string>;
 
   // Visual state (handles wrapping)
   allVisualLines: string[]; // All visual lines for the current text and viewport width.
@@ -2696,6 +3445,29 @@ export interface TextBuffer {
   getOffset: () => number;
   moveToOffset(offset: number): void;
   moveToVisualPosition(visualRow: number, visualCol: number): void;
+  /**
+   * Convert visual coordinates to logical position without moving cursor.
+   * Returns null if the position is out of bounds.
+   */
+  getLogicalPositionFromVisual(
+    visualRow: number,
+    visualCol: number,
+  ): { row: number; col: number } | null;
+  /**
+   * Check if a line index falls within an expanded paste region.
+   * Returns the paste placeholder ID if found, null otherwise.
+   */
+  getExpandedPasteAtLine(lineIndex: number): string | null;
+  /**
+   * Toggle expansion state for a paste placeholder.
+   * If collapsed, expands to show full content inline.
+   * If expanded, collapses back to placeholder.
+   */
+  togglePasteExpansion(id: string, row: number, col: number): void;
+  /**
+   * The current expanded paste info (read-only).
+   */
+  expandedPaste: ExpandedPasteInfo | null;
 
   // Vim-specific operations
   /**

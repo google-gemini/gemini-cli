@@ -21,6 +21,14 @@ import type { ToolResultDisplay } from '../tools/tools.js';
 export const SESSION_FILE_PREFIX = 'session-';
 
 /**
+ * Warning message shown when recording is disabled due to disk full.
+ */
+const ENOSPC_WARNING_MESSAGE =
+  'Chat recording disabled: No space left on device. ' +
+  'The conversation will continue but will not be saved to disk. ' +
+  'Free up disk space and restart to enable recording.';
+
+/**
  * Token usage summary for a message or conversation.
  */
 export interface TokensSummary {
@@ -88,6 +96,8 @@ export interface ConversationRecord {
   lastUpdated: string;
   messages: MessageRecord[];
   summary?: string;
+  /** Workspace directories added during the session via /dir add */
+  directories?: string[];
 }
 
 /**
@@ -173,6 +183,16 @@ export class ChatRecordingService {
       this.queuedThoughts = [];
       this.queuedTokens = null;
     } catch (error) {
+      // Handle disk full (ENOSPC) gracefully - disable recording but allow CLI to continue
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error as NodeJS.ErrnoException).code === 'ENOSPC'
+      ) {
+        this.conversationFile = null;
+        debugLogger.warn(ENOSPC_WARNING_MESSAGE);
+        return; // Don't throw - allow the CLI to continue
+      }
       debugLogger.error('Error initializing chat recording service:', error);
       throw error;
     }
@@ -425,6 +445,16 @@ export class ChatRecordingService {
         fs.writeFileSync(this.conversationFile, newContent);
       }
     } catch (error) {
+      // Handle disk full (ENOSPC) gracefully - disable recording but allow conversation to continue
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error as NodeJS.ErrnoException).code === 'ENOSPC'
+      ) {
+        this.conversationFile = null;
+        debugLogger.warn(ENOSPC_WARNING_MESSAGE);
+        return; // Don't throw - allow the conversation to continue
+      }
       debugLogger.error('Error writing conversation file.', error);
       throw error;
     }
@@ -459,6 +489,23 @@ export class ChatRecordingService {
   }
 
   /**
+   * Records workspace directories to the session file.
+   * Called when directories are added via /dir add.
+   */
+  recordDirectories(directories: readonly string[]): void {
+    if (!this.conversationFile) return;
+
+    try {
+      this.updateConversation((conversation) => {
+        conversation.directories = [...directories];
+      });
+    } catch (error) {
+      debugLogger.error('Error saving directories to chat history.', error);
+      // Don't throw - we want graceful degradation
+    }
+  }
+
+  /**
    * Gets the current conversation data (for summary generation).
    */
   getConversation(): ConversationRecord | null {
@@ -474,7 +521,7 @@ export class ChatRecordingService {
 
   /**
    * Gets the path to the current conversation file.
-   * Returns null if the service hasn't been initialized yet.
+   * Returns null if the service hasn't been initialized yet or recording is disabled.
    */
   getConversationFilePath(): string | null {
     return this.conversationFile;
