@@ -171,10 +171,12 @@ If you need to further tune your sub-agent, you can do so by selecting the model
 to optimize for with `/model` and then asking the model why it does not think
 that your sub-agent was called with a specific prompt and the given description.
 
-## Remote subagents (Agent2Agent)
+## Remote subagents (Agent2Agent) (experimental)
 
 Gemini CLI can also delegate tasks to remote subagents using the Agent-to-Agent
 (A2A) protocol.
+
+> **Note: Remote subagents are currently an experimental feature.**
 
 See the [Remote Subagents documentation](/docs/core/remote-agents) for detailed
 configuration and usage instructions.
