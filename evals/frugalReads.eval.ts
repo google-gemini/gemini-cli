@@ -43,7 +43,7 @@ describe('Frugal reads eval', () => {
       })(),
     },
     prompt:
-      'Fix all linter errors in linter_mess.ts manually by editing the file. Run eslint directly to find them. Do not run the file.',
+      'Fix all linter errors in linter_mess.ts manually by editing the file. Run eslint directly (using "npx --yes eslint") to find them. Do not run the file.',
     assert: async (rig, result) => {
       const logs = rig.readToolLogs();
 
