@@ -9,7 +9,7 @@ import type {
   IndividualToolCallDisplay,
 } from '../types.js';
 import { ToolCallStatus } from '../types.js';
-import { useCallback, useState, useRef, useEffect } from 'react';
+import { useCallback, useReducer, useRef, useEffect } from 'react';
 import type { AnsiOutput, Config, GeminiClient } from '@google/gemini-cli-core';
 import { isBinary, ShellExecutionService } from '@google/gemini-cli-core';
 import { type PartListUnion } from '@google/genai';
@@ -21,19 +21,16 @@ import path from 'node:path';
 import os from 'node:os';
 import fs from 'node:fs';
 import { themeManager } from '../../ui/themes/theme-manager.js';
+import {
+  shellReducer,
+  initialState,
+  type BackgroundShell,
+} from './shellReducer.js';
+export { type BackgroundShell };
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
+const RESTORE_VISIBILITY_DELAY_MS = 300;
 const MAX_OUTPUT_LENGTH = 10000;
-
-export interface BackgroundShell {
-  pid: number;
-  command: string;
-  output: string | AnsiOutput;
-  isBinary: boolean;
-  binaryBytesReceived: number;
-  status: 'running' | 'exited';
-  exitCode?: number;
-}
 
 function addShellCommandToGeminiHistory(
   geminiClient: GeminiClient,
@@ -83,80 +80,94 @@ export const useShellCommandProcessor = (
   activeToolPtyId?: number,
   isWaitingForConfirmation?: boolean,
 ) => {
-  const [activeShellPtyId, setActiveShellPtyId] = useState<number | null>(null);
-  const [lastShellOutputTime, setLastShellOutputTime] = useState<number>(0);
+  const [state, dispatch] = useReducer(shellReducer, initialState);
 
-  // Background shell state management
-  const backgroundShellsRef = useRef<Map<number, BackgroundShell>>(new Map());
-  const [backgroundShellCount, setBackgroundShellCount] = useState(0);
-  const [isBackgroundShellVisible, setIsBackgroundShellVisible] =
-    useState(false);
+  // Consolidate stable tracking into a single manager object
+  const manager = useRef<{
+    wasVisibleBeforeForeground: boolean;
+    restoreTimeout: NodeJS.Timeout | null;
+    backgroundedPids: Set<number>;
+    subscriptions: Map<number, () => void>;
+  } | null>(null);
 
-  // Sync ref with state for use in callbacks without stale closures
-  const isVisibleRef = useRef(false);
-  isVisibleRef.current = isBackgroundShellVisible;
+  if (!manager.current) {
+    manager.current = {
+      wasVisibleBeforeForeground: false,
+      restoreTimeout: null,
+      backgroundedPids: new Set(),
+      subscriptions: new Map(),
+    };
+  }
+  const m = manager.current;
 
-  // Persistence state for auto-hiding background shell during foreground execution
-  const wasVisibleBeforeForegroundRef = useRef(false);
-  const restoreTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Used to force re-render when background shell output updates while visible
-  const [, setTick] = useState(0);
-  const notifyUpdate = useCallback(() => {
-    if (isVisibleRef.current) {
-      setTick((t) => t + 1);
-    }
-  }, []);
-
-  const activePtyId = activeShellPtyId || activeToolPtyId;
+  const activePtyId = state.activeShellPtyId || activeToolPtyId;
 
   useEffect(() => {
     const isForegroundActive = !!activePtyId || !!isWaitingForConfirmation;
 
     if (isForegroundActive) {
-      if (restoreTimeoutRef.current) {
-        clearTimeout(restoreTimeoutRef.current);
-        restoreTimeoutRef.current = null;
+      if (m.restoreTimeout) {
+        clearTimeout(m.restoreTimeout);
+        m.restoreTimeout = null;
       }
 
-      if (isVisibleRef.current) {
-        wasVisibleBeforeForegroundRef.current = true;
-        setIsBackgroundShellVisible(false);
+      if (state.isBackgroundShellVisible && !m.wasVisibleBeforeForeground) {
+        m.wasVisibleBeforeForeground = true;
+        dispatch({ type: 'SET_VISIBILITY', visible: false });
       }
-    } else if (
-      wasVisibleBeforeForegroundRef.current &&
-      !restoreTimeoutRef.current
-    ) {
+    } else if (m.wasVisibleBeforeForeground && !m.restoreTimeout) {
       // Restore if it was automatically hidden, with a small delay to avoid
       // flickering between model turn segments.
-      restoreTimeoutRef.current = setTimeout(() => {
-        setIsBackgroundShellVisible(true);
-        wasVisibleBeforeForegroundRef.current = false;
-        restoreTimeoutRef.current = null;
-      }, 300);
+      m.restoreTimeout = setTimeout(() => {
+        dispatch({ type: 'SET_VISIBILITY', visible: true });
+        m.wasVisibleBeforeForeground = false;
+        m.restoreTimeout = null;
+      }, RESTORE_VISIBILITY_DELAY_MS);
     }
 
     return () => {
-      if (restoreTimeoutRef.current) {
-        clearTimeout(restoreTimeoutRef.current);
+      if (m.restoreTimeout) {
+        clearTimeout(m.restoreTimeout);
       }
     };
-  }, [activePtyId, isWaitingForConfirmation]);
+  }, [
+    activePtyId,
+    isWaitingForConfirmation,
+    state.isBackgroundShellVisible,
+    m,
+    dispatch,
+  ]);
 
-  const countRunningShells = useCallback(
-    () =>
-      Array.from(backgroundShellsRef.current.values()).filter(
-        (s) => s.status === 'running',
-      ).length,
-    [],
-  );
+  useEffect(() => {
+    return () => {
+      // Unsubscribe from all background shell events on unmount
+      for (const unsubscribe of m.subscriptions.values()) {
+        unsubscribe();
+      }
+      m.subscriptions.clear();
+    };
+  }, [m]);
 
   const toggleBackgroundShell = useCallback(() => {
-    if (backgroundShellsRef.current.size > 0) {
-      setIsBackgroundShellVisible((prev) => !prev);
-      wasVisibleBeforeForegroundRef.current = false;
+    if (state.backgroundShells.size > 0) {
+      const willBeVisible = !state.isBackgroundShellVisible;
+      dispatch({ type: 'TOGGLE_VISIBILITY' });
+
+      const isForegroundActive = !!activePtyId || !!isWaitingForConfirmation;
+      // If we are manually showing it during foreground, we set the restore flag
+      // so that useEffect doesn't immediately hide it again.
+      // If we are manually hiding it, we clear the restore flag so it stays hidden.
+      if (willBeVisible && isForegroundActive) {
+        m.wasVisibleBeforeForeground = true;
+      } else {
+        m.wasVisibleBeforeForeground = false;
+      }
+
+      if (willBeVisible) {
+        dispatch({ type: 'SYNC_BACKGROUND_SHELLS' });
+      }
     } else {
-      setIsBackgroundShellVisible(false);
+      dispatch({ type: 'SET_VISIBILITY', visible: false });
       addItemToHistory(
         {
           type: 'info',
@@ -165,96 +176,80 @@ export const useShellCommandProcessor = (
         Date.now(),
       );
     }
-  }, [addItemToHistory]);
+  }, [
+    addItemToHistory,
+    state.backgroundShells.size,
+    state.isBackgroundShellVisible,
+    activePtyId,
+    isWaitingForConfirmation,
+    m,
+    dispatch,
+  ]);
 
   const backgroundCurrentShell = useCallback(() => {
-    const pidToBackground = activeShellPtyId || activeToolPtyId;
+    const pidToBackground = state.activeShellPtyId || activeToolPtyId;
     if (pidToBackground) {
       ShellExecutionService.background(pidToBackground);
-      wasVisibleBeforeForegroundRef.current = false;
+      m.backgroundedPids.add(pidToBackground);
     }
-  }, [activeShellPtyId, activeToolPtyId]);
+  }, [state.activeShellPtyId, activeToolPtyId, m]);
 
   const dismissBackgroundShell = useCallback(
     (pid: number) => {
-      const shell = backgroundShellsRef.current.get(pid);
+      const shell = state.backgroundShells.get(pid);
       if (shell) {
         if (shell.status === 'running') {
           ShellExecutionService.kill(pid);
         }
-        // Always remove from UI list when dismissed, whether running (killed) or exited
-        backgroundShellsRef.current.delete(pid);
-        setBackgroundShellCount(countRunningShells());
-        if (backgroundShellsRef.current.size === 0) {
-          setIsBackgroundShellVisible(false);
+        dispatch({ type: 'DISMISS_SHELL', pid });
+        m.backgroundedPids.delete(pid);
+
+        // Unsubscribe from updates
+        const unsubscribe = m.subscriptions.get(pid);
+        if (unsubscribe) {
+          unsubscribe();
+          m.subscriptions.delete(pid);
         }
       }
     },
-    [countRunningShells],
+    [state.backgroundShells, dispatch, m],
   );
 
   const registerBackgroundShell = useCallback(
     (pid: number, command: string, initialOutput: string | AnsiOutput) => {
-      if (backgroundShellsRef.current.has(pid)) {
-        return;
-      }
-
-      // Initialize background shell state
-      backgroundShellsRef.current.set(pid, {
-        pid,
-        command,
-        output: initialOutput,
-        isBinary: false,
-        binaryBytesReceived: 0,
-        status: 'running',
-      });
+      dispatch({ type: 'REGISTER_SHELL', pid, command, initialOutput });
 
       // Subscribe to process exit directly
-      ShellExecutionService.onExit(pid, (code) => {
-        const shell = backgroundShellsRef.current.get(pid);
-        if (shell) {
-          // Remove and re-add to move to the end of the map (maintains insertion order)
-          backgroundShellsRef.current.delete(pid);
-          backgroundShellsRef.current.set(pid, {
-            ...shell,
-            status: 'exited',
-            exitCode: code,
-          });
-          setBackgroundShellCount(countRunningShells());
-          notifyUpdate();
-        }
+      const exitUnsubscribe = ShellExecutionService.onExit(pid, (code) => {
+        dispatch({
+          type: 'UPDATE_SHELL',
+          pid,
+          update: { status: 'exited', exitCode: code },
+        });
+        m.backgroundedPids.delete(pid);
       });
 
       // Subscribe to future updates (data only)
-      ShellExecutionService.subscribe(pid, (event) => {
-        const shell = backgroundShellsRef.current.get(pid);
-        if (!shell) return;
-
+      const dataUnsubscribe = ShellExecutionService.subscribe(pid, (event) => {
         if (event.type === 'data') {
-          if (typeof event.chunk === 'string') {
-            shell.output =
-              typeof shell.output === 'string'
-                ? shell.output + event.chunk
-                : event.chunk;
-          } else {
-            shell.output = event.chunk;
-          }
-          return;
+          dispatch({ type: 'APPEND_SHELL_OUTPUT', pid, chunk: event.chunk });
         } else if (event.type === 'binary_detected') {
-          shell.isBinary = true;
+          dispatch({ type: 'UPDATE_SHELL', pid, update: { isBinary: true } });
         } else if (event.type === 'binary_progress') {
-          shell.isBinary = true;
-          shell.binaryBytesReceived = event.bytesReceived;
-        } else {
-          return;
+          dispatch({
+            type: 'UPDATE_SHELL',
+            pid,
+            update: { isBinary: true, binaryBytesReceived: event.bytesReceived },
+          });
         }
-
-        notifyUpdate();
       });
 
-      setBackgroundShellCount(countRunningShells());
+      m.subscriptions.set(pid, () => {
+        exitUnsubscribe();
+        dataUnsubscribe();
+      });
     },
-    [countRunningShells, notifyUpdate],
+    [dispatch, m],
   );
 
   const handleShellCommand = useCallback(
@@ -365,21 +360,13 @@ export const useShellCommandProcessor = (
                     throw new Error('An unhandled ShellOutputEvent was found.');
                 }
 
-                if (
-                  executionPid &&
-                  backgroundShellsRef.current.has(executionPid)
-                ) {
+                if (executionPid && m.backgroundedPids.has(executionPid)) {
                   // If already backgrounded, let the background shell subscription handle it.
-                  // We update the map so that switches show the latest output immediately.
-                  const existingShell =
-                    backgroundShellsRef.current.get(executionPid)!;
-                  backgroundShellsRef.current.set(executionPid, {
-                    ...existingShell,
-                    output: cumulativeStdout,
-                    isBinary: isBinaryStream,
-                    binaryBytesReceived,
+                  dispatch({
+                    type: 'APPEND_SHELL_OUTPUT',
+                    pid: executionPid,
+                    chunk: event.type === 'data' ? event.chunk : cumulativeStdout,
                   });
-
                   return;
                 }
 
@@ -394,7 +381,7 @@ export const useShellCommandProcessor = (
                 }
 
                 if (shouldUpdate) {
-                  setLastShellOutputTime(Date.now());
+                  dispatch({ type: 'SET_OUTPUT_TIME', time: Date.now() });
                   setPendingHistoryItem((prevItem) => {
                     if (prevItem?.type === 'tool_group') {
                       return {
@@ -417,7 +404,7 @@ export const useShellCommandProcessor = (
 
           executionPid = pid;
           if (pid) {
-            setActiveShellPtyId(pid);
+            dispatch({ type: 'SET_ACTIVE_PTY', pid: pid });
             setPendingHistoryItem((prevItem) => {
               if (prevItem?.type === 'tool_group') {
                 return {
@@ -436,7 +423,7 @@ export const useShellCommandProcessor = (
 
           if (result.backgrounded && result.pid) {
             registerBackgroundShell(result.pid, rawQuery, cumulativeStdout);
-            setActiveShellPtyId(null);
+            dispatch({ type: 'SET_ACTIVE_PTY', pid: null });
           }
 
           let mainContent: string;
@@ -506,7 +493,7 @@ export const useShellCommandProcessor = (
             fs.unlinkSync(pwdFilePath);
           }
 
-          setActiveShellPtyId(null);
+          dispatch({ type: 'SET_ACTIVE_PTY', pid: null });
           setShellInputFocused(false);
         }
       };
@@ -525,20 +512,26 @@ export const useShellCommandProcessor = (
       terminalHeight,
       terminalWidth,
       registerBackgroundShell,
+      state.activeShellPtyId,
+      m,
+      dispatch,
     ],
   );
 
-  const backgroundShells = backgroundShellsRef.current;
+  const backgroundShellCount = Array.from(
+    state.backgroundShells.values(),
+  ).filter((s: BackgroundShell) => s.status === 'running').length;
+
   return {
     handleShellCommand,
-    activeShellPtyId,
-    lastShellOutputTime,
+    activeShellPtyId: state.activeShellPtyId,
+    lastShellOutputTime: state.lastShellOutputTime,
     backgroundShellCount,
-    isBackgroundShellVisible,
+    isBackgroundShellVisible: state.isBackgroundShellVisible,
     toggleBackgroundShell,
     backgroundCurrentShell,
     registerBackgroundShell,
     dismissBackgroundShell,
-    backgroundShells,
+    backgroundShells: state.backgroundShells,
   };
 };

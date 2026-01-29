@@ -341,7 +341,6 @@ describe('ShellTool', () => {
 
       expect(mockShellBackground).toHaveBeenCalledWith(12345);
 
-      vi.useRealTimers();
       await promise;
     });
 
@@ -470,8 +469,6 @@ describe('ShellTool', () => {
       // We can also verify that setTimeout was NOT called for the inactivity timeout.
       // However, since we don't have direct access to the internal `resetTimeout`,
       // we can infer success by the fact it didn't abort.
-
-      vi.useRealTimers();
     });
 
     it('should clean up the temp file on synchronous execution error', async () => {
@@ -506,8 +503,6 @@ describe('ShellTool', () => {
       await promise;
 
       expect(debugErrorSpy).not.toHaveBeenCalledWith('missing pgrep output');
-
-      vi.useRealTimers();
     });
 
     describe('Streaming to `updateOutput`', () => {

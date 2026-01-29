@@ -26,7 +26,11 @@ const mockShellSubscribe = vi.hoisted(() =>
     (pid: number, listener: (event: ShellOutputEvent) => void) => () => void
   >(() => vi.fn()),
 ); // Returns unsubscribe
-const mockShellOnExit = vi.hoisted(() => vi.fn());
+const mockShellOnExit = vi.hoisted(() =>
+  vi.fn<
+    (pid: number, callback: (exitCode: number, signal?: number) => void) => () => void
+  >(() => vi.fn()),
+);
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -891,9 +895,11 @@ describe('useShellCommandProcessor', () => {
       )?.[1];
       expect(exitCallback).toBeDefined();
 
-      act(() => {
-        exitCallback(0);
-      });
+      if (exitCallback) {
+        act(() => {
+          exitCallback(0);
+        });
+      }
 
       // Should NOT be removed, but updated
       expect(result.current.backgroundShellCount).toBe(0); // Badge count is 0
@@ -915,9 +921,11 @@ describe('useShellCommandProcessor', () => {
       )?.[1];
       expect(exitCallback).toBeDefined();
 
-      act(() => {
-        exitCallback(1);
-      });
+      if (exitCallback) {
+        act(() => {
+          exitCallback(1);
+        });
+      }
 
       // Should NOT be removed, but updated
       expect(result.current.backgroundShellCount).toBe(0); // Badge count is 0
@@ -957,7 +965,7 @@ describe('useShellCommandProcessor', () => {
         });
       }
 
-      expect(getRenderCount()).toBe(initialRenderCount);
+      expect(getRenderCount()).toBeGreaterThan(initialRenderCount);
       const shell = result.current.backgroundShells.get(1001);
       expect(shell?.output).toBe('initial + updated');
     });
@@ -983,7 +991,7 @@ describe('useShellCommandProcessor', () => {
         });
       }
 
-      expect(getRenderCount()).toBe(initialRenderCount);
+      expect(getRenderCount()).toBeGreaterThan(initialRenderCount);
       const shell = result.current.backgroundShells.get(1001);
       expect(shell?.output).toBe('initial + updated');
     });

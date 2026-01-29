@@ -82,6 +82,7 @@ vi.mock('../contexts/MouseContext.js', () => ({
 
 // Mock ScrollableList
 vi.mock('./shared/ScrollableList.js', () => ({
+  SCROLL_TO_ITEM_END: 999999,
   ScrollableList: vi.fn(
     ({
       data,

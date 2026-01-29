@@ -72,6 +72,7 @@ import {
   type TrackedCompletedToolCall,
   type TrackedCancelledToolCall,
   type TrackedWaitingToolCall,
+  type TrackedExecutingToolCall,
 } from './useToolScheduler.js';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
@@ -419,7 +420,7 @@ export const useGeminiStream = (
       (tc) =>
         tc.status === 'executing' && tc.request.name === 'run_shell_command',
     );
-    return executingShellTool?.pid;
+    return (executingShellTool as TrackedExecutingToolCall | undefined)?.pid;
   }, [toolCalls]);
 
   const lastQueryRef = useRef<PartListUnion | null>(null);
@@ -437,11 +438,6 @@ export const useGeminiStream = (
     await done;
     setIsResponding(false);
   }, []);
-
-  const isWaitingForConfirmation = useMemo(
-    () => toolCalls.some((tc) => tc.status === 'awaiting_approval'),
-    [toolCalls],
-  );
 
   const {
     handleShellCommand,
@@ -464,8 +460,7 @@ export const useGeminiStream = (
     setShellInputFocused,
     terminalWidth,
     terminalHeight,
-    activeToolPtyId,
-    isWaitingForConfirmation,
+    activeToolPtyId
   );
 
   const activePtyId = activeShellPtyId || activeToolPtyId;
@@ -1441,8 +1436,8 @@ export const useGeminiStream = (
         const rawData = response?.data;
         const data = isShellToolData(rawData) ? rawData : undefined;
 
-        // Use data.pid or fallback to t.pid (preserved from executing state)
-        const pid = data?.pid ?? t.pid;
+        // Use data.pid for shell commands moved to the background.
+        const pid = data?.pid;
 
         if (isShell && pid) {
           const command = (data?.['command'] as string) ?? 'shell';

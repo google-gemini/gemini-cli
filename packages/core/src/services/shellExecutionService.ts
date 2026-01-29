@@ -447,18 +447,6 @@ export class ShellExecutionService {
             onOutputEvent(event);
             ShellExecutionService.emitEvent(child.pid, event);
 
-            // Store exit info for late subscribers
-            this.exitedPtyInfo.set(child.pid, {
-              exitCode: exitCode ?? 0,
-              signal: exitSignal ?? undefined,
-            });
-            setTimeout(
-              () => {
-                if (child.pid) this.exitedPtyInfo.delete(child.pid);
-              },
-              5 * 60 * 1000,
-            ).unref();
-
             this.activeChildProcesses.delete(child.pid);
             this.activeResolvers.delete(child.pid);
             this.activeListeners.delete(child.pid);
@@ -989,11 +977,12 @@ export class ShellExecutionService {
    *
    * @param pid The process ID to watch.
    * @param callback The function to call on exit.
+   * @returns An unsubscribe function.
    */
   static onExit(
     pid: number,
     callback: (exitCode: number, signal?: number) => void,
-  ): void {
+  ): () => void {
     const activePty = this.activePtys.get(pid);
     if (activePty) {
       const disposable = activePty.ptyProcess.onExit(
@@ -1002,26 +991,27 @@ export class ShellExecutionService {
           disposable.dispose();
         },
       );
+      return () => disposable.dispose();
     } else if (this.activeChildProcesses.has(pid)) {
       const activeChild = this.activeChildProcesses.get(pid);
-      activeChild?.process.on('exit', (code, signal) => {
-        // ChildProcess signals are strings (e.g. 'SIGTERM'), but callback expects number or undefined
-        // Map string signal to number if possible, or leave as undefined since existing interface might expect number.
-        // However, child_process 'exit' event provides (code: number | null, signal: NodeJS.Signals | null).
-        // ptyProcess.onExit provides { exitCode: number, signal?: number }.
-        // We need to normalize.
+      const listener = (code: number | null, signal: NodeJS.Signals | null) => {
         let signalNumber: number | undefined;
         if (signal) {
           signalNumber = os.constants.signals[signal];
         }
         callback(code ?? 0, signalNumber);
-      });
+      };
+      activeChild?.process.on('exit', listener);
+      return () => {
+        activeChild?.process.removeListener('exit', listener);
+      };
     } else {
       // Check if it already exited recently
       const exitedInfo = this.exitedPtyInfo.get(pid);
       if (exitedInfo) {
         callback(exitedInfo.exitCode, exitedInfo.signal);
       }
+      return () => {};
     }
   }
 

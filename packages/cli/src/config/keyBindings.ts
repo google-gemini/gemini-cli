@@ -74,6 +74,10 @@ export enum Command {
 
   TOGGLE_BACKGROUND_SHELL = 'toggleBackgroundShell',
   TOGGLE_BACKGROUND_SHELL_LIST = 'toggleBackgroundShellList',
+  KILL_BACKGROUND_SHELL = 'backgroundShell.kill',
+  UNFOCUS_BACKGROUND_SHELL = 'backgroundShell.unfocus',
+  UNFOCUS_BACKGROUND_SHELL_LIST = 'backgroundShell.listUnfocus',
+  SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING = 'backgroundShell.unfocusWarning',
 
   // App Controls
   SHOW_ERROR_DETAILS = 'app.showErrorDetails',
@@ -261,6 +265,10 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.CYCLE_APPROVAL_MODE]: [{ key: 'tab', shift: true }],
   [Command.TOGGLE_BACKGROUND_SHELL]: [{ key: 'b', ctrl: true }],
   [Command.TOGGLE_BACKGROUND_SHELL_LIST]: [{ key: 'l', ctrl: true }],
+  [Command.KILL_BACKGROUND_SHELL]: [{ key: 'k', ctrl: true }],
+  [Command.UNFOCUS_BACKGROUND_SHELL]: [{ key: 'tab', shift: true }],
+  [Command.UNFOCUS_BACKGROUND_SHELL_LIST]: [{ key: 'tab', shift: false }],
+  [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING]: [{ key: 'tab', shift: false }],
   [Command.SHOW_MORE_LINES]: [
     { key: 'o', ctrl: true },
     { key: 's', ctrl: true },
@@ -376,6 +384,10 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.SHOW_MORE_LINES,
       Command.TOGGLE_BACKGROUND_SHELL,
       Command.TOGGLE_BACKGROUND_SHELL_LIST,
+      Command.KILL_BACKGROUND_SHELL,
+      Command.UNFOCUS_BACKGROUND_SHELL,
+      Command.UNFOCUS_BACKGROUND_SHELL_LIST,
+      Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING,
       Command.FOCUS_SHELL_INPUT,
       Command.UNFOCUS_SHELL_INPUT,
       Command.CLEAR_SCREEN,
@@ -389,8 +401,8 @@ export const commandCategories: readonly CommandCategory[] = [
  */
 export const commandDescriptions: Readonly<Record<Command, string>> = {
   // Basic Controls
-  [Command.RETURN]: 'Confirm the current selection or choice.',
-  [Command.ESCAPE]: 'Dismiss dialogs or cancel the current focus.',
+  [Command.RETURN]: 'Enter',
+  [Command.ESCAPE]: 'Esc',
   [Command.QUIT]:
     'Cancel the current request or quit the CLI when input is empty.',
   [Command.EXIT]: 'Exit the CLI when the input buffer is empty.',
@@ -466,10 +478,12 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
     'Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only).',
   [Command.SHOW_MORE_LINES]:
     'Expand a height-constrained response to show additional lines when not in alternate buffer mode.',
-  [Command.TOGGLE_BACKGROUND_SHELL]:
-    'Move current shell command to background or toggle background shell view.',
-  [Command.TOGGLE_BACKGROUND_SHELL_LIST]:
-    'Toggle the list of background shell processes.',
+  [Command.TOGGLE_BACKGROUND_SHELL]: 'Ctrl+B',
+  [Command.TOGGLE_BACKGROUND_SHELL_LIST]: 'Ctrl+L',
+  [Command.KILL_BACKGROUND_SHELL]: 'Ctrl+K',
+  [Command.UNFOCUS_BACKGROUND_SHELL]: 'Shift+Tab',
+  [Command.UNFOCUS_BACKGROUND_SHELL_LIST]: 'Tab',
+  [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING]: 'Tab',
   [Command.FOCUS_SHELL_INPUT]: 'Focus the shell input from the gemini input.',
   [Command.UNFOCUS_SHELL_INPUT]: 'Focus the Gemini input from the shell input.',
   [Command.CLEAR_SCREEN]: 'Clear the terminal screen and redraw the UI.',

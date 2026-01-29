@@ -1004,7 +1004,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, [backgroundShells]);
 
   const lastOutputTimeRef = useRef(0);
-  const tabFocusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     lastOutputTimeRef.current = lastOutputTime;
@@ -1344,6 +1343,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   useIncludeDirsTrust(config, isTrustedFolder, historyManager, setCustomDialog);
 
   const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const tabFocusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleWarning = useCallback((message: string) => {
     setWarningMessage(message);
@@ -1369,6 +1369,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       appEvents.off(AppEvent.PasteTimeout, handlePasteTimeout);
       if (warningTimeoutRef.current) {
         clearTimeout(warningTimeoutRef.current);
+      }
+      if (tabFocusTimeoutRef.current) {
+        clearTimeout(tabFocusTimeoutRef.current);
       }
     };
   }, [handleWarning]);
@@ -1601,6 +1604,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
           } else {
             // We are about to hide it
             tabFocusTimeoutRef.current = setTimeout(() => {
+              tabFocusTimeoutRef.current = null;
+              // If the shell produced output since the tab press, we assume it handled the tab
+              // (e.g. autocomplete) so we should not toggle focus.
+              if (lastOutputTimeRef.current > now) {
+                handleWarning('Press Shift+Tab to focus out.');
+                return;
+              }
               setEmbeddedShellFocused(false);
             }, 100);
           }

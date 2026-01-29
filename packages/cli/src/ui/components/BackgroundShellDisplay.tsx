@@ -14,13 +14,22 @@ import {
   type AnsiLine,
   type AnsiToken,
 } from '@google/gemini-cli-core';
+import {
+  cpLen,
+  cpSlice,
+  getCachedStringWidth,
+} from '../utils/textUtils.js';
 import { type BackgroundShell } from '../hooks/shellCommandProcessor.js';
 import { Command, keyMatchers } from '../keyMatchers.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { commandDescriptions } from '../../config/keyBindings.js';
 import {
   ScrollableList,
   type ScrollableListRef,
 } from './shared/ScrollableList.js';
+
+import { SCROLL_TO_ITEM_END } from './shared/VirtualizedList.js';
+
 import {
   RadioButtonSelect,
   type RadioSelectItem,
@@ -36,7 +45,6 @@ interface BackgroundShellDisplayProps {
 }
 
 const CONTENT_PADDING_X = 1;
-const RIGHT_TEXT = 'Ctrl+B Hide | Ctrl+K Kill';
 const BORDER_WIDTH = 2; // Left and Right border
 const HEADER_HEIGHT = 3; // 2 for border, 1 for header
 const TAB_PADDING = 2; // Spaces around tab text
@@ -44,8 +52,8 @@ const TAB_DISPLAY_HORIZONTAL_PADDING = 4;
 
 const formatShellCommandForDisplay = (command: string, maxWidth: number) => {
   const commandFirstLine = command.split('\n')[0];
-  return commandFirstLine.length > maxWidth
-    ? `${commandFirstLine.substring(0, maxWidth - 3)}...`
+  return cpLen(commandFirstLine) > maxWidth
+    ? `${cpSlice(commandFirstLine, 0, maxWidth - 3)}...`
     : commandFirstLine;
 };
 
@@ -74,7 +82,6 @@ export const BackgroundShellDisplay = ({
   // Remove manual listSelectionIndex as RadioButtonSelect handles it
   // const [listSelectionIndex, setListSelectionIndex] = useState(0);
   const outputRef = useRef<ScrollableListRef<AnsiLine | string>>(null);
-  const [isAtBottom, setIsAtBottom] = useState(true);
   const subscribedRef = useRef(false);
 
   useEffect(() => {
@@ -127,12 +134,6 @@ export const BackgroundShellDisplay = ({
     };
   }, [activePid, shells]);
 
-  useEffect(() => {
-    if (!isListOpenProp && outputRef.current && isAtBottom) {
-      outputRef.current.scrollToEnd();
-    }
-  }, [output, isListOpenProp, isAtBottom]);
-
   // Sync highlightedPid with activePid when list opens
   useEffect(() => {
     if (isListOpenProp) {
@@ -144,15 +145,24 @@ export const BackgroundShellDisplay = ({
     (key) => {
       if (!activeShell) return;
 
-      // Handle Shift+Tab to focus out
-      if (key.name === 'tab' && (key.shift || isListOpenProp)) {
+      // Handle Shift+Tab or Tab (in list) to focus out
+      if (
+        keyMatchers[Command.UNFOCUS_BACKGROUND_SHELL](key) ||
+        (isListOpenProp &&
+          keyMatchers[Command.UNFOCUS_BACKGROUND_SHELL_LIST](key))
+      ) {
         setEmbeddedShellFocused(false);
         return true;
       }
 
       // Handle Tab to warn but propagate
-      if (key.name === 'tab' && !key.shift) {
-        handleWarning('Press Shift+Tab to focus out.');
+      if (
+        !isListOpenProp &&
+        keyMatchers[Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING](key)
+      ) {
+        handleWarning(
+          `Press ${commandDescriptions[Command.UNFOCUS_BACKGROUND_SHELL]} to focus out.`,
+        );
         // Fall through to allow Tab to be sent to the shell
       }
 
@@ -161,12 +171,12 @@ export const BackgroundShellDisplay = ({
         // We only handle special keys not consumed by RadioButtonSelect or overriding them if needed
         // RadioButtonSelect handles Enter -> onSelect
 
-        if (key.name === 'escape') {
+        if (keyMatchers[Command.ESCAPE](key)) {
           setIsBackgroundShellListOpen(false);
           return true;
         }
 
-        if (key.ctrl && key.name === 'k') {
+        if (keyMatchers[Command.KILL_BACKGROUND_SHELL](key)) {
           if (highlightedPid) {
             dismissBackgroundShell(highlightedPid);
             // If we killed the active one, the list might update via props
@@ -188,7 +198,7 @@ export const BackgroundShellDisplay = ({
         return true;
       }
 
-      if (key.ctrl && key.name === 'k') {
+      if (keyMatchers[Command.KILL_BACKGROUND_SHELL](key)) {
         dismissBackgroundShell(activeShell.pid);
         return true;
       }
@@ -198,34 +208,10 @@ export const BackgroundShellDisplay = ({
         return true;
       }
 
-      const checkAtBottom = () => {
-        setTimeout(() => {
-          if (outputRef.current) {
-            const state = outputRef.current.getScrollState();
-            const atBottom =
-              state.scrollTop + state.innerHeight >= state.scrollHeight - 1;
-            setIsAtBottom(atBottom);
-          }
-        }, 50);
-      };
-
-      if (
-        keyMatchers[Command.SCROLL_UP](key) ||
-        keyMatchers[Command.SCROLL_DOWN](key) ||
-        keyMatchers[Command.PAGE_UP](key) ||
-        keyMatchers[Command.PAGE_DOWN](key) ||
-        keyMatchers[Command.SCROLL_HOME](key) ||
-        keyMatchers[Command.SCROLL_END](key)
-      ) {
-        // Check if we are at the bottom after scrolling
-        checkAtBottom();
-        return true;
-      }
-
-      if (key.name === 'return') {
+      if (keyMatchers[Command.RETURN](key)) {
         ShellExecutionService.writeToPty(activeShell.pid, '\r');
         return true;
-      } else if (key.name === 'backspace') {
+      } else if (keyMatchers[Command.DELETE_CHAR_LEFT](key)) {
         ShellExecutionService.writeToPty(activeShell.pid, '\b');
         return true;
       } else if (key.sequence) {
@@ -242,11 +228,17 @@ export const BackgroundShellDisplay = ({
       (s) => s.status === 'running',
     );
 
-    const pidInfoWidth = ` (PID: ${activePid}) ${isFocused ? '(Focused)' : ''}`
-      .length;
+    const helpText = `${commandDescriptions[Command.TOGGLE_BACKGROUND_SHELL]} Hide | ${commandDescriptions[Command.KILL_BACKGROUND_SHELL]} Kill | ${commandDescriptions[Command.TOGGLE_BACKGROUND_SHELL_LIST]} List`;
+
+    const pidInfoWidth = getCachedStringWidth(
+      ` (PID: ${activePid}) ${isFocused ? '(Focused)' : ''}`,
+    );
 
     const availableWidth =
-      width - TAB_DISPLAY_HORIZONTAL_PADDING - RIGHT_TEXT.length - pidInfoWidth;
+      width -
+      TAB_DISPLAY_HORIZONTAL_PADDING -
+      getCachedStringWidth(helpText) -
+      pidInfoWidth;
 
     let currentWidth = 0;
     const tabs = [];
@@ -263,7 +255,7 @@ export const BackgroundShellDisplay = ({
         maxTabLabelLength,
       );
       const label = ` ${i + 1}: ${truncatedCommand} `;
-      const labelWidth = label.length;
+      const labelWidth = getCachedStringWidth(label);
 
       if (currentWidth + labelWidth > availableWidth) {
         overflow = true;
@@ -287,7 +279,7 @@ export const BackgroundShellDisplay = ({
     if (overflow) {
       tabs.push(
         <Text key="overflow" color={theme.status.warning} bold>
-          {' ... (Ctrl+L) '}
+          {` ... (${commandDescriptions[Command.TOGGLE_BACKGROUND_SHELL_LIST]}) `}
         </Text>,
       );
     }
@@ -296,7 +288,6 @@ export const BackgroundShellDisplay = ({
   };
 
   const renderProcessList = () => {
-    const headerText = 'Select Process (Enter to select, Esc to cancel):';
     const maxCommandLength = Math.max(
       0,
       width - BORDER_WIDTH - CONTENT_PADDING_X * 2 - 10,
@@ -327,7 +318,9 @@ export const BackgroundShellDisplay = ({
     return (
       <Box flexDirection="column" height="100%" width="100%">
         <Box flexShrink={0} marginBottom={1} paddingTop={1}>
-          <Text bold>{headerText}</Text>
+          <Text bold>
+            {`Select Process (${commandDescriptions[Command.RETURN]} to select, ${commandDescriptions[Command.ESCAPE]} to cancel):`}
+          </Text>
         </Box>
         <Box flexGrow={1} width="100%">
           <RadioButtonSelect
@@ -421,9 +414,12 @@ export const BackgroundShellDisplay = ({
         estimatedItemHeight={() => 1}
         keyExtractor={(_, index) => index.toString()}
         hasFocus={isFocused}
+        initialScrollIndex={SCROLL_TO_ITEM_END}
       />
     );
   };
+
+  const helpText = `${commandDescriptions[Command.TOGGLE_BACKGROUND_SHELL]} Hide | ${commandDescriptions[Command.KILL_BACKGROUND_SHELL]} Kill | ${commandDescriptions[Command.TOGGLE_BACKGROUND_SHELL_LIST]} List`;
 
   return (
     <Box
@@ -451,7 +447,7 @@ export const BackgroundShellDisplay = ({
             (PID: {activeShell?.pid}) {isFocused ? '(Focused)' : ''}
           </Text>
         </Box>
-        <Text color={theme.text.accent}>{RIGHT_TEXT} | Ctrl+L List</Text>
+        <Text color={theme.text.accent}>{helpText}</Text>
       </Box>
       <Box flexGrow={1} overflow="hidden" paddingX={CONTENT_PADDING_X}>
         {isListOpenProp ? renderProcessList() : renderOutput()}

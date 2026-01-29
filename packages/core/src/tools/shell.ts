@@ -45,6 +45,8 @@ import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
+
+// Delay so user does not see the output of the process before the process is moved to the background.
 const BACKGROUND_DELAY_MS = 200;
 
 export interface ShellToolParams {
