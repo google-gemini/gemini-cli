@@ -31,6 +31,17 @@ import { useTabbedNavigation } from '../hooks/useTabbedNavigation.js';
 import { DialogFooter } from './shared/DialogFooter.js';
 import { MaxSizedBox } from './shared/MaxSizedBox.js';
 
+// Width reduction for content inside the dialog border/padding
+const CONTENT_WIDTH_REDUCTION = 4;
+
+// Height consumed by dialog chrome surrounding the content area:
+// - Border top/bottom: 2
+// - Question text + marginBottom: 2
+// - Footer (keyboard hints): 2
+// - Options/input minimum: 4
+// - Buffer for tab header when present: 2
+const DIALOG_CHROME_HEIGHT = 12;
+
 interface AskUserDialogState {
   answers: { [key: string]: string };
   isEditingCustomOption: boolean;
@@ -283,11 +294,16 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
       {progressHeader}
       {question.content && (
         <Box marginBottom={1} flexDirection="column">
-          <MaxSizedBox maxHeight={uiState?.availableTerminalHeight}>
+          <MaxSizedBox
+            maxHeight={
+              uiState?.availableTerminalHeight &&
+              uiState.availableTerminalHeight - DIALOG_CHROME_HEIGHT
+            }
+          >
             <MarkdownDisplay
               text={question.content}
               isPending={false}
-              terminalWidth={availableWidth - 4} // Adjust for parent border/padding
+              terminalWidth={availableWidth - CONTENT_WIDTH_REDUCTION}
             />
           </MaxSizedBox>
         </Box>
@@ -722,11 +738,16 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       {progressHeader}
       {question.content && (
         <Box marginBottom={1} flexDirection="column">
-          <MaxSizedBox maxHeight={uiState?.availableTerminalHeight}>
+          <MaxSizedBox
+            maxHeight={
+              uiState?.availableTerminalHeight &&
+              uiState.availableTerminalHeight - DIALOG_CHROME_HEIGHT
+            }
+          >
             <MarkdownDisplay
               text={question.content}
               isPending={false}
-              terminalWidth={availableWidth - 4} // Adjust for parent border/padding
+              terminalWidth={availableWidth - CONTENT_WIDTH_REDUCTION}
             />
           </MaxSizedBox>
         </Box>

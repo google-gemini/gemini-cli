@@ -11,6 +11,28 @@ exports[`AskUserDialog > Question content field > does not render content when c
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
+exports[`AskUserDialog > Question content field > does not truncate content when availableTerminalHeight is undefined 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Line 1                                                                                                               │
+│ Line 2                                                                                                               │
+│ Line 3                                                                                                               │
+│ Line 4                                                                                                               │
+│ Line 5                                                                                                               │
+│ Line 6                                                                                                               │
+│ Line 7                                                                                                               │
+│ Line 8                                                                                                               │
+│ Line 9                                                                                                               │
+│ Line 10                                                                                                              │
+│                                                                                                                      │
+│ Approve this plan?                                                                                                   │
+│                                                                                                                      │
+│ ● 1.  Yes                                                                                                            │
+│   2.  Enter a custom value                                                                                           │
+│                                                                                                                      │
+│ Enter to select · ↑/↓ to navigate · Esc to cancel                                                                    │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
 exports[`AskUserDialog > Question content field > renders content in a choice question 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ Plan Details                                                                                                         │
@@ -41,6 +63,21 @@ exports[`AskUserDialog > Question content field > renders content in a text ques
 │                                                                                                                      │
 │                                                                                                                      │
 │ Enter to submit · Esc to cancel                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`AskUserDialog > Question content field > truncates long content when availableTerminalHeight is small 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ... first 28 lines hidden ...                                                                                        │
+│ Line 29                                                                                                              │
+│ Line 30                                                                                                              │
+│                                                                                                                      │
+│ Approve this plan?                                                                                                   │
+│                                                                                                                      │
+│ ● 1.  Yes                                                                                                            │
+│   2.  Enter a custom value                                                                                           │
+│                                                                                                                      │
+│ Enter to select · ↑/↓ to navigate · Esc to cancel                                                                    │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
