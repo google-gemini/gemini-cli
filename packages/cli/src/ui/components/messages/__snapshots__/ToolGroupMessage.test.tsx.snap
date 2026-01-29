@@ -110,6 +110,8 @@ exports[`<ToolGroupMessage /> > Confirmation Handling > shows confirmation dialo
 
 exports[`<ToolGroupMessage /> > Event-Driven Scheduler > hides confirming tools when event-driven scheduler is enabled 1`] = `""`;
 
+exports[`<ToolGroupMessage /> > Event-Driven Scheduler > renders nothing when only tool is in-progress AskUser with borderBottom=false 1`] = `""`;
+
 exports[`<ToolGroupMessage /> > Event-Driven Scheduler > shows only successful tools when mixed with confirming tools 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ✓  success-tool A tool for testing                                           │
