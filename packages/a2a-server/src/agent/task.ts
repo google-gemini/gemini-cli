@@ -55,7 +55,7 @@ import type {
   ThoughtSummary,
   Citation,
 } from '../types.js';
-import type { PartUnion, Part as genAiPart } from '@google/genai';
+import type { PartUnion } from '@google/genai';
 
 type UnionKeys<T> = T extends T ? keyof T : never;
 
@@ -877,24 +877,16 @@ export class Task {
     logger.info(
       `[Task] Adding ${completedTools.length} tool responses to history without generating a new response.`,
     );
-    const responsesToAdd = completedTools.flatMap(
-      (toolCall) => toolCall.response.responseParts,
-    );
 
-    for (const response of responsesToAdd) {
-      let parts: genAiPart[];
-      if (Array.isArray(response)) {
-        parts = response;
-      } else if (typeof response === 'string') {
-        parts = [{ text: response }];
-      } else {
-        parts = [response];
+    for (const toolCall of completedTools) {
+      const parts = toolCall.response.responseParts;
+      if (parts.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        this.geminiClient.addHistory({
+          role: 'user',
+          parts,
+        });
       }
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      this.geminiClient.addHistory({
-        role: 'user',
-        parts,
-      });
     }
   }
 
