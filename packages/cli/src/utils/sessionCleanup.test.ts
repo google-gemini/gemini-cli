@@ -17,10 +17,23 @@ import { cleanupExpiredSessions } from './sessionCleanup.js';
 import { type SessionInfo, getAllSessionFiles } from './sessionUtils.js';
 
 // Mock the fs module
-vi.mock('fs/promises');
+vi.mock('node:fs/promises');
 vi.mock('./sessionUtils.js', () => ({
   getAllSessionFiles: vi.fn(),
 }));
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    Storage: class MockStorage {
+      getProjectTempDir() {
+        return '/tmp/test-project';
+      }
+    },
+  };
+});
 
 const mockFs = vi.mocked(fs);
 const mockGetAllSessionFiles = vi.mocked(getAllSessionFiles);
