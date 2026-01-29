@@ -28,6 +28,8 @@ import {
   type UserFeedbackPayload,
   type ResumedSessionData,
   AuthType,
+  UserAccountManager,
+  type ContentGeneratorConfig,
   type AgentDefinition,
   MessageBusType,
   QuestionType,
@@ -48,6 +50,11 @@ const mockCoreEvents = vi.hoisted(() => ({
 // Mock IdeClient
 const mockIdeClient = vi.hoisted(() => ({
   getInstance: vi.fn().mockReturnValue(new Promise(() => {})),
+}));
+
+// Mock UserAccountManager
+const mockUserAccountManager = vi.hoisted(() => ({
+  getCachedGoogleAccount: vi.fn().mockReturnValue(null),
 }));
 
 // Mock stdout
@@ -79,6 +86,9 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     })),
     enableMouseEvents: vi.fn(),
     disableMouseEvents: vi.fn(),
+    UserAccountManager: vi
+      .fn()
+      .mockImplementation(() => mockUserAccountManager),
     FileDiscoveryService: vi.fn().mockImplementation(() => ({
       initialize: vi.fn(),
     })),
@@ -473,6 +483,68 @@ describe('AppContainer State Management', () => {
       expect(() => {
         renderAppContainer({ config: debugConfig });
       }).not.toThrow();
+    });
+  });
+
+  describe('Authentication Check', () => {
+    it('checks for cached Google account on startup', async () => {
+      // Explicitly mock implementation to ensure we control the instance
+      (UserAccountManager as unknown as Mock).mockImplementation(
+        () => mockUserAccountManager,
+      );
+
+      mockUserAccountManager.getCachedGoogleAccount.mockReturnValue(
+        'test@example.com',
+      );
+      const mockAddItem = vi.fn();
+      mockedUseHistory.mockReturnValue({
+        history: [],
+        addItem: mockAddItem,
+        updateItem: vi.fn(),
+        clearItems: vi.fn(),
+        loadHistory: vi.fn(),
+      });
+
+      // Explicitly enable showUserIdentity
+      mockSettings.merged.ui = {
+        ...mockSettings.merged.ui,
+        showUserIdentity: true,
+      };
+
+      // Need to ensure config.getContentGeneratorConfig() returns appropriate authType
+      const authConfig = makeFakeConfig();
+      // Mock getTargetDir as well since makeFakeConfig might not set it up fully for the component
+      vi.spyOn(authConfig, 'getTargetDir').mockReturnValue('/test/workspace');
+      vi.spyOn(authConfig, 'initialize').mockResolvedValue(undefined);
+      vi.spyOn(authConfig, 'getExtensionLoader').mockReturnValue(
+        mockExtensionManager,
+      );
+
+      vi.spyOn(authConfig, 'getContentGeneratorConfig').mockReturnValue({
+        authType: AuthType.LOGIN_WITH_GOOGLE,
+      } as unknown as ContentGeneratorConfig);
+      vi.spyOn(authConfig, 'getUserTierName').mockReturnValue('Standard Tier');
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({ config: authConfig });
+        unmount = result.unmount;
+      });
+
+      await waitFor(() => {
+        expect(UserAccountManager).toHaveBeenCalled();
+        expect(
+          mockUserAccountManager.getCachedGoogleAccount,
+        ).toHaveBeenCalled();
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            text: expect.stringContaining(
+              'Authenticated as: test@example.com (Plan: Standard Tier)',
+            ),
+          }),
+        );
+      });
+      unmount!();
     });
   });
 
