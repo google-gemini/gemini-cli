@@ -29,6 +29,7 @@ import { getCachedStringWidth } from '../utils/textUtils.js';
 import { useTabbedNavigation } from '../hooks/useTabbedNavigation.js';
 import { DialogFooter } from './shared/DialogFooter.js';
 import { MarkdownDisplay } from '../utils/MarkdownDisplay.js';
+import { RenderInline } from '../utils/InlineMarkdownRenderer.js';
 
 interface AskUserDialogState {
   answers: { [key: string]: string };
@@ -789,7 +790,10 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
               {optionItem.description && (
                 <Text color={theme.text.secondary} wrap="wrap">
                   {' '}
-                  {optionItem.description}
+                  <RenderInline
+                    text={optionItem.description}
+                    defaultColor={theme.text.secondary}
+                  />
                 </Text>
               )}
             </Box>

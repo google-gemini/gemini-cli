@@ -311,7 +311,7 @@ const MarkdownDisplayInternal: React.FC<MarkdownDisplayProps> = ({
     );
   }
 
-  return <Box flexDirection="column">{contentBlocks}</Box>;
+  return <>{contentBlocks}</>;
 };
 
 // Helper functions (adapted from static methods of MarkdownRenderer)
