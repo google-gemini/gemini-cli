@@ -409,6 +409,7 @@ describe('SettingsSchema', () => {
       expect(setting.type).toBe('boolean');
       expect(setting.category).toBe('Advanced');
       expect(setting.default).toBe(true);
+      expect(setting.requiresRestart).toBe(true);
       expect(setting.showInDialog).toBe(true);
     });
 

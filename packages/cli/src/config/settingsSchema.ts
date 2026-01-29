@@ -1601,7 +1601,7 @@ const SETTINGS_SCHEMA = {
         type: 'boolean',
         label: 'Enable Hooks',
         category: 'Advanced',
-        requiresRestart: false,
+        requiresRestart: true,
         default: true,
         description:
           'Canonical toggle for the hooks system. When disabled, no hooks will be executed.',
