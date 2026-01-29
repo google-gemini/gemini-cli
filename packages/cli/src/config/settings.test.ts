@@ -1674,6 +1674,7 @@ describe('Settings Loading and Merging', () => {
       isWorkspaceTrustedValue = true,
     }) {
       delete process.env['TESTTEST']; // reset
+      delete process.env['GEMINI_API_KEY']; // reset
       const geminiEnvPath = path.resolve(path.join(GEMINI_DIR, '.env'));
 
       vi.mocked(isWorkspaceTrusted).mockReturnValue({
@@ -1700,7 +1701,8 @@ describe('Settings Loading and Merging', () => {
         (p: fs.PathOrFileDescriptor) => {
           if (p === USER_SETTINGS_PATH)
             return JSON.stringify(userSettingsContent);
-          if (p === geminiEnvPath) return 'TESTTEST=1234';
+          if (p === geminiEnvPath)
+            return 'TESTTEST=1234\nGEMINI_API_KEY=test-key';
           return '{}';
         },
       );
@@ -1711,6 +1713,7 @@ describe('Settings Loading and Merging', () => {
       loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
 
       expect(process.env['TESTTEST']).toEqual('1234');
+      expect(process.env['GEMINI_API_KEY']).toEqual('test-key');
     });
 
     it('does not load env files from untrusted spaces', () => {
@@ -1718,6 +1721,36 @@ describe('Settings Loading and Merging', () => {
       loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
 
       expect(process.env['TESTTEST']).not.toEqual('1234');
+      expect(process.env['GEMINI_API_KEY']).not.toEqual('test-key');
+    });
+
+    it('loads whitelisted env files from untrusted spaces if sandboxing is enabled', () => {
+      setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: false });
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      settings.merged.tools!.sandbox = true;
+      loadEnvironment(settings.merged);
+
+      // GEMINI_API_KEY is in the whitelist, so it should be loaded.
+      expect(process.env['GEMINI_API_KEY']).toEqual('test-key');
+      // TESTTEST is NOT in the whitelist, so it should be blocked.
+      expect(process.env['TESTTEST']).not.toEqual('1234');
+    });
+
+    it('loads whitelisted env files from untrusted spaces if sandboxing is enabled via CLI flag', () => {
+      const originalArgv = [...process.argv];
+      process.argv.push('-s');
+      try {
+        setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: false });
+        const settings = loadSettings(MOCK_WORKSPACE_DIR);
+        // Ensure sandbox is NOT in settings to test argv sniffing
+        settings.merged.tools!.sandbox = undefined;
+        loadEnvironment(settings.merged);
+
+        expect(process.env['GEMINI_API_KEY']).toEqual('test-key');
+        expect(process.env['TESTTEST']).not.toEqual('1234');
+      } finally {
+        process.argv = originalArgv;
+      }
     });
   });
 

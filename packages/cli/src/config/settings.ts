@@ -75,6 +75,13 @@ export const USER_SETTINGS_PATH = Storage.getGlobalSettingsPath();
 export const USER_SETTINGS_DIR = path.dirname(USER_SETTINGS_PATH);
 export const DEFAULT_EXCLUDED_ENV_VARS = ['DEBUG', 'DEBUG_MODE'];
 
+const AUTH_ENV_VAR_WHITELIST = [
+  'GEMINI_API_KEY',
+  'GOOGLE_API_KEY',
+  'GOOGLE_CLOUD_PROJECT',
+  'GOOGLE_CLOUD_LOCATION',
+];
+
 export function getSystemSettingsPath(): string {
   if (process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH']) {
     return process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH'];
@@ -424,7 +431,15 @@ export function setUpCloudShellEnvironment(envFilePath: string | null): void {
 export function loadEnvironment(settings: Settings): void {
   const envFilePath = findEnvFile(process.cwd());
 
-  if (!isWorkspaceTrusted(settings).isTrusted) {
+  const isTrusted = isWorkspaceTrusted(settings).isTrusted;
+  // Check settings OR check process.argv directly since this might be called
+  // before arguments are fully parsed.
+  const isSandboxed =
+    !!settings.tools?.sandbox ||
+    process.argv.includes('-s') ||
+    process.argv.includes('--sandbox');
+
+  if (!isTrusted && !isSandboxed) {
     return;
   }
 
@@ -446,6 +461,15 @@ export function loadEnvironment(settings: Settings): void {
 
       for (const key in parsedEnv) {
         if (Object.hasOwn(parsedEnv, key)) {
+          // If the workspace is untrusted but we are sandboxed, only allow whitelisted variables.
+          if (
+            !isTrusted &&
+            isSandboxed &&
+            !AUTH_ENV_VAR_WHITELIST.includes(key)
+          ) {
+            continue;
+          }
+
           // If it's a project .env file, skip loading excluded variables.
           if (isProjectEnvFile && excludedVars.includes(key)) {
             continue;
