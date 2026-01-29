@@ -86,6 +86,19 @@ function commandExists(cmd: string): boolean {
 }
 
 /**
+ * Creates a consistent error message for missing editors and emits feedback.
+ */
+function handleEditorNotFound(editor: EditorType, command: string): void {
+  const editorName = getEditorDisplayName(editor);
+  const message = 
+    `${editorName} command '${command}' not found. ` +
+    `Please ensure ${editorName} is installed and in your PATH, or configure a different editor.`;
+  
+  debugLogger.error(message);
+  coreEvents.emitFeedback('error', message);
+}
+
+/**
  * Editor command configurations for different platforms.
  * Each editor can have multiple possible command names, listed in order of preference.
  */
@@ -147,6 +160,7 @@ export function isEditorAvailable(editor: string | undefined): boolean {
 
 /**
  * Get the diff command for a specific editor.
+ * Uses -- separator to prevent argument injection attacks.
  */
 export function getDiffCommand(
   oldPath: string,
@@ -165,7 +179,7 @@ export function getDiffCommand(
     case 'cursor':
     case 'zed':
     case 'antigravity':
-      return { command, args: ['--wait', '--diff', oldPath, newPath] };
+      return { command, args: ['--wait', '--diff', '--', oldPath, newPath] };
     case 'vim':
     case 'neovim':
       return {
@@ -191,6 +205,7 @@ export function getDiffCommand(
           // Auto close all windows when one is closed
           '-c',
           'autocmd BufWritePost * wqa',
+          '--',
           oldPath,
           newPath,
         ],
@@ -229,6 +244,12 @@ export async function openDiff(
     return;
   }
 
+  // Pre-flight check: verify the editor command exists before attempting to spawn
+  if (!commandExists(diffCommand.command)) {
+    handleEditorNotFound(editor, diffCommand.command);
+    return;
+  }
+
   if (isTerminalEditor(editor)) {
     try {
       const result = spawnSync(diffCommand.command, diffCommand.args, {
@@ -246,10 +267,11 @@ export async function openDiff(
     return;
   }
 
+  // For GUI editors: spawn without shell to prevent command injection
   return new Promise<void>((resolve, reject) => {
     const childProcess = spawn(diffCommand.command, diffCommand.args, {
       stdio: 'inherit',
-      shell: process.platform === 'win32',
+      shell: false, // Explicitly disable shell to prevent command injection
     });
 
     childProcess.on('close', (code) => {

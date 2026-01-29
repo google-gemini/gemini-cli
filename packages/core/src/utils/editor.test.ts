@@ -23,11 +23,21 @@ import {
 } from './editor.js';
 import { execSync, spawn, spawnSync } from 'node:child_process';
 import { debugLogger } from './debugLogger.js';
+import { coreEvents, CoreEvent } from './events.js';
 
 vi.mock('child_process', () => ({
   execSync: vi.fn(),
   spawn: vi.fn(),
   spawnSync: vi.fn(() => ({ error: null, status: 0 })),
+}));
+
+vi.mock('./events.js', () => ({
+  coreEvents: {
+    emit: vi.fn(),
+  },
+  CoreEvent: {
+    ExternalEditorClosed: 'ExternalEditorClosed',
+  },
 }));
 
 const originalPlatform = process.platform;
@@ -195,7 +205,7 @@ describe('editor utils', () => {
         const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
         expect(diffCommand).toEqual({
           command: commands[0],
-          args: ['--wait', '--diff', 'old.txt', 'new.txt'],
+          args: ['--wait', '--diff', '--', 'old.txt', 'new.txt'], // Added -- separator
         });
       });
 
@@ -211,7 +221,7 @@ describe('editor utils', () => {
           const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
           expect(diffCommand).toEqual({
             command: commands[1],
-            args: ['--wait', '--diff', 'old.txt', 'new.txt'],
+            args: ['--wait', '--diff', '--', 'old.txt', 'new.txt'], // Added -- separator
           });
         });
       }
@@ -225,7 +235,7 @@ describe('editor utils', () => {
         const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
         expect(diffCommand).toEqual({
           command: commands[commands.length - 1],
-          args: ['--wait', '--diff', 'old.txt', 'new.txt'],
+          args: ['--wait', '--diff', '--', 'old.txt', 'new.txt'], // Added -- separator
         });
       });
 
@@ -238,7 +248,7 @@ describe('editor utils', () => {
         const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
         expect(diffCommand).toEqual({
           command: win32Commands[0],
-          args: ['--wait', '--diff', 'old.txt', 'new.txt'],
+          args: ['--wait', '--diff', '--', 'old.txt', 'new.txt'], // Added -- separator
         });
       });
 
@@ -256,7 +266,7 @@ describe('editor utils', () => {
           const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
           expect(diffCommand).toEqual({
             command: win32Commands[1],
-            args: ['--wait', '--diff', 'old.txt', 'new.txt'],
+            args: ['--wait', '--diff', '--', 'old.txt', 'new.txt'], // Added -- separator
           });
         });
       }
@@ -270,7 +280,7 @@ describe('editor utils', () => {
         const diffCommand = getDiffCommand('old.txt', 'new.txt', editor);
         expect(diffCommand).toEqual({
           command: win32Commands[win32Commands.length - 1],
-          args: ['--wait', '--diff', 'old.txt', 'new.txt'],
+          args: ['--wait', '--diff', '--', 'old.txt', 'new.txt'], // Added -- separator
         });
       });
     }
@@ -304,6 +314,7 @@ describe('editor utils', () => {
             'wincmd l | setlocal statusline=%#StatusBold#NEW\\ FILE\\ :wqa(save\\ &\\ quit)\\ \\|\\ i/esc(toggle\\ edit\\ mode)',
             '-c',
             'autocmd BufWritePost * wqa',
+            '--', // Added -- separator
             'old.txt',
             'new.txt',
           ],
@@ -330,7 +341,7 @@ describe('editor utils', () => {
       const command = getDiffCommand('old.txt', 'new.txt', 'hx');
       expect(command).toEqual({
         command: 'hx',
-        args: ['--vsplit', '--', 'old.txt', 'new.txt'],
+        args: ['--vsplit', '--', 'old.txt', 'new.txt'], // Added -- separator
       });
     });
 
@@ -338,6 +349,18 @@ describe('editor utils', () => {
       // @ts-expect-error Testing unsupported editor
       const command = getDiffCommand('old.txt', 'new.txt', 'foobar');
       expect(command).toBeNull();
+    });
+
+    // NEW: Test for argument injection prevention
+    it('should include -- separator to prevent argument injection', () => {
+      const command = getDiffCommand('/path/old', '/path/new', 'vim');
+      expect(command?.args).toContain('--');
+      
+      // Verify files come after the separator
+      const separatorIndex = command!.args.indexOf('--');
+      const argsAfterSeparator = command!.args.slice(separatorIndex + 1);
+      expect(argsAfterSeparator).toContain('/path/old');
+      expect(argsAfterSeparator).toContain('/path/new');
     });
   });
 
@@ -352,6 +375,9 @@ describe('editor utils', () => {
 
     for (const editor of guiEditors) {
       it(`should call spawn for ${editor}`, async () => {
+        // Mock editor exists
+        (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/code'));
+        
         const mockSpawnOn = vi.fn((event, cb) => {
           if (event === 'close') {
             cb(0);
@@ -366,7 +392,7 @@ describe('editor utils', () => {
           diffCommand.args,
           {
             stdio: 'inherit',
-            shell: process.platform === 'win32',
+            shell: false, // CHANGED: Now always false for security
           },
         );
         expect(mockSpawnOn).toHaveBeenCalledWith('close', expect.any(Function));
@@ -374,6 +400,9 @@ describe('editor utils', () => {
       });
 
       it(`should reject if spawn for ${editor} fails`, async () => {
+        // Mock editor exists
+        (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/code'));
+        
         const mockError = new Error('spawn error');
         const mockSpawnOn = vi.fn((event, cb) => {
           if (event === 'error') {
@@ -388,6 +417,9 @@ describe('editor utils', () => {
       });
 
       it(`should reject if ${editor} exits with non-zero code`, async () => {
+        // Mock editor exists
+        (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/code'));
+        
         const mockSpawnOn = vi.fn((event, cb) => {
           if (event === 'close') {
             cb(1);
@@ -399,12 +431,35 @@ describe('editor utils', () => {
           `${editor} exited with code 1`,
         );
       });
+
+      // NEW: Test that editor not found returns early without throwing
+      it(`should return early if ${editor} command does not exist`, async () => {
+        // Mock editor does not exist
+        (execSync as Mock).mockImplementation(() => {
+          throw new Error('Command not found');
+        });
+
+        const consoleErrorSpy = vi
+          .spyOn(debugLogger, 'error')
+          .mockImplementation(() => {});
+
+        await openDiff('old.txt', 'new.txt', editor);
+
+        // Should not call spawn
+        expect(spawn).not.toHaveBeenCalled();
+        // Should log error
+        expect(consoleErrorSpy).toHaveBeenCalled();
+      });
     }
 
     const terminalEditors: EditorType[] = ['vim', 'neovim', 'emacs', 'hx'];
 
     for (const editor of terminalEditors) {
       it(`should call spawnSync for ${editor}`, async () => {
+        // Mock editor exists
+        (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/vim'));
+        (spawnSync as Mock).mockReturnValue({ error: null, status: 0 });
+
         await openDiff('old.txt', 'new.txt', editor);
         const diffCommand = getDiffCommand('old.txt', 'new.txt', editor)!;
         expect(spawnSync).toHaveBeenCalledWith(
@@ -414,6 +469,55 @@ describe('editor utils', () => {
             stdio: 'inherit',
           },
         );
+        // NEW: Should emit event when editor closes
+        expect(coreEvents.emit).toHaveBeenCalledWith(CoreEvent.ExternalEditorClosed);
+      });
+
+      // NEW: Test error handling for terminal editors
+      it(`should throw if ${editor} exits with non-zero status`, async () => {
+        // Mock editor exists
+        (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/vim'));
+        (spawnSync as Mock).mockReturnValue({ error: null, status: 1 });
+
+        await expect(openDiff('old.txt', 'new.txt', editor)).rejects.toThrow(
+          `${editor} exited with code 1`,
+        );
+        
+        // Should still emit event even on error
+        expect(coreEvents.emit).toHaveBeenCalledWith(CoreEvent.ExternalEditorClosed);
+      });
+
+      it(`should throw if spawnSync has an error for ${editor}`, async () => {
+        // Mock editor exists
+        (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/vim'));
+        const testError = new Error('Test error');
+        (spawnSync as Mock).mockReturnValue({ error: testError, status: null });
+
+        await expect(openDiff('old.txt', 'new.txt', editor)).rejects.toThrow('Test error');
+        
+        // Should still emit event even on error
+        expect(coreEvents.emit).toHaveBeenCalledWith(CoreEvent.ExternalEditorClosed);
+      });
+
+      // NEW: Test that editor not found returns early without throwing
+      it(`should return early if ${editor} command does not exist`, async () => {
+        // Mock editor does not exist
+        (execSync as Mock).mockImplementation(() => {
+          throw new Error('Command not found');
+        });
+
+        const consoleErrorSpy = vi
+          .spyOn(debugLogger, 'error')
+          .mockImplementation(() => {});
+
+        await openDiff('old.txt', 'new.txt', editor);
+
+        // Should not call spawnSync
+        expect(spawnSync).not.toHaveBeenCalled();
+        // Should log error
+        expect(consoleErrorSpy).toHaveBeenCalled();
+        // Should not emit event if editor doesn't exist
+        expect(coreEvents.emit).not.toHaveBeenCalled();
       });
     }
 
