@@ -10,8 +10,8 @@ available combinations.
 
 | Action                                                          | Keys       |
 | --------------------------------------------------------------- | ---------- |
-| Confirm the current selection or choice.                        | `Enter`    |
-| Dismiss dialogs or cancel the current focus.                    | `Esc`      |
+| Enter                                                           | `Enter`    |
+| Esc                                                             | `Esc`      |
 | Cancel the current request or quit the CLI when input is empty. | `Ctrl + C` |
 | Exit the CLI when the input buffer is empty.                    | `Ctrl + D` |
 
@@ -106,8 +106,12 @@ available combinations.
 | Toggle YOLO (auto-approval) mode for tool calls.                                                      | `Ctrl + Y`                 |
 | Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only). | `Shift + Tab`              |
 | Expand a height-constrained response to show additional lines when not in alternate buffer mode.      | `Ctrl + O`<br />`Ctrl + S` |
-| Move current shell command to background or toggle background shell view.                             | `Ctrl + B`                 |
-| Toggle the list of background shell processes.                                                        | `Ctrl + L`                 |
+| Ctrl+B                                                                                                | `Ctrl + B`                 |
+| Ctrl+L                                                                                                | `Ctrl + L`                 |
+| Ctrl+K                                                                                                | `Ctrl + K`                 |
+| Shift+Tab                                                                                             | `Shift + Tab`              |
+| Tab                                                                                                   | `Tab (no Shift)`           |
+| Tab                                                                                                   | `Tab (no Shift)`           |
 | Focus the shell input from the gemini input.                                                          | `Tab (no Shift)`           |
 | Focus the Gemini input from the shell input.                                                          | `Tab`                      |
 | Clear the terminal screen and redraw the UI.                                                          | `Ctrl + L`                 |
