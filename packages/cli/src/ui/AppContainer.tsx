@@ -136,6 +136,7 @@ import { terminalCapabilityManager } from './utils/terminalCapabilityManager.js'
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { useBanner } from './hooks/useBanner.js';
 import { useHookDisplayState } from './hooks/useHookDisplayState.js';
+import { useBackgroundShellManager } from './hooks/useBackgroundShellManager.js';
 import {
   WARNING_PROMPT_DURATION_MS,
   QUEUE_ERROR_DISPLAY_DURATION_MS,
@@ -214,11 +215,6 @@ export const AppContainer = (props: AppContainerProps) => {
   const isBackgroundShellVisibleRef = useRef<boolean>(false);
   const backgroundShellsRef = useRef<Map<number, BackgroundShell>>(new Map());
 
-  const [isBackgroundShellListOpen, setIsBackgroundShellListOpen] =
-    useState(false);
-  const [activeBackgroundShellPid, setActiveBackgroundShellPid] = useState<
-    number | null
-  >(null);
   const [adminSettingsChanged, setAdminSettingsChanged] = useState(false);
 
   const [shellModeActive, setShellModeActive] = useState(false);
@@ -449,6 +445,12 @@ export const AppContainer = (props: AppContainerProps) => {
     registerCleanup(async () => {
       // Turn off mouse scroll.
       disableMouseEvents();
+
+      // Kill all background shells
+      for (const pid of backgroundShellsRef.current.keys()) {
+        ShellExecutionService.kill(pid);
+      }
+
       const ideClient = await IdeClient.getInstance();
       await ideClient.disconnect();
 
@@ -797,6 +799,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const { toggleVimEnabled } = useVimMode();
 
+  const setIsBackgroundShellListOpenRef = useRef<(open: boolean) => void>(
+    () => {},
+  );
+
   const slashCommandActions = useMemo(
     () => ({
       openAuthDialog: () => setAuthState(AuthState.Updating),
@@ -825,9 +831,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
         if (!isBackgroundShellVisibleRef.current) {
           setEmbeddedShellFocused(true);
           if (backgroundShellsRef.current.size > 1) {
-            setIsBackgroundShellListOpen(true);
+            setIsBackgroundShellListOpenRef.current(true);
           } else {
-            setIsBackgroundShellListOpen(false);
+            setIsBackgroundShellListOpenRef.current(false);
           }
         }
       },
@@ -849,7 +855,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       openPermissionsDialog,
       addConfirmUpdateExtensionRequest,
       toggleDebugProfiler,
-      setIsBackgroundShellListOpen,
       buffer,
     ],
   );
@@ -991,17 +996,27 @@ Logging in with Google... Restarting Gemini CLI to continue.
     embeddedShellFocused,
   );
 
-  useEffect(() => {
-    toggleBackgroundShellRef.current = toggleBackgroundShell;
-  }, [toggleBackgroundShell]);
+  toggleBackgroundShellRef.current = toggleBackgroundShell;
+  isBackgroundShellVisibleRef.current = isBackgroundShellVisible;
+  backgroundShellsRef.current = backgroundShells;
 
-  useEffect(() => {
-    isBackgroundShellVisibleRef.current = isBackgroundShellVisible;
-  }, [isBackgroundShellVisible]);
+  const {
+    activeBackgroundShellPid,
+    setIsBackgroundShellListOpen,
+    isBackgroundShellListOpen,
+    setActiveBackgroundShellPid,
+    backgroundShellHeight,
+  } = useBackgroundShellManager({
+    backgroundShells,
+    backgroundShellCount,
+    isBackgroundShellVisible,
+    activePtyId,
+    embeddedShellFocused,
+    setEmbeddedShellFocused,
+    terminalHeight,
+  });
 
-  useEffect(() => {
-    backgroundShellsRef.current = backgroundShells;
-  }, [backgroundShells]);
+  setIsBackgroundShellListOpenRef.current = setIsBackgroundShellListOpen;
 
   const lastOutputTimeRef = useRef(0);
 
@@ -1029,18 +1044,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     isActive: !embeddedShellFocused,
   });
 
-  useEffect(() => {
-    registerCleanup(async () => {
-      // Turn off mouse scroll.
-      disableMouseEvents();
-      // Kill all background shells
-      for (const pid of backgroundShells.keys()) {
-        ShellExecutionService.kill(pid);
-      }
-      const ideClient = await IdeClient.getInstance();
-      await ideClient.disconnect();
-    });
-  }, [config, backgroundShells]);
   const { isMcpReady } = useMcpStatus(config);
 
   const {
@@ -1055,46 +1058,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     submitQuery,
     isMcpReady,
   });
-
-  useEffect(() => {
-    if (backgroundShells.size === 0) {
-      if (activeBackgroundShellPid !== null) {
-        setActiveBackgroundShellPid(null);
-      }
-      if (isBackgroundShellListOpen) {
-        setIsBackgroundShellListOpen(false);
-      }
-    } else if (
-      activeBackgroundShellPid === null ||
-      !backgroundShells.has(activeBackgroundShellPid)
-    ) {
-      // If active shell is closed or none selected, select the first one (last added usually, or just first in iteration)
-      setActiveBackgroundShellPid(backgroundShells.keys().next().value ?? null);
-    }
-  }, [
-    backgroundShells,
-    activeBackgroundShellPid,
-    backgroundShellCount,
-    isBackgroundShellListOpen,
-  ]);
-
-  useEffect(() => {
-    if (embeddedShellFocused) {
-      const hasActiveForegroundShell = !!activePtyId;
-      const hasVisibleBackgroundShell =
-        isBackgroundShellVisible && backgroundShells.size > 0;
-
-      if (!hasActiveForegroundShell && !hasVisibleBackgroundShell) {
-        setEmbeddedShellFocused(false);
-      }
-    }
-  }, [
-    isBackgroundShellVisible,
-    backgroundShells,
-    embeddedShellFocused,
-    backgroundShellCount,
-    activePtyId,
-  ]);
 
   cancelHandlerRef.current = useCallback(
     (shouldRestorePrompt: boolean = true) => {
@@ -1203,11 +1166,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, [buffer, terminalWidth, terminalHeight, controlsHeight]);
 
   // Compute available terminal height based on controls measurement
-  const backgroundShellHeight =
-    isBackgroundShellVisible && backgroundShells.size > 0
-      ? Math.max(Math.floor(terminalHeight * 0.3), 5)
-      : 0;
-
   const availableTerminalHeight = Math.max(
     0,
     terminalHeight -

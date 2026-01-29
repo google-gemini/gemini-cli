@@ -32,28 +32,31 @@ export const ShellInputPrompt: React.FC<ShellInputPromptProps> = ({
   const handleInput = useCallback(
     (key: Key) => {
       if (!focus || !activeShellPtyId) {
-        return;
+        return false;
       }
 
       // Allow background shell toggle to bubble up
       if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL](key)) {
-        return;
+        return false;
       }
 
       if (key.ctrl && key.shift && key.name === 'up') {
         ShellExecutionService.scrollPty(activeShellPtyId, -1);
-        return;
+        return true;
       }
 
       if (key.ctrl && key.shift && key.name === 'down') {
         ShellExecutionService.scrollPty(activeShellPtyId, 1);
-        return;
+        return true;
       }
 
       const ansiSequence = keyToAnsi(key);
       if (ansiSequence) {
         handleShellInputSubmit(ansiSequence);
+        return true;
       }
+
+      return false;
     },
     [focus, handleShellInputSubmit, activeShellPtyId],
   );

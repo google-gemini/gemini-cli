@@ -1004,7 +1004,7 @@ describe('ShellExecutionService child_process fallback', () => {
       });
     });
 
-    it.skip('should truncate stdout using a sliding window and show a warning', async () => {
+    it('should truncate stdout using a sliding window and show a warning', async () => {
       const MAX_SIZE = 16 * 1024 * 1024;
       const chunk1 = 'a'.repeat(MAX_SIZE / 2 - 5);
       const chunk2 = 'b'.repeat(MAX_SIZE / 2 - 5);

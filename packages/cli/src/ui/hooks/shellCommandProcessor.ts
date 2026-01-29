@@ -138,15 +138,16 @@ export const useShellCommandProcessor = (
     dispatch,
   ]);
 
-  useEffect(() => {
-    return () => {
+  useEffect(
+    () => () => {
       // Unsubscribe from all background shell events on unmount
       for (const unsubscribe of m.subscriptions.values()) {
         unsubscribe();
       }
       m.subscriptions.clear();
-    };
-  }, [m]);
+    },
+    [m],
+  );
 
   const toggleBackgroundShell = useCallback(() => {
     if (state.backgroundShells.size > 0) {
@@ -239,7 +240,10 @@ export const useShellCommandProcessor = (
           dispatch({
             type: 'UPDATE_SHELL',
             pid,
-            update: { isBinary: true, binaryBytesReceived: event.bytesReceived },
+            update: {
+              isBinary: true,
+              binaryBytesReceived: event.bytesReceived,
+            },
           });
         }
       });
@@ -365,7 +369,8 @@ export const useShellCommandProcessor = (
                   dispatch({
                     type: 'APPEND_SHELL_OUTPUT',
                     pid: executionPid,
-                    chunk: event.type === 'data' ? event.chunk : cumulativeStdout,
+                    chunk:
+                      event.type === 'data' ? event.chunk : cumulativeStdout,
                   });
                   return;
                 }
@@ -404,7 +409,7 @@ export const useShellCommandProcessor = (
 
           executionPid = pid;
           if (pid) {
-            dispatch({ type: 'SET_ACTIVE_PTY', pid: pid });
+            dispatch({ type: 'SET_ACTIVE_PTY', pid });
             setPendingHistoryItem((prevItem) => {
               if (prevItem?.type === 'tool_group') {
                 return {
@@ -438,7 +443,10 @@ export const useShellCommandProcessor = (
           let finalOutput = mainContent;
           let finalStatus = ToolCallStatus.Success;
 
-          if (result.error || result.aborted) {
+          if (result.error) {
+            finalStatus = ToolCallStatus.Error;
+            finalOutput = `${result.error.message}\n${finalOutput}`;
+          } else if (result.aborted) {
             finalStatus = ToolCallStatus.Canceled;
             finalOutput = `Command was cancelled.\n${finalOutput}`;
           } else if (result.backgrounded) {
@@ -512,7 +520,6 @@ export const useShellCommandProcessor = (
       terminalHeight,
       terminalWidth,
       registerBackgroundShell,
-      state.activeShellPtyId,
       m,
       dispatch,
     ],

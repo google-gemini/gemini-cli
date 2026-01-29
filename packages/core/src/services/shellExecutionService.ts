@@ -27,9 +27,9 @@ import {
   sanitizeEnvironment,
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
+import { killProcessGroup } from '../utils/process-utils.js';
 const { Terminal } = pkg;
 
-const SIGKILL_TIMEOUT_MS = 200;
 const MAX_CHILD_PROCESS_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
 
 // We want to allow shell outputs that are close to the context window in size.
@@ -135,10 +135,8 @@ interface ActivePty {
 interface ActiveChildProcess {
   process: ChildProcess;
   state: {
-    stdout: string;
-    stderr: string;
-    stdoutTruncated: boolean;
-    stderrTruncated: boolean;
+    output: string;
+    truncated: boolean;
     outputChunks: Buffer[];
   };
 }
@@ -312,10 +310,8 @@ export class ShellExecutionService {
       });
 
       const state = {
-        stdout: '',
-        stderr: '',
-        stdoutTruncated: false,
-        stderrTruncated: false,
+        output: '',
+        truncated: false,
         outputChunks: [] as Buffer[],
       };
 
@@ -370,26 +366,14 @@ export class ShellExecutionService {
             const decoder = stream === 'stdout' ? stdoutDecoder : stderrDecoder;
             const decodedChunk = decoder.decode(data, { stream: true });
 
-            if (stream === 'stdout') {
-              const { newBuffer, truncated } = this.appendAndTruncate(
-                state.stdout,
-                decodedChunk,
-                MAX_CHILD_PROCESS_BUFFER_SIZE,
-              );
-              state.stdout = newBuffer;
-              if (truncated) {
-                state.stdoutTruncated = true;
-              }
-            } else {
-              const { newBuffer, truncated } = this.appendAndTruncate(
-                state.stderr,
-                decodedChunk,
-                MAX_CHILD_PROCESS_BUFFER_SIZE,
-              );
-              state.stderr = newBuffer;
-              if (truncated) {
-                state.stderrTruncated = true;
-              }
+            const { newBuffer, truncated } = this.appendAndTruncate(
+              state.output,
+              decodedChunk,
+              MAX_CHILD_PROCESS_BUFFER_SIZE,
+            );
+            state.output = newBuffer;
+            if (truncated) {
+              state.truncated = true;
             }
 
             if (decodedChunk) {
@@ -419,15 +403,10 @@ export class ShellExecutionService {
           signal: NodeJS.Signals | null,
         ) => {
           const { finalBuffer } = cleanup();
-          // Ensure we don't add an extra newline if stdout already ends with one.
-          const separator = state.stdout.endsWith('\n') ? '' : '\n';
-          let combinedOutput =
-            state.stdout +
-            (state.stderr
-              ? (state.stdout ? separator : '') + state.stderr
-              : '');
 
-          if (state.stdoutTruncated || state.stderrTruncated) {
+          let combinedOutput = state.output;
+
+          if (state.truncated) {
             const truncationMessage = `\n[GEMINI_CLI_WARNING: Output truncated. The buffer is limited to ${
               MAX_CHILD_PROCESS_BUFFER_SIZE / (1024 * 1024)
             }MB.]`;
@@ -473,19 +452,11 @@ export class ShellExecutionService {
 
         const abortHandler = async () => {
           if (child.pid && !exited) {
-            if (isWindows) {
-              cpSpawn('taskkill', ['/pid', child.pid.toString(), '/f', '/t']);
-            } else {
-              try {
-                process.kill(-child.pid, 'SIGTERM');
-                await new Promise((res) => setTimeout(res, SIGKILL_TIMEOUT_MS));
-                if (!exited) {
-                  process.kill(-child.pid, 'SIGKILL');
-                }
-              } catch (_e) {
-                if (!exited) child.kill('SIGKILL');
-              }
-            }
+            await killProcessGroup({
+              pid: child.pid,
+              escalate: true,
+              isExited: () => exited,
+            });
           }
         };
 
@@ -501,7 +472,7 @@ export class ShellExecutionService {
           if (stdoutDecoder) {
             const remaining = stdoutDecoder.decode();
             if (remaining) {
-              state.stdout += remaining;
+              state.output += remaining;
               // If there's remaining output, we should technically emit it too,
               // but it's rare to have partial utf8 chars at the very end of stream.
               if (isStreamingRawContent && remaining) {
@@ -518,7 +489,7 @@ export class ShellExecutionService {
           if (stderrDecoder) {
             const remaining = stderrDecoder.decode();
             if (remaining) {
-              state.stderr += remaining;
+              state.output += remaining;
               if (isStreamingRawContent && remaining) {
                 const event: ShellOutputEvent = {
                   type: 'data',
@@ -875,25 +846,12 @@ export class ShellExecutionService {
 
         const abortHandler = async () => {
           if (ptyProcess.pid && !exited) {
-            if (os.platform() === 'win32') {
-              ptyProcess.kill();
-            } else {
-              try {
-                // Kill the entire process group
-                process.kill(-ptyProcess.pid, 'SIGTERM');
-                await new Promise((res) => setTimeout(res, SIGKILL_TIMEOUT_MS));
-                if (!exited) {
-                  process.kill(-ptyProcess.pid, 'SIGKILL');
-                }
-              } catch (_e) {
-                // Fallback to killing just the process if the group kill fails
-                ptyProcess.kill('SIGTERM');
-                await new Promise((res) => setTimeout(res, SIGKILL_TIMEOUT_MS));
-                if (!exited) {
-                  ptyProcess.kill('SIGKILL');
-                }
-              }
-            }
+            await killProcessGroup({
+              pid: ptyProcess.pid,
+              escalate: true,
+              isExited: () => exited,
+              pty: ptyProcess,
+            });
           }
         };
 
@@ -1025,36 +983,10 @@ export class ShellExecutionService {
     const activeChild = this.activeChildProcesses.get(pid);
 
     if (activeChild) {
-      if (os.platform() === 'win32') {
-        cpSpawn('taskkill', ['/pid', pid.toString(), '/f', '/t']);
-      } else {
-        try {
-          process.kill(-pid, 'SIGKILL');
-        } catch {
-          try {
-            process.kill(pid, 'SIGKILL');
-          } catch {
-            // ignore
-          }
-        }
-      }
+      killProcessGroup({ pid }).catch(() => {});
       this.activeChildProcesses.delete(pid);
     } else if (activePty) {
-      try {
-        if (os.platform() === 'win32') {
-          activePty.ptyProcess.kill();
-        } else {
-          // Try killing the process group first
-          try {
-            process.kill(-pid, 'SIGKILL');
-          } catch {
-            // Fallback to killing the specific process
-            activePty.ptyProcess.kill('SIGKILL');
-          }
-        }
-      } catch {
-        // Ignore errors if process is already dead
-      }
+      killProcessGroup({ pid, pty: activePty.ptyProcess }).catch(() => {});
       this.activePtys.delete(pid);
     }
 
@@ -1091,13 +1023,7 @@ export class ShellExecutionService {
           backgrounded: true,
         });
       } else if (activeChild) {
-        const separator = activeChild.state.stdout.endsWith('\n') ? '' : '\n';
-        output =
-          activeChild.state.stdout +
-          (activeChild.state.stderr
-            ? (activeChild.state.stdout ? separator : '') +
-              activeChild.state.stderr
-            : '');
+        output = activeChild.state.output;
 
         resolve({
           rawOutput,
@@ -1145,13 +1071,7 @@ export class ShellExecutionService {
         listener({ type: 'data', chunk: bufferData });
       }
     } else if (activeChild) {
-      const separator = activeChild.state.stdout.endsWith('\n') ? '' : '\n';
-      const output =
-        activeChild.state.stdout +
-        (activeChild.state.stderr
-          ? (activeChild.state.stdout ? separator : '') +
-            activeChild.state.stderr
-          : '');
+      const output = activeChild.state.output;
       if (output) {
         listener({ type: 'data', chunk: output });
       }
