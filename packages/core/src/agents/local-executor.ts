@@ -46,6 +46,7 @@ import { templateString } from './utils.js';
 import { DEFAULT_GEMINI_MODEL, isAutoModel } from '../config/models.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
 import { parseThought } from '../utils/thoughtUtils.js';
+import { getFunctionCalls } from '../utils/generateContentResponseUtilities.js';
 import { type z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -700,8 +701,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         }
 
         // Collect any function calls requested by the model.
-        if (chunk.functionCalls) {
-          functionCalls.push(...chunk.functionCalls);
+        const chunkFunctionCalls = getFunctionCalls(chunk);
+        if (chunkFunctionCalls) {
+          functionCalls.push(...chunkFunctionCalls);
         }
 
         // Handle text response (non-thought text)
@@ -988,6 +990,21 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         },
       );
 
+      // Record tool calls with full metadata before processing responses.
+      try {
+        const currentModel =
+          this.runtimeContext.getGeminiClient().getCurrentSequenceModel() ??
+          this.runtimeContext.getModel();
+        this.runtimeContext
+          .getGeminiClient()
+          .getChat()
+          .recordCompletedToolCalls(currentModel, completedCalls);
+      } catch (error) {
+        debugLogger.warn(
+          `[LocalAgentExecutor] Error recording completed tool call information: ${error}`,
+        );
+      }
+
       for (const call of completedCalls) {
         const toolName =
           toolNameMap.get(call.request.callId) || call.request.name;
@@ -1015,6 +1032,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       }
     }
 
+    // Reconstruct toolResponseParts in the original order
     // Reconstruct toolResponseParts in the original order
     const toolResponseParts: Part[] = [];
     for (const [index, functionCall] of functionCalls.entries()) {
