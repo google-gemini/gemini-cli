@@ -15,6 +15,7 @@ import {
   ExperimentFlags,
   fetchAdminControlsOnce,
   coreEvents,
+  type FetchAdminControlsResponse,
 } from '@google/gemini-cli-core';
 
 // Mock dependencies
@@ -107,7 +108,9 @@ describe('loadConfig', () => {
       });
 
       it('should fetch admin controls and apply them', async () => {
-        const mockAdminSettings = { tool_allowlist: ['tool1'] };
+        const mockAdminSettings: FetchAdminControlsResponse = {
+          strictModeDisabled: false,
+        };
         vi.mocked(fetchAdminControlsOnce).mockResolvedValue(mockAdminSettings);
 
         const config = await loadConfig(
