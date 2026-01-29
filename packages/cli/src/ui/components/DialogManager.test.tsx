@@ -80,6 +80,7 @@ describe('DialogManager', () => {
     isFolderTrustDialogOpen: false,
     loopDetectionConfirmationRequest: null,
     confirmationRequest: null,
+    consentRequest: null,
     isThemeDialogOpen: false,
     isSettingsDialogOpen: false,
     isModelDialogOpen: false,
@@ -138,6 +139,10 @@ describe('DialogManager', () => {
     ],
     [
       { confirmationRequest: { prompt: 'foo', onConfirm: vi.fn() } },
+      'ConsentPrompt',
+    ],
+    [
+      { consentRequest: { prompt: 'bar', onConfirm: vi.fn() } },
       'ConsentPrompt',
     ],
     [

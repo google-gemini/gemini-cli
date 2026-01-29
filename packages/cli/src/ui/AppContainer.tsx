@@ -27,6 +27,7 @@ import {
   type HistoryItemWithoutId,
   type HistoryItemToolGroup,
   AuthState,
+  type ConfirmationRequest,
 } from './types.js';
 import { MessageType, StreamingState } from './types.js';
 import { ToolActionsProvider } from './contexts/ToolActionsContext.js';
@@ -67,6 +68,7 @@ import {
   SessionStartSource,
   SessionEndReason,
   generateSummary,
+  type ConsentRequestPayload,
   MessageBusType,
   type AskUserRequest,
   type AgentsDiscoveredPayload,
@@ -854,6 +856,26 @@ Logging in with Google... Restarting Gemini CLI to continue.
     setCustomDialog,
   );
 
+  const [consentRequest, setConsentRequest] =
+    useState<ConfirmationRequest | null>(null);
+
+  useEffect(() => {
+    const handleConsentRequest = (payload: ConsentRequestPayload) => {
+      setConsentRequest({
+        prompt: payload.prompt,
+        onConfirm: (confirmed: boolean) => {
+          setConsentRequest(null);
+          payload.onConfirm(confirmed);
+        },
+      });
+    };
+
+    coreEvents.on(CoreEvent.ConsentRequest, handleConsentRequest);
+    return () => {
+      coreEvents.off(CoreEvent.ConsentRequest, handleConsentRequest);
+    };
+  }, []);
+
   const performMemoryRefresh = useCallback(async () => {
     historyManager.addItem(
       {
@@ -1635,6 +1657,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     isFolderTrustDialogOpen ||
     adminSettingsChanged ||
     !!confirmationRequest ||
+    !!consentRequest ||
     !!customDialog ||
     confirmUpdateExtensionRequests.length > 0 ||
     !!loopDetectionConfirmationRequest ||
@@ -1745,6 +1768,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       pendingSlashCommandHistoryItems,
       commandContext,
       confirmationRequest,
+      consentRequest,
       confirmUpdateExtensionRequests,
       loopDetectionConfirmationRequest,
       geminiMdFileCount,
@@ -1843,6 +1867,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       pendingSlashCommandHistoryItems,
       commandContext,
       confirmationRequest,
+      consentRequest,
       confirmUpdateExtensionRequests,
       loopDetectionConfirmationRequest,
       geminiMdFileCount,
