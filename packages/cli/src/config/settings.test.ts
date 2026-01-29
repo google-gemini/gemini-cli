@@ -74,7 +74,11 @@ import {
   SettingScope,
   LoadedSettings,
 } from './settings.js';
-import { FatalConfigError, GEMINI_DIR } from '@google/gemini-cli-core';
+import {
+  FatalConfigError,
+  GEMINI_DIR,
+  FileDiscoveryService,
+} from '@google/gemini-cli-core';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
 import {
   getSettingsSchema,
@@ -1718,6 +1722,35 @@ describe('Settings Loading and Merging', () => {
       loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
 
       expect(process.env['TESTTEST']).not.toEqual('1234');
+    });
+
+    it('does not load .env files if they are ignored', () => {
+      setup({ isFolderTrustEnabled: false, isWorkspaceTrustedValue: true });
+
+      const ignoreSpy = vi.spyOn(
+        FileDiscoveryService.prototype,
+        'shouldIgnoreFile',
+      );
+
+      ignoreSpy.mockReturnValue(true);
+
+      try {
+        const settings = loadSettings(MOCK_WORKSPACE_DIR);
+        settings.merged.context.fileFiltering = {
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+          enableFuzzySearch: true,
+          enableRecursiveFileSearch: true,
+        };
+
+        loadEnvironment(settings.merged);
+
+        expect(process.env['TESTTEST']).not.toEqual('1234');
+
+        expect(ignoreSpy).toHaveBeenCalled();
+      } finally {
+        ignoreSpy.mockRestore();
+      }
     });
   });
 
