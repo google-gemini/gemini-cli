@@ -55,15 +55,21 @@ export class NotificationService {
     }
 
     if (!options.force) {
-      // List of terminals that do not properly support focus detection.
-      // In these terminals, we always send notifications.
-      const unsupportedTerminals: string[] = ['WarpTerminal'];
+      // List of terminals that do not properly support focus detection reporting (ANSI ?1004h).
+      // In these terminals, we always send notifications because we cannot reliably detect
+      // if the window has focus.
+      const unsupportedTerminals: string[] = ['Apple_Terminal'];
       const currentTerminal = process.env['TERM_PROGRAM'];
       const isUnsupportedTerminal =
         currentTerminal && unsupportedTerminals.includes(currentTerminal);
 
+      debugLogger.debug(
+        `Notification check: isFocused=${this.isFocused}, isUnsupportedTerminal=${isUnsupportedTerminal}`,
+      );
+
       if (this.isFocused && !isUnsupportedTerminal) {
         // Don't notify if focused, unless it's an unsupported terminal
+        debugLogger.debug('Notification suppressed (window is focused)');
         return;
       }
     }
@@ -71,28 +77,56 @@ export class NotificationService {
     const platform = process.platform;
     const isMac = platform === 'darwin';
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const notifierOptions: any = {
+    const notifierOptions: NotificationOptions = {
       title: options.title || 'Gemini CLI',
-      message: options.message,
-      sound: options.sound ?? false,
-      wait: options.wait ?? false,
-      force: options.force,
+      message: options.message || 'Requires Permission to Execute Command',
+      sound: !!options.sound,
+      wait: !!options.wait,
+      force: !!options.force,
     };
 
     if (isMac) {
+      const bundleId = process.env['__CFBundleIdentifier'];
+
       if (options.activate) {
         notifierOptions.activate = options.activate;
-      } else if (process.env['__CFBundleIdentifier']) {
-        notifierOptions.activate = process.env['__CFBundleIdentifier'];
+      } else if (bundleId) {
+        notifierOptions.activate = bundleId;
       }
     }
 
     try {
-      notifier.notify(notifierOptions);
+      notifier.notify(notifierOptions, (error, response, meta) => {
+        if (error) {
+          debugLogger.warn('Failed to send system notification', error);
+        }
+        debugLogger.debug('Notification callback', { response, meta });
+      });
+      this.sendTerminalNotification(options);
       debugLogger.debug(`Notification sent: ${options.message}`);
     } catch (error) {
-      debugLogger.warn('Failed to send notification', error);
+      debugLogger.warn('Failed to initiate notification', error);
+    }
+  }
+
+  /**
+   * Sends terminal-specific notification escape sequences.
+   * These are handled by the terminal emulator itself.
+   */
+  private sendTerminalNotification(options: NotificationOptions): void {
+    const termProgram = process.env['TERM_PROGRAM'];
+    const term = process.env['TERM'];
+
+    // OSC 9; <message> BEL is supported by iTerm2, Kitty, Warp and others.
+    const isIterm = termProgram === 'iTerm.app';
+    const isKitty = termProgram === 'kitty' || term === 'xterm-kitty';
+    const isWarp = termProgram === 'WarpTerminal';
+
+    if (isIterm || isKitty || isWarp) {
+      // Sanitize message to avoid escape sequence injection
+      // eslint-disable-next-line no-control-regex
+      const sanitizedMessage = options.message.replace(/[\x00-\x1f\x7f]/g, '');
+      process.stdout.write(`\x1b]9;${sanitizedMessage}\x07`);
     }
   }
 

@@ -16,18 +16,20 @@ import {
 } from '../../confirmation-bus/types.js';
 import { CoreEventEmitter } from '../../utils/events.js';
 
-vi.mock('node-notifier', () => ({
-  default: {
-    notify: vi.fn(),
-  },
-}));
-
-vi.mock('../../utils/debugLogger.js', () => ({
-  debugLogger: {
-    debug: vi.fn(),
-    warn: vi.fn(),
-  },
-}));
+vi.mock('node-notifier', () => {
+  const mockNotifyFn = vi.fn();
+  class MockNotifier {
+    notify = mockNotifyFn;
+  }
+  return {
+    default: {
+      notify: mockNotifyFn,
+      NotificationCenter: MockNotifier,
+      WindowsToaster: MockNotifier,
+      NotifySend: MockNotifier,
+    },
+  };
+});
 
 describe('NotificationService', () => {
   const mockNotify = notifier.notify as unknown as ReturnType<typeof vi.fn>;
@@ -49,6 +51,7 @@ describe('NotificationService', () => {
   afterEach(() => {
     process.env['__CFBundleIdentifier'] = originalEnvBundleId;
     process.env['TERM_PROGRAM'] = originalEnvTermProgram;
+    vi.restoreAllMocks();
   });
 
   it('should notify when enabled', () => {
@@ -62,6 +65,7 @@ describe('NotificationService', () => {
         message: 'Test Message',
         title: 'Gemini CLI',
       }),
+      expect.any(Function),
     );
   });
 
@@ -85,6 +89,7 @@ describe('NotificationService', () => {
       expect.objectContaining({
         activate: 'com.test.app',
       }),
+      expect.any(Function),
     );
   });
 
@@ -101,10 +106,11 @@ describe('NotificationService', () => {
       expect.objectContaining({
         activate: 'com.env.app',
       }),
+      expect.any(Function),
     );
   });
 
-  it('should subscribe to MessageBus and notify on TOOL_CONFIRMATION_REQUEST', () => {
+  it('should handle MessageBus subscriptions and notify on TOOL_CONFIRMATION_REQUEST', () => {
     const service = new NotificationService({ enabled: true }, mockEvents);
     mockEvents.emitWindowFocusChanged(false);
     const mockBus = {
@@ -124,6 +130,7 @@ describe('NotificationService', () => {
     ) => void;
     handler({
       type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+      correlationId: 'test-correlation-id',
       toolCall: { name: 'test_tool' } as never,
     });
 
@@ -131,6 +138,7 @@ describe('NotificationService', () => {
       expect.objectContaining({
         message: 'Confirm: test_tool',
       }),
+      expect.any(Function),
     );
   });
 
@@ -160,6 +168,7 @@ describe('NotificationService', () => {
         message: 'Policy Alert',
         force: true,
       }),
+      expect.any(Function),
     );
   });
 
@@ -179,13 +188,13 @@ describe('NotificationService', () => {
     expect(mockNotify).toHaveBeenCalled();
   });
 
-  it('should notify in unsupported terminal (Warp) even if focused', () => {
+  it('should NOT notify in WarpTerminal if focused (now that it is removed from unsupported list)', () => {
     process.env['TERM_PROGRAM'] = 'WarpTerminal';
     const service = new NotificationService({ enabled: true }, mockEvents);
     mockEvents.emitWindowFocusChanged(true);
 
     service.notify({ message: 'Test' });
-    expect(mockNotify).toHaveBeenCalled();
+    expect(mockNotify).not.toHaveBeenCalled();
   });
 
   it('should notify even if disabled when force is true', () => {
@@ -194,5 +203,54 @@ describe('NotificationService', () => {
 
     service.notify({ message: 'Test', force: true });
     expect(mockNotify).toHaveBeenCalled();
+  });
+
+  it('should notify in unsupported terminal (Apple_Terminal) even if focused', () => {
+    process.env['TERM_PROGRAM'] = 'Apple_Terminal';
+    const service = new NotificationService({ enabled: true }, mockEvents);
+    mockEvents.emitWindowFocusChanged(true);
+
+    service.notify({ message: 'Test' });
+    expect(mockNotify).toHaveBeenCalled();
+  });
+
+  it('should send OSC 9 escape sequence for iTerm', () => {
+    process.env['TERM_PROGRAM'] = 'iTerm.app';
+    const stdoutSpy = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation(() => true);
+    const service = new NotificationService({ enabled: true }, mockEvents);
+    mockEvents.emitWindowFocusChanged(false);
+
+    service.notify({ message: 'Test iTerm' });
+
+    expect(stdoutSpy).toHaveBeenCalledWith('\x1b]9;Test iTerm\x07');
+  });
+
+  it('should send OSC 9 escape sequence for Kitty', () => {
+    process.env['TERM_PROGRAM'] = 'kitty';
+    const stdoutSpy = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation(() => true);
+    const service = new NotificationService({ enabled: true }, mockEvents);
+    mockEvents.emitWindowFocusChanged(false);
+
+    service.notify({ message: 'Test Kitty' });
+
+    expect(stdoutSpy).toHaveBeenCalledWith('\x1b]9;Test Kitty\x07');
+  });
+
+  it('should sanitize message in escape sequence', () => {
+    process.env['TERM_PROGRAM'] = 'iTerm.app';
+    const stdoutSpy = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation(() => true);
+    const service = new NotificationService({ enabled: true }, mockEvents);
+    mockEvents.emitWindowFocusChanged(false);
+
+    service.notify({ message: 'Test\nMessage\x07' });
+
+    // Newline and BEL should be removed
+    expect(stdoutSpy).toHaveBeenCalledWith('\x1b]9;TestMessage\x07');
   });
 });
