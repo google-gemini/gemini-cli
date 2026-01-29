@@ -10,9 +10,9 @@ skill. To use it, ask Gemini CLI to create a new skill for you.
 
 **Example prompt:**
 
-> "create a new skill called 'my-new-skill'"
+> "create a new skill called 'code-reviewer'"
 
-Gemini CLI will then use the `skill-creator` to:
+Gemini CLI will then use the `skill-creator` to generate the skill:
 
 1.  Generate a new directory for your skill (e.g., `my-new-skill/`).
 2.  Create a `SKILL.md` file with the necessary YAML frontmatter (`name` and
@@ -50,20 +50,31 @@ my-skill/
 ### `SKILL.md` file
 
 The `SKILL.md` file is the core of your skill. This file uses YAML frontmatter
-for metadata and Markdown for instructions:
+for metadata and Markdown for instructions. For example:
 
 ```markdown
 ---
-name: <unique-name>
-description: <what the skill does and when Gemini should use it>
+name: code-reviewer
+description:
+  Use this skill to review code. It supports both local changes and remote Pull
+  Requests.
 ---
 
-<your instructions for how the agent should behave / use the skill>
+# Code Reviewer
+
+This skill guides the agent in conducting thorough code reviews.
+
+## Workflow
+
+### 1. Determine Review Target
+
+- **Remote PR**: If the user gives a PR number or URL, target that remote PR.
+- **Local Changes**: If changes are local... ...
 ```
 
 - **`name`**: A unique identifier for the skill. This should match the directory
   name.
 - **`description`**: A description of what the skill does and when Gemini should
   use it.
-- **Body**: The instructions for how the agent should behave when the skill is
-  activated.
+- **Body**: The Markdown body of the file contains the instructions that guide
+  the agent's behavior when the skill is active.
