@@ -17,6 +17,11 @@ describe('Frugal reads eval', () => {
   evalTest('ALWAYS_PASSES', {
     name: 'should use ranged read when specific line is targeted',
     files: {
+      'package.json': JSON.stringify({
+        name: 'test-project',
+        version: '1.0.0',
+        type: 'module',
+      }),
       'eslint.config.mjs': `export default [
         {
           files: ["**/*.ts"],
