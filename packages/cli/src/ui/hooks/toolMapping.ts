@@ -17,6 +17,8 @@ import {
   type HistoryItemToolGroup,
   type IndividualToolCallDisplay,
 } from '../types.js';
+import { pruneShellOutput } from '../utils/textUtils.js';
+import { SHELL_HISTORY_MAX_LINES } from '../constants.js';
 
 import { checkExhaustive } from '../../utils/checks.js';
 
@@ -119,7 +121,13 @@ export function mapToDisplay(
     return {
       ...baseDisplayProperties,
       status: mapCoreStatusToDisplayStatus(call.status),
-      resultDisplay,
+      resultDisplay:
+        call.request.name === 'run_shell_command' &&
+        (call.status === 'success' ||
+          call.status === 'error' ||
+          call.status === 'cancelled')
+          ? pruneShellOutput(resultDisplay, SHELL_HISTORY_MAX_LINES)
+          : resultDisplay,
       confirmationDetails,
       outputFile,
       ptyId,
