@@ -92,18 +92,21 @@ describe('Settings Validation Warning', () => {
     (fs.existsSync as Mock).mockReturnValue(false);
   });
 
-  it('should emit a warning and NOT throw when settings are invalid', () => {
+  it('should silently allow unknown keys in settings without throwing or warning', () => {
+    // Unknown keys should be silently allowed to enable forward compatibility
+    // when users have deprecated keys or typos in their settings files.
+    // This prevents the CLI from crashing due to minor configuration differences.
     (fs.existsSync as Mock).mockImplementation(
       (p: string) => p === USER_SETTINGS_PATH,
     );
 
-    const invalidSettingsContent = {
+    const settingsWithUnknownKey = {
       ui: {
         customThemes: {
           terafox: {
             name: 'terafox',
             type: 'custom',
-            DiffModified: '#ffffff', // Invalid key
+            DiffModified: '#ffffff', // Unknown key - should be silently allowed
           },
         },
       },
@@ -111,7 +114,7 @@ describe('Settings Validation Warning', () => {
 
     (fs.readFileSync as Mock).mockImplementation((p: string) => {
       if (p === USER_SETTINGS_PATH)
-        return JSON.stringify(invalidSettingsContent);
+        return JSON.stringify(settingsWithUnknownKey);
       return '{}';
     });
 
@@ -121,12 +124,13 @@ describe('Settings Validation Warning', () => {
       settings = loadSettings(MOCK_WORKSPACE_DIR);
     }).not.toThrow();
 
-    // Should have recorded a warning in the settings object
+    // Should NOT have any validation errors for unknown keys
+    // (unknown keys are silently passed through for forward compatibility)
     expect(
       settings?.errors.some((e) =>
         e.message.includes("Unrecognized key(s) in object: 'DiffModified'"),
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('should throw a fatal error when settings file is not a valid JSON object', () => {
