@@ -1727,7 +1727,7 @@ describe('Settings Loading and Merging', () => {
     it('loads whitelisted env files from untrusted spaces if sandboxing is enabled', () => {
       setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: false });
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
-      settings.merged.tools!.sandbox = true;
+      settings.merged.tools.sandbox = true;
       loadEnvironment(settings.merged);
 
       // GEMINI_API_KEY is in the whitelist, so it should be loaded.
@@ -1743,7 +1743,7 @@ describe('Settings Loading and Merging', () => {
         setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: false });
         const settings = loadSettings(MOCK_WORKSPACE_DIR);
         // Ensure sandbox is NOT in settings to test argv sniffing
-        settings.merged.tools!.sandbox = undefined;
+        settings.merged.tools.sandbox = undefined;
         loadEnvironment(settings.merged);
 
         expect(process.env['GEMINI_API_KEY']).toEqual('test-key');
