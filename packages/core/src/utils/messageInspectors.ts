@@ -7,10 +7,13 @@
 import type { Content } from '@google/genai';
 
 export function isFunctionResponse(content: Content): boolean {
+  if (content.role !== 'user' || !content.parts || content.parts.length === 0) {
+    return false;
+  }
+  const nonThoughtParts = content.parts.filter((p) => !p.thought);
   return (
-    content.role === 'user' &&
-    !!content.parts &&
-    content.parts.every((part) => !!part.functionResponse)
+    nonThoughtParts.length > 0 &&
+    nonThoughtParts.every((part) => !!part.functionResponse)
   );
 }
 
