@@ -16,6 +16,21 @@ import { OverflowProvider } from '../contexts/OverflowContext.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
 import { StickyHeader } from './StickyHeader.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+import type { SerializableConfirmationDetails } from '@google/gemini-cli-core';
+
+function getConfirmationHeader(
+  details: SerializableConfirmationDetails | undefined,
+): string {
+  const headers: Partial<
+    Record<SerializableConfirmationDetails['type'], string>
+  > = {
+    ask_user: 'Answer Questions',
+  };
+  if (!details?.type) {
+    return 'Action Required';
+  }
+  return headers[details.type] ?? 'Action Required';
+}
 
 interface ToolConfirmationQueueProps {
   confirmingTool: ConfirmingToolState;
@@ -67,25 +82,31 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
         >
           <Box flexDirection="column" width={mainAreaWidth - 4}>
             {/* Header */}
-            <Box marginBottom={1} justifyContent="space-between">
+            <Box
+              marginBottom={tool.confirmationDetails?.hideToolIdentity ? 0 : 1}
+              justifyContent="space-between"
+            >
               <Text color={theme.status.warning} bold>
-                Action Required
+                {getConfirmationHeader(tool.confirmationDetails)}
               </Text>
-              <Text color={theme.text.secondary}>
-                {index} of {total}
-              </Text>
+              {total > 1 && (
+                <Text color={theme.text.secondary}>
+                  {index} of {total}
+                </Text>
+              )}
             </Box>
 
-            {/* Tool Identity (Context) */}
-            <Box>
-              <ToolStatusIndicator status={tool.status} name={tool.name} />
-              <ToolInfo
-                name={tool.name}
-                status={tool.status}
-                description={tool.description}
-                emphasis="high"
-              />
-            </Box>
+            {!tool.confirmationDetails?.hideToolIdentity && (
+              <Box>
+                <ToolStatusIndicator status={tool.status} name={tool.name} />
+                <ToolInfo
+                  name={tool.name}
+                  status={tool.status}
+                  description={tool.description}
+                  emphasis="high"
+                />
+              </Box>
+            )}
           </Box>
         </StickyHeader>
 

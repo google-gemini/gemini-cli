@@ -16,6 +16,7 @@ import {
   MessageBusType,
   type ToolConfirmationRequest,
   type ToolConfirmationResponse,
+  type Question,
 } from '../confirmation-bus/types.js';
 
 /**
@@ -671,7 +672,14 @@ export interface DiffStat {
   user_removed_chars: number;
 }
 
-export interface ToolEditConfirmationDetails {
+/** Common optional properties for all confirmation details types */
+interface BaseToolConfirmationDetails {
+  /** When true, hides the tool identity (name/description) in the confirmation UI */
+  hideToolIdentity?: boolean;
+}
+
+export interface ToolEditConfirmationDetails
+  extends BaseToolConfirmationDetails {
   type: 'edit';
   title: string;
   onConfirm: (
@@ -690,10 +698,13 @@ export interface ToolEditConfirmationDetails {
 export interface ToolConfirmationPayload {
   // used to override `modifiedProposedContent` for modifiable tools in the
   // inline modify flow
-  newContent: string;
+  newContent?: string;
+  // used for askuser tool to return user's answers
+  answers?: { [questionIndex: string]: string };
 }
 
-export interface ToolExecuteConfirmationDetails {
+export interface ToolExecuteConfirmationDetails
+  extends BaseToolConfirmationDetails {
   type: 'exec';
   title: string;
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
@@ -703,7 +714,8 @@ export interface ToolExecuteConfirmationDetails {
   commands?: string[];
 }
 
-export interface ToolMcpConfirmationDetails {
+export interface ToolMcpConfirmationDetails
+  extends BaseToolConfirmationDetails {
   type: 'mcp';
   title: string;
   serverName: string;
@@ -712,7 +724,8 @@ export interface ToolMcpConfirmationDetails {
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
 }
 
-export interface ToolInfoConfirmationDetails {
+export interface ToolInfoConfirmationDetails
+  extends BaseToolConfirmationDetails {
   type: 'info';
   title: string;
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
@@ -720,11 +733,23 @@ export interface ToolInfoConfirmationDetails {
   urls?: string[];
 }
 
+export interface ToolAskUserConfirmationDetails
+  extends BaseToolConfirmationDetails {
+  type: 'ask_user';
+  title: string;
+  questions: Question[];
+  onConfirm: (
+    outcome: ToolConfirmationOutcome,
+    payload?: ToolConfirmationPayload,
+  ) => Promise<void>;
+}
+
 export type ToolCallConfirmationDetails =
   | ToolEditConfirmationDetails
   | ToolExecuteConfirmationDetails
   | ToolMcpConfirmationDetails
-  | ToolInfoConfirmationDetails;
+  | ToolInfoConfirmationDetails
+  | ToolAskUserConfirmationDetails;
 
 export enum ToolConfirmationOutcome {
   ProceedOnce = 'proceed_once',

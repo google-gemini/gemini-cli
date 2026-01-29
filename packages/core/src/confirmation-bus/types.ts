@@ -62,11 +62,24 @@ export interface ToolConfirmationResponse {
 }
 
 /**
+ * Common optional properties for all confirmation details types.
+ */
+interface BaseConfirmationDetails {
+  /** When true, hides the tool identity (name/description) in the confirmation UI */
+  hideToolIdentity?: boolean;
+}
+
+/**
  * Data-only versions of ToolCallConfirmationDetails for bus transmission.
  */
 export type SerializableConfirmationDetails =
-  | { type: 'info'; title: string; prompt: string; urls?: string[] }
-  | {
+  | (BaseConfirmationDetails & {
+      type: 'info';
+      title: string;
+      prompt: string;
+      urls?: string[];
+    })
+  | (BaseConfirmationDetails & {
       type: 'edit';
       title: string;
       fileName: string;
@@ -75,22 +88,27 @@ export type SerializableConfirmationDetails =
       originalContent: string | null;
       newContent: string;
       isModifying?: boolean;
-    }
-  | {
+    })
+  | (BaseConfirmationDetails & {
       type: 'exec';
       title: string;
       command: string;
       rootCommand: string;
       rootCommands: string[];
       commands?: string[];
-    }
-  | {
+    })
+  | (BaseConfirmationDetails & {
       type: 'mcp';
       title: string;
       serverName: string;
       toolName: string;
       toolDisplayName: string;
-    };
+    })
+  | (BaseConfirmationDetails & {
+      type: 'ask_user';
+      title: string;
+      questions: Question[];
+    });
 
 export interface UpdatePolicy {
   type: MessageBusType.UPDATE_POLICY;

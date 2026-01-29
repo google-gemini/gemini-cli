@@ -6,12 +6,9 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AskUserTool } from './ask-user.js';
-import {
-  MessageBusType,
-  QuestionType,
-  type Question,
-} from '../confirmation-bus/types.js';
+import { QuestionType, type Question } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { ToolConfirmationOutcome } from './tools.js';
 
 describe('AskUserTool', () => {
   let mockMessageBus: MessageBus;
@@ -213,142 +210,183 @@ describe('AskUserTool', () => {
     });
   });
 
-  it('should publish ASK_USER_REQUEST and wait for response', async () => {
-    const questions = [
-      {
-        question: 'How should we proceed with this task?',
-        header: 'Approach',
-        options: [
-          {
-            label: 'Quick fix (Recommended)',
-            description:
-              'Apply the most direct solution to resolve the immediate issue.',
-          },
-          {
-            label: 'Comprehensive refactor',
-            description:
-              'Restructure the affected code for better long-term maintainability.',
-          },
-        ],
-        multiSelect: false,
-      },
-    ];
-
-    const invocation = tool.build({ questions });
-    const executePromise = invocation.execute(new AbortController().signal);
-
-    // Verify publish called with normalized questions (type defaults to CHOICE)
-    expect(mockMessageBus.publish).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: MessageBusType.ASK_USER_REQUEST,
-        questions: questions.map((q) => ({
-          ...q,
-          type: QuestionType.CHOICE,
-        })),
-      }),
-    );
-
-    // Get the correlation ID from the published message
-    const publishCall = vi.mocked(mockMessageBus.publish).mock.calls[0][0] as {
-      correlationId: string;
-    };
-    const correlationId = publishCall.correlationId;
-    expect(correlationId).toBeDefined();
-
-    // Verify subscribe called
-    expect(mockMessageBus.subscribe).toHaveBeenCalledWith(
-      MessageBusType.ASK_USER_RESPONSE,
-      expect.any(Function),
-    );
-
-    // Simulate response
-    const subscribeCall = vi
-      .mocked(mockMessageBus.subscribe)
-      .mock.calls.find((call) => call[0] === MessageBusType.ASK_USER_RESPONSE);
-    const handler = subscribeCall![1];
-
-    const answers = { '0': 'Quick fix (Recommended)' };
-    handler({
-      type: MessageBusType.ASK_USER_RESPONSE,
-      correlationId,
-      answers,
-    });
-
-    const result = await executePromise;
-    expect(result.returnDisplay).toContain('User answered:');
-    expect(result.returnDisplay).toContain(
-      '  Approach → Quick fix (Recommended)',
-    );
-    expect(JSON.parse(result.llmContent as string)).toEqual({ answers });
-  });
-
-  it('should display message when user submits without answering', async () => {
-    const questions = [
-      {
-        question: 'Which approach?',
-        header: 'Approach',
-        options: [
-          { label: 'Option A', description: 'First option' },
-          { label: 'Option B', description: 'Second option' },
-        ],
-      },
-    ];
-
-    const invocation = tool.build({ questions });
-    const executePromise = invocation.execute(new AbortController().signal);
-
-    // Get the correlation ID from the published message
-    const publishCall = vi.mocked(mockMessageBus.publish).mock.calls[0][0] as {
-      correlationId: string;
-    };
-    const correlationId = publishCall.correlationId;
-
-    // Simulate response with empty answers
-    const subscribeCall = vi
-      .mocked(mockMessageBus.subscribe)
-      .mock.calls.find((call) => call[0] === MessageBusType.ASK_USER_RESPONSE);
-    const handler = subscribeCall![1];
-
-    handler({
-      type: MessageBusType.ASK_USER_RESPONSE,
-      correlationId,
-      answers: {},
-    });
-
-    const result = await executePromise;
-    expect(result.returnDisplay).toBe(
-      'User submitted without answering questions.',
-    );
-    expect(JSON.parse(result.llmContent as string)).toEqual({ answers: {} });
-  });
-
-  it('should handle cancellation', async () => {
-    const invocation = tool.build({
-      questions: [
+  describe('shouldConfirmExecute', () => {
+    it('should return confirmation details with normalized questions', async () => {
+      const questions = [
         {
-          question: 'Which sections of the documentation should be updated?',
-          header: 'Docs',
+          question: 'How should we proceed with this task?',
+          header: 'Approach',
           options: [
             {
-              label: 'User Guide',
-              description: 'Update the main user-facing documentation.',
+              label: 'Quick fix (Recommended)',
+              description:
+                'Apply the most direct solution to resolve the immediate issue.',
             },
             {
-              label: 'API Reference',
-              description: 'Update the detailed API documentation.',
+              label: 'Comprehensive refactor',
+              description:
+                'Restructure the affected code for better long-term maintainability.',
             },
           ],
-          multiSelect: true,
+          multiSelect: false,
         },
-      ],
+      ];
+
+      const invocation = tool.build({ questions });
+      const details = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+
+      expect(details).not.toBe(false);
+      if (details && details.type === 'ask_user') {
+        expect(details.title).toBe('Ask User');
+        expect(details.questions).toEqual(
+          questions.map((q) => ({
+            ...q,
+            type: QuestionType.CHOICE,
+          })),
+        );
+        expect(typeof details.onConfirm).toBe('function');
+      } else {
+        // Type guard for TypeScript
+        expect(details).toBeTruthy();
+      }
     });
 
-    const controller = new AbortController();
-    const executePromise = invocation.execute(controller.signal);
+    it('should normalize question type to CHOICE when omitted', async () => {
+      const questions = [
+        {
+          question: 'Which approach?',
+          header: 'Approach',
+          options: [
+            { label: 'Option A', description: 'First option' },
+            { label: 'Option B', description: 'Second option' },
+          ],
+        },
+      ];
 
-    controller.abort();
+      const invocation = tool.build({ questions });
+      const details = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
 
-    const result = await executePromise;
-    expect(result.error?.message).toBe('Cancelled');
+      if (details && details.type === 'ask_user') {
+        expect(details.questions[0].type).toBe(QuestionType.CHOICE);
+      }
+    });
+  });
+
+  describe('execute', () => {
+    it('should return user answers after confirmation', async () => {
+      const questions = [
+        {
+          question: 'How should we proceed with this task?',
+          header: 'Approach',
+          options: [
+            {
+              label: 'Quick fix (Recommended)',
+              description:
+                'Apply the most direct solution to resolve the immediate issue.',
+            },
+            {
+              label: 'Comprehensive refactor',
+              description:
+                'Restructure the affected code for better long-term maintainability.',
+            },
+          ],
+          multiSelect: false,
+        },
+      ];
+
+      const invocation = tool.build({ questions });
+      const details = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+
+      // Simulate confirmation with answers
+      if (details && 'onConfirm' in details) {
+        const answers = { '0': 'Quick fix (Recommended)' };
+        await details.onConfirm(ToolConfirmationOutcome.ProceedOnce, {
+          answers,
+        });
+      }
+
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.returnDisplay).toContain('User answered:');
+      expect(result.returnDisplay).toContain(
+        '  Approach → Quick fix (Recommended)',
+      );
+      expect(JSON.parse(result.llmContent as string)).toEqual({
+        answers: { '0': 'Quick fix (Recommended)' },
+      });
+    });
+
+    it('should display message when user submits without answering', async () => {
+      const questions = [
+        {
+          question: 'Which approach?',
+          header: 'Approach',
+          options: [
+            { label: 'Option A', description: 'First option' },
+            { label: 'Option B', description: 'Second option' },
+          ],
+        },
+      ];
+
+      const invocation = tool.build({ questions });
+      const details = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+
+      // Simulate confirmation with empty answers
+      if (details && 'onConfirm' in details) {
+        await details.onConfirm(ToolConfirmationOutcome.ProceedOnce, {
+          answers: {},
+        });
+      }
+
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.returnDisplay).toBe(
+        'User submitted without answering questions.',
+      );
+      expect(JSON.parse(result.llmContent as string)).toEqual({ answers: {} });
+    });
+
+    it('should handle cancellation', async () => {
+      const invocation = tool.build({
+        questions: [
+          {
+            question: 'Which sections of the documentation should be updated?',
+            header: 'Docs',
+            options: [
+              {
+                label: 'User Guide',
+                description: 'Update the main user-facing documentation.',
+              },
+              {
+                label: 'API Reference',
+                description: 'Update the detailed API documentation.',
+              },
+            ],
+            multiSelect: true,
+          },
+        ],
+      });
+
+      const details = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+
+      // Simulate cancellation
+      if (details && 'onConfirm' in details) {
+        await details.onConfirm(ToolConfirmationOutcome.Cancel);
+      }
+
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.returnDisplay).toBe('User dismissed dialog');
+      expect(result.llmContent).toBe(
+        'User dismissed ask user dialog without answering.',
+      );
+    });
   });
 });

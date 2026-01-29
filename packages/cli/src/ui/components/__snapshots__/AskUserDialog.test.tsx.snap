@@ -1,138 +1,118 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`AskUserDialog > Text type questions > renders text input for type: "text" 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ What should we name this component?                                                                                  │
-│                                                                                                                      │
-│ > e.g., UserProfileCard                                                                                              │
-│                                                                                                                      │
-│                                                                                                                      │
-│ Enter to submit · Esc to cancel                                                                                      │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+"What should we name this component?
+
+> e.g., UserProfileCard
+
+
+Enter to submit · Esc to cancel"
 `;
 
 exports[`AskUserDialog > Text type questions > shows correct keyboard hints for text type 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Enter the variable name:                                                                                             │
-│                                                                                                                      │
-│ > Enter your response                                                                                                │
-│                                                                                                                      │
-│                                                                                                                      │
-│ Enter to submit · Esc to cancel                                                                                      │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+"Enter the variable name:
+
+> Enter your response
+
+
+Enter to submit · Esc to cancel"
 `;
 
 exports[`AskUserDialog > Text type questions > shows default placeholder when none provided 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Enter the database connection string:                                                                                │
-│                                                                                                                      │
-│ > Enter your response                                                                                                │
-│                                                                                                                      │
-│                                                                                                                      │
-│ Enter to submit · Esc to cancel                                                                                      │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+"Enter the database connection string:
+
+> Enter your response
+
+
+Enter to submit · Esc to cancel"
 `;
 
 exports[`AskUserDialog > allows navigating to Review tab and back 1`] = `
-"╭─────────────────────────────────────────────────────────────────╮
-│ ← □ Tests │ □ Docs │ ≡ Review →                                 │
-│                                                                 │
-│ Review your answers:                                            │
-│                                                                 │
-│ ⚠ You have 2 unanswered questions                               │
-│                                                                 │
-│ Tests → (not answered)                                          │
-│ Docs → (not answered)                                           │
-│                                                                 │
-│ Enter to submit · Tab/Shift+Tab to edit answers · Esc to cancel │
-╰─────────────────────────────────────────────────────────────────╯"
+"← □ Tests │ □ Docs │ ≡ Review →
+
+Review your answers:
+
+⚠ You have 2 unanswered questions
+
+Tests → (not answered)
+Docs → (not answered)
+
+Enter to submit · Tab/Shift+Tab to edit answers · Esc to cancel"
 `;
 
 exports[`AskUserDialog > hides progress header for single question 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Which authentication method should we use?                                                                           │
-│                                                                                                                      │
-│ ● 1.  OAuth 2.0                                                                                                      │
-│       Industry standard, supports SSO                                                                                │
-│   2.  JWT tokens                                                                                                     │
-│       Stateless, good for APIs                                                                                       │
-│   3.  Enter a custom value                                                                                           │
-│                                                                                                                      │
-│ Enter to select · ↑/↓ to navigate · Esc to cancel                                                                    │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+"Which authentication method should we use?
+
+● 1.  OAuth 2.0
+      Industry standard, supports SSO
+  2.  JWT tokens
+      Stateless, good for APIs
+  3.  Enter a custom value
+
+Enter to select · ↑/↓ to navigate · Esc to cancel"
 `;
 
 exports[`AskUserDialog > renders question and options 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Which authentication method should we use?                                                                           │
-│                                                                                                                      │
-│ ● 1.  OAuth 2.0                                                                                                      │
-│       Industry standard, supports SSO                                                                                │
-│   2.  JWT tokens                                                                                                     │
-│       Stateless, good for APIs                                                                                       │
-│   3.  Enter a custom value                                                                                           │
-│                                                                                                                      │
-│ Enter to select · ↑/↓ to navigate · Esc to cancel                                                                    │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+"Which authentication method should we use?
+
+● 1.  OAuth 2.0
+      Industry standard, supports SSO
+  2.  JWT tokens
+      Stateless, good for APIs
+  3.  Enter a custom value
+
+Enter to select · ↑/↓ to navigate · Esc to cancel"
 `;
 
 exports[`AskUserDialog > shows Review tab in progress header for multiple questions 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ← □ Framework │ □ Styling │ ≡ Review →                                                                               │
-│                                                                                                                      │
-│ Which framework?                                                                                                     │
-│                                                                                                                      │
-│ ● 1.  React                                                                                                          │
-│       Component library                                                                                              │
-│   2.  Vue                                                                                                            │
-│       Progressive framework                                                                                          │
-│   3.  Enter a custom value                                                                                           │
-│                                                                                                                      │
-│ Enter to select · ←/→ to switch questions · Esc to cancel                                                            │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+"← □ Framework │ □ Styling │ ≡ Review →
+
+Which framework?
+
+● 1.  React
+      Component library
+  2.  Vue
+      Progressive framework
+  3.  Enter a custom value
+
+Enter to select · ←/→ to switch questions · Esc to cancel"
 `;
 
 exports[`AskUserDialog > shows keyboard hints 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Which authentication method should we use?                                                                           │
-│                                                                                                                      │
-│ ● 1.  OAuth 2.0                                                                                                      │
-│       Industry standard, supports SSO                                                                                │
-│   2.  JWT tokens                                                                                                     │
-│       Stateless, good for APIs                                                                                       │
-│   3.  Enter a custom value                                                                                           │
-│                                                                                                                      │
-│ Enter to select · ↑/↓ to navigate · Esc to cancel                                                                    │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+"Which authentication method should we use?
+
+● 1.  OAuth 2.0
+      Industry standard, supports SSO
+  2.  JWT tokens
+      Stateless, good for APIs
+  3.  Enter a custom value
+
+Enter to select · ↑/↓ to navigate · Esc to cancel"
 `;
 
 exports[`AskUserDialog > shows progress header for multiple questions 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ← □ Database │ □ ORM │ ≡ Review →                                                                                    │
-│                                                                                                                      │
-│ Which database should we use?                                                                                        │
-│                                                                                                                      │
-│ ● 1.  PostgreSQL                                                                                                     │
-│       Relational database                                                                                            │
-│   2.  MongoDB                                                                                                        │
-│       Document database                                                                                              │
-│   3.  Enter a custom value                                                                                           │
-│                                                                                                                      │
-│ Enter to select · ←/→ to switch questions · Esc to cancel                                                            │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+"← □ Database │ □ ORM │ ≡ Review →
+
+Which database should we use?
+
+● 1.  PostgreSQL
+      Relational database
+  2.  MongoDB
+      Document database
+  3.  Enter a custom value
+
+Enter to select · ←/→ to switch questions · Esc to cancel"
 `;
 
 exports[`AskUserDialog > shows warning for unanswered questions on Review tab 1`] = `
-"╭─────────────────────────────────────────────────────────────────╮
-│ ← □ License │ □ README │ ≡ Review →                             │
-│                                                                 │
-│ Review your answers:                                            │
-│                                                                 │
-│ ⚠ You have 2 unanswered questions                               │
-│                                                                 │
-│ License → (not answered)                                        │
-│ README → (not answered)                                         │
-│                                                                 │
-│ Enter to submit · Tab/Shift+Tab to edit answers · Esc to cancel │
-╰─────────────────────────────────────────────────────────────────╯"
+"← □ License │ □ README │ ≡ Review →
+
+Review your answers:
+
+⚠ You have 2 unanswered questions
+
+License → (not answered)
+README → (not answered)
+
+Enter to submit · Tab/Shift+Tab to edit answers · Esc to cancel"
 `;

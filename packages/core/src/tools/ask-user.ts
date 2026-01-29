@@ -9,17 +9,12 @@ import {
   BaseToolInvocation,
   type ToolResult,
   Kind,
-  type ToolCallConfirmationDetails,
+  type ToolAskUserConfirmationDetails,
+  type ToolConfirmationPayload,
+  ToolConfirmationOutcome,
 } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import {
-  MessageBusType,
-  QuestionType,
-  type Question,
-  type AskUserRequest,
-  type AskUserResponse,
-} from '../confirmation-bus/types.js';
-import { randomUUID } from 'node:crypto';
+import { QuestionType, type Question } from '../confirmation-bus/types.js';
 import { ASK_USER_TOOL_NAME, ASK_USER_DISPLAY_NAME } from './tool-names.js';
 
 export interface AskUserParams {
@@ -165,100 +160,62 @@ export class AskUserInvocation extends BaseToolInvocation<
   AskUserParams,
   ToolResult
 > {
+  private confirmationOutcome: ToolConfirmationOutcome | null = null;
+  private userAnswers: { [questionIndex: string]: string } = {};
+
   override async shouldConfirmExecute(
     _abortSignal: AbortSignal,
-  ): Promise<ToolCallConfirmationDetails | false> {
-    return false;
+  ): Promise<ToolAskUserConfirmationDetails | false> {
+    const normalizedQuestions = this.params.questions.map((q) => ({
+      ...q,
+      type: q.type ?? QuestionType.CHOICE,
+    }));
+
+    return {
+      type: 'ask_user',
+      title: 'Ask User',
+      questions: normalizedQuestions,
+      hideToolIdentity: true,
+      onConfirm: async (
+        outcome: ToolConfirmationOutcome,
+        payload?: ToolConfirmationPayload,
+      ) => {
+        this.confirmationOutcome = outcome;
+        if (payload?.answers) {
+          this.userAnswers = payload.answers;
+        }
+      },
+    };
   }
 
   getDescription(): string {
     return `Asking user: ${this.params.questions.map((q) => q.question).join(', ')}`;
   }
 
-  async execute(signal: AbortSignal): Promise<ToolResult> {
-    const correlationId = randomUUID();
+  async execute(_signal: AbortSignal): Promise<ToolResult> {
+    if (this.confirmationOutcome === ToolConfirmationOutcome.Cancel) {
+      return {
+        llmContent: 'User dismissed ask user dialog without answering.',
+        returnDisplay: 'User dismissed dialog',
+      };
+    }
 
-    const request: AskUserRequest = {
-      type: MessageBusType.ASK_USER_REQUEST,
-      questions: this.params.questions.map((q) => ({
-        ...q,
-        type: q.type ?? QuestionType.CHOICE,
-      })),
-      correlationId,
+    const answerEntries = Object.entries(this.userAnswers);
+    const hasAnswers = answerEntries.length > 0;
+
+    const returnDisplay = hasAnswers
+      ? `**User answered:**\n${answerEntries
+          .map(([index, answer]) => {
+            const question = this.params.questions[parseInt(index, 10)];
+            const category = question?.header ?? `Q${index}`;
+            return `  ${category} → ${answer}`;
+          })
+          .join('\n')}`
+      : 'User submitted without answering questions.';
+
+    return {
+      llmContent: JSON.stringify({ answers: this.userAnswers }),
+      returnDisplay,
     };
-
-    return new Promise<ToolResult>((resolve, reject) => {
-      const responseHandler = (response: AskUserResponse): void => {
-        if (response.correlationId === correlationId) {
-          cleanup();
-
-          // Handle user cancellation
-          if (response.cancelled) {
-            resolve({
-              llmContent: 'User dismissed ask user dialog without answering.',
-              returnDisplay: 'User dismissed dialog',
-            });
-            return;
-          }
-
-          // Build formatted key-value display
-          const answerEntries = Object.entries(response.answers);
-          const hasAnswers = answerEntries.length > 0;
-
-          const returnDisplay = hasAnswers
-            ? `**User answered:**\n${answerEntries
-                .map(([index, answer]) => {
-                  const question = this.params.questions[parseInt(index, 10)];
-                  const category = question?.header ?? `Q${index}`;
-                  return `  ${category} → ${answer}`;
-                })
-                .join('\n')}`
-            : 'User submitted without answering questions.';
-
-          resolve({
-            llmContent: JSON.stringify({ answers: response.answers }),
-            returnDisplay,
-          });
-        }
-      };
-
-      const cleanup = () => {
-        if (responseHandler) {
-          this.messageBus.unsubscribe(
-            MessageBusType.ASK_USER_RESPONSE,
-            responseHandler,
-          );
-        }
-        signal.removeEventListener('abort', abortHandler);
-      };
-
-      const abortHandler = () => {
-        cleanup();
-        resolve({
-          llmContent: 'Tool execution cancelled by user.',
-          returnDisplay: 'Cancelled',
-          error: {
-            message: 'Cancelled',
-          },
-        });
-      };
-
-      if (signal.aborted) {
-        abortHandler();
-        return;
-      }
-
-      signal.addEventListener('abort', abortHandler);
-      this.messageBus.subscribe(
-        MessageBusType.ASK_USER_RESPONSE,
-        responseHandler,
-      );
-
-      // Publish request
-      this.messageBus.publish(request).catch((err) => {
-        cleanup();
-        reject(err);
-      });
-    });
   }
 }
