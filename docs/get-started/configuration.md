@@ -588,6 +588,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Maximum number of directories to search for memory.
   - **Default:** `200`
 
+- **`context.bfsFileSearchMaxDirs`** (number):
+  - **Description:** Maximum number of directories the @-completion looks at.
+    High values may cause Gemini CLI to freeze.
+  - **Default:** `50`
+
 - **`context.includeDirectories`** (array):
   - **Description:** Additional directories to include in the workspace context.
     Missing directories will be skipped with a warning.

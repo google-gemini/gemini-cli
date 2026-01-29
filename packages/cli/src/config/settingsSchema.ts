@@ -867,6 +867,15 @@ const SETTINGS_SCHEMA = {
         description: 'Maximum number of directories to search for memory.',
         showInDialog: true,
       },
+      bfsFileSearchMaxDirs: {
+        type: 'number',
+        label: '@-Completion Max Dirs',
+        category: 'Context',
+        requiresRestart: false,
+        default: 50,
+        description: 'Maximum number of directories the @-completion looks at.',
+        showInDialog: true,
+      },
       includeDirectories: {
         type: 'array',
         label: 'Include Directories',

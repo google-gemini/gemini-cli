@@ -413,6 +413,7 @@ export interface ConfigParameters {
   loadMemoryFromIncludeDirectories?: boolean;
   importFormat?: 'tree' | 'flat';
   discoveryMaxDirs?: number;
+  bfsFileSearchMaxDirs?: number;
   compressionThreshold?: number;
   interactive?: boolean;
   trustedFolder?: boolean;
@@ -555,6 +556,7 @@ export class Config {
   private readonly loadMemoryFromIncludeDirectories: boolean = false;
   private readonly importFormat: 'tree' | 'flat';
   private readonly discoveryMaxDirs: number;
+  private readonly bfsFileSearchMaxDirs: number;
   private readonly compressionThreshold: number | undefined;
   /** Public for testing only */
   readonly interactive: boolean;
@@ -726,6 +728,7 @@ export class Config {
       params.loadMemoryFromIncludeDirectories ?? false;
     this.importFormat = params.importFormat ?? 'tree';
     this.discoveryMaxDirs = params.discoveryMaxDirs ?? 200;
+    this.bfsFileSearchMaxDirs = params.bfsFileSearchMaxDirs ?? 50;
     this.compressionThreshold = params.compressionThreshold;
     this.interactive = params.interactive ?? false;
     this.ptyInfo = params.ptyInfo ?? 'child_process';
@@ -1108,6 +1111,10 @@ export class Config {
 
   getDiscoveryMaxDirs(): number {
     return this.discoveryMaxDirs;
+  }
+
+  getBfsFileSearchMaxDirs(): number {
+    return this.bfsFileSearchMaxDirs;
   }
 
   getContentGeneratorConfig(): ContentGeneratorConfig {
