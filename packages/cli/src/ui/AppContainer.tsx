@@ -47,6 +47,7 @@ import {
   getErrorMessage,
   getAllGeminiMdFilenames,
   AuthType,
+  UserAccountManager,
   clearCachedCredentialFile,
   type ResumedSessionData,
   recordExitFail,
@@ -186,11 +187,58 @@ const SHELL_HEIGHT_PADDING = 10;
 
 export const AppContainer = (props: AppContainerProps) => {
   const { config, initializationResult, resumedSessionData } = props;
+  const settings = useSettings();
+
   const historyManager = useHistory({
     chatRecordingService: config.getGeminiClient()?.getChatRecordingService(),
   });
+  const { addItem } = historyManager;
+
+  const authCheckPerformed = useRef(false);
+  useEffect(() => {
+    if (authCheckPerformed.current) return;
+    authCheckPerformed.current = true;
+
+    if (resumedSessionData || settings.merged.ui.showUserIdentity === false) {
+      return;
+    }
+    const authType = config.getContentGeneratorConfig()?.authType;
+
+    // Run this asynchronously to avoid blocking the event loop.
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    (async () => {
+      try {
+        const userAccountManager = new UserAccountManager();
+        const email = userAccountManager.getCachedGoogleAccount();
+        const tierName = config.getUserTierName();
+
+        if (authType) {
+          let message =
+            authType === AuthType.LOGIN_WITH_GOOGLE
+              ? email
+                ? `Logged in with Google: ${email}`
+                : 'Logged in with Google'
+              : `Authenticated with ${authType}`;
+          if (tierName) {
+            message += ` (Plan: ${tierName})`;
+          }
+          addItem({
+            type: MessageType.INFO,
+            text: message,
+          });
+        }
+      } catch (_e) {
+        // Ignore errors during initial auth check
+      }
+    })();
+  }, [
+    config,
+    resumedSessionData,
+    settings.merged.ui.showUserIdentity,
+    addItem,
+  ]);
+
   useMemoryMonitor(historyManager);
-  const settings = useSettings();
   const isAlternateBuffer = useAlternateBuffer();
   const [corgiMode, setCorgiMode] = useState(false);
   const [debugMessage, setDebugMessage] = useState<string>('');
