@@ -901,6 +901,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Canonical toggle for the hooks system. When disabled, no
     hooks will be executed.
   - **Default:** `true`
+  - **Requires restart:** Yes
 
 - **`hooksConfig.disabled`** (array):
   - **Description:** List of hook names (commands) that should be disabled.
