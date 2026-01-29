@@ -72,6 +72,11 @@ export function AuthDialog({
       key: AuthType.USE_GEMINI,
     },
     {
+      label: 'OpenAI Compatible',
+      value: AuthType.USE_OPENAI_COMPATIBLE,
+      key: AuthType.USE_OPENAI_COMPATIBLE,
+    },
+    {
       label: 'Vertex AI',
       value: AuthType.USE_VERTEX_AI,
       key: AuthType.USE_VERTEX_AI,
@@ -144,6 +149,16 @@ export function AuthDialog({
             return;
           } else {
             setAuthState(AuthState.AwaitingApiKeyInput);
+            return;
+          }
+        }
+
+        if (authType === AuthType.USE_OPENAI_COMPATIBLE) {
+          if (process.env['OPENAI_API_KEY'] !== undefined) {
+            setAuthState(AuthState.Unauthenticated);
+            return;
+          } else {
+            setAuthState(AuthState.AwaitingOpenAIApiKeyInput);
             return;
           }
         }

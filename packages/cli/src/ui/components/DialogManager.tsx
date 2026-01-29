@@ -240,6 +240,25 @@ export const DialogManager = ({
       </Box>
     );
   }
+  if (uiState.isAwaitingOpenAIApiKeyInput) {
+    return (
+      <Box flexDirection="column">
+        <ApiAuthDialog
+          key={uiState.apiKeyDefaultValue}
+          onSubmit={uiActions.handleApiKeySubmit}
+          onCancel={uiActions.handleApiKeyCancel}
+          error={uiState.authError}
+          defaultValue={uiState.apiKeyDefaultValue}
+          title={'Enter OpenAI Compatible API Key'}
+          description={
+            'Please enter your OpenAI compatible API key. It will be securely stored in your system keychain.'
+          }
+          link={'https://platform.openai.com/account/api-keys'}
+          linkText={'https://platform.openai.com/account/api-keys'}
+        />
+      </Box>
+    );
+  }
   if (uiState.isAuthDialogOpen) {
     return (
       <Box flexDirection="column">

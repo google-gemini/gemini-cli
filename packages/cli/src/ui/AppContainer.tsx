@@ -741,7 +741,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       settings.merged.security.auth.enforcedType &&
       settings.merged.security.auth.selectedType &&
       settings.merged.security.auth.enforcedType !==
-        settings.merged.security.auth.selectedType
+      settings.merged.security.auth.selectedType
     ) {
       onAuthError(
         `Authentication is enforced to be ${settings.merged.security.auth.enforcedType}, but you are currently using ${settings.merged.security.auth.selectedType}.`,
@@ -869,11 +869,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       historyManager.addItem(
         {
           type: MessageType.INFO,
-          text: `Memory refreshed successfully. ${
-            memoryContent.length > 0
+          text: `Memory refreshed successfully. ${memoryContent.length > 0
               ? `Loaded ${memoryContent.length} characters from ${fileCount} file(s).`
               : 'No memory content found.'
-          }`,
+            }`,
         },
         Date.now(),
       );
@@ -899,7 +898,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, [config, historyManager]);
 
   const cancelHandlerRef = useRef<(shouldRestorePrompt?: boolean) => void>(
-    () => {},
+    () => { },
   );
 
   const onCancelSubmit = useCallback((shouldRestorePrompt?: boolean) => {
@@ -1209,9 +1208,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, []);
   const shouldShowIdePrompt = Boolean(
     currentIDE &&
-      !config.getIdeMode() &&
-      !settings.merged.ide.hasSeenNudge &&
-      !idePromptAnswered,
+    !config.getIdeMode() &&
+    !settings.merged.ide.hasSeenNudge &&
+    !idePromptAnswered,
   );
 
   const [showErrorDetails, setShowErrorDetails] = useState<boolean>(false);
@@ -1725,6 +1724,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       authError,
       isAuthDialogOpen,
       isAwaitingApiKeyInput: authState === AuthState.AwaitingApiKeyInput,
+      isAwaitingOpenAIApiKeyInput:
+        authState === AuthState.AwaitingOpenAIApiKeyInput,
       apiKeyDefaultValue,
       editorError,
       isEditorDialogOpen,

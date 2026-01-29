@@ -28,6 +28,8 @@ export enum AuthState {
   Updating = 'updating',
   // Waiting for user to input API key
   AwaitingApiKeyInput = 'awaiting_api_key_input',
+  // Waiting for user to input OpenAI API key
+  AwaitingOpenAIApiKeyInput = 'awaiting_openai_api_key_input',
   // Successfully authenticated
   Authenticated = 'authenticated',
   // Waiting for the user to restart after a Google login

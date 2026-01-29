@@ -16,6 +16,7 @@ import { resolveClassifierModel } from '../../config/models.js';
 import { createUserContent, Type } from '@google/genai';
 import type { Config } from '../../config/config.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { AuthType } from '../../core/contentGenerator.js';
 
 // The number of recent history turns to provide to the router for context.
 const HISTORY_TURNS_FOR_CONTEXT = 8;
@@ -135,6 +136,14 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
     const startTime = Date.now();
     try {
       if (!(await config.getNumericalRoutingEnabled())) {
+        return null;
+      }
+
+      const authType = config.getContentGeneratorConfig()?.authType;
+      if (authType === AuthType.USE_OPENAI_COMPATIBLE) {
+        debugLogger.debug(
+          '[Routing] Skipping NumericalClassifierStrategy for OpenAI-compatible auth to save cost.',
+        );
         return null;
       }
 

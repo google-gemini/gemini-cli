@@ -379,6 +379,19 @@ export class GeminiChat {
               throw error;
             }
             lastError = error;
+
+            try {
+              const fs = await import('node:fs');
+              const path = await import('node:path');
+              const process = await import('node:process');
+              const logPath = path.join(process.cwd(), 'debug_openai.log');
+              const errorMsg = error instanceof Error ? error.message : String(error);
+              const stack = error instanceof Error ? error.stack : '';
+              fs.appendFileSync(logPath, `[${new Date().toISOString()}] GeminiChat caught error (Attempt ${attempt + 1}/${maxAttempts}): ${errorMsg}\nStack: ${stack}\n\n`);
+            } catch (e) {
+              // ignore
+            }
+
             const isContentError = error instanceof InvalidStreamError;
             const isRetryable = isRetryableError(
               error,

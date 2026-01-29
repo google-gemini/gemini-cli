@@ -61,6 +61,7 @@ export interface UIState {
   authError: string | null;
   isAuthDialogOpen: boolean;
   isAwaitingApiKeyInput: boolean;
+  isAwaitingOpenAIApiKeyInput: boolean;
   apiKeyDefaultValue?: string;
   editorError: string | null;
   isEditorDialogOpen: boolean;

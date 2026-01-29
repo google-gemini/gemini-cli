@@ -20,6 +20,7 @@ import {
   isFunctionResponse,
 } from '../../utils/messageInspectors.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { AuthType } from '../../core/contentGenerator.js';
 
 // The number of recent history turns to provide to the router for context.
 const HISTORY_TURNS_FOR_CONTEXT = 4;
@@ -134,6 +135,14 @@ export class ClassifierStrategy implements RoutingStrategy {
     const startTime = Date.now();
     try {
       if (await config.getNumericalRoutingEnabled()) {
+        return null;
+      }
+
+      const authType = config.getContentGeneratorConfig()?.authType;
+      if (authType === AuthType.USE_OPENAI_COMPATIBLE) {
+        debugLogger.debug(
+          '[Routing] Skipping ClassifierStrategy for OpenAI-compatible auth to save cost.',
+        );
         return null;
       }
 

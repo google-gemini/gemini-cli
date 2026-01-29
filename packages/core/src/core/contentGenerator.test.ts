@@ -338,6 +338,26 @@ describe('createContentGenerator', () => {
       new LoggingContentGenerator(mockGenerator.models, mockConfig),
     );
   });
+
+  it('should create an OpenAICompatibleContentGenerator when AuthType is USE_OPENAI_COMPATIBLE', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => false,
+      getPreviewFeatures: vi.fn().mockReturnValue(false),
+    } as unknown as Config;
+
+    const generator = await createContentGenerator(
+      {
+        apiKey: 'openai-test-key',
+        authType: AuthType.USE_OPENAI_COMPATIBLE,
+        openaiEndpoint: 'https://api.openai.com/v1/chat/completions',
+        openaiModel: 'gpt-4',
+      },
+      mockConfig,
+    );
+    expect(generator).toBeInstanceOf(LoggingContentGenerator);
+  });
 });
 
 describe('createContentGeneratorConfig', () => {
@@ -421,5 +441,41 @@ describe('createContentGeneratorConfig', () => {
     );
     expect(config.apiKey).toBeUndefined();
     expect(config.vertexai).toBeUndefined();
+  });
+
+  it('should configure for OpenAI-compatible API using OPENAI_API_KEY when set', async () => {
+    vi.stubEnv('OPENAI_API_KEY', 'openai-test-key');
+    vi.stubEnv('OPENAI_API_ENDPOINT', 'http://localhost:11434/v1/chat/completions');
+    vi.stubEnv('OPENAI_MODEL', 'llama2');
+    const config = await createContentGeneratorConfig(
+      mockConfig,
+      AuthType.USE_OPENAI_COMPATIBLE,
+    );
+    expect(config.apiKey).toBe('openai-test-key');
+    expect(config.openaiEndpoint).toBe('http://localhost:11434/v1/chat/completions');
+    expect(config.openaiModel).toBe('llama2');
+  });
+
+  it('should use default OpenAI endpoint and model if not specified', async () => {
+    vi.stubEnv('OPENAI_API_KEY', 'openai-test-key');
+    vi.stubEnv('OPENAI_API_ENDPOINT', '');
+    vi.stubEnv('OPENAI_MODEL', '');
+    const config = await createContentGeneratorConfig(
+      mockConfig,
+      AuthType.USE_OPENAI_COMPATIBLE,
+    );
+    expect(config.apiKey).toBe('openai-test-key');
+    expect(config.openaiEndpoint).toBe('https://api.openai.com/v1/chat/completions');
+    expect(config.openaiModel).toBe('gpt-4');
+  });
+
+  it('should not configure for OpenAI-compatible if OPENAI_API_KEY is not set', async () => {
+    vi.stubEnv('OPENAI_API_KEY', '');
+    const config = await createContentGeneratorConfig(
+      mockConfig,
+      AuthType.USE_OPENAI_COMPATIBLE,
+    );
+    expect(config.apiKey).toBeUndefined();
+    expect(config.openaiEndpoint).toBeUndefined();
   });
 });

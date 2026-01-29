@@ -24,6 +24,7 @@ import { FakeContentGenerator } from './fakeContentGenerator.js';
 import { parseCustomHeaders } from '../utils/customHeaderUtils.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
 import { getVersion, resolveModel } from '../../index.js';
+import { OpenAICompatibleContentGenerator } from './openaiContentGenerator.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -54,6 +55,7 @@ export enum AuthType {
   USE_VERTEX_AI = 'vertex-ai',
   LEGACY_CLOUD_SHELL = 'cloud-shell',
   COMPUTE_ADC = 'compute-default-credentials',
+  USE_OPENAI_COMPATIBLE = 'openai-compatible',
 }
 
 export type ContentGeneratorConfig = {
@@ -61,6 +63,10 @@ export type ContentGeneratorConfig = {
   vertexai?: boolean;
   authType?: AuthType;
   proxy?: string;
+  // OpenAI-compatible API configuration
+  openaiEndpoint?: string;
+  openaiModel?: string;
+  openaiTimeoutMs?: number;
 };
 
 export async function createContentGeneratorConfig(
@@ -75,6 +81,16 @@ export async function createContentGeneratorConfig(
     process.env['GOOGLE_CLOUD_PROJECT_ID'] ||
     undefined;
   const googleCloudLocation = process.env['GOOGLE_CLOUD_LOCATION'] || undefined;
+
+  // OpenAI-compatible API environment variables
+  const openaiApiKey = process.env['OPENAI_API_KEY'] || "XXXXXXXX";
+  const openaiEndpoint =
+    process.env['OPENAI_API_ENDPOINT'] ||
+    'http://localhost:11434/v1/chat/completions';
+  const openaiModel = process.env['OPENAI_MODEL'] || 'gpt-oss:120b';
+  const openaiTimeoutMs = process.env['OPENAI_TIMEOUT_SECONDS']
+    ? parseInt(process.env['OPENAI_TIMEOUT_SECONDS'], 300) * 1000
+    : undefined;
 
   const contentGeneratorConfig: ContentGeneratorConfig = {
     authType,
@@ -102,6 +118,16 @@ export async function createContentGeneratorConfig(
   ) {
     contentGeneratorConfig.apiKey = googleApiKey;
     contentGeneratorConfig.vertexai = true;
+
+    return contentGeneratorConfig;
+  }
+
+  // OpenAI-compatible API configuration
+  if (authType === AuthType.USE_OPENAI_COMPATIBLE && openaiApiKey) {
+    contentGeneratorConfig.apiKey = openaiApiKey;
+    contentGeneratorConfig.openaiEndpoint = openaiEndpoint;
+    contentGeneratorConfig.openaiModel = openaiModel;
+    contentGeneratorConfig.openaiTimeoutMs = openaiTimeoutMs;
 
     return contentGeneratorConfig;
   }
@@ -184,6 +210,24 @@ export async function createContentGenerator(
       });
       return new LoggingContentGenerator(googleGenAI.models, gcConfig);
     }
+
+    // OpenAI-compatible API
+    if (config.authType === AuthType.USE_OPENAI_COMPATIBLE) {
+      const openaiGenerator = new OpenAICompatibleContentGenerator({
+        endpoint: config.openaiEndpoint || 'https://api.openai.com/v1/chat/completions',
+        model: config.openaiModel || 'gpt-4',
+        apiKey: config.apiKey,
+        timeout: config.openaiTimeoutMs,
+      });
+      // Log OpenAI configuration details as requested
+      const maskedKey = config.apiKey ? `${config.apiKey.slice(0, 8)}...` : 'undefined';
+      console.error(`OpenAI Configuration:
+  Endpoint: ${config.openaiEndpoint || 'https://api.openai.com/v1/chat/completions'}
+  Model: ${config.openaiModel || 'gpt-4'}
+  API Key: ${maskedKey}`);
+      return new LoggingContentGenerator(openaiGenerator, gcConfig);
+    }
+
     throw new Error(
       `Error creating contentGenerator: Unsupported authType: ${config.authType}`,
     );
