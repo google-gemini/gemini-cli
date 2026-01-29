@@ -4,9 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type { Mock } from 'vitest';
 import { newCommand } from './newCommand.js';
 import { SessionEndReason, SessionStartSource } from '@google/gemini-cli-core';
 import type { CommandContext } from './types.js';
+import { randomUUID } from 'node:crypto';
+
+vi.mock('node:crypto', () => ({
+  randomUUID: vi.fn(),
+}));
 
 describe('newCommand', () => {
   let mockContext: CommandContext;
@@ -57,14 +63,11 @@ describe('newCommand', () => {
       ui: mockUi,
     } as unknown as CommandContext;
 
-    // Mock randomUUID
-    vi.mock('node:crypto', () => ({
-      randomUUID: vi.fn().mockReturnValue('new-session-id'),
-    }));
+    (randomUUID as Mock).mockReturnValue('new-session-id');
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    vi.clearAllMocks();
   });
 
   it('should reset chat and start a new session', async () => {
