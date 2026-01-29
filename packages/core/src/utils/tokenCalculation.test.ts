@@ -230,19 +230,42 @@ describe('tokenCalculation', () => {
       expect(tokens).toBeLessThan(3100);
     });
 
-    it('should handle deeply nested recursive tool responses', () => {
+    it('should respect the maximum recursion depth limit', () => {
+      // Create a structure nested to depth 5 (exceeding limit of 3)
       const parts: Part[] = [
         {
           functionResponse: {
-            name: 'outer',
-            response: {},
-            // extreme recursion
+            name: 'd0',
+            response: { val: 'a' }, // ~12 chars -> 3 tokens
             parts: [
               {
                 functionResponse: {
-                  name: 'inner',
-                  response: { data: 'some data' },
-                  parts: [{ text: 'deep text' }] as Part[],
+                  name: 'd1',
+                  response: { val: 'a' }, // ~12 chars -> 3 tokens
+                  parts: [
+                    {
+                      functionResponse: {
+                        name: 'd2',
+                        response: { val: 'a' }, // ~12 chars -> 3 tokens
+                        parts: [
+                          {
+                            functionResponse: {
+                              name: 'd3',
+                              response: { val: 'a' }, // ~12 chars -> 3 tokens
+                              parts: [
+                                {
+                                  functionResponse: {
+                                    name: 'd4',
+                                    response: { val: 'a' },
+                                  },
+                                },
+                              ] as Part[],
+                            },
+                          },
+                        ] as Part[],
+                      },
+                    },
+                  ] as Part[],
                 },
               },
             ] as Part[],
@@ -251,8 +274,10 @@ describe('tokenCalculation', () => {
       ];
 
       const tokens = estimateTokenCountSync(parts);
-      expect(tokens).toBeGreaterThan(0);
-      expect(typeof tokens).toBe('number');
+      // It should count d0, d1, d2, d3 (depth 0, 1, 2, 3) but NOT d4 (depth 4)
+      // d0..d3: 4 * ~4 tokens = ~16
+      expect(tokens).toBeGreaterThan(10);
+      expect(tokens).toBeLessThan(30);
     });
 
     it('should handle empty or nullish inputs gracefully', () => {

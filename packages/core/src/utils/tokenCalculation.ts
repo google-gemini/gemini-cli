@@ -24,6 +24,11 @@ const PDF_TOKEN_ESTIMATE = 25800;
 // Above this, we use a faster approximation to avoid performance bottlenecks.
 const MAX_CHARS_FOR_FULL_HEURISTIC = 100_000;
 
+// Maximum depth for recursive token estimation to prevent stack overflow from
+// malicious or buggy nested structures. A depth of 3 is sufficient given
+// standard multimodal responses are typically depth 1.
+const MAX_RECURSION_DEPTH = 3;
+
 /**
  * Heuristic estimation of tokens for a text string.
  */
@@ -68,7 +73,7 @@ function estimateMediaTokens(part: Part): number | undefined {
  * Heuristic estimation for tool responses, avoiding massive string copies
  * and accounting for nested Gemini 3 multimodal parts.
  */
-function estimateFunctionResponseTokens(part: Part): number {
+function estimateFunctionResponseTokens(part: Part, depth: number): number {
   const fr = part.functionResponse;
   if (!fr) return 0;
 
@@ -85,7 +90,7 @@ function estimateFunctionResponseTokens(part: Part): number {
   // Gemini 3: Handle nested multimodal parts recursively.
   const nestedParts = (fr as unknown as { parts?: Part[] }).parts;
   if (nestedParts && nestedParts.length > 0) {
-    totalTokens += estimateTokenCountSync(nestedParts);
+    totalTokens += estimateTokenCountSync(nestedParts, depth + 1);
   }
 
   return totalTokens;
@@ -96,13 +101,20 @@ function estimateFunctionResponseTokens(part: Part): number {
  * - Text: character-based heuristic (ASCII vs CJK) for small strings, length/4 for massive ones.
  * - Non-text (Tools, etc): JSON string length / 4.
  */
-export function estimateTokenCountSync(parts: Part[]): number {
+export function estimateTokenCountSync(
+  parts: Part[],
+  depth: number = 0,
+): number {
+  if (depth > MAX_RECURSION_DEPTH) {
+    return 0;
+  }
+
   let totalTokens = 0;
   for (const part of parts) {
     if (typeof part.text === 'string') {
       totalTokens += estimateTextTokens(part.text);
     } else if (part.functionResponse) {
-      totalTokens += estimateFunctionResponseTokens(part);
+      totalTokens += estimateFunctionResponseTokens(part, depth);
     } else {
       const mediaEstimate = estimateMediaTokens(part);
       if (mediaEstimate !== undefined) {
