@@ -245,6 +245,12 @@ Slash commands provide meta-level control over the CLI itself.
     - **`nodesc`** or **`nodescriptions`**:
       - **Description:** Hide tool descriptions, showing only the tool names.
 
+- **`/plan`**
+  - **Description:** Switch to Plan Mode (read-only) and view the current plan
+    if one has been generated.
+  - **Note:** This feature requires the `experimental.plan` setting to be
+    enabled in your configuration.
+
 - **`/privacy`**
   - **Description:** Display the Privacy Notice and allow users to select
     whether they consent to the collection of their data for service improvement
