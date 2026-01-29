@@ -6,6 +6,21 @@
 
 import { writeToStdout } from './stdio.js';
 
+/**
+ * ANSI escape codes for disabling mouse tracking.
+ */
+export function disableMouseTracking() {
+  writeToStdout(
+    [
+      '\x1b[?1000l', // Normal tracking
+      '\x1b[?1003l', // Any-event tracking
+      '\x1b[?1015l', // urxvt extended mouse mode
+      '\x1b[?1006l', // SGR-style mouse tracking
+      '\x1b[?1002l', // Button-event tracking
+    ].join(''),
+  );
+}
+
 export function enableMouseEvents() {
   // Enable mouse tracking with SGR format
   // ?1002h = button event tracking (clicks + drags + scroll wheel)
