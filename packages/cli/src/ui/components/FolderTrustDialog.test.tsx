@@ -7,7 +7,7 @@
 import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { act } from 'react';
-import { vi } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { FolderTrustDialog } from './FolderTrustDialog.js';
 import { ExitCodes } from '@google/gemini-cli-core';
 import * as processUtils from '../../utils/processUtils.js';
@@ -74,7 +74,7 @@ describe('FolderTrustDialog', () => {
       <FolderTrustDialog onSelect={vi.fn()} isRestarting={true} />,
     );
 
-    expect(lastFrame()).toContain(' Gemini CLI is restarting');
+    expect(lastFrame()).toContain('Gemini CLI is restarting');
   });
 
   it('should call relaunchApp when isRestarting is true', async () => {
@@ -85,6 +85,23 @@ describe('FolderTrustDialog', () => {
     );
     await vi.advanceTimersByTimeAsync(250);
     expect(relaunchApp).toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it('should not call relaunchApp if unmounted before timeout', async () => {
+    vi.useFakeTimers();
+    const relaunchApp = vi.spyOn(processUtils, 'relaunchApp');
+    const { unmount } = renderWithProviders(
+      <FolderTrustDialog onSelect={vi.fn()} isRestarting={true} />,
+    );
+
+    // Unmount immediately (before 250ms)
+    act(() => {
+      unmount();
+    });
+
+    await vi.advanceTimersByTimeAsync(250);
+    expect(relaunchApp).not.toHaveBeenCalled();
     vi.useRealTimers();
   });
 

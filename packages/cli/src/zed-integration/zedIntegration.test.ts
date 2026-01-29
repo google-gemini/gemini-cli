@@ -24,6 +24,7 @@ import {
   ReadManyFilesTool,
   type GeminiChat,
   type Config,
+  type MessageBus,
 } from '@google/gemini-cli-core';
 import { SettingScope, type LoadedSettings } from '../config/settings.js';
 import { loadCliConfig, type CliArgs } from '../config/config.js';
@@ -96,6 +97,11 @@ describe('GeminiAgent', () => {
       setFileSystemService: vi.fn(),
       getGeminiClient: vi.fn().mockReturnValue({
         startChat: vi.fn().mockResolvedValue({}),
+      }),
+      getMessageBus: vi.fn().mockReturnValue({
+        publish: vi.fn(),
+        subscribe: vi.fn(),
+        unsubscribe: vi.fn(),
       }),
     } as unknown as Mocked<Awaited<ReturnType<typeof loadCliConfig>>>;
     mockSettings = {
@@ -261,6 +267,7 @@ describe('Session', () => {
   let session: Session;
   let mockToolRegistry: { getTool: Mock };
   let mockTool: { kind: string; build: Mock };
+  let mockMessageBus: Mocked<MessageBus>;
 
   beforeEach(() => {
     mockChat = {
@@ -279,6 +286,11 @@ describe('Session', () => {
     mockToolRegistry = {
       getTool: vi.fn().mockReturnValue(mockTool),
     };
+    mockMessageBus = {
+      publish: vi.fn(),
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+    } as unknown as Mocked<MessageBus>;
     mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getPreviewFeatures: vi.fn().mockReturnValue({}),
@@ -290,6 +302,7 @@ describe('Session', () => {
       getTargetDir: vi.fn().mockReturnValue('/tmp'),
       getEnableRecursiveFileSearch: vi.fn().mockReturnValue(false),
       getDebugMode: vi.fn().mockReturnValue(false),
+      getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
     } as unknown as Mocked<Config>;
     mockConnection = {
       sessionUpdate: vi.fn(),

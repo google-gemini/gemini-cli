@@ -12,6 +12,7 @@ import {
   type SafetyCheckerRule,
   InProcessCheckerType,
 } from './types.js';
+import { buildArgsPatterns } from './utils.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import toml from '@iarna/toml';
@@ -44,6 +45,8 @@ const PolicyRuleSchema = z.object({
         'priority must be <= 999 to prevent tier overflow. Priorities >= 1000 would jump to the next tier.',
     }),
   modes: z.array(z.nativeEnum(ApprovalMode)).optional(),
+  allow_redirection: z.boolean().optional(),
+  deny_message: z.string().optional(),
 });
 
 /**
@@ -117,17 +120,6 @@ export interface PolicyLoadResult {
   rules: PolicyRule[];
   checkers: SafetyCheckerRule[];
   errors: PolicyFileError[];
-}
-
-/**
- * Escapes special regex characters in a string for use in a regex pattern.
- * This is used for commandPrefix to ensure literal string matching.
- *
- * @param str The string to escape
- * @returns The escaped string safe for use in a regex
- */
-export function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /**
@@ -302,7 +294,6 @@ export async function loadPoliciesFromToml(
 
         // Validate shell command convenience syntax
         const tomlRules = validationResult.data.rule ?? [];
-        const tomlCheckers = validationResult.data.safety_checker ?? [];
 
         for (let i = 0; i < tomlRules.length; i++) {
           const rule = tomlRules[i];
@@ -319,61 +310,16 @@ export async function loadPoliciesFromToml(
             });
             // Continue to next rule, don't skip the entire file
           }
-
-          if (tier > 1 && rule.modes && rule.modes.length > 0) {
-            errors.push({
-              filePath,
-              fileName: file,
-              tier: tierName,
-              ruleIndex: i,
-              errorType: 'rule_validation',
-              message: 'Restricted property "modes"',
-              details: `Rule #${i + 1}: The "modes" property is currently reserved for Tier 1 (system) policies and cannot be used in ${tierName} policies.`,
-              suggestion: 'Remove the "modes" property from this rule.',
-            });
-          }
-        }
-
-        for (let i = 0; i < tomlCheckers.length; i++) {
-          const checker = tomlCheckers[i];
-          if (tier > 1 && checker.modes && checker.modes.length > 0) {
-            errors.push({
-              filePath,
-              fileName: file,
-              tier: tierName,
-              ruleIndex: i,
-              errorType: 'rule_validation',
-              message: 'Restricted property "modes" in safety checker',
-              details: `Safety Checker #${i + 1}: The "modes" property is currently reserved for Tier 1 (system) policies and cannot be used in ${tierName} policies.`,
-              suggestion:
-                'Remove the "modes" property from this safety checker.',
-            });
-          }
         }
 
         // Transform rules
         const parsedRules: PolicyRule[] = (validationResult.data.rule ?? [])
           .flatMap((rule) => {
-            // Transform commandPrefix/commandRegex to argsPattern
-            let effectiveArgsPattern = rule.argsPattern;
-            const commandPrefixes: string[] = [];
-
-            if (rule.commandPrefix) {
-              const prefixes = Array.isArray(rule.commandPrefix)
-                ? rule.commandPrefix
-                : [rule.commandPrefix];
-              commandPrefixes.push(...prefixes);
-            } else if (rule.commandRegex) {
-              effectiveArgsPattern = `"command":"${rule.commandRegex}`;
-            }
-
-            // Expand command prefixes to multiple patterns
-            const argsPatterns: Array<string | undefined> =
-              commandPrefixes.length > 0
-                ? commandPrefixes.map(
-                    (prefix) => `"command":"${escapeRegex(prefix)}(?:[\\s"]|$)`,
-                  )
-                : [effectiveArgsPattern];
+            const argsPatterns = buildArgsPatterns(
+              rule.argsPattern,
+              rule.commandPrefix,
+              rule.commandRegex,
+            );
 
             // For each argsPattern, expand toolName arrays
             return argsPatterns.flatMap((argsPattern) => {
@@ -399,7 +345,10 @@ export async function loadPoliciesFromToml(
                   toolName: effectiveToolName,
                   decision: rule.decision,
                   priority: transformPriority(rule.priority, tier),
-                  modes: tier === 1 ? rule.modes : undefined,
+                  modes: rule.modes,
+                  allowRedirection: rule.allow_redirection,
+                  source: `${tierName.charAt(0).toUpperCase() + tierName.slice(1)}: ${file}`,
+                  denyMessage: rule.deny_message,
                 };
 
                 // Compile regex pattern
@@ -436,24 +385,11 @@ export async function loadPoliciesFromToml(
           validationResult.data.safety_checker ?? []
         )
           .flatMap((checker) => {
-            let effectiveArgsPattern = checker.argsPattern;
-            const commandPrefixes: string[] = [];
-
-            if (checker.commandPrefix) {
-              const prefixes = Array.isArray(checker.commandPrefix)
-                ? checker.commandPrefix
-                : [checker.commandPrefix];
-              commandPrefixes.push(...prefixes);
-            } else if (checker.commandRegex) {
-              effectiveArgsPattern = `"command":"${checker.commandRegex}`;
-            }
-
-            const argsPatterns: Array<string | undefined> =
-              commandPrefixes.length > 0
-                ? commandPrefixes.map(
-                    (prefix) => `"command":"${escapeRegex(prefix)}(?:[\\s"]|$)`,
-                  )
-                : [effectiveArgsPattern];
+            const argsPatterns = buildArgsPatterns(
+              checker.argsPattern,
+              checker.commandPrefix,
+              checker.commandRegex,
+            );
 
             return argsPatterns.flatMap((argsPattern) => {
               const toolNames: Array<string | undefined> = checker.toolName
@@ -476,7 +412,7 @@ export async function loadPoliciesFromToml(
                   toolName: effectiveToolName,
                   priority: checker.priority,
                   checker: checker.checker as SafetyCheckerConfig,
-                  modes: tier === 1 ? checker.modes : undefined,
+                  modes: checker.modes,
                 };
 
                 if (argsPattern) {

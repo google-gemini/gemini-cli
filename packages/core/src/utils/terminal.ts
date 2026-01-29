@@ -34,6 +34,14 @@ export function disableModifyOtherKeys() {
   writeToStdout('\x1b[>4;0m');
 }
 
+export function enableBracketedPasteMode() {
+  writeToStdout('\x1b[?2004h');
+}
+
+export function disableBracketedPasteMode() {
+  writeToStdout('\x1b[?2004l');
+}
+
 export function enableLineWrapping() {
   writeToStdout('\x1b[?7h');
 }

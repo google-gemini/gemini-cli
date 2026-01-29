@@ -27,5 +27,5 @@
 
 [[rule]]
 toolName = "delegate_to_agent"
-decision = "allow"
+decision = "ask_user"
 priority = 50

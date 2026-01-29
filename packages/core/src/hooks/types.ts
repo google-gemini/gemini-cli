@@ -45,6 +45,11 @@ export enum HookEventName {
 }
 
 /**
+ * Fields in the hooks configuration that are not hook event names
+ */
+export const HOOKS_CONFIG_FIELDS = ['enabled', 'disabled', 'notifications'];
+
+/**
  * Hook configuration entry
  */
 export interface CommandHookConfig {
@@ -54,6 +59,7 @@ export interface CommandHookConfig {
   description?: string;
   timeout?: number;
   source?: ConfigSource;
+  env?: Record<string, string>;
 }
 
 export type HookConfig = CommandHookConfig;
@@ -135,6 +141,8 @@ export function createHookOutput(
       return new BeforeToolSelectionHookOutput(data);
     case 'BeforeTool':
       return new BeforeToolHookOutput(data);
+    case 'AfterAgent':
+      return new AfterAgentHookOutput(data);
     default:
       return new DefaultHookOutput(data);
   }
@@ -208,7 +216,7 @@ export class DefaultHookOutput implements HookOutput {
   }
 
   /**
-   * Get additional context for adding to responses
+   * Get sanitized additional context for adding to responses.
    */
   getAdditionalContext(): string | undefined {
     if (
@@ -216,7 +224,12 @@ export class DefaultHookOutput implements HookOutput {
       'additionalContext' in this.hookSpecificOutput
     ) {
       const context = this.hookSpecificOutput['additionalContext'];
-      return typeof context === 'string' ? context : undefined;
+      if (typeof context !== 'string') {
+        return undefined;
+      }
+
+      // Sanitize by escaping < and > to prevent tag injection
+      return context.replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
     return undefined;
   }
@@ -232,6 +245,13 @@ export class DefaultHookOutput implements HookOutput {
       };
     }
     return { blocked: false, reason: '' };
+  }
+
+  /**
+   * Check if context clearing was requested by hook.
+   */
+  shouldClearContext(): boolean {
+    return false;
   }
 }
 
@@ -353,24 +373,47 @@ export class AfterModelHookOutput extends DefaultHookOutput {
       }
     }
 
-    // If hook wants to stop execution, create a synthetic stop response
-    if (this.shouldStopExecution()) {
-      const stopResponse: LLMResponse = {
-        candidates: [
-          {
-            content: {
-              role: 'model',
-              parts: [this.getEffectiveReason() || 'Execution stopped by hook'],
-            },
-            finishReason: 'STOP',
-          },
-        ],
-      };
-      return defaultHookTranslator.fromHookLLMResponse(stopResponse);
-    }
-
     return undefined;
   }
+}
+
+/**
+ * Specific hook output class for AfterAgent events
+ */
+export class AfterAgentHookOutput extends DefaultHookOutput {
+  /**
+   * Check if context clearing was requested by hook
+   */
+  override shouldClearContext(): boolean {
+    if (this.hookSpecificOutput && 'clearContext' in this.hookSpecificOutput) {
+      return this.hookSpecificOutput['clearContext'] === true;
+    }
+    return false;
+  }
+}
+
+/**
+ * Context for MCP tool executions.
+ * Contains non-sensitive connection information about the MCP server
+ * identity. Since server_name is user controlled and arbitrary, we
+ * also include connection information (e.g., command or url) to
+ * help identify the MCP server.
+ *
+ * NOTE: In the future, consider defining a shared sanitized interface
+ * from MCPServerConfig to avoid duplication and ensure consistency.
+ */
+export interface McpToolContext {
+  server_name: string;
+  tool_name: string; // Original tool name from the MCP server
+
+  // Connection info (mutually exclusive based on transport type)
+  command?: string; // For stdio transport
+  args?: string[]; // For stdio transport
+  cwd?: string; // For stdio transport
+
+  url?: string; // For SSE/HTTP transport
+
+  tcp?: string; // For WebSocket transport
 }
 
 /**
@@ -379,6 +422,7 @@ export class AfterModelHookOutput extends DefaultHookOutput {
 export interface BeforeToolInput extends HookInput {
   tool_name: string;
   tool_input: Record<string, unknown>;
+  mcp_context?: McpToolContext; // Only present for MCP tools
 }
 
 /**
@@ -398,6 +442,7 @@ export interface AfterToolInput extends HookInput {
   tool_name: string;
   tool_input: Record<string, unknown>;
   tool_response: Record<string, unknown>;
+  mcp_context?: McpToolContext; // Only present for MCP tools
 }
 
 /**
@@ -458,6 +503,16 @@ export interface AfterAgentInput extends HookInput {
   prompt: string;
   prompt_response: string;
   stop_hook_active: boolean;
+}
+
+/**
+ * AfterAgent hook output
+ */
+export interface AfterAgentOutput extends HookOutput {
+  hookSpecificOutput?: {
+    hookEventName: 'AfterAgent';
+    clearContext?: boolean;
+  };
 }
 
 /**

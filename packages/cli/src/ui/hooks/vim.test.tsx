@@ -36,10 +36,10 @@ vi.mock('../contexts/VimModeContext.js', () => ({
 const createKey = (partial: Partial<Key>): Key => ({
   name: partial.name || '',
   sequence: partial.sequence || '',
-  ctrl: partial.ctrl || false,
-  meta: partial.meta || false,
   shift: partial.shift || false,
-  paste: partial.paste || false,
+  alt: partial.alt || false,
+  ctrl: partial.ctrl || false,
+  cmd: partial.cmd || false,
   insertable: partial.insertable || false,
   ...partial,
 });
@@ -67,6 +67,8 @@ const createMockTextBufferState = (
       transformedToLogicalMaps: lines.map(() => []),
       visualToTransformedMap: [],
     },
+    pastedContent: {},
+    expandedPaste: null,
     ...partial,
   };
 };
@@ -88,6 +90,7 @@ const TEST_SEQUENCES = {
   LINE_START: createKey({ sequence: '0' }),
   LINE_END: createKey({ sequence: '$' }),
   REPEAT: createKey({ sequence: '.' }),
+  CTRL_C: createKey({ sequence: '\x03', name: 'c', ctrl: true }),
 } as const;
 
 describe('useVim hook', () => {
@@ -1612,5 +1615,142 @@ describe('useVim hook', () => {
         expect(result.cursorCol).toBe(expectedCursorCol);
       },
     );
+  });
+
+  describe('double-escape to clear buffer', () => {
+    beforeEach(() => {
+      mockBuffer = createMockBuffer('hello world');
+      mockVimContext.vimEnabled = true;
+      mockVimContext.vimMode = 'NORMAL';
+      mockHandleFinalSubmit = vi.fn();
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('should clear buffer on double-escape in NORMAL mode', async () => {
+      const { result } = renderHook(() =>
+        useVim(mockBuffer as TextBuffer, mockHandleFinalSubmit),
+      );
+
+      // First escape - should pass through (return false)
+      let handled: boolean;
+      await act(async () => {
+        handled = result.current.handleInput(TEST_SEQUENCES.ESCAPE);
+      });
+      expect(handled!).toBe(false);
+
+      // Second escape within timeout - should clear buffer (return true)
+      await act(async () => {
+        handled = result.current.handleInput(TEST_SEQUENCES.ESCAPE);
+      });
+      expect(handled!).toBe(true);
+      expect(mockBuffer.setText).toHaveBeenCalledWith('');
+    });
+
+    it('should clear buffer on double-escape in INSERT mode', async () => {
+      mockVimContext.vimMode = 'INSERT';
+      const { result } = renderHook(() =>
+        useVim(mockBuffer as TextBuffer, mockHandleFinalSubmit),
+      );
+
+      // First escape - switches to NORMAL mode
+      let handled: boolean;
+      await act(async () => {
+        handled = result.current.handleInput(TEST_SEQUENCES.ESCAPE);
+      });
+      expect(handled!).toBe(true);
+      expect(mockBuffer.vimEscapeInsertMode).toHaveBeenCalled();
+
+      // Second escape within timeout - should clear buffer
+      await act(async () => {
+        handled = result.current.handleInput(TEST_SEQUENCES.ESCAPE);
+      });
+      expect(handled!).toBe(true);
+      expect(mockBuffer.setText).toHaveBeenCalledWith('');
+    });
+
+    it('should NOT clear buffer if escapes are too slow', async () => {
+      const { result } = renderHook(() =>
+        useVim(mockBuffer as TextBuffer, mockHandleFinalSubmit),
+      );
+
+      // First escape
+      await act(async () => {
+        result.current.handleInput(TEST_SEQUENCES.ESCAPE);
+      });
+
+      // Wait longer than timeout (500ms)
+      await act(async () => {
+        vi.advanceTimersByTime(600);
+      });
+
+      // Second escape - should NOT clear buffer because timeout expired
+      let handled: boolean;
+      await act(async () => {
+        handled = result.current.handleInput(TEST_SEQUENCES.ESCAPE);
+      });
+      // First escape of new sequence, passes through
+      expect(handled!).toBe(false);
+      expect(mockBuffer.setText).not.toHaveBeenCalled();
+    });
+
+    it('should clear escape history when clearing pending operator', async () => {
+      const { result } = renderHook(() =>
+        useVim(mockBuffer as TextBuffer, mockHandleFinalSubmit),
+      );
+
+      // First escape
+      await act(async () => {
+        result.current.handleInput(TEST_SEQUENCES.ESCAPE);
+      });
+
+      // Type 'd' to set pending operator
+      await act(async () => {
+        result.current.handleInput(TEST_SEQUENCES.DELETE);
+      });
+
+      // Escape to clear pending operator
+      await act(async () => {
+        result.current.handleInput(TEST_SEQUENCES.ESCAPE);
+      });
+
+      // Another escape - should NOT clear buffer (history was reset)
+      let handled: boolean;
+      await act(async () => {
+        handled = result.current.handleInput(TEST_SEQUENCES.ESCAPE);
+      });
+      expect(handled!).toBe(false);
+      expect(mockBuffer.setText).not.toHaveBeenCalled();
+    });
+
+    it('should pass Ctrl+C through to InputPrompt in NORMAL mode', async () => {
+      const { result } = renderHook(() =>
+        useVim(mockBuffer as TextBuffer, mockHandleFinalSubmit),
+      );
+
+      let handled: boolean;
+      await act(async () => {
+        handled = result.current.handleInput(TEST_SEQUENCES.CTRL_C);
+      });
+      // Should return false to let InputPrompt handle it
+      expect(handled!).toBe(false);
+    });
+
+    it('should pass Ctrl+C through to InputPrompt in INSERT mode', async () => {
+      mockVimContext.vimMode = 'INSERT';
+      const { result } = renderHook(() =>
+        useVim(mockBuffer as TextBuffer, mockHandleFinalSubmit),
+      );
+
+      let handled: boolean;
+      await act(async () => {
+        handled = result.current.handleInput(TEST_SEQUENCES.CTRL_C);
+      });
+      // Should return false to let InputPrompt handle it
+      expect(handled!).toBe(false);
+    });
   });
 });

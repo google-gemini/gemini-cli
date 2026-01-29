@@ -42,8 +42,13 @@ This project follows
 The process for contributing code is as follows:
 
 1.  **Find an issue** that you want to work on. If an issue is tagged as
-    "🔒Maintainers only", this means it is reserved for project maintainers. We
-    will not accept pull requests related to these issues.
+    `🔒Maintainers only`, this means it is reserved for project maintainers. We
+    will not accept pull requests related to these issues. In the near future,
+    we will explicitly mark issues looking for contributions using the
+    `help  wanted` label. If you believe an issue is a good candidate for
+    community contribution, please leave a comment on the issue. A maintainer
+    will review it and apply the `help-wanted` label if appropriate. Only
+    maintainers should attempt to add the `help-wanted` label to an issue.
 2.  **Fork the repository** and create a new branch.
 3.  **Make your changes** in the `packages/` directory.
 4.  **Ensure all checks pass** by running `npm run preflight`.
@@ -94,8 +99,11 @@ any code is written.
 - **For features:** The PR should be linked to the feature request or proposal
   issue that has been approved by a maintainer.
 
-If an issue for your change doesn't exist, please **open one first** and wait
-for feedback before you start coding.
+If an issue for your change doesn't exist, we will automatically close your PR
+along with a comment reminding you to associate the PR with an issue. The ideal
+workflow starts with an issue that has been reviewed and approved by a
+maintainer. Please **open the issue first** and wait for feedback before you
+start coding.
 
 #### 2. Keep it small and focused
 

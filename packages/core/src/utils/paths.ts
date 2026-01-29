@@ -6,7 +6,10 @@
 
 import path from 'node:path';
 import os from 'node:os';
+import process from 'node:process';
 import * as crypto from 'node:crypto';
+import * as fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 export const GEMINI_DIR = '.gemini';
 export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
@@ -19,12 +22,32 @@ export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
 export const SHELL_SPECIAL_CHARS = /[ \t()[\]{};|*?$`'"#&<>!~]/;
 
 /**
+ * Returns the home directory.
+ * If GEMINI_CLI_HOME environment variable is set, it returns its value.
+ * Otherwise, it returns the user's home directory.
+ */
+export function homedir(): string {
+  const envHome = process.env['GEMINI_CLI_HOME'];
+  if (envHome) {
+    return envHome;
+  }
+  return os.homedir();
+}
+
+/**
+ * Returns the operating system's default directory for temporary files.
+ */
+export function tmpdir(): string {
+  return os.tmpdir();
+}
+
+/**
  * Replaces the home directory with a tilde.
  * @param path - The path to tildeify.
  * @returns The tildeified path.
  */
 export function tildeifyPath(path: string): string {
-  const homeDir = os.homedir();
+  const homeDir = homedir();
   if (path.startsWith(homeDir)) {
     return path.replace(homeDir, '~');
   }
@@ -321,4 +344,35 @@ export function isSubpath(parentPath: string, childPath: string): boolean {
     relative !== '..' &&
     !pathModule.isAbsolute(relative)
   );
+}
+
+/**
+ * Resolves a path to its real path, sanitizing it first.
+ * - Removes 'file://' protocol if present.
+ * - Decodes URI components (e.g. %20 -> space).
+ * - Resolves symbolic links using fs.realpathSync.
+ *
+ * @param pathStr The path string to resolve.
+ * @returns The resolved real path.
+ */
+export function resolveToRealPath(path: string): string {
+  let resolvedPath = path;
+
+  try {
+    if (resolvedPath.startsWith('file://')) {
+      resolvedPath = fileURLToPath(resolvedPath);
+    }
+
+    resolvedPath = decodeURIComponent(resolvedPath);
+  } catch (_e) {
+    // Ignore error (e.g. malformed URI), keep path from previous step
+  }
+
+  try {
+    return fs.realpathSync(resolvedPath);
+  } catch (_e) {
+    // If realpathSync fails, it might be because the path doesn't exist.
+    // In that case, we can fall back to the path processed.
+    return resolvedPath;
+  }
 }

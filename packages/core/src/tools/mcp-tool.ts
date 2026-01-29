@@ -23,6 +23,12 @@ import { ToolErrorType } from './tool-error.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
+/**
+ * The separator used to qualify MCP tool names with their server prefix.
+ * e.g. "server_name__tool_name"
+ */
+export const MCP_QUALIFIED_NAME_SEPARATOR = '__';
+
 type ToolParams = Record<string, unknown>;
 
 // Discriminated union for MCP Content Blocks to ensure type safety.
@@ -59,7 +65,7 @@ type McpContentBlock =
   | McpResourceBlock
   | McpResourceLinkBlock;
 
-class DiscoveredMCPToolInvocation extends BaseToolInvocation<
+export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
   ToolParams,
   ToolResult
 > {
@@ -70,10 +76,10 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     readonly serverName: string,
     readonly serverToolName: string,
     readonly displayName: string,
+    messageBus: MessageBus,
     readonly trust?: boolean,
     params: ToolParams = {},
     private readonly cliConfig?: Config,
-    messageBus?: MessageBus,
   ) {
     // Use composite format for policy checks: serverName__toolName
     // This enables server wildcards (e.g., "google-workspace__*")
@@ -82,7 +88,7 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     super(
       params,
       messageBus,
-      `${serverName}__${serverToolName}`,
+      `${serverName}${MCP_QUALIFIED_NAME_SEPARATOR}${serverToolName}`,
       displayName,
       serverName,
     );
@@ -239,12 +245,12 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     readonly serverToolName: string,
     description: string,
     override readonly parameterSchema: unknown,
+    messageBus: MessageBus,
     readonly trust?: boolean,
     nameOverride?: string,
     private readonly cliConfig?: Config,
     override readonly extensionName?: string,
     override readonly extensionId?: string,
-    messageBus?: MessageBus,
   ) {
     super(
       nameOverride ?? generateValidName(serverToolName),
@@ -252,16 +258,20 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       description,
       Kind.Other,
       parameterSchema,
+      messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput,
-      messageBus,
       extensionName,
       extensionId,
     );
   }
 
   getFullyQualifiedPrefix(): string {
-    return `${this.serverName}__`;
+    return `${this.serverName}${MCP_QUALIFIED_NAME_SEPARATOR}`;
+  }
+
+  getFullyQualifiedName(): string {
+    return `${this.getFullyQualifiedPrefix()}${generateValidName(this.serverToolName)}`;
   }
 
   asFullyQualifiedTool(): DiscoveredMCPTool {
@@ -271,18 +281,18 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.serverToolName,
       this.description,
       this.parameterSchema,
+      this.messageBus,
       this.trust,
-      `${this.getFullyQualifiedPrefix()}${this.serverToolName}`,
+      this.getFullyQualifiedName(),
       this.cliConfig,
       this.extensionName,
       this.extensionId,
-      this.messageBus,
     );
   }
 
   protected createInvocation(
     params: ToolParams,
-    _messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _displayName?: string,
   ): ToolInvocation<ToolParams, ToolResult> {
@@ -290,11 +300,11 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.mcpTool,
       this.serverName,
       this.serverToolName,
-      this.displayName,
+      _displayName ?? this.displayName,
+      messageBus,
       this.trust,
       params,
       this.cliConfig,
-      _messageBus,
     );
   }
 }

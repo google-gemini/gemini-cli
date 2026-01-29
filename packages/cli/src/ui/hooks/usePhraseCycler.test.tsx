@@ -11,7 +11,6 @@ import { Text } from 'ink';
 import {
   usePhraseCycler,
   PHRASE_CHANGE_INTERVAL_MS,
-  INTERACTIVE_SHELL_WAITING_PHRASE,
 } from './usePhraseCycler.js';
 import { INFORMATIVE_TIPS } from '../constants/tips.js';
 import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
@@ -21,20 +20,17 @@ const TestComponent = ({
   isActive,
   isWaiting,
   isInteractiveShellWaiting = false,
-  lastOutputTime = 0,
   customPhrases,
 }: {
   isActive: boolean;
   isWaiting: boolean;
   isInteractiveShellWaiting?: boolean;
-  lastOutputTime?: number;
   customPhrases?: string[];
 }) => {
   const phrase = usePhraseCycler(
     isActive,
     isWaiting,
     isInteractiveShellWaiting,
-    lastOutputTime,
     customPhrases,
   );
   return <Text>{phrase}</Text>;
@@ -65,11 +61,10 @@ describe('usePhraseCycler', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
-    expect(lastFrame()).toBe('Waiting for user confirmation...');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('should show interactive shell waiting message when isInteractiveShellWaiting is true after 5s', async () => {
-    vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
+  it('should show interactive shell waiting message immediately when isInteractiveShellWaiting is true', async () => {
     const { lastFrame, rerender } = render(
       <TestComponent isActive={true} isWaiting={false} />,
     );
@@ -78,90 +73,34 @@ describe('usePhraseCycler', () => {
         isActive={true}
         isWaiting={false}
         isInteractiveShellWaiting={true}
-        lastOutputTime={1}
       />,
     );
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
-    // Should still be showing a witty phrase or tip initially
-    expect([...WITTY_LOADING_PHRASES, ...INFORMATIVE_TIPS]).toContain(
-      lastFrame(),
-    );
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(5000);
-    });
-    expect(lastFrame()).toBe(INTERACTIVE_SHELL_WAITING_PHRASE);
+    expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('should reset interactive shell waiting timer when lastOutputTime changes', async () => {
-    vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
-    const { lastFrame, rerender } = render(
-      <TestComponent
-        isActive={true}
-        isWaiting={false}
-        isInteractiveShellWaiting={true}
-        lastOutputTime={1000}
-      />,
-    );
-
-    // Advance 3 seconds
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(3000);
-    });
-    // Should still be witty phrase or tip
-    expect([...WITTY_LOADING_PHRASES, ...INFORMATIVE_TIPS]).toContain(
-      lastFrame(),
-    );
-
-    // Update lastOutputTime
-    rerender(
-      <TestComponent
-        isActive={true}
-        isWaiting={false}
-        isInteractiveShellWaiting={true}
-        lastOutputTime={4000}
-      />,
-    );
-
-    // Advance another 3 seconds (total 6s from start, but only 3s from last output)
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(3000);
-    });
-    // Should STILL be witty phrase or tip because timer reset
-    expect([...WITTY_LOADING_PHRASES, ...INFORMATIVE_TIPS]).toContain(
-      lastFrame(),
-    );
-
-    // Advance another 2 seconds (total 5s from last output)
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(2000);
-    });
-    expect(lastFrame()).toBe(INTERACTIVE_SHELL_WAITING_PHRASE);
-  });
-
-  it('should prioritize interactive shell waiting over normal waiting after 5s', async () => {
+  it('should prioritize interactive shell waiting over normal waiting immediately', async () => {
     const { lastFrame, rerender } = render(
       <TestComponent isActive={true} isWaiting={true} />,
     );
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
-    expect(lastFrame()).toBe('Waiting for user confirmation...');
+    expect(lastFrame()).toMatchSnapshot();
 
     rerender(
       <TestComponent
         isActive={true}
         isWaiting={true}
         isInteractiveShellWaiting={true}
-        lastOutputTime={1}
       />,
     );
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(5000);
+      await vi.advanceTimersByTimeAsync(0);
     });
-    expect(lastFrame()).toBe(INTERACTIVE_SHELL_WAITING_PHRASE);
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('should not cycle phrases if isActive is false and not waiting', async () => {
@@ -380,7 +319,7 @@ describe('usePhraseCycler', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
-    expect(lastFrame()).toBe('Waiting for user confirmation...');
+    expect(lastFrame()).toMatchSnapshot();
 
     // Go back to active cycling - should pick a phrase based on the logic (witty due to mock)
     rerender(<TestComponent isActive={true} isWaiting={false} />);

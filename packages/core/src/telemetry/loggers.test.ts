@@ -17,6 +17,7 @@ import {
   ToolConfirmationOutcome,
   ToolErrorType,
   ToolRegistry,
+  type MessageBus,
 } from '../index.js';
 import { OutputFormat } from '../output/types.js';
 import { logs } from '@opentelemetry/api-logs';
@@ -94,6 +95,7 @@ import {
 import * as metrics from './metrics.js';
 import { FileOperation } from './metrics.js';
 import * as sdk from './sdk.js';
+import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { vi, describe, beforeEach, it, expect, afterEach } from 'vitest';
 import { type GeminiCLIExtension } from '../config/config.js';
 import {
@@ -108,6 +110,14 @@ import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
 import { UserAccountManager } from '../utils/userAccountManager.js';
 import { InstallationManager } from '../utils/installationManager.js';
 import { AgentTerminateMode } from '../agents/types.js';
+
+vi.mock('systeminformation', () => ({
+  default: {
+    graphics: vi.fn().mockResolvedValue({
+      controllers: [{ model: 'Mock GPU' }],
+    }),
+  },
+}));
 
 describe('loggers', () => {
   const mockLogger = {
@@ -999,7 +1009,8 @@ describe('loggers', () => {
         },
       }),
       getQuestion: () => 'test-question',
-      getToolRegistry: () => new ToolRegistry(cfg1),
+      getToolRegistry: () =>
+        new ToolRegistry(cfg1, {} as unknown as MessageBus),
 
       getUserMemory: () => 'user-memory',
     } as unknown as Config;
@@ -1031,7 +1042,7 @@ describe('loggers', () => {
     });
 
     it('should log a tool call with all fields', () => {
-      const tool = new EditTool(mockConfig);
+      const tool = new EditTool(mockConfig, createMockMessageBus());
       const call: CompletedToolCall = {
         status: 'success',
         request: {
@@ -1050,6 +1061,7 @@ describe('loggers', () => {
           resultDisplay: {
             fileDiff: 'diff',
             fileName: 'file.txt',
+            filePath: 'file.txt',
             originalContent: 'old content',
             newContent: 'new content',
             diffStat: {
@@ -1247,7 +1259,7 @@ describe('loggers', () => {
           contentLength: 13,
         },
         outcome: ToolConfirmationOutcome.ModifyWithEditor,
-        tool: new EditTool(mockConfig),
+        tool: new EditTool(mockConfig, createMockMessageBus()),
         invocation: {} as AnyToolInvocation,
         durationMs: 100,
       };
@@ -1326,7 +1338,7 @@ describe('loggers', () => {
           errorType: undefined,
           contentLength: 13,
         },
-        tool: new EditTool(mockConfig),
+        tool: new EditTool(mockConfig, createMockMessageBus()),
         invocation: {} as AnyToolInvocation,
         durationMs: 100,
       };
@@ -1478,6 +1490,7 @@ describe('loggers', () => {
           },
           required: ['arg1', 'arg2'],
         },
+        createMockMessageBus(),
         false,
         undefined,
         undefined,
@@ -1748,7 +1761,6 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       getContentGeneratorConfig: () => null,
-      getUseSmartEdit: () => null,
       isInteractive: () => false,
     } as unknown as Config;
 
@@ -1799,7 +1811,6 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       getContentGeneratorConfig: () => null,
-      getUseSmartEdit: () => null,
       isInteractive: () => false,
     } as unknown as Config;
 
@@ -1852,7 +1863,6 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       getContentGeneratorConfig: () => null,
-      getUseSmartEdit: () => null,
       isInteractive: () => false,
     } as unknown as Config;
 

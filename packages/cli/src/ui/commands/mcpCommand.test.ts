@@ -13,10 +13,10 @@ import {
   getMCPServerStatus,
   getMCPDiscoveryState,
   DiscoveredMCPTool,
+  type MessageBus,
 } from '@google/gemini-cli-core';
 
 import type { CallableTool } from '@google/genai';
-import { Type } from '@google/genai';
 import { MessageType } from '../types.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -37,6 +37,12 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
+const mockMessageBus = {
+  publish: vi.fn(),
+  subscribe: vi.fn(),
+  unsubscribe: vi.fn(),
+} as unknown as MessageBus;
+
 // Helper function to create a mock DiscoveredMCPTool
 const createMockMCPTool = (
   name: string,
@@ -50,8 +56,14 @@ const createMockMCPTool = (
     } as unknown as CallableTool,
     serverName,
     name,
-    description || `Description for ${name}`,
-    { type: Type.OBJECT, properties: {} },
+    description || 'Mock tool description',
+    { type: 'object', properties: {} },
+    mockMessageBus,
+    undefined, // trust
+    undefined, // nameOverride
+    undefined, // cliConfig
+    undefined, // extensionName
+    undefined, // extensionId
   );
 
 describe('mcpCommand', () => {
@@ -219,7 +231,6 @@ describe('mcpCommand', () => {
             }),
           ]),
         }),
-        expect.any(Number),
       );
     });
 
@@ -234,7 +245,6 @@ describe('mcpCommand', () => {
           type: MessageType.MCP_STATUS,
           showDescriptions: true,
         }),
-        expect.any(Number),
       );
     });
 
@@ -249,7 +259,6 @@ describe('mcpCommand', () => {
           type: MessageType.MCP_STATUS,
           showDescriptions: false,
         }),
-        expect.any(Number),
       );
     });
   });

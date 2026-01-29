@@ -13,7 +13,7 @@ import { ApprovalMode } from '../policy/types.js';
 
 import { ToolRegistry, DiscoveredTool } from './tool-registry.js';
 import { DISCOVERED_TOOL_PREFIX } from './tool-names.js';
-import { DiscoveredMCPTool } from './mcp-tool.js';
+import { DiscoveredMCPTool, MCP_QUALIFIED_NAME_SEPARATOR } from './mcp-tool.js';
 import type { FunctionDeclaration, CallableTool } from '@google/genai';
 import { mcpToTool } from '@google/genai';
 import { spawn } from 'node:child_process';
@@ -90,12 +90,26 @@ const createMockCallableTool = (
 });
 
 // Helper to create a DiscoveredMCPTool
+const mockMessageBusForHelper = {
+  publish: vi.fn(),
+  subscribe: vi.fn(),
+  unsubscribe: vi.fn(),
+} as unknown as MessageBus;
+
 const createMCPTool = (
   serverName: string,
   toolName: string,
   description: string,
   mockCallable: CallableTool = {} as CallableTool,
-) => new DiscoveredMCPTool(mockCallable, serverName, toolName, description, {});
+) =>
+  new DiscoveredMCPTool(
+    mockCallable,
+    serverName,
+    toolName,
+    description,
+    {},
+    mockMessageBusForHelper,
+  );
 
 // Helper to create a mock spawn process for tool discovery
 const createDiscoveryProcess = (toolDeclarations: FunctionDeclaration[]) => {
@@ -171,6 +185,11 @@ const baseConfigParams: ConfigParameters = {
 describe('ToolRegistry', () => {
   let config: Config;
   let toolRegistry: ToolRegistry;
+  const mockMessageBus = {
+    publish: vi.fn(),
+    subscribe: vi.fn(),
+    unsubscribe: vi.fn(),
+  } as unknown as MessageBus;
   let mockConfigGetToolDiscoveryCommand: ReturnType<typeof vi.spyOn>;
   let mockConfigGetExcludedTools: MockInstance<
     typeof Config.prototype.getExcludeTools
@@ -182,7 +201,7 @@ describe('ToolRegistry', () => {
       isDirectory: () => true,
     } as fs.Stats);
     config = new Config(baseConfigParams);
-    toolRegistry = new ToolRegistry(config);
+    toolRegistry = new ToolRegistry(config, mockMessageBus);
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'debug').mockImplementation(() => {});
@@ -372,6 +391,7 @@ describe('ToolRegistry', () => {
         DISCOVERED_TOOL_PREFIX + 'discovered-1',
         'desc',
         {},
+        mockMessageBus,
       );
       const mcpZebra = createMCPTool('zebra-server', 'mcp-zebra', 'desc');
       const mcpApple = createMCPTool('apple-server', 'mcp-apple', 'desc');
@@ -482,13 +502,6 @@ describe('ToolRegistry', () => {
       const discoveryCommand = 'my-discovery-command';
       mockConfigGetToolDiscoveryCommand.mockReturnValue(discoveryCommand);
 
-      const mockMessageBus = {
-        publish: vi.fn(),
-        subscribe: vi.fn(),
-        unsubscribe: vi.fn(),
-      } as unknown as MessageBus;
-      toolRegistry.setMessageBus(mockMessageBus);
-
       const toolDeclaration: FunctionDeclaration = {
         name: 'policy-test-tool',
         description: 'tests policy',
@@ -512,6 +525,67 @@ describe('ToolRegistry', () => {
     });
   });
 
+  describe('getTool', () => {
+    it('should retrieve an MCP tool by its fully qualified name even if registered with simple name', () => {
+      const serverName = 'my-server';
+      const toolName = 'my-tool';
+      const mcpTool = createMCPTool(serverName, toolName, 'description');
+
+      // Register tool (will be registered as 'my-tool' since no conflict)
+      toolRegistry.registerTool(mcpTool);
+
+      // Verify it is available as 'my-tool'
+      expect(toolRegistry.getTool('my-tool')).toBeDefined();
+      expect(toolRegistry.getTool('my-tool')?.name).toBe('my-tool');
+
+      // Verify it is available as 'my-server__my-tool'
+      const fullyQualifiedName = `${serverName}__${toolName}`;
+      const retrievedTool = toolRegistry.getTool(fullyQualifiedName);
+
+      expect(retrievedTool).toBeDefined();
+      // The returned tool object is the same, so its name property is still 'my-tool'
+      expect(retrievedTool?.name).toBe('my-tool');
+    });
+
+    it('should retrieve an MCP tool by its fully qualified name when tool name has special characters', () => {
+      const serverName = 'my-server';
+      // Use a space which is invalid and will be replaced by underscore
+      const toolName = 'my tool';
+      const validToolName = 'my_tool';
+      const mcpTool = createMCPTool(serverName, toolName, 'description');
+
+      // Register tool (will be registered as sanitized name)
+      toolRegistry.registerTool(mcpTool);
+
+      // Verify it is available as sanitized name
+      expect(toolRegistry.getTool(validToolName)).toBeDefined();
+      expect(toolRegistry.getTool(validToolName)?.name).toBe(validToolName);
+
+      // Verify it is available as 'my-server__my_tool'
+      const fullyQualifiedName = `${serverName}__${validToolName}`;
+      const retrievedTool = toolRegistry.getTool(fullyQualifiedName);
+
+      expect(retrievedTool).toBeDefined();
+      expect(retrievedTool?.name).toBe(validToolName);
+    });
+
+    it('should resolve qualified names in getFunctionDeclarationsFiltered', () => {
+      const serverName = 'my-server';
+      const toolName = 'my-tool';
+      const mcpTool = createMCPTool(serverName, toolName, 'description');
+
+      toolRegistry.registerTool(mcpTool);
+
+      const fullyQualifiedName = `${serverName}${MCP_QUALIFIED_NAME_SEPARATOR}${toolName}`;
+      const declarations = toolRegistry.getFunctionDeclarationsFiltered([
+        fullyQualifiedName,
+      ]);
+
+      expect(declarations).toHaveLength(1);
+      expect(declarations[0].name).toBe(toolName);
+    });
+  });
+
   describe('DiscoveredToolInvocation', () => {
     it('should return the stringified params from getDescription', () => {
       const tool = new DiscoveredTool(
@@ -520,6 +594,7 @@ describe('ToolRegistry', () => {
         DISCOVERED_TOOL_PREFIX + 'test-tool',
         'A test tool',
         {},
+        mockMessageBus,
       );
       const params = { param: 'testValue' };
       const invocation = tool.build(params);
