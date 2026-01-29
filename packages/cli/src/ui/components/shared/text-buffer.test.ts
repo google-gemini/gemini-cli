@@ -27,6 +27,9 @@ import {
   textBufferReducer,
   findWordEndInLine,
   findNextWordStartInLine,
+  findNextBigWordStartInLine,
+  findPrevBigWordStartInLine,
+  findBigWordEndInLine,
   isWordCharStrict,
   calculateTransformationsForLine,
   calculateTransformedLine,
@@ -85,6 +88,43 @@ describe('textBufferReducer', () => {
     const state = textBufferReducer(initialState, action);
     expect(state).toHaveOnlyValidCharacters();
     expect(state).toEqual(initialState);
+  });
+
+  describe('Big Word Navigation Helpers', () => {
+    describe('findNextBigWordStartInLine (W)', () => {
+      it('should skip non-whitespace and then whitespace', () => {
+        expect(findNextBigWordStartInLine('hello world', 0)).toBe(6);
+        expect(findNextBigWordStartInLine('hello.world test', 0)).toBe(12);
+        expect(findNextBigWordStartInLine('   test', 0)).toBe(3);
+        expect(findNextBigWordStartInLine('test   ', 0)).toBe(null);
+      });
+    });
+
+    describe('findPrevBigWordStartInLine (B)', () => {
+      it('should skip whitespace backwards then non-whitespace', () => {
+        expect(findPrevBigWordStartInLine('hello world', 6)).toBe(0);
+        expect(findPrevBigWordStartInLine('hello.world test', 12)).toBe(0);
+        expect(findPrevBigWordStartInLine('   test', 3)).toBe(null); // At start of word
+        expect(findPrevBigWordStartInLine('   test', 4)).toBe(3); // Inside word
+        expect(findPrevBigWordStartInLine('test   ', 6)).toBe(0);
+      });
+    });
+
+    describe('findBigWordEndInLine (E)', () => {
+      it('should find end of current big word', () => {
+        expect(findBigWordEndInLine('hello world', 0)).toBe(4);
+        expect(findBigWordEndInLine('hello.world test', 0)).toBe(10);
+        expect(findBigWordEndInLine('hello.world test', 11)).toBe(15);
+      });
+
+      it('should skip whitespace if currently on whitespace', () => {
+        expect(findBigWordEndInLine('hello   world', 5)).toBe(12);
+      });
+
+      it('should find next big word end if at end of current', () => {
+        expect(findBigWordEndInLine('hello world', 4)).toBe(10);
+      });
+    });
   });
 
   describe('set_text action', () => {
