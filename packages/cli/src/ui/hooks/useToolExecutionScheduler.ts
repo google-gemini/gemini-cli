@@ -16,6 +16,7 @@ import {
   Scheduler,
   type EditorType,
   type ToolCallsUpdateMessage,
+  ROOT_SCHEDULER_ID,
 } from '@google/gemini-cli-core';
 import { useCallback, useState, useMemo, useEffect, useRef } from 'react';
 
@@ -54,8 +55,10 @@ export function useToolExecutionScheduler(
   CancelAllFn,
   number,
 ] {
-  // State stores Core objects, not Display objects
-  const [toolCalls, setToolCalls] = useState<TrackedToolCall[]>([]);
+  // State stores tool calls organized by their originating schedulerId
+  const [toolCallsMap, setToolCallsMap] = useState<
+    Record<string, TrackedToolCall[]>
+  >({});
   const [lastToolOutputTime, setLastToolOutputTime] = useState<number>(0);
 
   const messageBus = useMemo(() => config.getMessageBus(), [config]);
@@ -76,6 +79,7 @@ export function useToolExecutionScheduler(
         config,
         messageBus,
         getPreferredEditor: () => getPreferredEditorRef.current(),
+        schedulerId: ROOT_SCHEDULER_ID,
       }),
     [config, messageBus],
   );
@@ -88,15 +92,21 @@ export function useToolExecutionScheduler(
 
   useEffect(() => {
     const handler = (event: ToolCallsUpdateMessage) => {
-      setToolCalls((prev) => {
-        const adapted = internalAdaptToolCalls(event.toolCalls, prev);
+      // Update output timer for UI spinners (Side Effect)
+      if (event.toolCalls.some((tc) => tc.status === 'executing')) {
+        setLastToolOutputTime(Date.now());
+      }
 
-        // Update output timer for UI spinners
-        if (event.toolCalls.some((tc) => tc.status === 'executing')) {
-          setLastToolOutputTime(Date.now());
-        }
+      setToolCallsMap((prev) => {
+        const adapted = internalAdaptToolCalls(
+          event.toolCalls,
+          prev[event.schedulerId] ?? [],
+        );
 
-        return adapted;
+        return {
+          ...prev,
+          [event.schedulerId]: adapted,
+        };
       });
     };
 
@@ -109,12 +119,14 @@ export function useToolExecutionScheduler(
   const schedule: ScheduleFn = useCallback(
     async (request, signal) => {
       // Clear state for new run
-      setToolCalls([]);
+      setToolCallsMap({});
 
       // 1. Await Core Scheduler directly
       const results = await scheduler.schedule(request, signal);
 
       // 2. Trigger legacy reinjection logic (useGeminiStream loop)
+      // Since this hook instance owns the "root" scheduler, we always trigger
+      // onComplete when it finishes its batch.
       await onCompleteRef.current(results);
 
       return results;
@@ -131,13 +143,52 @@ export function useToolExecutionScheduler(
 
   const markToolsAsSubmitted: MarkToolsAsSubmittedFn = useCallback(
     (callIdsToMark: string[]) => {
-      setToolCalls((prevCalls) =>
-        prevCalls.map((tc) =>
-          callIdsToMark.includes(tc.request.callId)
-            ? { ...tc, responseSubmittedToGemini: true }
-            : tc,
-        ),
-      );
+      setToolCallsMap((prevMap) => {
+        const nextMap = { ...prevMap };
+        for (const [sid, calls] of Object.entries(nextMap)) {
+          nextMap[sid] = calls.map((tc) =>
+            callIdsToMark.includes(tc.request.callId)
+              ? { ...tc, responseSubmittedToGemini: true }
+              : tc,
+          );
+        }
+        return nextMap;
+      });
+    },
+    [],
+  );
+
+  // Flatten the map for the UI components that expect a single list of tools.
+  const toolCalls = useMemo(
+    () => Object.values(toolCallsMap).flat(),
+    [toolCallsMap],
+  );
+
+  // Provide a setter that maintains compatibility with legacy [].
+  const setToolCallsForDisplay = useCallback(
+    (action: React.SetStateAction<TrackedToolCall[]>) => {
+      setToolCallsMap((prev) => {
+        const currentFlattened = Object.values(prev).flat();
+        const nextFlattened =
+          typeof action === 'function' ? action(currentFlattened) : action;
+
+        if (nextFlattened.length === 0) {
+          return {};
+        }
+
+        // Re-group by schedulerId to preserve multi-scheduler state
+        const nextMap: Record<string, TrackedToolCall[]> = {};
+        for (const call of nextFlattened) {
+          // All tool calls should have a schedulerId from the core.
+          // Default to ROOT_SCHEDULER_ID as a safeguard.
+          const sid = call.schedulerId ?? ROOT_SCHEDULER_ID;
+          if (!nextMap[sid]) {
+            nextMap[sid] = [];
+          }
+          nextMap[sid].push(call);
+        }
+        return nextMap;
+      });
     },
     [],
   );
@@ -146,7 +197,7 @@ export function useToolExecutionScheduler(
     toolCalls,
     schedule,
     markToolsAsSubmitted,
-    setToolCalls,
+    setToolCallsForDisplay,
     cancelAll,
     lastToolOutputTime,
   ];

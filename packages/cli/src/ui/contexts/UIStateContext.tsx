@@ -94,6 +94,7 @@ export interface UIState {
   inputWidth: number;
   suggestionsWidth: number;
   isInputActive: boolean;
+  isResuming: boolean;
   shouldShowIdePrompt: boolean;
   isFolderTrustDialogOpen: boolean;
   isTrustedFolder: boolean | undefined;
@@ -154,6 +155,7 @@ export interface UIState {
   terminalBackgroundColor: TerminalBackgroundColor;
   settingsNonce: number;
   adminSettingsChanged: boolean;
+  newAgents: AgentDefinition[] | null;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);

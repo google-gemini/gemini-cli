@@ -244,8 +244,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Show the model name in the chat for each model turn.
   - **Default:** `false`
 
-- **`ui.useFullWidth`** (boolean):
-  - **Description:** Use the entire width of the terminal for output.
+- **`ui.showUserIdentity`** (boolean):
+  - **Description:** Show the logged-in user's identity (e.g. email) in the UI.
   - **Default:** `true`
 
 - **`ui.useAlternateBuffer`** (boolean):
@@ -254,12 +254,20 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`ui.useBackgroundColor`** (boolean):
+  - **Description:** Whether to use background colors in the UI.
+  - **Default:** `true`
+
 - **`ui.incrementalRendering`** (boolean):
   - **Description:** Enable incremental rendering for the UI. This option will
     reduce flickering but may cause rendering artifacts. Only supported when
     useAlternateBuffer is enabled.
   - **Default:** `true`
   - **Requires restart:** Yes
+
+- **`ui.showSpinner`** (boolean):
+  - **Description:** Show the spinner during operations.
+  - **Default:** `true`
 
 - **`ui.customWittyPhrases`** (array):
   - **Description:** Custom witty phrases to display during loading. When
@@ -612,6 +620,14 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
+- **`context.fileFiltering.customIgnoreFilePaths`** (array):
+  - **Description:** Additional ignore file paths to respect. These files take
+    precedence over .geminiignore and .gitignore. Files earlier in the array
+    take precedence over files later in the array, e.g. the first file takes
+    precedence over the second one.
+  - **Default:** `[]`
+  - **Requires restart:** Yes
+
 #### `tools`
 
 - **`tools.sandbox`** (boolean | string):
@@ -857,11 +873,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
-- **`experimental.skills`** (boolean):
-  - **Description:** Enable Agent Skills (experimental).
-  - **Default:** `false`
-  - **Requires restart:** Yes
-
 - **`experimental.useOSC52Paste`** (boolean):
   - **Description:** Use OSC 52 sequence for pasting instead of clipboardy
     (useful for remote sessions).
@@ -873,6 +884,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 #### `skills`
+
+- **`skills.enabled`** (boolean):
+  - **Description:** Enable Agent Skills.
+  - **Default:** `true`
+  - **Requires restart:** Yes
 
 - **`skills.disabled`** (array):
   - **Description:** List of disabled skills.
