@@ -14,6 +14,7 @@
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
+console.log("Hello World");
 async function main() {
   const argv = await yargs(hideBin(process.argv))
     .option('original-pr', {
