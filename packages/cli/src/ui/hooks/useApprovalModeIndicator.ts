@@ -49,7 +49,7 @@ export function useApprovalModeIndicator({
             let text =
               'You cannot enter YOLO mode since it is disabled in your settings.';
 
-            if (adminSettings?.secureModeEnabled) {
+            if (!adminSettings?.strictModeDisabled) {
               text = getAdminErrorMessage('YOLO mode', config);
             }
 
