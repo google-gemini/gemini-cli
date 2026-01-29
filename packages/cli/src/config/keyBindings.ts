@@ -72,6 +72,9 @@ export enum Command {
   OPEN_EXTERNAL_EDITOR = 'input.openExternalEditor',
   PASTE_CLIPBOARD = 'input.paste',
 
+  TOGGLE_BACKGROUND_SHELL = 'toggleBackgroundShell',
+  TOGGLE_BACKGROUND_SHELL_LIST = 'toggleBackgroundShellList',
+
   // App Controls
   SHOW_ERROR_DETAILS = 'app.showErrorDetails',
   SHOW_FULL_TODOS = 'app.showFullTodos',
@@ -139,7 +142,6 @@ export const defaultKeyBindings: KeyBindingConfig = {
   ],
   [Command.MOVE_LEFT]: [
     { key: 'left', shift: false, alt: false, ctrl: false, cmd: false },
-    { key: 'b', ctrl: true },
   ],
   [Command.MOVE_RIGHT]: [
     { key: 'right', shift: false, alt: false, ctrl: false, cmd: false },
@@ -265,6 +267,8 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.TOGGLE_COPY_MODE]: [{ key: 's', ctrl: true }],
   [Command.TOGGLE_YOLO]: [{ key: 'y', ctrl: true }],
   [Command.CYCLE_APPROVAL_MODE]: [{ key: 'tab', shift: true }],
+  [Command.TOGGLE_BACKGROUND_SHELL]: [{ key: 'b', ctrl: true }],
+  [Command.TOGGLE_BACKGROUND_SHELL_LIST]: [{ key: 'l', ctrl: true }],
   [Command.SHOW_MORE_LINES]: [
     { key: 'o', ctrl: true },
     { key: 's', ctrl: true },
@@ -379,6 +383,8 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.TOGGLE_YOLO,
       Command.CYCLE_APPROVAL_MODE,
       Command.SHOW_MORE_LINES,
+      Command.TOGGLE_BACKGROUND_SHELL,
+      Command.TOGGLE_BACKGROUND_SHELL_LIST,
       Command.FOCUS_SHELL_INPUT,
       Command.UNFOCUS_SHELL_INPUT,
       Command.CLEAR_SCREEN,
@@ -470,6 +476,10 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
     'Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only).',
   [Command.SHOW_MORE_LINES]:
     'Expand a height-constrained response to show additional lines when not in alternate buffer mode.',
+  [Command.TOGGLE_BACKGROUND_SHELL]:
+    'Move current shell command to background or toggle background shell view.',
+  [Command.TOGGLE_BACKGROUND_SHELL_LIST]:
+    'Toggle the list of background shell processes.',
   [Command.FOCUS_SHELL_INPUT]: 'Focus the shell input from the gemini input.',
   [Command.UNFOCUS_SHELL_INPUT]: 'Focus the Gemini input from the shell input.',
   [Command.CLEAR_SCREEN]: 'Clear the terminal screen and redraw the UI.',
