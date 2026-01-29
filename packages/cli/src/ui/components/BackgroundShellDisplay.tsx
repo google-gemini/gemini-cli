@@ -43,7 +43,6 @@ interface BackgroundShellDisplayProps {
 const CONTENT_PADDING_X = 1;
 const BORDER_WIDTH = 2; // Left and Right border
 const HEADER_HEIGHT = 3; // 2 for border, 1 for header
-const TAB_PADDING = 2; // Spaces around tab text
 const TAB_DISPLAY_HORIZONTAL_PADDING = 4;
 
 const formatShellCommandForDisplay = (command: string, maxWidth: number) => {
@@ -165,7 +164,7 @@ export const BackgroundShellDisplay = ({
         // We only handle special keys not consumed by RadioButtonSelect or overriding them if needed
         // RadioButtonSelect handles Enter -> onSelect
 
-        if (keyMatchers[Command.ESCAPE](key)) {
+        if (keyMatchers[Command.BACKGROUND_SHELL_ESCAPE](key)) {
           setIsBackgroundShellListOpen(false);
           return true;
         }
@@ -202,7 +201,7 @@ export const BackgroundShellDisplay = ({
         return true;
       }
 
-      if (keyMatchers[Command.RETURN](key)) {
+      if (keyMatchers[Command.BACKGROUND_SHELL_SELECT](key)) {
         ShellExecutionService.writeToPty(activeShell.pid, '\r');
         return true;
       } else if (keyMatchers[Command.DELETE_CHAR_LEFT](key)) {
@@ -217,12 +216,12 @@ export const BackgroundShellDisplay = ({
     { isActive: isFocused && !!activeShell },
   );
 
+  const helpText = `${commandDescriptions[Command.TOGGLE_BACKGROUND_SHELL]} Hide | ${commandDescriptions[Command.KILL_BACKGROUND_SHELL]} Kill | ${commandDescriptions[Command.TOGGLE_BACKGROUND_SHELL_LIST]} List`;
+
   const renderTabs = () => {
     const shellList = Array.from(shells.values()).filter(
       (s) => s.status === 'running',
     );
-
-    const helpText = `${commandDescriptions[Command.TOGGLE_BACKGROUND_SHELL]} Hide | ${commandDescriptions[Command.KILL_BACKGROUND_SHELL]} Kill | ${commandDescriptions[Command.TOGGLE_BACKGROUND_SHELL_LIST]} List`;
 
     const pidInfoWidth = getCachedStringWidth(
       ` (PID: ${activePid}) ${isFocused ? '(Focused)' : ''}`,
@@ -236,13 +235,14 @@ export const BackgroundShellDisplay = ({
 
     let currentWidth = 0;
     const tabs = [];
-    let overflow = false;
 
     for (let i = 0; i < shellList.length; i++) {
       const shell = shellList[i];
+      // Account for " i: " (length 4 if i < 9) and spaces (length 2)
+      const labelOverhead = 4 + (i + 1).toString().length;
       const maxTabLabelLength = Math.max(
         1,
-        Math.floor(availableWidth / shellList.length) - TAB_PADDING,
+        Math.floor(availableWidth / shellList.length) - labelOverhead,
       );
       const truncatedCommand = formatShellCommandForDisplay(
         shell.command,
@@ -251,8 +251,9 @@ export const BackgroundShellDisplay = ({
       const label = ` ${i + 1}: ${truncatedCommand} `;
       const labelWidth = getCachedStringWidth(label);
 
-      if (currentWidth + labelWidth > availableWidth) {
-        overflow = true;
+      // If this is the only shell, we MUST show it (truncated if necessary)
+      // even if it exceeds availableWidth, as there are no alternatives.
+      if (i > 0 && currentWidth + labelWidth > availableWidth) {
         break;
       }
 
@@ -270,12 +271,22 @@ export const BackgroundShellDisplay = ({
       currentWidth += labelWidth;
     }
 
-    if (overflow) {
-      tabs.push(
-        <Text key="overflow" color={theme.status.warning} bold>
-          {` ... (${commandDescriptions[Command.TOGGLE_BACKGROUND_SHELL_LIST]}) `}
-        </Text>,
-      );
+    if (shellList.length > tabs.length && !isListOpenProp) {
+      const overflowLabel = ` ... (${commandDescriptions[Command.TOGGLE_BACKGROUND_SHELL_LIST]}) `;
+      const overflowWidth = getCachedStringWidth(overflowLabel);
+
+      // If we only have one tab, ensure we don't show the overflow if it's too cramped
+      // We want at least 10 chars for the overflow or we favor the first tab.
+      const shouldShowOverflow =
+        tabs.length > 1 || availableWidth - currentWidth >= overflowWidth;
+
+      if (shouldShowOverflow) {
+        tabs.push(
+          <Text key="overflow" color={theme.status.warning} bold>
+            {overflowLabel}
+          </Text>,
+        );
+      }
     }
 
     return tabs;
@@ -412,8 +423,6 @@ export const BackgroundShellDisplay = ({
       />
     );
   };
-
-  const helpText = `${commandDescriptions[Command.TOGGLE_BACKGROUND_SHELL]} Hide | ${commandDescriptions[Command.KILL_BACKGROUND_SHELL]} Kill | ${commandDescriptions[Command.TOGGLE_BACKGROUND_SHELL_LIST]} List`;
 
   return (
     <Box

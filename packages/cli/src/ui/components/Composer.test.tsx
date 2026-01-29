@@ -131,6 +131,8 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     nightly: false,
     isTrustedFolder: true,
     activeHooks: [],
+    isBackgroundShellVisible: false,
+    embeddedShellFocused: false,
     ...overrides,
   }) as UIState;
 
@@ -307,6 +309,32 @@ describe('Composer', () => {
       const output = lastFrame();
       expect(output).toContain('LoadingIndicator');
       expect(output).not.toContain('Should not show during confirmation');
+    });
+
+    it('renders LoadingIndicator when embedded shell is focused but background shell is visible', () => {
+      const uiState = createMockUIState({
+        streamingState: StreamingState.Responding,
+        embeddedShellFocused: true,
+        isBackgroundShellVisible: true,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      const output = lastFrame();
+      expect(output).toContain('LoadingIndicator');
+    });
+
+    it('does NOT render LoadingIndicator when embedded shell is focused and background shell is NOT visible', () => {
+      const uiState = createMockUIState({
+        streamingState: StreamingState.Responding,
+        embeddedShellFocused: true,
+        isBackgroundShellVisible: false,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      const output = lastFrame();
+      expect(output).not.toContain('LoadingIndicator');
     });
   });
 

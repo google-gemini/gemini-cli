@@ -109,6 +109,8 @@ available combinations.
 | Ctrl+B                                                                                                | `Ctrl + B`                 |
 | Ctrl+L                                                                                                | `Ctrl + L`                 |
 | Ctrl+K                                                                                                | `Ctrl + K`                 |
+| Enter                                                                                                 | `Enter`                    |
+| Esc                                                                                                   | `Esc`                      |
 | Shift+Tab                                                                                             | `Shift + Tab`              |
 | Tab                                                                                                   | `Tab (no Shift)`           |
 | Tab                                                                                                   | `Tab (no Shift)`           |

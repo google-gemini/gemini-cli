@@ -192,6 +192,12 @@ export const useShellCommandProcessor = (
     if (pidToBackground) {
       ShellExecutionService.background(pidToBackground);
       m.backgroundedPids.add(pidToBackground);
+      // Ensure backgrounding is silent and doesn't trigger restoration
+      m.wasVisibleBeforeForeground = false;
+      if (m.restoreTimeout) {
+        clearTimeout(m.restoreTimeout);
+        m.restoreTimeout = null;
+      }
     }
   }, [state.activeShellPtyId, activeToolPtyId, m]);
 

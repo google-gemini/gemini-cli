@@ -281,6 +281,8 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING]: [
     { key: 'tab', shift: false },
   ],
+  [Command.BACKGROUND_SHELL_SELECT]: [{ key: 'return' }],
+  [Command.BACKGROUND_SHELL_ESCAPE]: [{ key: 'escape' }],
   [Command.SHOW_MORE_LINES]: [
     { key: 'o', ctrl: true },
     { key: 's', ctrl: true },
@@ -398,6 +400,8 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.TOGGLE_BACKGROUND_SHELL,
       Command.TOGGLE_BACKGROUND_SHELL_LIST,
       Command.KILL_BACKGROUND_SHELL,
+      Command.BACKGROUND_SHELL_SELECT,
+      Command.BACKGROUND_SHELL_ESCAPE,
       Command.UNFOCUS_BACKGROUND_SHELL,
       Command.UNFOCUS_BACKGROUND_SHELL_LIST,
       Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING,

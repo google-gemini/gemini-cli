@@ -17,13 +17,10 @@ import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { CopyModeWarning } from '../components/CopyModeWarning.js';
 import { BackgroundShellDisplay } from '../components/BackgroundShellDisplay.js';
 import { StreamingState } from '../types.js';
-import { LoadingIndicator } from '../components/LoadingIndicator.js';
-import { useConfig } from '../contexts/ConfigContext.js';
 
 export const DefaultAppLayout: React.FC = () => {
   const uiState = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
-  const config = useConfig();
 
   const { rootUiRef, terminalHeight } = uiState;
   useFlickerDetector(rootUiRef, terminalHeight);
@@ -42,7 +39,8 @@ export const DefaultAppLayout: React.FC = () => {
     >
       <MainContent />
 
-      {uiState.backgroundShells.size > 0 &&
+      {uiState.isBackgroundShellVisible &&
+        uiState.backgroundShells.size > 0 &&
         uiState.activeBackgroundShellPid &&
         uiState.backgroundShellHeight > 0 &&
         uiState.streamingState !== StreamingState.WaitingForConfirmation && (
@@ -66,20 +64,6 @@ export const DefaultAppLayout: React.FC = () => {
         flexGrow={0}
         width={uiState.terminalWidth}
       >
-        <LoadingIndicator
-          thought={
-            uiState.streamingState === StreamingState.WaitingForConfirmation ||
-            config.getAccessibility()?.enableLoadingPhrases === false
-              ? undefined
-              : uiState.thought
-          }
-          currentLoadingPhrase={
-            config.getAccessibility()?.enableLoadingPhrases === false
-              ? undefined
-              : uiState.currentLoadingPhrase
-          }
-          elapsedTime={uiState.elapsedTime}
-        />
         <Notifications />
         <CopyModeWarning />
 

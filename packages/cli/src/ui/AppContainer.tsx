@@ -1599,7 +1599,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         const now = Date.now();
         // If the shell hasn't produced output in the last 100ms, it's considered idle.
         const isIdle = now - lastOutputTimeRef.current >= 100;
-        if (isIdle) {
+        if (isIdle && !activePtyId) {
           if (tabFocusTimeoutRef.current) {
             clearTimeout(tabFocusTimeoutRef.current);
           }
@@ -1637,10 +1637,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
           if (isBackgroundShellVisible && !embeddedShellFocused) {
             setEmbeddedShellFocused(true);
           } else {
-            const wasVisible = isBackgroundShellVisible;
             toggleBackgroundShell();
             // Toggle focus based on intent: if we were hiding, unfocus; if showing, focus.
-            if (!wasVisible && backgroundShells.size > 0) {
+            if (!isBackgroundShellVisible && backgroundShells.size > 0) {
               setEmbeddedShellFocused(true);
               if (backgroundShells.size > 1) {
                 setIsBackgroundShellListOpen(true);
@@ -1969,6 +1968,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       extensionsUpdateState,
       activePtyId,
       backgroundShellCount,
+      isBackgroundShellVisible,
       embeddedShellFocused,
       showDebugProfiler,
       customDialog,
@@ -2072,6 +2072,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       extensionsUpdateState,
       activePtyId,
       backgroundShellCount,
+      isBackgroundShellVisible,
       historyManager,
       embeddedShellFocused,
       showDebugProfiler,

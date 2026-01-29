@@ -34,6 +34,7 @@ const mockUIState = {
   constrainHeight: false,
   availableTerminalHeight: 20,
   activePtyId: null,
+  isBackgroundShellVisible: true,
 } as unknown as UIState;
 
 vi.mock('../contexts/UIStateContext.js', () => ({
