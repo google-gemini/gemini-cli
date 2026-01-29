@@ -9,6 +9,7 @@ import { crawl } from '../utils/filesearch/crawler.js';
 import { loadIgnoreRules } from '../utils/filesearch/ignore.js';
 import type { FileDiscoveryService } from './fileDiscoveryService.js';
 import fastLevenshtein from 'fast-levenshtein';
+import { LRUCache } from 'mnemonist';
 const { get } = fastLevenshtein;
 
 export interface SearchResult {
@@ -22,10 +23,30 @@ export class FuzzySearchService {
   /**
    * Searches for files matching the query string using fuzzy matching.
    */
+  private readonly cache = new LRUCache<string, SearchResult[]>(100);
+
+  /**
+   * Searches for files matching the query string using fuzzy matching.
+   */
   async search(
     query: string,
     maxResults: number = 20,
   ): Promise<SearchResult[]> {
+    if (!query?.trim()) {
+      return [];
+    }
+
+    // Limit query length to prevent expensive calculations
+    const MAX_QUERY_LENGTH = 500;
+    const normalizedQuery = query.slice(0, MAX_QUERY_LENGTH).toLowerCase();
+
+    // Check cache first
+    const cacheKey = `${normalizedQuery}:${maxResults}`;
+    const cached = this.cache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const ignore = loadIgnoreRules(this.fileDiscoveryService);
     const root = this.fileDiscoveryService.getTargetDir();
 
@@ -35,9 +56,9 @@ export class FuzzySearchService {
       ignore,
       cache: true,
       cacheTtl: 60, // 1 minute cache
+      maxFiles: 20000, // Limit files to prevent OOM
     });
 
-    const normalizedQuery = query.toLowerCase();
     const rankedFiles: SearchResult[] = allFiles.map((filePath) => {
       const normalizedPath = filePath.toLowerCase();
       const basename = path.basename(filePath).toLowerCase();
@@ -76,9 +97,12 @@ export class FuzzySearchService {
     });
 
     // Filter out zero scores and sort
-    return rankedFiles
+    const results = rankedFiles
       .filter((r) => r.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, maxResults);
+
+    this.cache.set(cacheKey, results);
+    return results;
   }
 }
