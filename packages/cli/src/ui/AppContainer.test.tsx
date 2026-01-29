@@ -2356,15 +2356,17 @@ describe('AppContainer State Management', () => {
         handler(payload);
       });
 
-      expect(capturedUIState.consentRequest).toBeDefined();
-      expect(capturedUIState.consentRequest?.prompt).toBe('Do you consent?');
+      expect(capturedUIState.authConsentRequest).toBeDefined();
+      expect(capturedUIState.authConsentRequest?.prompt).toBe(
+        'Do you consent?',
+      );
 
       act(() => {
-        capturedUIState.consentRequest?.onConfirm(true);
+        capturedUIState.authConsentRequest?.onConfirm(true);
       });
 
       expect(onConfirm).toHaveBeenCalledWith(true);
-      expect(capturedUIState.consentRequest).toBeNull();
+      expect(capturedUIState.authConsentRequest).toBeNull();
       unmount!();
     });
 

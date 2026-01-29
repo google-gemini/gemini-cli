@@ -138,11 +138,11 @@ describe('DialogManager', () => {
       'LoopDetectionConfirmation',
     ],
     [
-      { confirmationRequest: { prompt: 'foo', onConfirm: vi.fn() } },
+      { commandConfirmationRequest: { prompt: 'foo', onConfirm: vi.fn() } },
       'ConsentPrompt',
     ],
     [
-      { consentRequest: { prompt: 'bar', onConfirm: vi.fn() } },
+      { authConsentRequest: { prompt: 'bar', onConfirm: vi.fn() } },
       'ConsentPrompt',
     ],
     [

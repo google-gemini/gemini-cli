@@ -80,8 +80,8 @@ export interface UIState {
   slashCommands: readonly SlashCommand[] | undefined;
   pendingSlashCommandHistoryItems: HistoryItemWithoutId[];
   commandContext: CommandContext;
-  confirmationRequest: ConfirmationRequest | null;
-  consentRequest: ConfirmationRequest | null;
+  commandConfirmationRequest: ConfirmationRequest | null;
+  authConsentRequest: ConfirmationRequest | null;
   confirmUpdateExtensionRequests: ConfirmationRequest[];
   loopDetectionConfirmationRequest: LoopDetectionConfirmationRequest | null;
   geminiMdFileCount: number;
