@@ -80,6 +80,10 @@
     "items": [
       { "label": "Agent skills", "slug": "docs/cli/skills" },
       {
+        "label": "Creating Agent skills",
+        "slug": "docs/cli/creating-skills"
+      },
+      {
         "label": "Sub-agents (experimental)",
         "slug": "docs/core/subagents"
       },
