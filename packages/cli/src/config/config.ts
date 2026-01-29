@@ -308,7 +308,7 @@ export async function parseArguments(
     yargsInstance.command(skillsCommand);
   }
   // Register hooks command if hooks are enabled
-  if (settings.hooksConfig?.enabled ?? true) {
+  if (settings.hooksConfig.enabled) {
     yargsInstance.command(hooksCommand);
   }
 
@@ -790,8 +790,8 @@ export async function loadCliConfig(
     acceptRawOutputRisk: argv.acceptRawOutputRisk,
     modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
-    enableHooks: settings.hooksConfig?.enabled ?? true,
-    enableHooksUI: settings.hooksConfig?.enabled ?? true,
+    enableHooks: settings.hooksConfig.enabled,
+    enableHooksUI: settings.hooksConfig.enabled,
     hooks: settings.hooks || {},
     disabledHooks: settings.hooksConfig?.disabled || [],
     projectHooks: projectHooks || {},
