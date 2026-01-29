@@ -130,3 +130,8 @@ available combinations.
 - `Double-click` on a paste placeholder (`[Pasted Text: X lines]`) in alternate
   buffer mode: Expand to view full content inline. Double-click again to
   collapse.
+
+## Vim Mode
+
+If you have [Vim mode](./vim-mode.md) enabled, a wide range of standard Vim
+navigation and editing commands are available.
