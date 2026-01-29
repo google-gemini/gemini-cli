@@ -38,6 +38,7 @@ import {
   type OutputFormat,
   coreEvents,
   GEMINI_MODEL_ALIAS_AUTO,
+  getAdminErrorMessage,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -550,7 +551,7 @@ export async function loadCliConfig(
         );
       }
       throw new FatalConfigError(
-        'Cannot start in YOLO mode since it is disabled by your admin',
+        getAdminErrorMessage('YOLO mode', undefined /* config */),
       );
     }
   } else if (approvalMode === ApprovalMode.YOLO) {

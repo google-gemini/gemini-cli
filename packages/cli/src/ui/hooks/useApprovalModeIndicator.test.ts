@@ -30,6 +30,9 @@ vi.mock('@google/gemini-cli-core', async () => {
   return {
     ...actualServerModule,
     Config: vi.fn(),
+    getAdminErrorMessage: vi.fn(
+      (featureName: string) => `[Mock] ${featureName} is disabled`,
+    ),
   };
 });
 
@@ -52,6 +55,9 @@ interface MockConfigInstanceShape {
   getUserMemory: Mock<() => string>;
   getGeminiMdFileCount: Mock<() => number>;
   getToolRegistry: Mock<() => { discoverTools: Mock<() => void> }>;
+  getRemoteAdminSettings: Mock<
+    () => { secureModeEnabled?: boolean } | undefined
+  >;
 }
 
 type UseKeypressHandler = (key: Key) => void;
@@ -108,6 +114,9 @@ describe('useApprovalModeIndicator', () => {
           .fn()
           .mockReturnValue({ discoverTools: vi.fn() }) as Mock<
           () => { discoverTools: Mock<() => void> }
+        >,
+        getRemoteAdminSettings: vi.fn().mockReturnValue(undefined) as Mock<
+          () => { secureModeEnabled?: boolean } | undefined
         >,
       };
       instanceSetApprovalModeMock.mockImplementation((value: ApprovalMode) => {
@@ -543,6 +552,33 @@ describe('useApprovalModeIndicator', () => {
       );
       // The mode should not change
       expect(result.current).toBe(ApprovalMode.DEFAULT);
+    });
+
+    it('should show admin error message when YOLO mode is disabled by admin', () => {
+      mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
+      mockConfigInstance.getRemoteAdminSettings.mockReturnValue({
+        secureModeEnabled: true,
+      });
+
+      const mockAddItem = vi.fn();
+      renderHook(() =>
+        useApprovalModeIndicator({
+          config: mockConfigInstance as unknown as ActualConfigType,
+          addItem: mockAddItem,
+        }),
+      );
+
+      act(() => {
+        capturedUseKeypressHandler({ name: 'y', ctrl: true } as Key);
+      });
+
+      expect(mockAddItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.WARNING,
+          text: '[Mock] YOLO mode is disabled',
+        },
+        expect.any(Number),
+      );
     });
   });
 

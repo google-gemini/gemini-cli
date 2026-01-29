@@ -17,8 +17,15 @@ import {
   fetchAdminControls,
   sanitizeAdminSettings,
   stopAdminControlsPolling,
+  getAdminErrorMessage,
 } from './admin_controls.js';
 import type { CodeAssistServer } from '../server.js';
+import type { Config } from '../../config/config.js';
+import { getCodeAssistServer } from '../codeAssist.js';
+
+vi.mock('../codeAssist.js', () => ({
+  getCodeAssistServer: vi.fn(),
+}));
 
 describe('Admin Controls', () => {
   let mockServer: CodeAssistServer;
@@ -370,6 +377,57 @@ describe('Admin Controls', () => {
 
       // The poll should not have fired again
       expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('getAdminErrorMessage', () => {
+    let mockConfig: Config;
+
+    beforeEach(() => {
+      mockConfig = {} as Config;
+    });
+
+    it('should include feature name and project ID when present', () => {
+      vi.mocked(getCodeAssistServer).mockReturnValue({
+        projectId: 'test-project-123',
+      } as CodeAssistServer);
+
+      const message = getAdminErrorMessage('Code Completion', mockConfig);
+
+      expect(message).toBe(
+        'Code Completion is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli?project=test-project-123',
+      );
+    });
+
+    it('should include feature name but OMIT project ID when missing', () => {
+      vi.mocked(getCodeAssistServer).mockReturnValue({
+        projectId: undefined,
+      } as CodeAssistServer);
+
+      const message = getAdminErrorMessage('Chat', mockConfig);
+
+      expect(message).toBe(
+        'Chat is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
+      );
+    });
+
+    it('should include feature name but OMIT project ID when server is undefined', () => {
+      vi.mocked(getCodeAssistServer).mockReturnValue(undefined);
+
+      const message = getAdminErrorMessage('Chat', mockConfig);
+
+      expect(message).toBe(
+        'Chat is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
+      );
+    });
+
+    it('should include feature name but OMIT project ID when config is undefined', () => {
+      const message = getAdminErrorMessage('Chat', undefined);
+
+      expect(message).toBe(
+        'Chat is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
+      );
     });
   });
 });
