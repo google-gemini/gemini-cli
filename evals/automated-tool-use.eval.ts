@@ -13,42 +13,53 @@ describe('automated_tool_use', () => {
     files: {
       'package.json': JSON.stringify(
         {
-          name: 'test-project',
+          name: 'typescript-project',
           version: '1.0.0',
-          description: 'A test project with lint errors',
+          type: 'module',
           scripts: {
             lint: 'eslint .',
           },
           devDependencies: {
-            eslint: '^8.56.0',
+            eslint: '^9.0.0',
+            globals: '^15.0.0',
+            typescript: '^5.0.0',
+            'typescript-eslint': '^8.0.0',
+            '@eslint/js': '^9.0.0',
           },
         },
         null,
         2,
       ),
-      '.eslintrc.json': JSON.stringify(
-        {
-          env: {
-            browser: true,
-            es2021: true,
-            node: true,
+      'eslint.config.js': `
+        import globals from "globals";
+        import pluginJs from "@eslint/js";
+        import tseslint from "typescript-eslint";
+
+        export default [
+          {
+            files: ["**/*.{js,mjs,cjs,ts}"], 
+            languageOptions: { 
+                globals: globals.node 
+            }
           },
-          extends: 'eslint:recommended',
-          parserOptions: {
-            ecmaVersion: 'latest',
-          },
-          rules: {
-            semi: ['error', 'always'],
-            quotes: ['error', 'single'],
-          },
-        },
-        null,
-        2,
-      ),
-      'src/file1.js': `const x = "double quotes";\n`,
-      'src/file2.js': `const y = 'missing semi'\n`,
+          pluginJs.configs.recommended,
+          ...tseslint.configs.recommended,
+          {
+            rules: {
+                "@typescript-eslint/no-unused-vars": "error"
+            }
+          }
+        ];
+      `,
+      'src/app.ts': `
+        function main() {
+            const count: number = "10"; // Error: Type 'string' is not assignable to type 'number'
+            console.log(count);
+        }
+      `,
     },
-    prompt: 'Fix the linter errors in this project. Use npx and pass --yes.',
+    prompt:
+      'Fix the linter errors in this project. Make sure to avoid interactive commands.',
     assert: async (rig) => {
       // Check if run_shell_command was used with --fix
       const toolCalls = rig.readToolLogs();
