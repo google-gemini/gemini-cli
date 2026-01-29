@@ -690,7 +690,8 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
 }
 
 function trimPreservingTrailingNewline(str: string): string {
-  const trailingWhitespace = (str.match(/\s*$/) || [''])[0];
+  const trimmedEnd = str.trimEnd();
+  const trailingWhitespace = str.slice(trimmedEnd.length);
   const trailingNewlines = trailingWhitespace.replace(/[^\r\n]/g, '');
   return str.trim() + trailingNewlines;
 }
