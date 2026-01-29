@@ -1,0 +1,1 @@
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"text":"Hello! How can I help you today?"}],"role":"model"},"finishReason":"STOP","index":0}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":9,"totalTokenCount":14,"promptTokensDetails":[{"modality":"TEXT","tokenCount":5}]}}]}
