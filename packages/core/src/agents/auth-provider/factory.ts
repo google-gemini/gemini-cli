@@ -11,96 +11,55 @@ import type {
   AuthValidationResult,
 } from './types.js';
 
-/**
- * Options for creating an auth provider.
- */
 export interface CreateAuthProviderOptions {
-  /**
-   * Name of the agent (for error messages and token storage).
-   */
-  agentName: string;
-
-  /**
-   * Auth configuration from the agent definition frontmatter.
-   */
+  /** Required for OAuth/OIDC token storage. */
+  agentName?: string;
   authConfig?: A2AAuthConfig;
-
-  /**
-   * The fetched AgentCard with securitySchemes.
-   */
   agentCard?: AgentCard;
 }
 
 /**
  * Factory for creating A2A authentication providers.
+ * @see https://a2a-protocol.org/latest/specification/#451-securityscheme
  */
 export class A2AAuthProviderFactory {
-  /**
-   * Create an auth provider from configuration.
-   *
-   * @param options Creation options including agent name and config
-   * @returns The created auth provider, or undefined if no auth is needed
-   */
   static async create(
     options: CreateAuthProviderOptions,
   ): Promise<A2AAuthProvider | undefined> {
-    const { agentName, authConfig, agentCard } = options;
+    const { agentName: _agentName, authConfig, agentCard } = options;
 
-    // If no auth config, check if the AgentCard requires auth
     if (!authConfig) {
       if (
         agentCard?.securitySchemes &&
         Object.keys(agentCard.securitySchemes).length > 0
       ) {
-        // AgentCard requires auth but none configured
-        // The caller should handle this case by prompting the user
-        return undefined;
+        return undefined; // Caller should prompt user to configure auth
       }
       return undefined;
     }
 
-    // Create provider based on config type
-    // Providers are lazy-loaded to support incremental implementation
     switch (authConfig.type) {
-      case 'google-credentials': {
-        const { GoogleAdcAuthProvider } = await import(
-          './google-adc-provider.js'
-        );
-        const provider = new GoogleAdcAuthProvider(agentName, authConfig);
-        await provider.initialize();
-        return provider;
-      }
+      case 'google-credentials':
+        // TODO: Implement
+        throw new Error('google-credentials auth provider not yet implemented');
 
-      case 'apiKey': {
-        const { ApiKeyAuthProvider } = await import('./api-key-provider.js');
-        const provider = new ApiKeyAuthProvider(authConfig);
-        await provider.initialize();
-        return provider;
-      }
+      case 'apiKey':
+        // TODO: Implement
+        throw new Error('apiKey auth provider not yet implemented');
 
-      case 'http': {
-        const { HttpAuthProvider } = await import('./http-auth-provider.js');
-        const provider = new HttpAuthProvider(authConfig);
-        await provider.initialize();
-        return provider;
-      }
+      case 'http':
+        // TODO: Implement
+        throw new Error('http auth provider not yet implemented');
 
-      case 'oauth2': {
-        const { A2AOAuthProvider } = await import('./oauth-provider.js');
-        const provider = new A2AOAuthProvider(agentName, authConfig, agentCard);
-        await provider.initialize();
-        return provider;
-      }
+      case 'oauth2':
+        // TODO: Implement
+        throw new Error('oauth2 auth provider not yet implemented');
 
-      case 'openIdConnect': {
-        const { OidcAuthProvider } = await import('./oidc-provider.js');
-        const provider = new OidcAuthProvider(agentName, authConfig);
-        await provider.initialize();
-        return provider;
-      }
+      case 'openIdConnect':
+        // TODO: Implement
+        throw new Error('openIdConnect auth provider not yet implemented');
 
       default: {
-        // TypeScript exhaustiveness check
         const _exhaustive: never = authConfig;
         throw new Error(
           `Unknown auth type: ${(_exhaustive as A2AAuthConfig).type}`,
@@ -109,21 +68,14 @@ export class A2AAuthProviderFactory {
     }
   }
 
-  /**
-   * Create an auth provider directly from a config (for AgentCard fetching).
-   * This bypasses AgentCard-based validation since we need auth to fetch the card.
-   *
-   * @param agentName Name of the agent
-   * @param authConfig Auth configuration
-   * @returns The created auth provider
-   */
+  /** Create provider directly from config, bypassing AgentCard validation. */
   static async createFromConfig(
-    agentName: string,
     authConfig: A2AAuthConfig,
+    agentName?: string,
   ): Promise<A2AAuthProvider> {
     const provider = await A2AAuthProviderFactory.create({
-      agentName,
       authConfig,
+      agentName,
     });
 
     if (!provider) {
@@ -135,25 +87,17 @@ export class A2AAuthProviderFactory {
     return provider;
   }
 
-  /**
-   * Validate that the auth configuration satisfies the AgentCard's security requirements.
-   *
-   * @param authConfig The configured auth from agent-definition
-   * @param securitySchemes The security schemes declared in the AgentCard
-   * @returns Validation result with diff if invalid
-   */
+  /** Validate auth config against AgentCard's security requirements. */
   static validateAuthConfig(
     authConfig: A2AAuthConfig | undefined,
     securitySchemes: Record<string, SecurityScheme> | undefined,
   ): AuthValidationResult {
-    // If no security schemes required, any config is valid
     if (!securitySchemes || Object.keys(securitySchemes).length === 0) {
       return { valid: true };
     }
 
     const requiredSchemes = Object.keys(securitySchemes);
 
-    // If auth is required but none configured
     if (!authConfig) {
       return {
         valid: false,
@@ -165,7 +109,6 @@ export class A2AAuthProviderFactory {
       };
     }
 
-    // Check if the configured type matches any of the required schemes
     const matchResult = A2AAuthProviderFactory.findMatchingScheme(
       authConfig,
       securitySchemes,
@@ -185,9 +128,6 @@ export class A2AAuthProviderFactory {
     };
   }
 
-  /**
-   * Find a matching security scheme for the given auth config.
-   */
   private static findMatchingScheme(
     authConfig: A2AAuthConfig,
     securitySchemes: Record<string, SecurityScheme>,
@@ -207,7 +147,6 @@ export class A2AAuthProviderFactory {
 
         case 'http':
           if (authConfig.type === 'http') {
-            // Check if the scheme matches (Bearer, Basic, etc.)
             if (
               authConfig.scheme.toLowerCase() === scheme.scheme.toLowerCase()
             ) {
@@ -220,7 +159,6 @@ export class A2AAuthProviderFactory {
             authConfig.type === 'google-credentials' &&
             scheme.scheme.toLowerCase() === 'bearer'
           ) {
-            // Google credentials can provide Bearer tokens
             return { matched: true, missingConfig: [] };
           } else {
             missingConfig.push(
@@ -240,13 +178,6 @@ export class A2AAuthProviderFactory {
 
         case 'openIdConnect':
           if (authConfig.type === 'openIdConnect') {
-            return { matched: true, missingConfig: [] };
-          }
-          // Google credentials with target_audience can work as OIDC
-          if (
-            authConfig.type === 'google-credentials' &&
-            authConfig.target_audience
-          ) {
             return { matched: true, missingConfig: [] };
           }
           missingConfig.push(
@@ -270,9 +201,7 @@ export class A2AAuthProviderFactory {
     return { matched: false, missingConfig };
   }
 
-  /**
-   * Get a human-readable description of required auth for an AgentCard.
-   */
+  /** Get human-readable description of required auth for error messages. */
   static describeRequiredAuth(
     securitySchemes: Record<string, SecurityScheme>,
   ): string {
@@ -298,7 +227,7 @@ export class A2AAuthProviderFactory {
           descriptions.push(`Mutual TLS (${name})`);
           break;
         default:
-          descriptions.push(`Unknown (${name}: ${scheme.type})`);
+          // Exhaustiveness check - TypeScript will error if a case is missing
           break;
       }
     }
