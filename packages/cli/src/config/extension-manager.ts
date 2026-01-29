@@ -9,7 +9,7 @@ import * as path from 'node:path';
 import { stat } from 'node:fs/promises';
 import chalk from 'chalk';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
-import { type Settings, SettingScope } from './settings.js';
+import { type MergedSettings, SettingScope } from './settings.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { loadInstallMetadata, type ExtensionConfig } from './extension.js';
 import {
@@ -57,6 +57,7 @@ import {
   INSTALL_METADATA_FILENAME,
   recursivelyHydrateStrings,
   type JsonObject,
+  type VariableContext,
 } from './extensions/variables.js';
 import {
   getEnvContents,
@@ -68,15 +69,16 @@ import {
   ExtensionSettingScope,
 } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
-import { getEnableHooks } from './settingsSchema.js';
+import { themeManager } from '../ui/themes/theme-manager.js';
 
 interface ExtensionManagerParams {
   enabledExtensionOverrides?: string[];
-  settings: Settings;
+  settings: MergedSettings;
   requestConsent: (consent: string) => Promise<boolean>;
   requestSetting: ((setting: ExtensionSetting) => Promise<string>) | null;
   workspaceDir: string;
   eventEmitter?: EventEmitter<ExtensionEvents>;
+  clientVersion?: string;
 }
 
 /**
@@ -86,7 +88,7 @@ interface ExtensionManagerParams {
  */
 export class ExtensionManager extends ExtensionLoader {
   private extensionEnablementManager: ExtensionEnablementManager;
-  private settings: Settings;
+  private settings: MergedSettings;
   private requestConsent: (consent: string) => Promise<boolean>;
   private requestSetting:
     | ((setting: ExtensionSetting) => Promise<string>)
@@ -106,6 +108,7 @@ export class ExtensionManager extends ExtensionLoader {
       telemetry: options.settings.telemetry,
       interactive: false,
       sessionId: randomUUID(),
+      clientVersion: options.clientVersion ?? 'unknown',
       targetDir: options.workspaceDir,
       cwd: options.workspaceDir,
       model: '',
@@ -143,7 +146,7 @@ export class ExtensionManager extends ExtensionLoader {
     if (
       (installMetadata.type === 'git' ||
         installMetadata.type === 'github-release') &&
-      this.settings.security?.blockGitExtensions
+      this.settings.security.blockGitExtensions
     ) {
       throw new Error(
         'Installing extensions from remote sources is disallowed by your current settings.',
@@ -287,7 +290,7 @@ Would you like to attempt to install via "git clone" instead?`,
         }
 
         await fs.promises.mkdir(destinationPath, { recursive: true });
-        if (this.requestSetting) {
+        if (this.requestSetting && this.settings.experimental.extensionConfig) {
           if (isUpdate) {
             await maybePromptForSettings(
               newExtensionConfig,
@@ -305,11 +308,13 @@ Would you like to attempt to install via "git clone" instead?`,
           }
         }
 
-        const missingSettings = await getMissingSettings(
-          newExtensionConfig,
-          extensionId,
-          this.workspaceDir,
-        );
+        const missingSettings = this.settings.experimental.extensionConfig
+          ? await getMissingSettings(
+              newExtensionConfig,
+              extensionId,
+              this.workspaceDir,
+            )
+          : [];
         if (missingSettings.length > 0) {
           const message = `Extension "${newExtensionConfig.name}" has missing settings: ${missingSettings
             .map((s) => s.name)
@@ -464,6 +469,20 @@ Would you like to attempt to install via "git clone" instead?`,
     );
   }
 
+  protected override async startExtension(extension: GeminiCLIExtension) {
+    await super.startExtension(extension);
+    if (extension.themes) {
+      themeManager.registerExtensionThemes(extension.name, extension.themes);
+    }
+  }
+
+  protected override async stopExtension(extension: GeminiCLIExtension) {
+    await super.stopExtension(extension);
+    if (extension.themes) {
+      themeManager.unregisterExtensionThemes(extension.name, extension.themes);
+    }
+  }
+
   /**
    * Loads all installed extensions, should only be called once.
    */
@@ -472,7 +491,7 @@ Would you like to attempt to install via "git clone" instead?`,
       throw new Error('Extensions already loaded, only load extensions once.');
     }
 
-    if (this.settings.admin?.extensions?.enabled === false) {
+    if (this.settings.admin.extensions.enabled === false) {
       this.loadedExtensions = [];
       return this.loadedExtensions;
     }
@@ -505,7 +524,7 @@ Would you like to attempt to install via "git clone" instead?`,
     if (
       (installMetadata?.type === 'git' ||
         installMetadata?.type === 'github-release') &&
-      this.settings.security?.blockGitExtensions
+      this.settings.security.blockGitExtensions
     ) {
       return null;
     }
@@ -526,23 +545,30 @@ Would you like to attempt to install via "git clone" instead?`,
 
       const extensionId = getExtensionId(config, installMetadata);
 
-      const userSettings = await getScopedEnvContents(
-        config,
-        extensionId,
-        ExtensionSettingScope.USER,
-      );
-      const workspaceSettings = await getScopedEnvContents(
-        config,
-        extensionId,
-        ExtensionSettingScope.WORKSPACE,
-        this.workspaceDir,
-      );
+      let userSettings: Record<string, string> = {};
+      let workspaceSettings: Record<string, string> = {};
+
+      if (this.settings.experimental.extensionConfig) {
+        userSettings = await getScopedEnvContents(
+          config,
+          extensionId,
+          ExtensionSettingScope.USER,
+        );
+        if (isWorkspaceTrusted(this.settings).isTrusted) {
+          workspaceSettings = await getScopedEnvContents(
+            config,
+            extensionId,
+            ExtensionSettingScope.WORKSPACE,
+            this.workspaceDir,
+          );
+        }
+      }
 
       const customEnv = { ...userSettings, ...workspaceSettings };
       config = resolveEnvVarsInObject(config, customEnv);
 
       const resolvedSettings: ResolvedExtensionSetting[] = [];
-      if (config.settings) {
+      if (config.settings && this.settings.experimental.extensionConfig) {
         for (const setting of config.settings) {
           const value = customEnv[setting.envVar];
           let scope: 'user' | 'workspace' | undefined;
@@ -586,7 +612,7 @@ Would you like to attempt to install via "git clone" instead?`,
       }
 
       if (config.mcpServers) {
-        if (this.settings.admin?.mcp?.enabled === false) {
+        if (this.settings.admin.mcp.enabled === false) {
           config.mcpServers = undefined;
         } else {
           config.mcpServers = Object.fromEntries(
@@ -604,20 +630,62 @@ Would you like to attempt to install via "git clone" instead?`,
         )
         .filter((contextFilePath) => fs.existsSync(contextFilePath));
 
+      const hydrationContext: VariableContext = {
+        extensionPath: effectiveExtensionPath,
+        workspacePath: this.workspaceDir,
+        '/': path.sep,
+        pathSeparator: path.sep,
+        ...customEnv,
+      };
+
       let hooks: { [K in HookEventName]?: HookDefinition[] } | undefined;
-      if (getEnableHooks(this.settings)) {
-        hooks = await this.loadExtensionHooks(effectiveExtensionPath, {
-          extensionPath: effectiveExtensionPath,
-          workspacePath: this.workspaceDir,
-        });
+      if (
+        this.settings.tools.enableHooks &&
+        this.settings.hooksConfig.enabled
+      ) {
+        hooks = await this.loadExtensionHooks(
+          effectiveExtensionPath,
+          hydrationContext,
+        );
       }
 
-      const skills = await loadSkillsFromDir(
+      // Hydrate hooks with extension settings as environment variables
+      if (hooks && config.settings) {
+        const hookEnv: Record<string, string> = {};
+        for (const setting of config.settings) {
+          const value = customEnv[setting.envVar];
+          if (value !== undefined) {
+            hookEnv[setting.envVar] = value;
+          }
+        }
+
+        if (Object.keys(hookEnv).length > 0) {
+          for (const eventName of Object.keys(hooks)) {
+            const eventHooks = hooks[eventName as HookEventName];
+            if (eventHooks) {
+              for (const definition of eventHooks) {
+                for (const hook of definition.hooks) {
+                  // Merge existing env with new env vars, giving extension settings precedence.
+                  hook.env = { ...hook.env, ...hookEnv };
+                }
+              }
+            }
+          }
+        }
+      }
+
+      let skills = await loadSkillsFromDir(
         path.join(effectiveExtensionPath, 'skills'),
+      );
+      skills = skills.map((skill) =>
+        recursivelyHydrateStrings(skill, hydrationContext),
       );
 
       const agentLoadResult = await loadAgentsFromDirectory(
         path.join(effectiveExtensionPath, 'agents'),
+      );
+      agentLoadResult.agents = agentLoadResult.agents.map((agent) =>
+        recursivelyHydrateStrings(agent, hydrationContext),
       );
 
       // Log errors but don't fail the entire extension load
@@ -645,6 +713,7 @@ Would you like to attempt to install via "git clone" instead?`,
         resolvedSettings,
         skills,
         agents: agentLoadResult.agents,
+        themes: config.themes,
       };
       this.loadedExtensions = [...this.loadedExtensions, extension];
 
@@ -658,6 +727,14 @@ Would you like to attempt to install via "git clone" instead?`,
       );
       return null;
     }
+  }
+
+  override async restartExtension(
+    extension: GeminiCLIExtension,
+  ): Promise<void> {
+    const extensionDir = extension.path;
+    await this.unloadExtension(extension);
+    await this.loadExtension(extensionDir);
   }
 
   /**
@@ -709,7 +786,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
   private async loadExtensionHooks(
     extensionDir: string,
-    context: { extensionPath: string; workspacePath: string },
+    context: VariableContext,
   ): Promise<{ [K in HookEventName]?: HookDefinition[] } | undefined> {
     const hooksFilePath = path.join(extensionDir, 'hooks', 'hooks.json');
 

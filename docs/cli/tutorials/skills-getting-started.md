@@ -1,37 +1,10 @@
 # Getting Started with Agent Skills
 
 Agent Skills allow you to extend Gemini CLI with specialized expertise. This
-tutorial will guide you through creating your first skill, enabling it, and
-using it in a session.
+tutorial will guide you through creating your first skill and using it in a
+session.
 
-## 1. Enable Agent Skills
-
-Agent Skills are currently an experimental feature and must be enabled in your
-settings.
-
-### Via the interactive UI
-
-1.  Start a Gemini CLI session by running `gemini`.
-2.  Type `/settings` to open the interactive settings dialog.
-3.  Search for "Skills".
-4.  Toggle **Agent Skills** to `true`.
-5.  Press `Esc` to save and exit. You may need to restart the CLI for the
-    changes to take effect.
-
-### Via `settings.json`
-
-Alternatively, you can manually edit your global settings file at
-`~/.gemini/settings.json` (create it if it doesn't exist):
-
-```json
-{
-  "experimental": {
-    "skills": true
-  }
-}
-```
-
-## 2. Create Your First Skill
+## 1. Create your first skill
 
 A skill is a directory containing a `SKILL.md` file. Let's create an **API
 Auditor** skill that helps you verify if local or remote endpoints are
@@ -86,7 +59,7 @@ responding correctly.
       .catch((e) => console.error(`Result: Failed (${e.message})`));
     ```
 
-## 3. Verify the Skill is Discovered
+## 2. Verify the skill is discovered
 
 Use the `/skills` slash command (or `gemini skills list` from your terminal) to
 see if Gemini CLI has found your new skill.
@@ -99,7 +72,7 @@ In a Gemini CLI session:
 
 You should see `api-auditor` in the list of available skills.
 
-## 4. Use the Skill in a Chat
+## 3. Use the skill in a chat
 
 Now, let's see the skill in action. Start a new session and ask a question about
 an endpoint.

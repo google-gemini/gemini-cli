@@ -20,7 +20,10 @@ import {
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import { ShellToolInvocation } from '../tools/shell.js';
 import { executeToolWithHooks } from '../core/coreToolHookTriggers.js';
-import { saveTruncatedContent } from '../utils/fileUtils.js';
+import {
+  saveTruncatedToolOutput,
+  formatTruncatedToolOutput,
+} from '../utils/fileUtils.js';
 import { convertToFunctionResponse } from '../utils/generateContentResponseUtilities.js';
 import type {
   CompletedToolCall,
@@ -63,8 +66,6 @@ export class ToolExecutor {
         : undefined;
 
     const shellExecutionConfig = this.config.getShellExecutionConfig();
-    const hooksEnabled = this.config.getEnableHooks();
-    const messageBus = this.config.getMessageBus();
 
     return runInDevTraceSpan(
       {
@@ -92,8 +93,6 @@ export class ToolExecutor {
               invocation,
               toolName,
               signal,
-              messageBus,
-              hooksEnabled,
               tool,
               liveOutputCallback,
               shellExecutionConfig,
@@ -105,8 +104,6 @@ export class ToolExecutor {
               invocation,
               toolName,
               signal,
-              messageBus,
-              hooksEnabled,
               tool,
               liveOutputCallback,
               shellExecutionConfig,
@@ -217,17 +214,17 @@ export class ToolExecutor {
       const originalContentLength = content.length;
       const threshold = this.config.getTruncateToolOutputThreshold();
       const lines = this.config.getTruncateToolOutputLines();
-      const truncatedResult = await saveTruncatedContent(
-        content,
-        callId,
-        this.config.storage.getProjectTempDir(),
-        threshold,
-        lines,
-      );
-      content = truncatedResult.content;
-      outputFile = truncatedResult.outputFile;
 
-      if (outputFile) {
+      if (content.length > threshold) {
+        const { outputFile: savedPath } = await saveTruncatedToolOutput(
+          content,
+          toolName,
+          callId,
+          this.config.storage.getProjectTempDir(),
+        );
+        outputFile = savedPath;
+        content = formatTruncatedToolOutput(content, outputFile, lines);
+
         logToolOutputTruncated(
           this.config,
           new ToolOutputTruncatedEvent(call.request.prompt_id, {

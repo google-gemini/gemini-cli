@@ -5,6 +5,9 @@
  */
 
 import { EventEmitter } from 'node:events';
+import type { AgentDefinition } from '../agents/types.js';
+import type { McpClient } from '../tools/mcp-client.js';
+import type { ExtensionEvents } from './extensionLoader.js';
 
 /**
  * Defines the severity level for user-facing feedback.
@@ -97,6 +100,24 @@ export interface HookEndPayload extends HookPayload {
   success: boolean;
 }
 
+/**
+ * Payload for the 'retry-attempt' event.
+ */
+export interface RetryAttemptPayload {
+  attempt: number;
+  maxAttempts: number;
+  delayMs: number;
+  error?: string;
+  model: string;
+}
+
+/**
+ * Payload for the 'agents-discovered' event.
+ */
+export interface AgentsDiscoveredPayload {
+  agents: AgentDefinition[];
+}
+
 export enum CoreEvent {
   UserFeedback = 'user-feedback',
   ModelChanged = 'model-changed',
@@ -104,23 +125,33 @@ export enum CoreEvent {
   Output = 'output',
   MemoryChanged = 'memory-changed',
   ExternalEditorClosed = 'external-editor-closed',
+  McpClientUpdate = 'mcp-client-update',
+  OauthDisplayMessage = 'oauth-display-message',
   SettingsChanged = 'settings-changed',
   HookStart = 'hook-start',
   HookEnd = 'hook-end',
   AgentsRefreshed = 'agents-refreshed',
+  AdminSettingsChanged = 'admin-settings-changed',
+  RetryAttempt = 'retry-attempt',
+  AgentsDiscovered = 'agents-discovered',
 }
 
-export interface CoreEvents {
+export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.UserFeedback]: [UserFeedbackPayload];
   [CoreEvent.ModelChanged]: [ModelChangedPayload];
   [CoreEvent.ConsoleLog]: [ConsoleLogPayload];
   [CoreEvent.Output]: [OutputPayload];
   [CoreEvent.MemoryChanged]: [MemoryChangedPayload];
   [CoreEvent.ExternalEditorClosed]: never[];
+  [CoreEvent.McpClientUpdate]: Array<Map<string, McpClient> | never>;
+  [CoreEvent.OauthDisplayMessage]: string[];
   [CoreEvent.SettingsChanged]: never[];
   [CoreEvent.HookStart]: [HookStartPayload];
   [CoreEvent.HookEnd]: [HookEndPayload];
   [CoreEvent.AgentsRefreshed]: never[];
+  [CoreEvent.AdminSettingsChanged]: never[];
+  [CoreEvent.RetryAttempt]: [RetryAttemptPayload];
+  [CoreEvent.AgentsDiscovered]: [AgentsDiscoveredPayload];
 }
 
 type EventBacklogItem = {
@@ -227,6 +258,28 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
    */
   emitAgentsRefreshed(): void {
     this.emit(CoreEvent.AgentsRefreshed);
+  }
+
+  /**
+   * Notifies subscribers that admin settings have changed.
+   */
+  emitAdminSettingsChanged(): void {
+    this.emit(CoreEvent.AdminSettingsChanged);
+  }
+
+  /**
+   * Notifies subscribers that a retry attempt is happening.
+   */
+  emitRetryAttempt(payload: RetryAttemptPayload): void {
+    this.emit(CoreEvent.RetryAttempt, payload);
+  }
+
+  /**
+   * Notifies subscribers that new unacknowledged agents have been discovered.
+   */
+  emitAgentsDiscovered(agents: AgentDefinition[]): void {
+    const payload: AgentsDiscoveredPayload = { agents };
+    this._emitOrQueue(CoreEvent.AgentsDiscovered, payload);
   }
 
   /**

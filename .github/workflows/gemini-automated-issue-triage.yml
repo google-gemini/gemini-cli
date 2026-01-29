@@ -95,7 +95,8 @@ jobs:
         id: 'generate_token'
         env:
           APP_ID: '${{ secrets.APP_ID }}'
-        if: "${{ env.APP_ID != '' }}"
+        if: |-
+          ${{ env.APP_ID != '' }}
         uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b' # ratchet:actions/create-github-app-token@v2
         with:
           app-id: '${{ secrets.APP_ID }}'
@@ -304,22 +305,6 @@ jobs:
               labels: labelsToAdd
             });
             core.info(`Successfully added labels for #${issueNumber}: ${labelsToAdd.join(', ')}`);
-
-            // Remove the 'status/need-triage' label
-            try {
-                await github.rest.issues.removeLabel({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    issue_number: issueNumber,
-                    name: 'status/need-triage'
-                });
-                core.info(`Successfully removed 'status/need-triage' label.`);
-            } catch (error) {
-                // If the label doesn't exist, the API call will throw a 404. We can ignore this.
-                if (error.status !== 404) {
-                    core.warning(`Failed to remove 'status/need-triage': ${error.message}`);
-                }
-            }
 
       - name: 'Post Issue Analysis Failure Comment'
         if: |-

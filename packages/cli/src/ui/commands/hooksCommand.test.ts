@@ -11,6 +11,7 @@ import { MessageType } from '../types.js';
 import type { HookRegistryEntry } from '@google/gemini-cli-core';
 import { HookType, HookEventName, ConfigSource } from '@google/gemini-cli-core';
 import type { CommandContext } from './types.js';
+import { SettingScope } from '../../config/settings.js';
 
 describe('hooksCommand', () => {
   let mockContext: CommandContext;
@@ -22,10 +23,11 @@ describe('hooksCommand', () => {
   let mockConfig: {
     getHookSystem: ReturnType<typeof vi.fn>;
     getEnableHooks: ReturnType<typeof vi.fn>;
+    updateDisabledHooks: ReturnType<typeof vi.fn>;
   };
   let mockSettings: {
     merged: {
-      hooks?: {
+      hooksConfig?: {
         disabled?: string[];
       };
       tools?: {
@@ -33,6 +35,11 @@ describe('hooksCommand', () => {
       };
     };
     setValue: ReturnType<typeof vi.fn>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    workspace: { path: string; settings: any };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    user: { path: string; settings: any };
+    forScope: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -51,17 +58,37 @@ describe('hooksCommand', () => {
     mockConfig = {
       getHookSystem: vi.fn().mockReturnValue(mockHookSystem),
       getEnableHooks: vi.fn().mockReturnValue(true),
+      updateDisabledHooks: vi.fn(),
     };
 
     // Create mock settings
+    const mockUser = {
+      path: '/mock/user.json',
+      settings: { hooksConfig: { disabled: [] } },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+    const mockWorkspace = {
+      path: '/mock/workspace.json',
+      settings: { hooksConfig: { disabled: [] } },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
+
     mockSettings = {
       merged: {
-        hooks: {
+        hooksConfig: {
           disabled: [],
         },
       },
       setValue: vi.fn(),
-    };
+      workspace: mockWorkspace,
+      user: mockUser,
+      forScope: vi.fn((scope) => {
+        if (scope === SettingScope.User) return mockUser;
+        if (scope === SettingScope.Workspace) return mockWorkspace;
+        return mockUser;
+      }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any;
 
     // Create mock context with config and settings
     mockContext = createMockCommandContext({
@@ -270,10 +297,12 @@ describe('hooksCommand', () => {
     });
 
     it('should enable a hook and update settings', async () => {
-      // Update the context's settings with disabled hooks
-      mockContext.services.settings.merged.hooks = {
-        disabled: ['test-hook', 'other-hook'],
-      };
+      // Update the user settings with disabled hooks
+      mockSettings.user.settings.hooksConfig.disabled = [
+        'test-hook',
+        'other-hook',
+      ];
+      mockSettings.workspace.settings.hooksConfig.disabled = [];
 
       const enableCmd = hooksCommand.subCommands!.find(
         (cmd) => cmd.name === 'enable',
@@ -285,8 +314,8 @@ describe('hooksCommand', () => {
       const result = await enableCmd.action(mockContext, 'test-hook');
 
       expect(mockContext.services.settings.setValue).toHaveBeenCalledWith(
-        expect.any(String),
-        'hooks.disabled',
+        SettingScope.User,
+        'hooksConfig.disabled',
         ['other-hook'],
       );
       expect(mockHookSystem.setHookEnabled).toHaveBeenCalledWith(
@@ -296,28 +325,8 @@ describe('hooksCommand', () => {
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
-        content: 'Hook "test-hook" enabled successfully.',
-      });
-    });
-
-    it('should handle error when enabling hook fails', async () => {
-      mockSettings.setValue.mockImplementationOnce(() => {
-        throw new Error('Failed to save settings');
-      });
-
-      const enableCmd = hooksCommand.subCommands!.find(
-        (cmd) => cmd.name === 'enable',
-      );
-      if (!enableCmd?.action) {
-        throw new Error('enable command must have an action');
-      }
-
-      const result = await enableCmd.action(mockContext, 'test-hook');
-
-      expect(result).toEqual({
-        type: 'message',
-        messageType: 'error',
-        content: 'Failed to enable hook: Failed to save settings',
+        content:
+          'Hook "test-hook" enabled by removing it from the disabled list in user (/mock/user.json) and workspace (/mock/workspace.json) settings.',
       });
     });
 
@@ -329,7 +338,7 @@ describe('hooksCommand', () => {
       const hookEntry = createMockHook(
         './hooks/test.sh',
         HookEventName.BeforeTool,
-        true,
+        false, // Must be disabled for enable completion
       );
       hookEntry.config.name = 'friendly-name';
 
@@ -401,9 +410,9 @@ describe('hooksCommand', () => {
     });
 
     it('should disable a hook and update settings', async () => {
-      mockContext.services.settings.merged.hooks = {
-        disabled: [],
-      };
+      // Ensure not disabled anywhere
+      mockSettings.workspace.settings.hooksConfig.disabled = [];
+      mockSettings.user.settings.hooksConfig.disabled = [];
 
       const disableCmd = hooksCommand.subCommands!.find(
         (cmd) => cmd.name === 'disable',
@@ -414,9 +423,10 @@ describe('hooksCommand', () => {
 
       const result = await disableCmd.action(mockContext, 'test-hook');
 
+      // Should default to workspace if present
       expect(mockContext.services.settings.setValue).toHaveBeenCalledWith(
-        expect.any(String),
-        'hooks.disabled',
+        SettingScope.Workspace,
+        'hooksConfig.disabled',
         ['test-hook'],
       );
       expect(mockHookSystem.setHookEnabled).toHaveBeenCalledWith(
@@ -426,15 +436,14 @@ describe('hooksCommand', () => {
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
-        content: 'Hook "test-hook" disabled successfully.',
+        content:
+          'Hook "test-hook" disabled by adding it to the disabled list in workspace (/mock/workspace.json) settings.',
       });
     });
 
     it('should return info when hook is already disabled', async () => {
-      // Update the context's settings with the hook already disabled
-      mockContext.services.settings.merged.hooks = {
-        disabled: ['test-hook'],
-      };
+      // Update the context's settings with the hook already disabled in Workspace
+      mockSettings.workspace.settings.hooksConfig.disabled = ['test-hook'];
 
       const disableCmd = hooksCommand.subCommands!.find(
         (cmd) => cmd.name === 'disable',
@@ -446,7 +455,6 @@ describe('hooksCommand', () => {
       const result = await disableCmd.action(mockContext, 'test-hook');
 
       expect(mockContext.services.settings.setValue).not.toHaveBeenCalled();
-      expect(mockHookSystem.setHookEnabled).not.toHaveBeenCalled();
       expect(result).toEqual({
         type: 'message',
         messageType: 'info',
@@ -454,28 +462,22 @@ describe('hooksCommand', () => {
       });
     });
 
-    it('should handle error when disabling hook fails', async () => {
-      mockContext.services.settings.merged.hooks = {
-        disabled: [],
-      };
-      mockSettings.setValue.mockImplementationOnce(() => {
-        throw new Error('Failed to save settings');
-      });
-
+    it('should complete hook names using friendly names', () => {
       const disableCmd = hooksCommand.subCommands!.find(
         (cmd) => cmd.name === 'disable',
+      )!;
+
+      const hookEntry = createMockHook(
+        './hooks/test.sh',
+        HookEventName.BeforeTool,
+        true, // Must be enabled for disable completion
       );
-      if (!disableCmd?.action) {
-        throw new Error('disable command must have an action');
-      }
+      hookEntry.config.name = 'friendly-name';
 
-      const result = await disableCmd.action(mockContext, 'test-hook');
+      mockHookSystem.getAllHooks.mockReturnValue([hookEntry]);
 
-      expect(result).toEqual({
-        type: 'message',
-        messageType: 'error',
-        content: 'Failed to disable hook: Failed to save settings',
-      });
+      const completions = disableCmd.completion!(mockContext, 'frie');
+      expect(completions).toContain('friendly-name');
     });
   });
 
@@ -512,50 +514,52 @@ describe('hooksCommand', () => {
       expect(result).toEqual([]);
     });
 
-    it('should return matching hook names', () => {
+    it('should return matching hook names based on status', () => {
       const mockHooks: HookRegistryEntry[] = [
-        createMockHook('test-hook-1', HookEventName.BeforeTool, true),
-        createMockHook('test-hook-2', HookEventName.AfterTool, true),
-        createMockHook('other-hook', HookEventName.AfterAgent, false),
+        createMockHook('test-hook-enabled', HookEventName.BeforeTool, true),
+        createMockHook('test-hook-disabled', HookEventName.AfterTool, false),
       ];
 
       mockHookSystem.getAllHooks.mockReturnValue(mockHooks);
 
       const enableCmd = hooksCommand.subCommands!.find(
         (cmd) => cmd.name === 'enable',
-      );
-      if (!enableCmd?.completion) {
-        throw new Error('enable command must have completion');
-      }
+      )!;
+      const disableCmd = hooksCommand.subCommands!.find(
+        (cmd) => cmd.name === 'disable',
+      )!;
 
-      const result = enableCmd.completion(mockContext, 'test');
-      expect(result).toEqual(['test-hook-1', 'test-hook-2']);
+      const enableResult = enableCmd.completion!(mockContext, 'test');
+      expect(enableResult).toEqual(['test-hook-disabled']);
+
+      const disableResult = disableCmd.completion!(mockContext, 'test');
+      expect(disableResult).toEqual(['test-hook-enabled']);
     });
 
-    it('should return all hook names when partial is empty', () => {
+    it('should return all relevant hook names when partial is empty', () => {
       const mockHooks: HookRegistryEntry[] = [
-        createMockHook('hook-1', HookEventName.BeforeTool, true),
-        createMockHook('hook-2', HookEventName.AfterTool, true),
+        createMockHook('hook-enabled', HookEventName.BeforeTool, true),
+        createMockHook('hook-disabled', HookEventName.AfterTool, false),
       ];
 
       mockHookSystem.getAllHooks.mockReturnValue(mockHooks);
 
       const enableCmd = hooksCommand.subCommands!.find(
         (cmd) => cmd.name === 'enable',
-      );
-      if (!enableCmd?.completion) {
-        throw new Error('enable command must have completion');
-      }
+      )!;
+      const disableCmd = hooksCommand.subCommands!.find(
+        (cmd) => cmd.name === 'disable',
+      )!;
 
-      const result = enableCmd.completion(mockContext, '');
-      expect(result).toEqual(['hook-1', 'hook-2']);
+      expect(enableCmd.completion!(mockContext, '')).toEqual(['hook-disabled']);
+      expect(disableCmd.completion!(mockContext, '')).toEqual(['hook-enabled']);
     });
 
     it('should handle hooks without command name gracefully', () => {
       const mockHooks: HookRegistryEntry[] = [
-        createMockHook('test-hook', HookEventName.BeforeTool, true),
+        createMockHook('test-hook', HookEventName.BeforeTool, false),
         {
-          ...createMockHook('', HookEventName.AfterTool, true),
+          ...createMockHook('', HookEventName.AfterTool, false),
           config: { command: '', type: HookType.Command, timeout: 30 },
         },
       ];
@@ -635,8 +639,8 @@ describe('hooksCommand', () => {
       const result = await enableAllCmd.action(mockContext, '');
 
       expect(mockContext.services.settings.setValue).toHaveBeenCalledWith(
-        expect.any(String),
-        'hooks.disabled',
+        expect.any(String), // enableAll uses legacy logic so it might return 'Workspace' or 'User' depending on ternary
+        'hooksConfig.disabled',
         [],
       );
       expect(mockHookSystem.setHookEnabled).toHaveBeenCalledWith(
@@ -760,7 +764,7 @@ describe('hooksCommand', () => {
 
       expect(mockContext.services.settings.setValue).toHaveBeenCalledWith(
         expect.any(String),
-        'hooks.disabled',
+        'hooksConfig.disabled',
         ['hook-1', 'hook-2', 'hook-3'],
       );
       expect(mockHookSystem.setHookEnabled).toHaveBeenCalledWith(

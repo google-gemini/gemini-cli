@@ -18,6 +18,7 @@ Learn how to enable and setup OpenTelemetry for Gemini CLI.
   - [Logs and metrics](#logs-and-metrics)
     - [Logs](#logs)
       - [Sessions](#sessions)
+      - [Approval Mode](#approval-mode)
       - [Tools](#tools)
       - [Files](#files)
       - [API](#api)
@@ -224,11 +225,11 @@ visualize your telemetry.
 This dashboard can be found under **Google Cloud Monitoring Dashboard
 Templates** as "**Gemini CLI Monitoring**".
 
-![Gemini CLI Monitoring Dashboard Overview](../assets/monitoring-dashboard-overview.png)
+![Gemini CLI Monitoring Dashboard Overview](/docs/assets/monitoring-dashboard-overview.png)
 
-![Gemini CLI Monitoring Dashboard Metrics](../assets/monitoring-dashboard-metrics.png)
+![Gemini CLI Monitoring Dashboard Metrics](/docs/assets/monitoring-dashboard-metrics.png)
 
-![Gemini CLI Monitoring Dashboard Logs](../assets/monitoring-dashboard-logs.png)
+![Gemini CLI Monitoring Dashboard Logs](/docs/assets/monitoring-dashboard-logs.png)
 
 To learn more, check out this blog post:
 [Instant insights: Gemini CLI’s new pre-configured monitoring dashboards](https://cloud.google.com/blog/topics/developers-practitioners/instant-insights-gemini-clis-new-pre-configured-monitoring-dashboards/).
@@ -314,6 +315,20 @@ Captures startup configuration and user prompt submissions.
     - `prompt_id` (string)
     - `prompt` (string; excluded if `telemetry.logPrompts` is `false`)
     - `auth_type` (string)
+
+#### Approval Mode
+
+Tracks changes and duration of approval modes.
+
+- `approval_mode_switch`: Approval mode was changed.
+  - **Attributes**:
+    - `from_mode` (string)
+    - `to_mode` (string)
+
+- `approval_mode_duration`: Duration spent in an approval mode.
+  - **Attributes**:
+    - `mode` (string)
+    - `duration_ms` (int)
 
 #### Tools
 

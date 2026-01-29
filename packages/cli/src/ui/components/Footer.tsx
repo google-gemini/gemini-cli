@@ -42,7 +42,7 @@ export const Footer: React.FC = () => {
     promptTokenCount,
     nightly,
     isTrustedFolder,
-    mainAreaWidth,
+    terminalWidth,
   } = {
     model: uiState.currentModel,
     targetDir: config.getTargetDir(),
@@ -55,18 +55,17 @@ export const Footer: React.FC = () => {
     promptTokenCount: uiState.sessionStats.lastPromptTokenCount,
     nightly: uiState.nightly,
     isTrustedFolder: uiState.isTrustedFolder,
-    mainAreaWidth: uiState.mainAreaWidth,
+    terminalWidth: uiState.terminalWidth,
   };
 
   const showMemoryUsage =
-    config.getDebugMode() || settings.merged.ui?.showMemoryUsage || false;
-  const hideCWD = settings.merged.ui?.footer?.hideCWD;
-  const hideSandboxStatus = settings.merged.ui?.footer?.hideSandboxStatus;
-  const hideModelInfo = settings.merged.ui?.footer?.hideModelInfo;
-  const hideContextPercentage =
-    settings.merged.ui?.footer?.hideContextPercentage;
+    config.getDebugMode() || settings.merged.ui.showMemoryUsage;
+  const hideCWD = settings.merged.ui.footer.hideCWD;
+  const hideSandboxStatus = settings.merged.ui.footer.hideSandboxStatus;
+  const hideModelInfo = settings.merged.ui.footer.hideModelInfo;
+  const hideContextPercentage = settings.merged.ui.footer.hideContextPercentage;
 
-  const pathLength = Math.max(20, Math.floor(mainAreaWidth * 0.25));
+  const pathLength = Math.max(20, Math.floor(terminalWidth * 0.25));
   const displayPath = shortenPath(tildeifyPath(targetDir), pathLength);
 
   const justifyContent = hideCWD && hideModelInfo ? 'center' : 'space-between';
@@ -77,7 +76,7 @@ export const Footer: React.FC = () => {
   return (
     <Box
       justifyContent={justifyContent}
-      width={mainAreaWidth}
+      width={terminalWidth}
       flexDirection="row"
       alignItems="center"
       paddingX={1}
@@ -135,7 +134,7 @@ export const Footer: React.FC = () => {
           ) : (
             <Text color={theme.status.error}>
               no sandbox
-              {mainAreaWidth >= 100 && (
+              {terminalWidth >= 100 && (
                 <Text color={theme.text.secondary}> (see /docs)</Text>
               )}
             </Text>
@@ -156,7 +155,7 @@ export const Footer: React.FC = () => {
                   <ContextUsageDisplay
                     promptTokenCount={promptTokenCount}
                     model={model}
-                    terminalWidth={mainAreaWidth}
+                    terminalWidth={terminalWidth}
                   />
                 </>
               )}

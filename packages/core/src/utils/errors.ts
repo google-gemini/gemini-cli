@@ -81,6 +81,13 @@ export class ForbiddenError extends Error {}
 export class UnauthorizedError extends Error {}
 export class BadRequestError extends Error {}
 
+export class ChangeAuthRequestedError extends Error {
+  constructor() {
+    super('User requested to change authentication method');
+    this.name = 'ChangeAuthRequestedError';
+  }
+}
+
 interface ResponseData {
   error?: {
     code?: number;

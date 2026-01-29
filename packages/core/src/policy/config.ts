@@ -29,6 +29,8 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { SHELL_TOOL_NAMES } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 
+import { isDirectorySecure } from '../utils/security.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 export const DEFAULT_CORE_POLICIES_DIR = path.join(__dirname, 'policies');
@@ -112,19 +114,47 @@ export function formatPolicyError(error: PolicyFileError): string {
   return message;
 }
 
+/**
+ * Filters out insecure policy directories (specifically the system policy directory).
+ * Emits warnings if insecure directories are found.
+ */
+async function filterSecurePolicyDirectories(
+  dirs: string[],
+): Promise<string[]> {
+  const systemPoliciesDir = path.resolve(Storage.getSystemPoliciesDir());
+
+  const results = await Promise.all(
+    dirs.map(async (dir) => {
+      // Only check security for system policies
+      if (path.resolve(dir) === systemPoliciesDir) {
+        const { secure, reason } = await isDirectorySecure(dir);
+        if (!secure) {
+          const msg = `Security Warning: Skipping system policies from ${dir}: ${reason}`;
+          coreEvents.emitFeedback('warning', msg);
+          return null;
+        }
+      }
+      return dir;
+    }),
+  );
+
+  return results.filter((dir): dir is string => dir !== null);
+}
+
 export async function createPolicyEngineConfig(
   settings: PolicySettings,
   approvalMode: ApprovalMode,
   defaultPoliciesDir?: string,
 ): Promise<PolicyEngineConfig> {
   const policyDirs = getPolicyDirectories(defaultPoliciesDir);
+  const securePolicyDirs = await filterSecurePolicyDirectories(policyDirs);
 
   // Load policies from TOML files
   const {
     rules: tomlRules,
     checkers: tomlCheckers,
     errors,
-  } = await loadPoliciesFromToml(policyDirs, (dir) =>
+  } = await loadPoliciesFromToml(securePolicyDirs, (dir) =>
     getPolicyTier(dir, defaultPoliciesDir),
   );
 
@@ -174,6 +204,7 @@ export async function createPolicyEngineConfig(
         toolName: `${serverName}__*`,
         decision: PolicyDecision.DENY,
         priority: 2.9,
+        source: 'Settings (MCP Excluded)',
       });
     }
   }
@@ -186,6 +217,7 @@ export async function createPolicyEngineConfig(
         toolName: tool,
         decision: PolicyDecision.DENY,
         priority: 2.4,
+        source: 'Settings (Tools Excluded)',
       });
     }
   }
@@ -213,6 +245,7 @@ export async function createPolicyEngineConfig(
                 decision: PolicyDecision.ALLOW,
                 priority: 2.3,
                 argsPattern: new RegExp(pattern),
+                source: 'Settings (Tools Allowed)',
               });
             }
           }
@@ -223,6 +256,7 @@ export async function createPolicyEngineConfig(
             toolName,
             decision: PolicyDecision.ALLOW,
             priority: 2.3,
+            source: 'Settings (Tools Allowed)',
           });
         }
       } else {
@@ -234,6 +268,7 @@ export async function createPolicyEngineConfig(
           toolName,
           decision: PolicyDecision.ALLOW,
           priority: 2.3,
+          source: 'Settings (Tools Allowed)',
         });
       }
     }
@@ -252,6 +287,7 @@ export async function createPolicyEngineConfig(
           toolName: `${serverName}__*`,
           decision: PolicyDecision.ALLOW,
           priority: 2.2,
+          source: 'Settings (MCP Trusted)',
         });
       }
     }
@@ -265,6 +301,7 @@ export async function createPolicyEngineConfig(
         toolName: `${serverName}__*`,
         decision: PolicyDecision.ALLOW,
         priority: 2.1,
+        source: 'Settings (MCP Allowed)',
       });
     }
   }
@@ -310,6 +347,7 @@ export function createPolicyUpdater(
               // but still lose to admin policies (3.xxx) and settings excludes (200)
               priority: 2.95,
               argsPattern: new RegExp(pattern),
+              source: 'Dynamic (Confirmed)',
             });
           }
         }
@@ -326,6 +364,7 @@ export function createPolicyUpdater(
           // but still lose to admin policies (3.xxx) and settings excludes (200)
           priority: 2.95,
           argsPattern,
+          source: 'Dynamic (Confirmed)',
         });
       }
 

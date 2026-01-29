@@ -5,12 +5,15 @@
  */
 
 import * as fs from 'node:fs/promises';
+import { createWriteStream } from 'node:fs';
+import { execSync, spawn } from 'node:child_process';
 import * as path from 'node:path';
 import {
   debugLogger,
   spawnAsync,
   unescapePath,
   escapePath,
+  Storage,
 } from '@google/gemini-cli-core';
 
 /**
@@ -29,11 +32,147 @@ export const IMAGE_EXTENSIONS = [
 /** Matches strings that start with a path prefix (/, ~, ., Windows drive letter, or UNC path) */
 const PATH_PREFIX_PATTERN = /^([/~.]|[a-zA-Z]:|\\\\)/;
 
+// Track which tool works on Linux to avoid redundant checks/failures
+let linuxClipboardTool: 'wl-paste' | 'xclip' | null = null;
+
+// Helper to check the user's display server and whether they have a compatible clipboard tool installed
+function getUserLinuxClipboardTool(): typeof linuxClipboardTool {
+  if (linuxClipboardTool !== null) {
+    return linuxClipboardTool;
+  }
+
+  let toolName: 'wl-paste' | 'xclip' | null = null;
+  const displayServer = process.env['XDG_SESSION_TYPE'];
+
+  if (displayServer === 'wayland') toolName = 'wl-paste';
+  else if (displayServer === 'x11') toolName = 'xclip';
+  else return null;
+
+  try {
+    // output is piped to stdio: 'ignore' to suppress the path printing to console
+    execSync(`command -v ${toolName}`, { stdio: 'ignore' });
+    linuxClipboardTool = toolName;
+    return toolName;
+  } catch (e) {
+    debugLogger.warn(`${toolName} not found. Please install it: ${e}`);
+    return null;
+  }
+}
+
 /**
- * Checks if the system clipboard contains an image (macOS and Windows)
+ * Helper to save command stdout to a file while preventing shell injections and race conditions
+ */
+async function saveFromCommand(
+  command: string,
+  args: string[],
+  destination: string,
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    const child = spawn(command, args);
+    const fileStream = createWriteStream(destination);
+    let resolved = false;
+
+    const safeResolve = (value: boolean) => {
+      if (!resolved) {
+        resolved = true;
+        resolve(value);
+      }
+    };
+
+    child.stdout.pipe(fileStream);
+
+    child.on('error', (err) => {
+      debugLogger.debug(`Failed to spawn ${command}:`, err);
+      safeResolve(false);
+    });
+
+    fileStream.on('error', (err) => {
+      debugLogger.debug(`File stream error for ${destination}:`, err);
+      safeResolve(false);
+    });
+
+    child.on('close', async (code) => {
+      if (resolved) return;
+
+      if (code !== 0) {
+        debugLogger.debug(
+          `${command} exited with code ${code}. Args: ${args.join(' ')}`,
+        );
+        safeResolve(false);
+        return;
+      }
+
+      // Helper to check file size
+      const checkFile = async () => {
+        try {
+          const stats = await fs.stat(destination);
+          safeResolve(stats.size > 0);
+        } catch (e) {
+          debugLogger.debug(`Failed to stat output file ${destination}:`, e);
+          safeResolve(false);
+        }
+      };
+
+      if (fileStream.writableFinished) {
+        await checkFile();
+      } else {
+        fileStream.on('finish', checkFile);
+        // In case finish never fires due to error (though error handler should catch it)
+        fileStream.on('close', async () => {
+          if (!resolved) await checkFile();
+        });
+      }
+    });
+  });
+}
+
+/**
+ * Checks if the Wayland clipboard contains an image using wl-paste.
+ */
+async function checkWlPasteForImage() {
+  try {
+    const { stdout } = await spawnAsync('wl-paste', ['--list-types']);
+    return stdout.includes('image/');
+  } catch (e) {
+    debugLogger.warn('Error checking wl-clipboard for image:', e);
+  }
+  return false;
+}
+
+/**
+ * Checks if the X11 clipboard contains an image using xclip.
+ */
+async function checkXclipForImage() {
+  try {
+    const { stdout } = await spawnAsync('xclip', [
+      '-selection',
+      'clipboard',
+      '-t',
+      'TARGETS',
+      '-o',
+    ]);
+    return stdout.includes('image/');
+  } catch (e) {
+    debugLogger.warn('Error checking xclip for image:', e);
+  }
+  return false;
+}
+
+/**
+ * Checks if the system clipboard contains an image (macOS, Windows, and Linux)
  * @returns true if clipboard contains an image
  */
 export async function clipboardHasImage(): Promise<boolean> {
+  if (process.platform === 'linux') {
+    const tool = getUserLinuxClipboardTool();
+    if (tool === 'wl-paste') {
+      if (await checkWlPasteForImage()) return true;
+    } else if (tool === 'xclip') {
+      if (await checkXclipForImage()) return true;
+    }
+    return false;
+  }
+
   if (process.platform === 'win32') {
     try {
       const { stdout } = await spawnAsync('powershell', [
@@ -65,26 +204,93 @@ export async function clipboardHasImage(): Promise<boolean> {
 }
 
 /**
- * Saves the image from clipboard to a temporary file (macOS and Windows)
+ * Saves clipboard content to a file using wl-paste (Wayland).
+ */
+async function saveFileWithWlPaste(tempFilePath: string) {
+  const success = await saveFromCommand(
+    'wl-paste',
+    ['--no-newline', '--type', 'image/png'],
+    tempFilePath,
+  );
+  if (success) {
+    return true;
+  }
+  // Cleanup on failure
+  try {
+    await fs.unlink(tempFilePath);
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
+/**
+ * Saves clipboard content to a file using xclip (X11).
+ */
+const saveFileWithXclip = async (tempFilePath: string) => {
+  const success = await saveFromCommand(
+    'xclip',
+    ['-selection', 'clipboard', '-t', 'image/png', '-o'],
+    tempFilePath,
+  );
+  if (success) {
+    return true;
+  }
+  // Cleanup on failure
+  try {
+    await fs.unlink(tempFilePath);
+  } catch {
+    /* ignore */
+  }
+  return false;
+};
+
+/**
+ * Gets the directory where clipboard images should be stored for a specific project.
+ *
+ * This uses the global temporary directory but creates a project-specific subdirectory
+ * based on the hash of the project path (via `Storage.getProjectTempDir()`).
+ * This prevents path conflicts between different projects while keeping the images
+ * outside of the user's project directory.
+ *
+ * @param targetDir The root directory of the current project.
+ * @returns The absolute path to the images directory.
+ */
+function getProjectClipboardImagesDir(targetDir: string): string {
+  const storage = new Storage(targetDir);
+  const baseDir = storage.getProjectTempDir();
+  return path.join(baseDir, 'images');
+}
+
+/**
+ * Saves the image from clipboard to a temporary file (macOS, Windows, and Linux)
  * @param targetDir The target directory to create temp files within
  * @returns The path to the saved image file, or null if no image or error
  */
 export async function saveClipboardImage(
-  targetDir?: string,
+  targetDir: string,
 ): Promise<string | null> {
-  if (process.platform !== 'darwin' && process.platform !== 'win32') {
-    return null;
-  }
-
   try {
-    // Create a temporary directory for clipboard images within the target directory
-    // This avoids security restrictions on paths outside the target directory
-    const baseDir = targetDir || process.cwd();
-    const tempDir = path.join(baseDir, '.gemini-clipboard');
+    const tempDir = getProjectClipboardImagesDir(targetDir);
     await fs.mkdir(tempDir, { recursive: true });
 
     // Generate a unique filename with timestamp
     const timestamp = new Date().getTime();
+
+    if (process.platform === 'linux') {
+      const tempFilePath = path.join(tempDir, `clipboard-${timestamp}.png`);
+      const tool = getUserLinuxClipboardTool();
+
+      if (tool === 'wl-paste') {
+        if (await saveFileWithWlPaste(tempFilePath)) return tempFilePath;
+        return null;
+      }
+      if (tool === 'xclip') {
+        if (await saveFileWithXclip(tempFilePath)) return tempFilePath;
+        return null;
+      }
+      return null;
+    }
 
     if (process.platform === 'win32') {
       const tempFilePath = path.join(tempDir, `clipboard-${timestamp}.png`);
@@ -187,11 +393,10 @@ export async function saveClipboardImage(
  * @param targetDir The target directory where temp files are stored
  */
 export async function cleanupOldClipboardImages(
-  targetDir?: string,
+  targetDir: string,
 ): Promise<void> {
   try {
-    const baseDir = targetDir || process.cwd();
-    const tempDir = path.join(baseDir, '.gemini-clipboard');
+    const tempDir = getProjectClipboardImagesDir(targetDir);
     const files = await fs.readdir(tempDir);
     const oneHourAgo = Date.now() - 60 * 60 * 1000;
 

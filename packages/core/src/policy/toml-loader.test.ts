@@ -53,6 +53,7 @@ priority = 100
         toolName: 'glob',
         decision: PolicyDecision.ALLOW,
         priority: 1.1, // tier 1 + 100/1000
+        source: 'Default: test.toml',
       });
       expect(result.checkers).toHaveLength(0);
       expect(result.errors).toHaveLength(0);
@@ -172,6 +173,22 @@ allow_redirection = true
       expect(result.errors).toHaveLength(0);
     });
 
+    it('should parse deny_message property', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "rm"
+decision = "deny"
+priority = 100
+deny_message = "Deletion is permanent"
+`);
+
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].toolName).toBe('rm');
+      expect(result.rules[0].decision).toBe(PolicyDecision.DENY);
+      expect(result.rules[0].denyMessage).toBe('Deletion is permanent');
+      expect(result.errors).toHaveLength(0);
+    });
+
     it('should support modes property for Tier 2 and Tier 3 policies', async () => {
       await fs.writeFile(
         path.join(tempDir, 'tier2.toml'),
@@ -190,6 +207,7 @@ modes = ["autoEdit"]
       expect(result.rules).toHaveLength(1);
       expect(result.rules[0].toolName).toBe('tier2-tool');
       expect(result.rules[0].modes).toEqual(['autoEdit']);
+      expect(result.rules[0].source).toBe('User: tier2.toml');
       expect(result.errors).toHaveLength(0);
     });
 

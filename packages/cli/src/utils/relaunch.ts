@@ -6,7 +6,10 @@
 
 import { spawn } from 'node:child_process';
 import { RELAUNCH_EXIT_CODE } from './processUtils.js';
-import { writeToStderr } from '@google/gemini-cli-core';
+import {
+  writeToStderr,
+  type FetchAdminControlsResponse,
+} from '@google/gemini-cli-core';
 
 export async function relaunchOnExitCode(runner: () => Promise<number>) {
   while (true) {
@@ -31,10 +34,13 @@ export async function relaunchOnExitCode(runner: () => Promise<number>) {
 export async function relaunchAppInChildProcess(
   additionalNodeArgs: string[],
   additionalScriptArgs: string[],
+  remoteAdminSettings?: FetchAdminControlsResponse,
 ) {
   if (process.env['GEMINI_CLI_NO_RELAUNCH']) {
     return;
   }
+
+  let latestAdminSettings = remoteAdminSettings;
 
   const runner = () => {
     // process.argv is [node, script, ...args]
@@ -55,8 +61,18 @@ export async function relaunchAppInChildProcess(
     process.stdin.pause();
 
     const child = spawn(process.execPath, nodeArgs, {
-      stdio: 'inherit',
+      stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
       env: newEnv,
+    });
+
+    if (latestAdminSettings) {
+      child.send({ type: 'admin-settings', settings: latestAdminSettings });
+    }
+
+    child.on('message', (msg: { type?: string; settings?: unknown }) => {
+      if (msg.type === 'admin-settings-update' && msg.settings) {
+        latestAdminSettings = msg.settings as FetchAdminControlsResponse;
+      }
     });
 
     return new Promise<number>((resolve, reject) => {

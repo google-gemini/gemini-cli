@@ -50,10 +50,13 @@ export function EditorSettingsDialog({
     (key) => {
       if (key.name === 'tab') {
         setFocusedSection((prev) => (prev === 'editor' ? 'scope' : 'editor'));
+        return true;
       }
       if (key.name === 'escape') {
         onExit();
+        return true;
       }
+      return false;
     },
     { isActive: true },
   );
@@ -124,12 +127,12 @@ export function EditorSettingsDialog({
 
   let mergedEditorName = 'None';
   if (
-    settings.merged.general?.preferredEditor &&
-    isEditorAvailable(settings.merged.general?.preferredEditor)
+    settings.merged.general.preferredEditor &&
+    isEditorAvailable(settings.merged.general.preferredEditor)
   ) {
     mergedEditorName =
       EDITOR_DISPLAY_NAMES[
-        settings.merged.general?.preferredEditor as EditorType
+        settings.merged.general.preferredEditor as EditorType
       ];
   }
 

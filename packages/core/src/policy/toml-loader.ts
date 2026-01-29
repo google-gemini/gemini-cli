@@ -46,6 +46,7 @@ const PolicyRuleSchema = z.object({
     }),
   modes: z.array(z.nativeEnum(ApprovalMode)).optional(),
   allow_redirection: z.boolean().optional(),
+  deny_message: z.string().optional(),
 });
 
 /**
@@ -346,6 +347,8 @@ export async function loadPoliciesFromToml(
                   priority: transformPriority(rule.priority, tier),
                   modes: rule.modes,
                   allowRedirection: rule.allow_redirection,
+                  source: `${tierName.charAt(0).toUpperCase() + tierName.slice(1)}: ${file}`,
+                  denyMessage: rule.deny_message,
                 };
 
                 // Compile regex pattern

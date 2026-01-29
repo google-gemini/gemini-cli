@@ -18,14 +18,11 @@ import type {
  * Handles Text, Data (JSON), and File parts.
  */
 export function extractMessageText(message: Message | undefined): string {
-  if (!message || !message.parts) {
+  if (!message) {
     return '';
   }
 
-  const parts = message.parts
-    .map((part) => extractPartText(part))
-    .filter(Boolean);
-  return parts.join('\n');
+  return extractPartsText(message.parts);
 }
 
 /**
@@ -56,41 +53,47 @@ export function extractPartText(part: Part): string {
 }
 
 /**
- * Extracts a human-readable text summary from a Task object.
- * Includes status, ID, and any artifact content.
+ * Extracts a clean, human-readable text summary from a Task object.
+ * Includes the status message and any artifact content with context headers.
+ * Technical metadata like ID and State are omitted for better clarity and token efficiency.
  */
 export function extractTaskText(task: Task): string {
-  let output = `ID: ${task.id}\n`;
-  output += `State: ${task.status.state}\n`;
+  const parts: string[] = [];
 
   // Status Message
-  const statusMessageText = extractMessageText(task.status.message);
+  const statusMessageText = extractMessageText(task.status?.message);
   if (statusMessageText) {
-    output += `Status Message: ${statusMessageText}\n`;
+    parts.push(statusMessageText);
   }
 
   // Artifacts
-  if (task.artifacts && task.artifacts.length > 0) {
-    output += `Artifacts:\n`;
+  if (task.artifacts) {
     for (const artifact of task.artifacts) {
-      output += `  - Name: ${artifact.name}\n`;
-      if (artifact.parts && artifact.parts.length > 0) {
-        // Treat artifact parts as a message for extraction
-        const artifactContent = artifact.parts
-          .map((p) => extractPartText(p))
-          .filter(Boolean)
-          .join('\n');
+      const artifactContent = extractPartsText(artifact.parts);
 
-        if (artifactContent) {
-          // Indent content for readability
-          const indentedContent = artifactContent.replace(/^/gm, '    ');
-          output += `    Content:\n${indentedContent}\n`;
-        }
+      if (artifactContent) {
+        const header = artifact.name
+          ? `Artifact (${artifact.name}):`
+          : 'Artifact:';
+        parts.push(`${header}\n${artifactContent}`);
       }
     }
   }
 
-  return output;
+  return parts.join('\n\n');
+}
+
+/**
+ * Extracts text from an array of parts.
+ */
+function extractPartsText(parts: Part[] | undefined): string {
+  if (!parts || parts.length === 0) {
+    return '';
+  }
+  return parts
+    .map((p) => extractPartText(p))
+    .filter(Boolean)
+    .join('\n');
 }
 
 // Type Guards
