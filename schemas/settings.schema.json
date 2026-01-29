@@ -1537,7 +1537,7 @@
         "enabled": {
           "title": "Enable Hooks",
           "description": "Canonical toggle for the hooks system. When disabled, no hooks will be executed.",
-          "markdownDescription": "Canonical toggle for the hooks system. When disabled, no hooks will be executed.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `true`",
+          "markdownDescription": "Canonical toggle for the hooks system. When disabled, no hooks will be executed.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
