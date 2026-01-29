@@ -124,6 +124,8 @@ function charLengthAt(str: string, i: number): number {
   return code !== undefined && code >= kUTF16SurrogateThreshold ? 2 : 1;
 }
 
+// Note: we do not convert alt+z, alt+shift+z, or alt+v here
+// because mac users have alternative hotkeys.
 const MAC_ALT_KEY_CHARACTER_MAP: Record<string, string> = {
   '\u222B': 'b', // "∫" back one word
   '\u0192': 'f', // "ƒ" forward one word
