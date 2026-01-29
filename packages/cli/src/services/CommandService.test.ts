@@ -350,4 +350,75 @@ describe('CommandService', () => {
     expect(deployExtension).toBeDefined();
     expect(deployExtension?.description).toBe('[gcp] Deploy to Google Cloud');
   });
+
+  it('should report conflicts via getConflicts', async () => {
+    const builtinCommand = createMockCommand('deploy', CommandKind.BUILT_IN);
+    const extensionCommand = {
+      ...createMockCommand('deploy', CommandKind.FILE),
+      extensionName: 'firebase',
+    };
+
+    const mockLoader = new MockCommandLoader([
+      builtinCommand,
+      extensionCommand,
+    ]);
+
+    const service = await CommandService.create(
+      [mockLoader],
+      new AbortController().signal,
+    );
+
+    const conflicts = service.getConflicts();
+    expect(conflicts).toHaveLength(1);
+
+    expect(conflicts[0]).toMatchObject({
+      name: 'deploy',
+      renamedTo: 'firebase.deploy',
+    });
+    expect(conflicts[0].winner).toEqual(builtinCommand);
+    expect(conflicts[0].loser).toMatchObject({
+      name: 'deploy',
+      extensionName: 'firebase',
+    });
+  });
+
+  it('should report extension vs extension conflicts correctly', async () => {
+    // Both extensions try to register 'deploy'
+    const extension1Command = {
+      ...createMockCommand('deploy', CommandKind.FILE),
+      extensionName: 'firebase',
+    };
+    const extension2Command = {
+      ...createMockCommand('deploy', CommandKind.FILE),
+      extensionName: 'aws',
+    };
+
+    const mockLoader = new MockCommandLoader([
+      extension1Command,
+      extension2Command,
+    ]);
+
+    const service = await CommandService.create(
+      [mockLoader],
+      new AbortController().signal,
+    );
+
+    const conflicts = service.getConflicts();
+    expect(conflicts).toHaveLength(1);
+
+    expect(conflicts[0]).toMatchObject({
+      name: 'deploy',
+      renamedTo: 'aws.deploy', // ext2 is 'aws' and it lost because it was second in the list
+    });
+
+    expect(conflicts[0].winner).toMatchObject({
+      name: 'deploy',
+      extensionName: 'firebase',
+    });
+
+    expect(conflicts[0].loser).toMatchObject({
+      name: 'deploy',
+      extensionName: 'aws',
+    });
+  });
 });

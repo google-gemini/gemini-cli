@@ -1050,4 +1050,119 @@ describe('useSlashCommandProcessor', () => {
       expect(result.current.slashCommands).toEqual([newCommand]),
     );
   });
+
+  describe('Conflict Notifications', () => {
+    it('should display a warning when a command conflict occurs', async () => {
+      const builtinCommand = createTestCommand({ name: 'deploy' });
+      const extensionCommand = createTestCommand(
+        {
+          name: 'deploy',
+          extensionName: 'firebase',
+        },
+        CommandKind.FILE,
+      );
+
+      const result = await setupProcessorHook({
+        builtinCommands: [builtinCommand],
+        fileCommands: [extensionCommand],
+      });
+
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(2));
+
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining('Command conflicts detected'),
+        }),
+        expect.any(Number),
+      );
+
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining(
+            "- Command '/deploy' from extension 'firebase' was renamed",
+          ),
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should deduplicate conflict warnings across re-renders', async () => {
+      const builtinCommand = createTestCommand({ name: 'deploy' });
+      const extensionCommand = createTestCommand(
+        {
+          name: 'deploy',
+          extensionName: 'firebase',
+        },
+        CommandKind.FILE,
+      );
+
+      const result = await setupProcessorHook({
+        builtinCommands: [builtinCommand],
+        fileCommands: [extensionCommand],
+      });
+
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(2));
+
+      // First notification
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining('Command conflicts detected'),
+        }),
+        expect.any(Number),
+      );
+
+      mockAddItem.mockClear();
+
+      // Trigger a reload or re-render
+      await act(async () => {
+        result.current.commandContext.ui.reloadCommands();
+      });
+
+      // Wait a bit for effect to run
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Should NOT have notified again
+      expect(mockAddItem).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining('Command conflicts detected'),
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should correctly identify the winner extension in the message', async () => {
+      const ext1Command = createTestCommand(
+        {
+          name: 'deploy',
+          extensionName: 'firebase',
+        },
+        CommandKind.FILE,
+      );
+      const ext2Command = createTestCommand(
+        {
+          name: 'deploy',
+          extensionName: 'aws',
+        },
+        CommandKind.FILE,
+      );
+
+      const result = await setupProcessorHook({
+        fileCommands: [ext1Command, ext2Command],
+      });
+
+      await waitFor(() => expect(result.current.slashCommands).toHaveLength(2));
+
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining("conflicts with extension 'firebase'"),
+        }),
+        expect.any(Number),
+      );
+    });
+  });
 });
