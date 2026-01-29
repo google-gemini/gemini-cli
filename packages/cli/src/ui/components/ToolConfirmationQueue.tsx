@@ -70,6 +70,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
       : undefined;
 
   const borderColor = theme.status.warning;
+  const hideToolIdentity = tool.confirmationDetails?.type === 'ask_user';
 
   return (
     <OverflowProvider>
@@ -83,7 +84,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
           <Box flexDirection="column" width={mainAreaWidth - 4}>
             {/* Header */}
             <Box
-              marginBottom={tool.confirmationDetails?.hideToolIdentity ? 0 : 1}
+              marginBottom={hideToolIdentity ? 0 : 1}
               justifyContent="space-between"
             >
               <Text color={theme.status.warning} bold>
@@ -96,7 +97,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
               )}
             </Box>
 
-            {!tool.confirmationDetails?.hideToolIdentity && (
+            {!hideToolIdentity && (
               <Box>
                 <ToolStatusIndicator status={tool.status} name={tool.name} />
                 <ToolInfo

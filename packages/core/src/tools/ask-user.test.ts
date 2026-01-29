@@ -385,7 +385,7 @@ describe('AskUserTool', () => {
       const result = await invocation.execute(new AbortController().signal);
       expect(result.returnDisplay).toBe('User dismissed dialog');
       expect(result.llmContent).toBe(
-        'User dismissed ask user dialog without answering.',
+        'User dismissed ask_user dialog without answering.',
       );
     });
   });

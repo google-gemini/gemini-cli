@@ -672,14 +672,7 @@ export interface DiffStat {
   user_removed_chars: number;
 }
 
-/** Common optional properties for all confirmation details types */
-interface BaseToolConfirmationDetails {
-  /** When true, hides the tool identity (name/description) in the confirmation UI */
-  hideToolIdentity?: boolean;
-}
-
-export interface ToolEditConfirmationDetails
-  extends BaseToolConfirmationDetails {
+export interface ToolEditConfirmationDetails {
   type: 'edit';
   title: string;
   onConfirm: (
@@ -703,8 +696,7 @@ export interface ToolConfirmationPayload {
   answers?: { [questionIndex: string]: string };
 }
 
-export interface ToolExecuteConfirmationDetails
-  extends BaseToolConfirmationDetails {
+export interface ToolExecuteConfirmationDetails {
   type: 'exec';
   title: string;
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
@@ -714,8 +706,7 @@ export interface ToolExecuteConfirmationDetails
   commands?: string[];
 }
 
-export interface ToolMcpConfirmationDetails
-  extends BaseToolConfirmationDetails {
+export interface ToolMcpConfirmationDetails {
   type: 'mcp';
   title: string;
   serverName: string;
@@ -724,8 +715,7 @@ export interface ToolMcpConfirmationDetails
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
 }
 
-export interface ToolInfoConfirmationDetails
-  extends BaseToolConfirmationDetails {
+export interface ToolInfoConfirmationDetails {
   type: 'info';
   title: string;
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
@@ -733,8 +723,7 @@ export interface ToolInfoConfirmationDetails
   urls?: string[];
 }
 
-export interface ToolAskUserConfirmationDetails
-  extends BaseToolConfirmationDetails {
+export interface ToolAskUserConfirmationDetails {
   type: 'ask_user';
   title: string;
   questions: Question[];

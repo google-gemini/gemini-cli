@@ -175,7 +175,6 @@ export class AskUserInvocation extends BaseToolInvocation<
       type: 'ask_user',
       title: 'Ask User',
       questions: normalizedQuestions,
-      hideToolIdentity: true,
       onConfirm: async (
         outcome: ToolConfirmationOutcome,
         payload?: ToolConfirmationPayload,
@@ -195,7 +194,7 @@ export class AskUserInvocation extends BaseToolInvocation<
   async execute(_signal: AbortSignal): Promise<ToolResult> {
     if (this.confirmationOutcome === ToolConfirmationOutcome.Cancel) {
       return {
-        llmContent: 'User dismissed ask user dialog without answering.',
+        llmContent: 'User dismissed ask_user dialog without answering.',
         returnDisplay: 'User dismissed dialog',
       };
     }

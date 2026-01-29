@@ -25,6 +25,7 @@ import { sanitizeForDisplay } from '../../utils/textUtils.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { theme } from '../../semantic-colors.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
+import { keyMatchers, Command } from '../../keyMatchers.js';
 import {
   REDIRECTION_WARNING_NOTE_LABEL,
   REDIRECTION_WARNING_NOTE_TEXT,
@@ -60,6 +61,9 @@ export const ToolConfirmationMessage: React.FC<
   const allowPermanentApproval =
     settings.merged.security.enablePermanentToolApproval;
 
+  const handlesOwnUI = confirmationDetails.type === 'ask_user';
+  const isTrustedFolder = config.isTrustedFolder();
+
   const handleConfirm = useCallback(
     (
       outcome: ToolConfirmationOutcome,
@@ -75,19 +79,21 @@ export const ToolConfirmationMessage: React.FC<
     [confirm, callId],
   );
 
-  const isAskUser = confirmationDetails.type === 'ask_user';
-  const isTrustedFolder = config.isTrustedFolder();
-
   useKeypress(
     (key) => {
-      if (!isFocused || isAskUser) return false;
-      if (key.name === 'escape' || (key.ctrl && key.name === 'c')) {
+      if (!isFocused) return false;
+      if (keyMatchers[Command.ESCAPE](key)) {
         handleConfirm(ToolConfirmationOutcome.Cancel);
         return true;
       }
+      if (keyMatchers[Command.QUIT](key)) {
+        // Return false to let ctrl-C bubble up to AppContainer for exit flow.
+        // AppContainer will call cancelOngoingRequest which will cancel the tool.
+        return false;
+      }
       return false;
     },
-    { isActive: isFocused && !isAskUser },
+    { isActive: isFocused },
   );
 
   const handleSelect = useCallback(
@@ -251,14 +257,12 @@ export const ToolConfirmationMessage: React.FC<
     return Math.max(availableTerminalHeight - surroundingElementsHeight, 1);
   }, [availableTerminalHeight, getOptions]);
 
-  const { question, bodyContent, options, handlesOwnUI } = useMemo(() => {
+  const { question, bodyContent, options } = useMemo(() => {
     let bodyContent: React.ReactNode | null = null;
     let question = '';
     const options = getOptions();
-    let handlesOwnUI = false;
 
     if (confirmationDetails.type === 'ask_user') {
-      handlesOwnUI = true;
       bodyContent = (
         <AskUserDialog
           questions={confirmationDetails.questions}
@@ -269,10 +273,10 @@ export const ToolConfirmationMessage: React.FC<
             handleConfirm(ToolConfirmationOutcome.Cancel);
           }}
           width={terminalWidth}
-          availableHeight={availableBodyContentHeight()}
+          availableHeight={availableBodyContentHeight() ?? 10}
         />
       );
-      return { question: '', bodyContent, options: [], handlesOwnUI };
+      return { question: '', bodyContent, options: [] };
     }
 
     if (confirmationDetails.type === 'edit') {
@@ -423,7 +427,7 @@ export const ToolConfirmationMessage: React.FC<
       );
     }
 
-    return { question, bodyContent, options, handlesOwnUI };
+    return { question, bodyContent, options };
   }, [
     confirmationDetails,
     getOptions,
@@ -459,30 +463,32 @@ export const ToolConfirmationMessage: React.FC<
       paddingTop={0}
       paddingBottom={handlesOwnUI ? 0 : 1}
     >
-      <Box flexGrow={1} flexShrink={1} overflow="hidden">
-        <MaxSizedBox
-          maxHeight={availableBodyContentHeight()}
-          maxWidth={terminalWidth}
-          overflowDirection="top"
-        >
-          {bodyContent}
-        </MaxSizedBox>
-      </Box>
+      {handlesOwnUI ? (
+        bodyContent
+      ) : (
+        <>
+          <Box flexGrow={1} flexShrink={1} overflow="hidden">
+            <MaxSizedBox
+              maxHeight={availableBodyContentHeight()}
+              maxWidth={terminalWidth}
+              overflowDirection="top"
+            >
+              {bodyContent}
+            </MaxSizedBox>
+          </Box>
 
-      {!handlesOwnUI && (
-        <Box marginBottom={1} flexShrink={0}>
-          <Text color={theme.text.primary}>{question}</Text>
-        </Box>
-      )}
+          <Box marginBottom={1} flexShrink={0}>
+            <Text color={theme.text.primary}>{question}</Text>
+          </Box>
 
-      {!handlesOwnUI && (
-        <Box flexShrink={0}>
-          <RadioButtonSelect
-            items={options}
-            onSelect={handleSelect}
-            isFocused={isFocused}
-          />
-        </Box>
+          <Box flexShrink={0}>
+            <RadioButtonSelect
+              items={options}
+              onSelect={handleSelect}
+              isFocused={isFocused}
+            />
+          </Box>
+        </>
       )}
     </Box>
   );
