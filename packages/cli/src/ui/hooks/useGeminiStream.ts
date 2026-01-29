@@ -469,7 +469,7 @@ export const useGeminiStream = (
     setShellInputFocused,
     terminalWidth,
     terminalHeight,
-    activeToolPtyId
+    activeToolPtyId,
   );
 
   const activePtyId = activeShellPtyId || activeToolPtyId;

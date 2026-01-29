@@ -14,11 +14,7 @@ import {
   type AnsiLine,
   type AnsiToken,
 } from '@google/gemini-cli-core';
-import {
-  cpLen,
-  cpSlice,
-  getCachedStringWidth,
-} from '../utils/textUtils.js';
+import { cpLen, cpSlice, getCachedStringWidth } from '../utils/textUtils.js';
 import { type BackgroundShell } from '../hooks/shellCommandProcessor.js';
 import { Command, keyMatchers } from '../keyMatchers.js';
 import { useKeypress } from '../hooks/useKeypress.js';

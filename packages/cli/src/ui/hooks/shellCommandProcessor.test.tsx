@@ -28,7 +28,10 @@ const mockShellSubscribe = vi.hoisted(() =>
 ); // Returns unsubscribe
 const mockShellOnExit = vi.hoisted(() =>
   vi.fn<
-    (pid: number, callback: (exitCode: number, signal?: number) => void) => () => void
+    (
+      pid: number,
+      callback: (exitCode: number, signal?: number) => void,
+    ) => () => void
   >(() => vi.fn()),
 );
 

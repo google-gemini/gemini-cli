@@ -46,7 +46,10 @@ export const initialState: ShellState = {
   isBackgroundShellVisible: false,
 };
 
-export function shellReducer(state: ShellState, action: ShellAction): ShellState {
+export function shellReducer(
+  state: ShellState,
+  action: ShellAction,
+): ShellState {
   switch (action.type) {
     case 'SET_ACTIVE_PTY':
       return { ...state, activeShellPtyId: action.pid };

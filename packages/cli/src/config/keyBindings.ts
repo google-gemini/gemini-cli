@@ -276,7 +276,9 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.KILL_BACKGROUND_SHELL]: [{ key: 'k', ctrl: true }],
   [Command.UNFOCUS_BACKGROUND_SHELL]: [{ key: 'tab', shift: true }],
   [Command.UNFOCUS_BACKGROUND_SHELL_LIST]: [{ key: 'tab', shift: false }],
-  [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING]: [{ key: 'tab', shift: false }],
+  [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING]: [
+    { key: 'tab', shift: false },
+  ],
   [Command.SHOW_MORE_LINES]: [
     { key: 'o', ctrl: true },
     { key: 's', ctrl: true },
