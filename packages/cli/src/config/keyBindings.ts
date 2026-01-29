@@ -413,8 +413,8 @@ export const commandCategories: readonly CommandCategory[] = [
  */
 export const commandDescriptions: Readonly<Record<Command, string>> = {
   // Basic Controls
-  [Command.RETURN]: 'Enter',
-  [Command.ESCAPE]: 'Esc',
+  [Command.RETURN]: 'Confirm the current selection or choice.',
+  [Command.ESCAPE]: 'Dismiss dialogs or cancel the current focus.',
   [Command.QUIT]:
     'Cancel the current request or quit the CLI when input is empty.',
   [Command.EXIT]: 'Exit the CLI when the input buffer is empty.',
