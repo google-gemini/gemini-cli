@@ -676,18 +676,13 @@ describe('<ToolGroupMessage />', () => {
         }),
       ];
 
-      const mockConfig = {
-        ...baseMockConfig,
-        isEventDrivenSchedulerEnabled: () => true,
-      } as unknown as Config;
-
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage
           {...baseProps}
           toolCalls={toolCalls}
           borderBottom={false}
         />,
-        { config: mockConfig },
+        { config: baseMockConfig },
       );
       // AskUser tools in progress are rendered by AskUserDialog, so we expect nothing.
       expect(lastFrame()).toMatchSnapshot();
