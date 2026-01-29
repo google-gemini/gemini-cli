@@ -2156,7 +2156,7 @@ describe('Settings Loading and Merging', () => {
 
       // 2. Now, set remote admin settings.
       loadedSettings.setRemoteAdminSettings({
-        secureModeEnabled: true,
+        strictModeDisabled: false,
         mcpSetting: { mcpEnabled: false },
         cliFeatureSetting: { extensionsSetting: { extensionsEnabled: false } },
       });
@@ -2197,7 +2197,7 @@ describe('Settings Loading and Merging', () => {
       expect(loadedSettings.merged.ui?.theme).toBe('initial-theme');
 
       const newRemoteSettings = {
-        secureModeEnabled: true,
+        strictModeDisabled: false,
         mcpSetting: { mcpEnabled: false },
         cliFeatureSetting: { extensionsSetting: { extensionsEnabled: false } },
       };
@@ -2213,7 +2213,7 @@ describe('Settings Loading and Merging', () => {
 
       // Verify that calling setRemoteAdminSettings with partial data overwrites previous remote settings
       // and missing properties revert to schema defaults.
-      loadedSettings.setRemoteAdminSettings({ secureModeEnabled: false });
+      loadedSettings.setRemoteAdminSettings({ strictModeDisabled: true });
       expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
       expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false); // Defaulting to false if missing
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false); // Defaulting to false if missing
@@ -2271,9 +2271,9 @@ describe('Settings Loading and Merging', () => {
       expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
 
-      // Set remote settings with only secureModeEnabled
+      // Set remote settings with only strictModeDisabled (false -> secureModeEnabled: true)
       loadedSettings.setRemoteAdminSettings({
-        secureModeEnabled: true,
+        strictModeDisabled: false,
       });
 
       // Verify secureModeEnabled is updated, others default to false
@@ -2286,8 +2286,8 @@ describe('Settings Loading and Merging', () => {
         mcpSetting: { mcpEnabled: false },
       });
 
-      // Verify mcpEnabled is updated, others remain defaults (secureModeEnabled reverts to default:false)
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
+      // Verify mcpEnabled is updated, others remain defaults (secureModeEnabled defaults to true if strictModeDisabled is missing)
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
       expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
 
@@ -2297,9 +2297,33 @@ describe('Settings Loading and Merging', () => {
       });
 
       // Verify extensionsEnabled is updated, others remain defaults
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
       expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
+
+      // Verify that missing strictModeDisabled falls back to secureModeEnabled
+      loadedSettings.setRemoteAdminSettings({
+        secureModeEnabled: false,
+      });
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
+
+      loadedSettings.setRemoteAdminSettings({
+        secureModeEnabled: true,
+      });
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
+
+      // Verify strictModeDisabled takes precedence over secureModeEnabled
+      loadedSettings.setRemoteAdminSettings({
+        strictModeDisabled: false,
+        secureModeEnabled: false,
+      });
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
+
+      loadedSettings.setRemoteAdminSettings({
+        strictModeDisabled: true,
+        secureModeEnabled: true,
+      });
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
     });
 
     it('should set skills based on unmanagedCapabilitiesEnabled', () => {
@@ -2337,12 +2361,12 @@ describe('Settings Loading and Merging', () => {
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
     });
 
-    it('should force secureModeEnabled to false if undefined, overriding schema defaults', () => {
-      // Mock schema to have secureModeEnabled default to true to verify the override
+    it('should force secureModeEnabled to true if undefined, overriding schema defaults', () => {
+      // Mock schema to have secureModeEnabled default to false to verify the override
       const originalSchema = getSettingsSchema();
       const modifiedSchema = JSON.parse(JSON.stringify(originalSchema));
       if (modifiedSchema.admin?.properties?.secureModeEnabled) {
-        modifiedSchema.admin.properties.secureModeEnabled.default = true;
+        modifiedSchema.admin.properties.secureModeEnabled.default = false;
       }
       vi.mocked(getSettingsSchema).mockReturnValue(modifiedSchema);
 
@@ -2352,13 +2376,13 @@ describe('Settings Loading and Merging', () => {
 
         const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
 
-        // Pass a non-empty object that doesn't have secureModeEnabled
+        // Pass a non-empty object that doesn't have strictModeDisabled
         loadedSettings.setRemoteAdminSettings({
           mcpSetting: {},
         });
 
-        // It should be forced to false by the logic, overriding the mock default of true
-        expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
+        // It should be forced to true by the logic (default secure), overriding the mock default of false
+        expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
       } finally {
         vi.mocked(getSettingsSchema).mockReturnValue(originalSchema);
       }

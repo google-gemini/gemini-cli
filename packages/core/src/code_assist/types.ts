@@ -317,7 +317,9 @@ const McpSettingSchema = z.object({
 });
 
 export const FetchAdminControlsResponseSchema = z.object({
+  // TODO: deprecate once backend stops sending this field
   secureModeEnabled: z.boolean().optional(),
+  strictModeDisabled: z.boolean().optional(),
   mcpSetting: McpSettingSchema.optional(),
   cliFeatureSetting: CliFeatureSettingSchema.optional(),
 });
