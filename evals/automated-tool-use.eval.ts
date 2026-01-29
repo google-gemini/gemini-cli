@@ -8,6 +8,11 @@ import { describe, expect } from 'vitest';
 import { evalTest } from './test-helper.js';
 
 describe('automated_tool_use', () => {
+  /**
+   * Tests that the agent always utilizes --fix when calling eslint.
+   * We provide a 'lint' script in the package.json, which helps elicit
+   * a repro by guiding the agent into using the existing deficient script.
+   */
   evalTest('ALWAYS_PASSES', {
     name: 'should use automated tools (eslint --fix) to fix code style issues',
     files: {
