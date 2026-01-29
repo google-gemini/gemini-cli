@@ -12,10 +12,17 @@ import type {
 import {
   partListUnionToString,
   SESSION_FILE_PREFIX,
+  SessionEndReason,
+  SessionStartSource,
+  flushTelemetry,
+  uiTelemetryService,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { stripUnsafeCharacters } from '../ui/utils/textUtils.js';
+import type { CommandContext } from '../ui/commands/types.js';
+import { randomUUID } from 'node:crypto';
+import { MessageType } from '../ui/types.js';
 
 /**
  * Constant for the resume "latest" identifier.
@@ -512,5 +519,80 @@ export class SessionSelector {
         `Failed to load session ${sessionInfo.id}: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
+  }
+}
+
+/**
+ * Creates a new chat session by resetting the client, generating a new session ID,
+ * and firing the appropriate hooks.
+ *
+ * @param context - The command context
+ * @param source - The source of the session start
+ * @param clearScreen - Whether to clear the screen
+ */
+export async function createNewSession(
+  context: CommandContext,
+  source: SessionStartSource = SessionStartSource.Clear,
+  clearScreen = false,
+): Promise<void> {
+  const geminiClient = context.services.config?.getGeminiClient();
+  const config = context.services.config;
+
+  const hookSystem = config?.getHookSystem();
+  if (hookSystem) {
+    await hookSystem.fireSessionEndEvent(SessionEndReason.Clear);
+  }
+
+  // Generate and set new session ID *before* resetting chat, so the new
+  // ChatRecordingService created during resetChat() picks up the new ID.
+  if (config) {
+    const newSessionId = randomUUID();
+    config.setSessionId(newSessionId);
+  }
+
+  if (geminiClient) {
+    if (clearScreen) {
+      context.ui.setDebugMessage('Clearing terminal and resetting chat.');
+    } else {
+      context.ui.setDebugMessage('Resetting chat.');
+    }
+    await geminiClient.resetChat();
+  } else if (clearScreen) {
+    context.ui.setDebugMessage('Clearing terminal.');
+  }
+
+  let result;
+  if (hookSystem) {
+    result = await hookSystem.fireSessionStartEvent(source);
+  }
+
+  await new Promise((resolve) => setImmediate(resolve));
+
+  if (config) {
+    await flushTelemetry(config);
+  }
+
+  uiTelemetryService.setLastPromptTokenCount(0);
+
+  if (clearScreen) {
+    context.ui.clear();
+  } else {
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: 'Started a new session. Previous chat session saved.',
+      },
+      Date.now(),
+    );
+  }
+
+  if (result?.systemMessage) {
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: result.systemMessage,
+      },
+      Date.now(),
+    );
   }
 }
