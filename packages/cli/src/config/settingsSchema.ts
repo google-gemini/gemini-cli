@@ -9,19 +9,17 @@
 // to regenerate the settings reference in `docs/get-started/configuration.md`.
 // --------------------------------------------------------------------------
 
-import type {
-  MCPServerConfig,
-  BugCommandSettings,
-  TelemetrySettings,
-  AuthType,
-  AgentOverride,
-} from '@google/gemini-cli-core';
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   DEFAULT_MODEL_CONFIGS,
+  type MCPServerConfig,
+  type BugCommandSettings,
+  type TelemetrySettings,
+  type AuthType,
+  type AgentOverride,
+  type CustomTheme,
 } from '@google/gemini-cli-core';
-import type { CustomTheme } from '../ui/themes/theme.js';
 import type { SessionRetentionSettings } from './settings.js';
 import { DEFAULT_MIN_RETENTION } from '../utils/sessionCleanup.js';
 
@@ -524,6 +522,16 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: false,
         description: 'Show the model name in the chat for each model turn.',
+        showInDialog: true,
+      },
+      showUserIdentity: {
+        type: 'boolean',
+        label: 'Show User Identity',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          "Show the logged-in user's identity (e.g. email) in the UI.",
         showInDialog: true,
       },
       useAlternateBuffer: {
@@ -1593,11 +1601,11 @@ const SETTINGS_SCHEMA = {
         type: 'boolean',
         label: 'Enable Hooks',
         category: 'Advanced',
-        requiresRestart: false,
+        requiresRestart: true,
         default: true,
         description:
           'Canonical toggle for the hooks system. When disabled, no hooks will be executed.',
-        showInDialog: false,
+        showInDialog: true,
       },
       disabled: {
         type: 'array',
