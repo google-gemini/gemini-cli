@@ -24,44 +24,104 @@ const PDF_TOKEN_ESTIMATE = 25800;
 // Above this, we use a faster approximation to avoid performance bottlenecks.
 const MAX_CHARS_FOR_FULL_HEURISTIC = 100_000;
 
+// Maximum depth for recursive token estimation to prevent stack overflow from
+// malicious or buggy nested structures. A depth of 3 is sufficient given
+// standard multimodal responses are typically depth 1.
+const MAX_RECURSION_DEPTH = 3;
+
+/**
+ * Heuristic estimation of tokens for a text string.
+ */
+function estimateTextTokens(text: string): number {
+  if (text.length > MAX_CHARS_FOR_FULL_HEURISTIC) {
+    return text.length / 4;
+  }
+
+  let tokens = 0;
+  // Optimized loop: charCodeAt is faster than for...of on large strings
+  for (let i = 0; i < text.length; i++) {
+    if (text.charCodeAt(i) <= 127) {
+      tokens += ASCII_TOKENS_PER_CHAR;
+    } else {
+      tokens += NON_ASCII_TOKENS_PER_CHAR;
+    }
+  }
+  return tokens;
+}
+
+/**
+ * Heuristic estimation for media parts (images, PDFs) using fixed safe estimates.
+ */
+function estimateMediaTokens(part: Part): number | undefined {
+  const inlineData = 'inlineData' in part ? part.inlineData : undefined;
+  const fileData = 'fileData' in part ? part.fileData : undefined;
+  const mimeType = inlineData?.mimeType || fileData?.mimeType;
+
+  if (mimeType?.startsWith('image/')) {
+    // Images: 3,000 tokens (covers up to 4K resolution on Gemini 3)
+    // See: https://ai.google.dev/gemini-api/docs/vision#token_counting
+    return IMAGE_TOKEN_ESTIMATE;
+  } else if (mimeType?.startsWith('application/pdf')) {
+    // PDFs: 25,800 tokens (~100 pages at 258 tokens/page)
+    // See: https://ai.google.dev/gemini-api/docs/document-processing
+    return PDF_TOKEN_ESTIMATE;
+  }
+  return undefined;
+}
+
+/**
+ * Heuristic estimation for tool responses, avoiding massive string copies
+ * and accounting for nested Gemini 3 multimodal parts.
+ */
+function estimateFunctionResponseTokens(part: Part, depth: number): number {
+  const fr = part.functionResponse;
+  if (!fr) return 0;
+
+  let totalTokens = (fr.name?.length ?? 0) / 4;
+  const response = fr.response as unknown;
+
+  if (typeof response === 'string') {
+    totalTokens += response.length / 4;
+  } else if (response !== undefined && response !== null) {
+    // For objects, stringify only the payload, not the whole Part object.
+    totalTokens += JSON.stringify(response).length / 4;
+  }
+
+  // Gemini 3: Handle nested multimodal parts recursively.
+  const nestedParts = (fr as unknown as { parts?: Part[] }).parts;
+  if (nestedParts && nestedParts.length > 0) {
+    totalTokens += estimateTokenCountSync(nestedParts, depth + 1);
+  }
+
+  return totalTokens;
+}
+
 /**
  * Estimates token count for parts synchronously using a heuristic.
  * - Text: character-based heuristic (ASCII vs CJK) for small strings, length/4 for massive ones.
  * - Non-text (Tools, etc): JSON string length / 4.
  */
-export function estimateTokenCountSync(parts: Part[]): number {
+export function estimateTokenCountSync(
+  parts: Part[],
+  depth: number = 0,
+): number {
+  if (depth > MAX_RECURSION_DEPTH) {
+    return 0;
+  }
+
   let totalTokens = 0;
   for (const part of parts) {
     if (typeof part.text === 'string') {
-      if (part.text.length > MAX_CHARS_FOR_FULL_HEURISTIC) {
-        totalTokens += part.text.length / 4;
-      } else {
-        for (const char of part.text) {
-          if (char.codePointAt(0)! <= 127) {
-            totalTokens += ASCII_TOKENS_PER_CHAR;
-          } else {
-            totalTokens += NON_ASCII_TOKENS_PER_CHAR;
-          }
-        }
-      }
+      totalTokens += estimateTextTokens(part.text);
+    } else if (part.functionResponse) {
+      totalTokens += estimateFunctionResponseTokens(part, depth);
     } else {
-      // For images and PDFs, we use fixed safe estimates:
-      // - Images: 3,000 tokens (covers up to 4K resolution on Gemini 3)
-      // - PDFs: 25,800 tokens (~100 pages at 258 tokens/page)
-      // See: https://ai.google.dev/gemini-api/docs/vision#token_counting
-      // See: https://ai.google.dev/gemini-api/docs/document-processing
-      const inlineData = 'inlineData' in part ? part.inlineData : undefined;
-      const fileData = 'fileData' in part ? part.fileData : undefined;
-      const mimeType = inlineData?.mimeType || fileData?.mimeType;
-
-      if (mimeType?.startsWith('image/')) {
-        totalTokens += IMAGE_TOKEN_ESTIMATE;
-      } else if (mimeType?.startsWith('application/pdf')) {
-        totalTokens += PDF_TOKEN_ESTIMATE;
+      const mediaEstimate = estimateMediaTokens(part);
+      if (mediaEstimate !== undefined) {
+        totalTokens += mediaEstimate;
       } else {
-        // For other non-text parts (functionCall, functionResponse, etc.),
-        // we fallback to the JSON string length heuristic.
-        // Note: This is an approximation.
+        // Fallback for other non-text parts (e.g., functionCall).
+        // Note: JSON.stringify(part) here is safe as these parts are typically small.
         totalTokens += JSON.stringify(part).length / 4;
       }
     }
