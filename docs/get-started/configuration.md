@@ -733,12 +733,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
-- **`tools.enableHooks`** (boolean):
-  - **Description:** Enables the hooks system experiment. When disabled, the
-    hooks system is completely deactivated regardless of other settings.
-  - **Default:** `true`
-  - **Requires restart:** Yes
-
 #### `mcp`
 
 - **`mcp.serverCommand`** (string):
