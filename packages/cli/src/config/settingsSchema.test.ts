@@ -403,16 +403,6 @@ describe('SettingsSchema', () => {
       );
     });
 
-    it('should have hooksConfig.enabled setting in schema', () => {
-      const setting = getSettingsSchema().hooksConfig?.properties.enabled;
-      expect(setting).toBeDefined();
-      expect(setting.type).toBe('boolean');
-      expect(setting.category).toBe('Advanced');
-      expect(setting.default).toBe(true);
-      expect(setting.requiresRestart).toBe(true);
-      expect(setting.showInDialog).toBe(true);
-    });
-
     it('should have hooksConfig.notifications setting in schema', () => {
       const setting = getSettingsSchema().hooksConfig?.properties.notifications;
       expect(setting).toBeDefined();
