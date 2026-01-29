@@ -131,18 +131,10 @@ function toSerializableDetails(
 function getNotificationMessage(
   confirmationDetails: ToolCallConfirmationDetails,
 ): string {
-  switch (confirmationDetails.type) {
-    case 'edit':
-      return `Tool ${confirmationDetails.title} requires editing`;
-    case 'exec':
-      return `Tool ${confirmationDetails.title} requires execution`;
-    case 'mcp':
-      return `Tool ${confirmationDetails.title} requires MCP`;
-    case 'info':
-      return `Tool ${confirmationDetails.title} requires information`;
-    default:
-      return `Tool requires confirmation`;
-  }
+  const name = confirmationDetails.title.startsWith('Confirm: ')
+    ? confirmationDetails.title.slice(9)
+    : confirmationDetails.title;
+  return `Require tool Permission: ${name}`;
 }
 
 export class HookSystem {

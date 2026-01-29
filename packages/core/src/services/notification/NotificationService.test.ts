@@ -151,7 +151,7 @@ describe('NotificationService', () => {
 
     expect(mockNotify).toHaveBeenCalledWith(
       expect.objectContaining({
-        message: 'Confirm: test_tool',
+        message: 'Require tool Permission: test_tool',
       }),
       expect.any(Function),
     );

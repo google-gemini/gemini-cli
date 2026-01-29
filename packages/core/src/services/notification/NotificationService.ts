@@ -169,7 +169,7 @@ export class NotificationService {
   ): void {
     const toolName = message.toolCall.name;
     this.notify({
-      message: `Confirm: ${toolName}`,
+      message: `Require tool Permission: ${toolName}`,
     });
   }
 
