@@ -11,11 +11,13 @@ import { writeToStdout } from './stdio.js';
  */
 export function disableMouseTracking() {
   writeToStdout(
-    '\x1b[?1000l' + // Normal tracking
-      '\x1b[?1003l' + // Any-event tracking
-      '\x1b[?1015l' + // urxvt extended mouse mode
-      '\x1b[?1006l' + // SGR-style mouse tracking
+    [
+      '\x1b[?1000l', // Normal tracking
+      '\x1b[?1003l', // Any-event tracking
+      '\x1b[?1015l', // urxvt extended mouse mode
+      '\x1b[?1006l', // SGR-style mouse tracking
       '\x1b[?1002l', // Button-event tracking
+    ].join(''),
   );
 }
 
