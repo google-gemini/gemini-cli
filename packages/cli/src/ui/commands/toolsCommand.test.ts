@@ -40,13 +40,10 @@ describe('toolsCommand', () => {
     if (!toolsCommand.action) throw new Error('Action not defined');
     await toolsCommand.action(mockContext, '');
 
-    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-      {
-        type: MessageType.ERROR,
-        text: 'Could not retrieve tool registry.',
-      },
-      expect.any(Number),
-    );
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+      type: MessageType.ERROR,
+      text: 'Could not retrieve tool registry.',
+    });
   });
 
   it('should display "No tools available" when none are found', async () => {
@@ -63,14 +60,11 @@ describe('toolsCommand', () => {
     if (!toolsCommand.action) throw new Error('Action not defined');
     await toolsCommand.action(mockContext, '');
 
-    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-      {
-        type: MessageType.TOOLS_LIST,
-        tools: [],
-        showDescriptions: false,
-      },
-      expect.any(Number),
-    );
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+      type: MessageType.TOOLS_LIST,
+      tools: [],
+      showDescriptions: false,
+    });
   });
 
   it('should list tools without descriptions by default', async () => {

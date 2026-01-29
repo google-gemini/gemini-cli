@@ -8,13 +8,11 @@ import type {
   Config,
   ToolCallRequestInfo,
   ResumedSessionData,
-  CompletedToolCall,
   UserFeedbackPayload,
 } from '@google/gemini-cli-core';
 import { isSlashCommand } from './ui/utils/commandUtils.js';
 import type { LoadedSettings } from './config/settings.js';
 import {
-  executeToolCall,
   GeminiEventType,
   FatalInputError,
   promptIdContext,
@@ -29,10 +27,13 @@ import {
   createWorkingStdio,
   recordToolCallInteractions,
   ToolErrorType,
+  Scheduler,
+  ROOT_SCHEDULER_ID,
 } from '@google/gemini-cli-core';
 
 import type { Content, Part } from '@google/genai';
 import readline from 'node:readline';
+import stripAnsi from 'strip-ansi';
 
 import { convertSessionToHistoryFormats } from './ui/hooks/useSessionBrowser.js';
 import { handleSlashCommand } from './nonInteractiveCliCommands.js';
@@ -51,7 +52,6 @@ interface RunNonInteractiveParams {
   settings: LoadedSettings;
   input: string;
   prompt_id: string;
-  hasDeprecatedPromptArg?: boolean;
   resumedSessionData?: ResumedSessionData;
 }
 
@@ -60,7 +60,6 @@ export async function runNonInteractive({
   settings,
   input,
   prompt_id,
-  hasDeprecatedPromptArg,
   resumedSessionData,
 }: RunNonInteractiveParams): Promise<void> {
   return promptIdContext.run(prompt_id, async () => {
@@ -71,6 +70,14 @@ export async function runNonInteractive({
         coreEvents.emitConsoleLog(msg.type, msg.content);
       },
     });
+
+    if (config.storage && process.env['GEMINI_CLI_ACTIVITY_LOG_FILE']) {
+      const { registerActivityLogger } = await import(
+        './utils/activityLogger.js'
+      );
+      registerActivityLogger(config);
+    }
+
     const { stdout: workingStdout } = createWorkingStdio();
     const textOutput = new TextOutput(workingStdout);
 
@@ -178,6 +185,16 @@ export async function runNonInteractive({
     try {
       consolePatcher.patch();
 
+      if (
+        config.getRawOutput() &&
+        !config.getAcceptRawOutputRisk() &&
+        config.getOutputFormat() === OutputFormat.TEXT
+      ) {
+        process.stderr.write(
+          '[WARNING] --raw-output is enabled. Model output is not sanitized and may contain harmful ANSI sequences (e.g. for phishing or command injection). Use --accept-raw-output-risk to suppress this warning.\n',
+        );
+      }
+
       // Setup stdin cancellation listener
       setupStdinCancellation();
 
@@ -193,6 +210,12 @@ export async function runNonInteractive({
       });
 
       const geminiClient = config.getGeminiClient();
+      const scheduler = new Scheduler({
+        config,
+        messageBus: config.getMessageBus(),
+        getPreferredEditor: () => undefined,
+        schedulerId: ROOT_SCHEDULER_ID,
+      });
 
       // Initialize chat.  Resume if resume data is passed.
       if (resumedSessionData) {
@@ -264,21 +287,6 @@ export async function runNonInteractive({
       let currentMessages: Content[] = [{ role: 'user', parts: query }];
 
       let turnCount = 0;
-      const deprecateText =
-        'The --prompt (-p) flag has been deprecated and will be removed in a future version. Please use a positional argument for your prompt. See gemini --help for more information.\n';
-      if (hasDeprecatedPromptArg) {
-        if (streamFormatter) {
-          streamFormatter.emitEvent({
-            type: JsonStreamEventType.MESSAGE,
-            timestamp: new Date().toISOString(),
-            role: 'assistant',
-            content: deprecateText,
-            delta: true,
-          });
-        } else {
-          process.stderr.write(deprecateText);
-        }
-      }
       while (true) {
         turnCount++;
         if (
@@ -302,19 +310,22 @@ export async function runNonInteractive({
           }
 
           if (event.type === GeminiEventType.Content) {
+            const isRaw =
+              config.getRawOutput() || config.getAcceptRawOutputRisk();
+            const output = isRaw ? event.value : stripAnsi(event.value);
             if (streamFormatter) {
               streamFormatter.emitEvent({
                 type: JsonStreamEventType.MESSAGE,
                 timestamp: new Date().toISOString(),
                 role: 'assistant',
-                content: event.value,
+                content: output,
                 delta: true,
               });
             } else if (config.getOutputFormat() === OutputFormat.JSON) {
-              responseText += event.value;
+              responseText += output;
             } else {
               if (event.value) {
-                textOutput.write(event.value);
+                textOutput.write(output);
               }
             }
           } else if (event.type === GeminiEventType.ToolCallRequest) {
@@ -349,7 +360,7 @@ export async function runNonInteractive({
           } else if (event.type === GeminiEventType.Error) {
             throw event.value.error;
           } else if (event.type === GeminiEventType.AgentExecutionStopped) {
-            const stopMessage = `Agent execution stopped: ${event.value.reason}`;
+            const stopMessage = `Agent execution stopped: ${event.value.systemMessage?.trim() || event.value.reason}`;
             if (config.getOutputFormat() === OutputFormat.TEXT) {
               process.stderr.write(`${stopMessage}\n`);
             }
@@ -369,7 +380,7 @@ export async function runNonInteractive({
             }
             return;
           } else if (event.type === GeminiEventType.AgentExecutionBlocked) {
-            const blockMessage = `Agent execution blocked: ${event.value.reason}`;
+            const blockMessage = `Agent execution blocked: ${event.value.systemMessage?.trim() || event.value.reason}`;
             if (config.getOutputFormat() === OutputFormat.TEXT) {
               process.stderr.write(`[WARNING] ${blockMessage}\n`);
             }
@@ -378,25 +389,23 @@ export async function runNonInteractive({
 
         if (toolCallRequests.length > 0) {
           textOutput.ensureTrailingNewline();
+          const completedToolCalls = await scheduler.schedule(
+            toolCallRequests,
+            abortController.signal,
+          );
           const toolResponseParts: Part[] = [];
-          const completedToolCalls: CompletedToolCall[] = [];
 
-          for (const requestInfo of toolCallRequests) {
-            const completedToolCall = await executeToolCall(
-              config,
-              requestInfo,
-              abortController.signal,
-            );
+          for (const completedToolCall of completedToolCalls) {
             const toolResponse = completedToolCall.response;
-
-            completedToolCalls.push(completedToolCall);
+            const requestInfo = completedToolCall.request;
 
             if (streamFormatter) {
               streamFormatter.emitEvent({
                 type: JsonStreamEventType.TOOL_RESULT,
                 timestamp: new Date().toISOString(),
                 tool_id: requestInfo.callId,
-                status: toolResponse.error ? 'error' : 'success',
+                status:
+                  completedToolCall.status === 'error' ? 'error' : 'success',
                 output:
                   typeof toolResponse.resultDisplay === 'string'
                     ? toolResponse.resultDisplay

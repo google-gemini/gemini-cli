@@ -23,6 +23,12 @@ import { ToolErrorType } from './tool-error.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
+/**
+ * The separator used to qualify MCP tool names with their server prefix.
+ * e.g. "server_name__tool_name"
+ */
+export const MCP_QUALIFIED_NAME_SEPARATOR = '__';
+
 type ToolParams = Record<string, unknown>;
 
 // Discriminated union for MCP Content Blocks to ensure type safety.
@@ -59,7 +65,7 @@ type McpContentBlock =
   | McpResourceBlock
   | McpResourceLinkBlock;
 
-class DiscoveredMCPToolInvocation extends BaseToolInvocation<
+export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
   ToolParams,
   ToolResult
 > {
@@ -82,7 +88,7 @@ class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     super(
       params,
       messageBus,
-      `${serverName}__${serverToolName}`,
+      `${serverName}${MCP_QUALIFIED_NAME_SEPARATOR}${serverToolName}`,
       displayName,
       serverName,
     );
@@ -261,7 +267,11 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
   }
 
   getFullyQualifiedPrefix(): string {
-    return `${this.serverName}__`;
+    return `${this.serverName}${MCP_QUALIFIED_NAME_SEPARATOR}`;
+  }
+
+  getFullyQualifiedName(): string {
+    return `${this.getFullyQualifiedPrefix()}${generateValidName(this.serverToolName)}`;
   }
 
   asFullyQualifiedTool(): DiscoveredMCPTool {
@@ -273,7 +283,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.parameterSchema,
       this.messageBus,
       this.trust,
-      `${this.getFullyQualifiedPrefix()}${this.serverToolName}`,
+      this.getFullyQualifiedName(),
       this.cliConfig,
       this.extensionName,
       this.extensionId,

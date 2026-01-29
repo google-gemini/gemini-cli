@@ -35,6 +35,16 @@ vi.mock('os', async (importOriginal) => {
   };
 });
 
+vi.mock('../utils/paths.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/paths.js')>();
+  return {
+    ...actual,
+    homedir: vi.fn(),
+  };
+});
+
+import { homedir as pathsHomedir } from './paths.js';
+
 describe('memoryDiscovery', () => {
   const DEFAULT_FOLDER_TRUST = true;
   let testRootDir: string;
@@ -67,6 +77,7 @@ describe('memoryDiscovery', () => {
     cwd = await createEmptyDir(path.join(projectRoot, 'src'));
     homedir = await createEmptyDir(path.join(testRootDir, 'userhome'));
     vi.mocked(os.homedir).mockReturnValue(homedir);
+    vi.mocked(pathsHomedir).mockReturnValue(homedir);
   });
 
   afterEach(async () => {
@@ -425,6 +436,7 @@ Subdir memory
       {
         respectGitIgnore: true,
         respectGeminiIgnore: true,
+        customIgnoreFilePaths: [],
       },
       200, // maxDirs parameter
     );
@@ -461,6 +473,7 @@ My code memory
       {
         respectGitIgnore: true,
         respectGeminiIgnore: true,
+        customIgnoreFilePaths: [],
       },
       1, // maxDirs
     );

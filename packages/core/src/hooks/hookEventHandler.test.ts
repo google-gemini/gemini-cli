@@ -4,11 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {
+  GenerateContentParameters,
+  GenerateContentResponse,
+} from '@google/genai';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { HookEventHandler } from './hookEventHandler.js';
 import type { Config } from '../config/config.js';
 import type { HookConfig } from './types.js';
-import type { Logger } from '@opentelemetry/api-logs';
 import type { HookPlanner } from './hookPlanner.js';
 import type { HookRunner } from './hookRunner.js';
 import type { HookAggregator } from './hookAggregator.js';
@@ -18,7 +21,6 @@ import {
   SessionStartSource,
   type HookExecutionResult,
 } from './types.js';
-import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 
 // Mock debugLogger
 const mockDebugLogger = vi.hoisted(() => ({
@@ -31,6 +33,8 @@ const mockDebugLogger = vi.hoisted(() => ({
 // Mock coreEvents
 const mockCoreEvents = vi.hoisted(() => ({
   emitFeedback: vi.fn(),
+  emitHookStart: vi.fn(),
+  emitHookEnd: vi.fn(),
 }));
 
 vi.mock('../utils/debugLogger.js', () => ({
@@ -52,7 +56,6 @@ vi.mock('../telemetry/clearcut-logger/clearcut-logger.js', () => ({
 describe('HookEventHandler', () => {
   let hookEventHandler: HookEventHandler;
   let mockConfig: Config;
-  let mockLogger: Logger;
   let mockHookPlanner: HookPlanner;
   let mockHookRunner: HookRunner;
   let mockHookAggregator: HookAggregator;
@@ -72,8 +75,6 @@ describe('HookEventHandler', () => {
       }),
     } as unknown as Config;
 
-    mockLogger = {} as Logger;
-
     mockHookPlanner = {
       createExecutionPlan: vi.fn(),
     } as unknown as HookPlanner;
@@ -89,11 +90,9 @@ describe('HookEventHandler', () => {
 
     hookEventHandler = new HookEventHandler(
       mockConfig,
-      mockLogger,
       mockHookPlanner,
       mockHookRunner,
       mockHookAggregator,
-      createMockMessageBus(),
     );
   });
 
@@ -158,7 +157,30 @@ describe('HookEventHandler', () => {
           tool_name: 'EditTool',
           tool_input: { file: 'test.txt' },
         }),
+        expect.any(Function),
+        expect.any(Function),
       );
+
+      // Verify event emission via callbacks
+      const onHookStart = vi.mocked(mockHookRunner.executeHooksParallel).mock
+        .calls[0][3];
+      const onHookEnd = vi.mocked(mockHookRunner.executeHooksParallel).mock
+        .calls[0][4];
+
+      if (onHookStart) onHookStart(mockPlan[0].hookConfig, 0);
+      expect(mockCoreEvents.emitHookStart).toHaveBeenCalledWith({
+        hookName: './test.sh',
+        eventName: HookEventName.BeforeTool,
+        hookIndex: 1,
+        totalHooks: 1,
+      });
+
+      if (onHookEnd) onHookEnd(mockPlan[0].hookConfig, mockResults[0]);
+      expect(mockCoreEvents.emitHookEnd).toHaveBeenCalledWith({
+        hookName: './test.sh',
+        eventName: HookEventName.BeforeTool,
+        success: true,
+      });
 
       expect(result).toBe(mockAggregated);
     });
@@ -233,6 +255,128 @@ describe('HookEventHandler', () => {
         expect.stringContaining('F12'),
       );
     });
+
+    it('should fire BeforeTool event with MCP context when provided', async () => {
+      const mockPlan = [
+        {
+          hookConfig: {
+            type: HookType.Command,
+            command: './test.sh',
+          } as unknown as HookConfig,
+          eventName: HookEventName.BeforeTool,
+        },
+      ];
+      const mockResults: HookExecutionResult[] = [
+        {
+          success: true,
+          duration: 100,
+          hookConfig: {
+            type: HookType.Command,
+            command: './test.sh',
+            timeout: 30000,
+          },
+          eventName: HookEventName.BeforeTool,
+        },
+      ];
+      const mockAggregated = {
+        success: true,
+        allOutputs: [],
+        errors: [],
+        totalDuration: 100,
+      };
+
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+        eventName: HookEventName.BeforeTool,
+        hookConfigs: mockPlan.map((p) => p.hookConfig),
+        sequential: false,
+      });
+      vi.mocked(mockHookRunner.executeHooksParallel).mockResolvedValue(
+        mockResults,
+      );
+      vi.mocked(mockHookAggregator.aggregateResults).mockReturnValue(
+        mockAggregated,
+      );
+
+      const mcpContext = {
+        server_name: 'my-mcp-server',
+        tool_name: 'read_file',
+        command: 'npx',
+        args: ['-y', '@my-org/mcp-server'],
+      };
+
+      const result = await hookEventHandler.fireBeforeToolEvent(
+        'my-mcp-server__read_file',
+        { path: '/etc/passwd' },
+        mcpContext,
+      );
+
+      expect(mockHookRunner.executeHooksParallel).toHaveBeenCalledWith(
+        [mockPlan[0].hookConfig],
+        HookEventName.BeforeTool,
+        expect.objectContaining({
+          session_id: 'test-session',
+          cwd: '/test/project',
+          hook_event_name: 'BeforeTool',
+          tool_name: 'my-mcp-server__read_file',
+          tool_input: { path: '/etc/passwd' },
+          mcp_context: mcpContext,
+        }),
+        expect.any(Function),
+        expect.any(Function),
+      );
+
+      expect(result).toBe(mockAggregated);
+    });
+
+    it('should not include mcp_context when not provided', async () => {
+      const mockPlan = [
+        {
+          hookConfig: {
+            type: HookType.Command,
+            command: './test.sh',
+          } as unknown as HookConfig,
+          eventName: HookEventName.BeforeTool,
+        },
+      ];
+      const mockResults: HookExecutionResult[] = [
+        {
+          success: true,
+          duration: 100,
+          hookConfig: {
+            type: HookType.Command,
+            command: './test.sh',
+            timeout: 30000,
+          },
+          eventName: HookEventName.BeforeTool,
+        },
+      ];
+      const mockAggregated = {
+        success: true,
+        allOutputs: [],
+        errors: [],
+        totalDuration: 100,
+      };
+
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+        eventName: HookEventName.BeforeTool,
+        hookConfigs: mockPlan.map((p) => p.hookConfig),
+        sequential: false,
+      });
+      vi.mocked(mockHookRunner.executeHooksParallel).mockResolvedValue(
+        mockResults,
+      );
+      vi.mocked(mockHookAggregator.aggregateResults).mockReturnValue(
+        mockAggregated,
+      );
+
+      await hookEventHandler.fireBeforeToolEvent('EditTool', {
+        file: 'test.txt',
+      });
+
+      const callArgs = vi.mocked(mockHookRunner.executeHooksParallel).mock
+        .calls[0][2];
+      expect(callArgs).not.toHaveProperty('mcp_context');
+    });
   });
 
   describe('fireAfterToolEvent', () => {
@@ -294,6 +438,80 @@ describe('HookEventHandler', () => {
           tool_input: toolInput,
           tool_response: toolResponse,
         }),
+        expect.any(Function),
+        expect.any(Function),
+      );
+
+      expect(result).toBe(mockAggregated);
+    });
+
+    it('should fire AfterTool event with MCP context when provided', async () => {
+      const mockPlan = [
+        {
+          hookConfig: {
+            type: HookType.Command,
+            command: './after.sh',
+          } as unknown as HookConfig,
+          eventName: HookEventName.AfterTool,
+        },
+      ];
+      const mockResults: HookExecutionResult[] = [
+        {
+          success: true,
+          duration: 100,
+          hookConfig: {
+            type: HookType.Command,
+            command: './after.sh',
+            timeout: 30000,
+          },
+          eventName: HookEventName.AfterTool,
+        },
+      ];
+      const mockAggregated = {
+        success: true,
+        allOutputs: [],
+        errors: [],
+        totalDuration: 100,
+      };
+
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+        eventName: HookEventName.AfterTool,
+        hookConfigs: mockPlan.map((p) => p.hookConfig),
+        sequential: false,
+      });
+      vi.mocked(mockHookRunner.executeHooksParallel).mockResolvedValue(
+        mockResults,
+      );
+      vi.mocked(mockHookAggregator.aggregateResults).mockReturnValue(
+        mockAggregated,
+      );
+
+      const toolInput = { path: '/etc/passwd' };
+      const toolResponse = { success: true, content: 'File content' };
+      const mcpContext = {
+        server_name: 'my-mcp-server',
+        tool_name: 'read_file',
+        url: 'https://mcp.example.com',
+      };
+
+      const result = await hookEventHandler.fireAfterToolEvent(
+        'my-mcp-server__read_file',
+        toolInput,
+        toolResponse,
+        mcpContext,
+      );
+
+      expect(mockHookRunner.executeHooksParallel).toHaveBeenCalledWith(
+        [mockPlan[0].hookConfig],
+        HookEventName.AfterTool,
+        expect.objectContaining({
+          tool_name: 'my-mcp-server__read_file',
+          tool_input: toolInput,
+          tool_response: toolResponse,
+          mcp_context: mcpContext,
+        }),
+        expect.any(Function),
+        expect.any(Function),
       );
 
       expect(result).toBe(mockAggregated);
@@ -352,6 +570,8 @@ describe('HookEventHandler', () => {
         expect.objectContaining({
           prompt,
         }),
+        expect.any(Function),
+        expect.any(Function),
       );
 
       expect(result).toBe(mockAggregated);
@@ -415,6 +635,8 @@ describe('HookEventHandler', () => {
           notification_type: 'ToolPermission',
           details: { type: 'ToolPermission', title: 'Test Permission' },
         }),
+        expect.any(Function),
+        expect.any(Function),
       );
 
       expect(result).toBe(mockAggregated);
@@ -478,6 +700,8 @@ describe('HookEventHandler', () => {
         expect.objectContaining({
           source: 'startup',
         }),
+        expect.any(Function),
+        expect.any(Function),
       );
 
       expect(result).toBe(mockAggregated);
@@ -548,9 +772,73 @@ describe('HookEventHandler', () => {
             ]),
           }),
         }),
+        expect.any(Function),
+        expect.any(Function),
       );
 
       expect(result).toBe(mockAggregated);
+    });
+  });
+
+  describe('failure suppression', () => {
+    it('should suppress duplicate feedback for the same failing hook and request context', async () => {
+      const mockHook: HookConfig = {
+        type: HookType.Command,
+        command: './fail.sh',
+        name: 'failing-hook',
+      };
+      const mockResults: HookExecutionResult[] = [
+        {
+          success: false,
+          duration: 10,
+          hookConfig: mockHook,
+          eventName: HookEventName.AfterModel,
+          error: new Error('Failed'),
+        },
+      ];
+      const mockAggregated = {
+        success: false,
+        allOutputs: [],
+        errors: [new Error('Failed')],
+        totalDuration: 10,
+      };
+
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+        eventName: HookEventName.AfterModel,
+        hookConfigs: [mockHook],
+        sequential: false,
+      });
+      vi.mocked(mockHookRunner.executeHooksParallel).mockResolvedValue(
+        mockResults,
+      );
+      vi.mocked(mockHookAggregator.aggregateResults).mockReturnValue(
+        mockAggregated,
+      );
+
+      const llmRequest = { model: 'test', contents: [] };
+      const llmResponse = { candidates: [] };
+
+      // First call - should emit feedback
+      await hookEventHandler.fireAfterModelEvent(
+        llmRequest as unknown as GenerateContentParameters,
+        llmResponse as unknown as GenerateContentResponse,
+      );
+      expect(mockCoreEvents.emitFeedback).toHaveBeenCalledTimes(1);
+
+      // Second call with SAME request - should NOT emit feedback
+      await hookEventHandler.fireAfterModelEvent(
+        llmRequest as unknown as GenerateContentParameters,
+        llmResponse as unknown as GenerateContentResponse,
+      );
+      expect(mockCoreEvents.emitFeedback).toHaveBeenCalledTimes(1);
+
+      // Third call with DIFFERENT request - should emit feedback again
+      const differentRequest = { model: 'different', contents: [] };
+      await hookEventHandler.fireAfterModelEvent(
+        differentRequest as unknown as GenerateContentParameters,
+        llmResponse as unknown as GenerateContentResponse,
+      );
+      expect(mockCoreEvents.emitFeedback).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -591,6 +879,8 @@ describe('HookEventHandler', () => {
           hook_event_name: 'BeforeTool',
           timestamp: expect.any(String),
         }),
+        expect.any(Function),
+        expect.any(Function),
       );
     });
   });

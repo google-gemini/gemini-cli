@@ -149,7 +149,7 @@ export function colorizeCode({
   const activeTheme = theme || themeManager.getActiveTheme();
   const showLineNumbers = hideLineNumbers
     ? false
-    : (settings?.merged.ui?.showLineNumbers ?? true);
+    : settings.merged.ui.showLineNumbers;
 
   const useMaxSizedBox = !isAlternateBufferEnabled(settings);
   try {
@@ -178,17 +178,8 @@ export function colorizeCode({
       );
 
       return (
-        <Box key={index} minHeight={useMaxSizedBox ? undefined : 1}>
-          {/* We have to render line numbers differently depending on whether we are using MaxSizeBox or not */}
-          {showLineNumbers && useMaxSizedBox && (
-            <Text color={activeTheme.colors.Gray}>
-              {`${String(index + 1 + hiddenLinesCount).padStart(
-                padWidth,
-                ' ',
-              )} `}
-            </Text>
-          )}
-          {showLineNumbers && !useMaxSizedBox && (
+        <Box key={index} minHeight={1}>
+          {showLineNumbers && (
             <Box
               minWidth={padWidth + 1}
               flexShrink={0}
@@ -236,14 +227,8 @@ export function colorizeCode({
     const lines = codeToHighlight.split('\n');
     const padWidth = String(lines.length).length; // Calculate padding width based on number of lines
     const fallbackLines = lines.map((line, index) => (
-      <Box key={index} minHeight={useMaxSizedBox ? undefined : 1}>
-        {/* We have to render line numbers differently depending on whether we are using MaxSizeBox or not */}
-        {showLineNumbers && useMaxSizedBox && (
-          <Text color={activeTheme.defaultColor}>
-            {`${String(index + 1).padStart(padWidth, ' ')} `}
-          </Text>
-        )}
-        {showLineNumbers && !useMaxSizedBox && (
+      <Box key={index} minHeight={1}>
+        {showLineNumbers && (
           <Box
             minWidth={padWidth + 1}
             flexShrink={0}

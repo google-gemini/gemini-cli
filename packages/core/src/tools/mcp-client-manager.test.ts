@@ -14,7 +14,7 @@ import {
   type MockedObject,
 } from 'vitest';
 import { McpClientManager } from './mcp-client-manager.js';
-import { McpClient } from './mcp-client.js';
+import { McpClient, MCPDiscoveryState } from './mcp-client.js';
 import type { ToolRegistry } from './tool-registry.js';
 import type { Config } from '../config/config.js';
 
@@ -50,9 +50,11 @@ describe('McpClientManager', () => {
       getAllowedMcpServers: vi.fn().mockReturnValue([]),
       getBlockedMcpServers: vi.fn().mockReturnValue([]),
       getMcpServerCommand: vi.fn().mockReturnValue(''),
+      getMcpEnablementCallbacks: vi.fn().mockReturnValue(undefined),
       getGeminiClient: vi.fn().mockReturnValue({
         isInitialized: vi.fn(),
       }),
+      refreshMcpContext: vi.fn(),
     } as unknown as Config);
     toolRegistry = {} as ToolRegistry;
   });
@@ -65,10 +67,40 @@ describe('McpClientManager', () => {
     mockConfig.getMcpServers.mockReturnValue({
       'test-server': {},
     });
-    const manager = new McpClientManager(toolRegistry, mockConfig);
+    const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
     await manager.startConfiguredMcpServers();
     expect(mockedMcpClient.connect).toHaveBeenCalledOnce();
     expect(mockedMcpClient.discover).toHaveBeenCalledOnce();
+    expect(mockConfig.refreshMcpContext).toHaveBeenCalledOnce();
+  });
+
+  it('should batch context refresh when starting multiple servers', async () => {
+    mockConfig.getMcpServers.mockReturnValue({
+      'server-1': {},
+      'server-2': {},
+      'server-3': {},
+    });
+    const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+    await manager.startConfiguredMcpServers();
+
+    // Each client should be connected/discovered
+    expect(mockedMcpClient.connect).toHaveBeenCalledTimes(3);
+    expect(mockedMcpClient.discover).toHaveBeenCalledTimes(3);
+
+    // But context refresh should happen only once
+    expect(mockConfig.refreshMcpContext).toHaveBeenCalledOnce();
+  });
+
+  it('should update global discovery state', async () => {
+    mockConfig.getMcpServers.mockReturnValue({
+      'test-server': {},
+    });
+    const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+    expect(manager.getDiscoveryState()).toBe(MCPDiscoveryState.NOT_STARTED);
+    const promise = manager.startConfiguredMcpServers();
+    expect(manager.getDiscoveryState()).toBe(MCPDiscoveryState.IN_PROGRESS);
+    await promise;
+    expect(manager.getDiscoveryState()).toBe(MCPDiscoveryState.COMPLETED);
   });
 
   it('should not discover tools if folder is not trusted', async () => {
@@ -76,7 +108,7 @@ describe('McpClientManager', () => {
       'test-server': {},
     });
     mockConfig.isTrustedFolder.mockReturnValue(false);
-    const manager = new McpClientManager(toolRegistry, mockConfig);
+    const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
     await manager.startConfiguredMcpServers();
     expect(mockedMcpClient.connect).not.toHaveBeenCalled();
     expect(mockedMcpClient.discover).not.toHaveBeenCalled();
@@ -87,7 +119,7 @@ describe('McpClientManager', () => {
       'test-server': {},
     });
     mockConfig.getBlockedMcpServers.mockReturnValue(['test-server']);
-    const manager = new McpClientManager(toolRegistry, mockConfig);
+    const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
     await manager.startConfiguredMcpServers();
     expect(mockedMcpClient.connect).not.toHaveBeenCalled();
     expect(mockedMcpClient.discover).not.toHaveBeenCalled();
@@ -99,14 +131,14 @@ describe('McpClientManager', () => {
       'another-server': {},
     });
     mockConfig.getAllowedMcpServers.mockReturnValue(['another-server']);
-    const manager = new McpClientManager(toolRegistry, mockConfig);
+    const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
     await manager.startConfiguredMcpServers();
     expect(mockedMcpClient.connect).toHaveBeenCalledOnce();
     expect(mockedMcpClient.discover).toHaveBeenCalledOnce();
   });
 
   it('should start servers from extensions', async () => {
-    const manager = new McpClientManager(toolRegistry, mockConfig);
+    const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
     await manager.startExtension({
       name: 'test-extension',
       mcpServers: {
@@ -123,7 +155,7 @@ describe('McpClientManager', () => {
   });
 
   it('should not start servers from disabled extensions', async () => {
-    const manager = new McpClientManager(toolRegistry, mockConfig);
+    const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
     await manager.startExtension({
       name: 'test-extension',
       mcpServers: {
@@ -144,7 +176,7 @@ describe('McpClientManager', () => {
       'test-server': {},
     });
     mockConfig.getBlockedMcpServers.mockReturnValue(['test-server']);
-    const manager = new McpClientManager(toolRegistry, mockConfig);
+    const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
     await manager.startConfiguredMcpServers();
     expect(manager.getBlockedMcpServers()).toEqual([
       { name: 'test-server', extensionName: '' },
@@ -157,7 +189,7 @@ describe('McpClientManager', () => {
         'test-server': {},
       });
       mockedMcpClient.getServerConfig.mockReturnValue({});
-      const manager = new McpClientManager(toolRegistry, mockConfig);
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
       await manager.startConfiguredMcpServers();
 
       expect(mockedMcpClient.connect).toHaveBeenCalledTimes(1);
@@ -176,7 +208,7 @@ describe('McpClientManager', () => {
         'test-server': {},
       });
       mockedMcpClient.getServerConfig.mockReturnValue({});
-      const manager = new McpClientManager(toolRegistry, mockConfig);
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
       await manager.startConfiguredMcpServers();
 
       expect(mockedMcpClient.connect).toHaveBeenCalledTimes(1);
@@ -190,7 +222,7 @@ describe('McpClientManager', () => {
     });
 
     it('should throw an error if the server does not exist', async () => {
-      const manager = new McpClientManager(toolRegistry, mockConfig);
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
       await expect(manager.restartServer('non-existent')).rejects.toThrow(
         'No MCP server registered with the name "non-existent"',
       );
@@ -216,7 +248,11 @@ describe('McpClientManager', () => {
           }) as unknown as McpClient,
       );
 
-      const manager = new McpClientManager({} as ToolRegistry, mockConfig);
+      const manager = new McpClientManager(
+        '0.0.1',
+        {} as ToolRegistry,
+        mockConfig,
+      );
 
       mockConfig.getMcpServers.mockReturnValue({
         'server-with-instructions': {},
@@ -227,14 +263,16 @@ describe('McpClientManager', () => {
       const instructions = manager.getMcpInstructions();
 
       expect(instructions).toContain(
-        "# Instructions for MCP Server 'server-with-instructions'",
+        "The following are instructions provided by the tool server 'server-with-instructions':",
       );
+      expect(instructions).toContain('---[start of server instructions]---');
       expect(instructions).toContain(
         'Instructions for server-with-instructions',
       );
+      expect(instructions).toContain('---[end of server instructions]---');
 
       expect(instructions).not.toContain(
-        "# Instructions for MCP Server 'server-without-instructions'",
+        "The following are instructions provided by the tool server 'server-without-instructions':",
       );
     });
   });
@@ -249,7 +287,11 @@ describe('McpClientManager', () => {
         'test-server': {},
       });
 
-      const manager = new McpClientManager({} as ToolRegistry, mockConfig);
+      const manager = new McpClientManager(
+        '0.0.1',
+        {} as ToolRegistry,
+        mockConfig,
+      );
 
       await expect(manager.startConfiguredMcpServers()).resolves.not.toThrow();
     });
@@ -268,7 +310,11 @@ describe('McpClientManager', () => {
         'test-server': {},
       });
 
-      const manager = new McpClientManager({} as ToolRegistry, mockConfig);
+      const manager = new McpClientManager(
+        '0.0.1',
+        {} as ToolRegistry,
+        mockConfig,
+      );
       await manager.startConfiguredMcpServers();
 
       await expect(manager.restartServer('test-server')).resolves.not.toThrow();

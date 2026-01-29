@@ -33,7 +33,7 @@ export const aboutCommand: SlashCommand = {
     const modelVersion = context.services.config?.getModel() || 'Unknown';
     const cliVersion = await getVersion();
     const selectedAuthType =
-      context.services.settings.merged.security?.auth?.selectedType || '';
+      context.services.settings.merged.security.auth.selectedType || '';
     const gcpProject = process.env['GOOGLE_CLOUD_PROJECT'] || '';
     const ideClient = await getIdeClientName(context);
 
@@ -43,6 +43,8 @@ export const aboutCommand: SlashCommand = {
       cachedAccount,
     });
     const userEmail = cachedAccount ?? undefined;
+
+    const tier = context.services.config?.getUserTierName();
 
     const aboutItem: Omit<HistoryItemAbout, 'id'> = {
       type: MessageType.ABOUT,
@@ -54,9 +56,10 @@ export const aboutCommand: SlashCommand = {
       gcpProject,
       ideClient,
       userEmail,
+      tier,
     };
 
-    context.ui.addItem(aboutItem, Date.now());
+    context.ui.addItem(aboutItem);
   },
 };
 

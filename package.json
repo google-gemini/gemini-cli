@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.24.0-nightly.20251227.37be16243",
+  "version": "0.28.0-nightly.20260128.adc8e11bb",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -14,7 +14,7 @@
     "url": "git+https://github.com/google-gemini/gemini-cli.git"
   },
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.24.0-nightly.20251227.37be16243"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.28.0-nightly.20260128.adc8e11bb"
   },
   "scripts": {
     "start": "cross-env NODE_ENV=development node scripts/start.js",
@@ -41,12 +41,14 @@
     "test": "npm run test --workspaces --if-present",
     "test:ci": "npm run test:ci --workspaces --if-present && npm run test:scripts",
     "test:scripts": "vitest run --config ./scripts/tests/vitest.config.ts",
+    "test:always_passing_evals": "vitest run --config evals/vitest.config.ts",
+    "test:all_evals": "cross-env RUN_EVALS=1 vitest run --config evals/vitest.config.ts",
     "test:e2e": "cross-env VERBOSE=true KEEP_OUTPUT=true npm run test:integration:sandbox:none",
     "test:integration:all": "npm run test:integration:sandbox:none && npm run test:integration:sandbox:docker && npm run test:integration:sandbox:podman",
     "test:integration:sandbox:none": "cross-env GEMINI_SANDBOX=false vitest run --root ./integration-tests",
     "test:integration:sandbox:docker": "cross-env GEMINI_SANDBOX=docker npm run build:sandbox && cross-env GEMINI_SANDBOX=docker vitest run --root ./integration-tests",
     "test:integration:sandbox:podman": "cross-env GEMINI_SANDBOX=podman vitest run --root ./integration-tests",
-    "lint": "eslint . --ext .ts,.tsx && eslint integration-tests && eslint scripts",
+    "lint": "eslint . --cache",
     "lint:fix": "eslint . --fix --ext .ts,.tsx && eslint integration-tests --fix && eslint scripts --fix && npm run format",
     "lint:ci": "npm run lint:all",
     "lint:all": "node scripts/lint.js",
@@ -62,7 +64,7 @@
     "pre-commit": "node scripts/pre-commit.js"
   },
   "overrides": {
-    "ink": "npm:@jrichman/ink@6.4.6",
+    "ink": "npm:@jrichman/ink@6.4.8",
     "wrap-ansi": "9.0.2",
     "cliui": {
       "wrap-ansi": "7.0.0"
@@ -77,6 +79,7 @@
     "LICENSE"
   ],
   "devDependencies": {
+    "@agentclientprotocol/sdk": "^0.12.0",
     "@octokit/rest": "^22.0.0",
     "@types/marked": "^5.0.2",
     "@types/mime-types": "^3.0.1",
@@ -121,7 +124,7 @@
     "yargs": "^17.7.2"
   },
   "dependencies": {
-    "ink": "npm:@jrichman/ink@6.4.6",
+    "ink": "npm:@jrichman/ink@6.4.8",
     "latest-version": "^9.0.0",
     "simple-git": "^3.28.0"
   },
@@ -132,6 +135,7 @@
     "@lydell/node-pty-linux-x64": "1.1.0",
     "@lydell/node-pty-win32-arm64": "1.1.0",
     "@lydell/node-pty-win32-x64": "1.1.0",
+    "keytar": "^7.9.0",
     "node-pty": "^1.0.0"
   },
   "lint-staged": {

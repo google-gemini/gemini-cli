@@ -86,6 +86,18 @@ export async function cleanupExpiredSessions(
         const sessionPath = path.join(chatsDir, sessionToDelete.fileName);
         await fs.unlink(sessionPath);
 
+        // ALSO cleanup Activity logs in the project logs directory
+        const sessionId = sessionToDelete.sessionInfo?.id;
+        if (sessionId) {
+          const logsDir = path.join(config.storage.getProjectTempDir(), 'logs');
+          const logPath = path.join(logsDir, `session-${sessionId}.jsonl`);
+          try {
+            await fs.unlink(logPath);
+          } catch {
+            /* ignore if log doesn't exist */
+          }
+        }
+
         if (config.getDebugMode()) {
           if (sessionToDelete.sessionInfo === null) {
             debugLogger.debug(

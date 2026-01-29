@@ -14,8 +14,15 @@ vi.mock('node:child_process', async (importOriginal) => {
     spawnSync: vi.fn(() => ({ status: 0 })),
   };
 });
-vi.mock('fs');
-vi.mock('os');
+vi.mock('node:fs');
+vi.mock('node:os');
+vi.mock('../utils/paths.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/paths.js')>();
+  return {
+    ...actual,
+    homedir: vi.fn(),
+  };
+});
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getIdeInstaller } from './ide-installer.js';
@@ -24,12 +31,14 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { IDE_DEFINITIONS, type IdeInfo } from './detect-ide.js';
+import { homedir as pathsHomedir } from '../utils/paths.js';
 
 describe('ide-installer', () => {
   const HOME_DIR = '/home/user';
 
   beforeEach(() => {
     vi.spyOn(os, 'homedir').mockReturnValue(HOME_DIR);
+    vi.mocked(pathsHomedir).mockReturnValue(HOME_DIR);
   });
 
   afterEach(() => {
@@ -191,6 +200,53 @@ describe('ide-installer', () => {
           expect(result.message).toContain(expectedErr);
         },
       );
+    });
+  });
+
+  describe('PositronInstaller', () => {
+    function setup({
+      execSync = () => '',
+      platform = 'linux' as NodeJS.Platform,
+      existsResult = false,
+    }: {
+      execSync?: () => string;
+      platform?: NodeJS.Platform;
+      existsResult?: boolean;
+    } = {}) {
+      vi.spyOn(child_process, 'execSync').mockImplementation(execSync);
+      vi.spyOn(fs, 'existsSync').mockReturnValue(existsResult);
+      const installer = getIdeInstaller(IDE_DEFINITIONS.positron, platform)!;
+
+      return { installer };
+    }
+
+    it('installs the extension', async () => {
+      vi.stubEnv('POSITRON', '1');
+      const { installer } = setup({});
+      const result = await installer.install();
+
+      expect(result.success).toBe(true);
+      expect(child_process.spawnSync).toHaveBeenCalledWith(
+        'positron',
+        [
+          '--install-extension',
+          'google.gemini-cli-vscode-ide-companion',
+          '--force',
+        ],
+        { stdio: 'pipe', shell: false },
+      );
+    });
+
+    it('returns a failure message if the cli is not found', async () => {
+      const { installer } = setup({
+        execSync: () => {
+          throw new Error('Command not found');
+        },
+      });
+      const result = await installer.install();
+
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('Positron CLI not found');
     });
   });
 });

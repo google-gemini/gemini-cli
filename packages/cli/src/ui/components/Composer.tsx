@@ -5,10 +5,10 @@
  */
 
 import { useState } from 'react';
-import { Box, Text, useIsScreenReaderEnabled } from 'ink';
+import { Box, useIsScreenReaderEnabled } from 'ink';
 import { LoadingIndicator } from './LoadingIndicator.js';
-import { ContextSummaryDisplay } from './ContextSummaryDisplay.js';
-import { AutoAcceptIndicator } from './AutoAcceptIndicator.js';
+import { StatusDisplay } from './StatusDisplay.js';
+import { ApprovalModeIndicator } from './ApprovalModeIndicator.js';
 import { ShellModeIndicator } from './ShellModeIndicator.js';
 import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
 import { RawMarkdownIndicator } from './RawMarkdownIndicator.js';
@@ -17,7 +17,6 @@ import { Footer } from './Footer.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
 import { QueuedMessageDisplay } from './QueuedMessageDisplay.js';
 import { OverflowProvider } from '../contexts/OverflowContext.js';
-import { theme } from '../semantic-colors.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
@@ -30,7 +29,7 @@ import { StreamingState } from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
 
-export const Composer = () => {
+export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const config = useConfig();
   const settings = useSettings();
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
@@ -43,7 +42,7 @@ export const Composer = () => {
   const [suggestionsVisible, setSuggestionsVisible] = useState(false);
 
   const isAlternateBuffer = useAlternateBuffer();
-  const { contextFileNames, showAutoAcceptIndicator } = uiState;
+  const { showApprovalModeIndicator } = uiState;
   const suggestionsPosition = isAlternateBuffer ? 'above' : 'below';
   const hideContextSummary =
     suggestionsVisible && suggestionsPosition === 'above';
@@ -51,7 +50,7 @@ export const Composer = () => {
   return (
     <Box
       flexDirection="column"
-      width={uiState.mainAreaWidth}
+      width={uiState.terminalWidth}
       flexGrow={0}
       flexShrink={0}
     >
@@ -59,12 +58,12 @@ export const Composer = () => {
         <LoadingIndicator
           thought={
             uiState.streamingState === StreamingState.WaitingForConfirmation ||
-            config.getAccessibility()?.disableLoadingPhrases
+            config.getAccessibility()?.enableLoadingPhrases === false
               ? undefined
               : uiState.thought
           }
           currentLoadingPhrase={
-            config.getAccessibility()?.disableLoadingPhrases
+            config.getAccessibility()?.enableLoadingPhrases === false
               ? undefined
               : uiState.currentLoadingPhrase
           }
@@ -72,8 +71,12 @@ export const Composer = () => {
         />
       )}
 
-      {(!uiState.slashCommands || !uiState.isConfigInitialized) && (
-        <ConfigInitDisplay />
+      {(!uiState.slashCommands ||
+        !uiState.isConfigInitialized ||
+        uiState.isResuming) && (
+        <ConfigInitDisplay
+          message={uiState.isResuming ? 'Resuming session...' : undefined}
+        />
       )}
 
       <QueuedMessageDisplay messageQueue={uiState.messageQueue} />
@@ -83,52 +86,19 @@ export const Composer = () => {
       <Box
         marginTop={1}
         justifyContent={
-          settings.merged.ui?.hideContextSummary
-            ? 'flex-start'
-            : 'space-between'
+          settings.merged.ui.hideContextSummary ? 'flex-start' : 'space-between'
         }
         width="100%"
         flexDirection={isNarrow ? 'column' : 'row'}
         alignItems={isNarrow ? 'flex-start' : 'center'}
       >
         <Box marginRight={1}>
-          {process.env['GEMINI_SYSTEM_MD'] && (
-            <Text color={theme.status.error}>|⌐■_■| </Text>
-          )}
-          {uiState.ctrlCPressedOnce ? (
-            <Text color={theme.status.warning}>
-              Press Ctrl+C again to exit.
-            </Text>
-          ) : uiState.warningMessage ? (
-            <Text color={theme.status.warning}>{uiState.warningMessage}</Text>
-          ) : uiState.ctrlDPressedOnce ? (
-            <Text color={theme.status.warning}>
-              Press Ctrl+D again to exit.
-            </Text>
-          ) : uiState.showEscapePrompt ? (
-            <Text color={theme.text.secondary}>Press Esc again to clear.</Text>
-          ) : uiState.queueErrorMessage ? (
-            <Text color={theme.status.error}>{uiState.queueErrorMessage}</Text>
-          ) : (
-            !settings.merged.ui?.hideContextSummary &&
-            !hideContextSummary && (
-              <ContextSummaryDisplay
-                ideContext={uiState.ideContextState}
-                geminiMdFileCount={uiState.geminiMdFileCount}
-                contextFileNames={contextFileNames}
-                mcpServers={config.getMcpClientManager()?.getMcpServers() ?? {}}
-                blockedMcpServers={
-                  config.getMcpClientManager()?.getBlockedMcpServers() ?? []
-                }
-                skillCount={config.getSkillManager().getSkills().length}
-              />
-            )
-          )}
+          <StatusDisplay hideContextSummary={hideContextSummary} />
         </Box>
         <Box paddingTop={isNarrow ? 1 : 0}>
-          {showAutoAcceptIndicator !== ApprovalMode.DEFAULT &&
+          {showApprovalModeIndicator !== ApprovalMode.DEFAULT &&
             !uiState.shellModeActive && (
-              <AutoAcceptIndicator approvalMode={showAutoAcceptIndicator} />
+              <ApprovalModeIndicator approvalMode={showApprovalModeIndicator} />
             )}
           {uiState.shellModeActive && <ShellModeIndicator />}
           {!uiState.renderMarkdown && <RawMarkdownIndicator />}
@@ -143,7 +113,7 @@ export const Composer = () => {
               maxHeight={
                 uiState.constrainHeight ? debugConsoleMaxHeight : undefined
               }
-              width={uiState.mainAreaWidth}
+              width={uiState.terminalWidth}
               hasFocus={uiState.showErrorDetails}
             />
             <ShowMoreLines constrainHeight={uiState.constrainHeight} />
@@ -165,9 +135,9 @@ export const Composer = () => {
           commandContext={uiState.commandContext}
           shellModeActive={uiState.shellModeActive}
           setShellModeActive={uiActions.setShellModeActive}
-          approvalMode={showAutoAcceptIndicator}
+          approvalMode={showApprovalModeIndicator}
           onEscapePromptChange={uiActions.onEscapePromptChange}
-          focus={true}
+          focus={isFocused}
           vimHandleInput={uiActions.vimHandleInput}
           isEmbeddedShellFocused={uiState.embeddedShellFocused}
           popAllMessages={uiActions.popAllMessages}
@@ -185,7 +155,7 @@ export const Composer = () => {
         />
       )}
 
-      {!settings.merged.ui?.hideFooter && !isScreenReaderEnabled && <Footer />}
+      {!settings.merged.ui.hideFooter && !isScreenReaderEnabled && <Footer />}
     </Box>
   );
 };

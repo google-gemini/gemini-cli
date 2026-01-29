@@ -16,8 +16,17 @@ import type {
   GenerateContentResponseUsageMetadata,
 } from '@google/genai';
 import { debugLogger } from '../utils/debugLogger.js';
+import type { ToolResultDisplay } from '../tools/tools.js';
 
 export const SESSION_FILE_PREFIX = 'session-';
+
+/**
+ * Warning message shown when recording is disabled due to disk full.
+ */
+const ENOSPC_WARNING_MESSAGE =
+  'Chat recording disabled: No space left on device. ' +
+  'The conversation will continue but will not be saved to disk. ' +
+  'Free up disk space and restart to enable recording.';
 
 /**
  * Token usage summary for a message or conversation.
@@ -53,7 +62,7 @@ export interface ToolCallRecord {
   // UI-specific fields for display purposes
   displayName?: string;
   description?: string;
-  resultDisplay?: string;
+  resultDisplay?: ToolResultDisplay;
   renderOutputAsMarkdown?: boolean;
 }
 
@@ -87,6 +96,8 @@ export interface ConversationRecord {
   lastUpdated: string;
   messages: MessageRecord[];
   summary?: string;
+  /** Workspace directories added during the session via /dir add */
+  directories?: string[];
 }
 
 /**
@@ -172,6 +183,16 @@ export class ChatRecordingService {
       this.queuedThoughts = [];
       this.queuedTokens = null;
     } catch (error) {
+      // Handle disk full (ENOSPC) gracefully - disable recording but allow CLI to continue
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error as NodeJS.ErrnoException).code === 'ENOSPC'
+      ) {
+        this.conversationFile = null;
+        debugLogger.warn(ENOSPC_WARNING_MESSAGE);
+        return; // Don't throw - allow the CLI to continue
+      }
       debugLogger.error('Error initializing chat recording service:', error);
       throw error;
     }
@@ -407,11 +428,14 @@ export class ChatRecordingService {
   /**
    * Saves the conversation record; overwrites the file.
    */
-  private writeConversation(conversation: ConversationRecord): void {
+  private writeConversation(
+    conversation: ConversationRecord,
+    { allowEmpty = false }: { allowEmpty?: boolean } = {},
+  ): void {
     try {
       if (!this.conversationFile) return;
       // Don't write the file yet until there's at least one message.
-      if (conversation.messages.length === 0) return;
+      if (conversation.messages.length === 0 && !allowEmpty) return;
 
       // Only write the file if this change would change the file.
       if (this.cachedLastConvData !== JSON.stringify(conversation, null, 2)) {
@@ -421,6 +445,16 @@ export class ChatRecordingService {
         fs.writeFileSync(this.conversationFile, newContent);
       }
     } catch (error) {
+      // Handle disk full (ENOSPC) gracefully - disable recording but allow conversation to continue
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        (error as NodeJS.ErrnoException).code === 'ENOSPC'
+      ) {
+        this.conversationFile = null;
+        debugLogger.warn(ENOSPC_WARNING_MESSAGE);
+        return; // Don't throw - allow the conversation to continue
+      }
       debugLogger.error('Error writing conversation file.', error);
       throw error;
     }
@@ -455,6 +489,23 @@ export class ChatRecordingService {
   }
 
   /**
+   * Records workspace directories to the session file.
+   * Called when directories are added via /dir add.
+   */
+  recordDirectories(directories: readonly string[]): void {
+    if (!this.conversationFile) return;
+
+    try {
+      this.updateConversation((conversation) => {
+        conversation.directories = [...directories];
+      });
+    } catch (error) {
+      debugLogger.error('Error saving directories to chat history.', error);
+      // Don't throw - we want graceful degradation
+    }
+  }
+
+  /**
    * Gets the current conversation data (for summary generation).
    */
   getConversation(): ConversationRecord | null {
@@ -470,7 +521,7 @@ export class ChatRecordingService {
 
   /**
    * Gets the path to the current conversation file.
-   * Returns null if the service hasn't been initialized yet.
+   * Returns null if the service hasn't been initialized yet or recording is disabled.
    */
   getConversationFilePath(): string | null {
     return this.conversationFile;
@@ -491,5 +542,30 @@ export class ChatRecordingService {
       debugLogger.error('Error deleting session file.', error);
       throw error;
     }
+  }
+
+  /**
+   * Rewinds the conversation to the state just before the specified message ID.
+   * All messages from (and including) the specified ID onwards are removed.
+   */
+  rewindTo(messageId: string): ConversationRecord | null {
+    if (!this.conversationFile) {
+      return null;
+    }
+    const conversation = this.readConversation();
+    const messageIndex = conversation.messages.findIndex(
+      (m) => m.id === messageId,
+    );
+
+    if (messageIndex === -1) {
+      debugLogger.error(
+        'Message to rewind to not found in conversation history',
+      );
+      return conversation;
+    }
+
+    conversation.messages = conversation.messages.slice(0, messageIndex);
+    this.writeConversation(conversation, { allowEmpty: true });
+    return conversation;
   }
 }

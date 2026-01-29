@@ -35,15 +35,15 @@ import {
   type SettingDefinition,
   type SettingsSchemaType,
 } from '../../config/settingsSchema.js';
-import { terminalCapabilityManager } from '../../ui/utils/terminalCapabilityManager.js';
+import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 
 // Mock the VimModeContext
-const mockToggleVimEnabled = vi.fn();
+const mockToggleVimEnabled = vi.fn().mockResolvedValue(undefined);
 const mockSetVimMode = vi.fn();
 
 vi.mock('../contexts/UIStateContext.js', () => ({
   useUIState: () => ({
-    mainAreaWidth: 100, // Fixed width for consistent snapshots
+    terminalWidth: 100, // Fixed width for consistent snapshots
   }),
 }));
 
@@ -105,7 +105,7 @@ const createMockSettings = (
       path: '/workspace/settings.json',
     },
     true,
-    new Set(),
+    [],
   );
 
 vi.mock('../../config/settingsSchema.js', async (importOriginal) => {
@@ -254,11 +254,12 @@ const renderDialog = (
 
 describe('SettingsDialog', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.spyOn(
       terminalCapabilityManager,
-      'isBracketedPasteEnabled',
+      'isKittyProtocolEnabled',
     ).mockReturnValue(true);
-    mockToggleVimEnabled.mockResolvedValue(true);
+    mockToggleVimEnabled.mockRejectedValue(undefined);
   });
 
   afterEach(() => {
@@ -306,6 +307,43 @@ describe('SettingsDialog', () => {
       // Use snapshot to capture visual layout including indicators
       expect(output).toMatchSnapshot();
     });
+
+    it('should use almost full height of the window but no more when the window height is 25 rows', async () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+
+      // Render with a fixed height of 25 rows
+      const { lastFrame } = renderDialog(settings, onSelect, {
+        availableTerminalHeight: 25,
+      });
+
+      // Wait for the dialog to render
+      await waitFor(() => {
+        const output = lastFrame();
+        expect(output).toBeDefined();
+        const lines = output!.split('\n');
+
+        expect(lines.length).toBeGreaterThanOrEqual(24);
+        expect(lines.length).toBeLessThanOrEqual(25);
+      });
+    });
+  });
+
+  describe('Setting Descriptions', () => {
+    it('should render descriptions for settings that have them', () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+
+      const { lastFrame } = renderDialog(settings, onSelect);
+
+      const output = lastFrame();
+      // 'general.vimMode' has description 'Enable Vim keybindings' in settingsSchema.ts
+      expect(output).toContain('Vim Mode');
+      expect(output).toContain('Enable Vim keybindings');
+      // 'general.enableAutoUpdate' has description 'Enable automatic updates.'
+      expect(output).toContain('Enable Auto Update');
+      expect(output).toContain('Enable automatic updates.');
+    });
   });
 
   describe('Settings Navigation', () => {
@@ -335,7 +373,7 @@ describe('SettingsDialog', () => {
       });
 
       await waitFor(() => {
-        expect(lastFrame()).toContain('Disable Auto Update');
+        expect(lastFrame()).toContain('Enable Auto Update');
       });
 
       // Navigate up
@@ -363,7 +401,7 @@ describe('SettingsDialog', () => {
 
       await waitFor(() => {
         // Should wrap to last setting (without relying on exact bullet character)
-        expect(lastFrame()).toContain('Codebase Investigator Max Num Turns');
+        expect(lastFrame()).toContain('Hook Notifications');
       });
 
       unmount();
@@ -1054,6 +1092,87 @@ describe('SettingsDialog', () => {
     });
   });
 
+  describe('Restart and Search Conflict Regression', () => {
+    it('should prioritize restart request over search text box when showRestartPrompt is true', async () => {
+      vi.mocked(getSettingsSchema).mockReturnValue(TOOLS_SHELL_FAKE_SCHEMA);
+      const settings = createMockSettings();
+      const onRestartRequest = vi.fn();
+
+      const { stdin, lastFrame, unmount } = renderDialog(settings, vi.fn(), {
+        onRestartRequest,
+      });
+
+      // Wait for initial render
+      await waitFor(() => expect(lastFrame()).toContain('Show Color'));
+
+      // Navigate to "Enable Interactive Shell" (second item in TOOLS_SHELL_FAKE_SCHEMA)
+      act(() => {
+        stdin.write(TerminalKeys.DOWN_ARROW);
+      });
+
+      // Wait for navigation to complete
+      await waitFor(() =>
+        expect(lastFrame()).toContain('● Enable Interactive Shell'),
+      );
+
+      // Toggle it to trigger restart required
+      act(() => {
+        stdin.write(TerminalKeys.ENTER);
+      });
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain(
+          'To see changes, Gemini CLI must be restarted',
+        );
+      });
+
+      // Press 'r' - it should call onRestartRequest, NOT be handled by search
+      act(() => {
+        stdin.write('r');
+      });
+
+      await waitFor(() => {
+        expect(onRestartRequest).toHaveBeenCalled();
+      });
+
+      unmount();
+    });
+
+    it('should hide search box when showRestartPrompt is true', async () => {
+      vi.mocked(getSettingsSchema).mockReturnValue(TOOLS_SHELL_FAKE_SCHEMA);
+      const settings = createMockSettings();
+
+      const { stdin, lastFrame, unmount } = renderDialog(settings, vi.fn());
+
+      // Search box should be visible initially (searchPlaceholder)
+      expect(lastFrame()).toContain('Search to filter');
+
+      // Navigate to "Enable Interactive Shell" and toggle it
+      act(() => {
+        stdin.write(TerminalKeys.DOWN_ARROW);
+      });
+
+      await waitFor(() =>
+        expect(lastFrame()).toContain('● Enable Interactive Shell'),
+      );
+
+      act(() => {
+        stdin.write(TerminalKeys.ENTER);
+      });
+
+      await waitFor(() => {
+        expect(lastFrame()).toContain(
+          'To see changes, Gemini CLI must be restarted',
+        );
+      });
+
+      // Search box should now be hidden
+      expect(lastFrame()).not.toContain('Search to filter');
+
+      unmount();
+    });
+  });
+
   describe('String Settings Editing', () => {
     it('should allow editing and committing a string setting', async () => {
       let settings = createMockSettings({ 'a.string.setting': 'initial' });
@@ -1195,9 +1314,7 @@ describe('SettingsDialog', () => {
       await waitFor(() => {
         expect(lastFrame()).toContain('vim');
         expect(lastFrame()).toContain('Vim Mode');
-        expect(lastFrame()).not.toContain(
-          'Codebase Investigator Max Num Turns',
-        );
+        expect(lastFrame()).not.toContain('Hook Notifications');
       });
 
       unmount();
@@ -1218,7 +1335,7 @@ describe('SettingsDialog', () => {
         expect(lastFrame()).toContain('nonexistentsetting');
         expect(lastFrame()).toContain('');
         expect(lastFrame()).not.toContain('Vim Mode'); // Should not contain any settings
-        expect(lastFrame()).not.toContain('Disable Auto Update'); // Should not contain any settings
+        expect(lastFrame()).not.toContain('Enable Auto Update'); // Should not contain any settings
       });
 
       unmount();
@@ -1245,7 +1362,7 @@ describe('SettingsDialog', () => {
         userSettings: {
           general: {
             vimMode: true,
-            disableAutoUpdate: true,
+            enableAutoUpdate: false,
             debugKeystrokeLogging: true,
             enablePromptCompletion: true,
           },
@@ -1256,7 +1373,7 @@ describe('SettingsDialog', () => {
             showLineNumbers: true,
             showCitations: true,
             accessibility: {
-              disableLoadingPhrases: true,
+              enableLoadingPhrases: false,
               screenReader: true,
             },
           },
@@ -1269,7 +1386,7 @@ describe('SettingsDialog', () => {
               respectGitIgnore: true,
               respectGeminiIgnore: true,
               enableRecursiveFileSearch: true,
-              disableFuzzySearch: false,
+              enableFuzzySearch: true,
             },
           },
           tools: {
@@ -1292,7 +1409,7 @@ describe('SettingsDialog', () => {
         userSettings: {
           general: {
             vimMode: false,
-            disableAutoUpdate: true,
+            enableAutoUpdate: false,
           },
           ui: {
             showMemoryUsage: true,
@@ -1330,7 +1447,7 @@ describe('SettingsDialog', () => {
         userSettings: {
           ui: {
             accessibility: {
-              disableLoadingPhrases: true,
+              enableLoadingPhrases: false,
               screenReader: true,
             },
             showMemoryUsage: true,
@@ -1352,7 +1469,7 @@ describe('SettingsDialog', () => {
               respectGitIgnore: false,
               respectGeminiIgnore: true,
               enableRecursiveFileSearch: false,
-              disableFuzzySearch: true,
+              enableFuzzySearch: false,
             },
             loadMemoryFromIncludeDirectories: true,
             discoveryMaxDirs: 100,
@@ -1391,7 +1508,7 @@ describe('SettingsDialog', () => {
         userSettings: {
           general: {
             vimMode: false,
-            disableAutoUpdate: false,
+            enableAutoUpdate: true,
             debugKeystrokeLogging: false,
             enablePromptCompletion: false,
           },
@@ -1402,7 +1519,7 @@ describe('SettingsDialog', () => {
             showLineNumbers: false,
             showCitations: false,
             accessibility: {
-              disableLoadingPhrases: false,
+              enableLoadingPhrases: true,
               screenReader: false,
             },
           },
@@ -1415,7 +1532,7 @@ describe('SettingsDialog', () => {
               respectGitIgnore: false,
               respectGeminiIgnore: false,
               enableRecursiveFileSearch: false,
-              disableFuzzySearch: false,
+              enableFuzzySearch: true,
             },
           },
           tools: {

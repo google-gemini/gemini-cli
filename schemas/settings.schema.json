@@ -49,18 +49,18 @@
           "default": false,
           "type": "boolean"
         },
-        "disableAutoUpdate": {
-          "title": "Disable Auto Update",
-          "description": "Disable automatic updates",
-          "markdownDescription": "Disable automatic updates\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
+        "enableAutoUpdate": {
+          "title": "Enable Auto Update",
+          "description": "Enable automatic updates.",
+          "markdownDescription": "Enable automatic updates.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
-        "disableUpdateNag": {
-          "title": "Disable Update Nag",
-          "description": "Disable update notification prompts.",
-          "markdownDescription": "Disable update notification prompts.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
+        "enableAutoUpdateNotification": {
+          "title": "Enable Auto Update Notification",
+          "description": "Enable update notification prompts.",
+          "markdownDescription": "Enable update notification prompts.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "checkpointing": {
@@ -148,8 +148,8 @@
       "properties": {
         "format": {
           "title": "Output Format",
-          "description": "The format of the CLI output.",
-          "markdownDescription": "The format of the CLI output.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `text`",
+          "description": "The format of the CLI output. Can be `text` or `json`.",
+          "markdownDescription": "The format of the CLI output. Can be `text` or `json`.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `text`",
           "default": "text",
           "type": "string",
           "enum": ["text", "json"]
@@ -188,10 +188,24 @@
           "type": "boolean"
         },
         "showStatusInTitle": {
-          "title": "Show Status in Title",
-          "description": "Show Gemini CLI status and thoughts in the terminal window title",
-          "markdownDescription": "Show Gemini CLI status and thoughts in the terminal window title\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "title": "Show Thoughts in Title",
+          "description": "Show Gemini CLI model thoughts in the terminal window title during the working phase",
+          "markdownDescription": "Show Gemini CLI model thoughts in the terminal window title during the working phase\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
+          "type": "boolean"
+        },
+        "dynamicWindowTitle": {
+          "title": "Dynamic Window Title",
+          "description": "Update the terminal window title with current status icons (Ready: ◇, Action Required: ✋, Working: ✦)",
+          "markdownDescription": "Update the terminal window title with current status icons (Ready: ◇, Action Required: ✋, Working: ✦)\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "showHomeDirectoryWarning": {
+          "title": "Show Home Directory Warning",
+          "description": "Show a warning when running Gemini CLI in the home directory.",
+          "markdownDescription": "Show a warning when running Gemini CLI in the home directory.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "hideTips": {
@@ -288,10 +302,10 @@
           "default": false,
           "type": "boolean"
         },
-        "useFullWidth": {
-          "title": "Use Full Width",
-          "description": "Use the entire width of the terminal for output.",
-          "markdownDescription": "Use the entire width of the terminal for output.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+        "showUserIdentity": {
+          "title": "Show User Identity",
+          "description": "Show the logged-in user's identity (e.g. email) in the UI.",
+          "markdownDescription": "Show the logged-in user's identity (e.g. email) in the UI.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
@@ -302,10 +316,24 @@
           "default": false,
           "type": "boolean"
         },
+        "useBackgroundColor": {
+          "title": "Use Background Color",
+          "description": "Whether to use background colors in the UI.",
+          "markdownDescription": "Whether to use background colors in the UI.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "incrementalRendering": {
           "title": "Incremental Rendering",
           "description": "Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled.",
           "markdownDescription": "Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "showSpinner": {
+          "title": "Show Spinner",
+          "description": "Show the spinner during operations.",
+          "markdownDescription": "Show the spinner during operations.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
@@ -326,11 +354,11 @@
           "default": {},
           "type": "object",
           "properties": {
-            "disableLoadingPhrases": {
-              "title": "Disable Loading Phrases",
-              "description": "Disable loading phrases for accessibility",
-              "markdownDescription": "Disable loading phrases for accessibility\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
-              "default": false,
+            "enableLoadingPhrases": {
+              "title": "Enable Loading Phrases",
+              "description": "Enable loading phrases during operations.",
+              "markdownDescription": "Enable loading phrases during operations.\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
               "type": "boolean"
             },
             "screenReader": {
@@ -355,8 +383,8 @@
       "properties": {
         "enabled": {
           "title": "IDE Mode",
-          "description": "Enable IDE integration mode",
-          "markdownDescription": "Enable IDE integration mode\n\n- Category: `IDE`\n- Requires restart: `yes`\n- Default: `false`",
+          "description": "Enable IDE integration mode.",
+          "markdownDescription": "Enable IDE integration mode.\n\n- Category: `IDE`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -912,6 +940,26 @@
       },
       "additionalProperties": false
     },
+    "agents": {
+      "title": "Agents",
+      "description": "Settings for subagents.",
+      "markdownDescription": "Settings for subagents.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "overrides": {
+          "title": "Agent Overrides",
+          "description": "Override settings for specific agents, e.g. to disable the agent, set a custom model config, or run config.",
+          "markdownDescription": "Override settings for specific agents, e.g. to disable the agent, set a custom model config, or run config.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/AgentOverride"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "context": {
       "title": "Context",
       "description": "Settings for managing context provided to the model.",
@@ -964,15 +1012,15 @@
           "properties": {
             "respectGitIgnore": {
               "title": "Respect .gitignore",
-              "description": "Respect .gitignore files when searching",
-              "markdownDescription": "Respect .gitignore files when searching\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `true`",
+              "description": "Respect .gitignore files when searching.",
+              "markdownDescription": "Respect .gitignore files when searching.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             },
             "respectGeminiIgnore": {
               "title": "Respect .geminiignore",
-              "description": "Respect .geminiignore files when searching",
-              "markdownDescription": "Respect .geminiignore files when searching\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `true`",
+              "description": "Respect .geminiignore files when searching.",
+              "markdownDescription": "Respect .geminiignore files when searching.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `true`",
               "default": true,
               "type": "boolean"
             },
@@ -983,12 +1031,22 @@
               "default": true,
               "type": "boolean"
             },
-            "disableFuzzySearch": {
-              "title": "Disable Fuzzy Search",
-              "description": "Disable fuzzy search when searching for files.",
-              "markdownDescription": "Disable fuzzy search when searching for files.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `false`",
-              "default": false,
+            "enableFuzzySearch": {
+              "title": "Enable Fuzzy Search",
+              "description": "Enable fuzzy search when searching for files.",
+              "markdownDescription": "Enable fuzzy search when searching for files.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
               "type": "boolean"
+            },
+            "customIgnoreFilePaths": {
+              "title": "Custom Ignore File Paths",
+              "description": "Additional ignore file paths to respect. These files take precedence over .geminiignore and .gitignore. Files earlier in the array take precedence over files later in the array, e.g. the first file takes precedence over the second one.",
+              "markdownDescription": "Additional ignore file paths to respect. These files take precedence over .geminiignore and .gitignore. Files earlier in the array take precedence over files later in the array, e.g. the first file takes precedence over the second one.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `[]`",
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           },
           "additionalProperties": false
@@ -1061,6 +1119,14 @@
           "default": false,
           "type": "boolean"
         },
+        "approvalMode": {
+          "title": "Approval Mode",
+          "description": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet.",
+          "markdownDescription": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `default`",
+          "default": "default",
+          "type": "string",
+          "enum": ["default", "auto_edit", "plan"]
+        },
         "core": {
           "title": "Core Tools",
           "description": "Restrict the set of built-in tools with an allowlist. Match semantics mirror tools.allowed; see the built-in tools documentation for available names.",
@@ -1128,11 +1194,18 @@
           "default": 1000,
           "type": "number"
         },
+        "disableLLMCorrection": {
+          "title": "Disable LLM Correction",
+          "description": "Disable LLM-based error correction for edit tools. When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct.",
+          "markdownDescription": "Disable LLM-based error correction for edit tools. When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "enableHooks": {
-          "title": "Enable Hooks System",
-          "description": "Enable the hooks system for intercepting and customizing Gemini CLI behavior. When enabled, hooks configured in settings will execute at appropriate lifecycle events (BeforeTool, AfterTool, BeforeModel, etc.). Requires MessageBus integration.",
-          "markdownDescription": "Enable the hooks system for intercepting and customizing Gemini CLI behavior. When enabled, hooks configured in settings will execute at appropriate lifecycle events (BeforeTool, AfterTool, BeforeModel, etc.). Requires MessageBus integration.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+          "title": "Enable Hooks System (Experimental)",
+          "description": "Enables the hooks system experiment. When disabled, the hooks system is completely deactivated regardless of other settings.",
+          "markdownDescription": "Enables the hooks system experiment. When disabled, the hooks system is completely deactivated regardless of other settings.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         }
       },
@@ -1352,6 +1425,20 @@
           "default": true,
           "type": "boolean"
         },
+        "extensionConfig": {
+          "title": "Extension Configuration",
+          "description": "Enable requesting and fetching of extension settings.",
+          "markdownDescription": "Enable requesting and fetching of extension settings.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "enableEventDrivenScheduler": {
+          "title": "Event Driven Scheduler",
+          "description": "Enables event-driven scheduler within the CLI session.",
+          "markdownDescription": "Enables event-driven scheduler within the CLI session.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "extensionReloading": {
           "title": "Extension Reloading",
           "description": "Enables extension loading/unloading within the CLI session.",
@@ -1366,58 +1453,6 @@
           "default": false,
           "type": "boolean"
         },
-        "skills": {
-          "title": "Agent Skills",
-          "description": "Enable Agent Skills (experimental).",
-          "markdownDescription": "Enable Agent Skills (experimental).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
-          "type": "boolean"
-        },
-        "codebaseInvestigatorSettings": {
-          "title": "Codebase Investigator Settings",
-          "description": "Configuration for Codebase Investigator.",
-          "markdownDescription": "Configuration for Codebase Investigator.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
-          "default": {},
-          "type": "object",
-          "properties": {
-            "enabled": {
-              "title": "Enable Codebase Investigator",
-              "description": "Enable the Codebase Investigator agent.",
-              "markdownDescription": "Enable the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
-              "default": true,
-              "type": "boolean"
-            },
-            "maxNumTurns": {
-              "title": "Codebase Investigator Max Num Turns",
-              "description": "Maximum number of turns for the Codebase Investigator agent.",
-              "markdownDescription": "Maximum number of turns for the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `10`",
-              "default": 10,
-              "type": "number"
-            },
-            "maxTimeMinutes": {
-              "title": "Max Time (Minutes)",
-              "description": "Maximum time for the Codebase Investigator agent (in minutes).",
-              "markdownDescription": "Maximum time for the Codebase Investigator agent (in minutes).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `3`",
-              "default": 3,
-              "type": "number"
-            },
-            "thinkingBudget": {
-              "title": "Thinking Budget",
-              "description": "The thinking budget for the Codebase Investigator agent.",
-              "markdownDescription": "The thinking budget for the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `8192`",
-              "default": 8192,
-              "type": "number"
-            },
-            "model": {
-              "title": "Model",
-              "description": "The model to use for the Codebase Investigator agent.",
-              "markdownDescription": "The model to use for the Codebase Investigator agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `auto`",
-              "default": "auto",
-              "type": "string"
-            }
-          },
-          "additionalProperties": false
-        },
         "useOSC52Paste": {
           "title": "Use OSC 52 Paste",
           "description": "Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions).",
@@ -1425,22 +1460,12 @@
           "default": false,
           "type": "boolean"
         },
-        "introspectionAgentSettings": {
-          "title": "Introspection Agent Settings",
-          "description": "Configuration for Introspection Agent.",
-          "markdownDescription": "Configuration for Introspection Agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
-          "default": {},
-          "type": "object",
-          "properties": {
-            "enabled": {
-              "title": "Enable Introspection Agent",
-              "description": "Enable the Introspection Agent.",
-              "markdownDescription": "Enable the Introspection Agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
-              "default": false,
-              "type": "boolean"
-            }
-          },
-          "additionalProperties": false
+        "plan": {
+          "title": "Plan",
+          "description": "Enable planning features (Plan Mode and tools).",
+          "markdownDescription": "Enable planning features (Plan Mode and tools).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
         }
       },
       "additionalProperties": false
@@ -1482,6 +1507,13 @@
       "default": {},
       "type": "object",
       "properties": {
+        "enabled": {
+          "title": "Enable Agent Skills",
+          "description": "Enable Agent Skills.",
+          "markdownDescription": "Enable Agent Skills.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "disabled": {
           "title": "Disabled Skills",
           "description": "List of disabled skills.",
@@ -1495,13 +1527,20 @@
       },
       "additionalProperties": false
     },
-    "hooks": {
-      "title": "Hooks",
+    "hooksConfig": {
+      "title": "HooksConfig",
       "description": "Hook configurations for intercepting and customizing agent behavior.",
       "markdownDescription": "Hook configurations for intercepting and customizing agent behavior.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `{}`",
       "default": {},
       "type": "object",
       "properties": {
+        "enabled": {
+          "title": "Enable Hooks",
+          "description": "Canonical toggle for the hooks system. When disabled, no hooks will be executed.",
+          "markdownDescription": "Canonical toggle for the hooks system. When disabled, no hooks will be executed.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "disabled": {
           "title": "Disabled Hooks",
           "description": "List of hook names (commands) that should be disabled. Hooks in this list will not execute even if configured.",
@@ -1512,6 +1551,23 @@
             "type": "string"
           }
         },
+        "notifications": {
+          "title": "Hook Notifications",
+          "description": "Show visual indicators when hooks are executing.",
+          "markdownDescription": "Show visual indicators when hooks are executing.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "hooks": {
+      "title": "Hook Events",
+      "description": "Event-specific hook configurations.",
+      "markdownDescription": "Event-specific hook configurations.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
         "BeforeTool": {
           "title": "Before Tool Hooks",
           "description": "Hooks that execute before tool execution. Can intercept, validate, or modify tool calls.",
@@ -1594,6 +1650,74 @@
         "type": "array",
         "items": {}
       }
+    },
+    "admin": {
+      "title": "Admin",
+      "description": "Settings configured remotely by enterprise admins.",
+      "markdownDescription": "Settings configured remotely by enterprise admins.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "secureModeEnabled": {
+          "title": "Secure Mode Enabled",
+          "description": "If true, disallows yolo mode from being used.",
+          "markdownDescription": "If true, disallows yolo mode from being used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "extensions": {
+          "title": "Extensions Settings",
+          "description": "Extensions-specific admin settings.",
+          "markdownDescription": "Extensions-specific admin settings.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "Extensions Enabled",
+              "description": "If false, disallows extensions from being installed or used.",
+              "markdownDescription": "If false, disallows extensions from being installed or used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mcp": {
+          "title": "MCP Settings",
+          "description": "MCP-specific admin settings.",
+          "markdownDescription": "MCP-specific admin settings.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "MCP Enabled",
+              "description": "If false, disallows MCP servers from being used.",
+              "markdownDescription": "If false, disallows MCP servers from being used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "skills": {
+          "title": "Skills Settings",
+          "description": "Agent Skills-specific admin settings.",
+          "markdownDescription": "Agent Skills-specific admin settings.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "Skills Enabled",
+              "description": "If false, disallows agent skills from being used.",
+              "markdownDescription": "If false, disallows agent skills from being used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     }
   },
   "$defs": {
@@ -1765,6 +1889,36 @@
         "tokenBudget": {
           "type": "number",
           "description": "Maximum number of tokens used when summarizing tool output."
+        }
+      }
+    },
+    "AgentOverride": {
+      "type": "object",
+      "description": "Override settings for a specific agent.",
+      "additionalProperties": false,
+      "properties": {
+        "modelConfig": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "runConfig": {
+          "type": "object",
+          "description": "Run configuration for an agent.",
+          "additionalProperties": false,
+          "properties": {
+            "maxTimeMinutes": {
+              "type": "number",
+              "description": "The maximum execution time for the agent in minutes."
+            },
+            "maxTurns": {
+              "type": "number",
+              "description": "The maximum number of conversational turns."
+            }
+          }
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether to enable the agent."
         }
       }
     },

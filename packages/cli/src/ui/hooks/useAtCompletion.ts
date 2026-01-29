@@ -5,11 +5,19 @@
  */
 
 import { useEffect, useReducer, useRef } from 'react';
+import { setTimeout as setTimeoutPromise } from 'node:timers/promises';
 import type { Config, FileSearch } from '@google/gemini-cli-core';
-import { FileSearchFactory, escapePath } from '@google/gemini-cli-core';
+import {
+  FileSearchFactory,
+  escapePath,
+  FileDiscoveryService,
+} from '@google/gemini-cli-core';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
 import { MAX_SUGGESTIONS_TO_SHOW } from '../components/SuggestionsDisplay.js';
+import { CommandKind } from '../commands/types.js';
 import { AsyncFzf } from 'fzf';
+
+const DEFAULT_SEARCH_TIMEOUT_MS = 5000;
 
 export enum AtCompletionStatus {
   IDLE = 'idle',
@@ -127,6 +135,18 @@ function buildResourceCandidates(
   return resources;
 }
 
+function buildAgentCandidates(config?: Config): Suggestion[] {
+  const registry = config?.getAgentRegistry?.();
+  if (!registry) {
+    return [];
+  }
+  return registry.getAllDefinitions().map((def) => ({
+    label: def.name,
+    value: def.name,
+    commandKind: CommandKind.AGENT,
+  }));
+}
+
 async function searchResourceCandidates(
   pattern: string,
   candidates: ResourceSuggestionCandidate[],
@@ -151,6 +171,26 @@ async function searchResourceCandidates(
   return results.map(
     (result: { item: ResourceSuggestionCandidate }) => result.item.suggestion,
   );
+}
+
+async function searchAgentCandidates(
+  pattern: string,
+  candidates: Suggestion[],
+): Promise<Suggestion[]> {
+  if (candidates.length === 0) {
+    return [];
+  }
+  const normalizedPattern = pattern.toLowerCase();
+  if (!normalizedPattern) {
+    return candidates.slice(0, MAX_SUGGESTIONS_TO_SHOW);
+  }
+  const fzf = new AsyncFzf(candidates, {
+    selector: (s: Suggestion) => s.label,
+  });
+  const results = await fzf.find(normalizedPattern, {
+    limit: MAX_SUGGESTIONS_TO_SHOW,
+  });
+  return results.map((r: { item: Suggestion }) => r.item);
 }
 
 export function useAtCompletion(props: UseAtCompletionProps): void {
@@ -214,16 +254,17 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
         const searcher = FileSearchFactory.create({
           projectRoot: cwd,
           ignoreDirs: [],
-          useGitignore:
-            config?.getFileFilteringOptions()?.respectGitIgnore ?? true,
-          useGeminiignore:
-            config?.getFileFilteringOptions()?.respectGeminiIgnore ?? true,
+          fileDiscoveryService: new FileDiscoveryService(
+            cwd,
+            config?.getFileFilteringOptions(),
+          ),
           cache: true,
           cacheTtl: 30, // 30 seconds
           enableRecursiveFileSearch:
             config?.getEnableRecursiveFileSearch() ?? true,
-          disableFuzzySearch:
-            config?.getFileFilteringDisableFuzzySearch() ?? false,
+          enableFuzzySearch:
+            config?.getFileFilteringEnableFuzzySearch() ?? true,
+          maxFiles: config?.getFileFilteringOptions()?.maxFileCount,
         });
         await searcher.initialize();
         fileSearch.current = searcher;
@@ -251,6 +292,22 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
       slowSearchTimer.current = setTimeout(() => {
         dispatch({ type: 'SET_LOADING', payload: true });
       }, 200);
+
+      const timeoutMs =
+        config?.getFileFilteringOptions()?.searchTimeout ??
+        DEFAULT_SEARCH_TIMEOUT_MS;
+
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      (async () => {
+        try {
+          await setTimeoutPromise(timeoutMs, undefined, {
+            signal: controller.signal,
+          });
+          controller.abort();
+        } catch {
+          // ignore
+        }
+      })();
 
       try {
         const results = await fileSearch.current.search(state.pattern, {
@@ -283,7 +340,14 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
           value: suggestion.value.replace(/^@/, ''),
         }));
 
+        const agentCandidates = buildAgentCandidates(config);
+        const agentSuggestions = await searchAgentCandidates(
+          state.pattern ?? '',
+          agentCandidates,
+        );
+
         const combinedSuggestions = [
+          ...agentSuggestions,
           ...fileSuggestions,
           ...resourceSuggestions,
         ];
@@ -292,6 +356,8 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
         if (!(error instanceof Error && error.name === 'AbortError')) {
           dispatch({ type: 'ERROR' });
         }
+      } finally {
+        controller.abort();
       }
     };
 

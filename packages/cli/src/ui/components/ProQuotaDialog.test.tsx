@@ -12,7 +12,6 @@ import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 
 import {
   PREVIEW_GEMINI_MODEL,
-  UserTierId,
   DEFAULT_GEMINI_FLASH_MODEL,
 } from '@google/gemini-cli-core';
 
@@ -37,7 +36,6 @@ describe('ProQuotaDialog', () => {
           message="flash error"
           isTerminalQuotaError={true} // should not matter
           onChoice={mockOnChoice}
-          userTier={UserTierId.FREE}
         />,
       );
 
@@ -64,7 +62,7 @@ describe('ProQuotaDialog', () => {
 
   describe('for non-flash model failures', () => {
     describe('when it is a terminal quota error', () => {
-      it('should render switch and stop options for paid tiers', () => {
+      it('should render switch, upgrade, and stop options for paid tiers', () => {
         const { unmount } = render(
           <ProQuotaDialog
             failedModel="gemini-2.5-pro"
@@ -73,7 +71,6 @@ describe('ProQuotaDialog', () => {
             isTerminalQuotaError={true}
             isModelNotFoundError={false}
             onChoice={mockOnChoice}
-            userTier={UserTierId.LEGACY}
           />,
         );
 
@@ -84,6 +81,11 @@ describe('ProQuotaDialog', () => {
                 label: 'Switch to gemini-2.5-flash',
                 value: 'retry_always',
                 key: 'retry_always',
+              },
+              {
+                label: 'Upgrade for higher limits',
+                value: 'upgrade',
+                key: 'upgrade',
               },
               {
                 label: 'Stop',
@@ -105,7 +107,6 @@ describe('ProQuotaDialog', () => {
             message="flash error"
             isTerminalQuotaError={true}
             onChoice={mockOnChoice}
-            userTier={UserTierId.FREE}
           />,
         );
 
@@ -138,7 +139,6 @@ describe('ProQuotaDialog', () => {
             isTerminalQuotaError={true}
             isModelNotFoundError={false}
             onChoice={mockOnChoice}
-            userTier={UserTierId.FREE}
           />,
         );
 
@@ -169,7 +169,7 @@ describe('ProQuotaDialog', () => {
     });
 
     describe('when it is a capacity error', () => {
-      it('should render keep trying and stop options', () => {
+      it('should render keep trying, switch, and stop options', () => {
         const { unmount } = render(
           <ProQuotaDialog
             failedModel="gemini-2.5-pro"
@@ -178,7 +178,6 @@ describe('ProQuotaDialog', () => {
             isTerminalQuotaError={false}
             isModelNotFoundError={false}
             onChoice={mockOnChoice}
-            userTier={UserTierId.FREE}
           />,
         );
 
@@ -189,6 +188,11 @@ describe('ProQuotaDialog', () => {
                 label: 'Keep trying',
                 value: 'retry_once',
                 key: 'retry_once',
+              },
+              {
+                label: 'Switch to gemini-2.5-flash',
+                value: 'retry_always',
+                key: 'retry_always',
               },
               { label: 'Stop', value: 'retry_later', key: 'retry_later' },
             ],
@@ -209,7 +213,6 @@ describe('ProQuotaDialog', () => {
             isTerminalQuotaError={false}
             isModelNotFoundError={true}
             onChoice={mockOnChoice}
-            userTier={UserTierId.FREE}
           />,
         );
 
@@ -220,6 +223,11 @@ describe('ProQuotaDialog', () => {
                 label: 'Switch to gemini-2.5-pro',
                 value: 'retry_always',
                 key: 'retry_always',
+              },
+              {
+                label: 'Upgrade for higher limits',
+                value: 'upgrade',
+                key: 'upgrade',
               },
               {
                 label: 'Stop',
@@ -242,7 +250,6 @@ describe('ProQuotaDialog', () => {
             isTerminalQuotaError={false}
             isModelNotFoundError={true}
             onChoice={mockOnChoice}
-            userTier={UserTierId.LEGACY}
           />,
         );
 
@@ -253,6 +260,11 @@ describe('ProQuotaDialog', () => {
                 label: 'Switch to gemini-2.5-pro',
                 value: 'retry_always',
                 key: 'retry_always',
+              },
+              {
+                label: 'Upgrade for higher limits',
+                value: 'upgrade',
+                key: 'upgrade',
               },
               {
                 label: 'Stop',
@@ -277,7 +289,6 @@ describe('ProQuotaDialog', () => {
           message=""
           isTerminalQuotaError={false}
           onChoice={mockOnChoice}
-          userTier={UserTierId.FREE}
         />,
       );
 

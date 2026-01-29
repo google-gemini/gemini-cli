@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { z } from 'zod';
+
 export interface ClientMetadata {
   ideType?: ClientMetadataIdeType;
   ideVersion?: string;
@@ -80,6 +82,11 @@ export interface IneligibleTier {
   reasonMessage: string;
   tierId: UserTierId;
   tierName: string;
+  validationErrorMessage?: string;
+  validationUrl?: string;
+  validationUrlLinkText?: string;
+  validationLearnMoreUrl?: string;
+  validationLearnMoreLinkText?: string;
 }
 
 /**
@@ -96,6 +103,7 @@ export enum IneligibleTierReasonCode {
   UNKNOWN = 'UNKNOWN',
   UNKNOWN_LOCATION = 'UNKNOWN_LOCATION',
   UNSUPPORTED_LOCATION = 'UNSUPPORTED_LOCATION',
+  VALIDATION_REQUIRED = 'VALIDATION_REQUIRED',
   // go/keep-sorted end
 }
 /**
@@ -255,6 +263,13 @@ export enum ActionStatus {
   ACTION_STATUS_EMPTY = 4,
 }
 
+export enum InitiationMethod {
+  INITIATION_METHOD_UNSPECIFIED = 0,
+  TAB = 1,
+  COMMAND = 2,
+  AGENT = 3,
+}
+
 export interface ConversationOffered {
   citationCount?: string;
   includedCode?: boolean;
@@ -262,6 +277,7 @@ export interface ConversationOffered {
   traceId?: string;
   streamingLatency?: StreamingLatency;
   isAgentic?: boolean;
+  initiationMethod?: InitiationMethod;
 }
 
 export interface StreamingLatency {
@@ -277,3 +293,33 @@ export interface ConversationInteraction {
   language?: string;
   isAgentic?: boolean;
 }
+
+export interface FetchAdminControlsRequest {
+  project: string;
+}
+
+export type FetchAdminControlsResponse = z.infer<
+  typeof FetchAdminControlsResponseSchema
+>;
+
+const ExtensionsSettingSchema = z.object({
+  extensionsEnabled: z.boolean().optional(),
+});
+
+const CliFeatureSettingSchema = z.object({
+  extensionsSetting: ExtensionsSettingSchema.optional(),
+  unmanagedCapabilitiesEnabled: z.boolean().optional(),
+});
+
+const McpSettingSchema = z.object({
+  mcpEnabled: z.boolean().optional(),
+  overrideMcpConfigJson: z.string().optional(),
+});
+
+export const FetchAdminControlsResponseSchema = z.object({
+  // TODO: deprecate once backend stops sending this field
+  secureModeEnabled: z.boolean().optional(),
+  strictModeDisabled: z.boolean().optional(),
+  mcpSetting: McpSettingSchema.optional(),
+  cliFeatureSetting: CliFeatureSettingSchema.optional(),
+});

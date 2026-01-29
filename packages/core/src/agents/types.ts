@@ -11,6 +11,8 @@
 import type { Content, FunctionDeclaration } from '@google/genai';
 import type { AnyDeclarativeTool } from '../tools/tools.js';
 import { type z } from 'zod';
+import type { ModelConfig } from '../services/modelConfigService.js';
+import type { AnySchema } from 'ajv';
 
 /**
  * Describes the possible termination modes for an agent.
@@ -33,10 +35,20 @@ export interface OutputObject {
 }
 
 /**
+ * The default query string provided to an agent as input.
+ */
+export const DEFAULT_QUERY_STRING = 'Get Started!';
+
+/**
  * Represents the validated input parameters passed to an agent upon invocation.
  * Used primarily for templating the system prompt. (Replaces ContextState)
  */
 export type AgentInputs = Record<string, unknown>;
+
+/**
+ * Simplified input structure for Remote Agents, which consumes a single string query.
+ */
+export type RemoteAgentInputs = { query: string };
 
 /**
  * Structured events emitted during subagent execution for user observability.
@@ -59,8 +71,13 @@ export interface BaseAgentDefinition<
   name: string;
   displayName?: string;
   description: string;
+  experimental?: boolean;
   inputConfig: InputConfig;
   outputConfig?: OutputConfig<TOutput>;
+  metadata?: {
+    hash?: string;
+    filePath?: string;
+  };
 }
 
 export interface LocalAgentDefinition<
@@ -130,24 +147,7 @@ export interface ToolConfig {
  * Configures the expected inputs (parameters) for the agent.
  */
 export interface InputConfig {
-  /**
-   * Defines the parameters the agent accepts.
-   * This is vital for generating the tool wrapper schema.
-   */
-  inputs: Record<
-    string,
-    {
-      description: string;
-      type:
-        | 'string'
-        | 'number'
-        | 'boolean'
-        | 'integer'
-        | 'string[]'
-        | 'number[]';
-      required: boolean;
-    }
-  >;
+  inputSchema: AnySchema;
 }
 
 /**
@@ -173,21 +173,11 @@ export interface OutputConfig<T extends z.ZodTypeAny> {
 }
 
 /**
- * Configures the generative model parameters for the agent.
- */
-export interface ModelConfig {
-  model: string;
-  temp: number;
-  top_p: number;
-  thinkingBudget?: number;
-}
-
-/**
  * Configures the execution environment and constraints for the agent.
  */
 export interface RunConfig {
   /** The maximum execution time for the agent in minutes. */
-  max_time_minutes: number;
+  maxTimeMinutes: number;
   /** The maximum number of conversational turns. */
-  max_turns?: number;
+  maxTurns?: number;
 }

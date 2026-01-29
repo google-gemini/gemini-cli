@@ -10,21 +10,29 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
 │  ▲                                                                                               │
-│  ● Preview Features (e.g., models)                      false                                    │
+│  ● Preview Features (e.g., models)                                                        false  │
+│    Enable preview features (e.g., preview models).                                               │
 │                                                                                                  │
-│    Vim Mode                                             false                                    │
+│    Vim Mode                                                                               false  │
+│    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│    Disable Auto Update                                  false                                    │
+│    Enable Auto Update                                                                      true  │
+│    Enable automatic updates.                                                                     │
 │                                                                                                  │
-│    Enable Prompt Completion                             false                                    │
+│    Enable Prompt Completion                                                               false  │
+│    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
-│    Debug Keystroke Logging                              false                                    │
+│    Debug Keystroke Logging                                                                false  │
+│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
-│    Enable Session Cleanup                               false                                    │
+│    Enable Session Cleanup                                                                 false  │
+│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
-│    Output Format                                        Text                                     │
+│    Output Format                                                                           Text  │
+│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
-│    Hide Window Title                                    false                                    │
+│    Hide Window Title                                                                      false  │
+│    Hide the window title bar                                                                     │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -33,7 +41,7 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │    Workspace Settings                                                                            │
 │    System Settings                                                                               │
 │                                                                                                  │
-│  (Use Enter to select, Tab to change focus, Esc to close)                                        │
+│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -48,21 +56,29 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
 │  ▲                                                                                               │
-│  ● Preview Features (e.g., models)                      false                                    │
+│  ● Preview Features (e.g., models)                                                        false  │
+│    Enable preview features (e.g., preview models).                                               │
 │                                                                                                  │
-│    Vim Mode                                             true*                                    │
+│    Vim Mode                                                                               true*  │
+│    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│    Disable Auto Update                                  false                                    │
+│    Enable Auto Update                                                                      true  │
+│    Enable automatic updates.                                                                     │
 │                                                                                                  │
-│    Enable Prompt Completion                             false                                    │
+│    Enable Prompt Completion                                                               false  │
+│    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
-│    Debug Keystroke Logging                              false                                    │
+│    Debug Keystroke Logging                                                                false  │
+│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
-│    Enable Session Cleanup                               false                                    │
+│    Enable Session Cleanup                                                                 false  │
+│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
-│    Output Format                                        Text                                     │
+│    Output Format                                                                           Text  │
+│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
-│    Hide Window Title                                    false                                    │
+│    Hide Window Title                                                                      false  │
+│    Hide the window title bar                                                                     │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -71,7 +87,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │    Workspace Settings                                                                            │
 │    System Settings                                                                               │
 │                                                                                                  │
-│  (Use Enter to select, Tab to change focus, Esc to close)                                        │
+│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -86,21 +102,29 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
 │  ▲                                                                                               │
-│  ● Preview Features (e.g., models)                      false                                    │
+│  ● Preview Features (e.g., models)                                                        false  │
+│    Enable preview features (e.g., preview models).                                               │
 │                                                                                                  │
-│    Vim Mode                                             false*                                   │
+│    Vim Mode                                                                              false*  │
+│    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│    Disable Auto Update                                  false*                                   │
+│    Enable Auto Update                                                                     true*  │
+│    Enable automatic updates.                                                                     │
 │                                                                                                  │
-│    Enable Prompt Completion                             false*                                   │
+│    Enable Prompt Completion                                                              false*  │
+│    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
-│    Debug Keystroke Logging                              false*                                   │
+│    Debug Keystroke Logging                                                               false*  │
+│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
-│    Enable Session Cleanup                               false                                    │
+│    Enable Session Cleanup                                                                 false  │
+│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
-│    Output Format                                        Text                                     │
+│    Output Format                                                                           Text  │
+│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
-│    Hide Window Title                                    false*                                   │
+│    Hide Window Title                                                                     false*  │
+│    Hide the window title bar                                                                     │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -109,7 +133,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │    Workspace Settings                                                                            │
 │    System Settings                                                                               │
 │                                                                                                  │
-│  (Use Enter to select, Tab to change focus, Esc to close)                                        │
+│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -124,21 +148,29 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
 │  ▲                                                                                               │
-│  ● Preview Features (e.g., models)                      false                                    │
+│  ● Preview Features (e.g., models)                                                        false  │
+│    Enable preview features (e.g., preview models).                                               │
 │                                                                                                  │
-│    Vim Mode                                             false                                    │
+│    Vim Mode                                                                               false  │
+│    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│    Disable Auto Update                                  false                                    │
+│    Enable Auto Update                                                                      true  │
+│    Enable automatic updates.                                                                     │
 │                                                                                                  │
-│    Enable Prompt Completion                             false                                    │
+│    Enable Prompt Completion                                                               false  │
+│    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
-│    Debug Keystroke Logging                              false                                    │
+│    Debug Keystroke Logging                                                                false  │
+│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
-│    Enable Session Cleanup                               false                                    │
+│    Enable Session Cleanup                                                                 false  │
+│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
-│    Output Format                                        Text                                     │
+│    Output Format                                                                           Text  │
+│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
-│    Hide Window Title                                    false                                    │
+│    Hide Window Title                                                                      false  │
+│    Hide the window title bar                                                                     │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -147,7 +179,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │    Workspace Settings                                                                            │
 │    System Settings                                                                               │
 │                                                                                                  │
-│  (Use Enter to select, Tab to change focus, Esc to close)                                        │
+│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -162,21 +194,29 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
 │  ▲                                                                                               │
-│  ● Preview Features (e.g., models)                      false                                    │
+│  ● Preview Features (e.g., models)                                                        false  │
+│    Enable preview features (e.g., preview models).                                               │
 │                                                                                                  │
-│    Vim Mode                                             false                                    │
+│    Vim Mode                                                                               false  │
+│    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│    Disable Auto Update                                  false                                    │
+│    Enable Auto Update                                                                      true  │
+│    Enable automatic updates.                                                                     │
 │                                                                                                  │
-│    Enable Prompt Completion                             false                                    │
+│    Enable Prompt Completion                                                               false  │
+│    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
-│    Debug Keystroke Logging                              false                                    │
+│    Debug Keystroke Logging                                                                false  │
+│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
-│    Enable Session Cleanup                               false                                    │
+│    Enable Session Cleanup                                                                 false  │
+│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
-│    Output Format                                        Text                                     │
+│    Output Format                                                                           Text  │
+│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
-│    Hide Window Title                                    false                                    │
+│    Hide Window Title                                                                      false  │
+│    Hide the window title bar                                                                     │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -185,7 +225,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │    Workspace Settings                                                                            │
 │    System Settings                                                                               │
 │                                                                                                  │
-│  (Use Enter to select, Tab to change focus, Esc to close)                                        │
+│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -200,21 +240,29 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
 │  ▲                                                                                               │
-│    Preview Features (e.g., models)                      false                                    │
+│    Preview Features (e.g., models)                                                        false  │
+│    Enable preview features (e.g., preview models).                                               │
 │                                                                                                  │
-│    Vim Mode                                             false                                    │
+│    Vim Mode                                                                               false  │
+│    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│    Disable Auto Update                                  false                                    │
+│    Enable Auto Update                                                                      true  │
+│    Enable automatic updates.                                                                     │
 │                                                                                                  │
-│    Enable Prompt Completion                             false                                    │
+│    Enable Prompt Completion                                                               false  │
+│    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
-│    Debug Keystroke Logging                              false                                    │
+│    Debug Keystroke Logging                                                                false  │
+│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
-│    Enable Session Cleanup                               false                                    │
+│    Enable Session Cleanup                                                                 false  │
+│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
-│    Output Format                                        Text                                     │
+│    Output Format                                                                           Text  │
+│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
-│    Hide Window Title                                    false                                    │
+│    Hide Window Title                                                                      false  │
+│    Hide the window title bar                                                                     │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -223,7 +271,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │    2. Workspace Settings                                                                         │
 │    3. System Settings                                                                            │
 │                                                                                                  │
-│  (Use Enter to select, Tab to change focus, Esc to close)                                        │
+│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -238,21 +286,29 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
 │  ▲                                                                                               │
-│  ● Preview Features (e.g., models)                      false                                    │
+│  ● Preview Features (e.g., models)                                                        false  │
+│    Enable preview features (e.g., preview models).                                               │
 │                                                                                                  │
-│    Vim Mode                                             false*                                   │
+│    Vim Mode                                                                              false*  │
+│    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│    Disable Auto Update                                  true*                                    │
+│    Enable Auto Update                                                                    false*  │
+│    Enable automatic updates.                                                                     │
 │                                                                                                  │
-│    Enable Prompt Completion                             false                                    │
+│    Enable Prompt Completion                                                               false  │
+│    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
-│    Debug Keystroke Logging                              false                                    │
+│    Debug Keystroke Logging                                                                false  │
+│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
-│    Enable Session Cleanup                               false                                    │
+│    Enable Session Cleanup                                                                 false  │
+│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
-│    Output Format                                        Text                                     │
+│    Output Format                                                                           Text  │
+│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
-│    Hide Window Title                                    false*                                   │
+│    Hide Window Title                                                                     false*  │
+│    Hide the window title bar                                                                     │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -261,7 +317,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │    Workspace Settings                                                                            │
 │    System Settings                                                                               │
 │                                                                                                  │
-│  (Use Enter to select, Tab to change focus, Esc to close)                                        │
+│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -276,21 +332,29 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
 │  ▲                                                                                               │
-│  ● Preview Features (e.g., models)                      false                                    │
+│  ● Preview Features (e.g., models)                                                        false  │
+│    Enable preview features (e.g., preview models).                                               │
 │                                                                                                  │
-│    Vim Mode                                             false                                    │
+│    Vim Mode                                                                               false  │
+│    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│    Disable Auto Update                                  false                                    │
+│    Enable Auto Update                                                                      true  │
+│    Enable automatic updates.                                                                     │
 │                                                                                                  │
-│    Enable Prompt Completion                             false                                    │
+│    Enable Prompt Completion                                                               false  │
+│    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
-│    Debug Keystroke Logging                              false                                    │
+│    Debug Keystroke Logging                                                                false  │
+│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
-│    Enable Session Cleanup                               false                                    │
+│    Enable Session Cleanup                                                                 false  │
+│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
-│    Output Format                                        Text                                     │
+│    Output Format                                                                           Text  │
+│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
-│    Hide Window Title                                    false                                    │
+│    Hide Window Title                                                                      false  │
+│    Hide the window title bar                                                                     │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -299,7 +363,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │    Workspace Settings                                                                            │
 │    System Settings                                                                               │
 │                                                                                                  │
-│  (Use Enter to select, Tab to change focus, Esc to close)                                        │
+│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
@@ -314,21 +378,29 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯ │
 │                                                                                                  │
 │  ▲                                                                                               │
-│  ● Preview Features (e.g., models)                      false                                    │
+│  ● Preview Features (e.g., models)                                                        false  │
+│    Enable preview features (e.g., preview models).                                               │
 │                                                                                                  │
-│    Vim Mode                                             true*                                    │
+│    Vim Mode                                                                               true*  │
+│    Enable Vim keybindings                                                                        │
 │                                                                                                  │
-│    Disable Auto Update                                  true*                                    │
+│    Enable Auto Update                                                                    false*  │
+│    Enable automatic updates.                                                                     │
 │                                                                                                  │
-│    Enable Prompt Completion                             true*                                    │
+│    Enable Prompt Completion                                                               true*  │
+│    Enable AI-powered prompt completion suggestions while typing.                                 │
 │                                                                                                  │
-│    Debug Keystroke Logging                              true*                                    │
+│    Debug Keystroke Logging                                                                true*  │
+│    Enable debug logging of keystrokes to the console.                                            │
 │                                                                                                  │
-│    Enable Session Cleanup                               false                                    │
+│    Enable Session Cleanup                                                                 false  │
+│    Enable automatic session cleanup                                                              │
 │                                                                                                  │
-│    Output Format                                        Text                                     │
+│    Output Format                                                                           Text  │
+│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
-│    Hide Window Title                                    true*                                    │
+│    Hide Window Title                                                                      true*  │
+│    Hide the window title bar                                                                     │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -337,7 +409,7 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │    Workspace Settings                                                                            │
 │    System Settings                                                                               │
 │                                                                                                  │
-│  (Use Enter to select, Tab to change focus, Esc to close)                                        │
+│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;

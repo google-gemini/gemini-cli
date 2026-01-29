@@ -11,14 +11,14 @@ import { useUIState } from '../contexts/UIStateContext.js';
 import { theme } from '../semantic-colors.js';
 import { StreamingState } from '../types.js';
 import { UpdateNotification } from './UpdateNotification.js';
+import { persistentState } from '../../utils/persistentState.js';
 
-import { GEMINI_DIR, Storage, debugLogger } from '@google/gemini-cli-core';
+import { GEMINI_DIR, Storage, homedir } from '@google/gemini-cli-core';
 
 import * as fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 
-const settingsPath = path.join(os.homedir(), GEMINI_DIR, 'settings.json');
+const settingsPath = path.join(homedir(), GEMINI_DIR, 'settings.json');
 
 const screenReaderNudgeFilePath = path.join(
   Storage.getGlobalTempDir(),
@@ -34,15 +34,20 @@ export const Notifications = () => {
   const showInitError =
     initError && streamingState !== StreamingState.Responding;
 
-  const [hasSeenScreenReaderNudge, setHasSeenScreenReaderNudge] = useState<
-    boolean | undefined
-  >(undefined);
+  const [hasSeenScreenReaderNudge, setHasSeenScreenReaderNudge] = useState(() =>
+    persistentState.get('hasSeenScreenReaderNudge'),
+  );
 
   useEffect(() => {
-    const checkScreenReader = async () => {
+    const checkLegacyScreenReaderNudge = async () => {
+      if (hasSeenScreenReaderNudge !== undefined) return;
+
       try {
         await fs.access(screenReaderNudgeFilePath);
+        persistentState.set('hasSeenScreenReaderNudge', true);
         setHasSeenScreenReaderNudge(true);
+        // Best effort cleanup of legacy file
+        await fs.unlink(screenReaderNudgeFilePath).catch(() => {});
       } catch {
         setHasSeenScreenReaderNudge(false);
       }
@@ -50,28 +55,17 @@ export const Notifications = () => {
 
     if (isScreenReaderEnabled) {
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      checkScreenReader();
+      checkLegacyScreenReaderNudge();
     }
-  }, [isScreenReaderEnabled]);
+  }, [isScreenReaderEnabled, hasSeenScreenReaderNudge]);
 
   const showScreenReaderNudge =
     isScreenReaderEnabled && hasSeenScreenReaderNudge === false;
 
   useEffect(() => {
-    const writeScreenReaderNudgeFile = async () => {
-      if (showScreenReaderNudge) {
-        try {
-          await fs.mkdir(path.dirname(screenReaderNudgeFilePath), {
-            recursive: true,
-          });
-          await fs.writeFile(screenReaderNudgeFilePath, 'true');
-        } catch (error) {
-          debugLogger.error('Error storing screen reader nudge', error);
-        }
-      }
-    };
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    writeScreenReaderNudgeFile();
+    if (showScreenReaderNudge) {
+      persistentState.set('hasSeenScreenReaderNudge', true);
+    }
   }, [showScreenReaderNudge]);
 
   if (

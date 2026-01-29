@@ -13,10 +13,10 @@ import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { theme } from '../../semantic-colors.js';
 import type { AnsiOutput } from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
-import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
+import { tryParseJSON } from '../../../utils/jsonoutput.js';
 
 const STATIC_HEIGHT = 1;
-const RESERVED_LINE_COUNT = 5; // for tool name, status, padding etc.
+const RESERVED_LINE_COUNT = 6; // for tool name, status, padding, and 'ShowMoreLines' hint
 const MIN_LINES_SHOWN = 2; // show at least this many lines
 
 // Large threshold to ensure we don't cause performance issues for very large
@@ -42,7 +42,6 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   renderOutputAsMarkdown = true,
 }) => {
   const { renderMarkdown } = useUIState();
-  const isAlternateBuffer = useAlternateBuffer();
 
   const availableHeight = availableTerminalHeight
     ? Math.max(
@@ -50,13 +49,6 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
         MIN_LINES_SHOWN + 1, // enforce minimum lines shown
       )
     : undefined;
-
-  // Long tool call response in MarkdownDisplay doesn't respect availableTerminalHeight properly,
-  // so if we aren't using alternate buffer mode, we're forcing it to not render as markdown when the response is too long, it will fallback
-  // to render as plain text, which is contained within the terminal using MaxSizedBox
-  if (availableHeight && !isAlternateBuffer) {
-    renderOutputAsMarkdown = false;
-  }
 
   const combinedPaddingAndBorderWidth = 4;
   const childWidth = terminalWidth - combinedPaddingAndBorderWidth;
@@ -72,56 +64,76 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
 
   if (!truncatedResultDisplay) return null;
 
+  // Check if string content is valid JSON and pretty-print it
+  const prettyJSON =
+    typeof truncatedResultDisplay === 'string'
+      ? tryParseJSON(truncatedResultDisplay)
+      : null;
+  const formattedJSON = prettyJSON ? JSON.stringify(prettyJSON, null, 2) : null;
+
+  let content: React.ReactNode;
+
+  if (formattedJSON) {
+    // Render pretty-printed JSON
+    content = (
+      <Text wrap="wrap" color={theme.text.primary}>
+        {formattedJSON}
+      </Text>
+    );
+  } else if (
+    typeof truncatedResultDisplay === 'string' &&
+    renderOutputAsMarkdown
+  ) {
+    content = (
+      <MarkdownDisplay
+        text={truncatedResultDisplay}
+        terminalWidth={childWidth}
+        renderMarkdown={renderMarkdown}
+        isPending={false}
+      />
+    );
+  } else if (
+    typeof truncatedResultDisplay === 'string' &&
+    !renderOutputAsMarkdown
+  ) {
+    content = (
+      <Text wrap="wrap" color={theme.text.primary}>
+        {truncatedResultDisplay}
+      </Text>
+    );
+  } else if (
+    typeof truncatedResultDisplay === 'object' &&
+    'fileDiff' in truncatedResultDisplay
+  ) {
+    content = (
+      <DiffRenderer
+        diffContent={(truncatedResultDisplay as FileDiffResult).fileDiff}
+        filename={(truncatedResultDisplay as FileDiffResult).fileName}
+        availableTerminalHeight={availableHeight}
+        terminalWidth={childWidth}
+      />
+    );
+  } else if (
+    typeof truncatedResultDisplay === 'object' &&
+    'todos' in truncatedResultDisplay
+  ) {
+    // display nothing, as the TodoTray will handle rendering todos
+    return null;
+  } else {
+    content = (
+      <AnsiOutputText
+        data={truncatedResultDisplay as AnsiOutput}
+        availableTerminalHeight={availableHeight}
+        width={childWidth}
+      />
+    );
+  }
+
   return (
     <Box width={childWidth} flexDirection="column">
-      <Box flexDirection="column">
-        {typeof truncatedResultDisplay === 'string' &&
-        renderOutputAsMarkdown ? (
-          <Box flexDirection="column">
-            <MarkdownDisplay
-              text={truncatedResultDisplay}
-              terminalWidth={childWidth}
-              renderMarkdown={renderMarkdown}
-              isPending={false}
-            />
-          </Box>
-        ) : typeof truncatedResultDisplay === 'string' &&
-          !renderOutputAsMarkdown ? (
-          isAlternateBuffer ? (
-            <Box flexDirection="column" width={childWidth}>
-              <Text wrap="wrap" color={theme.text.primary}>
-                {truncatedResultDisplay}
-              </Text>
-            </Box>
-          ) : (
-            <MaxSizedBox maxHeight={availableHeight} maxWidth={childWidth}>
-              <Box>
-                <Text wrap="wrap" color={theme.text.primary}>
-                  {truncatedResultDisplay}
-                </Text>
-              </Box>
-            </MaxSizedBox>
-          )
-        ) : typeof truncatedResultDisplay === 'object' &&
-          'fileDiff' in truncatedResultDisplay ? (
-          <DiffRenderer
-            diffContent={(truncatedResultDisplay as FileDiffResult).fileDiff}
-            filename={(truncatedResultDisplay as FileDiffResult).fileName}
-            availableTerminalHeight={availableHeight}
-            terminalWidth={childWidth}
-          />
-        ) : typeof truncatedResultDisplay === 'object' &&
-          'todos' in truncatedResultDisplay ? (
-          // display nothing, as the TodoTray will handle rendering todos
-          <></>
-        ) : (
-          <AnsiOutputText
-            data={truncatedResultDisplay as AnsiOutput}
-            availableTerminalHeight={availableHeight}
-            width={childWidth}
-          />
-        )}
-      </Box>
+      <MaxSizedBox maxHeight={availableHeight} maxWidth={childWidth}>
+        {content}
+      </MaxSizedBox>
     </Box>
   );
 };

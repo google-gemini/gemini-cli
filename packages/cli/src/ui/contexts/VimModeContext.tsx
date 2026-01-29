@@ -32,7 +32,7 @@ export const VimModeProvider = ({
   children: React.ReactNode;
   settings: LoadedSettings;
 }) => {
-  const initialVimEnabled = settings.merged.general?.vimMode ?? false;
+  const initialVimEnabled = settings.merged.general.vimMode;
   const [vimEnabled, setVimEnabled] = useState(initialVimEnabled);
   const [vimMode, setVimMode] = useState<VimMode>(
     initialVimEnabled ? 'NORMAL' : 'INSERT',
@@ -40,13 +40,13 @@ export const VimModeProvider = ({
 
   useEffect(() => {
     // Initialize vimEnabled from settings on mount
-    const enabled = settings.merged.general?.vimMode ?? false;
+    const enabled = settings.merged.general.vimMode;
     setVimEnabled(enabled);
     // When vim mode is enabled, always start in NORMAL mode
     if (enabled) {
       setVimMode('NORMAL');
     }
-  }, [settings.merged.general?.vimMode]);
+  }, [settings.merged.general.vimMode]);
 
   const toggleVimEnabled = useCallback(async () => {
     const newValue = !vimEnabled;

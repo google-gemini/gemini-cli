@@ -51,7 +51,7 @@ const createMockSettings = (
       path: '/workspace/settings.json',
     },
     true,
-    new Set(),
+    [],
   );
 
 describe('ThemeDialog Snapshots', () => {

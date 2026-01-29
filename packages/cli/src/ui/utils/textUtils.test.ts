@@ -9,9 +9,54 @@ import type {
   ToolCallConfirmationDetails,
   ToolEditConfirmationDetails,
 } from '@google/gemini-cli-core';
-import { escapeAnsiCtrlCodes, stripUnsafeCharacters } from './textUtils.js';
+import {
+  escapeAnsiCtrlCodes,
+  stripUnsafeCharacters,
+  getCachedStringWidth,
+  sanitizeForDisplay,
+} from './textUtils.js';
 
 describe('textUtils', () => {
+  describe('sanitizeForListDisplay', () => {
+    it('should strip ANSI codes and replace newlines/tabs with spaces', () => {
+      const input = '\u001b[31mLine 1\nLine 2\tTabbed\r\nEnd\u001b[0m';
+      expect(sanitizeForDisplay(input)).toBe('Line 1 Line 2 Tabbed End');
+    });
+
+    it('should collapse multiple consecutive whitespace characters into a single space', () => {
+      const input = 'Multiple \n\n newlines and \t\t tabs';
+      expect(sanitizeForDisplay(input)).toBe('Multiple newlines and tabs');
+    });
+
+    it('should truncate long strings', () => {
+      const longInput = 'a'.repeat(50);
+      expect(sanitizeForDisplay(longInput, 20)).toBe('a'.repeat(17) + '...');
+    });
+
+    it('should handle empty or null input', () => {
+      expect(sanitizeForDisplay('')).toBe('');
+      expect(sanitizeForDisplay(null as unknown as string)).toBe('');
+    });
+
+    it('should strip control characters like backspace', () => {
+      const input = 'Hello\x08 World';
+      expect(sanitizeForDisplay(input)).toBe('Hello World');
+    });
+  });
+
+  describe('getCachedStringWidth', () => {
+    it('should handle unicode characters that crash string-width', () => {
+      // U+0602 caused string-width to crash (see #16418)
+      const char = '؂';
+      expect(getCachedStringWidth(char)).toBe(1);
+    });
+
+    it('should handle unicode characters that crash string-width with ANSI codes', () => {
+      const charWithAnsi = '\u001b[31m' + '؂' + '\u001b[0m';
+      expect(getCachedStringWidth(charWithAnsi)).toBe(1);
+    });
+  });
+
   describe('stripUnsafeCharacters', () => {
     it('should not strip tab characters', () => {
       const input = 'hello	world';
@@ -46,6 +91,7 @@ describe('textUtils', () => {
             type: 'exec',
             command: '\u001b[31mmls -l\u001b[0m',
             rootCommand: '\u001b[32msudo apt-get update\u001b[0m',
+            rootCommands: ['sudo'],
             onConfirm: async () => {},
           };
 

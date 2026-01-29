@@ -33,10 +33,12 @@ const argv = yargs(hideBin(process.argv)).option('q', {
   default: false,
 }).argv;
 
+const homedir = () => process.env['GEMINI_CLI_HOME'] || os.homedir();
+
 let geminiSandbox = process.env.GEMINI_SANDBOX;
 
 if (!geminiSandbox) {
-  const userSettingsFile = join(os.homedir(), GEMINI_DIR, 'settings.json');
+  const userSettingsFile = join(homedir(), GEMINI_DIR, 'settings.json');
   if (existsSync(userSettingsFile)) {
     const settings = JSON.parse(
       stripJsonComments(readFileSync(userSettingsFile, 'utf-8')),
