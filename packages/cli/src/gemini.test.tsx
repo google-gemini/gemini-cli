@@ -1547,7 +1547,8 @@ describe('startInteractiveUI', () => {
 
     // Verify all startup tasks were called
     expect(getVersion).toHaveBeenCalledTimes(1);
-    expect(registerCleanup).toHaveBeenCalledTimes(3);
+    // 4 cleanups: mouseEvents, consolePatcher, instance.unmount, and TTY check
+    expect(registerCleanup).toHaveBeenCalledTimes(4);
 
     // Verify cleanup handler is registered with unmount function
     const cleanupFn = vi.mocked(registerCleanup).mock.calls[0][0];
