@@ -25,6 +25,7 @@ import {
   debugLogger,
   runInDevTraceSpan,
   EDIT_TOOL_NAMES,
+  ASK_USER_TOOL_NAME,
   processRestorableToolCalls,
   recordToolCallInteractions,
   ToolErrorType,
@@ -367,6 +368,14 @@ export const useGeminiStream = (
     const isEventDriven = config.isEventDrivenSchedulerEnabled();
     const anyVisibleInHistory = pushedToolCallIds.size > 0;
     const anyVisibleInPending = remainingTools.some((tc) => {
+      // AskUser tools are rendered by AskUserDialog, not ToolGroupMessage
+      const isInProgress =
+        tc.status !== 'success' &&
+        tc.status !== 'error' &&
+        tc.status !== 'cancelled';
+      if (tc.request.name === ASK_USER_TOOL_NAME && isInProgress) {
+        return false;
+      }
       if (!isEventDriven) return true;
       return (
         tc.status !== 'scheduled' &&
