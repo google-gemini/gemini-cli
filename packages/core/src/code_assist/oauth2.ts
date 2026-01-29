@@ -459,12 +459,12 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
 async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
   const port = await getAvailablePort();
   // The hostname used for the HTTP server binding (e.g., '0.0.0.0' in Docker).
-  const host = process.env['OAUTH_CALLBACK_HOST'] || 'localhost';
+  const host = process.env['OAUTH_CALLBACK_HOST'] || '127.0.0.1';
   // The `redirectUri` sent to Google's authorization server MUST use a loopback IP literal
   // (i.e., 'localhost' or '127.0.0.1'). This is a strict security policy for credentials of
   // type 'Desktop app' or 'Web application' (when using loopback flow) to mitigate
   // authorization code interception attacks.
-  const redirectUri = `http://localhost:${port}/oauth2callback`;
+  const redirectUri = `http://127.0.0.1:${port}/oauth2callback`;
   const state = crypto.randomBytes(32).toString('hex');
   const authUrl = client.generateAuthUrl({
     redirect_uri: redirectUri,
@@ -486,7 +486,7 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
           );
         }
         // acquire the code from the querystring, and close the web server.
-        const qs = new url.URL(req.url!, 'http://localhost:3000').searchParams;
+        const qs = new url.URL(req.url!, 'http://127.0.0.1:3000').searchParams;
         if (qs.get('error')) {
           res.writeHead(HTTP_REDIRECT, { Location: SIGN_IN_FAILURE_URL });
           res.end();

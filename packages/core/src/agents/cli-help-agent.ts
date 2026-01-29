@@ -32,12 +32,15 @@ export const CliHelpAgent = (
   description:
     'Specialized in answering questions about how users use you, (Gemini CLI): features, documentation, and current runtime configuration.',
   inputConfig: {
-    inputs: {
-      question: {
-        description: 'The specific question about Gemini CLI.',
-        type: 'string',
-        required: true,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        question: {
+          type: 'string',
+          description: 'The specific question about Gemini CLI.',
+        },
       },
+      required: ['question'],
     },
   },
   outputConfig: {
@@ -50,14 +53,19 @@ export const CliHelpAgent = (
 
   modelConfig: {
     model: GEMINI_MODEL_ALIAS_FLASH,
-    temp: 0.1,
-    top_p: 0.95,
-    thinkingBudget: -1,
+    generateContentConfig: {
+      temperature: 0.1,
+      topP: 0.95,
+      thinkingConfig: {
+        includeThoughts: true,
+        thinkingBudget: -1,
+      },
+    },
   },
 
   runConfig: {
-    max_time_minutes: 3,
-    max_turns: 10,
+    maxTimeMinutes: 3,
+    maxTurns: 10,
   },
 
   toolConfig: {

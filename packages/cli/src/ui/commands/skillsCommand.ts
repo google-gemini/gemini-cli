@@ -23,27 +23,32 @@ async function listAction(
   context: CommandContext,
   args: string,
 ): Promise<void | SlashCommandActionReturn> {
-  const subCommand = args.trim();
+  const subArgs = args.trim().split(/\s+/);
 
   // Default to SHOWING descriptions. The user can hide them with 'nodesc'.
   let useShowDescriptions = true;
-  if (subCommand === 'nodesc') {
-    useShowDescriptions = false;
+  let showAll = false;
+
+  for (const arg of subArgs) {
+    if (arg === 'nodesc' || arg === '--nodesc') {
+      useShowDescriptions = false;
+    } else if (arg === 'all' || arg === '--all') {
+      showAll = true;
+    }
   }
 
   const skillManager = context.services.config?.getSkillManager();
   if (!skillManager) {
-    context.ui.addItem(
-      {
-        type: MessageType.ERROR,
-        text: 'Could not retrieve skill manager.',
-      },
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: 'Could not retrieve skill manager.',
+    });
     return;
   }
 
-  const skills = skillManager.getAllSkills();
+  const skills = showAll
+    ? skillManager.getAllSkills()
+    : skillManager.getAllSkills().filter((s) => !s.isBuiltin);
 
   const skillsListItem: HistoryItemSkillsList = {
     type: MessageType.SKILLS_LIST,
@@ -53,11 +58,12 @@ async function listAction(
       disabled: skill.disabled,
       location: skill.location,
       body: skill.body,
+      isBuiltin: skill.isBuiltin,
     })),
     showDescriptions: useShowDescriptions,
   };
 
-  context.ui.addItem(skillsListItem, Date.now());
+  context.ui.addItem(skillsListItem);
 }
 
 async function disableAction(
@@ -66,16 +72,24 @@ async function disableAction(
 ): Promise<void | SlashCommandActionReturn> {
   const skillName = args.trim();
   if (!skillName) {
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: 'Please provide a skill name to disable.',
+    });
+    return;
+  }
+  const skillManager = context.services.config?.getSkillManager();
+  if (skillManager?.isAdminEnabled() === false) {
     context.ui.addItem(
       {
         type: MessageType.ERROR,
-        text: 'Please provide a skill name to disable.',
+        text: 'Agent skills are disabled by your admin.',
       },
       Date.now(),
     );
     return;
   }
-  const skillManager = context.services.config?.getSkillManager();
+
   const skill = skillManager?.getSkill(skillName);
   if (!skill) {
     context.ui.addItem(
@@ -98,17 +112,15 @@ async function disableAction(
     result,
     (label, path) => `${label} (${path})`,
   );
-  if (result.status === 'success') {
-    feedback += ' Use "/skills reload" for it to take effect.';
+  if (result.status === 'success' || result.status === 'no-op') {
+    feedback +=
+      ' You can run "/skills reload" to refresh your current instance.';
   }
 
-  context.ui.addItem(
-    {
-      type: MessageType.INFO,
-      text: feedback,
-    },
-    Date.now(),
-  );
+  context.ui.addItem({
+    type: MessageType.INFO,
+    text: feedback,
+  });
 }
 
 async function enableAction(
@@ -117,10 +129,19 @@ async function enableAction(
 ): Promise<void | SlashCommandActionReturn> {
   const skillName = args.trim();
   if (!skillName) {
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: 'Please provide a skill name to enable.',
+    });
+    return;
+  }
+
+  const skillManager = context.services.config?.getSkillManager();
+  if (skillManager?.isAdminEnabled() === false) {
     context.ui.addItem(
       {
         type: MessageType.ERROR,
-        text: 'Please provide a skill name to enable.',
+        text: 'Agent skills are disabled by your admin.',
       },
       Date.now(),
     );
@@ -133,17 +154,15 @@ async function enableAction(
     result,
     (label, path) => `${label} (${path})`,
   );
-  if (result.status === 'success') {
-    feedback += ' Use "/skills reload" for it to take effect.';
+  if (result.status === 'success' || result.status === 'no-op') {
+    feedback +=
+      ' You can run "/skills reload" to refresh your current instance.';
   }
 
-  context.ui.addItem(
-    {
-      type: MessageType.INFO,
-      text: feedback,
-    },
-    Date.now(),
-  );
+  context.ui.addItem({
+    type: MessageType.INFO,
+    text: feedback,
+  });
 }
 
 async function reloadAction(
@@ -151,13 +170,10 @@ async function reloadAction(
 ): Promise<void | SlashCommandActionReturn> {
   const config = context.services.config;
   if (!config) {
-    context.ui.addItem(
-      {
-        type: MessageType.ERROR,
-        text: 'Could not retrieve configuration.',
-      },
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: 'Could not retrieve configuration.',
+    });
     return;
   }
 
@@ -217,27 +233,21 @@ async function reloadAction(
       successText += ` ${details.join(' and ')}.`;
     }
 
-    context.ui.addItem(
-      {
-        type: 'info',
-        text: successText,
-        icon: '✓ ',
-        color: 'green',
-      } as HistoryItemInfo,
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: 'info',
+      text: successText,
+      icon: '✓ ',
+      color: 'green',
+    } as HistoryItemInfo);
   } catch (error) {
     clearTimeout(pendingTimeout);
     if (pendingItemSet) {
       context.ui.setPendingItem(null);
     }
-    context.ui.addItem(
-      {
-        type: MessageType.ERROR,
-        text: `Failed to reload skills: ${error instanceof Error ? error.message : String(error)}`,
-      },
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: `Failed to reload skills: ${error instanceof Error ? error.message : String(error)}`,
+    });
   }
 }
 
@@ -278,7 +288,8 @@ export const skillsCommand: SlashCommand = {
   subCommands: [
     {
       name: 'list',
-      description: 'List available agent skills. Usage: /skills list [nodesc]',
+      description:
+        'List available agent skills. Usage: /skills list [nodesc] [all]',
       kind: CommandKind.BUILT_IN,
       action: listAction,
     },

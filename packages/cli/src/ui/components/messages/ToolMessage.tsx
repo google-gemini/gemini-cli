@@ -5,8 +5,7 @@
  */
 
 import type React from 'react';
-import { useState, useEffect } from 'react';
-import { Box, Text } from 'ink';
+import { Box } from 'ink';
 import type { IndividualToolCallDisplay } from '../../types.js';
 import { StickyHeader } from '../StickyHeader.js';
 import { ToolResultDisplay } from './ToolResultDisplay.js';
@@ -16,15 +15,12 @@ import {
   TrailingIndicator,
   type TextEmphasis,
   STATUS_INDICATOR_WIDTH,
+  isThisShellFocusable as checkIsShellFocusable,
+  isThisShellFocused as checkIsShellFocused,
+  useFocusHint,
+  FocusHint,
 } from './ToolShared.js';
-import {
-  SHELL_COMMAND_NAME,
-  SHELL_FOCUS_HINT_DELAY_MS,
-} from '../../constants.js';
-import { theme } from '../../semantic-colors.js';
-import type { Config } from '@google/gemini-cli-core';
-import { useInactivityTimer } from '../../hooks/useInactivityTimer.js';
-import { ToolCallStatus } from '../../types.js';
+import { type Config } from '@google/gemini-cli-core';
 import { ShellInputPrompt } from '../ShellInputPrompt.js';
 
 export type { TextEmphasis };
@@ -60,42 +56,27 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   ptyId,
   config,
 }) => {
-  const isThisShellFocused =
-    (name === SHELL_COMMAND_NAME || name === 'Shell') &&
-    status === ToolCallStatus.Executing &&
-    ptyId === activeShellPtyId &&
-    embeddedShellFocused;
-
-  const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null);
-  const [userHasFocused, setUserHasFocused] = useState(false);
-  const showFocusHint = useInactivityTimer(
-    !!lastUpdateTime,
-    lastUpdateTime ? lastUpdateTime.getTime() : 0,
-    SHELL_FOCUS_HINT_DELAY_MS,
+  const isThisShellFocused = checkIsShellFocused(
+    name,
+    status,
+    ptyId,
+    activeShellPtyId,
+    embeddedShellFocused,
   );
 
-  useEffect(() => {
-    if (resultDisplay) {
-      setLastUpdateTime(new Date());
-    }
-  }, [resultDisplay]);
+  const isThisShellFocusable = checkIsShellFocusable(name, status, config);
 
-  useEffect(() => {
-    if (isThisShellFocused) {
-      setUserHasFocused(true);
-    }
-  }, [isThisShellFocused]);
-
-  const isThisShellFocusable =
-    (name === SHELL_COMMAND_NAME || name === 'Shell') &&
-    status === ToolCallStatus.Executing &&
-    config?.getEnableInteractiveShell();
-
-  const shouldShowFocusHint =
-    isThisShellFocusable && (showFocusHint || userHasFocused);
+  const { shouldShowFocusHint } = useFocusHint(
+    isThisShellFocusable,
+    isThisShellFocused,
+    resultDisplay,
+  );
 
   return (
-    <Box flexDirection="column" width={terminalWidth}>
+    // It is crucial we don't replace this <> with a Box because otherwise the
+    // sticky header inside it would be sticky to that box rather than to the
+    // parent component of this ToolMessage.
+    <>
       <StickyHeader
         width={terminalWidth}
         isFirst={isFirst}
@@ -109,13 +90,10 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
           description={description}
           emphasis={emphasis}
         />
-        {shouldShowFocusHint && (
-          <Box marginLeft={1} flexShrink={0}>
-            <Text color={theme.text.accent}>
-              {isThisShellFocused ? '(Focused)' : '(ctrl+f to focus)'}
-            </Text>
-          </Box>
-        )}
+        <FocusHint
+          shouldShowFocusHint={shouldShowFocusHint}
+          isThisShellFocused={isThisShellFocused}
+        />
         {emphasis === 'high' && <TrailingIndicator />}
       </StickyHeader>
       <Box
@@ -145,6 +123,6 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
           </Box>
         )}
       </Box>
-    </Box>
+    </>
   );
 };

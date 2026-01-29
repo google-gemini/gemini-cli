@@ -22,7 +22,7 @@ export const ExtensionsList: React.FC<ExtensionsList> = ({ extensions }) => {
   }
 
   return (
-    <Box flexDirection="column" marginTop={1} marginBottom={1}>
+    <Box flexDirection="column" marginBottom={1}>
       <Text>Installed extensions: </Text>
       <Box flexDirection="column" paddingLeft={2}>
         {extensions.map((ext) => {
@@ -71,6 +71,15 @@ export const ExtensionsList: React.FC<ExtensionsList> = ({ extensions }) => {
                   {ext.resolvedSettings.map((setting) => (
                     <Text key={setting.name}>
                       - {setting.name}: {setting.value}
+                      {setting.scope && (
+                        <Text color="gray">
+                          {' '}
+                          (
+                          {setting.scope.charAt(0).toUpperCase() +
+                            setting.scope.slice(1)}
+                          {setting.source ? ` - ${setting.source}` : ''})
+                        </Text>
+                      )}
                     </Text>
                   ))}
                 </Box>

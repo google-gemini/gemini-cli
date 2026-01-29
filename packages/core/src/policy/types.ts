@@ -46,6 +46,7 @@ export enum ApprovalMode {
   DEFAULT = 'default',
   AUTO_EDIT = 'autoEdit',
   YOLO = 'yolo',
+  PLAN = 'plan',
 }
 
 /**
@@ -96,6 +97,11 @@ export type SafetyCheckerConfig =
 
 export interface PolicyRule {
   /**
+   * A unique name for the policy rule, useful for identification and debugging.
+   */
+  name?: string;
+
+  /**
    * The name of the tool this rule applies to.
    * If undefined, the rule applies to all tools.
    */
@@ -130,6 +136,18 @@ export interface PolicyRule {
    * Only applies when decision is ALLOW.
    */
   allowRedirection?: boolean;
+
+  /**
+   * Effect of the rule's source.
+   * e.g. "my-policies.toml", "Settings (MCP Trusted)", etc.
+   */
+  source?: string;
+
+  /**
+   * Optional message to display when this rule results in a DENY decision.
+   * This message will be returned to the model/user.
+   */
+  denyMessage?: string;
 }
 
 export interface SafetyCheckerRule {
@@ -252,4 +270,9 @@ export interface PolicySettings {
     allowed?: string[];
   };
   mcpServers?: Record<string, { trust?: boolean }>;
+}
+
+export interface CheckResult {
+  decision: PolicyDecision;
+  rule?: PolicyRule;
 }

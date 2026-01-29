@@ -14,6 +14,7 @@ import type { Config } from '../config/config.js';
 describe('CliHelpAgent', () => {
   const fakeConfig = {
     getMessageBus: () => ({}),
+    isAgentsEnabled: () => false,
   } as unknown as Config;
   const localAgent = CliHelpAgent(fakeConfig) as LocalAgentDefinition;
 
@@ -25,8 +26,10 @@ describe('CliHelpAgent', () => {
   });
 
   it('should have correctly configured inputs and outputs', () => {
-    expect(localAgent.inputConfig.inputs['question']).toBeDefined();
-    expect(localAgent.inputConfig.inputs['question'].required).toBe(true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const inputSchema = localAgent.inputConfig.inputSchema as any;
+    expect(inputSchema.properties['question']).toBeDefined();
+    expect(inputSchema.required).toContain('question');
 
     expect(localAgent.outputConfig?.outputName).toBe('report');
     expect(localAgent.outputConfig?.description).toBeDefined();

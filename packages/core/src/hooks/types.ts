@@ -45,6 +45,11 @@ export enum HookEventName {
 }
 
 /**
+ * Fields in the hooks configuration that are not hook event names
+ */
+export const HOOKS_CONFIG_FIELDS = ['enabled', 'disabled', 'notifications'];
+
+/**
  * Hook configuration entry
  */
 export interface CommandHookConfig {
@@ -54,6 +59,7 @@ export interface CommandHookConfig {
   description?: string;
   timeout?: number;
   source?: ConfigSource;
+  env?: Record<string, string>;
 }
 
 export type HookConfig = CommandHookConfig;
@@ -135,6 +141,8 @@ export function createHookOutput(
       return new BeforeToolSelectionHookOutput(data);
     case 'BeforeTool':
       return new BeforeToolHookOutput(data);
+    case 'AfterAgent':
+      return new AfterAgentHookOutput(data);
     default:
       return new DefaultHookOutput(data);
   }
@@ -208,7 +216,7 @@ export class DefaultHookOutput implements HookOutput {
   }
 
   /**
-   * Get additional context for adding to responses
+   * Get sanitized additional context for adding to responses.
    */
   getAdditionalContext(): string | undefined {
     if (
@@ -216,7 +224,12 @@ export class DefaultHookOutput implements HookOutput {
       'additionalContext' in this.hookSpecificOutput
     ) {
       const context = this.hookSpecificOutput['additionalContext'];
-      return typeof context === 'string' ? context : undefined;
+      if (typeof context !== 'string') {
+        return undefined;
+      }
+
+      // Sanitize by escaping < and > to prevent tag injection
+      return context.replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
     return undefined;
   }
@@ -232,6 +245,13 @@ export class DefaultHookOutput implements HookOutput {
       };
     }
     return { blocked: false, reason: '' };
+  }
+
+  /**
+   * Check if context clearing was requested by hook.
+   */
+  shouldClearContext(): boolean {
+    return false;
   }
 }
 
@@ -353,23 +373,22 @@ export class AfterModelHookOutput extends DefaultHookOutput {
       }
     }
 
-    // If hook wants to stop execution, create a synthetic stop response
-    if (this.shouldStopExecution()) {
-      const stopResponse: LLMResponse = {
-        candidates: [
-          {
-            content: {
-              role: 'model',
-              parts: [this.getEffectiveReason() || 'Execution stopped by hook'],
-            },
-            finishReason: 'STOP',
-          },
-        ],
-      };
-      return defaultHookTranslator.fromHookLLMResponse(stopResponse);
-    }
-
     return undefined;
+  }
+}
+
+/**
+ * Specific hook output class for AfterAgent events
+ */
+export class AfterAgentHookOutput extends DefaultHookOutput {
+  /**
+   * Check if context clearing was requested by hook
+   */
+  override shouldClearContext(): boolean {
+    if (this.hookSpecificOutput && 'clearContext' in this.hookSpecificOutput) {
+      return this.hookSpecificOutput['clearContext'] === true;
+    }
+    return false;
   }
 }
 
@@ -484,6 +503,16 @@ export interface AfterAgentInput extends HookInput {
   prompt: string;
   prompt_response: string;
   stop_hook_active: boolean;
+}
+
+/**
+ * AfterAgent hook output
+ */
+export interface AfterAgentOutput extends HookOutput {
+  hookSpecificOutput?: {
+    hookEventName: 'AfterAgent';
+    clearContext?: boolean;
+  };
 }
 
 /**

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { z } from 'zod';
+
 export interface ClientMetadata {
   ideType?: ClientMetadataIdeType;
   ideVersion?: string;
@@ -80,6 +82,11 @@ export interface IneligibleTier {
   reasonMessage: string;
   tierId: UserTierId;
   tierName: string;
+  validationErrorMessage?: string;
+  validationUrl?: string;
+  validationUrlLinkText?: string;
+  validationLearnMoreUrl?: string;
+  validationLearnMoreLinkText?: string;
 }
 
 /**
@@ -96,6 +103,7 @@ export enum IneligibleTierReasonCode {
   UNKNOWN = 'UNKNOWN',
   UNKNOWN_LOCATION = 'UNKNOWN_LOCATION',
   UNSUPPORTED_LOCATION = 'UNSUPPORTED_LOCATION',
+  VALIDATION_REQUIRED = 'VALIDATION_REQUIRED',
   // go/keep-sorted end
 }
 /**
@@ -286,25 +294,32 @@ export interface ConversationInteraction {
   isAgentic?: boolean;
 }
 
-export interface GeminiCodeAssistSetting {
-  secureModeEnabled?: boolean;
-  mcpSetting?: McpSetting;
-  cliFeatureSetting?: CliFeatureSetting;
+export interface FetchAdminControlsRequest {
+  project: string;
 }
 
-export interface McpSetting {
-  mcpEnabled?: boolean;
-  allowedMcpConfigs?: McpConfig[];
-}
+export type FetchAdminControlsResponse = z.infer<
+  typeof FetchAdminControlsResponseSchema
+>;
 
-export interface McpConfig {
-  mcpServer?: string;
-}
+const ExtensionsSettingSchema = z.object({
+  extensionsEnabled: z.boolean().optional(),
+});
 
-export interface CliFeatureSetting {
-  extensionsSetting?: ExtensionsSetting;
-}
+const CliFeatureSettingSchema = z.object({
+  extensionsSetting: ExtensionsSettingSchema.optional(),
+  unmanagedCapabilitiesEnabled: z.boolean().optional(),
+});
 
-export interface ExtensionsSetting {
-  extensionsEnabled?: boolean;
-}
+const McpSettingSchema = z.object({
+  mcpEnabled: z.boolean().optional(),
+  overrideMcpConfigJson: z.string().optional(),
+});
+
+export const FetchAdminControlsResponseSchema = z.object({
+  // TODO: deprecate once backend stops sending this field
+  secureModeEnabled: z.boolean().optional(),
+  strictModeDisabled: z.boolean().optional(),
+  mcpSetting: McpSettingSchema.optional(),
+  cliFeatureSetting: CliFeatureSettingSchema.optional(),
+});

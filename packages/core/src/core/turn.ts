@@ -78,6 +78,8 @@ export type ServerGeminiAgentExecutionStoppedEvent = {
   type: GeminiEventType.AgentExecutionStopped;
   value: {
     reason: string;
+    systemMessage?: string;
+    contextCleared?: boolean;
   };
 };
 
@@ -85,6 +87,8 @@ export type ServerGeminiAgentExecutionBlockedEvent = {
   type: GeminiEventType.AgentExecutionBlocked;
   value: {
     reason: string;
+    systemMessage?: string;
+    contextCleared?: boolean;
   };
 };
 
@@ -169,6 +173,9 @@ export enum CompressionStatus {
 
   /** The compression failed due to an error counting tokens */
   COMPRESSION_FAILED_TOKEN_COUNT_ERROR,
+
+  /** The compression failed because the summary was empty */
+  COMPRESSION_FAILED_EMPTY_SUMMARY,
 
   /** The compression was not necessary and no action was taken */
   NOOP,
@@ -264,6 +271,22 @@ export class Turn {
           continue; // Skip to the next event in the stream
         }
 
+        if (streamEvent.type === 'agent_execution_stopped') {
+          yield {
+            type: GeminiEventType.AgentExecutionStopped,
+            value: { reason: streamEvent.reason },
+          };
+          return;
+        }
+
+        if (streamEvent.type === 'agent_execution_blocked') {
+          yield {
+            type: GeminiEventType.AgentExecutionBlocked,
+            value: { reason: streamEvent.reason },
+          };
+          continue;
+        }
+
         // Assuming other events are chunks with a `value` property
         const resp = streamEvent.value;
         if (!resp) continue; // Skip if there's no response body
@@ -272,15 +295,16 @@ export class Turn {
 
         const traceId = resp.responseId;
 
-        const thoughtPart = resp.candidates?.[0]?.content?.parts?.[0];
-        if (thoughtPart?.thought) {
-          const thought = parseThought(thoughtPart.text ?? '');
-          yield {
-            type: GeminiEventType.Thought,
-            value: thought,
-            traceId,
-          };
-          continue;
+        const parts = resp.candidates?.[0]?.content?.parts ?? [];
+        for (const part of parts) {
+          if (part.thought) {
+            const thought = parseThought(part.text ?? '');
+            yield {
+              type: GeminiEventType.Thought,
+              value: thought,
+              traceId,
+            };
+          }
         }
 
         const text = getResponseText(resp);

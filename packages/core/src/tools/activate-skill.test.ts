@@ -76,6 +76,34 @@ describe('ActivateSkillTool', () => {
     expect(details.prompt).toContain('Mock folder structure');
   });
 
+  it('should skip confirmation for built-in skills', async () => {
+    const builtinSkill = {
+      name: 'builtin-skill',
+      description: 'A built-in skill',
+      location: '/path/to/builtin/SKILL.md',
+      isBuiltin: true,
+      body: 'Built-in instructions',
+    };
+    vi.mocked(mockConfig.getSkillManager().getSkill).mockReturnValue(
+      builtinSkill,
+    );
+    vi.mocked(mockConfig.getSkillManager().getSkills).mockReturnValue([
+      builtinSkill,
+    ]);
+
+    const params = { name: 'builtin-skill' };
+    const toolWithBuiltin = new ActivateSkillTool(mockConfig, mockMessageBus);
+    const invocation = toolWithBuiltin.build(params);
+
+    const details = await (
+      invocation as unknown as {
+        getConfirmationDetails: (signal: AbortSignal) => Promise<unknown>;
+      }
+    ).getConfirmationDetails(new AbortController().signal);
+
+    expect(details).toBe(false);
+  });
+
   it('should activate a valid skill and return its content in XML tags', async () => {
     const params = { name: 'test-skill' };
     const invocation = tool.build(params);

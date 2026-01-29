@@ -145,4 +145,40 @@ describe('calculateRequestTokenCount', () => {
 
     expect(count).toBe(3000);
   });
+
+  it('should use countTokens API for PDF requests', async () => {
+    vi.mocked(mockContentGenerator.countTokens).mockResolvedValue({
+      totalTokens: 5160,
+    });
+    const request = [
+      { inlineData: { mimeType: 'application/pdf', data: 'pdf_data' } },
+    ];
+
+    const count = await calculateRequestTokenCount(
+      request,
+      mockContentGenerator,
+      model,
+    );
+
+    expect(count).toBe(5160);
+    expect(mockContentGenerator.countTokens).toHaveBeenCalled();
+  });
+
+  it('should use fixed estimate for PDFs in fallback', async () => {
+    vi.mocked(mockContentGenerator.countTokens).mockRejectedValue(
+      new Error('API error'),
+    );
+    const request = [
+      { inlineData: { mimeType: 'application/pdf', data: 'large_pdf_data' } },
+    ];
+
+    const count = await calculateRequestTokenCount(
+      request,
+      mockContentGenerator,
+      model,
+    );
+
+    // PDF estimate: 25800 tokens (~100 pages at 258 tokens/page)
+    expect(count).toBe(25800);
+  });
 });

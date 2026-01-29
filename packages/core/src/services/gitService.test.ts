@@ -147,15 +147,13 @@ describe('GitService', () => {
 
   describe('verifyGitAvailability', () => {
     it('should resolve true if git --version command succeeds', async () => {
-      const service = new GitService(projectRoot, storage);
-      await expect(service.verifyGitAvailability()).resolves.toBe(true);
+      await expect(GitService.verifyGitAvailability()).resolves.toBe(true);
       expect(spawnAsync).toHaveBeenCalledWith('git', ['--version']);
     });
 
     it('should resolve false if git --version command fails', async () => {
       (spawnAsync as Mock).mockRejectedValue(new Error('git not found'));
-      const service = new GitService(projectRoot, storage);
-      await expect(service.verifyGitAvailability()).resolves.toBe(false);
+      await expect(GitService.verifyGitAvailability()).resolves.toBe(false);
     });
   });
 
@@ -284,6 +282,25 @@ describe('GitService', () => {
       expect(hoistedMockDebugLogger.debug).toHaveBeenCalledWith(
         expect.stringContaining('checkIsRepo failed'),
       );
+    });
+
+    it('should configure git environment to use local gitconfig', async () => {
+      hoistedMockCheckIsRepo.mockResolvedValue(false);
+      const service = new GitService(projectRoot, storage);
+      await service.setupShadowGitRepository();
+
+      expect(hoistedMockEnv).toHaveBeenCalledWith(
+        expect.objectContaining({
+          GIT_CONFIG_GLOBAL: gitConfigPath,
+          GIT_CONFIG_SYSTEM: path.join(repoDir, '.gitconfig_system_empty'),
+        }),
+      );
+
+      const systemConfigContent = await fs.readFile(
+        path.join(repoDir, '.gitconfig_system_empty'),
+        'utf-8',
+      );
+      expect(systemConfigContent).toBe('');
     });
   });
 

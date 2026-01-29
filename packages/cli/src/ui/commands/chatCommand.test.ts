@@ -12,7 +12,7 @@ import type { Content } from '@google/genai';
 import { AuthType, type GeminiClient } from '@google/gemini-cli-core';
 
 import * as fsPromises from 'node:fs/promises';
-import { chatCommand } from './chatCommand.js';
+import { chatCommand, debugCommand } from './chatCommand.js';
 import {
   serializeHistoryToMarkdown,
   exportHistoryToFile,
@@ -127,22 +127,19 @@ describe('chatCommand', () => {
 
       await listCommand?.action?.(mockContext, '');
 
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: 'chat_list',
-          chats: [
-            {
-              name: 'test1',
-              mtime: date1.toISOString(),
-            },
-            {
-              name: 'test2',
-              mtime: date2.toISOString(),
-            },
-          ],
-        },
-        expect.any(Number),
-      );
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: 'chat_list',
+        chats: [
+          {
+            name: 'test1',
+            mtime: date1.toISOString(),
+          },
+          {
+            name: 'test2',
+            mtime: date2.toISOString(),
+          },
+        ],
+      });
     });
   });
   describe('save subcommand', () => {
@@ -692,6 +689,67 @@ Hi there!`;
 
       const result = serializeHistoryToMarkdown(history as Content[]);
       expect(result).toBe(expectedMarkdown);
+    });
+    describe('debug subcommand', () => {
+      let mockGetLatestApiRequest: ReturnType<typeof vi.fn>;
+
+      beforeEach(() => {
+        mockGetLatestApiRequest = vi.fn();
+        mockContext.services.config!.getLatestApiRequest =
+          mockGetLatestApiRequest;
+        vi.spyOn(process, 'cwd').mockReturnValue('/project/root');
+        vi.spyOn(Date, 'now').mockReturnValue(1234567890);
+        mockFs.writeFile.mockClear();
+      });
+
+      it('should return an error if no API request is found', async () => {
+        mockGetLatestApiRequest.mockReturnValue(undefined);
+
+        const result = await debugCommand.action?.(mockContext, '');
+
+        expect(result).toEqual({
+          type: 'message',
+          messageType: 'error',
+          content: 'No recent API request found to export.',
+        });
+        expect(mockFs.writeFile).not.toHaveBeenCalled();
+      });
+
+      it('should convert and write the API request to a json file', async () => {
+        const mockRequest = {
+          contents: [{ role: 'user', parts: [{ text: 'test' }] }],
+        };
+        mockGetLatestApiRequest.mockReturnValue(mockRequest);
+
+        const result = await debugCommand.action?.(mockContext, '');
+
+        const expectedFilename = 'gcli-request-1234567890.json';
+        const expectedPath = path.join('/project/root', expectedFilename);
+
+        expect(mockFs.writeFile).toHaveBeenCalledWith(
+          expectedPath,
+          expect.stringContaining('"role": "user"'),
+        );
+        expect(result).toEqual({
+          type: 'message',
+          messageType: 'info',
+          content: `Debug API request saved to ${expectedFilename}`,
+        });
+      });
+
+      it('should handle errors during file write', async () => {
+        const mockRequest = { contents: [] };
+        mockGetLatestApiRequest.mockReturnValue(mockRequest);
+        mockFs.writeFile.mockRejectedValue(new Error('Write failed'));
+
+        const result = await debugCommand.action?.(mockContext, '');
+
+        expect(result).toEqual({
+          type: 'message',
+          messageType: 'error',
+          content: 'Error saving debug request: Write failed',
+        });
+      });
     });
   });
 });

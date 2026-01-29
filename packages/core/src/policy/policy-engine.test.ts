@@ -109,6 +109,37 @@ describe('PolicyEngine', () => {
       );
     });
 
+    it('should match unqualified tool names with qualified rules when serverName is provided', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'my-server__tool',
+          decision: PolicyDecision.ALLOW,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // Match with qualified name (standard)
+      expect(
+        (await engine.check({ name: 'my-server__tool' }, 'my-server')).decision,
+      ).toBe(PolicyDecision.ALLOW);
+
+      // Match with unqualified name + serverName (the fix)
+      expect((await engine.check({ name: 'tool' }, 'my-server')).decision).toBe(
+        PolicyDecision.ALLOW,
+      );
+
+      // Should NOT match with unqualified name but NO serverName
+      expect((await engine.check({ name: 'tool' }, undefined)).decision).toBe(
+        PolicyDecision.ASK_USER,
+      );
+
+      // Should NOT match with unqualified name but WRONG serverName
+      expect(
+        (await engine.check({ name: 'tool' }, 'wrong-server')).decision,
+      ).toBe(PolicyDecision.ASK_USER);
+    });
+
     it('should match by args pattern', async () => {
       const rules: PolicyRule[] = [
         {
@@ -1248,6 +1279,123 @@ describe('PolicyEngine', () => {
 
       expect(result.decision).toBe(PolicyDecision.ALLOW);
     });
+
+    it('should require confirmation for a compound command with redirection even if individual commands are allowed', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"mkdir\b/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"echo\b/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // The full command has redirection, even if the individual split commands do not.
+      // splitCommands will return ['mkdir -p "bar"', 'echo "hello"']
+      // The redirection '> bar/test.md' is stripped by splitCommands.
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'mkdir -p "bar" && echo "hello" > bar/test.md' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should report redirection when a sub-command specifically has redirection', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"mkdir\b/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"echo\b/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // In this case, we mock splitCommands to keep the redirection in the sub-command
+      vi.mocked(initializeShellParsers).mockResolvedValue(undefined);
+      const { splitCommands } = await import('../utils/shell-utils.js');
+      vi.mocked(splitCommands).mockReturnValueOnce([
+        'mkdir bar',
+        'echo hello > bar/test.md',
+      ]);
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'mkdir bar && echo hello > bar/test.md' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should allow redirected shell commands in AUTO_EDIT mode if individual commands are allowed', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"echo\b/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+      engine.setApprovalMode(ApprovalMode.AUTO_EDIT);
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo "hello" > test.txt' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should allow compound commands with safe operators (&&, ||) if individual commands are allowed', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          argsPattern: /"command":"echo\b/,
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // "echo hello && echo world" should be allowed since both parts are ALLOW and no redirection is present.
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'echo hello && echo world' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
   });
 
   describe('safety checker integration', () => {
@@ -1671,293 +1819,6 @@ describe('PolicyEngine', () => {
 
       const result = await engine.check({ name: 'tool' }, undefined);
       expect(result.decision).toBe(PolicyDecision.DENY);
-    });
-  });
-
-  describe('checkHook', () => {
-    it('should allow hooks by default', async () => {
-      engine = new PolicyEngine({}, mockCheckerRunner);
-      const decision = await engine.checkHook({
-        eventName: 'BeforeTool',
-        hookSource: 'user',
-      });
-      expect(decision).toBe(PolicyDecision.ALLOW);
-    });
-
-    it('should deny all hooks when allowHooks is false', async () => {
-      engine = new PolicyEngine({ allowHooks: false }, mockCheckerRunner);
-      const decision = await engine.checkHook({
-        eventName: 'BeforeTool',
-        hookSource: 'user',
-      });
-      expect(decision).toBe(PolicyDecision.DENY);
-    });
-
-    it('should deny project hooks in untrusted folders', async () => {
-      engine = new PolicyEngine({}, mockCheckerRunner);
-      const decision = await engine.checkHook({
-        eventName: 'BeforeTool',
-        hookSource: 'project',
-        trustedFolder: false,
-      });
-      expect(decision).toBe(PolicyDecision.DENY);
-    });
-
-    it('should allow project hooks in trusted folders', async () => {
-      engine = new PolicyEngine({}, mockCheckerRunner);
-      const decision = await engine.checkHook({
-        eventName: 'BeforeTool',
-        hookSource: 'project',
-        trustedFolder: true,
-      });
-      expect(decision).toBe(PolicyDecision.ALLOW);
-    });
-
-    it('should allow user hooks in untrusted folders', async () => {
-      engine = new PolicyEngine({}, mockCheckerRunner);
-      const decision = await engine.checkHook({
-        eventName: 'BeforeTool',
-        hookSource: 'user',
-        trustedFolder: false,
-      });
-      expect(decision).toBe(PolicyDecision.ALLOW);
-    });
-
-    it('should run hook checkers and deny on DENY decision', async () => {
-      const hookCheckers = [
-        {
-          eventName: 'BeforeTool',
-          checker: { type: 'external' as const, name: 'test-hook-checker' },
-        },
-      ];
-      engine = new PolicyEngine({ hookCheckers }, mockCheckerRunner);
-
-      vi.mocked(mockCheckerRunner.runChecker).mockResolvedValue({
-        decision: SafetyCheckDecision.DENY,
-        reason: 'Hook checker denied',
-      });
-
-      const decision = await engine.checkHook({
-        eventName: 'BeforeTool',
-        hookSource: 'user',
-      });
-
-      expect(decision).toBe(PolicyDecision.DENY);
-      expect(mockCheckerRunner.runChecker).toHaveBeenCalledWith(
-        expect.objectContaining({ name: 'hook:BeforeTool' }),
-        expect.objectContaining({ name: 'test-hook-checker' }),
-      );
-    });
-
-    it('should run hook checkers and allow on ALLOW decision', async () => {
-      const hookCheckers = [
-        {
-          eventName: 'BeforeTool',
-          checker: { type: 'external' as const, name: 'test-hook-checker' },
-        },
-      ];
-      engine = new PolicyEngine({ hookCheckers }, mockCheckerRunner);
-
-      vi.mocked(mockCheckerRunner.runChecker).mockResolvedValue({
-        decision: SafetyCheckDecision.ALLOW,
-      });
-
-      const decision = await engine.checkHook({
-        eventName: 'BeforeTool',
-        hookSource: 'user',
-      });
-
-      expect(decision).toBe(PolicyDecision.ALLOW);
-    });
-
-    it('should return ASK_USER when checker requests it', async () => {
-      const hookCheckers = [
-        {
-          checker: { type: 'external' as const, name: 'test-hook-checker' },
-        },
-      ];
-      engine = new PolicyEngine({ hookCheckers }, mockCheckerRunner);
-
-      vi.mocked(mockCheckerRunner.runChecker).mockResolvedValue({
-        decision: SafetyCheckDecision.ASK_USER,
-        reason: 'Needs confirmation',
-      });
-
-      const decision = await engine.checkHook({
-        eventName: 'BeforeTool',
-        hookSource: 'user',
-      });
-
-      expect(decision).toBe(PolicyDecision.ASK_USER);
-    });
-
-    it('should return DENY for ASK_USER in non-interactive mode', async () => {
-      const hookCheckers = [
-        {
-          checker: { type: 'external' as const, name: 'test-hook-checker' },
-        },
-      ];
-      engine = new PolicyEngine(
-        { hookCheckers, nonInteractive: true },
-        mockCheckerRunner,
-      );
-
-      vi.mocked(mockCheckerRunner.runChecker).mockResolvedValue({
-        decision: SafetyCheckDecision.ASK_USER,
-        reason: 'Needs confirmation',
-      });
-
-      const decision = await engine.checkHook({
-        eventName: 'BeforeTool',
-        hookSource: 'user',
-      });
-
-      expect(decision).toBe(PolicyDecision.DENY);
-    });
-
-    it('should match hook checkers by eventName', async () => {
-      const hookCheckers = [
-        {
-          eventName: 'AfterTool',
-          checker: { type: 'external' as const, name: 'after-tool-checker' },
-        },
-        {
-          eventName: 'BeforeTool',
-          checker: { type: 'external' as const, name: 'before-tool-checker' },
-        },
-      ];
-      engine = new PolicyEngine({ hookCheckers }, mockCheckerRunner);
-
-      vi.mocked(mockCheckerRunner.runChecker).mockResolvedValue({
-        decision: SafetyCheckDecision.ALLOW,
-      });
-
-      await engine.checkHook({
-        eventName: 'BeforeTool',
-        hookSource: 'user',
-      });
-
-      expect(mockCheckerRunner.runChecker).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({ name: 'before-tool-checker' }),
-      );
-      expect(mockCheckerRunner.runChecker).not.toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({ name: 'after-tool-checker' }),
-      );
-    });
-
-    it('should match hook checkers by hookSource', async () => {
-      const hookCheckers = [
-        {
-          hookSource: 'project' as const,
-          checker: { type: 'external' as const, name: 'project-checker' },
-        },
-        {
-          hookSource: 'user' as const,
-          checker: { type: 'external' as const, name: 'user-checker' },
-        },
-      ];
-      engine = new PolicyEngine({ hookCheckers }, mockCheckerRunner);
-
-      vi.mocked(mockCheckerRunner.runChecker).mockResolvedValue({
-        decision: SafetyCheckDecision.ALLOW,
-      });
-
-      await engine.checkHook({
-        eventName: 'BeforeTool',
-        hookSource: 'user',
-      });
-
-      expect(mockCheckerRunner.runChecker).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({ name: 'user-checker' }),
-      );
-      expect(mockCheckerRunner.runChecker).not.toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({ name: 'project-checker' }),
-      );
-    });
-
-    it('should deny when hook checker throws an error', async () => {
-      const hookCheckers = [
-        {
-          checker: { type: 'external' as const, name: 'failing-checker' },
-        },
-      ];
-      engine = new PolicyEngine({ hookCheckers }, mockCheckerRunner);
-
-      vi.mocked(mockCheckerRunner.runChecker).mockRejectedValue(
-        new Error('Checker failed'),
-      );
-
-      const decision = await engine.checkHook({
-        eventName: 'BeforeTool',
-        hookSource: 'user',
-      });
-
-      expect(decision).toBe(PolicyDecision.DENY);
-    });
-
-    it('should run hook checkers in priority order', async () => {
-      const hookCheckers = [
-        {
-          priority: 5,
-          checker: { type: 'external' as const, name: 'low-priority' },
-        },
-        {
-          priority: 20,
-          checker: { type: 'external' as const, name: 'high-priority' },
-        },
-        {
-          priority: 10,
-          checker: { type: 'external' as const, name: 'medium-priority' },
-        },
-      ];
-      engine = new PolicyEngine({ hookCheckers }, mockCheckerRunner);
-
-      vi.mocked(mockCheckerRunner.runChecker).mockImplementation(
-        async (_call, config) => {
-          if (config.name === 'high-priority') {
-            return { decision: SafetyCheckDecision.DENY, reason: 'denied' };
-          }
-          return { decision: SafetyCheckDecision.ALLOW };
-        },
-      );
-
-      await engine.checkHook({
-        eventName: 'BeforeTool',
-        hookSource: 'user',
-      });
-
-      // Should only call the high-priority checker (first in sorted order)
-      expect(mockCheckerRunner.runChecker).toHaveBeenCalledTimes(1);
-      expect(mockCheckerRunner.runChecker).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({ name: 'high-priority' }),
-      );
-    });
-  });
-
-  describe('addHookChecker', () => {
-    it('should add a new hook checker and maintain priority order', () => {
-      engine = new PolicyEngine({}, mockCheckerRunner);
-
-      engine.addHookChecker({
-        priority: 5,
-        checker: { type: 'external', name: 'checker1' },
-      });
-      engine.addHookChecker({
-        priority: 10,
-        checker: { type: 'external', name: 'checker2' },
-      });
-
-      const checkers = engine.getHookCheckers();
-      expect(checkers).toHaveLength(2);
-      expect(checkers[0].priority).toBe(10);
-      expect(checkers[0].checker.name).toBe('checker2');
-      expect(checkers[1].priority).toBe(5);
-      expect(checkers[1].checker.name).toBe('checker1');
     });
   });
 });

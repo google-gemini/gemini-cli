@@ -11,15 +11,13 @@ import {
   type PolicyRule,
   type SafetyCheckerRule,
   type HookCheckerRule,
-  type HookExecutionContext,
-  getHookSource,
   ApprovalMode,
+  type CheckResult,
 } from './types.js';
 import { stableStringify } from './stable-stringify.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { CheckerRunner } from '../safety/checker-runner.js';
 import { SafetyCheckDecision } from '../safety/protocol.js';
-import type { HookExecutionRequest } from '../confirmation-bus/types.js';
 import {
   SHELL_TOOL_NAMES,
   initializeShellParsers,
@@ -80,26 +78,6 @@ function ruleMatches(
   return true;
 }
 
-/**
- * Check if a hook checker rule matches a hook execution context.
- */
-function hookCheckerMatches(
-  rule: HookCheckerRule,
-  context: HookExecutionContext,
-): boolean {
-  // Check event name if specified
-  if (rule.eventName && rule.eventName !== context.eventName) {
-    return false;
-  }
-
-  // Check hook source if specified
-  if (rule.hookSource && rule.hookSource !== context.hookSource) {
-    return false;
-  }
-
-  return true;
-}
-
 export class PolicyEngine {
   private rules: PolicyRule[];
   private checkers: SafetyCheckerRule[];
@@ -107,7 +85,6 @@ export class PolicyEngine {
   private readonly defaultDecision: PolicyDecision;
   private readonly nonInteractive: boolean;
   private readonly checkerRunner?: CheckerRunner;
-  private readonly allowHooks: boolean;
   private approvalMode: ApprovalMode;
 
   constructor(config: PolicyEngineConfig = {}, checkerRunner?: CheckerRunner) {
@@ -123,7 +100,6 @@ export class PolicyEngine {
     this.defaultDecision = config.defaultDecision ?? PolicyDecision.ASK_USER;
     this.nonInteractive = config.nonInteractive ?? false;
     this.checkerRunner = checkerRunner;
-    this.allowHooks = config.allowHooks ?? true;
     this.approvalMode = config.approvalMode ?? ApprovalMode.DEFAULT;
   }
 
@@ -141,6 +117,18 @@ export class PolicyEngine {
     return this.approvalMode;
   }
 
+  private shouldDowngradeForRedirection(
+    command: string,
+    allowRedirection?: boolean,
+  ): boolean {
+    return (
+      !allowRedirection &&
+      hasRedirection(command) &&
+      this.approvalMode !== ApprovalMode.AUTO_EDIT &&
+      this.approvalMode !== ApprovalMode.YOLO
+    );
+  }
+
   /**
    * Check if a shell command is allowed.
    */
@@ -151,9 +139,13 @@ export class PolicyEngine {
     serverName: string | undefined,
     dir_path: string | undefined,
     allowRedirection?: boolean,
-  ): Promise<PolicyDecision> {
+    rule?: PolicyRule,
+  ): Promise<CheckResult> {
     if (!command) {
-      return this.applyNonInteractiveMode(ruleDecision);
+      return {
+        decision: this.applyNonInteractiveMode(ruleDecision),
+        rule,
+      };
     }
 
     await initializeShellParsers();
@@ -163,7 +155,12 @@ export class PolicyEngine {
       debugLogger.debug(
         `[PolicyEngine.check] Command parsing failed for: ${command}. Falling back to ASK_USER.`,
       );
-      return this.applyNonInteractiveMode(PolicyDecision.ASK_USER);
+      // Parsing logic failed, we can't trust it. Force ASK_USER (or DENY).
+      // We don't blame a specific rule here, unless the input rule was stricter.
+      return {
+        decision: this.applyNonInteractiveMode(PolicyDecision.ASK_USER),
+        rule: undefined,
+      };
     }
 
     // If there are multiple parts, or if we just want to validate the single part against DENY rules
@@ -173,34 +170,44 @@ export class PolicyEngine {
       );
 
       if (ruleDecision === PolicyDecision.DENY) {
-        return PolicyDecision.DENY;
+        return { decision: PolicyDecision.DENY, rule };
       }
 
       // Start optimistically. If all parts are ALLOW, the whole is ALLOW.
       // We will downgrade if any part is ASK_USER or DENY.
       let aggregateDecision = PolicyDecision.ALLOW;
+      let responsibleRule: PolicyRule | undefined;
 
-      for (const subCmd of subCommands) {
+      // Check for redirection on the full command string
+      if (this.shouldDowngradeForRedirection(command, allowRedirection)) {
+        debugLogger.debug(
+          `[PolicyEngine.check] Downgrading ALLOW to ASK_USER for redirected command: ${command}`,
+        );
+        aggregateDecision = PolicyDecision.ASK_USER;
+        responsibleRule = undefined; // Inherent policy
+      }
+
+      for (const rawSubCmd of subCommands) {
+        const subCmd = rawSubCmd.trim();
         // Prevent infinite recursion for the root command
         if (subCmd === command) {
-          if (!allowRedirection && hasRedirection(subCmd)) {
+          if (this.shouldDowngradeForRedirection(subCmd, allowRedirection)) {
             debugLogger.debug(
               `[PolicyEngine.check] Downgrading ALLOW to ASK_USER for redirected command: ${subCmd}`,
             );
             // Redirection always downgrades ALLOW to ASK_USER
             if (aggregateDecision === PolicyDecision.ALLOW) {
               aggregateDecision = PolicyDecision.ASK_USER;
+              responsibleRule = undefined; // Inherent policy
             }
           } else {
-            // If the command is atomic (cannot be split further) and didn't
-            // trigger infinite recursion checks, we must respect the decision
-            // of the rule that triggered this check. If the rule was ASK_USER
-            // (e.g. wildcard), we must downgrade.
+            // Atomic command matching the rule.
             if (
               ruleDecision === PolicyDecision.ASK_USER &&
               aggregateDecision === PolicyDecision.ALLOW
             ) {
               aggregateDecision = PolicyDecision.ASK_USER;
+              responsibleRule = rule;
             }
           }
           continue;
@@ -214,36 +221,49 @@ export class PolicyEngine {
         // subResult.decision is already filtered through applyNonInteractiveMode by this.check()
         const subDecision = subResult.decision;
 
-        // If any part is DENIED, the whole command is DENIED
+        // If any part is DENIED, the whole command is DENY
         if (subDecision === PolicyDecision.DENY) {
-          return PolicyDecision.DENY;
+          return {
+            decision: PolicyDecision.DENY,
+            rule: subResult.rule,
+          };
         }
 
         // If any part requires ASK_USER, the whole command requires ASK_USER
         if (subDecision === PolicyDecision.ASK_USER) {
-          if (aggregateDecision === PolicyDecision.ALLOW) {
-            aggregateDecision = PolicyDecision.ASK_USER;
+          aggregateDecision = PolicyDecision.ASK_USER;
+          if (!responsibleRule) {
+            responsibleRule = subResult.rule;
           }
         }
 
         // Check for redirection in allowed sub-commands
         if (
           subDecision === PolicyDecision.ALLOW &&
-          !allowRedirection &&
-          hasRedirection(subCmd)
+          this.shouldDowngradeForRedirection(subCmd, allowRedirection)
         ) {
           debugLogger.debug(
             `[PolicyEngine.check] Downgrading ALLOW to ASK_USER for redirected command: ${subCmd}`,
           );
           if (aggregateDecision === PolicyDecision.ALLOW) {
             aggregateDecision = PolicyDecision.ASK_USER;
+            responsibleRule = undefined;
           }
         }
       }
-      return this.applyNonInteractiveMode(aggregateDecision);
+
+      return {
+        decision: this.applyNonInteractiveMode(aggregateDecision),
+        // If we stayed at ALLOW, we return the original rule (if any).
+        // If we downgraded, we return the responsible rule (or undefined if implicit).
+        rule: aggregateDecision === ruleDecision ? rule : responsibleRule,
+      };
     }
 
-    return this.applyNonInteractiveMode(ruleDecision);
+    return {
+      decision: this.applyNonInteractiveMode(ruleDecision),
+      rule,
+    };
   }
 
   /**
@@ -253,10 +273,7 @@ export class PolicyEngine {
   async check(
     toolCall: FunctionCall,
     serverName: string | undefined,
-  ): Promise<{
-    decision: PolicyDecision;
-    rule?: PolicyRule;
-  }> {
+  ): Promise<CheckResult> {
     let stringifiedArgs: string | undefined;
     // Compute stringified args once before the loop
     if (
@@ -271,51 +288,88 @@ export class PolicyEngine {
       `[PolicyEngine.check] toolCall.name: ${toolCall.name}, stringifiedArgs: ${stringifiedArgs}`,
     );
 
+    // Check for shell commands upfront to handle splitting
+    let isShellCommand = false;
+    let command: string | undefined;
+    let shellDirPath: string | undefined;
+
+    const toolName = toolCall.name;
+
+    if (toolName && SHELL_TOOL_NAMES.includes(toolName)) {
+      isShellCommand = true;
+      const args = toolCall.args as { command?: string; dir_path?: string };
+      command = args?.command;
+      shellDirPath = args?.dir_path;
+    }
+
     // Find the first matching rule (already sorted by priority)
     let matchedRule: PolicyRule | undefined;
     let decision: PolicyDecision | undefined;
 
+    // For tools with a server name, we want to try matching both the
+    // original name and the fully qualified name (server__tool).
+    const toolCallsToTry: FunctionCall[] = [toolCall];
+    if (serverName && toolCall.name && !toolCall.name.includes('__')) {
+      toolCallsToTry.push({
+        ...toolCall,
+        name: `${serverName}__${toolCall.name}`,
+      });
+    }
+
     for (const rule of this.rules) {
-      if (
-        ruleMatches(
-          rule,
-          toolCall,
-          stringifiedArgs,
-          serverName,
-          this.approvalMode,
-        )
-      ) {
+      const match = toolCallsToTry.some((tc) =>
+        ruleMatches(rule, tc, stringifiedArgs, serverName, this.approvalMode),
+      );
+
+      if (match) {
         debugLogger.debug(
           `[PolicyEngine.check] MATCHED rule: toolName=${rule.toolName}, decision=${rule.decision}, priority=${rule.priority}, argsPattern=${rule.argsPattern?.source || 'none'}`,
         );
 
-        if (toolCall.name && SHELL_TOOL_NAMES.includes(toolCall.name)) {
-          const args = toolCall.args as { command?: string; dir_path?: string };
-          decision = await this.checkShellCommand(
-            toolCall.name,
-            args?.command,
+        if (isShellCommand && toolName) {
+          const shellResult = await this.checkShellCommand(
+            toolName,
+            command,
             rule.decision,
             serverName,
-            args?.dir_path,
+            shellDirPath,
             rule.allowRedirection,
+            rule,
           );
+          decision = shellResult.decision;
+          if (shellResult.rule) {
+            matchedRule = shellResult.rule;
+            break;
+          }
         } else {
           decision = this.applyNonInteractiveMode(rule.decision);
+          matchedRule = rule;
+          break;
         }
-        matchedRule = rule;
-        break;
       }
     }
 
-    if (!decision) {
-      // No matching rule found, use default decision
+    // Default if no rule matched
+    if (decision === undefined) {
       debugLogger.debug(
         `[PolicyEngine.check] NO MATCH - using default decision: ${this.defaultDecision}`,
       );
-      decision = this.applyNonInteractiveMode(this.defaultDecision);
+      if (toolName && SHELL_TOOL_NAMES.includes(toolName)) {
+        const shellResult = await this.checkShellCommand(
+          toolName,
+          command,
+          this.defaultDecision,
+          serverName,
+          shellDirPath,
+        );
+        decision = shellResult.decision;
+        matchedRule = shellResult.rule;
+      } else {
+        decision = this.applyNonInteractiveMode(this.defaultDecision);
+      }
     }
 
-    // If decision is not DENY, run safety checkers
+    // Safety checks
     if (decision !== PolicyDecision.DENY && this.checkerRunner) {
       for (const checkerRule of this.checkers) {
         if (
@@ -335,10 +389,9 @@ export class PolicyEngine {
               toolCall,
               checkerRule.checker,
             );
-
             if (result.decision === SafetyCheckDecision.DENY) {
               debugLogger.debug(
-                `[PolicyEngine.check] Safety checker denied: ${result.reason}`,
+                `[PolicyEngine.check] Safety checker '${checkerRule.checker.name}' denied execution: ${result.reason}`,
               );
               return {
                 decision: PolicyDecision.DENY,
@@ -352,7 +405,8 @@ export class PolicyEngine {
             }
           } catch (error) {
             debugLogger.debug(
-              `[PolicyEngine.check] Safety checker failed: ${error}`,
+              `[PolicyEngine.check] Safety checker '${checkerRule.checker.name}' threw an error:`,
+              error,
             );
             return {
               decision: PolicyDecision.DENY,
@@ -414,84 +468,6 @@ export class PolicyEngine {
    */
   getHookCheckers(): readonly HookCheckerRule[] {
     return this.hookCheckers;
-  }
-
-  /**
-   * Check if a hook execution is allowed based on the configured policies.
-   * Runs hook-specific safety checkers if configured.
-   */
-  async checkHook(
-    request: HookExecutionRequest | HookExecutionContext,
-  ): Promise<PolicyDecision> {
-    // If hooks are globally disabled, deny all hook executions
-    if (!this.allowHooks) {
-      return PolicyDecision.DENY;
-    }
-
-    const context: HookExecutionContext =
-      'input' in request
-        ? {
-            eventName: request.eventName,
-            hookSource: getHookSource(request.input),
-            trustedFolder:
-              typeof request.input['trusted_folder'] === 'boolean'
-                ? request.input['trusted_folder']
-                : undefined,
-          }
-        : request;
-
-    // In untrusted folders, deny project-level hooks
-    if (context.trustedFolder === false && context.hookSource === 'project') {
-      return PolicyDecision.DENY;
-    }
-
-    // Run hook-specific safety checkers if configured
-    if (this.checkerRunner && this.hookCheckers.length > 0) {
-      for (const checkerRule of this.hookCheckers) {
-        if (hookCheckerMatches(checkerRule, context)) {
-          debugLogger.debug(
-            `[PolicyEngine.checkHook] Running hook checker: ${checkerRule.checker.name} for event: ${context.eventName}`,
-          );
-          try {
-            // Create a synthetic function call for the checker runner
-            // This allows reusing the existing checker infrastructure
-            const syntheticCall = {
-              name: `hook:${context.eventName}`,
-              args: {
-                hookSource: context.hookSource,
-                trustedFolder: context.trustedFolder,
-              },
-            };
-
-            const result = await this.checkerRunner.runChecker(
-              syntheticCall,
-              checkerRule.checker,
-            );
-
-            if (result.decision === SafetyCheckDecision.DENY) {
-              debugLogger.debug(
-                `[PolicyEngine.checkHook] Hook checker denied: ${result.reason}`,
-              );
-              return PolicyDecision.DENY;
-            } else if (result.decision === SafetyCheckDecision.ASK_USER) {
-              debugLogger.debug(
-                `[PolicyEngine.checkHook] Hook checker requested ASK_USER: ${result.reason}`,
-              );
-              // For hooks, ASK_USER is treated as DENY in non-interactive mode
-              return this.applyNonInteractiveMode(PolicyDecision.ASK_USER);
-            }
-          } catch (error) {
-            debugLogger.debug(
-              `[PolicyEngine.checkHook] Hook checker failed: ${error}`,
-            );
-            return PolicyDecision.DENY;
-          }
-        }
-      }
-    }
-
-    // Default: Allow hooks
-    return PolicyDecision.ALLOW;
   }
 
   private applyNonInteractiveMode(decision: PolicyDecision): PolicyDecision {

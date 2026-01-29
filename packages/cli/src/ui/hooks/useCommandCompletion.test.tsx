@@ -16,7 +16,10 @@ import {
 import { act, useEffect } from 'react';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
-import { useCommandCompletion } from './useCommandCompletion.js';
+import {
+  useCommandCompletion,
+  CompletionMode,
+} from './useCommandCompletion.js';
 import type { CommandContext } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
 import { useTextBuffer } from '../components/shared/text-buffer.js';
@@ -160,6 +163,7 @@ describe('useCommandCompletion', () => {
         expect(result.current.visibleStartIndex).toBe(0);
         expect(result.current.showSuggestions).toBe(false);
         expect(result.current.isLoadingSuggestions).toBe(false);
+        expect(result.current.completionMode).toBe(CompletionMode.IDLE);
       });
 
       it('should reset state when completion mode becomes IDLE', async () => {
@@ -207,7 +211,7 @@ describe('useCommandCompletion', () => {
 
       it('should call useAtCompletion with the correct query for an escaped space', async () => {
         const text = '@src/a\\ file.txt';
-        renderCommandCompletionHook(text);
+        const { result } = renderCommandCompletionHook(text);
 
         await waitFor(() => {
           expect(useAtCompletion).toHaveBeenLastCalledWith(
@@ -216,6 +220,7 @@ describe('useCommandCompletion', () => {
               pattern: 'src/a\\ file.txt',
             }),
           );
+          expect(result.current.completionMode).toBe(CompletionMode.AT);
         });
       });
 
@@ -272,6 +277,9 @@ describe('useCommandCompletion', () => {
             expect(result.current.showSuggestions).toBe(
               expectedShowSuggestions,
             );
+            if (!shellModeActive) {
+              expect(result.current.completionMode).toBe(CompletionMode.SLASH);
+            }
           });
         },
       );

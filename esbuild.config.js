@@ -14,8 +14,8 @@ let esbuild;
 try {
   esbuild = (await import('esbuild')).default;
 } catch (_error) {
-  console.warn('esbuild not available, skipping bundle step');
-  process.exit(0);
+  console.error('esbuild not available - cannot build bundle');
+  process.exit(1);
 }
 
 const __filename = fileURLToPath(import.meta.url);
