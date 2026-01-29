@@ -30,5 +30,13 @@ export {
   type CreateAuthProviderOptions,
 } from './factory.js';
 
-// Note: Individual providers are lazy-loaded by the factory.
-// They will be exported as they are implemented in subsequent PRs.
+// Providers
+export { ApiKeyAuthProvider } from './api-key-provider.js';
+export { HttpAuthProvider } from './http-auth-provider.js';
+
+// Utilities
+export {
+  resolveAuthValue,
+  needsResolution,
+  maskSensitiveValue,
+} from './value-resolver.js';
