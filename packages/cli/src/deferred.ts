@@ -5,7 +5,7 @@
  */
 import type { ArgumentsCamelCase, CommandModule } from 'yargs';
 import {
-  debugLogger,
+  coreEvents,
   ExitCodes,
   getAdminErrorMessage,
 } from '@google/gemini-cli-core';
@@ -34,8 +34,9 @@ export async function runDeferredCommand(settings: MergedSettings) {
   const commandName = deferredCommand.commandName;
 
   if (commandName === 'mcp' && adminSettings?.mcp?.enabled === false) {
-    debugLogger.error(
-      `Error: ${getAdminErrorMessage('MCP', undefined /* config */)}`,
+    coreEvents.emitFeedback(
+      'error',
+      getAdminErrorMessage('MCP', undefined /* config */),
     );
     await runExitCleanup();
     process.exit(ExitCodes.FATAL_CONFIG_ERROR);
@@ -45,16 +46,18 @@ export async function runDeferredCommand(settings: MergedSettings) {
     commandName === 'extensions' &&
     adminSettings?.extensions?.enabled === false
   ) {
-    debugLogger.error(
-      `Error: ${getAdminErrorMessage('Extensions', undefined /* config */)}`,
+    coreEvents.emitFeedback(
+      'error',
+      getAdminErrorMessage('Extensions', undefined /* config */),
     );
     await runExitCleanup();
     process.exit(ExitCodes.FATAL_CONFIG_ERROR);
   }
 
   if (commandName === 'skills' && adminSettings?.skills?.enabled === false) {
-    debugLogger.error(
-      `Error: ${getAdminErrorMessage('Agent skills', undefined /* config */)}`,
+    coreEvents.emitFeedback(
+      'error',
+      getAdminErrorMessage('Agent skills', undefined /* config */),
     );
     await runExitCleanup();
     process.exit(ExitCodes.FATAL_CONFIG_ERROR);

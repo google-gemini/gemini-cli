@@ -138,7 +138,7 @@ export function stopAdminControlsPolling() {
 /**
  * Returns a standardized error message for features disabled by admin settings.
  *
- * @param featureName The name of the disabled feature (currently unused in the message but good for future proofing/logging)
+ * @param featureName The name of the disabled feature
  * @param config The application config
  * @returns The formatted error message
  */
