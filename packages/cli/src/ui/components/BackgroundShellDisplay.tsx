@@ -75,8 +75,6 @@ export const BackgroundShellDisplay = ({
   const [highlightedPid, setHighlightedPid] = useState<number | null>(
     activePid,
   );
-  // Remove manual listSelectionIndex as RadioButtonSelect handles it
-  // const [listSelectionIndex, setListSelectionIndex] = useState(0);
   const outputRef = useRef<ScrollableListRef<AnsiLine | string>>(null);
   const subscribedRef = useRef(false);
 
@@ -315,7 +313,7 @@ export const BackgroundShellDisplay = ({
       <Box flexDirection="column" height="100%" width="100%">
         <Box flexShrink={0} marginBottom={1} paddingTop={1}>
           <Text bold>
-            {`Select Process (${commandDescriptions[Command.RETURN]} to select, ${commandDescriptions[Command.ESCAPE]} to cancel):`}
+            {`Select Process (${commandDescriptions[Command.BACKGROUND_SHELL_SELECT]} to select, ${commandDescriptions[Command.BACKGROUND_SHELL_ESCAPE]} to cancel):`}
           </Text>
         </Box>
         <Box flexGrow={1} width="100%">
