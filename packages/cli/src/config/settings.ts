@@ -350,22 +350,20 @@ export class LoadedSettings {
     const admin: Settings['admin'] = {};
     const { secureModeEnabled, mcpSetting, cliFeatureSetting } = remoteSettings;
 
-    if (secureModeEnabled !== undefined) {
-      admin.secureModeEnabled = secureModeEnabled;
+    if (Object.keys(remoteSettings).length === 0) {
+      this._remoteAdminSettings = { admin };
+      this._merged = this.computeMergedSettings();
+      return;
     }
 
-    if (mcpSetting?.mcpEnabled !== undefined) {
-      admin.mcp = { enabled: mcpSetting.mcpEnabled };
-    }
-
-    const extensionsSetting = cliFeatureSetting?.extensionsSetting;
-    if (extensionsSetting?.extensionsEnabled !== undefined) {
-      admin.extensions = { enabled: extensionsSetting.extensionsEnabled };
-    }
-
-    if (cliFeatureSetting?.advancedFeaturesEnabled !== undefined) {
-      admin.skills = { enabled: cliFeatureSetting.advancedFeaturesEnabled };
-    }
+    admin.secureModeEnabled = secureModeEnabled ?? false;
+    admin.mcp = { enabled: mcpSetting?.mcpEnabled ?? false };
+    admin.extensions = {
+      enabled: cliFeatureSetting?.extensionsSetting?.extensionsEnabled ?? false,
+    };
+    admin.skills = {
+      enabled: cliFeatureSetting?.unmanagedCapabilitiesEnabled ?? false,
+    };
 
     this._remoteAdminSettings = { admin };
     this._merged = this.computeMergedSettings();
@@ -804,6 +802,14 @@ export function migrateDeprecatedSettings(
         anyModified = true;
       }
     }
+
+    // Migrate experimental agent settings
+    anyModified ||= migrateExperimentalSettings(
+      settings,
+      loadedSettings,
+      scope,
+      removeDeprecated,
+    );
   };
 
   processScope(SettingScope.User);
@@ -851,4 +857,101 @@ export function saveModelChange(
       error,
     );
   }
+}
+
+function migrateExperimentalSettings(
+  settings: Settings,
+  loadedSettings: LoadedSettings,
+  scope: LoadableSettingScope,
+  removeDeprecated: boolean,
+): boolean {
+  const experimentalSettings = settings.experimental as
+    | Record<string, unknown>
+    | undefined;
+  if (experimentalSettings) {
+    const agentsSettings = {
+      ...(settings.agents as Record<string, unknown> | undefined),
+    };
+    const agentsOverrides = {
+      ...((agentsSettings['overrides'] as Record<string, unknown>) || {}),
+    };
+    let modified = false;
+
+    // Migrate codebaseInvestigatorSettings -> agents.overrides.codebase_investigator
+    if (experimentalSettings['codebaseInvestigatorSettings']) {
+      const old = experimentalSettings[
+        'codebaseInvestigatorSettings'
+      ] as Record<string, unknown>;
+      const override = {
+        ...(agentsOverrides['codebase_investigator'] as
+          | Record<string, unknown>
+          | undefined),
+      };
+
+      if (old['enabled'] !== undefined) override['enabled'] = old['enabled'];
+
+      const runConfig = {
+        ...(override['runConfig'] as Record<string, unknown> | undefined),
+      };
+      if (old['maxNumTurns'] !== undefined)
+        runConfig['maxTurns'] = old['maxNumTurns'];
+      if (old['maxTimeMinutes'] !== undefined)
+        runConfig['maxTimeMinutes'] = old['maxTimeMinutes'];
+      if (Object.keys(runConfig).length > 0) override['runConfig'] = runConfig;
+
+      if (old['model'] !== undefined || old['thinkingBudget'] !== undefined) {
+        const modelConfig = {
+          ...(override['modelConfig'] as Record<string, unknown> | undefined),
+        };
+        if (old['model'] !== undefined) modelConfig['model'] = old['model'];
+        if (old['thinkingBudget'] !== undefined) {
+          const generateContentConfig = {
+            ...(modelConfig['generateContentConfig'] as
+              | Record<string, unknown>
+              | undefined),
+          };
+          const thinkingConfig = {
+            ...(generateContentConfig['thinkingConfig'] as
+              | Record<string, unknown>
+              | undefined),
+          };
+          thinkingConfig['thinkingBudget'] = old['thinkingBudget'];
+          generateContentConfig['thinkingConfig'] = thinkingConfig;
+          modelConfig['generateContentConfig'] = generateContentConfig;
+        }
+        override['modelConfig'] = modelConfig;
+      }
+
+      agentsOverrides['codebase_investigator'] = override;
+      modified = true;
+    }
+
+    // Migrate cliHelpAgentSettings -> agents.overrides.cli_help
+    if (experimentalSettings['cliHelpAgentSettings']) {
+      const old = experimentalSettings['cliHelpAgentSettings'] as Record<
+        string,
+        unknown
+      >;
+      const override = {
+        ...(agentsOverrides['cli_help'] as Record<string, unknown> | undefined),
+      };
+      if (old['enabled'] !== undefined) override['enabled'] = old['enabled'];
+      agentsOverrides['cli_help'] = override;
+      modified = true;
+    }
+
+    if (modified) {
+      agentsSettings['overrides'] = agentsOverrides;
+      loadedSettings.setValue(scope, 'agents', agentsSettings);
+
+      if (removeDeprecated) {
+        const newExperimental = { ...experimentalSettings };
+        delete newExperimental['codebaseInvestigatorSettings'];
+        delete newExperimental['cliHelpAgentSettings'];
+        loadedSettings.setValue(scope, 'experimental', newExperimental);
+      }
+      return true;
+    }
+  }
+  return false;
 }

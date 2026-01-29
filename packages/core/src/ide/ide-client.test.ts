@@ -23,6 +23,8 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { detectIde, IDE_DEFINITIONS } from './detect-ide.js';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { getIdeServerHost } from './ide-client.js';
+import { pathToFileURL } from 'node:url';
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof fs>();
@@ -34,7 +36,7 @@ vi.mock('node:fs', async (importOriginal) => {
       readdir: vi.fn(),
     },
     realpathSync: (p: string) => p,
-    existsSync: () => false,
+    existsSync: vi.fn(() => false),
   };
 });
 vi.mock('./process-utils.js');
@@ -110,7 +112,7 @@ describe('IdeClient', () => {
       await ideClient.connect();
 
       expect(fs.promises.readFile).toHaveBeenCalledWith(
-        path.join('/tmp/', 'gemini-ide-server-12345.json'),
+        path.join('/tmp', 'gemini', 'ide', 'gemini-ide-server-12345.json'),
         'utf8',
       );
       expect(StreamableHTTPClientTransport).toHaveBeenCalledWith(
@@ -277,7 +279,7 @@ describe('IdeClient', () => {
 
       expect(result).toEqual(config);
       expect(fs.promises.readFile).toHaveBeenCalledWith(
-        path.join('/tmp', 'gemini-ide-server-12345.json'),
+        path.join('/tmp', 'gemini', 'ide', 'gemini-ide-server-12345.json'),
         'utf8',
       );
     });
@@ -324,7 +326,7 @@ describe('IdeClient', () => {
 
       expect(result).toEqual(config);
       expect(fs.promises.readFile).toHaveBeenCalledWith(
-        path.join('/tmp/gemini/ide', 'gemini-ide-server-12345-123.json'),
+        path.join('/tmp', 'gemini', 'ide', 'gemini-ide-server-12345-123.json'),
         'utf8',
       );
     });
@@ -517,11 +519,11 @@ describe('IdeClient', () => {
 
       expect(result).toEqual(validConfig);
       expect(fs.promises.readFile).toHaveBeenCalledWith(
-        path.join('/tmp/gemini/ide', 'gemini-ide-server-12345-111.json'),
+        path.join('/tmp', 'gemini', 'ide', 'gemini-ide-server-12345-111.json'),
         'utf8',
       );
       expect(fs.promises.readFile).not.toHaveBeenCalledWith(
-        path.join('/tmp/gemini/ide', 'not-a-config-file.txt'),
+        path.join('/tmp', 'gemini', 'ide', 'not-a-config-file.txt'),
         'utf8',
       );
     });
@@ -952,6 +954,273 @@ describe('IdeClient', () => {
       );
       expect(ideClient.getConnectionStatus().status).toBe(
         IDEConnectionStatus.Connected,
+      );
+    });
+  });
+});
+
+describe('getIdeServerHost', () => {
+  let existsSyncMock: Mock;
+  let originalSshConnection: string | undefined;
+  let originalVscodeRemoteSession: string | undefined;
+  let originalRemoteContainers: string | undefined;
+
+  beforeEach(() => {
+    existsSyncMock = vi.mocked(fs.existsSync);
+    existsSyncMock.mockClear();
+    originalSshConnection = process.env['SSH_CONNECTION'];
+    originalVscodeRemoteSession =
+      process.env['VSCODE_REMOTE_CONTAINERS_SESSION'];
+    originalRemoteContainers = process.env['REMOTE_CONTAINERS'];
+
+    delete process.env['SSH_CONNECTION'];
+    delete process.env['VSCODE_REMOTE_CONTAINERS_SESSION'];
+    delete process.env['REMOTE_CONTAINERS'];
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    if (originalSshConnection !== undefined) {
+      process.env['SSH_CONNECTION'] = originalSshConnection;
+    } else {
+      delete process.env['SSH_CONNECTION'];
+    }
+    if (originalVscodeRemoteSession !== undefined) {
+      process.env['VSCODE_REMOTE_CONTAINERS_SESSION'] =
+        originalVscodeRemoteSession;
+    } else {
+      delete process.env['VSCODE_REMOTE_CONTAINERS_SESSION'];
+    }
+    if (originalRemoteContainers !== undefined) {
+      process.env['REMOTE_CONTAINERS'] = originalRemoteContainers;
+    } else {
+      delete process.env['REMOTE_CONTAINERS'];
+    }
+  });
+
+  // Helper to set existsSync mock behavior
+  const setupFsMocks = (
+    dockerenvExists: boolean,
+    containerenvExists: boolean,
+  ) => {
+    existsSyncMock.mockImplementation((path: string) => {
+      if (path === '/.dockerenv') {
+        return dockerenvExists;
+      }
+      if (path === '/run/.containerenv') {
+        return containerenvExists;
+      }
+      return false;
+    });
+  };
+
+  it('should return 127.0.0.1 when not in container and no SSH_CONNECTION or Dev Container env vars', () => {
+    setupFsMocks(false, false);
+    delete process.env['SSH_CONNECTION'];
+    delete process.env['VSCODE_REMOTE_CONTAINERS_SESSION'];
+    delete process.env['REMOTE_CONTAINERS'];
+    expect(getIdeServerHost()).toBe('127.0.0.1');
+    expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/.dockerenv');
+    expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/run/.containerenv');
+  });
+
+  it('should return 127.0.0.1 when not in container but SSH_CONNECTION is set', () => {
+    setupFsMocks(false, false);
+    process.env['SSH_CONNECTION'] = 'some_ssh_value';
+    delete process.env['VSCODE_REMOTE_CONTAINERS_SESSION'];
+    delete process.env['REMOTE_CONTAINERS'];
+    expect(getIdeServerHost()).toBe('127.0.0.1');
+    expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/.dockerenv');
+    expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/run/.containerenv');
+  });
+
+  it('should return host.docker.internal when in .dockerenv container and no SSH_CONNECTION or Dev Container env vars', () => {
+    setupFsMocks(true, false);
+    delete process.env['SSH_CONNECTION'];
+    delete process.env['VSCODE_REMOTE_CONTAINERS_SESSION'];
+    delete process.env['REMOTE_CONTAINERS'];
+    expect(getIdeServerHost()).toBe('host.docker.internal');
+    expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/.dockerenv');
+    expect(vi.mocked(fs.existsSync)).not.toHaveBeenCalledWith(
+      '/run/.containerenv',
+    ); // Short-circuiting
+  });
+
+  it('should return 127.0.0.1 when in .dockerenv container and SSH_CONNECTION is set', () => {
+    setupFsMocks(true, false);
+    process.env['SSH_CONNECTION'] = 'some_ssh_value';
+    delete process.env['VSCODE_REMOTE_CONTAINERS_SESSION'];
+    delete process.env['REMOTE_CONTAINERS'];
+    expect(getIdeServerHost()).toBe('127.0.0.1');
+    expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/.dockerenv');
+    expect(vi.mocked(fs.existsSync)).not.toHaveBeenCalledWith(
+      '/run/.containerenv',
+    ); // Short-circuiting
+  });
+
+  it('should return 127.0.0.1 when in .dockerenv container and VSCODE_REMOTE_CONTAINERS_SESSION is set', () => {
+    setupFsMocks(true, false);
+    delete process.env['SSH_CONNECTION'];
+    process.env['VSCODE_REMOTE_CONTAINERS_SESSION'] = 'some_session_id';
+    expect(getIdeServerHost()).toBe('127.0.0.1');
+    expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/.dockerenv');
+    expect(vi.mocked(fs.existsSync)).not.toHaveBeenCalledWith(
+      '/run/.containerenv',
+    ); // Short-circuiting
+  });
+
+  it('should return host.docker.internal when in .containerenv container and no SSH_CONNECTION or Dev Container env vars', () => {
+    setupFsMocks(false, true);
+    delete process.env['SSH_CONNECTION'];
+    delete process.env['VSCODE_REMOTE_CONTAINERS_SESSION'];
+    delete process.env['REMOTE_CONTAINERS'];
+    expect(getIdeServerHost()).toBe('host.docker.internal');
+    expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/.dockerenv');
+    expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/run/.containerenv');
+  });
+
+  it('should return 127.0.0.1 when in .containerenv container and SSH_CONNECTION is set', () => {
+    setupFsMocks(false, true);
+    process.env['SSH_CONNECTION'] = 'some_ssh_value';
+    delete process.env['VSCODE_REMOTE_CONTAINERS_SESSION'];
+    delete process.env['REMOTE_CONTAINERS'];
+    expect(getIdeServerHost()).toBe('127.0.0.1');
+    expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/.dockerenv');
+    expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/run/.containerenv');
+  });
+
+  it('should return 127.0.0.1 when in .containerenv container and REMOTE_CONTAINERS is set', () => {
+    setupFsMocks(false, true);
+    delete process.env['SSH_CONNECTION'];
+    process.env['REMOTE_CONTAINERS'] = 'true';
+    expect(getIdeServerHost()).toBe('127.0.0.1');
+    expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/.dockerenv');
+    expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/run/.containerenv');
+  });
+
+  it('should return host.docker.internal when in both containers and no SSH_CONNECTION or Dev Container env vars', () => {
+    setupFsMocks(true, true);
+    delete process.env['SSH_CONNECTION'];
+    delete process.env['VSCODE_REMOTE_CONTAINERS_SESSION'];
+    delete process.env['REMOTE_CONTAINERS'];
+    expect(getIdeServerHost()).toBe('host.docker.internal');
+    expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/.dockerenv');
+    expect(vi.mocked(fs.existsSync)).not.toHaveBeenCalledWith(
+      '/run/.containerenv',
+    ); // Short-circuiting
+  });
+
+  it('should return 127.0.0.1 when in both containers and SSH_CONNECTION is set', () => {
+    setupFsMocks(true, true);
+    process.env['SSH_CONNECTION'] = 'some_ssh_value';
+    delete process.env['VSCODE_REMOTE_CONTAINERS_SESSION'];
+    delete process.env['REMOTE_CONTAINERS'];
+    expect(getIdeServerHost()).toBe('127.0.0.1');
+    expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/.dockerenv');
+    expect(vi.mocked(fs.existsSync)).not.toHaveBeenCalledWith(
+      '/run/.containerenv',
+    ); // Short-circuiting
+  });
+
+  it('should return 127.0.0.1 when in both containers and VSCODE_REMOTE_CONTAINERS_SESSION is set', () => {
+    setupFsMocks(true, true);
+    delete process.env['SSH_CONNECTION'];
+    process.env['VSCODE_REMOTE_CONTAINERS_SESSION'] = 'some_session_id';
+    expect(getIdeServerHost()).toBe('127.0.0.1');
+    expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/.dockerenv');
+    expect(vi.mocked(fs.existsSync)).not.toHaveBeenCalledWith(
+      '/run/.containerenv',
+    ); // Short-circuiting
+  });
+
+  describe('validateWorkspacePath', () => {
+    describe('with special characters and encoding', () => {
+      it('should return true for a URI-encoded path with spaces', () => {
+        const workspaceDir = path.resolve('/test/my workspace');
+        const workspacePath = '/test/my%20workspace';
+        const cwd = path.join(workspaceDir, 'sub-dir');
+        const result = IdeClient.validateWorkspacePath(workspacePath, cwd);
+        expect(result.isValid).toBe(true);
+      });
+
+      it('should return true for a URI-encoded path with Korean characters', () => {
+        const workspaceDir = path.resolve('/test/테스트');
+        const workspacePath = '/test/%ED%85%8C%EC%8A%A4%ED%8A%B8'; // "테스트"
+        const cwd = path.join(workspaceDir, 'sub-dir');
+        const result = IdeClient.validateWorkspacePath(workspacePath, cwd);
+        expect(result.isValid).toBe(true);
+      });
+
+      it('should return true for a plain decoded path with Korean characters', () => {
+        const workspacePath = path.resolve('/test/테스트');
+        const cwd = path.join(workspacePath, 'sub-dir');
+        const result = IdeClient.validateWorkspacePath(workspacePath, cwd);
+        expect(result.isValid).toBe(true);
+      });
+
+      it('should return true when one of multi-root paths is a valid URI-encoded path', () => {
+        const workspaceDir1 = path.resolve('/another/workspace');
+        const workspaceDir2 = path.resolve('/test/테스트');
+        const workspacePath = [
+          workspaceDir1,
+          '/test/%ED%85%8C%EC%8A%A4%ED%8A%B8', // "테스트"
+        ].join(path.delimiter);
+        const cwd = path.join(workspaceDir2, 'sub-dir');
+        const result = IdeClient.validateWorkspacePath(workspacePath, cwd);
+        expect(result.isValid).toBe(true);
+      });
+
+      it('should return true for paths containing a literal % sign', () => {
+        const workspacePath = path.resolve('/test/a%path');
+        const cwd = path.join(workspacePath, 'sub-dir');
+        const result = IdeClient.validateWorkspacePath(workspacePath, cwd);
+        expect(result.isValid).toBe(true);
+      });
+
+      it.skipIf(process.platform !== 'win32')(
+        'should correctly convert a Windows file URI',
+        () => {
+          const workspacePath = 'file:///C:\\Users\\test';
+          const cwd = 'C:\\Users\\test\\sub-dir';
+
+          const result = IdeClient.validateWorkspacePath(workspacePath, cwd);
+
+          expect(result.isValid).toBe(true);
+        },
+      );
+    });
+  });
+
+  describe('validateWorkspacePath (sanitization)', () => {
+    it.each([
+      {
+        description: 'should return true for identical paths',
+        workspacePath: path.resolve('test', 'ws'),
+        cwd: path.resolve('test', 'ws'),
+        expectedValid: true,
+      },
+      {
+        description: 'should return true when workspace has file:// protocol',
+        workspacePath: pathToFileURL(path.resolve('test', 'ws')).toString(),
+        cwd: path.resolve('test', 'ws'),
+        expectedValid: true,
+      },
+      {
+        description: 'should return true when workspace has encoded spaces',
+        workspacePath: path.resolve('test', 'my ws').replace(/ /g, '%20'),
+        cwd: path.resolve('test', 'my ws'),
+        expectedValid: true,
+      },
+      {
+        description:
+          'should return true when cwd needs normalization matching workspace',
+        workspacePath: path.resolve('test', 'my ws'),
+        cwd: path.resolve('test', 'my ws').replace(/ /g, '%20'),
+        expectedValid: true,
+      },
+    ])('$description', ({ workspacePath, cwd, expectedValid }) => {
+      expect(IdeClient.validateWorkspacePath(workspacePath, cwd)).toMatchObject(
+        { isValid: expectedValid },
       );
     });
   });

@@ -10,6 +10,7 @@ import type {
   MCPServerConfig,
   ThoughtSummary,
   ToolCallConfirmationDetails,
+  SerializableConfirmationDetails,
   ToolResultDisplay,
   RetrieveUserQuotaResponse,
   SkillDefinition,
@@ -63,7 +64,11 @@ export interface ToolCallEvent {
   name: string;
   args: Record<string, never>;
   resultDisplay: ToolResultDisplay | undefined;
-  confirmationDetails: ToolCallConfirmationDetails | undefined;
+  confirmationDetails:
+    | ToolCallConfirmationDetails
+    | SerializableConfirmationDetails
+    | undefined;
+  correlationId?: string;
 }
 
 export interface IndividualToolCallDisplay {
@@ -72,10 +77,14 @@ export interface IndividualToolCallDisplay {
   description: string;
   resultDisplay: ToolResultDisplay | undefined;
   status: ToolCallStatus;
-  confirmationDetails: ToolCallConfirmationDetails | undefined;
+  confirmationDetails:
+    | ToolCallConfirmationDetails
+    | SerializableConfirmationDetails
+    | undefined;
   renderOutputAsMarkdown?: boolean;
   ptyId?: number;
   outputFile?: string;
+  correlationId?: string;
 }
 
 export interface CompressionProps {
@@ -136,6 +145,7 @@ export type HistoryItemAbout = HistoryItemBase & {
   gcpProject: string;
   ideClient: string;
   userEmail?: string;
+  tier?: string;
 };
 
 export type HistoryItemHelp = HistoryItemBase & {
@@ -147,10 +157,16 @@ export type HistoryItemStats = HistoryItemBase & {
   type: 'stats';
   duration: string;
   quotas?: RetrieveUserQuotaResponse;
+  selectedAuthType?: string;
+  userEmail?: string;
+  tier?: string;
 };
 
 export type HistoryItemModelStats = HistoryItemBase & {
   type: 'model_stats';
+  selectedAuthType?: string;
+  userEmail?: string;
+  tier?: string;
 };
 
 export type HistoryItemToolStats = HistoryItemBase & {
@@ -170,6 +186,8 @@ export type HistoryItemQuit = HistoryItemBase & {
 export type HistoryItemToolGroup = HistoryItemBase & {
   type: 'tool_group';
   tools: IndividualToolCallDisplay[];
+  borderTop?: boolean;
+  borderBottom?: boolean;
 };
 
 export type HistoryItemUserShell = HistoryItemBase & {
@@ -260,6 +278,14 @@ export type HistoryItemMcpStatus = HistoryItemBase & {
   authStatus: Record<
     string,
     'authenticated' | 'expired' | 'unauthenticated' | 'not-configured'
+  >;
+  enablementState: Record<
+    string,
+    {
+      enabled: boolean;
+      isSessionDisabled: boolean;
+      isPersistentDisabled: boolean;
+    }
   >;
   blockedServers: Array<{ name: string; extensionName: string }>;
   discoveryInProgress: boolean;

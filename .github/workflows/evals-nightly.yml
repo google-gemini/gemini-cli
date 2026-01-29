@@ -9,6 +9,10 @@ on:
         description: 'Run all evaluations (including usually passing)'
         type: 'boolean'
         default: true
+      test_name_pattern:
+        description: 'Test name pattern or file name'
+        required: false
+        type: 'string'
 
 permissions:
   contents: 'read'
@@ -22,6 +26,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        model:
+          - 'gemini-3-pro-preview'
+          - 'gemini-3-flash-preview'
+          - 'gemini-2.5-pro'
+          - 'gemini-2.5-flash'
+          - 'gemini-2.5-flash-lite'
         run_attempt: [1, 2, 3]
     steps:
       - name: 'Checkout'
@@ -43,16 +53,31 @@ jobs:
         run: 'mkdir -p evals/logs'
 
       - name: 'Run Evals'
+        continue-on-error: true
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          GEMINI_MODEL: '${{ matrix.model }}'
           RUN_EVALS: "${{ github.event.inputs.run_all != 'false' }}"
-        run: 'npm run test:all_evals'
+          TEST_NAME_PATTERN: '${{ github.event.inputs.test_name_pattern }}'
+        run: |
+          CMD="npm run test:all_evals"
+          PATTERN="${{ env.TEST_NAME_PATTERN }}"
+
+          if [[ -n "$PATTERN" ]]; then
+            if [[ "$PATTERN" == *.ts || "$PATTERN" == *.js || "$PATTERN" == */* ]]; then
+              $CMD -- "$PATTERN"
+            else
+              $CMD -- -t "$PATTERN"
+            fi
+          else
+            $CMD
+          fi
 
       - name: 'Upload Logs'
         if: 'always()'
         uses: 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' # ratchet:actions/upload-artifact@v4
         with:
-          name: 'eval-logs-${{ matrix.run_attempt }}'
+          name: 'eval-logs-${{ matrix.model }}-${{ matrix.run_attempt }}'
           path: 'evals/logs'
           retention-days: 7
 

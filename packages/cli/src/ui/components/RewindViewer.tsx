@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Box, Text } from 'ink';
 import { useUIState } from '../contexts/UIStateContext.js';
 import {
@@ -19,8 +19,9 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { useRewind } from '../hooks/useRewind.js';
 import { RewindConfirmation, RewindOutcome } from './RewindConfirmation.js';
 import { stripReferenceContent } from '../utils/formatters.js';
-import { MaxSizedBox } from './shared/MaxSizedBox.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
+import { CliSpinner } from './CliSpinner.js';
+import { ExpandableText } from './shared/ExpandableText.js';
 
 interface RewindViewerProps {
   conversation: ConversationRecord;
@@ -29,7 +30,7 @@ interface RewindViewerProps {
     messageId: string,
     newText: string,
     outcome: RewindOutcome,
-  ) => void;
+  ) => Promise<void>;
 }
 
 const MAX_LINES_PER_BOX = 2;
@@ -39,6 +40,7 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
   onExit,
   onRewind,
 }) => {
+  const [isRewinding, setIsRewinding] = useState(false);
   const { terminalWidth, terminalHeight } = useUIState();
   const {
     selectedMessageId,
@@ -48,30 +50,63 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
     clearSelection,
   } = useRewind(conversation);
 
+  const [highlightedMessageId, setHighlightedMessageId] = useState<
+    string | null
+  >(null);
+  const [expandedMessageId, setExpandedMessageId] = useState<string | null>(
+    null,
+  );
+
   const interactions = useMemo(
     () => conversation.messages.filter((msg) => msg.type === 'user'),
     [conversation.messages],
   );
 
-  const items = useMemo(
-    () =>
-      interactions
-        .map((msg, idx) => ({
-          key: `${msg.id || 'msg'}-${idx}`,
-          value: msg,
-          index: idx,
-        }))
-        .reverse(),
-    [interactions],
-  );
+  const items = useMemo(() => {
+    const interactionItems = interactions.map((msg, idx) => ({
+      key: `${msg.id || 'msg'}-${idx}`,
+      value: msg,
+      index: idx,
+    }));
+
+    // Add "Current Position" as the last item
+    return [
+      ...interactionItems,
+      {
+        key: 'current-position',
+        value: {
+          id: 'current-position',
+          type: 'user',
+          content: 'Stay at current position',
+          timestamp: new Date().toISOString(),
+        } as MessageRecord,
+        index: interactionItems.length,
+      },
+    ];
+  }, [interactions]);
 
   useKeypress(
     (key) => {
       if (!selectedMessageId) {
         if (keyMatchers[Command.ESCAPE](key)) {
           onExit();
+          return true;
+        }
+        if (keyMatchers[Command.EXPAND_SUGGESTION](key)) {
+          if (
+            highlightedMessageId &&
+            highlightedMessageId !== 'current-position'
+          ) {
+            setExpandedMessageId(highlightedMessageId);
+            return true;
+          }
+        }
+        if (keyMatchers[Command.COLLAPSE_SUGGESTION](key)) {
+          setExpandedMessageId(null);
+          return true;
         }
       }
+      return false;
     },
     { isActive: true },
   );
@@ -89,6 +124,28 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
   const maxItemsToShow = Math.max(1, Math.floor(listHeight / 4));
 
   if (selectedMessageId) {
+    if (isRewinding) {
+      return (
+        <Box
+          borderStyle="round"
+          borderColor={theme.border.default}
+          padding={1}
+          width={terminalWidth}
+          flexDirection="row"
+        >
+          <Box>
+            <CliSpinner />
+          </Box>
+          <Text>Rewinding...</Text>
+        </Box>
+      );
+    }
+
+    if (selectedMessageId === 'current-position') {
+      onExit();
+      return null;
+    }
+
     const selectedMessage = interactions.find(
       (m) => m.id === selectedMessageId,
     );
@@ -97,7 +154,7 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
         stats={confirmationStats}
         terminalWidth={terminalWidth}
         timestamp={selectedMessage?.timestamp}
-        onConfirm={(outcome) => {
+        onConfirm={async (outcome) => {
           if (outcome === RewindOutcome.Cancel) {
             clearSelection();
           } else {
@@ -109,7 +166,8 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
                 ? partToString(userPrompt.content)
                 : '';
               const cleanedText = stripReferenceContent(originalUserText);
-              onRewind(selectedMessageId, cleanedText, outcome);
+              setIsRewinding(true);
+              await onRewind(selectedMessageId, cleanedText, outcome);
             }
           }
         }}
@@ -133,17 +191,48 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
       <Box flexDirection="column" flexGrow={1}>
         <BaseSelectionList
           items={items}
+          initialIndex={items.length - 1}
           isFocused={true}
           showNumbers={false}
+          wrapAround={false}
           onSelect={(item: MessageRecord) => {
             const userPrompt = item;
             if (userPrompt && userPrompt.id) {
-              selectMessage(userPrompt.id);
+              if (userPrompt.id === 'current-position') {
+                onExit();
+              } else {
+                selectMessage(userPrompt.id);
+              }
+            }
+          }}
+          onHighlight={(item: MessageRecord) => {
+            if (item.id) {
+              setHighlightedMessageId(item.id);
+              // Collapse when moving selection
+              setExpandedMessageId(null);
             }
           }}
           maxItemsToShow={maxItemsToShow}
           renderItem={(itemWrapper, { isSelected }) => {
             const userPrompt = itemWrapper.value;
+
+            if (userPrompt.id === 'current-position') {
+              return (
+                <Box flexDirection="column" marginBottom={1}>
+                  <Text
+                    color={
+                      isSelected ? theme.status.success : theme.text.primary
+                    }
+                  >
+                    {partToString(userPrompt.content)}
+                  </Text>
+                  <Text color={theme.text.secondary}>
+                    Cancel rewind and stay here
+                  </Text>
+                </Box>
+              );
+            }
+
             const stats = getStats(userPrompt);
             const firstFileName = stats?.details?.at(0)?.fileName;
             const originalUserText = userPrompt.content
@@ -154,25 +243,15 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
             return (
               <Box flexDirection="column" marginBottom={1}>
                 <Box>
-                  <MaxSizedBox
-                    maxWidth={terminalWidth - 4}
-                    maxHeight={isSelected ? undefined : MAX_LINES_PER_BOX + 1}
-                    overflowDirection="bottom"
-                  >
-                    {cleanedText.split('\n').map((line, i) => (
-                      <Box key={i}>
-                        <Text
-                          color={
-                            isSelected
-                              ? theme.status.success
-                              : theme.text.primary
-                          }
-                        >
-                          {line}
-                        </Text>
-                      </Box>
-                    ))}
-                  </MaxSizedBox>
+                  <ExpandableText
+                    label={cleanedText}
+                    isExpanded={expandedMessageId === userPrompt.id}
+                    textColor={
+                      isSelected ? theme.status.success : theme.text.primary
+                    }
+                    maxWidth={(terminalWidth - 4) * MAX_LINES_PER_BOX}
+                    maxLines={MAX_LINES_PER_BOX}
+                  />
                 </Box>
                 {stats ? (
                   <Box flexDirection="row">
@@ -203,7 +282,8 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
 
       <Box marginTop={1}>
         <Text color={theme.text.secondary}>
-          (Use Enter to select a message, Esc to close)
+          (Use Enter to select a message, Esc to close, Right/Left to
+          expand/collapse)
         </Text>
       </Box>
     </Box>

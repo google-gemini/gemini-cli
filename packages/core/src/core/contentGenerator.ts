@@ -44,6 +44,8 @@ export interface ContentGenerator {
   embedContent(request: EmbedContentParameters): Promise<EmbedContentResponse>;
 
   userTier?: UserTierId;
+
+  userTierName?: string;
 }
 
 export enum AuthType {

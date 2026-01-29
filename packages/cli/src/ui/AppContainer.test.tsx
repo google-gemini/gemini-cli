@@ -20,6 +20,8 @@ import { cleanup } from 'ink-testing-library';
 import { act, useContext, type ReactElement } from 'react';
 import { AppContainer } from './AppContainer.js';
 import { SettingsContext } from './contexts/SettingsContext.js';
+import { type TrackedToolCall } from './hooks/useReactToolScheduler.js';
+import { MessageType } from './types.js';
 import {
   type Config,
   makeFakeConfig,
@@ -27,7 +29,16 @@ import {
   type UserFeedbackPayload,
   type ResumedSessionData,
   AuthType,
+  UserAccountManager,
+  type ContentGeneratorConfig,
+  type AgentDefinition,
+  MessageBusType,
+  QuestionType,
 } from '@google/gemini-cli-core';
+import {
+  AskUserActionsContext,
+  type AskUserState,
+} from './contexts/AskUserActionsContext.js';
 
 // Mock coreEvents
 const mockCoreEvents = vi.hoisted(() => ({
@@ -40,6 +51,11 @@ const mockCoreEvents = vi.hoisted(() => ({
 // Mock IdeClient
 const mockIdeClient = vi.hoisted(() => ({
   getInstance: vi.fn().mockReturnValue(new Promise(() => {})),
+}));
+
+// Mock UserAccountManager
+const mockUserAccountManager = vi.hoisted(() => ({
+  getCachedGoogleAccount: vi.fn().mockReturnValue(null),
 }));
 
 // Mock stdout
@@ -71,6 +87,9 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     })),
     enableMouseEvents: vi.fn(),
     disableMouseEvents: vi.fn(),
+    UserAccountManager: vi
+      .fn()
+      .mockImplementation(() => mockUserAccountManager),
     FileDiscoveryService: vi.fn().mockImplementation(() => ({
       initialize: vi.fn(),
     })),
@@ -105,9 +124,11 @@ vi.mock('ink', async (importOriginal) => {
 // so we can assert against them in our tests.
 let capturedUIState: UIState;
 let capturedUIActions: UIActions;
+let capturedAskUserRequest: AskUserState | null;
 function TestContextConsumer() {
   capturedUIState = useContext(UIStateContext)!;
   capturedUIActions = useContext(UIActionsContext)!;
+  capturedAskUserRequest = useContext(AskUserActionsContext)?.request ?? null;
   return null;
 }
 
@@ -183,6 +204,7 @@ import {
   disableMouseEvents,
 } from '@google/gemini-cli-core';
 import { type ExtensionManager } from '../config/extension-manager.js';
+import { WARNING_PROMPT_DURATION_MS } from './constants.js';
 
 describe('AppContainer State Management', () => {
   let mockConfig: Config;
@@ -257,6 +279,7 @@ describe('AppContainer State Management', () => {
     mocks.mockStdout.write.mockClear();
 
     capturedUIState = null!;
+    capturedAskUserRequest = null;
 
     // **Provide a default return value for EVERY mocked hook.**
     mockedUseQuotaAndFallback.mockReturnValue({
@@ -393,6 +416,7 @@ describe('AppContainer State Management', () => {
           ...defaultMergedSettings.ui,
           showStatusInTitle: false,
           hideWindowTitle: false,
+          showUserIdentity: true,
         },
         useAlternateBuffer: false,
       },
@@ -461,6 +485,162 @@ describe('AppContainer State Management', () => {
       expect(() => {
         renderAppContainer({ config: debugConfig });
       }).not.toThrow();
+    });
+  });
+
+  describe('Authentication Check', () => {
+    it('displays correct message for LOGIN_WITH_GOOGLE auth type', async () => {
+      // Explicitly mock implementation to ensure we control the instance
+      (UserAccountManager as unknown as Mock).mockImplementation(
+        () => mockUserAccountManager,
+      );
+
+      mockUserAccountManager.getCachedGoogleAccount.mockReturnValue(
+        'test@example.com',
+      );
+      const mockAddItem = vi.fn();
+      mockedUseHistory.mockReturnValue({
+        history: [],
+        addItem: mockAddItem,
+        updateItem: vi.fn(),
+        clearItems: vi.fn(),
+        loadHistory: vi.fn(),
+      });
+
+      // Explicitly enable showUserIdentity
+      mockSettings.merged.ui = {
+        ...mockSettings.merged.ui,
+        showUserIdentity: true,
+      };
+
+      // Need to ensure config.getContentGeneratorConfig() returns appropriate authType
+      const authConfig = makeFakeConfig();
+      // Mock getTargetDir as well since makeFakeConfig might not set it up fully for the component
+      vi.spyOn(authConfig, 'getTargetDir').mockReturnValue('/test/workspace');
+      vi.spyOn(authConfig, 'initialize').mockResolvedValue(undefined);
+      vi.spyOn(authConfig, 'getExtensionLoader').mockReturnValue(
+        mockExtensionManager,
+      );
+
+      vi.spyOn(authConfig, 'getContentGeneratorConfig').mockReturnValue({
+        authType: AuthType.LOGIN_WITH_GOOGLE,
+      } as unknown as ContentGeneratorConfig);
+      vi.spyOn(authConfig, 'getUserTierName').mockReturnValue('Standard Tier');
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({ config: authConfig });
+        unmount = result.unmount;
+      });
+
+      await waitFor(() => {
+        expect(UserAccountManager).toHaveBeenCalled();
+        expect(
+          mockUserAccountManager.getCachedGoogleAccount,
+        ).toHaveBeenCalled();
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            text: 'Logged in with Google: test@example.com (Plan: Standard Tier)',
+          }),
+        );
+      });
+      await act(async () => {
+        unmount!();
+      });
+    });
+    it('displays correct message for USE_GEMINI auth type', async () => {
+      // Explicitly mock implementation to ensure we control the instance
+      (UserAccountManager as unknown as Mock).mockImplementation(
+        () => mockUserAccountManager,
+      );
+
+      mockUserAccountManager.getCachedGoogleAccount.mockReturnValue(null);
+      const mockAddItem = vi.fn();
+      mockedUseHistory.mockReturnValue({
+        history: [],
+        addItem: mockAddItem,
+        updateItem: vi.fn(),
+        clearItems: vi.fn(),
+        loadHistory: vi.fn(),
+      });
+
+      const authConfig = makeFakeConfig();
+      vi.spyOn(authConfig, 'getTargetDir').mockReturnValue('/test/workspace');
+      vi.spyOn(authConfig, 'initialize').mockResolvedValue(undefined);
+      vi.spyOn(authConfig, 'getExtensionLoader').mockReturnValue(
+        mockExtensionManager,
+      );
+
+      vi.spyOn(authConfig, 'getContentGeneratorConfig').mockReturnValue({
+        authType: AuthType.USE_GEMINI,
+      } as unknown as ContentGeneratorConfig);
+      vi.spyOn(authConfig, 'getUserTierName').mockReturnValue('Standard Tier');
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({ config: authConfig });
+        unmount = result.unmount;
+      });
+
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            text: expect.stringContaining('Authenticated with gemini-api-key'),
+          }),
+        );
+      });
+      await act(async () => {
+        unmount!();
+      });
+    });
+
+    it('does not display authentication message if showUserIdentity is false', async () => {
+      mockUserAccountManager.getCachedGoogleAccount.mockReturnValue(
+        'test@example.com',
+      );
+      const mockAddItem = vi.fn();
+      mockedUseHistory.mockReturnValue({
+        history: [],
+        addItem: mockAddItem,
+        updateItem: vi.fn(),
+        clearItems: vi.fn(),
+        loadHistory: vi.fn(),
+      });
+
+      mockSettings.merged.ui = {
+        ...mockSettings.merged.ui,
+        showUserIdentity: false,
+      };
+
+      const authConfig = makeFakeConfig();
+      vi.spyOn(authConfig, 'getTargetDir').mockReturnValue('/test/workspace');
+      vi.spyOn(authConfig, 'initialize').mockResolvedValue(undefined);
+      vi.spyOn(authConfig, 'getExtensionLoader').mockReturnValue(
+        mockExtensionManager,
+      );
+
+      vi.spyOn(authConfig, 'getContentGeneratorConfig').mockReturnValue({
+        authType: AuthType.LOGIN_WITH_GOOGLE,
+      } as unknown as ContentGeneratorConfig);
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({ config: authConfig });
+        unmount = result.unmount;
+      });
+
+      // Give it some time to potentially call addItem
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(mockAddItem).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+        }),
+      );
+
+      await act(async () => {
+        unmount!();
+      });
     });
   });
 
@@ -1274,8 +1454,12 @@ describe('AppContainer State Management', () => {
           pendingHistoryItems: [],
           thought: { subject: 'Executing shell command' },
           cancelOngoingRequest: vi.fn(),
+          pendingToolCalls: [],
+          handleApprovalModeChange: vi.fn(),
           activePtyId: 'pty-1',
-          lastOutputTime: 0,
+          loopDetectionConfirmationRequest: null,
+          lastOutputTime: startTime + 100, // Trigger aggressive delay
+          retryStatus: null,
         });
 
         vi.spyOn(mockConfig, 'isInteractive').mockReturnValue(true);
@@ -1309,6 +1493,136 @@ describe('AppContainer State Management', () => {
         unmount();
       });
 
+      it('should show Working… in title for redirected commands after 2 mins', async () => {
+        const startTime = 1000000;
+        vi.setSystemTime(startTime);
+
+        // Arrange: Set up mock settings with showStatusInTitle enabled
+        const mockSettingsWithTitleEnabled = {
+          ...mockSettings,
+          merged: {
+            ...mockSettings.merged,
+            ui: {
+              ...mockSettings.merged.ui,
+              showStatusInTitle: true,
+              hideWindowTitle: false,
+            },
+          },
+        } as unknown as LoadedSettings;
+
+        // Mock an active shell pty with redirection active
+        mockedUseGeminiStream.mockReturnValue({
+          streamingState: 'responding',
+          submitQuery: vi.fn(),
+          initError: null,
+          pendingHistoryItems: [],
+          thought: { subject: 'Executing shell command' },
+          cancelOngoingRequest: vi.fn(),
+          pendingToolCalls: [
+            {
+              request: {
+                name: 'run_shell_command',
+                args: { command: 'ls > out' },
+              },
+              status: 'executing',
+            } as unknown as TrackedToolCall,
+          ],
+          handleApprovalModeChange: vi.fn(),
+          activePtyId: 'pty-1',
+          loopDetectionConfirmationRequest: null,
+          lastOutputTime: startTime,
+          retryStatus: null,
+        });
+
+        vi.spyOn(mockConfig, 'isInteractive').mockReturnValue(true);
+        vi.spyOn(mockConfig, 'isInteractiveShellEnabled').mockReturnValue(true);
+
+        const { unmount } = renderAppContainer({
+          settings: mockSettingsWithTitleEnabled,
+        });
+
+        // Fast-forward time by 65 seconds - should still NOT be Action Required
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(65000);
+        });
+
+        const titleWritesMid = mocks.mockStdout.write.mock.calls.filter(
+          (call) => call[0].includes('\x1b]0;'),
+        );
+        expect(titleWritesMid[titleWritesMid.length - 1][0]).not.toContain(
+          '✋  Action Required',
+        );
+
+        // Fast-forward to 2 minutes (120000ms)
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(60000);
+        });
+
+        const titleWritesEnd = mocks.mockStdout.write.mock.calls.filter(
+          (call) => call[0].includes('\x1b]0;'),
+        );
+        expect(titleWritesEnd[titleWritesEnd.length - 1][0]).toContain(
+          '⏲  Working…',
+        );
+
+        unmount();
+      });
+
+      it('should show Working… in title for silent non-redirected commands after 1 min', async () => {
+        const startTime = 1000000;
+        vi.setSystemTime(startTime);
+
+        // Arrange: Set up mock settings with showStatusInTitle enabled
+        const mockSettingsWithTitleEnabled = {
+          ...mockSettings,
+          merged: {
+            ...mockSettings.merged,
+            ui: {
+              ...mockSettings.merged.ui,
+              showStatusInTitle: true,
+              hideWindowTitle: false,
+            },
+          },
+        } as unknown as LoadedSettings;
+
+        // Mock an active shell pty with NO output since operation started (silent)
+        mockedUseGeminiStream.mockReturnValue({
+          streamingState: 'responding',
+          submitQuery: vi.fn(),
+          initError: null,
+          pendingHistoryItems: [],
+          thought: { subject: 'Executing shell command' },
+          cancelOngoingRequest: vi.fn(),
+          pendingToolCalls: [],
+          handleApprovalModeChange: vi.fn(),
+          activePtyId: 'pty-1',
+          loopDetectionConfirmationRequest: null,
+          lastOutputTime: startTime, // lastOutputTime <= operationStartTime
+          retryStatus: null,
+        });
+
+        vi.spyOn(mockConfig, 'isInteractive').mockReturnValue(true);
+        vi.spyOn(mockConfig, 'isInteractiveShellEnabled').mockReturnValue(true);
+
+        const { unmount } = renderAppContainer({
+          settings: mockSettingsWithTitleEnabled,
+        });
+
+        // Fast-forward time by 65 seconds
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(65000);
+        });
+
+        const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
+          call[0].includes('\x1b]0;'),
+        );
+        const lastTitle = titleWrites[titleWrites.length - 1][0];
+        // Should show Working… (⏲) instead of Action Required (✋)
+        expect(lastTitle).toContain('⏲  Working…');
+
+        unmount();
+      });
+
       it('should NOT show Action Required in title if shell is streaming output', async () => {
         const startTime = 1000000;
         vi.setSystemTime(startTime);
@@ -1327,7 +1641,7 @@ describe('AppContainer State Management', () => {
         } as unknown as LoadedSettings;
 
         // Mock an active shell pty but not focused
-        let lastOutputTime = 1000;
+        let lastOutputTime = startTime + 1000;
         mockedUseGeminiStream.mockImplementation(() => ({
           streamingState: 'responding',
           submitQuery: vi.fn(),
@@ -1353,7 +1667,7 @@ describe('AppContainer State Management', () => {
         });
 
         // Update lastOutputTime to simulate new output
-        lastOutputTime = 21000;
+        lastOutputTime = startTime + 21000;
         mockedUseGeminiStream.mockImplementation(() => ({
           streamingState: 'responding',
           submitQuery: vi.fn(),
@@ -1660,9 +1974,10 @@ describe('AppContainer State Management', () => {
         act(() => {
           handleGlobalKeypress({
             name: 'c',
-            ctrl: false,
-            meta: false,
             shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
             ...key,
           } as Key);
         });
@@ -1754,7 +2069,7 @@ describe('AppContainer State Management', () => {
 
         // Advance timer past the reset threshold
         act(() => {
-          vi.advanceTimersByTime(1001);
+          vi.advanceTimersByTime(WARNING_PROMPT_DURATION_MS + 1);
         });
 
         pressKey({ name: 'c', ctrl: true });
@@ -1799,7 +2114,7 @@ describe('AppContainer State Management', () => {
 
         // Advance timer past the reset threshold
         act(() => {
-          vi.advanceTimersByTime(1001);
+          vi.advanceTimersByTime(WARNING_PROMPT_DURATION_MS + 1);
         });
 
         pressKey({ name: 'd', ctrl: true });
@@ -1870,9 +2185,10 @@ describe('AppContainer State Management', () => {
         act(() => {
           handleGlobalKeypress({
             name: 's',
-            ctrl: true,
-            meta: false,
             shift: false,
+            alt: false,
+            ctrl: true,
+            cmd: false,
             insertable: false,
             sequence: '\x13',
           });
@@ -1896,9 +2212,10 @@ describe('AppContainer State Management', () => {
           act(() => {
             handleGlobalKeypress({
               name: 's',
-              ctrl: true,
-              meta: false,
               shift: false,
+              alt: false,
+              ctrl: true,
+              cmd: false,
               insertable: false,
               sequence: '\x13',
             });
@@ -1910,9 +2227,10 @@ describe('AppContainer State Management', () => {
           act(() => {
             handleGlobalKeypress({
               name: 'any', // Any key should exit copy mode
-              ctrl: false,
-              meta: false,
               shift: false,
+              alt: false,
+              ctrl: false,
+              cmd: false,
               insertable: true,
               sequence: 'a',
             });
@@ -1930,9 +2248,10 @@ describe('AppContainer State Management', () => {
           act(() => {
             handleGlobalKeypress({
               name: 's',
-              ctrl: true,
-              meta: false,
               shift: false,
+              alt: false,
+              ctrl: true,
+              cmd: false,
               insertable: false,
               sequence: '\x13',
             });
@@ -1945,9 +2264,10 @@ describe('AppContainer State Management', () => {
           act(() => {
             handleGlobalKeypress({
               name: 'a',
-              ctrl: false,
-              meta: false,
               shift: false,
+              alt: false,
+              ctrl: false,
+              cmd: false,
               insertable: true,
               sequence: 'a',
             });
@@ -2002,6 +2322,77 @@ describe('AppContainer State Management', () => {
         capturedUIActions.closeModelDialog();
       });
       expect(mockCloseModelDialog).toHaveBeenCalled();
+      unmount!();
+    });
+  });
+
+  describe('Agent Configuration Dialog Integration', () => {
+    it('should initialize with dialog closed and no agent selected', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      expect(capturedUIState.isAgentConfigDialogOpen).toBe(false);
+      expect(capturedUIState.selectedAgentName).toBeUndefined();
+      expect(capturedUIState.selectedAgentDisplayName).toBeUndefined();
+      expect(capturedUIState.selectedAgentDefinition).toBeUndefined();
+      unmount!();
+    });
+
+    it('should update state when openAgentConfigDialog is called', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      const agentDefinition = { name: 'test-agent' };
+      act(() => {
+        capturedUIActions.openAgentConfigDialog(
+          'test-agent',
+          'Test Agent',
+          agentDefinition as unknown as AgentDefinition,
+        );
+      });
+
+      expect(capturedUIState.isAgentConfigDialogOpen).toBe(true);
+      expect(capturedUIState.selectedAgentName).toBe('test-agent');
+      expect(capturedUIState.selectedAgentDisplayName).toBe('Test Agent');
+      expect(capturedUIState.selectedAgentDefinition).toEqual(agentDefinition);
+      unmount!();
+    });
+
+    it('should clear state when closeAgentConfigDialog is called', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      const agentDefinition = { name: 'test-agent' };
+      act(() => {
+        capturedUIActions.openAgentConfigDialog(
+          'test-agent',
+          'Test Agent',
+          agentDefinition as unknown as AgentDefinition,
+        );
+      });
+
+      expect(capturedUIState.isAgentConfigDialogOpen).toBe(true);
+
+      act(() => {
+        capturedUIActions.closeAgentConfigDialog();
+      });
+
+      expect(capturedUIState.isAgentConfigDialogOpen).toBe(false);
+      expect(capturedUIState.selectedAgentName).toBeUndefined();
+      expect(capturedUIState.selectedAgentDisplayName).toBeUndefined();
+      expect(capturedUIState.selectedAgentDefinition).toBeUndefined();
       unmount!();
     });
   });
@@ -2282,6 +2673,41 @@ describe('AppContainer State Management', () => {
       // (it should not be affected by clearing conversation history)
       expect(capturedUIState.userMessages).toContain('first prompt');
       expect(capturedUIState.userMessages).toContain('second prompt');
+
+      unmount!();
+    });
+
+    it('should show ask user dialog when request is received', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+
+      const questions = [
+        {
+          question: 'What is your favorite color?',
+          header: 'Color Preference',
+          type: QuestionType.TEXT,
+        },
+      ];
+
+      await act(async () => {
+        await mockConfig.getMessageBus().publish({
+          type: MessageBusType.ASK_USER_REQUEST,
+          questions,
+          correlationId: 'test-id',
+        });
+      });
+
+      await waitFor(
+        () => {
+          expect(capturedAskUserRequest).not.toBeNull();
+          expect(capturedAskUserRequest?.questions).toEqual(questions);
+          expect(capturedAskUserRequest?.correlationId).toBe('test-id');
+        },
+        { timeout: 2000 },
+      );
 
       unmount!();
     });

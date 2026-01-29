@@ -5,10 +5,8 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { SHELL_FOCUS_HINT_DELAY_MS } from '../constants.js';
 import { INFORMATIVE_TIPS } from '../constants/tips.js';
 import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
-import { useInactivityTimer } from './useInactivityTimer.js';
 
 export const PHRASE_CHANGE_INTERVAL_MS = 15000;
 export const INTERACTIVE_SHELL_WAITING_PHRASE =
@@ -18,15 +16,14 @@ export const INTERACTIVE_SHELL_WAITING_PHRASE =
  * Custom hook to manage cycling through loading phrases.
  * @param isActive Whether the phrase cycling should be active.
  * @param isWaiting Whether to show a specific waiting phrase.
- * @param isInteractiveShellWaiting Whether an interactive shell is waiting for input but not focused.
+ * @param shouldShowFocusHint Whether to show the shell focus hint.
  * @param customPhrases Optional list of custom phrases to use.
  * @returns The current loading phrase.
  */
 export const usePhraseCycler = (
   isActive: boolean,
   isWaiting: boolean,
-  isInteractiveShellWaiting: boolean,
-  lastOutputTime: number = 0,
+  shouldShowFocusHint: boolean,
   customPhrases?: string[],
 ) => {
   const loadingPhrases =
@@ -37,11 +34,7 @@ export const usePhraseCycler = (
   const [currentLoadingPhrase, setCurrentLoadingPhrase] = useState(
     loadingPhrases[0],
   );
-  const showShellFocusHint = useInactivityTimer(
-    isInteractiveShellWaiting,
-    lastOutputTime,
-    SHELL_FOCUS_HINT_DELAY_MS,
-  );
+
   const phraseIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const hasShownFirstRequestTipRef = useRef(false);
 
@@ -52,7 +45,7 @@ export const usePhraseCycler = (
       phraseIntervalRef.current = null;
     }
 
-    if (isInteractiveShellWaiting && showShellFocusHint) {
+    if (shouldShowFocusHint) {
       setCurrentLoadingPhrase(INTERACTIVE_SHELL_WAITING_PHRASE);
       return;
     }
@@ -102,14 +95,7 @@ export const usePhraseCycler = (
         phraseIntervalRef.current = null;
       }
     };
-  }, [
-    isActive,
-    isWaiting,
-    isInteractiveShellWaiting,
-    customPhrases,
-    loadingPhrases,
-    showShellFocusHint,
-  ]);
+  }, [isActive, isWaiting, shouldShowFocusHint, customPhrases, loadingPhrases]);
 
   return currentLoadingPhrase;
 };
