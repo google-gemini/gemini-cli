@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.27.0-preview.1",
+  "version": "0.27.0-preview.2",
   "description": "Gemini CLI",
   "license": "Apache-2.0",
   "repository": {
@@ -26,7 +26,7 @@
     "dist"
   ],
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.27.0-preview.1"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.27.0-preview.2"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.12.0",
