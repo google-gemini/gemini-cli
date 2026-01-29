@@ -302,6 +302,13 @@
           "default": false,
           "type": "boolean"
         },
+        "showUserIdentity": {
+          "title": "Show User Identity",
+          "description": "Show the logged-in user's identity (e.g. email) in the UI.",
+          "markdownDescription": "Show the logged-in user's identity (e.g. email) in the UI.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "useAlternateBuffer": {
           "title": "Use Alternate Screen Buffer",
           "description": "Use an alternate screen buffer for the UI, preserving shell history.",
@@ -1537,7 +1544,7 @@
         "enabled": {
           "title": "Enable Hooks",
           "description": "Canonical toggle for the hooks system. When disabled, no hooks will be executed.",
-          "markdownDescription": "Canonical toggle for the hooks system. When disabled, no hooks will be executed.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `true`",
+          "markdownDescription": "Canonical toggle for the hooks system. When disabled, no hooks will be executed.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },

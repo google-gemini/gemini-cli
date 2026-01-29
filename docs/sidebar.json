@@ -119,7 +119,14 @@
     "items": [
       { "label": "FAQ", "slug": "docs/faq" },
       { "label": "Quota and pricing", "slug": "docs/quota-and-pricing" },
-      { "label": "Release notes", "slug": "docs/changelogs/" },
+      {
+        "label": "Releases",
+        "items": [
+          { "label": "Release notes", "slug": "docs/changelogs/" },
+          { "label": "Stable release", "slug": "docs/changelogs/latest" },
+          { "label": "Preview release", "slug": "docs/changelogs/preview" }
+        ]
+      },
       { "label": "Terms and privacy", "slug": "docs/tos-privacy" },
       { "label": "Troubleshooting", "slug": "docs/troubleshooting" },
       { "label": "Uninstall", "slug": "docs/cli/uninstall" }

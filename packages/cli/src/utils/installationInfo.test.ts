@@ -233,7 +233,7 @@ describe('getInstallationInfo', () => {
   });
 
   it('should detect global bun installation', () => {
-    const bunPath = `/Users/test/.bun/bin/gemini`;
+    const bunPath = `/Users/test/.bun/install/global/node_modules/@google/gemini-cli/dist/index.js`;
     process.argv[1] = bunPath;
     mockedRealPathSync.mockReturnValue(bunPath);
     mockedExecSync.mockImplementation(() => {

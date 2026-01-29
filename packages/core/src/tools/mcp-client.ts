@@ -33,7 +33,11 @@ import {
   type Tool as McpTool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { parse } from 'shell-quote';
-import type { Config, MCPServerConfig } from '../config/config.js';
+import type {
+  Config,
+  GeminiCLIExtension,
+  MCPServerConfig,
+} from '../config/config.js';
 import { AuthProviderType } from '../config/config.js';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { ServiceAccountImpersonationProvider } from '../mcp/sa-impersonation-provider.js';
@@ -1870,10 +1874,23 @@ export async function createTransport(
     const transport = new StdioClientTransport({
       command: mcpServerConfig.command,
       args: mcpServerConfig.args || [],
-      env: {
-        ...sanitizeEnvironment(process.env, sanitizationConfig),
-        ...(mcpServerConfig.env || {}),
-      } as Record<string, string>,
+      env: sanitizeEnvironment(
+        {
+          ...process.env,
+          ...getExtensionEnvironment(mcpServerConfig.extension),
+          ...(mcpServerConfig.env || {}),
+        },
+        {
+          ...sanitizationConfig,
+          allowedEnvironmentVariables: [
+            ...(sanitizationConfig.allowedEnvironmentVariables ?? []),
+            ...(mcpServerConfig.extension?.resolvedSettings?.map(
+              (s) => s.envVar,
+            ) ?? []),
+          ],
+          enableEnvironmentVariableRedaction: true,
+        },
+      ) as Record<string, string>,
       cwd: mcpServerConfig.cwd,
       stderr: 'pipe',
     });
@@ -1923,4 +1940,16 @@ export function isEnabled(
       (tool) => tool === funcDecl.name || tool.startsWith(`${funcDecl.name}(`),
     )
   );
+}
+
+function getExtensionEnvironment(
+  extension?: GeminiCLIExtension,
+): Record<string, string> {
+  const env: Record<string, string> = {};
+  if (extension?.resolvedSettings) {
+    for (const setting of extension.resolvedSettings) {
+      env[setting.envVar] = setting.value;
+    }
+  }
+  return env;
 }
