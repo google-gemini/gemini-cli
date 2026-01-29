@@ -89,6 +89,45 @@ describe('<AnsiOutputText />', () => {
     expect(output).toContain('Line 4');
   });
 
+  it('respects the maxLines prop and slices the lines correctly', () => {
+    const data: AnsiOutput = [
+      [createAnsiToken({ text: 'Line 1' })],
+      [createAnsiToken({ text: 'Line 2' })],
+      [createAnsiToken({ text: 'Line 3' })],
+      [createAnsiToken({ text: 'Line 4' })],
+    ];
+    const { lastFrame } = render(
+      <AnsiOutputText data={data} maxLines={2} width={80} />,
+    );
+    const output = lastFrame();
+    expect(output).not.toContain('Line 1');
+    expect(output).not.toContain('Line 2');
+    expect(output).toContain('Line 3');
+    expect(output).toContain('Line 4');
+  });
+
+  it('prioritizes maxLines over availableTerminalHeight if maxLines is smaller', () => {
+    const data: AnsiOutput = [
+      [createAnsiToken({ text: 'Line 1' })],
+      [createAnsiToken({ text: 'Line 2' })],
+      [createAnsiToken({ text: 'Line 3' })],
+      [createAnsiToken({ text: 'Line 4' })],
+    ];
+    // availableTerminalHeight=3, maxLines=2 => show 2 lines
+    const { lastFrame } = render(
+      <AnsiOutputText
+        data={data}
+        availableTerminalHeight={3}
+        maxLines={2}
+        width={80}
+      />,
+    );
+    const output = lastFrame();
+    expect(output).not.toContain('Line 2');
+    expect(output).toContain('Line 3');
+    expect(output).toContain('Line 4');
+  });
+
   it('renders a large AnsiOutput object without crashing', () => {
     const largeData: AnsiOutput = [];
     for (let i = 0; i < 1000; i++) {

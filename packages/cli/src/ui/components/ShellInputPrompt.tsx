@@ -9,15 +9,18 @@ import type React from 'react';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { ShellExecutionService } from '@google/gemini-cli-core';
 import { keyToAnsi, type Key } from '../hooks/keyToAnsi.js';
+import { ACTIVE_SHELL_MAX_LINES } from '../constants.js';
 
 export interface ShellInputPromptProps {
   activeShellPtyId: number | null;
   focus?: boolean;
+  scrollPageSize?: number;
 }
 
 export const ShellInputPrompt: React.FC<ShellInputPromptProps> = ({
   activeShellPtyId,
   focus = true,
+  scrollPageSize = ACTIVE_SHELL_MAX_LINES,
 }) => {
   const handleShellInputSubmit = useCallback(
     (input: string) => {
@@ -33,14 +36,23 @@ export const ShellInputPrompt: React.FC<ShellInputPromptProps> = ({
       if (!focus || !activeShellPtyId) {
         return;
       }
-      if (key.ctrl && key.shift && key.name === 'up') {
-        ShellExecutionService.scrollPty(activeShellPtyId, -1);
-        return;
-      }
-
-      if (key.ctrl && key.shift && key.name === 'down') {
-        ShellExecutionService.scrollPty(activeShellPtyId, 1);
-        return;
+      if (key.ctrl && key.shift) {
+        if (key.name === 'up') {
+          ShellExecutionService.scrollPty(activeShellPtyId, -1);
+          return;
+        }
+        if (key.name === 'down') {
+          ShellExecutionService.scrollPty(activeShellPtyId, 1);
+          return;
+        }
+        if (key.name === 'pageup') {
+          ShellExecutionService.scrollPty(activeShellPtyId, -scrollPageSize);
+          return;
+        }
+        if (key.name === 'pagedown') {
+          ShellExecutionService.scrollPty(activeShellPtyId, scrollPageSize);
+          return;
+        }
       }
 
       const ansiSequence = keyToAnsi(key);
@@ -48,7 +60,7 @@ export const ShellInputPrompt: React.FC<ShellInputPromptProps> = ({
         handleShellInputSubmit(ansiSequence);
       }
     },
-    [focus, handleShellInputSubmit, activeShellPtyId],
+    [focus, handleShellInputSubmit, activeShellPtyId, scrollPageSize],
   );
 
   useKeypress(handleInput, { isActive: focus });
