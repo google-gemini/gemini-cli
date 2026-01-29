@@ -8,10 +8,11 @@ import { createContext, useContext } from 'react';
 import { type Key } from '../hooks/useKeypress.js';
 import { type IdeIntegrationNudgeResult } from '../IdeIntegrationNudge.js';
 import { type FolderTrustChoice } from '../components/FolderTrustDialog.js';
-import {
-  type AuthType,
-  type EditorType,
-  type AgentDefinition,
+import type {
+  ApprovalMode,
+  AuthType,
+  EditorType,
+  AgentDefinition,
 } from '@google/gemini-cli-core';
 import { type LoadableSettingScope } from '../../config/settings.js';
 import type { AuthState } from '../types.js';
@@ -71,6 +72,9 @@ export interface UIActions {
   setAuthContext: (context: { requiresRestart?: boolean }) => void;
   handleRestart: () => void;
   handleNewAgentsSelect: (choice: NewAgentsChoice) => Promise<void>;
+  handlePlanApprove: (mode: ApprovalMode) => Promise<void>;
+  handlePlanFeedback: (feedback: string) => Promise<void>;
+  handlePlanCancel: () => Promise<void>;
 }
 
 export const UIActionsContext = createContext<UIActions | null>(null);

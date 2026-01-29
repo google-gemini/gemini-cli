@@ -1,0 +1,57 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`PlanApprovalDialog > calls onFeedback when feedback is typed and submitted 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Overview                                                                                                             │
+│                                                                                                                      │
+│ Add user authentication to the CLI application.                                                                      │
+│                                                                                                                      │
+│ Implementation Steps                                                                                                 │
+│                                                                                                                      │
+│  1. Create src/auth/AuthService.ts with login/logout methods                                                         │
+│  2. Add session storage in src/storage/SessionStore.ts                                                               │
+│  3. Update src/commands/index.ts to check auth status                                                                │
+│  4. Add tests in src/auth/__tests__/                                                                                 │
+│                                                                                                                      │
+│ Files to Modify                                                                                                      │
+│                                                                                                                      │
+│  - src/index.ts - Add auth middleware                                                                                │
+│  - src/config.ts - Add auth configuration options                                                                    │
+│                                                                                                                      │
+│ Ready to start implementation?                                                                                       │
+│                                                                                                                      │
+│   1.  Yes, automatically accept edits                                                                                │
+│   2.  Yes, manually accept edits                                                                                     │
+│ ● 3.  Add tests  ✓                                                                                                   │
+│                                                                                                                      │
+│ Enter to submit · Esc to cancel                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`PlanApprovalDialog > renders correctly with plan content 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Overview                                                                                                             │
+│                                                                                                                      │
+│ Add user authentication to the CLI application.                                                                      │
+│                                                                                                                      │
+│ Implementation Steps                                                                                                 │
+│                                                                                                                      │
+│  1. Create src/auth/AuthService.ts with login/logout methods                                                         │
+│  2. Add session storage in src/storage/SessionStore.ts                                                               │
+│  3. Update src/commands/index.ts to check auth status                                                                │
+│  4. Add tests in src/auth/__tests__/                                                                                 │
+│                                                                                                                      │
+│ Files to Modify                                                                                                      │
+│                                                                                                                      │
+│  - src/index.ts - Add auth middleware                                                                                │
+│  - src/config.ts - Add auth configuration options                                                                    │
+│                                                                                                                      │
+│ Ready to start implementation?                                                                                       │
+│                                                                                                                      │
+│ ● 1.  Yes, automatically accept edits                                                                                │
+│   2.  Yes, manually accept edits                                                                                     │
+│   3.  Provide feedback...                                                                                            │
+│                                                                                                                      │
+│ Enter to select · ↑/↓ to navigate · Esc to cancel                                                                    │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;

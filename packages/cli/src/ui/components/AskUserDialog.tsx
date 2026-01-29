@@ -16,6 +16,7 @@ import {
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import type { Question } from '@google/gemini-cli-core';
+import { MarkdownDisplay } from '../utils/MarkdownDisplay.js';
 import { BaseSelectionList } from './shared/BaseSelectionList.js';
 import type { SelectionListItem } from '../hooks/useSelectionList.js';
 import { TabHeader, type Tab } from './shared/TabHeader.js';
@@ -28,6 +29,18 @@ import { UIStateContext } from '../contexts/UIStateContext.js';
 import { getCachedStringWidth } from '../utils/textUtils.js';
 import { useTabbedNavigation } from '../hooks/useTabbedNavigation.js';
 import { DialogFooter } from './shared/DialogFooter.js';
+import { MaxSizedBox } from './shared/MaxSizedBox.js';
+
+// Width reduction for content inside the dialog border/padding
+const CONTENT_WIDTH_REDUCTION = 4;
+
+// Height consumed by dialog chrome surrounding the content area:
+// - Border top/bottom: 2
+// - Question text + marginBottom: 2
+// - Footer (keyboard hints): 2
+// - Options/input minimum: 4
+// - Buffer for tab header when present: 2
+const DIALOG_CHROME_HEIGHT = 12;
 
 interface AskUserDialogState {
   answers: { [key: string]: string };
@@ -214,6 +227,7 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
   progressHeader,
   keyboardHints,
 }) => {
+  const uiState = useContext(UIStateContext);
   const prefix = '> ';
   const horizontalPadding = 4 + 1; // Padding from Box (2) and border (2) + 1 for cursor
   const bufferWidth =
@@ -278,6 +292,22 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
       borderColor={theme.border.default}
     >
       {progressHeader}
+      {question.content && (
+        <Box marginBottom={1} flexDirection="column">
+          <MaxSizedBox
+            maxHeight={
+              uiState?.availableTerminalHeight &&
+              uiState.availableTerminalHeight - DIALOG_CHROME_HEIGHT
+            }
+          >
+            <MarkdownDisplay
+              text={question.content}
+              isPending={false}
+              terminalWidth={availableWidth - CONTENT_WIDTH_REDUCTION}
+            />
+          </MaxSizedBox>
+        </Box>
+      )}
       <Box marginBottom={1}>
         <Text bold color={theme.text.primary}>
           {question.question}
@@ -706,6 +736,22 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       borderColor={theme.border.default}
     >
       {progressHeader}
+      {question.content && (
+        <Box marginBottom={1} flexDirection="column">
+          <MaxSizedBox
+            maxHeight={
+              uiState?.availableTerminalHeight &&
+              uiState.availableTerminalHeight - DIALOG_CHROME_HEIGHT
+            }
+          >
+            <MarkdownDisplay
+              text={question.content}
+              isPending={false}
+              terminalWidth={availableWidth - CONTENT_WIDTH_REDUCTION}
+            />
+          </MaxSizedBox>
+        </Box>
+      )}
       <Box marginBottom={1}>
         <Text bold color={theme.text.primary}>
           {question.question}
@@ -734,7 +780,8 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
 
           // Render inline text input for custom option
           if (optionItem.type === 'other') {
-            const placeholder = 'Enter a custom value';
+            const placeholder =
+              question.customOptionPlaceholder || 'Enter a custom value';
             return (
               <Box flexDirection="row">
                 {showCheck && (
