@@ -56,7 +56,7 @@ interface MockConfigInstanceShape {
   getGeminiMdFileCount: Mock<() => number>;
   getToolRegistry: Mock<() => { discoverTools: Mock<() => void> }>;
   getRemoteAdminSettings: Mock<
-    () => { secureModeEnabled?: boolean } | undefined
+    () => { strictModeDisabled?: boolean } | undefined
   >;
 }
 
@@ -116,7 +116,7 @@ describe('useApprovalModeIndicator', () => {
           () => { discoverTools: Mock<() => void> }
         >,
         getRemoteAdminSettings: vi.fn().mockReturnValue(undefined) as Mock<
-          () => { secureModeEnabled?: boolean } | undefined
+          () => { strictModeDisabled?: boolean } | undefined
         >,
       };
       instanceSetApprovalModeMock.mockImplementation((value: ApprovalMode) => {
@@ -526,6 +526,9 @@ describe('useApprovalModeIndicator', () => {
 
     it('should not enable YOLO mode when Ctrl+Y is pressed and add an info message', () => {
       mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
+      mockConfigInstance.getRemoteAdminSettings.mockReturnValue({
+        strictModeDisabled: true,
+      });
       const mockAddItem = vi.fn();
       const { result } = renderHook(() =>
         useApprovalModeIndicator({
@@ -556,9 +559,7 @@ describe('useApprovalModeIndicator', () => {
 
     it('should show admin error message when YOLO mode is disabled by admin', () => {
       mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
-      mockConfigInstance.getRemoteAdminSettings.mockReturnValue({
-        secureModeEnabled: true,
-      });
+      mockConfigInstance.getRemoteAdminSettings.mockReturnValue({});
 
       const mockAddItem = vi.fn();
       renderHook(() =>
