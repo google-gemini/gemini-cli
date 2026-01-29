@@ -15,11 +15,23 @@ import {
 } from 'vitest';
 import yargs, { type Argv } from 'yargs';
 import { SettingScope, type LoadedSettings } from '../../config/settings.js';
+import * as trustedFolders from '../../config/trustedFolders.js';
 import { removeCommand } from './remove.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { GEMINI_DIR, debugLogger } from '@google/gemini-cli-core';
+
+vi.mock('fs', async (importOriginal) => {
+  const actualFs = await importOriginal<typeof fs>();
+  return {
+    ...actualFs,
+    existsSync: vi.fn(actualFs.existsSync),
+    readFileSync: vi.fn(actualFs.readFileSync),
+    writeFileSync: vi.fn(actualFs.writeFileSync),
+    mkdirSync: vi.fn(actualFs.mkdirSync),
+  };
+});
 
 vi.mock('fs/promises', () => ({
   readFile: vi.fn(),
@@ -38,6 +50,11 @@ describe('mcp remove command', () => {
 
     beforeEach(async () => {
       vi.resetAllMocks();
+      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
+        isTrusted: true,
+        source: undefined,
+      });
+      vi.spyOn(trustedFolders, 'isFolderTrustEnabled').mockReturnValue(false);
 
       mockSetValue = vi.fn();
       mockSettings = {
@@ -96,6 +113,12 @@ describe('mcp remove command', () => {
     beforeEach(() => {
       vi.resetAllMocks();
       vi.restoreAllMocks();
+
+      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
+        isTrusted: true,
+        source: undefined,
+      });
+      vi.spyOn(trustedFolders, 'isFolderTrustEnabled').mockReturnValue(false);
 
       tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-remove-test-'));
       settingsDir = path.join(tempDir, GEMINI_DIR);
