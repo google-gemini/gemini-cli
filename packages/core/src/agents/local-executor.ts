@@ -788,7 +788,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     // Map to keep track of tool name by callId for activity emission
     const toolNameMap = new Map<string, string>();
     // Synchronous results (like complete_task or unauthorized calls)
-    const syncResults = new Map<string, Part>();
+    const syncResults = new Map<string, Part[]>();
 
     for (const [index, functionCall] of functionCalls.entries()) {
       const callId = functionCall.id ?? `${promptId}-${index}`;
@@ -804,13 +804,15 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         if (taskCompleted) {
           const error =
             'Task already marked complete in this turn. Ignoring duplicate call.';
-          syncResults.set(callId, {
-            functionResponse: {
-              name: TASK_COMPLETE_TOOL_NAME,
-              response: { error },
-              id: callId,
+          syncResults.set(callId, [
+            {
+              functionResponse: {
+                name: TASK_COMPLETE_TOOL_NAME,
+                response: { error },
+                id: callId,
+              },
             },
-          });
+          ]);
           this.emitActivity('ERROR', {
             context: 'tool_call',
             name: toolName,
@@ -831,13 +833,15 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             if (!validationResult.success) {
               taskCompleted = false; // Validation failed, revoke completion
               const error = `Output validation failed: ${JSON.stringify(validationResult.error.flatten())}`;
-              syncResults.set(callId, {
-                functionResponse: {
-                  name: TASK_COMPLETE_TOOL_NAME,
-                  response: { error },
-                  id: callId,
+              syncResults.set(callId, [
+                {
+                  functionResponse: {
+                    name: TASK_COMPLETE_TOOL_NAME,
+                    response: { error },
+                    id: callId,
+                  },
                 },
-              });
+              ]);
               this.emitActivity('ERROR', {
                 context: 'tool_call',
                 name: toolName,
@@ -855,13 +859,15 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
                   ? outputValue
                   : JSON.stringify(outputValue, null, 2);
             }
-            syncResults.set(callId, {
-              functionResponse: {
-                name: TASK_COMPLETE_TOOL_NAME,
-                response: { result: 'Output submitted and task completed.' },
-                id: callId,
+            syncResults.set(callId, [
+              {
+                functionResponse: {
+                  name: TASK_COMPLETE_TOOL_NAME,
+                  response: { result: 'Output submitted and task completed.' },
+                  id: callId,
+                },
               },
-            });
+            ]);
             this.emitActivity('TOOL_CALL_END', {
               name: toolName,
               output: 'Output submitted and task completed.',
@@ -870,13 +876,15 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             // Failed to provide required output.
             taskCompleted = false; // Revoke completion status
             const error = `Missing required argument '${outputName}' for completion.`;
-            syncResults.set(callId, {
-              functionResponse: {
-                name: TASK_COMPLETE_TOOL_NAME,
-                response: { error },
-                id: callId,
+            syncResults.set(callId, [
+              {
+                functionResponse: {
+                  name: TASK_COMPLETE_TOOL_NAME,
+                  response: { error },
+                  id: callId,
+                },
               },
-            });
+            ]);
             this.emitActivity('ERROR', {
               context: 'tool_call',
               name: toolName,
@@ -895,13 +903,15 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
               typeof resultArg === 'string'
                 ? resultArg
                 : JSON.stringify(resultArg, null, 2);
-            syncResults.set(callId, {
-              functionResponse: {
-                name: TASK_COMPLETE_TOOL_NAME,
-                response: { status: 'Result submitted and task completed.' },
-                id: callId,
+            syncResults.set(callId, [
+              {
+                functionResponse: {
+                  name: TASK_COMPLETE_TOOL_NAME,
+                  response: { status: 'Result submitted and task completed.' },
+                  id: callId,
+                },
               },
-            });
+            ]);
             this.emitActivity('TOOL_CALL_END', {
               name: toolName,
               output: 'Result submitted and task completed.',
@@ -911,13 +921,15 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             taskCompleted = false; // Revoke completion
             const error =
               'Missing required "result" argument. You must provide your findings when calling complete_task.';
-            syncResults.set(callId, {
-              functionResponse: {
-                name: TASK_COMPLETE_TOOL_NAME,
-                response: { error },
-                id: callId,
+            syncResults.set(callId, [
+              {
+                functionResponse: {
+                  name: TASK_COMPLETE_TOOL_NAME,
+                  response: { error },
+                  id: callId,
+                },
               },
-            });
+            ]);
             this.emitActivity('ERROR', {
               context: 'tool_call',
               name: toolName,
@@ -933,13 +945,15 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         const error = createUnauthorizedToolError(toolName);
         debugLogger.warn(`[LocalAgentExecutor] Blocked call: ${error}`);
 
-        syncResults.set(callId, {
-          functionResponse: {
-            name: toolName,
-            id: callId,
-            response: { error },
+        syncResults.set(callId, [
+          {
+            functionResponse: {
+              name: toolName,
+              id: callId,
+              response: { error },
+            },
           },
-        });
+        ]);
 
         this.emitActivity('ERROR', {
           context: 'tool_call_unauthorized',
@@ -997,7 +1011,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         }
 
         // Add result to syncResults to preserve order later
-        syncResults.set(call.request.callId, call.response.responseParts[0]);
+        syncResults.set(call.request.callId, call.response.responseParts);
       }
     }
 
