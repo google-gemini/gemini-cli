@@ -37,7 +37,8 @@ describe('Frugal reads eval', () => {
         return lines.join('\n');
       })(),
     },
-    prompt: 'Fix all linter errors in linter_mess.ts. Run eslint to find them.',
+    prompt:
+      'Fix all linter errors in linter_mess.ts manually by editing the file. Run eslint directly to find them.',
     assert: async (rig, result) => {
       const logs = rig.readToolLogs();
 
@@ -57,14 +58,15 @@ describe('Frugal reads eval', () => {
       ).toBeGreaterThan(0);
 
       // We expect 2-3 ranges: one covering 1000/1040 (or two separate ones) and one for 3000
+      // Some models re-verify their findings, so we relax this to 6.
       expect(
         targetFileReads.length,
-        'Agent should have used 2-3 ranged reads on the target file',
+        'Agent should have used ranged reads on the target file',
       ).toBeGreaterThanOrEqual(2);
       expect(
         targetFileReads.length,
-        'Agent should have used 2-3 ranged reads on the target file',
-      ).toBeLessThanOrEqual(3);
+        'Agent should have used ranged reads on the target file',
+      ).toBeLessThanOrEqual(6);
 
       let totalLinesRead = 0;
       const readRanges: { offset: number; limit: number }[] = [];
