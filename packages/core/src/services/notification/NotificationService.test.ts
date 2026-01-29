@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import notifier from 'node-notifier';
 import process from 'node:process';
+import { execSync } from 'node:child_process';
 import { NotificationService } from './NotificationService.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import {
@@ -15,6 +16,15 @@ import {
   type ToolConfirmationRequest,
 } from '../../confirmation-bus/types.js';
 import { CoreEventEmitter } from '../../utils/events.js';
+import { isTerminalAppFocused } from './focusUtils.js';
+
+vi.mock('node:child_process', () => ({
+  execSync: vi.fn(),
+}));
+
+vi.mock('./focusUtils.js', () => ({
+  isTerminalAppFocused: vi.fn(),
+}));
 
 vi.mock('node-notifier', () => {
   const mockNotifyFn = vi.fn();
@@ -33,6 +43,9 @@ vi.mock('node-notifier', () => {
 
 describe('NotificationService', () => {
   const mockNotify = notifier.notify as unknown as ReturnType<typeof vi.fn>;
+  const mockExecSync = execSync as unknown as ReturnType<typeof vi.fn>;
+  const mockIsTerminalAppFocused =
+    isTerminalAppFocused as unknown as ReturnType<typeof vi.fn>;
   const originalPlatform = process.platform;
   const originalEnvBundleId = process.env['__CFBundleIdentifier'];
   const originalEnvTermProgram = process.env['TERM_PROGRAM'];
@@ -46,6 +59,8 @@ describe('NotificationService', () => {
     delete process.env['__CFBundleIdentifier'];
     delete process.env['TERM_PROGRAM'];
     mockEvents = new CoreEventEmitter();
+    mockExecSync.mockReturnValue(''); // Default to empty string (no match)
+    mockIsTerminalAppFocused.mockReturnValue(null);
   });
 
   afterEach(() => {
@@ -188,13 +203,51 @@ describe('NotificationService', () => {
     expect(mockNotify).toHaveBeenCalled();
   });
 
-  it('should NOT notify in WarpTerminal if focused (now that it is removed from unsupported list)', () => {
+  it('should NOT notify in WarpTerminal if OS check confirms focus', () => {
     process.env['TERM_PROGRAM'] = 'WarpTerminal';
+    mockIsTerminalAppFocused.mockReturnValue(true);
+
     const service = new NotificationService({ enabled: true }, mockEvents);
     mockEvents.emitWindowFocusChanged(true);
 
     service.notify({ message: 'Test' });
     expect(mockNotify).not.toHaveBeenCalled();
+    expect(mockIsTerminalAppFocused).toHaveBeenCalled();
+  });
+
+  it('should notify in WarpTerminal if OS check confirms NOT focused', () => {
+    process.env['TERM_PROGRAM'] = 'WarpTerminal';
+    mockIsTerminalAppFocused.mockReturnValue(false);
+
+    const service = new NotificationService({ enabled: true }, mockEvents);
+    mockEvents.emitWindowFocusChanged(true);
+
+    service.notify({ message: 'Test' });
+    expect(mockNotify).toHaveBeenCalled();
+  });
+
+  it('should NOT notify on Windows if OS check confirms focus', () => {
+    process.env['TERM_PROGRAM'] = 'Apple_Terminal';
+    mockIsTerminalAppFocused.mockReturnValue(true);
+
+    const service = new NotificationService({ enabled: true }, mockEvents);
+    mockEvents.emitWindowFocusChanged(true);
+
+    service.notify({ message: 'Test' });
+    expect(mockNotify).not.toHaveBeenCalled();
+    expect(mockIsTerminalAppFocused).toHaveBeenCalled();
+  });
+
+  it('should NOT notify on Linux if OS check confirms focus', () => {
+    process.env['TERM_PROGRAM'] = 'Apple_Terminal';
+    mockIsTerminalAppFocused.mockReturnValue(true);
+
+    const service = new NotificationService({ enabled: true }, mockEvents);
+    mockEvents.emitWindowFocusChanged(true);
+
+    service.notify({ message: 'Test' });
+    expect(mockNotify).not.toHaveBeenCalled();
+    expect(mockIsTerminalAppFocused).toHaveBeenCalled();
   });
 
   it('should notify even if disabled when force is true', () => {
@@ -205,9 +258,35 @@ describe('NotificationService', () => {
     expect(mockNotify).toHaveBeenCalled();
   });
 
-  it('should notify in unsupported terminal (Apple_Terminal) even if focused', () => {
+  it('should notify in unsupported terminal (Apple_Terminal) even if focused, when OS check fails', () => {
     process.env['TERM_PROGRAM'] = 'Apple_Terminal';
+    // Ensure OS check fails (returns null)
+    mockIsTerminalAppFocused.mockReturnValue(null);
+
     const service = new NotificationService({ enabled: true }, mockEvents);
+    mockEvents.emitWindowFocusChanged(true);
+
+    service.notify({ message: 'Test' });
+    expect(mockNotify).toHaveBeenCalled();
+  });
+
+  it('should NOT notify in unsupported terminal (Apple_Terminal) if OS check confirms focus', () => {
+    process.env['TERM_PROGRAM'] = 'Apple_Terminal';
+    mockIsTerminalAppFocused.mockReturnValue(true);
+
+    const service = new NotificationService({ enabled: true }, mockEvents);
+    mockEvents.emitWindowFocusChanged(true);
+
+    service.notify({ message: 'Test' });
+    expect(mockNotify).not.toHaveBeenCalled();
+  });
+
+  it('should notify if OS check confirms NOT focused', () => {
+    process.env['TERM_PROGRAM'] = 'Apple_Terminal';
+    mockIsTerminalAppFocused.mockReturnValue(false);
+
+    const service = new NotificationService({ enabled: true }, mockEvents);
+    // Even if internal focus thinks it's true (default), the OS check says no.
     mockEvents.emitWindowFocusChanged(true);
 
     service.notify({ message: 'Test' });

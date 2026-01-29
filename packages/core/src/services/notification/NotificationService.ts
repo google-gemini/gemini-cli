@@ -18,6 +18,7 @@ import {
   CoreEvent,
   type CoreEventEmitter,
 } from '../../utils/events.js';
+import { isTerminalAppFocused } from './focusUtils.js';
 
 export interface NotificationConfig {
   enabled: boolean;
@@ -56,19 +57,32 @@ export class NotificationService {
 
     if (!options.force) {
       // List of terminals that do not properly support focus detection reporting (ANSI ?1004h).
-      // In these terminals, we always send notifications because we cannot reliably detect
-      // if the window has focus.
-      const unsupportedTerminals: string[] = ['Apple_Terminal'];
-      const currentTerminal = process.env['TERM_PROGRAM'];
+      // In these terminals, we use an OS-level check to see if the terminal app is frontmost.
+      const unsupportedTerminals = ['Apple_Terminal', 'WarpTerminal'];
+      const termProgram = process.env['TERM_PROGRAM'];
       const isUnsupportedTerminal =
-        currentTerminal && unsupportedTerminals.includes(currentTerminal);
+        termProgram && unsupportedTerminals.includes(termProgram);
+
+      let focused = this.isFocused;
+
+      // If the terminal doesn't support focus reporting, or if we want to double-check,
+      // we use the OS-level focus check.
+      if (isUnsupportedTerminal) {
+        const osFocused = isTerminalAppFocused();
+        if (osFocused !== null) {
+          focused = osFocused;
+        } else {
+          // If we can't determine OS-level focus for an unsupported terminal,
+          // we assume NOT focused to be safe and send the notification.
+          focused = false;
+        }
+      }
 
       debugLogger.debug(
-        `Notification check: isFocused=${this.isFocused}, isUnsupportedTerminal=${isUnsupportedTerminal}`,
+        `Notification check: isFocused=${this.isFocused}, isUnsupportedTerminal=${isUnsupportedTerminal}, effectiveFocused=${focused}`,
       );
 
-      if (this.isFocused && !isUnsupportedTerminal) {
-        // Don't notify if focused, unless it's an unsupported terminal
+      if (focused) {
         debugLogger.debug('Notification suppressed (window is focused)');
         return;
       }
