@@ -2,6 +2,7 @@
 
 exports[`<DefaultAppLayout /> > hides BackgroundShellDisplay when StreamingState is WaitingForConfirmation 1`] = `
 "MainContent
+LoadingIndicator
 Notifications
 CopyModeWarning
 Composer
@@ -15,6 +16,7 @@ BackgroundShellDisplay
 
 
 
+LoadingIndicator
 Notifications
 CopyModeWarning
 Composer
@@ -28,6 +30,7 @@ BackgroundShellDisplay
 
 
 
+LoadingIndicator
 Notifications
 CopyModeWarning
 Composer

@@ -48,7 +48,18 @@ vi.mock('../hooks/useAlternateBuffer.js', () => ({
   useAlternateBuffer: vi.fn(() => false),
 }));
 
+vi.mock('../contexts/ConfigContext.js', () => ({
+  useConfig: () => ({
+    getAccessibility: vi.fn(() => ({
+      enableLoadingPhrases: true,
+    })),
+  }),
+}));
+
 // Mock child components to simplify output
+vi.mock('../components/LoadingIndicator.js', () => ({
+  LoadingIndicator: () => <Text>LoadingIndicator</Text>,
+}));
 vi.mock('../components/MainContent.js', () => ({
   MainContent: () => <Text>MainContent</Text>,
 }));
