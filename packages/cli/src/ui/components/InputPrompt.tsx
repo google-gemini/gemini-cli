@@ -796,27 +796,18 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           inputHistory.navigateDown();
           return true;
         }
-        const isOnFirstLine =
-          buffer.allVisualLines.length === 1 ||
-          (buffer.lines.length > 1
-            ? buffer.cursor[0] === 0
-            : buffer.visualCursor[0] === 0);
-        const isOnLastLine =
-          buffer.allVisualLines.length === 1 ||
-          (buffer.lines.length > 1
-            ? buffer.cursor[0] === buffer.lines.length - 1
-            : buffer.visualCursor[0] === buffer.allVisualLines.length - 1);
-        if (keyMatchers[Command.NAVIGATION_UP](key) && isOnFirstLine) {
-          // Check for queued messages first when input is empty
-          // If no queued messages, inputHistory.navigateUp() is called inside tryLoadQueuedMessages
+        // In multiline prompts, Up/Down only move the cursor; never trigger history.
+        // This avoids history when the user holds the key or presses one time too many.
+        // Single-line: Up/Down still go to history. Use Ctrl+P / Ctrl+N for history in multiline.
+        const isMultiline = buffer.lines.length > 1;
+        if (!isMultiline && keyMatchers[Command.NAVIGATION_UP](key)) {
           if (tryLoadQueuedMessages()) {
             return true;
           }
-          // Only navigate history if popAllMessages doesn't exist
           inputHistory.navigateUp();
           return true;
         }
-        if (keyMatchers[Command.NAVIGATION_DOWN](key) && isOnLastLine) {
+        if (!isMultiline && keyMatchers[Command.NAVIGATION_DOWN](key)) {
           inputHistory.navigateDown();
           return true;
         }
