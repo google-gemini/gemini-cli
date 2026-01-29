@@ -24,6 +24,7 @@ import { ExtensionUpdateState } from '../../ui/state/extensions.js';
 
 // Mock dependencies
 const emitConsoleLog = vi.hoisted(() => vi.fn());
+const emitFeedback = vi.hoisted(() => vi.fn());
 const debugLogger = vi.hoisted(() => ({
   log: vi.fn((message, ...args) => {
     emitConsoleLog('log', format(message, ...args));
@@ -40,6 +41,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     ...actual,
     coreEvents: {
       emitConsoleLog,
+      emitFeedback,
     },
     debugLogger,
   };
@@ -84,6 +86,42 @@ describe('extensions update command', () => {
   });
 
   describe('handleUpdate', () => {
+    it('should list installed extensions when requested extension is not found', async () => {
+      const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      const extensions = [
+        { name: 'ext1', version: '1.0.0' },
+        { name: 'ext2', version: '2.0.0' },
+      ];
+      mockExtensionManager.prototype.loadExtensions = vi
+        .fn()
+        .mockResolvedValue(extensions);
+
+      await handleUpdate({ name: 'missing-extension' });
+
+      expect(emitFeedback).toHaveBeenCalledWith(
+        'error',
+        'Extension "missing-extension" not found.\n\nInstalled extensions:\next1 (1.0.0)\next2 (2.0.0)\n\nRun "gemini extensions list" for details.',
+      );
+      expect(mockUpdateExtension).not.toHaveBeenCalled();
+      mockCwd.mockRestore();
+    });
+
+    it('should log a helpful message when no extensions are installed and requested extension is not found', async () => {
+      const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      mockExtensionManager.prototype.loadExtensions = vi
+        .fn()
+        .mockResolvedValue([]);
+
+      await handleUpdate({ name: 'missing-extension' });
+
+      expect(emitFeedback).toHaveBeenCalledWith(
+        'error',
+        'Extension "missing-extension" not found.\n\nNo extensions installed.',
+      );
+      expect(mockUpdateExtension).not.toHaveBeenCalled();
+      mockCwd.mockRestore();
+    });
+
     it.each([
       {
         state: ExtensionUpdateState.UPDATE_AVAILABLE,
