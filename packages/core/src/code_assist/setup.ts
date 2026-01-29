@@ -127,13 +127,7 @@ export async function setupUser(
       }
 
       // If user is not setup for standard tier, inform them about all other tiers they are ineligible for.
-      if (loadRes.ineligibleTiers && loadRes.ineligibleTiers.length > 0) {
-        const reasons = loadRes.ineligibleTiers
-          .map((t) => t.reasonMessage)
-          .join(', ');
-        throw new Error(reasons);
-      }
-      throw new ProjectIdRequiredError();
+      throwIneligibleOrProjectIdError(loadRes);
     }
     return {
       projectId: loadRes.cloudaicompanionProject,
@@ -180,7 +174,8 @@ export async function setupUser(
         userTierName: tier.name,
       };
     }
-    throw new ProjectIdRequiredError();
+
+    throwIneligibleOrProjectIdError(loadRes);
   }
 
   return {
@@ -188,6 +183,14 @@ export async function setupUser(
     userTier: tier.id,
     userTierName: tier.name,
   };
+}
+
+function throwIneligibleOrProjectIdError(res: LoadCodeAssistResponse): never {
+  if (res.ineligibleTiers && res.ineligibleTiers.length > 0) {
+    const reasons = res.ineligibleTiers.map((t) => t.reasonMessage).join(', ');
+    throw new Error(reasons);
+  }
+  throw new ProjectIdRequiredError();
 }
 
 function getOnboardTier(res: LoadCodeAssistResponse): GeminiUserTier {
