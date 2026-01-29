@@ -57,6 +57,7 @@ they appear in the UI.
 | Show Line Numbers              | `ui.showLineNumbers`                    | Show line numbers in the chat.                                                                                                                                    | `true`  |
 | Show Citations                 | `ui.showCitations`                      | Show citations for generated text in the chat.                                                                                                                    | `false` |
 | Show Model Info In Chat        | `ui.showModelInfoInChat`                | Show the model name in the chat for each model turn.                                                                                                              | `false` |
+| Show User Identity             | `ui.showUserIdentity`                   | Show the logged-in user's identity (e.g. email) in the UI.                                                                                                        | `true`  |
 | Use Alternate Screen Buffer    | `ui.useAlternateBuffer`                 | Use an alternate screen buffer for the UI, preserving shell history.                                                                                              | `false` |
 | Use Background Color           | `ui.useBackgroundColor`                 | Whether to use background colors in the UI.                                                                                                                       | `true`  |
 | Incremental Rendering          | `ui.incrementalRendering`               | Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled. | `true`  |
@@ -80,14 +81,15 @@ they appear in the UI.
 
 ### Context
 
-| UI Label                             | Setting                                           | Description                                                                                                                                     | Default |
-| ------------------------------------ | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| Memory Discovery Max Dirs            | `context.discoveryMaxDirs`                        | Maximum number of directories to search for memory.                                                                                             | `200`   |
-| Load Memory From Include Directories | `context.loadMemoryFromIncludeDirectories`        | Controls how /memory refresh loads GEMINI.md files. When true, include directories are scanned; when false, only the current directory is used. | `false` |
-| Respect .gitignore                   | `context.fileFiltering.respectGitIgnore`          | Respect .gitignore files when searching.                                                                                                        | `true`  |
-| Respect .geminiignore                | `context.fileFiltering.respectGeminiIgnore`       | Respect .geminiignore files when searching.                                                                                                     | `true`  |
-| Enable Recursive File Search         | `context.fileFiltering.enableRecursiveFileSearch` | Enable recursive file search functionality when completing @ references in the prompt.                                                          | `true`  |
-| Enable Fuzzy Search                  | `context.fileFiltering.enableFuzzySearch`         | Enable fuzzy search when searching for files.                                                                                                   | `true`  |
+| UI Label                             | Setting                                           | Description                                                                                                                                                                                                                                 | Default |
+| ------------------------------------ | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| Memory Discovery Max Dirs            | `context.discoveryMaxDirs`                        | Maximum number of directories to search for memory.                                                                                                                                                                                         | `200`   |
+| Load Memory From Include Directories | `context.loadMemoryFromIncludeDirectories`        | Controls how /memory refresh loads GEMINI.md files. When true, include directories are scanned; when false, only the current directory is used.                                                                                             | `false` |
+| Respect .gitignore                   | `context.fileFiltering.respectGitIgnore`          | Respect .gitignore files when searching.                                                                                                                                                                                                    | `true`  |
+| Respect .geminiignore                | `context.fileFiltering.respectGeminiIgnore`       | Respect .geminiignore files when searching.                                                                                                                                                                                                 | `true`  |
+| Enable Recursive File Search         | `context.fileFiltering.enableRecursiveFileSearch` | Enable recursive file search functionality when completing @ references in the prompt.                                                                                                                                                      | `true`  |
+| Enable Fuzzy Search                  | `context.fileFiltering.enableFuzzySearch`         | Enable fuzzy search when searching for files.                                                                                                                                                                                               | `true`  |
+| Custom Ignore File Paths             | `context.fileFiltering.customIgnoreFilePaths`     | Additional ignore file paths to respect. These files take precedence over .geminiignore and .gitignore. Files earlier in the array take precedence over files later in the array, e.g. the first file takes precedence over the second one. | `[]`    |
 
 ### Tools
 
@@ -117,14 +119,20 @@ they appear in the UI.
 
 | UI Label         | Setting                      | Description                                                                         | Default |
 | ---------------- | ---------------------------- | ----------------------------------------------------------------------------------- | ------- |
-| Agent Skills     | `experimental.skills`        | Enable Agent Skills (experimental).                                                 | `false` |
 | Use OSC 52 Paste | `experimental.useOSC52Paste` | Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions). | `false` |
 | Plan             | `experimental.plan`          | Enable planning features (Plan Mode and tools).                                     | `false` |
 
+### Skills
+
+| UI Label            | Setting          | Description          | Default |
+| ------------------- | ---------------- | -------------------- | ------- |
+| Enable Agent Skills | `skills.enabled` | Enable Agent Skills. | `true`  |
+
 ### HooksConfig
 
-| UI Label           | Setting                     | Description                                      | Default |
-| ------------------ | --------------------------- | ------------------------------------------------ | ------- |
-| Hook Notifications | `hooksConfig.notifications` | Show visual indicators when hooks are executing. | `true`  |
+| UI Label           | Setting                     | Description                                                                      | Default |
+| ------------------ | --------------------------- | -------------------------------------------------------------------------------- | ------- |
+| Enable Hooks       | `hooksConfig.enabled`       | Canonical toggle for the hooks system. When disabled, no hooks will be executed. | `true`  |
+| Hook Notifications | `hooksConfig.notifications` | Show visual indicators when hooks are executing.                                 | `true`  |
 
 <!-- SETTINGS-AUTOGEN:END -->

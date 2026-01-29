@@ -244,6 +244,10 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Show the model name in the chat for each model turn.
   - **Default:** `false`
 
+- **`ui.showUserIdentity`** (boolean):
+  - **Description:** Show the logged-in user's identity (e.g. email) in the UI.
+  - **Default:** `true`
+
 - **`ui.useAlternateBuffer`** (boolean):
   - **Description:** Use an alternate screen buffer for the UI, preserving shell
     history.
@@ -616,6 +620,14 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
+- **`context.fileFiltering.customIgnoreFilePaths`** (array):
+  - **Description:** Additional ignore file paths to respect. These files take
+    precedence over .geminiignore and .gitignore. Files earlier in the array
+    take precedence over files later in the array, e.g. the first file takes
+    precedence over the second one.
+  - **Default:** `[]`
+  - **Requires restart:** Yes
+
 #### `tools`
 
 - **`tools.sandbox`** (boolean | string):
@@ -861,11 +873,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
-- **`experimental.skills`** (boolean):
-  - **Description:** Enable Agent Skills (experimental).
-  - **Default:** `false`
-  - **Requires restart:** Yes
-
 - **`experimental.useOSC52Paste`** (boolean):
   - **Description:** Use OSC 52 sequence for pasting instead of clipboardy
     (useful for remote sessions).
@@ -878,6 +885,11 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `skills`
 
+- **`skills.enabled`** (boolean):
+  - **Description:** Enable Agent Skills.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
 - **`skills.disabled`** (array):
   - **Description:** List of disabled skills.
   - **Default:** `[]`
@@ -889,6 +901,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Canonical toggle for the hooks system. When disabled, no
     hooks will be executed.
   - **Default:** `true`
+  - **Requires restart:** Yes
 
 - **`hooksConfig.disabled`** (array):
   - **Description:** List of hook names (commands) that should be disabled.

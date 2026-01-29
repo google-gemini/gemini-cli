@@ -2867,27 +2867,98 @@ export function useTextBuffer({
   }, [text, pastedContent, stdin, setRawMode, getPreferredEditor]);
 
   const handleInput = useCallback(
-    (key: Key): void => {
+    (key: Key): boolean => {
       const { sequence: input } = key;
 
-      if (key.name === 'paste') insert(input, { paste: true });
-      else if (keyMatchers[Command.RETURN](key)) newline();
-      else if (keyMatchers[Command.NEWLINE](key)) newline();
-      else if (keyMatchers[Command.MOVE_LEFT](key)) move('left');
-      else if (keyMatchers[Command.MOVE_RIGHT](key)) move('right');
-      else if (keyMatchers[Command.MOVE_UP](key)) move('up');
-      else if (keyMatchers[Command.MOVE_DOWN](key)) move('down');
-      else if (keyMatchers[Command.MOVE_WORD_LEFT](key)) move('wordLeft');
-      else if (keyMatchers[Command.MOVE_WORD_RIGHT](key)) move('wordRight');
-      else if (keyMatchers[Command.HOME](key)) move('home');
-      else if (keyMatchers[Command.END](key)) move('end');
-      else if (keyMatchers[Command.DELETE_WORD_BACKWARD](key)) deleteWordLeft();
-      else if (keyMatchers[Command.DELETE_WORD_FORWARD](key)) deleteWordRight();
-      else if (keyMatchers[Command.DELETE_CHAR_LEFT](key)) backspace();
-      else if (keyMatchers[Command.DELETE_CHAR_RIGHT](key)) del();
-      else if (keyMatchers[Command.UNDO](key)) undo();
-      else if (keyMatchers[Command.REDO](key)) redo();
-      else if (key.insertable) insert(input, { paste: false });
+      if (key.name === 'paste') {
+        insert(input, { paste: true });
+        return true;
+      }
+      if (keyMatchers[Command.RETURN](key)) {
+        if (singleLine) {
+          return false;
+        }
+        newline();
+        return true;
+      }
+      if (keyMatchers[Command.NEWLINE](key)) {
+        if (singleLine) {
+          return false;
+        }
+        newline();
+        return true;
+      }
+      if (keyMatchers[Command.MOVE_LEFT](key)) {
+        if (cursorRow === 0 && cursorCol === 0) return false;
+        move('left');
+        return true;
+      }
+      if (keyMatchers[Command.MOVE_RIGHT](key)) {
+        const lastLineIdx = lines.length - 1;
+        if (
+          cursorRow === lastLineIdx &&
+          cursorCol === cpLen(lines[lastLineIdx] ?? '')
+        ) {
+          return false;
+        }
+        move('right');
+        return true;
+      }
+      if (keyMatchers[Command.MOVE_UP](key)) {
+        if (cursorRow === 0) return false;
+        move('up');
+        return true;
+      }
+      if (keyMatchers[Command.MOVE_DOWN](key)) {
+        if (cursorRow === lines.length - 1) return false;
+        move('down');
+        return true;
+      }
+      if (keyMatchers[Command.MOVE_WORD_LEFT](key)) {
+        move('wordLeft');
+        return true;
+      }
+      if (keyMatchers[Command.MOVE_WORD_RIGHT](key)) {
+        move('wordRight');
+        return true;
+      }
+      if (keyMatchers[Command.HOME](key)) {
+        move('home');
+        return true;
+      }
+      if (keyMatchers[Command.END](key)) {
+        move('end');
+        return true;
+      }
+      if (keyMatchers[Command.DELETE_WORD_BACKWARD](key)) {
+        deleteWordLeft();
+        return true;
+      }
+      if (keyMatchers[Command.DELETE_WORD_FORWARD](key)) {
+        deleteWordRight();
+        return true;
+      }
+      if (keyMatchers[Command.DELETE_CHAR_LEFT](key)) {
+        backspace();
+        return true;
+      }
+      if (keyMatchers[Command.DELETE_CHAR_RIGHT](key)) {
+        del();
+        return true;
+      }
+      if (keyMatchers[Command.UNDO](key)) {
+        undo();
+        return true;
+      }
+      if (keyMatchers[Command.REDO](key)) {
+        redo();
+        return true;
+      }
+      if (key.insertable) {
+        insert(input, { paste: false });
+        return true;
+      }
+      return false;
     },
     [
       newline,
@@ -2899,6 +2970,10 @@ export function useTextBuffer({
       insert,
       undo,
       redo,
+      cursorRow,
+      cursorCol,
+      lines,
+      singleLine,
     ],
   );
 

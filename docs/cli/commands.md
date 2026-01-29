@@ -199,8 +199,8 @@ Slash commands provide meta-level control over the CLI itself.
     while others require a restart.
 
 - [**`/skills`**](./skills.md)
-  - **Description:** (Experimental) Manage Agent Skills, which provide on-demand
-    expertise and specialized workflows.
+  - **Description:** Manage Agent Skills, which provide on-demand expertise and
+    specialized workflows.
   - **Sub-commands:**
     - **`list`**:
       - **Description:** List all discovered skills and their current status
@@ -288,12 +288,12 @@ please see the dedicated [Custom Commands documentation](./custom-commands.md).
 These shortcuts apply directly to the input prompt for text manipulation.
 
 - **Undo:**
-  - **Keyboard shortcut:** Press **Ctrl+z** to undo the last action in the input
-    prompt.
+  - **Keyboard shortcut:** Press **Cmd+z** or **Alt+z** to undo the last action
+    in the input prompt.
 
 - **Redo:**
-  - **Keyboard shortcut:** Press **Ctrl+Shift+Z** to redo the last undone action
-    in the input prompt.
+  - **Keyboard shortcut:** Press **Shift+Cmd+Z** or **Shift+Alt+Z** to redo the
+    last undone action in the input prompt.
 
 ## At commands (`@`)
 

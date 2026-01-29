@@ -225,8 +225,6 @@ file in every session where the extension is active.
 
 ## (Optional) Step 6: Add an Agent Skill
 
-_Note: This is an experimental feature enabled via `experimental.skills`._
-
 [Agent Skills](../cli/skills.md) let you bundle specialized expertise and
 procedural workflows. Unlike `GEMINI.md`, which provides persistent context,
 skills are activated only when needed, saving context tokens.

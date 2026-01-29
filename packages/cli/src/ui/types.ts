@@ -157,10 +157,16 @@ export type HistoryItemStats = HistoryItemBase & {
   type: 'stats';
   duration: string;
   quotas?: RetrieveUserQuotaResponse;
+  selectedAuthType?: string;
+  userEmail?: string;
+  tier?: string;
 };
 
 export type HistoryItemModelStats = HistoryItemBase & {
   type: 'model_stats';
+  selectedAuthType?: string;
+  userEmail?: string;
+  tier?: string;
 };
 
 export type HistoryItemToolStats = HistoryItemBase & {
@@ -180,6 +186,8 @@ export type HistoryItemQuit = HistoryItemBase & {
 export type HistoryItemToolGroup = HistoryItemBase & {
   type: 'tool_group';
   tools: IndividualToolCallDisplay[];
+  borderTop?: boolean;
+  borderBottom?: boolean;
 };
 
 export type HistoryItemUserShell = HistoryItemBase & {
