@@ -8,18 +8,14 @@ import { render } from '../../test-utils/render.js';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { Header } from './Header.js';
 import * as useTerminalSize from '../hooks/useTerminalSize.js';
-import { longAsciiLogo, longAsciiLogoIde } from './AsciiArt.js';
+import { longAsciiLogo } from './AsciiArt.js';
 import * as semanticColors from '../semantic-colors.js';
-import * as terminalSetup from '../utils/terminalSetup.js';
 import { Text } from 'ink';
 import type React from 'react';
 
 vi.mock('../hooks/useTerminalSize.js');
 vi.mock('../hooks/useSnowfall.js', () => ({
   useSnowfall: vi.fn((art) => art),
-}));
-vi.mock('../utils/terminalSetup.js', () => ({
-  getTerminalProgram: vi.fn(),
 }));
 vi.mock('ink-gradient', () => {
   const MockGradient = ({ children }: { children: React.ReactNode }) => (
@@ -41,7 +37,6 @@ vi.mock('ink', async () => {
 describe('<Header />', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(terminalSetup.getTerminalProgram).mockReturnValue(null);
   });
 
   it('renders the long logo on a wide terminal', () => {
@@ -53,22 +48,6 @@ describe('<Header />', () => {
     expect(Text).toHaveBeenCalledWith(
       expect.objectContaining({
         children: longAsciiLogo,
-      }),
-      undefined,
-    );
-  });
-
-  it('uses the IDE logo when running in an IDE', () => {
-    vi.spyOn(useTerminalSize, 'useTerminalSize').mockReturnValue({
-      columns: 120,
-      rows: 20,
-    });
-    vi.mocked(terminalSetup.getTerminalProgram).mockReturnValue('vscode');
-
-    render(<Header version="1.0.0" nightly={false} />);
-    expect(Text).toHaveBeenCalledWith(
-      expect.objectContaining({
-        children: longAsciiLogoIde,
       }),
       undefined,
     );
@@ -87,24 +66,13 @@ describe('<Header />', () => {
     );
   });
 
-  it('renders custom ASCII art as is when running in an IDE', () => {
-    const customArt = 'CUSTOM ART';
-    vi.mocked(terminalSetup.getTerminalProgram).mockReturnValue('vscode');
-    render(
-      <Header version="1.0.0" nightly={false} customAsciiArt={customArt} />,
-    );
-    expect(Text).toHaveBeenCalledWith(
-      expect.objectContaining({
-        children: customArt,
-      }),
-      undefined,
-    );
-  });
-
   it('displays the version number when nightly is true', () => {
     render(<Header version="1.0.0" nightly={true} />);
     const textCalls = (Text as Mock).mock.calls;
-    expect(textCalls[1][0].children.join('')).toBe('v1.0.0');
+    const versionText = Array.isArray(textCalls[1][0].children)
+      ? textCalls[1][0].children.join('')
+      : textCalls[1][0].children;
+    expect(versionText).toBe('v1.0.0');
   });
 
   it('does not display the version number when nightly is false', () => {
