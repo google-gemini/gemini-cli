@@ -439,9 +439,14 @@ export class PolicyEngine {
 
   /**
    * Remove rules for a specific tool.
+   * If source is provided, only rules matching that source are removed.
    */
-  removeRulesForTool(toolName: string): void {
-    this.rules = this.rules.filter((rule) => rule.toolName !== toolName);
+  removeRulesForTool(toolName: string, source?: string): void {
+    this.rules = this.rules.filter(
+      (rule) =>
+        rule.toolName !== toolName ||
+        (source !== undefined && rule.source !== source),
+    );
   }
 
   /**
@@ -449,6 +454,18 @@ export class PolicyEngine {
    */
   getRules(): readonly PolicyRule[] {
     return this.rules;
+  }
+
+  /**
+   * Check if a rule for a specific tool already exists.
+   * If ignoreDynamic is true, it only returns true if a rule exists that was NOT added by AgentRegistry.
+   */
+  hasRuleForTool(toolName: string, ignoreDynamic = false): boolean {
+    return this.rules.some(
+      (rule) =>
+        rule.toolName === toolName &&
+        (!ignoreDynamic || rule.source !== 'AgentRegistry (Dynamic)'),
+    );
   }
 
   getCheckers(): readonly SafetyCheckerRule[] {
