@@ -17,10 +17,18 @@ describe('Frugal reads eval', () => {
   evalTest('ALWAYS_PASSES', {
     name: 'should use ranged read when specific line is targeted',
     files: {
+      'eslint.config.mjs': `export default [
+        {
+          files: ["**/*.ts"],
+          rules: {
+            "no-var": "error"
+          }
+        }
+      ];`,
       'linter_mess.ts': (() => {
         const lines = [];
         for (let i = 0; i < 4000; i++) {
-          if (i === 3000) {
+          if (i === 1000 || i === 1040 || i === 3000) {
             lines.push(`var oldVar${i} = "needs fix";`);
           } else {
             lines.push(`const goodVar${i} = "clean";`);
@@ -29,8 +37,7 @@ describe('Frugal reads eval', () => {
         return lines.join('\n');
       })(),
     },
-    prompt:
-      'Fix the linter error on line 3000 of linter_mess.ts. The error is the use of "var".',
+    prompt: 'Fix all linter errors in linter_mess.ts. Run eslint to find them.',
     assert: async (rig, result) => {
       const logs = rig.readToolLogs();
 
@@ -38,32 +45,46 @@ describe('Frugal reads eval', () => {
       const readCalls = logs.filter(
         (log) => log.toolRequest?.name === READ_FILE_TOOL_NAME,
       );
+
+      const targetFileReads = readCalls.filter((call) => {
+        const args = JSON.parse(call.toolRequest.args);
+        return args.file_path.includes('linter_mess.ts');
+      });
+
       expect(
-        readCalls.length,
+        targetFileReads.length,
         'Agent should have used read_file to check context',
       ).toBeGreaterThan(0);
 
-      let targetedReadFound = false;
+      // We expect 2-3 ranges: one covering 1000/1040 (or two separate ones) and one for 3000
+      expect(
+        targetFileReads.length,
+        'Agent should have used 2-3 ranged reads on the target file',
+      ).toBeGreaterThanOrEqual(2);
+      expect(
+        targetFileReads.length,
+        'Agent should have used 2-3 ranged reads on the target file',
+      ).toBeLessThanOrEqual(3);
+
       let totalLinesRead = 0;
+      const readRanges: { offset: number; limit: number }[] = [];
 
-      for (const call of readCalls) {
+      for (const call of targetFileReads) {
         const args = JSON.parse(call.toolRequest.args);
-        if (args.file_path.includes('linter_mess.ts')) {
-          totalLinesRead += args.limit ?? 4000;
+        // file_path check is redundant now but harmless
+        const limit = args.limit ?? 4000;
+        const offset = args.offset ?? 0;
+        totalLinesRead += limit;
+        readRanges.push({ offset, limit });
 
-          expect(
-            args.limit,
-            'Agent read the entire file (missing limit) instead of using ranged read',
-          ).toBeDefined();
+        expect(
+          args.limit,
+          'Agent read the entire file (missing limit) instead of using ranged read',
+        ).toBeDefined();
 
-          expect(args.limit, 'Agent read too many lines at once').toBeLessThan(
-            1000,
-          );
-
-          if (args.offset !== undefined && args.offset > 2000) {
-            targetedReadFound = true;
-          }
-        }
+        expect(args.limit, 'Agent read too many lines at once').toBeLessThan(
+          1000,
+        );
       }
 
       // Ranged read shoud be frugal and just enough to satisfy the task at hand.
@@ -72,10 +93,16 @@ describe('Frugal reads eval', () => {
         'Agent read more of the file than expected',
       ).toBeLessThan(500);
 
-      expect(
-        targetedReadFound,
-        'Agent should have used offset to read around line 3000 at least once',
-      ).toBe(true);
+      // Check that we read around the error lines
+      const errorLines = [1000, 1040, 3000];
+      for (const line of errorLines) {
+        const covered = readRanges.some(
+          (range) => line >= range.offset && line < range.offset + range.limit,
+        );
+        expect(covered, `Agent should have read around line ${line}`).toBe(
+          true,
+        );
+      }
     },
   });
 });
