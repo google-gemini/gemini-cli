@@ -21,6 +21,7 @@ import { act, useContext, type ReactElement } from 'react';
 import { AppContainer } from './AppContainer.js';
 import { SettingsContext } from './contexts/SettingsContext.js';
 import { type TrackedToolCall } from './hooks/useReactToolScheduler.js';
+import { MessageType } from './types.js';
 import {
   type Config,
   makeFakeConfig,
@@ -415,6 +416,7 @@ describe('AppContainer State Management', () => {
           ...defaultMergedSettings.ui,
           showStatusInTitle: false,
           hideWindowTitle: false,
+          showUserIdentity: true,
         },
         useAlternateBuffer: false,
       },
@@ -487,7 +489,7 @@ describe('AppContainer State Management', () => {
   });
 
   describe('Authentication Check', () => {
-    it('checks for cached Google account on startup', async () => {
+    it('displays correct message for LOGIN_WITH_GOOGLE auth type', async () => {
       // Explicitly mock implementation to ensure we control the instance
       (UserAccountManager as unknown as Mock).mockImplementation(
         () => mockUserAccountManager,
@@ -538,13 +540,107 @@ describe('AppContainer State Management', () => {
         ).toHaveBeenCalled();
         expect(mockAddItem).toHaveBeenCalledWith(
           expect.objectContaining({
-            text: expect.stringContaining(
-              'Authenticated as: test@example.com (Plan: Standard Tier)',
-            ),
+            text: 'Logged in with Google: test@example.com (Plan: Standard Tier)',
           }),
         );
       });
-      unmount!();
+      await act(async () => {
+        unmount!();
+      });
+    });
+    it('displays correct message for USE_GEMINI auth type', async () => {
+      // Explicitly mock implementation to ensure we control the instance
+      (UserAccountManager as unknown as Mock).mockImplementation(
+        () => mockUserAccountManager,
+      );
+
+      mockUserAccountManager.getCachedGoogleAccount.mockReturnValue(null);
+      const mockAddItem = vi.fn();
+      mockedUseHistory.mockReturnValue({
+        history: [],
+        addItem: mockAddItem,
+        updateItem: vi.fn(),
+        clearItems: vi.fn(),
+        loadHistory: vi.fn(),
+      });
+
+      const authConfig = makeFakeConfig();
+      vi.spyOn(authConfig, 'getTargetDir').mockReturnValue('/test/workspace');
+      vi.spyOn(authConfig, 'initialize').mockResolvedValue(undefined);
+      vi.spyOn(authConfig, 'getExtensionLoader').mockReturnValue(
+        mockExtensionManager,
+      );
+
+      vi.spyOn(authConfig, 'getContentGeneratorConfig').mockReturnValue({
+        authType: AuthType.USE_GEMINI,
+      } as unknown as ContentGeneratorConfig);
+      vi.spyOn(authConfig, 'getUserTierName').mockReturnValue('Standard Tier');
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({ config: authConfig });
+        unmount = result.unmount;
+      });
+
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            text: expect.stringContaining('Authenticated with gemini-api-key'),
+          }),
+        );
+      });
+      await act(async () => {
+        unmount!();
+      });
+    });
+
+    it('does not display authentication message if showUserIdentity is false', async () => {
+      mockUserAccountManager.getCachedGoogleAccount.mockReturnValue(
+        'test@example.com',
+      );
+      const mockAddItem = vi.fn();
+      mockedUseHistory.mockReturnValue({
+        history: [],
+        addItem: mockAddItem,
+        updateItem: vi.fn(),
+        clearItems: vi.fn(),
+        loadHistory: vi.fn(),
+      });
+
+      mockSettings.merged.ui = {
+        ...mockSettings.merged.ui,
+        showUserIdentity: false,
+      };
+
+      const authConfig = makeFakeConfig();
+      vi.spyOn(authConfig, 'getTargetDir').mockReturnValue('/test/workspace');
+      vi.spyOn(authConfig, 'initialize').mockResolvedValue(undefined);
+      vi.spyOn(authConfig, 'getExtensionLoader').mockReturnValue(
+        mockExtensionManager,
+      );
+
+      vi.spyOn(authConfig, 'getContentGeneratorConfig').mockReturnValue({
+        authType: AuthType.LOGIN_WITH_GOOGLE,
+      } as unknown as ContentGeneratorConfig);
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({ config: authConfig });
+        unmount = result.unmount;
+      });
+
+      // Give it some time to potentially call addItem
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(mockAddItem).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+        }),
+      );
+
+      await act(async () => {
+        unmount!();
+      });
     });
   });
 

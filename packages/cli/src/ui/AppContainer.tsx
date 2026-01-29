@@ -202,15 +202,7 @@ export const AppContainer = (props: AppContainerProps) => {
     if (resumedSessionData || settings.merged.ui.showUserIdentity === false) {
       return;
     }
-    // We can't use authState here because it's initialized in useAuthCommand which is called later.
-    // However, we can check config directly since we know startup just finished.
     const authType = config.getContentGeneratorConfig()?.authType;
-    if (
-      authType !== AuthType.LOGIN_WITH_GOOGLE &&
-      authType !== AuthType.COMPUTE_ADC
-    ) {
-      return;
-    }
 
     // Run this asynchronously to avoid blocking the event loop.
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -220,8 +212,13 @@ export const AppContainer = (props: AppContainerProps) => {
         const email = userAccountManager.getCachedGoogleAccount();
         const tierName = config.getUserTierName();
 
-        if (email) {
-          let message = `Authenticated as: ${email}`;
+        if (authType) {
+          let message =
+            authType === AuthType.LOGIN_WITH_GOOGLE
+              ? email
+                ? `Logged in with Google: ${email}`
+                : 'Logged in with Google'
+              : `Authenticated with ${authType}`;
           if (tierName) {
             message += ` (Plan: ${tierName})`;
           }
