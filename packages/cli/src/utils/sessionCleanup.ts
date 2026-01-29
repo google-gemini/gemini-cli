@@ -6,7 +6,12 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { debugLogger, type Config } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  Storage,
+  TOOL_OUTPUT_DIR,
+  type Config,
+} from '@google/gemini-cli-core';
 import type { Settings, SessionRetentionSettings } from '../config/settings.js';
 import { getAllSessionFiles, type SessionFileEntry } from './sessionUtils.js';
 
@@ -308,4 +313,149 @@ function validateRetentionConfig(
   }
 
   return null;
+}
+
+/**
+ * Result of tool output cleanup operation
+ */
+export interface ToolOutputCleanupResult {
+  disabled: boolean;
+  scanned: number;
+  deleted: number;
+  failed: number;
+}
+
+/**
+ * Cleans up tool output files based on age and count limits.
+ * Uses the same retention settings as session cleanup.
+ */
+export async function cleanupToolOutputFiles(
+  settings: Settings,
+  debugMode: boolean = false,
+  projectTempDir?: string,
+): Promise<ToolOutputCleanupResult> {
+  const result: ToolOutputCleanupResult = {
+    disabled: false,
+    scanned: 0,
+    deleted: 0,
+    failed: 0,
+  };
+
+  try {
+    // Early exit if cleanup is disabled
+    if (!settings.general?.sessionRetention?.enabled) {
+      return { ...result, disabled: true };
+    }
+
+    const retentionConfig = settings.general.sessionRetention;
+    const tempDir =
+      projectTempDir ?? new Storage(process.cwd()).getProjectTempDir();
+    const toolOutputDir = path.join(tempDir, TOOL_OUTPUT_DIR);
+
+    // Check if directory exists
+    try {
+      await fs.access(toolOutputDir);
+    } catch {
+      // Directory doesn't exist, nothing to clean up
+      return result;
+    }
+
+    // Get all files in the tool_output directory
+    const entries = await fs.readdir(toolOutputDir, { withFileTypes: true });
+    const files = entries.filter((e) => e.isFile());
+    result.scanned = files.length;
+
+    if (files.length === 0) {
+      return result;
+    }
+
+    // Get file stats for age-based cleanup (parallel for better performance)
+    const fileStatsResults = await Promise.all(
+      files.map(async (file) => {
+        try {
+          const filePath = path.join(toolOutputDir, file.name);
+          const stat = await fs.stat(filePath);
+          return { name: file.name, mtime: stat.mtime };
+        } catch (error) {
+          debugLogger.debug(
+            `Failed to stat file ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          );
+          return null;
+        }
+      }),
+    );
+    const fileStats = fileStatsResults.filter(
+      (f): f is { name: string; mtime: Date } => f !== null,
+    );
+
+    // Sort by mtime (oldest first)
+    fileStats.sort((a, b) => a.mtime.getTime() - b.mtime.getTime());
+
+    const now = new Date();
+    const filesToDelete: string[] = [];
+
+    // Age-based cleanup: delete files older than maxAge
+    if (retentionConfig.maxAge) {
+      try {
+        const maxAgeMs = parseRetentionPeriod(retentionConfig.maxAge);
+        const cutoffDate = new Date(now.getTime() - maxAgeMs);
+
+        for (const file of fileStats) {
+          if (file.mtime < cutoffDate) {
+            filesToDelete.push(file.name);
+          }
+        }
+      } catch (error) {
+        debugLogger.debug(
+          `Invalid maxAge format, skipping age-based cleanup: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
+      }
+    }
+
+    // Count-based cleanup: after age-based cleanup, if we still have more files
+    // than maxCount, delete the oldest ones to bring the count down.
+    // This ensures we keep at most maxCount files, preferring newer ones.
+    if (retentionConfig.maxCount !== undefined) {
+      // Filter out files already marked for deletion by age-based cleanup
+      const remainingFiles = fileStats.filter(
+        (f) => !filesToDelete.includes(f.name),
+      );
+      if (remainingFiles.length > retentionConfig.maxCount) {
+        // Calculate how many excess files need to be deleted
+        const excessCount = remainingFiles.length - retentionConfig.maxCount;
+        // remainingFiles is already sorted oldest first, so delete from the start
+        for (let i = 0; i < excessCount; i++) {
+          filesToDelete.push(remainingFiles[i].name);
+        }
+      }
+    }
+
+    // Delete the files
+    for (const fileName of filesToDelete) {
+      try {
+        const filePath = path.join(toolOutputDir, fileName);
+        await fs.unlink(filePath);
+        result.deleted++;
+      } catch (error) {
+        debugLogger.debug(
+          `Failed to delete file ${fileName}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
+        result.failed++;
+      }
+    }
+
+    if (debugMode && result.deleted > 0) {
+      debugLogger.debug(
+        `Tool output cleanup: deleted ${result.deleted}, failed ${result.failed}`,
+      );
+    }
+  } catch (error) {
+    // Global error handler - don't let cleanup failures break startup
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    debugLogger.warn(`Tool output cleanup failed: ${errorMessage}`);
+    result.failed++;
+  }
+
+  return result;
 }
