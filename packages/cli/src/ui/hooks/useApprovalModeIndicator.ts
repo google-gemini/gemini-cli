@@ -45,11 +45,12 @@ export function useApprovalModeIndicator({
           config.getApprovalMode() !== ApprovalMode.YOLO
         ) {
           if (addItem) {
-            const adminSettings = config.getRemoteAdminSettings();
             let text =
               'You cannot enter YOLO mode since it is disabled in your settings.';
-
-            if (!adminSettings?.strictModeDisabled) {
+            const adminSettings = config.getRemoteAdminSettings();
+            const hasSettings =
+              adminSettings && Object.keys(adminSettings).length > 0;
+            if (hasSettings && !adminSettings.strictModeDisabled) {
               text = getAdminErrorMessage('YOLO mode', config);
             }
 

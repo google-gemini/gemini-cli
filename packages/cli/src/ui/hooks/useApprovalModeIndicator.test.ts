@@ -56,7 +56,7 @@ interface MockConfigInstanceShape {
   getGeminiMdFileCount: Mock<() => number>;
   getToolRegistry: Mock<() => { discoverTools: Mock<() => void> }>;
   getRemoteAdminSettings: Mock<
-    () => { strictModeDisabled?: boolean } | undefined
+    () => { strictModeDisabled?: boolean; mcpEnabled?: boolean } | undefined
   >;
 }
 
@@ -559,7 +559,9 @@ describe('useApprovalModeIndicator', () => {
 
     it('should show admin error message when YOLO mode is disabled by admin', () => {
       mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
-      mockConfigInstance.getRemoteAdminSettings.mockReturnValue({});
+      mockConfigInstance.getRemoteAdminSettings.mockReturnValue({
+        mcpEnabled: true,
+      });
 
       const mockAddItem = vi.fn();
       renderHook(() =>
@@ -577,6 +579,31 @@ describe('useApprovalModeIndicator', () => {
         {
           type: MessageType.WARNING,
           text: '[Mock] YOLO mode is disabled',
+        },
+        expect.any(Number),
+      );
+    });
+
+    it('should show default error message when admin settings are empty', () => {
+      mockConfigInstance.getApprovalMode.mockReturnValue(ApprovalMode.DEFAULT);
+      mockConfigInstance.getRemoteAdminSettings.mockReturnValue({});
+
+      const mockAddItem = vi.fn();
+      renderHook(() =>
+        useApprovalModeIndicator({
+          config: mockConfigInstance as unknown as ActualConfigType,
+          addItem: mockAddItem,
+        }),
+      );
+
+      act(() => {
+        capturedUseKeypressHandler({ name: 'y', ctrl: true } as Key);
+      });
+
+      expect(mockAddItem).toHaveBeenCalledWith(
+        {
+          type: MessageType.WARNING,
+          text: 'You cannot enter YOLO mode since it is disabled in your settings.',
         },
         expect.any(Number),
       );
