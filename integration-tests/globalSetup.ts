@@ -72,6 +72,13 @@ export async function setup() {
 }
 
 export async function teardown() {
+  // Disable mouse tracking
+  if (process.stdout.isTTY) {
+    process.stdout.write(
+      '\x1b[?1000l\x1b[?1003l\x1b[?1015l\x1b[?1006l\x1b[?1002l',
+    );
+  }
+
   // Cleanup the test run directory unless KEEP_OUTPUT is set
   if (process.env['KEEP_OUTPUT'] !== 'true' && runDir) {
     try {
