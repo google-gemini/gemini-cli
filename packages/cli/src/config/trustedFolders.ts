@@ -63,6 +63,32 @@ export interface TrustResult {
   source: 'ide' | 'file' | undefined;
 }
 
+const realPathCache = new Map<string, string>();
+
+/**
+ * FOR TESTING PURPOSES ONLY.
+ * Clears the real path cache.
+ */
+export function clearRealPathCacheForTesting(): void {
+  realPathCache.clear();
+}
+
+function getRealPath(location: string): string {
+  let realPath = realPathCache.get(location);
+  if (realPath !== undefined) {
+    return realPath;
+  }
+
+  try {
+    realPath = fs.existsSync(location) ? fs.realpathSync(location) : location;
+  } catch {
+    realPath = location;
+  }
+
+  realPathCache.set(location, realPath);
+  return realPath;
+}
+
 export class LoadedTrustedFolders {
   constructor(
     readonly user: TrustedFoldersFile,
@@ -88,39 +114,36 @@ export class LoadedTrustedFolders {
     config?: Record<string, TrustLevel>,
   ): boolean | undefined {
     const configToUse = config ?? this.user.config;
-    const trustedPaths: string[] = [];
-    const untrustedPaths: string[] = [];
 
-    for (const rule of Object.entries(configToUse).map(
-      ([path, trustLevel]) => ({ path, trustLevel }),
-    )) {
-      switch (rule.trustLevel) {
-        case TrustLevel.TRUST_FOLDER:
-          trustedPaths.push(rule.path);
-          break;
-        case TrustLevel.TRUST_PARENT:
-          trustedPaths.push(path.dirname(rule.path));
-          break;
-        case TrustLevel.DO_NOT_TRUST:
-          untrustedPaths.push(rule.path);
-          break;
-        default:
-          // Do nothing for unknown trust levels.
-          break;
+    // Resolve location to its realpath for canonical comparison
+    const realLocation = getRealPath(location);
+
+    let longestMatchLen = -1;
+    let longestMatchTrust: TrustLevel | undefined = undefined;
+
+    for (const [rulePath, trustLevel] of Object.entries(configToUse)) {
+      const effectivePath =
+        trustLevel === TrustLevel.TRUST_PARENT
+          ? path.dirname(rulePath)
+          : rulePath;
+
+      // Resolve effectivePath to its realpath for canonical comparison
+      const realEffectivePath = getRealPath(effectivePath);
+
+      if (isWithinRoot(realLocation, realEffectivePath)) {
+        if (rulePath.length > longestMatchLen) {
+          longestMatchLen = rulePath.length;
+          longestMatchTrust = trustLevel;
+        }
       }
     }
 
-    for (const trustedPath of trustedPaths) {
-      if (isWithinRoot(location, trustedPath)) {
-        return true;
-      }
-    }
-
-    for (const untrustedPath of untrustedPaths) {
-      if (path.normalize(location) === path.normalize(untrustedPath)) {
-        return false;
-      }
-    }
+    if (longestMatchTrust === TrustLevel.DO_NOT_TRUST) return false;
+    if (
+      longestMatchTrust === TrustLevel.TRUST_FOLDER ||
+      longestMatchTrust === TrustLevel.TRUST_PARENT
+    )
+      return true;
 
     return undefined;
   }
@@ -150,6 +173,7 @@ let loadedTrustedFolders: LoadedTrustedFolders | undefined;
  */
 export function resetTrustedFoldersForTesting(): void {
   loadedTrustedFolders = undefined;
+  clearRealPathCacheForTesting();
 }
 
 export function loadTrustedFolders(): LoadedTrustedFolders {
