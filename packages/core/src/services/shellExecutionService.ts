@@ -822,12 +822,13 @@ export class ShellExecutionService {
         // due to a race condition between the exit event and this call.
         const err = e as { code?: string; message?: string };
         const isEsrch = err.code === 'ESRCH';
+        const isEbadf = err.code === 'EBADF';
         const isWindowsPtyError = err.message?.includes(
           'Cannot resize a pty that has already exited',
         );
 
-        if (isEsrch || isWindowsPtyError) {
-          // On Unix, we get an ESRCH error.
+        if (isEsrch || isEbadf || isWindowsPtyError) {
+          // On Unix, we get an ESRCH or EBADF error.
           // On Windows, we get a message-based error.
           // In both cases, it's safe to ignore.
         } else {

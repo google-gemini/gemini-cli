@@ -1204,12 +1204,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
       } catch (e) {
         // This can happen in a race condition where the pty exits
         // right before we try to resize it.
-        if (
-          !(
-            e instanceof Error &&
-            e.message.includes('Cannot resize a pty that has already exited')
-          )
-        ) {
+        const err = e as { code?: string };
+        const isWindowsPtyError = err instanceof Error && err.message.includes('Cannot resize a pty that has already exited');
+        const isUnixPtyError = err instanceof Error && (err.code === 'ESRCH' || err.code === 'EBADF');
+        
+        if (!isWindowsPtyError && !isUnixPtyError) {
           throw e;
         }
       }
