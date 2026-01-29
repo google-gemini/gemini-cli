@@ -155,6 +155,15 @@ export class PolicyEngine {
       debugLogger.debug(
         `[PolicyEngine.check] Command parsing failed for: ${command}. Falling back to ASK_USER.`,
       );
+
+      // In YOLO mode, we should proceed anyway even if we can't parse the command.
+      if (this.approvalMode === ApprovalMode.YOLO) {
+        return {
+          decision: PolicyDecision.ALLOW,
+          rule,
+        };
+      }
+
       // Parsing logic failed, we can't trust it. Force ASK_USER (or DENY).
       // We don't blame a specific rule here, unless the input rule was stricter.
       return {
