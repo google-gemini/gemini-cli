@@ -81,6 +81,7 @@ const mockConfigInternal = {
   getGeminiMdFileCount: () => 0,
   setGeminiMdFileCount: vi.fn(),
   getDisableLLMCorrection: vi.fn(() => false),
+  validatePathAccess: vi.fn().mockReturnValue(null),
   getToolRegistry: () =>
     ({
       registerTool: vi.fn(),

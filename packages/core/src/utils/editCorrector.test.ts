@@ -656,6 +656,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
 
         // old_string should be trimmed to 'find me' because 'find me' also exists uniquely in '  find me'
