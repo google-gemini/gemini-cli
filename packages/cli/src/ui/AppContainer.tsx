@@ -438,6 +438,8 @@ export const AppContainer = (props: AppContainerProps) => {
   // For performance profiling only
   const rootUiRef = useRef<DOMElement>(null);
   const lastTitleRef = useRef<string | null>(null);
+  // Track previous "needs input" state for terminal bell
+  const wasNeedingInputRef = useRef(false);
   const staticExtraHeight = 3;
 
   useEffect(() => {
@@ -1583,10 +1585,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
     // Respect hideWindowTitle settings
     if (settings.merged.ui.hideWindowTitle) return;
 
+    const isConfirming = !!confirmationRequest || shouldShowActionRequiredTitle;
+
     const paddedTitle = computeTerminalTitle({
       streamingState,
       thoughtSubject: thought?.subject,
-      isConfirming: !!confirmationRequest || shouldShowActionRequiredTitle,
+      isConfirming,
       isSilentWorking: shouldShowSilentWorkingTitle,
       folderName: basename(config.getTargetDir()),
       showThoughts: !!settings.merged.ui.showStatusInTitle,
@@ -1598,6 +1602,17 @@ Logging in with Google... Restarting Gemini CLI to continue.
       lastTitleRef.current = paddedTitle;
       stdout.write(`\x1b]0;${paddedTitle}\x07`);
     }
+
+    // Play terminal bell when user input is newly required
+    if (settings.merged.ui.terminalBell) {
+      const needsInput =
+        isConfirming ||
+        streamingState === StreamingState.WaitingForConfirmation;
+      if (needsInput && !wasNeedingInputRef.current) {
+        stdout.write('\x07');
+      }
+      wasNeedingInputRef.current = needsInput;
+    }
     // Note: We don't need to reset the window title on exit because Gemini CLI is already doing that elsewhere
   }, [
     streamingState,
@@ -1608,6 +1623,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     settings.merged.ui.showStatusInTitle,
     settings.merged.ui.dynamicWindowTitle,
     settings.merged.ui.hideWindowTitle,
+    settings.merged.ui.terminalBell,
     config,
     stdout,
   ]);

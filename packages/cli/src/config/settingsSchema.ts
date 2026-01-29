@@ -431,6 +431,16 @@ const SETTINGS_SCHEMA = {
           'Hide the context summary (GEMINI.md, MCP servers) above the input.',
         showInDialog: true,
       },
+      terminalBell: {
+        type: 'boolean',
+        label: 'Terminal Bell',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Play a terminal bell sound when user input is required (e.g., tool confirmations).',
+        showInDialog: true,
+      },
       footer: {
         type: 'object',
         label: 'Footer',

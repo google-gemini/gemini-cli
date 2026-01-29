@@ -1847,6 +1847,126 @@ describe('AppContainer State Management', () => {
     });
   });
 
+  describe('Terminal Bell Feature', () => {
+    beforeEach(() => {
+      mocks.mockStdout.write.mockClear();
+    });
+
+    it('should not play bell when terminalBell setting is disabled', () => {
+      // Arrange: Set up mock settings with terminalBell disabled (default)
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+      const mockSettingsWithBellDisabled = {
+        ...mockSettings,
+        merged: {
+          ...defaultMergedSettings,
+          ui: {
+            ...defaultMergedSettings.ui,
+            terminalBell: false,
+            hideWindowTitle: false,
+          },
+        },
+      } as unknown as LoadedSettings;
+
+      // Mock the streaming state as WaitingForConfirmation
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'waiting_for_confirmation',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      // Act: Render the container
+      const { unmount } = renderAppContainer({
+        settings: mockSettingsWithBellDisabled,
+      });
+
+      // Assert: Check that only title was written, no standalone bell
+      const bellWrites = mocks.mockStdout.write.mock.calls.filter(
+        (call) => call[0] === '\x07',
+      );
+      expect(bellWrites).toHaveLength(0);
+      unmount();
+    });
+
+    it('should play bell when terminalBell is enabled and confirmation is needed', () => {
+      // Arrange: Set up mock settings with terminalBell enabled
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+      const mockSettingsWithBellEnabled = {
+        ...mockSettings,
+        merged: {
+          ...defaultMergedSettings,
+          ui: {
+            ...defaultMergedSettings.ui,
+            terminalBell: true,
+            hideWindowTitle: false,
+          },
+        },
+      } as unknown as LoadedSettings;
+
+      // Mock the streaming state as WaitingForConfirmation
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'waiting_for_confirmation',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      // Act: Render the container
+      const { unmount } = renderAppContainer({
+        settings: mockSettingsWithBellEnabled,
+      });
+
+      // Assert: Check that a standalone bell was written
+      const bellWrites = mocks.mockStdout.write.mock.calls.filter(
+        (call) => call[0] === '\x07',
+      );
+      expect(bellWrites).toHaveLength(1);
+      unmount();
+    });
+
+    it('should not play bell when idle even if terminalBell is enabled', () => {
+      // Arrange: Set up mock settings with terminalBell enabled
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+      const mockSettingsWithBellEnabled = {
+        ...mockSettings,
+        merged: {
+          ...defaultMergedSettings,
+          ui: {
+            ...defaultMergedSettings.ui,
+            terminalBell: true,
+            hideWindowTitle: false,
+          },
+        },
+      } as unknown as LoadedSettings;
+
+      // Mock the streaming state as Idle
+      mockedUseGeminiStream.mockReturnValue({
+        streamingState: 'idle',
+        submitQuery: vi.fn(),
+        initError: null,
+        pendingHistoryItems: [],
+        thought: null,
+        cancelOngoingRequest: vi.fn(),
+      });
+
+      // Act: Render the container
+      const { unmount } = renderAppContainer({
+        settings: mockSettingsWithBellEnabled,
+      });
+
+      // Assert: Check that no standalone bell was written
+      const bellWrites = mocks.mockStdout.write.mock.calls.filter(
+        (call) => call[0] === '\x07',
+      );
+      expect(bellWrites).toHaveLength(0);
+      unmount();
+    });
+  });
+
   describe('Queue Error Message', () => {
     beforeEach(() => {
       vi.useFakeTimers();
