@@ -53,6 +53,20 @@ vi.mock('node:fs/promises', () => ({
   stat: vi.fn(),
 }));
 
+vi.mock('../../config/extensions/extensionSettings.js', () => ({
+  ExtensionSettingScope: {
+    USER: 'user',
+    WORKSPACE: 'workspace',
+  },
+  getScopedEnvContents: vi.fn().mockResolvedValue({}),
+  promptForSetting: vi.fn(),
+  updateSetting: vi.fn(),
+}));
+
+vi.mock('prompts', () => ({
+  default: vi.fn(),
+}));
+
 vi.mock('../../config/extensions/update.js', () => ({
   updateExtension: vi.fn(),
   checkForAllExtensionUpdates: vi.fn(),
@@ -107,9 +121,23 @@ const allExt: GeminiCLIExtension = {
 describe('extensionsCommand', () => {
   let mockContext: CommandContext;
   const mockDispatchExtensionState = vi.fn();
+  let mockExtensionLoader: unknown;
 
   beforeEach(() => {
     vi.resetAllMocks();
+
+    mockExtensionLoader = Object.create(ExtensionManager.prototype);
+    Object.assign(mockExtensionLoader as object, {
+      enableExtension: mockEnableExtension,
+      disableExtension: mockDisableExtension,
+      installOrUpdateExtension: mockInstallExtension,
+      uninstallExtension: mockUninstallExtension,
+      getExtensions: mockGetExtensions,
+      loadExtensionConfig: vi.fn().mockResolvedValue({
+        name: 'test-ext',
+        settings: [{ name: 'setting1', envVar: 'SETTING1' }],
+      }),
+    });
 
     mockGetExtensions.mockReturnValue([inactiveExt, activeExt, allExt]);
     vi.mocked(open).mockClear();
@@ -117,17 +145,7 @@ describe('extensionsCommand', () => {
       services: {
         config: {
           getExtensions: mockGetExtensions,
-          getExtensionLoader: vi.fn().mockImplementation(() => {
-            const actual = Object.create(ExtensionManager.prototype);
-            Object.assign(actual, {
-              enableExtension: mockEnableExtension,
-              disableExtension: mockDisableExtension,
-              installOrUpdateExtension: mockInstallExtension,
-              uninstallExtension: mockUninstallExtension,
-              getExtensions: mockGetExtensions,
-            });
-            return actual;
-          }),
+          getExtensionLoader: vi.fn().mockReturnValue(mockExtensionLoader),
           getWorkingDir: () => '/test/dir',
         },
       },
@@ -976,6 +994,107 @@ describe('extensionsCommand', () => {
 
       const suggestions = completeExtensions(mockContext, 'ext');
       expect(suggestions).toEqual(['ext1']);
+    });
+  });
+
+  describe('config', () => {
+    let configAction: SlashCommand['action'];
+
+    beforeEach(async () => {
+      configAction = extensionsCommand(true).subCommands?.find(
+        (cmd) => cmd.name === 'config',
+      )?.action;
+
+      expect(configAction).not.toBeNull();
+      mockContext.invocation!.name = 'config';
+
+      const prompts = (await import('prompts')).default;
+      vi.mocked(prompts).mockResolvedValue({ overwrite: true });
+
+      const { getScopedEnvContents } = await import(
+        '../../config/extensions/extensionSettings.js'
+      );
+      vi.mocked(getScopedEnvContents).mockResolvedValue({});
+    });
+
+    it('should configure all extensions if no args provided', async () => {
+      await configAction!(mockContext, '');
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining('Configuring settings for "ext-one"'),
+        }),
+      );
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining('Configuring settings for "ext-two"'),
+        }),
+      );
+    });
+
+    it('should configure specific extension', async () => {
+      await configAction!(mockContext, 'ext-one');
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: 'Configuring settings for "ext-one"...',
+        }),
+      );
+    });
+
+    it('should configure specific setting for an extension', async () => {
+      const { updateSetting } = await import(
+        '../../config/extensions/extensionSettings.js'
+      );
+      await configAction!(mockContext, 'ext-one SETTING1');
+      expect(updateSetting).toHaveBeenCalledWith(
+        expect.anything(),
+        'ext-one-id',
+        'SETTING1',
+        expect.anything(),
+        'user',
+        expect.anything(),
+      );
+    });
+
+    it('should respect scope argument', async () => {
+      const { updateSetting } = await import(
+        '../../config/extensions/extensionSettings.js'
+      );
+      await configAction!(mockContext, 'ext-one SETTING1 --scope=workspace');
+      expect(updateSetting).toHaveBeenCalledWith(
+        expect.anything(),
+        'ext-one-id',
+        'SETTING1',
+        expect.anything(),
+        'workspace',
+        expect.anything(),
+      );
+    });
+
+    it('should show error for invalid extension name', async () => {
+      await configAction!(mockContext, '../invalid');
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.ERROR,
+        text: 'Invalid extension name. Names cannot contain path separators or "..".',
+      });
+    });
+
+    it('should inform if extension has no settings', async () => {
+      const extensionLoader =
+        mockContext.services.config!.getExtensionLoader() as ExtensionManager;
+      vi.mocked(extensionLoader.loadExtensionConfig).mockResolvedValueOnce({
+        name: 'ext-one',
+        version: '1.0.0',
+        settings: [],
+      });
+
+      await configAction!(mockContext, 'ext-one');
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.INFO,
+        text: 'Extension "ext-one" has no settings to configure.',
+      });
     });
   });
 });
