@@ -9,10 +9,7 @@ import {
   listExtensions,
   type ExtensionInstallMetadata,
 } from '@google/gemini-cli-core';
-import type {
-  ExtensionConfig,
-  ExtensionUpdateInfo,
-} from '../../config/extension.js';
+import type { ExtensionUpdateInfo } from '../../config/extension.js';
 import { getErrorMessage } from '../../utils/errors.js';
 import {
   emptyIcon,
@@ -35,13 +32,10 @@ import { SettingScope } from '../../config/settings.js';
 import { McpServerEnablementManager } from '../../config/mcp/mcpServerEnablement.js';
 import { theme } from '../semantic-colors.js';
 import { stat } from 'node:fs/promises';
-import {
-  ExtensionSettingScope,
-  getScopedEnvContents,
-  promptForSetting,
-  updateSetting,
-} from '../../config/extensions/extensionSettings.js';
-import prompts from 'prompts';
+import { ExtensionSettingScope } from '../../config/extensions/extensionSettings.js';
+import { type ConfigLogger } from '../../commands/extensions/utils.js';
+import { ConfigExtensionDialog } from '../components/ConfigExtensionDialog.js';
+import React from 'react';
 
 function showMessageIfNoExtensions(
   context: CommandContext,
@@ -623,217 +617,34 @@ async function configAction(context: CommandContext, args: string) {
     }
   }
 
-  // Case 1: Configure specific setting for an extension
-  if (name && setting) {
-    await configureSpecificSetting(context, name, setting, scope);
-  }
-  // Case 2: Configure all settings for an extension
-  else if (name) {
-    await configureExtension(context, name, scope);
-  }
-  // Case 3: Configure all extensions
-  else {
-    await configureAllExtensions(context, scope);
-  }
-}
-
-async function configureSpecificSetting(
-  context: CommandContext,
-  extensionName: string,
-  settingKey: string,
-  scope: ExtensionSettingScope,
-) {
   const extensionManager = context.services.config?.getExtensionLoader();
-  if (!(extensionManager instanceof ExtensionManager)) return;
-
-  const extension = extensionManager
-    .getExtensions()
-    .find((e) => e.name === extensionName);
-  if (!extension) {
-    context.ui.addItem({
-      type: MessageType.ERROR,
-      text: `Extension "${extensionName}" not found.`,
-    });
-    return;
-  }
-
-  const extensionConfig = await extensionManager.loadExtensionConfig(
-    extension.path,
-  );
-  if (!extensionConfig) {
-    context.ui.addItem({
-      type: MessageType.ERROR,
-      text: `Could not find configuration for extension "${extensionName}".`,
-    });
-    return;
-  }
-
-  await updateSetting(
-    extensionConfig,
-    extension.id,
-    settingKey,
-    promptForSetting,
-    scope,
-    process.cwd(),
-  );
-  context.ui.addItem({
-    type: MessageType.INFO,
-    text: `Setting "${settingKey}" updated.`,
-  });
-}
-
-async function configureExtension(
-  context: CommandContext,
-  extensionName: string,
-  scope: ExtensionSettingScope,
-) {
-  const extensionManager = context.services.config?.getExtensionLoader();
-  if (!(extensionManager instanceof ExtensionManager)) return;
-
-  const extension = extensionManager
-    .getExtensions()
-    .find((e) => e.name === extensionName);
-  if (!extension) {
-    context.ui.addItem({
-      type: MessageType.ERROR,
-      text: `Extension "${extensionName}" not found.`,
-    });
-    return;
-  }
-
-  const extensionConfig = await extensionManager.loadExtensionConfig(
-    extension.path,
-  );
-  if (
-    !extensionConfig ||
-    !extensionConfig.settings ||
-    extensionConfig.settings.length === 0
-  ) {
-    context.ui.addItem({
-      type: MessageType.INFO,
-      text: `Extension "${extensionName}" has no settings to configure.`,
-    });
-    return;
-  }
-
-  context.ui.addItem({
-    type: MessageType.INFO,
-    text: `Configuring settings for "${extensionName}"...`,
-  });
-  await configureExtensionSettings(
-    context,
-    extensionConfig,
-    extension.id,
-    scope,
-  );
-  context.ui.addItem({
-    type: MessageType.INFO,
-    text: `Configuration for "${extensionName}" completed.`,
-  });
-}
-
-async function configureAllExtensions(
-  context: CommandContext,
-  scope: ExtensionSettingScope,
-) {
-  const extensionManager = context.services.config?.getExtensionLoader();
-  if (!(extensionManager instanceof ExtensionManager)) return;
-
-  const extensions = extensionManager.getExtensions();
-
-  if (extensions.length === 0) {
-    context.ui.addItem({
-      type: MessageType.INFO,
-      text: 'No extensions installed.',
-    });
-    return;
-  }
-
-  for (const extension of extensions) {
-    const extensionConfig = await extensionManager.loadExtensionConfig(
-      extension.path,
+  if (!(extensionManager instanceof ExtensionManager)) {
+    debugLogger.error(
+      `Cannot ${context.invocation?.name} extensions in this environment`,
     );
-    if (
-      extensionConfig &&
-      extensionConfig.settings &&
-      extensionConfig.settings.length > 0
-    ) {
-      context.ui.addItem({
-        type: MessageType.INFO,
-        text: `\nConfiguring settings for "${extension.name}"...`,
-      });
-      await configureExtensionSettings(
-        context,
-        extensionConfig,
-        extension.id,
-        scope,
-      );
-    }
-  }
-  context.ui.addItem({
-    type: MessageType.INFO,
-    text: 'All extensions configured.',
-  });
-}
-
-async function configureExtensionSettings(
-  context: CommandContext,
-  extensionConfig: ExtensionConfig,
-  extensionId: string,
-  scope: ExtensionSettingScope,
-) {
-  const currentScopedSettings = await getScopedEnvContents(
-    extensionConfig,
-    extensionId,
-    scope,
-    process.cwd(),
-  );
-
-  let workspaceSettings: Record<string, string> = {};
-  if (scope === ExtensionSettingScope.USER) {
-    workspaceSettings = await getScopedEnvContents(
-      extensionConfig,
-      extensionId,
-      ExtensionSettingScope.WORKSPACE,
-      process.cwd(),
-    );
+    return;
   }
 
-  if (!extensionConfig.settings) return;
+  const logger: ConfigLogger = {
+    log: (message: string) => {
+      context.ui.addItem({ type: MessageType.INFO, text: message.trim() });
+    },
+    error: (message: string) =>
+      context.ui.addItem({ type: MessageType.ERROR, text: message }),
+  };
 
-  for (const setting of extensionConfig.settings) {
-    const currentValue = currentScopedSettings[setting.envVar];
-    const workspaceValue = workspaceSettings[setting.envVar];
-
-    if (workspaceValue !== undefined) {
-      context.ui.addItem({
-        type: MessageType.INFO,
-        text: `Note: Setting "${setting.name}" is already configured in the workspace scope.`,
-      });
-    }
-
-    if (currentValue !== undefined) {
-      const response = await prompts({
-        type: 'confirm',
-        name: 'overwrite',
-        message: `Setting "${setting.name}" (${setting.envVar}) is already set. Overwrite?`,
-        initial: false,
-      });
-
-      if (!response.overwrite) {
-        continue;
-      }
-    }
-
-    await updateSetting(
-      extensionConfig,
-      extensionId,
-      setting.envVar,
-      promptForSetting,
+  return {
+    type: 'custom_dialog' as const,
+    component: React.createElement(ConfigExtensionDialog, {
+      extensionManager,
+      onClose: () => context.ui.removeComponent(),
+      extensionName: name,
+      settingKey: setting,
       scope,
-      process.cwd(),
-    );
-  }
+      configureAll: !name && !setting,
+      loggerAdapter: logger,
+    }),
+  };
 }
 
 /**

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { type ReactElement } from 'react';
+
 import type {
   ExtensionLoader,
   GeminiCLIExtension,
@@ -15,7 +17,12 @@ import {
   completeExtensionsAndScopes,
   extensionsCommand,
 } from './extensionsCommand.js';
+import {
+  ConfigExtensionDialog,
+  type ConfigExtensionDialogProps,
+} from '../components/ConfigExtensionDialog.js';
 import { type CommandContext, type SlashCommand } from './types.js';
+
 import {
   describe,
   it,
@@ -1017,60 +1024,59 @@ describe('extensionsCommand', () => {
       vi.mocked(getScopedEnvContents).mockResolvedValue({});
     });
 
-    it('should configure all extensions if no args provided', async () => {
-      await configAction!(mockContext, '');
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: MessageType.INFO,
-          text: expect.stringContaining('Configuring settings for "ext-one"'),
-        }),
-      );
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: MessageType.INFO,
-          text: expect.stringContaining('Configuring settings for "ext-two"'),
-        }),
-      );
+    it('should return dialog to configure all extensions if no args provided', async () => {
+      const result = await configAction!(mockContext, '');
+      if (result?.type !== 'custom_dialog') {
+        throw new Error('Expected custom_dialog');
+      }
+      const dialogResult = result;
+      const component =
+        dialogResult.component as ReactElement<ConfigExtensionDialogProps>;
+      expect(component.type).toBe(ConfigExtensionDialog);
+      expect(component.props.configureAll).toBe(true);
+      expect(component.props.extensionManager).toBeDefined();
     });
 
-    it('should configure specific extension', async () => {
-      await configAction!(mockContext, 'ext-one');
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: MessageType.INFO,
-          text: 'Configuring settings for "ext-one"...',
-        }),
-      );
+    it('should return dialog to configure specific extension', async () => {
+      const result = await configAction!(mockContext, 'ext-one');
+      if (result?.type !== 'custom_dialog') {
+        throw new Error('Expected custom_dialog');
+      }
+      const dialogResult = result;
+      const component =
+        dialogResult.component as ReactElement<ConfigExtensionDialogProps>;
+      expect(component.type).toBe(ConfigExtensionDialog);
+      expect(component.props.extensionName).toBe('ext-one');
+      expect(component.props.settingKey).toBeUndefined();
+      expect(component.props.configureAll).toBe(false);
     });
 
-    it('should configure specific setting for an extension', async () => {
-      const { updateSetting } = await import(
-        '../../config/extensions/extensionSettings.js'
-      );
-      await configAction!(mockContext, 'ext-one SETTING1');
-      expect(updateSetting).toHaveBeenCalledWith(
-        expect.anything(),
-        'ext-one-id',
-        'SETTING1',
-        expect.anything(),
-        'user',
-        expect.anything(),
-      );
+    it('should return dialog to configure specific setting for an extension', async () => {
+      const result = await configAction!(mockContext, 'ext-one SETTING1');
+      if (result?.type !== 'custom_dialog') {
+        throw new Error('Expected custom_dialog');
+      }
+      const dialogResult = result;
+      const component =
+        dialogResult.component as ReactElement<ConfigExtensionDialogProps>;
+      expect(component.type).toBe(ConfigExtensionDialog);
+      expect(component.props.extensionName).toBe('ext-one');
+      expect(component.props.settingKey).toBe('SETTING1');
+      expect(component.props.scope).toBe('user'); // Default scope
     });
 
-    it('should respect scope argument', async () => {
-      const { updateSetting } = await import(
-        '../../config/extensions/extensionSettings.js'
+    it('should respect scope argument passed to dialog', async () => {
+      const result = await configAction!(
+        mockContext,
+        'ext-one SETTING1 --scope=workspace',
       );
-      await configAction!(mockContext, 'ext-one SETTING1 --scope=workspace');
-      expect(updateSetting).toHaveBeenCalledWith(
-        expect.anything(),
-        'ext-one-id',
-        'SETTING1',
-        expect.anything(),
-        'workspace',
-        expect.anything(),
-      );
+      if (result?.type !== 'custom_dialog') {
+        throw new Error('Expected custom_dialog');
+      }
+      const dialogResult = result;
+      const component =
+        dialogResult.component as ReactElement<ConfigExtensionDialogProps>;
+      expect(component.props.scope).toBe('workspace');
     });
 
     it('should show error for invalid extension name', async () => {
@@ -1081,20 +1087,18 @@ describe('extensionsCommand', () => {
       });
     });
 
-    it('should inform if extension has no settings', async () => {
-      const extensionLoader =
-        mockContext.services.config!.getExtensionLoader() as ExtensionManager;
-      vi.mocked(extensionLoader.loadExtensionConfig).mockResolvedValueOnce({
-        name: 'ext-one',
-        version: '1.0.0',
-        settings: [],
-      });
-
-      await configAction!(mockContext, 'ext-one');
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
-        type: MessageType.INFO,
-        text: 'Extension "ext-one" has no settings to configure.',
-      });
+    // "should inform if extension has no settings" - This check is now inside ConfigExtensionDialog logic.
+    // We can test that we still return a dialog, and the dialog will handle logical checks via utils.ts
+    // For unit testing extensionsCommand, we just ensure delegation.
+    it('should return dialog even if extension has no settings (dialog handles logic)', async () => {
+      const result = await configAction!(mockContext, 'ext-one');
+      if (result?.type !== 'custom_dialog') {
+        throw new Error('Expected custom_dialog');
+      }
+      const dialogResult = result;
+      const component =
+        dialogResult.component as ReactElement<ConfigExtensionDialogProps>;
+      expect(component.type).toBe(ConfigExtensionDialog);
     });
   });
 });
