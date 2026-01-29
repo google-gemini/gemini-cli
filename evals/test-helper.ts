@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { it, onTestFinished } from 'vitest';
+import { it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
@@ -34,52 +34,52 @@ export type EvalPolicy = 'ALWAYS_PASSES' | 'USUALLY_PASSES';
 export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
   const fn = async () => {
     const rig = new TestRig();
-    onTestFinished(async () => {
+    try {
+      rig.setup(evalCase.name, evalCase.params);
+
+      if (evalCase.files) {
+        for (const [filePath, content] of Object.entries(evalCase.files)) {
+          const fullPath = path.join(rig.testDir!, filePath);
+          fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+          fs.writeFileSync(fullPath, content);
+        }
+
+        const execOptions = { cwd: rig.testDir!, stdio: 'inherit' as const };
+        execSync('git init', execOptions);
+        execSync('git config user.email "test@example.com"', execOptions);
+        execSync('git config user.name "Test User"', execOptions);
+
+        // Temporarily disable the interactive editor and git pager
+        // to avoid hanging the tests. It seems the the agent isn't
+        // consistently honoring the instructions to avoid interactive
+        // commands.
+        execSync('git config core.editor "true"', execOptions);
+        execSync('git config core.pager "cat"', execOptions);
+        execSync('git add .', execOptions);
+        execSync('git commit --allow-empty -m "Initial commit"', execOptions);
+      }
+
+      const result = await rig.run({
+        args: evalCase.prompt,
+        approvalMode: evalCase.approvalMode ?? 'yolo',
+      });
+
+      const unauthorizedErrorPrefix =
+        createUnauthorizedToolError('').split("'")[0];
+      if (result.includes(unauthorizedErrorPrefix)) {
+        throw new Error(
+          'Test failed due to unauthorized tool call in output: ' + result,
+        );
+      }
+
+      await evalCase.assert(rig, result);
+    } finally {
       await logToFile(
         evalCase.name,
         JSON.stringify(rig.readToolLogs(), null, 2),
       );
       await rig.cleanup();
-    });
-
-    rig.setup(evalCase.name, evalCase.params);
-
-    if (evalCase.files) {
-      for (const [filePath, content] of Object.entries(evalCase.files)) {
-        const fullPath = path.join(rig.testDir!, filePath);
-        fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-        fs.writeFileSync(fullPath, content);
-      }
-
-      const execOptions = { cwd: rig.testDir!, stdio: 'inherit' as const };
-      execSync('git init', execOptions);
-      execSync('git config user.email "test@example.com"', execOptions);
-      execSync('git config user.name "Test User"', execOptions);
-
-      // Temporarily disable the interactive editor and git pager
-      // to avoid hanging the tests. It seems the the agent isn't
-      // consistently honoring the instructions to avoid interactive
-      // commands.
-      execSync('git config core.editor "true"', execOptions);
-      execSync('git config core.pager "cat"', execOptions);
-      execSync('git add .', execOptions);
-      execSync('git commit --allow-empty -m "Initial commit"', execOptions);
     }
-
-    const result = await rig.run({
-      args: evalCase.prompt,
-      approvalMode: evalCase.approvalMode ?? 'yolo',
-    });
-
-    const unauthorizedErrorPrefix =
-      createUnauthorizedToolError('').split("'")[0];
-    if (result.includes(unauthorizedErrorPrefix)) {
-      throw new Error(
-        'Test failed due to unauthorized tool call in output: ' + result,
-      );
-    }
-
-    await evalCase.assert(rig, result);
   };
 
   if (policy === 'USUALLY_PASSES' && !process.env['RUN_EVALS']) {
