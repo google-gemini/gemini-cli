@@ -92,6 +92,7 @@ export enum Command {
   UNFOCUS_SHELL_INPUT = 'app.unfocusShellInput',
   CLEAR_SCREEN = 'app.clearScreen',
   RESTART_APP = 'app.restart',
+  SUSPEND_APP = 'app.suspend',
 }
 
 /**
@@ -176,8 +177,15 @@ export const defaultKeyBindings: KeyBindingConfig = {
   ],
   [Command.DELETE_CHAR_LEFT]: [{ key: 'backspace' }, { key: 'h', ctrl: true }],
   [Command.DELETE_CHAR_RIGHT]: [{ key: 'delete' }, { key: 'd', ctrl: true }],
-  [Command.UNDO]: [{ key: 'z', shift: false, ctrl: true }],
-  [Command.REDO]: [{ key: 'z', shift: true, ctrl: true }],
+  [Command.UNDO]: [
+    { key: 'z', cmd: true, shift: false },
+    { key: 'z', alt: true, shift: false },
+  ],
+  [Command.REDO]: [
+    { key: 'z', ctrl: true, shift: true },
+    { key: 'z', cmd: true, shift: true },
+    { key: 'z', alt: true, shift: true },
+  ],
 
   // Scrolling
   [Command.SCROLL_UP]: [{ key: 'up', shift: true }],
@@ -277,6 +285,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.UNFOCUS_SHELL_INPUT]: [{ key: 'tab' }],
   [Command.CLEAR_SCREEN]: [{ key: 'l', ctrl: true }],
   [Command.RESTART_APP]: [{ key: 'r' }],
+  [Command.SUSPEND_APP]: [{ key: 'z', ctrl: true }],
 };
 
 interface CommandCategory {
@@ -392,6 +401,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.UNFOCUS_SHELL_INPUT,
       Command.CLEAR_SCREEN,
       Command.RESTART_APP,
+      Command.SUSPEND_APP,
     ],
   },
 ];
@@ -488,4 +498,5 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.UNFOCUS_SHELL_INPUT]: 'Focus the Gemini input from the shell input.',
   [Command.CLEAR_SCREEN]: 'Clear the terminal screen and redraw the UI.',
   [Command.RESTART_APP]: 'Restart the application.',
+  [Command.SUSPEND_APP]: 'Suspend the application (not yet implemented).',
 };

@@ -32,6 +32,14 @@ class MockConfig {
     return true;
   }
 
+  getFileFilteringOptions() {
+    return {
+      respectGitIgnore: true,
+      respectGeminiIgnore: true,
+      customIgnoreFilePaths: [],
+    };
+  }
+
   validatePathAccess() {
     return null;
   }
