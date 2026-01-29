@@ -705,18 +705,66 @@ describe('AgentRegistry', () => {
       );
     });
 
-    it('should not register a policy if one already exists', async () => {
+    it('should not register a policy if a USER policy already exists', async () => {
       const agent: AgentDefinition = {
         ...MOCK_AGENT_V1,
-        name: 'ExistingPolicyAgent',
+        name: 'ExistingUserPolicyAgent',
       };
       const policyEngine = mockConfig.getPolicyEngine();
-      vi.spyOn(policyEngine, 'hasRuleForTool').mockReturnValue(true);
+      // Mock hasRuleForTool to return true when ignoreDynamic=true (simulating a user policy)
+      vi.spyOn(policyEngine, 'hasRuleForTool').mockImplementation(
+        (toolName, ignoreDynamic) =>
+          toolName === 'ExistingUserPolicyAgent' && ignoreDynamic === true,
+      );
       const addRuleSpy = vi.spyOn(policyEngine, 'addRule');
 
       await registry.testRegisterAgent(agent);
 
       expect(addRuleSpy).not.toHaveBeenCalled();
+    });
+
+    it('should replace an existing dynamic policy when an agent is overwritten', async () => {
+      const localAgent: AgentDefinition = {
+        ...MOCK_AGENT_V1,
+        name: 'OverwrittenAgent',
+      };
+      const remoteAgent: AgentDefinition = {
+        kind: 'remote',
+        name: 'OverwrittenAgent',
+        description: 'A remote agent',
+        agentCardUrl: 'https://example.com/card',
+        inputConfig: { inputSchema: { type: 'object' } },
+      };
+
+      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
+        loadAgent: vi.fn().mockResolvedValue({ name: 'OverwrittenAgent' }),
+      } as unknown as A2AClientManager);
+
+      const policyEngine = mockConfig.getPolicyEngine();
+      const removeRuleSpy = vi.spyOn(policyEngine, 'removeRulesForTool');
+      const addRuleSpy = vi.spyOn(policyEngine, 'addRule');
+
+      // 1. Register local
+      await registry.testRegisterAgent(localAgent);
+      expect(addRuleSpy).toHaveBeenLastCalledWith(
+        expect.objectContaining({ decision: PolicyDecision.ALLOW }),
+      );
+
+      // 2. Overwrite with remote
+      await registry.testRegisterAgent(remoteAgent);
+
+      // Verify old dynamic rule was removed
+      expect(removeRuleSpy).toHaveBeenCalledWith(
+        'OverwrittenAgent',
+        'AgentRegistry (Dynamic)',
+      );
+      // Verify new dynamic rule (remote -> ASK_USER) was added
+      expect(addRuleSpy).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          toolName: 'OverwrittenAgent',
+          decision: PolicyDecision.ASK_USER,
+        }),
+      );
     });
   });
 

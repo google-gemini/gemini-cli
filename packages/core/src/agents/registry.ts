@@ -272,17 +272,34 @@ export class AgentRegistry {
 
   private addAgentPolicy(definition: AgentDefinition<z.ZodTypeAny>): void {
     const policyEngine = this.config.getPolicyEngine();
-    if (policyEngine && !policyEngine.hasRuleForTool(definition.name)) {
-      policyEngine.addRule({
-        toolName: definition.name,
-        decision:
-          definition.kind === 'local'
-            ? PolicyDecision.ALLOW
-            : PolicyDecision.ASK_USER,
-        priority: 1.05,
-        source: 'AgentRegistry (Dynamic)',
-      });
+    if (!policyEngine) {
+      return;
     }
+
+    // If the user has explicitly defined a policy for this tool, respect it.
+    // ignoreDynamic=true means we only check for rules NOT added by this registry.
+    if (policyEngine.hasRuleForTool(definition.name, true)) {
+      if (this.config.getDebugMode()) {
+        debugLogger.log(
+          `[AgentRegistry] User policy exists for '${definition.name}', skipping dynamic registration.`,
+        );
+      }
+      return;
+    }
+
+    // Clean up any old dynamic policy for this tool (e.g. if we are overwriting an agent)
+    policyEngine.removeRulesForTool(definition.name, 'AgentRegistry (Dynamic)');
+
+    // Add the new dynamic policy
+    policyEngine.addRule({
+      toolName: definition.name,
+      decision:
+        definition.kind === 'local'
+          ? PolicyDecision.ALLOW
+          : PolicyDecision.ASK_USER,
+      priority: 1.05,
+      source: 'AgentRegistry (Dynamic)',
+    });
   }
 
   private isAgentEnabled<TOutput extends z.ZodTypeAny>(
