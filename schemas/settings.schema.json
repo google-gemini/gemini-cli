@@ -1276,7 +1276,7 @@
         "allowedExtensions": {
           "title": "Extension Source Regex Allowlist",
           "description": "List of Regex patterns for allowed extensions. If nonempty, only extensions that match the patterns in this list are allowed. Overrides the blockGitExtensions setting.",
-          "markdownDescription": "List of Regex patterns for allowed extensions. If nonempty, only extensions that match the patterns in this list are allowed. Overrides the blockGitExtensions setting.\n\n- Category: 'Security'\n- Requires restart: 'yes'\n- Default: '[]'",
+          "markdownDescription": "List of Regex patterns for allowed extensions. If nonempty, only extensions that match the patterns in this list are allowed. Overrides the blockGitExtensions setting.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `[]`",
           "default": [],
           "type": "array",
           "items": {
