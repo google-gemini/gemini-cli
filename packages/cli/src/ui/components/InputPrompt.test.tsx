@@ -294,6 +294,13 @@ describe('InputPrompt', () => {
       setQueueErrorMessage: vi.fn(),
       streamingState: StreamingState.Idle,
       setBannerVisible: vi.fn(),
+      promptStash: {
+        stashedPrompt: null,
+        stash: vi.fn().mockReturnValue(true),
+        pop: vi.fn().mockReturnValue(null),
+        hasStash: false,
+        clear: vi.fn(),
+      },
     };
   });
 

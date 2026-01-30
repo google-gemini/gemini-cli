@@ -357,6 +357,13 @@ describe('keyMatchers', () => {
       positive: [createKey('tab', { shift: true })],
       negative: [createKey('tab')],
     },
+
+    // Prompt stashing - Ctrl+Q toggles stash/restore
+    {
+      command: Command.TOGGLE_STASH,
+      positive: [createKey('q', { ctrl: true })],
+      negative: [createKey('q'), createKey('s', { ctrl: true })],
+    },
   ];
 
   describe('Data-driven key binding matches original logic', () => {
