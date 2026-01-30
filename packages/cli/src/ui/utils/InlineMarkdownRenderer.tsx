@@ -189,16 +189,10 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
       } else if (fullMatch.match(/^https?:\/\//)) {
         const { url: cleanUrl, trailing } = stripTrailingPunctuation(fullMatch);
         renderedNode = (
-          <>
-            <Text key={key} color={theme.text.link}>
-              {cleanUrl}
-            </Text>
-            {trailing && (
-              <Text key={`${key}-trail`} color={baseColor}>
-                {trailing}
-              </Text>
-            )}
-          </>
+          <React.Fragment key={key}>
+            <Text color={theme.text.link}>{cleanUrl}</Text>
+            {trailing && <Text color={baseColor}>{trailing}</Text>}
+          </React.Fragment>
         );
       }
     } catch (e) {
