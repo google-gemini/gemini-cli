@@ -66,7 +66,7 @@ modes = ["plan"]
 
 [[rule]]
 toolName = "ask_user"
-decision = "allow"
+decision = "ask_user"
 priority = 50
 modes = ["plan"]
 
