@@ -527,9 +527,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           if (promptStash.stash(buffer.text)) {
             buffer.setText('');
             resetCompletionState();
+            return; // Only return if we actually stashed
           }
         }
-        return;
+        // If no text to stash, fall through to pop handler
       }
 
       // Pop stash - Ctrl+Q to restore stashed input (same key toggles)
