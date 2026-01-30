@@ -147,3 +147,5 @@ This documentation is organized into the following sections:
   the terms of service and privacy notices applicable to your use of Gemini CLI.
 
 We hope this documentation helps you make the most of Gemini CLI!
+
+<!-- workflow validation test -->
