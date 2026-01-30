@@ -243,12 +243,15 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
   const handleExtraKeys = useCallback(
     (key: Key) => {
       if (keyMatchers[Command.QUIT](key)) {
+        if (textValue === '') {
+          return false;
+        }
         buffer.setText('');
         return true;
       }
       return false;
     },
-    [buffer],
+    [buffer, textValue],
   );
 
   useKeypress(handleExtraKeys, { isActive: true, priority: true });
@@ -542,6 +545,9 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     (key: Key) => {
       // If focusing custom option, handle Ctrl+C
       if (isCustomOptionFocused && keyMatchers[Command.QUIT](key)) {
+        if (customOptionText === '') {
+          return false;
+        }
         customBuffer.setText('');
         return true;
       }
@@ -584,7 +590,12 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       }
       return false;
     },
-    [isCustomOptionFocused, customBuffer, onEditingCustomOption],
+    [
+      isCustomOptionFocused,
+      customBuffer,
+      onEditingCustomOption,
+      customOptionText,
+    ],
   );
 
   useKeypress(handleExtraKeys, { isActive: true, priority: true });
@@ -851,11 +862,9 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
       } else if (keyMatchers[Command.QUIT](key)) {
         if (!isEditingCustomOption) {
           onCancel();
-          // Return false to let ctrl-C bubble up to AppContainer for exit flow
-          return false;
         }
-        // In editing mode, ctrl-C is handled by the text buffer (clears input)
-        return true;
+        // Return false to let ctrl-C bubble up to AppContainer for exit flow
+        return false;
       }
       return false;
     },
