@@ -270,6 +270,25 @@ describe('AppContainer State Management', () => {
   const mockedUseInputHistoryStore = useInputHistoryStore as Mock;
   const mockedUseHookDisplayState = useHookDisplayState as Mock;
 
+  const DEFAULT_GEMINI_STREAM_MOCK = {
+    streamingState: 'idle',
+    submitQuery: vi.fn(),
+    initError: null,
+    pendingHistoryItems: [],
+    thought: null,
+    cancelOngoingRequest: vi.fn(),
+    handleApprovalModeChange: vi.fn(),
+    activePtyId: null,
+    loopDetectionConfirmationRequest: null,
+    backgroundShellCount: 0,
+    isBackgroundShellVisible: false,
+    toggleBackgroundShell: vi.fn(),
+    backgroundCurrentShell: vi.fn(),
+    backgroundShells: new Map(),
+    registerBackgroundShell: vi.fn(),
+    dismissBackgroundShell: vi.fn(),
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
 
@@ -335,14 +354,7 @@ describe('AppContainer State Management', () => {
       handleNewMessage: vi.fn(),
       clearConsoleMessages: vi.fn(),
     });
-    mockedUseGeminiStream.mockReturnValue({
-      streamingState: 'idle',
-      submitQuery: vi.fn(),
-      initError: null,
-      pendingHistoryItems: [],
-      thought: null,
-      cancelOngoingRequest: vi.fn(),
-    });
+    mockedUseGeminiStream.mockReturnValue(DEFAULT_GEMINI_STREAM_MOCK);
     mockedUseVim.mockReturnValue({ handleInput: vi.fn() });
     mockedUseFolderTrust.mockReturnValue({
       isFolderTrustDialogOpen: false,
@@ -1194,12 +1206,9 @@ describe('AppContainer State Management', () => {
 
       // Mock the streaming state as Active
       mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
         streamingState: 'responding',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
         thought: { subject: 'Some thought' },
-        cancelOngoingRequest: vi.fn(),
       });
 
       // Act: Render the container
@@ -1235,12 +1244,9 @@ describe('AppContainer State Management', () => {
 
       // Mock the streaming state
       mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
         streamingState: 'responding',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
         thought: { subject: 'Some thought' },
-        cancelOngoingRequest: vi.fn(),
       });
 
       // Act: Render the container
@@ -1307,12 +1313,9 @@ describe('AppContainer State Management', () => {
       // Mock the streaming state and thought
       const thoughtSubject = 'Processing request';
       mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
         streamingState: 'responding',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
         thought: { subject: thoughtSubject },
-        cancelOngoingRequest: vi.fn(),
       });
 
       // Act: Render the container
@@ -1348,14 +1351,7 @@ describe('AppContainer State Management', () => {
       } as unknown as LoadedSettings;
 
       // Mock the streaming state as Idle with no thought
-      mockedUseGeminiStream.mockReturnValue({
-        streamingState: 'idle',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
-        thought: null,
-        cancelOngoingRequest: vi.fn(),
-      });
+      mockedUseGeminiStream.mockReturnValue(DEFAULT_GEMINI_STREAM_MOCK);
 
       // Act: Render the container
       const { unmount } = renderAppContainer({
@@ -1392,12 +1388,9 @@ describe('AppContainer State Management', () => {
       // Mock the streaming state and thought
       const thoughtSubject = 'Confirm tool execution';
       mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
         streamingState: 'waiting_for_confirmation',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
         thought: { subject: thoughtSubject },
-        cancelOngoingRequest: vi.fn(),
       });
 
       // Act: Render the container
@@ -1449,16 +1442,11 @@ describe('AppContainer State Management', () => {
 
         // Mock an active shell pty but not focused
         mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
           streamingState: 'responding',
-          submitQuery: vi.fn(),
-          initError: null,
-          pendingHistoryItems: [],
           thought: { subject: 'Executing shell command' },
-          cancelOngoingRequest: vi.fn(),
           pendingToolCalls: [],
-          handleApprovalModeChange: vi.fn(),
           activePtyId: 'pty-1',
-          loopDetectionConfirmationRequest: null,
           lastOutputTime: startTime + 100, // Trigger aggressive delay
           retryStatus: null,
         });
@@ -1513,12 +1501,9 @@ describe('AppContainer State Management', () => {
 
         // Mock an active shell pty with redirection active
         mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
           streamingState: 'responding',
-          submitQuery: vi.fn(),
-          initError: null,
-          pendingHistoryItems: [],
           thought: { subject: 'Executing shell command' },
-          cancelOngoingRequest: vi.fn(),
           pendingToolCalls: [
             {
               request: {
@@ -1528,9 +1513,7 @@ describe('AppContainer State Management', () => {
               status: 'executing',
             } as unknown as TrackedToolCall,
           ],
-          handleApprovalModeChange: vi.fn(),
           activePtyId: 'pty-1',
-          loopDetectionConfirmationRequest: null,
           lastOutputTime: startTime,
           retryStatus: null,
         });
@@ -1588,16 +1571,11 @@ describe('AppContainer State Management', () => {
 
         // Mock an active shell pty with NO output since operation started (silent)
         mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
           streamingState: 'responding',
-          submitQuery: vi.fn(),
-          initError: null,
-          pendingHistoryItems: [],
           thought: { subject: 'Executing shell command' },
-          cancelOngoingRequest: vi.fn(),
           pendingToolCalls: [],
-          handleApprovalModeChange: vi.fn(),
           activePtyId: 'pty-1',
-          loopDetectionConfirmationRequest: null,
           lastOutputTime: startTime, // lastOutputTime <= operationStartTime
           retryStatus: null,
         });
@@ -1644,12 +1622,9 @@ describe('AppContainer State Management', () => {
         // Mock an active shell pty but not focused
         let lastOutputTime = startTime + 1000;
         mockedUseGeminiStream.mockImplementation(() => ({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
           streamingState: 'responding',
-          submitQuery: vi.fn(),
-          initError: null,
-          pendingHistoryItems: [],
           thought: { subject: 'Executing shell command' },
-          cancelOngoingRequest: vi.fn(),
           activePtyId: 'pty-1',
           lastOutputTime,
         }));
@@ -1670,12 +1645,9 @@ describe('AppContainer State Management', () => {
         // Update lastOutputTime to simulate new output
         lastOutputTime = startTime + 21000;
         mockedUseGeminiStream.mockImplementation(() => ({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
           streamingState: 'responding',
-          submitQuery: vi.fn(),
-          initError: null,
-          pendingHistoryItems: [],
           thought: { subject: 'Executing shell command' },
-          cancelOngoingRequest: vi.fn(),
           activePtyId: 'pty-1',
           lastOutputTime,
         }));
@@ -1735,12 +1707,9 @@ describe('AppContainer State Management', () => {
       // Mock the streaming state and thought with a short subject
       const shortTitle = 'Short';
       mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
         streamingState: 'responding',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
         thought: { subject: shortTitle },
-        cancelOngoingRequest: vi.fn(),
       });
 
       // Act: Render the container
@@ -1779,12 +1748,9 @@ describe('AppContainer State Management', () => {
       // Mock the streaming state and thought
       const title = 'Test Title';
       mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
         streamingState: 'responding',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
         thought: { subject: title },
-        cancelOngoingRequest: vi.fn(),
       });
 
       // Act: Render the container
@@ -1822,12 +1788,8 @@ describe('AppContainer State Management', () => {
 
       // Mock the streaming state
       mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
         streamingState: 'responding',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
-        thought: null,
-        cancelOngoingRequest: vi.fn(),
       });
 
       // Act: Render the container
@@ -1929,12 +1891,7 @@ describe('AppContainer State Management', () => {
       mockedMeasureElement.mockReturnValue({ width: 80, height: 10 }); // Footer is taller than the screen
 
       mockedUseGeminiStream.mockReturnValue({
-        streamingState: 'idle',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
-        thought: null,
-        cancelOngoingRequest: vi.fn(),
+        ...DEFAULT_GEMINI_STREAM_MOCK,
         activePtyId: 'some-id',
       });
 
@@ -2006,11 +1963,7 @@ describe('AppContainer State Management', () => {
       // Mock request cancellation
       mockCancelOngoingRequest = vi.fn();
       mockedUseGeminiStream.mockReturnValue({
-        streamingState: 'idle',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
-        thought: null,
+        ...DEFAULT_GEMINI_STREAM_MOCK,
         cancelOngoingRequest: mockCancelOngoingRequest,
       });
 
@@ -2031,11 +1984,8 @@ describe('AppContainer State Management', () => {
     describe('CTRL+C', () => {
       it('should cancel ongoing request on first press', async () => {
         mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
           streamingState: 'responding',
-          submitQuery: vi.fn(),
-          initError: null,
-          pendingHistoryItems: [],
-          thought: null,
           cancelOngoingRequest: mockCancelOngoingRequest,
         });
         await setupKeypressTest();
@@ -2511,6 +2461,59 @@ describe('AppContainer State Management', () => {
       expect(capturedUIState.activeHooks).toEqual(mockHooks);
       unmount!();
     });
+
+    it('handles consent request events', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      const handler = mockCoreEvents.on.mock.calls.find(
+        (call: unknown[]) => call[0] === CoreEvent.ConsentRequest,
+      )?.[1];
+      expect(handler).toBeDefined();
+
+      const onConfirm = vi.fn();
+      const payload = {
+        prompt: 'Do you consent?',
+        onConfirm,
+      };
+
+      act(() => {
+        handler(payload);
+      });
+
+      expect(capturedUIState.authConsentRequest).toBeDefined();
+      expect(capturedUIState.authConsentRequest?.prompt).toBe(
+        'Do you consent?',
+      );
+
+      act(() => {
+        capturedUIState.authConsentRequest?.onConfirm(true);
+      });
+
+      expect(onConfirm).toHaveBeenCalledWith(true);
+      expect(capturedUIState.authConsentRequest).toBeNull();
+      unmount!();
+    });
+
+    it('unsubscribes from ConsentRequest on unmount', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      unmount!();
+
+      expect(mockCoreEvents.off).toHaveBeenCalledWith(
+        CoreEvent.ConsentRequest,
+        expect.any(Function),
+      );
+    });
   });
 
   describe('Shell Interaction', () => {
@@ -2522,12 +2525,7 @@ describe('AppContainer State Management', () => {
         });
 
       mockedUseGeminiStream.mockReturnValue({
-        streamingState: 'idle',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
-        thought: null,
-        cancelOngoingRequest: vi.fn(),
+        ...DEFAULT_GEMINI_STREAM_MOCK,
         activePtyId: 'some-pty-id', // Make sure activePtyId is set
       });
 
