@@ -24,8 +24,9 @@ export function stripTrailingPunctuation(url: string): {
   url: string;
   trailing: string;
 } {
-  // Trailing characters to strip (ASCII and CJK punctuation)
-  const trailingCharsRegex = /[.,;:!?'")[\]>{}、。，；：！？''"")）」』》‖‧…]/;
+  // Trailing characters to strip (common sentence-ending punctuation)
+  // Excludes []{}>"' which can be valid parts of URLs
+  const trailingCharsRegex = /[.,;:!?)）、。，；：！？‖‧…]/;
 
   // Count parentheses once upfront to avoid O(N²) complexity
   const allParens = url.match(/[()（）]/g) || [];
