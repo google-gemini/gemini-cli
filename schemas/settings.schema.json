@@ -170,6 +170,20 @@
           "markdownDescription": "The color theme for the UI. See the CLI themes guide for available options.\n\n- Category: `UI`\n- Requires restart: `no`",
           "type": "string"
         },
+        "autoThemeSwitching": {
+          "title": "Auto Theme Switching",
+          "description": "Automatically switch between default light and dark themes based on terminal background color.",
+          "markdownDescription": "Automatically switch between default light and dark themes based on terminal background color.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "terminalBackgroundPollingInterval": {
+          "title": "Terminal Background Polling Interval",
+          "description": "Interval in milliseconds to poll the terminal background color.",
+          "markdownDescription": "Interval in milliseconds to poll the terminal background color.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `60000`",
+          "default": 60000,
+          "type": "number"
+        },
         "customThemes": {
           "title": "Custom Themes",
           "description": "Custom theme definitions.",
