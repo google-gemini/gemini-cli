@@ -6,7 +6,7 @@
 
 import { useEffect } from 'react';
 import { useStdout } from 'ink';
-import { parseX11Rgb, getLuminance } from '../themes/color-utils.js';
+import { getLuminance, parseColor } from '../themes/color-utils.js';
 import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
 import { DefaultLight } from '../themes/default-light.js';
 import { useSettings } from '../contexts/SettingsContext.js';
@@ -47,7 +47,7 @@ export function useTerminalTheme(
         );
       if (!match) return;
 
-      const hexColor = parseX11Rgb(match[1], match[2], match[3]);
+      const hexColor = parseColor(match[1], match[2], match[3]);
       const luminance = getLuminance(hexColor);
       config.setTerminalBackground(hexColor);
 

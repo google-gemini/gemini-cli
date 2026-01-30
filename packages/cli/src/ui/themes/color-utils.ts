@@ -318,7 +318,7 @@ export function getLuminance(backgroundColor: string): number {
  * @param bHex Blue component as hex string
  * @returns Hex color string (e.g. #RRGGBB)
  */
-export function parseX11Rgb(rHex: string, gHex: string, bHex: string): string {
+export function parseColor(rHex: string, gHex: string, bHex: string): string {
   const parseComponent = (hex: string) => {
     const val = parseInt(hex, 16);
     if (hex.length === 1) return (val / 15) * 255;
