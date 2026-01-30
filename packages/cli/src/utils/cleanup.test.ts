@@ -68,6 +68,16 @@ describe('cleanup', () => {
     expect(asyncFn).toHaveBeenCalledTimes(1);
   });
 
+  it('should not run a function that has been unregistered', async () => {
+    const cleanupFn = vi.fn();
+    const unsubscribe = registerCleanup(cleanupFn);
+
+    unsubscribe();
+    await runExitCleanup();
+
+    expect(cleanupFn).not.toHaveBeenCalled();
+  });
+
   it('should continue running cleanup functions even if one throws an error', async () => {
     const errorFn = vi.fn().mockImplementation(() => {
       throw new Error('test error');

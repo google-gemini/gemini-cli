@@ -13,9 +13,11 @@ import {
 } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
 
-const cleanupFunctions: Array<(() => void) | (() => Promise<void>)> = [];
-const syncCleanupFunctions: Array<() => void> = [];
+const cleanupFunctions: Array<{ id: number; fn: CleanupFunction }> = [];
+const syncCleanupFunctions: Array<{ id: number; fn: SyncCleanupFunction }> = [];
 let configForTelemetry: Config | null = null;
+type CleanupFunction = (() => void) | (() => Promise<void>);
+type SyncCleanupFunction = () => void;
 
 export function registerCleanup(fn: (() => void) | (() => Promise<void>)) {
   cleanupFunctions.push(fn);
@@ -45,12 +47,13 @@ export function resetCleanupForTesting() {
   cleanupFunctions.length = 0;
   syncCleanupFunctions.length = 0;
   configForTelemetry = null;
+  nextId = 0;
 }
 
 export function runSyncCleanup() {
-  for (const fn of syncCleanupFunctions) {
+  for (const item of syncCleanupFunctions) {
     try {
-      fn();
+      item.fn();
     } catch (_) {
       // Ignore errors during cleanup.
     }
@@ -72,9 +75,9 @@ export async function runExitCleanup() {
   await drainStdin();
 
   runSyncCleanup();
-  for (const fn of cleanupFunctions) {
+  for (const item of cleanupFunctions) {
     try {
-      await fn();
+      await item.fn();
     } catch (_) {
       // Ignore errors during cleanup.
     }
