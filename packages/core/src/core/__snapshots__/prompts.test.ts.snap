@@ -5,6 +5,7 @@ exports[`Core System Prompt (prompts.ts) > ApprovalMode in System Prompt > shoul
 
 # Core Mandates
 
+- **Context Efficiency:** Minimize context usage. Do not read entire files unless necessary. Use 'search_file_content' or 'read_file' with 'limit' to inspect large files.
 - **Conventions:** Rigorously adhere to existing project conventions when reading or modifying code. Analyze surrounding code, tests, and configuration first.
 - **Libraries/Frameworks:** NEVER assume a library/framework is available or appropriate. Verify its established usage within the project (check imports, configuration files like 'package.json', 'Cargo.toml', 'requirements.txt', 'build.gradle', etc., or observe neighboring files) before employing it.
 - **Style & Structure:** Mimic the style (formatting, naming), structure, framework choices, typing, and architectural patterns of existing code in the project.
@@ -104,6 +105,7 @@ exports[`Core System Prompt (prompts.ts) > ApprovalMode in System Prompt > shoul
 
 # Core Mandates
 
+- **Context Efficiency:** Minimize context usage. Do not read entire files unless necessary. Use 'search_file_content' or 'read_file' with 'limit' to inspect large files.
 - **Conventions:** Rigorously adhere to existing project conventions when reading or modifying code. Analyze surrounding code, tests, and configuration first.
 - **Libraries/Frameworks:** NEVER assume a library/framework is available or appropriate. Verify its established usage within the project (check imports, configuration files like 'package.json', 'Cargo.toml', 'requirements.txt', 'build.gradle', etc., or observe neighboring files) before employing it.
 - **Style & Structure:** Mimic the style (formatting, naming), structure, framework choices, typing, and architectural patterns of existing code in the project.
@@ -216,6 +218,7 @@ exports[`Core System Prompt (prompts.ts) > should append userMemory with separat
 
 # Core Mandates
 
+- **Context Efficiency:** Minimize context usage. Do not read entire files unless necessary. Use 'search_file_content' or 'read_file' with 'limit' to inspect large files.
 - **Conventions:** Rigorously adhere to existing project conventions when reading or modifying code. Analyze surrounding code, tests, and configuration first.
 - **Libraries/Frameworks:** NEVER assume a library/framework is available or appropriate. Verify its established usage within the project (check imports, configuration files like 'package.json', 'Cargo.toml', 'requirements.txt', 'build.gradle', etc., or observe neighboring files) before employing it.
 - **Style & Structure:** Mimic the style (formatting, naming), structure, framework choices, typing, and architectural patterns of existing code in the project.
@@ -320,6 +323,7 @@ exports[`Core System Prompt (prompts.ts) > should handle CodebaseInvestigator wi
 
 # Core Mandates
 
+- **Context Efficiency:** Minimize context usage. Do not read entire files unless necessary. Use 'search_file_content' or 'read_file' with 'limit' to inspect large files.
 - **Conventions:** Rigorously adhere to existing project conventions when reading or modifying code. Analyze surrounding code, tests, and configuration first.
 - **Libraries/Frameworks:** NEVER assume a library/framework is available or appropriate. Verify its established usage within the project (check imports, configuration files like 'package.json', 'Cargo.toml', 'requirements.txt', 'build.gradle', etc., or observe neighboring files) before employing it.
 - **Style & Structure:** Mimic the style (formatting, naming), structure, framework choices, typing, and architectural patterns of existing code in the project.
@@ -418,6 +422,7 @@ exports[`Core System Prompt (prompts.ts) > should handle CodebaseInvestigator wi
 
 # Core Mandates
 
+- **Context Efficiency:** Minimize context usage. Do not read entire files unless necessary. Use 'search_file_content' or 'read_file' with 'limit' to inspect large files.
 - **Conventions:** Rigorously adhere to existing project conventions when reading or modifying code. Analyze surrounding code, tests, and configuration first.
 - **Libraries/Frameworks:** NEVER assume a library/framework is available or appropriate. Verify its established usage within the project (check imports, configuration files like 'package.json', 'Cargo.toml', 'requirements.txt', 'build.gradle', etc., or observe neighboring files) before employing it.
 - **Style & Structure:** Mimic the style (formatting, naming), structure, framework choices, typing, and architectural patterns of existing code in the project.
@@ -515,6 +520,7 @@ exports[`Core System Prompt (prompts.ts) > should handle git instructions when i
 
 # Core Mandates
 
+- **Context Efficiency:** Minimize context usage. Do not read entire files unless necessary. Use 'search_file_content' or 'read_file' with 'limit' to inspect large files.
 - **Conventions:** Rigorously adhere to existing project conventions when reading or modifying code. Analyze surrounding code, tests, and configuration first.
 - **Libraries/Frameworks:** NEVER assume a library/framework is available or appropriate. Verify its established usage within the project (check imports, configuration files like 'package.json', 'Cargo.toml', 'requirements.txt', 'build.gradle', etc., or observe neighboring files) before employing it.
 - **Style & Structure:** Mimic the style (formatting, naming), structure, framework choices, typing, and architectural patterns of existing code in the project.
@@ -614,6 +620,7 @@ exports[`Core System Prompt (prompts.ts) > should handle git instructions when i
 
 # Core Mandates
 
+- **Context Efficiency:** Minimize context usage. Do not read entire files unless necessary. Use 'search_file_content' or 'read_file' with 'limit' to inspect large files.
 - **Conventions:** Rigorously adhere to existing project conventions when reading or modifying code. Analyze surrounding code, tests, and configuration first.
 - **Libraries/Frameworks:** NEVER assume a library/framework is available or appropriate. Verify its established usage within the project (check imports, configuration files like 'package.json', 'Cargo.toml', 'requirements.txt', 'build.gradle', etc., or observe neighboring files) before employing it.
 - **Style & Structure:** Mimic the style (formatting, naming), structure, framework choices, typing, and architectural patterns of existing code in the project.
@@ -731,6 +738,7 @@ exports[`Core System Prompt (prompts.ts) > should include available_skills when 
 
 # Core Mandates
 
+- **Context Efficiency:** Minimize context usage. Do not read entire files unless necessary. Use 'search_file_content' or 'read_file' with 'limit' to inspect large files.
 - **Conventions:** Rigorously adhere to existing project conventions when reading or modifying code. Analyze surrounding code, tests, and configuration first.
 - **Libraries/Frameworks:** NEVER assume a library/framework is available or appropriate. Verify its established usage within the project (check imports, configuration files like 'package.json', 'Cargo.toml', 'requirements.txt', 'build.gradle', etc., or observe neighboring files) before employing it.
 - **Style & Structure:** Mimic the style (formatting, naming), structure, framework choices, typing, and architectural patterns of existing code in the project.
@@ -843,6 +851,7 @@ exports[`Core System Prompt (prompts.ts) > should include correct sandbox instru
 
 # Core Mandates
 
+- **Context Efficiency:** Minimize context usage. Do not read entire files unless necessary. Use 'search_file_content' or 'read_file' with 'limit' to inspect large files.
 - **Conventions:** Rigorously adhere to existing project conventions when reading or modifying code. Analyze surrounding code, tests, and configuration first.
 - **Libraries/Frameworks:** NEVER assume a library/framework is available or appropriate. Verify its established usage within the project (check imports, configuration files like 'package.json', 'Cargo.toml', 'requirements.txt', 'build.gradle', etc., or observe neighboring files) before employing it.
 - **Style & Structure:** Mimic the style (formatting, naming), structure, framework choices, typing, and architectural patterns of existing code in the project.
@@ -942,6 +951,7 @@ exports[`Core System Prompt (prompts.ts) > should include correct sandbox instru
 
 # Core Mandates
 
+- **Context Efficiency:** Minimize context usage. Do not read entire files unless necessary. Use 'search_file_content' or 'read_file' with 'limit' to inspect large files.
 - **Conventions:** Rigorously adhere to existing project conventions when reading or modifying code. Analyze surrounding code, tests, and configuration first.
 - **Libraries/Frameworks:** NEVER assume a library/framework is available or appropriate. Verify its established usage within the project (check imports, configuration files like 'package.json', 'Cargo.toml', 'requirements.txt', 'build.gradle', etc., or observe neighboring files) before employing it.
 - **Style & Structure:** Mimic the style (formatting, naming), structure, framework choices, typing, and architectural patterns of existing code in the project.
@@ -1041,6 +1051,7 @@ exports[`Core System Prompt (prompts.ts) > should include correct sandbox instru
 
 # Core Mandates
 
+- **Context Efficiency:** Minimize context usage. Do not read entire files unless necessary. Use 'search_file_content' or 'read_file' with 'limit' to inspect large files.
 - **Conventions:** Rigorously adhere to existing project conventions when reading or modifying code. Analyze surrounding code, tests, and configuration first.
 - **Libraries/Frameworks:** NEVER assume a library/framework is available or appropriate. Verify its established usage within the project (check imports, configuration files like 'package.json', 'Cargo.toml', 'requirements.txt', 'build.gradle', etc., or observe neighboring files) before employing it.
 - **Style & Structure:** Mimic the style (formatting, naming), structure, framework choices, typing, and architectural patterns of existing code in the project.
@@ -1140,6 +1151,7 @@ exports[`Core System Prompt (prompts.ts) > should return the base prompt when us
 
 # Core Mandates
 
+- **Context Efficiency:** Minimize context usage. Do not read entire files unless necessary. Use 'search_file_content' or 'read_file' with 'limit' to inspect large files.
 - **Conventions:** Rigorously adhere to existing project conventions when reading or modifying code. Analyze surrounding code, tests, and configuration first.
 - **Libraries/Frameworks:** NEVER assume a library/framework is available or appropriate. Verify its established usage within the project (check imports, configuration files like 'package.json', 'Cargo.toml', 'requirements.txt', 'build.gradle', etc., or observe neighboring files) before employing it.
 - **Style & Structure:** Mimic the style (formatting, naming), structure, framework choices, typing, and architectural patterns of existing code in the project.
@@ -1239,6 +1251,7 @@ exports[`Core System Prompt (prompts.ts) > should return the base prompt when us
 
 # Core Mandates
 
+- **Context Efficiency:** Minimize context usage. Do not read entire files unless necessary. Use 'search_file_content' or 'read_file' with 'limit' to inspect large files.
 - **Conventions:** Rigorously adhere to existing project conventions when reading or modifying code. Analyze surrounding code, tests, and configuration first.
 - **Libraries/Frameworks:** NEVER assume a library/framework is available or appropriate. Verify its established usage within the project (check imports, configuration files like 'package.json', 'Cargo.toml', 'requirements.txt', 'build.gradle', etc., or observe neighboring files) before employing it.
 - **Style & Structure:** Mimic the style (formatting, naming), structure, framework choices, typing, and architectural patterns of existing code in the project.
@@ -1338,6 +1351,7 @@ exports[`Core System Prompt (prompts.ts) > should return the interactive avoidan
 
 # Core Mandates
 
+- **Context Efficiency:** Minimize context usage. Do not read entire files unless necessary. Use 'search_file_content' or 'read_file' with 'limit' to inspect large files.
 - **Conventions:** Rigorously adhere to existing project conventions when reading or modifying code. Analyze surrounding code, tests, and configuration first.
 - **Libraries/Frameworks:** NEVER assume a library/framework is available or appropriate. Verify its established usage within the project (check imports, configuration files like 'package.json', 'Cargo.toml', 'requirements.txt', 'build.gradle', etc., or observe neighboring files) before employing it.
 - **Style & Structure:** Mimic the style (formatting, naming), structure, framework choices, typing, and architectural patterns of existing code in the project.
@@ -1436,6 +1450,7 @@ exports[`Core System Prompt (prompts.ts) > should use chatty system prompt for p
 
 # Core Mandates
 
+- **Context Efficiency:** Minimize context usage. Do not read entire files unless necessary. Use 'search_file_content' or 'read_file' with 'limit' to inspect large files.
 - **Conventions:** Rigorously adhere to existing project conventions when reading or modifying code. Analyze surrounding code, tests, and configuration first.
 - **Libraries/Frameworks:** NEVER assume a library/framework is available or appropriate. Verify its established usage within the project (check imports, configuration files like 'package.json', 'Cargo.toml', 'requirements.txt', 'build.gradle', etc., or observe neighboring files) before employing it.
 - **Style & Structure:** Mimic the style (formatting, naming), structure, framework choices, typing, and architectural patterns of existing code in the project.
@@ -1536,6 +1551,7 @@ exports[`Core System Prompt (prompts.ts) > should use chatty system prompt for p
 
 # Core Mandates
 
+- **Context Efficiency:** Minimize context usage. Do not read entire files unless necessary. Use 'search_file_content' or 'read_file' with 'limit' to inspect large files.
 - **Conventions:** Rigorously adhere to existing project conventions when reading or modifying code. Analyze surrounding code, tests, and configuration first.
 - **Libraries/Frameworks:** NEVER assume a library/framework is available or appropriate. Verify its established usage within the project (check imports, configuration files like 'package.json', 'Cargo.toml', 'requirements.txt', 'build.gradle', etc., or observe neighboring files) before employing it.
 - **Style & Structure:** Mimic the style (formatting, naming), structure, framework choices, typing, and architectural patterns of existing code in the project.

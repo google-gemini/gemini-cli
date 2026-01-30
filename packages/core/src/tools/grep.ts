@@ -46,6 +46,11 @@ export interface GrepToolParams {
    * File pattern to include in the search (e.g. "*.js", "*.{ts,tsx}")
    */
   include?: string;
+
+  /**
+   * Max number of matches to return. Defaults to 20,000.
+   */
+  limit?: number;
 }
 
 /**
@@ -184,7 +189,7 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       // Collect matches from all search directories
       let allMatches: GrepMatch[] = [];
-      const totalMaxMatches = DEFAULT_TOTAL_MAX_MATCHES;
+      const totalMaxMatches = this.params.limit ?? DEFAULT_TOTAL_MAX_MATCHES;
 
       // Create a timeout controller to prevent indefinitely hanging searches
       const timeoutController = new AbortController();
@@ -352,10 +357,6 @@ class GrepToolInvocation extends BaseToolInvocation<
           '--ignore-case',
           pattern,
         ];
-        if (include) {
-          gitArgs.push('--', include);
-        }
-
         try {
           const generator = execStreaming('git', gitArgs, {
             cwd: absolutePath,
@@ -586,6 +587,11 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
           include: {
             description: `Optional: A glob pattern to filter which files are searched (e.g., '*.js', '*.{ts,tsx}', 'src/**'). If omitted, searches all files (respecting potential global ignores).`,
             type: 'string',
+          },
+          limit: {
+            description:
+              'Optional: Max number of matches to return. Defaults to 20,000.',
+            type: 'integer',
           },
         },
         required: ['pattern'],
