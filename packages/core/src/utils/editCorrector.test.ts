@@ -639,6 +639,33 @@ describe('editCorrector', () => {
         expect(result.params).toEqual(originalParams);
       });
     });
+
+    describe('Scenario Group 7: Trimming with Newline Preservation', () => {
+      it('Test 7.1: should preserve trailing newlines in new_string when trimming is applied', async () => {
+        const currentContent = '  find me'; // Matches old_string initially
+        const originalParams = {
+          file_path: '/test/file.txt',
+          old_string: '  find me', // Matches, but has whitespace to trim
+          new_string: '  replaced\n\n', // Needs trimming but preserve newlines
+        };
+
+        const result = await ensureCorrectEdit(
+          '/test/file.txt',
+          currentContent,
+          originalParams,
+          mockGeminiClientInstance,
+          mockBaseLlmClientInstance,
+          abortSignal,
+          false,
+        );
+
+        // old_string should be trimmed to 'find me' because 'find me' also exists uniquely in '  find me'
+        expect(result.params.old_string).toBe('find me');
+        // new_string should be trimmed of spaces but keep ALL newlines
+        expect(result.params.new_string).toBe('replaced\n\n');
+        expect(result.occurrences).toBe(1);
+      });
+    });
   });
 
   describe('ensureCorrectFileContent', () => {
