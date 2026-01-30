@@ -24,7 +24,9 @@ approach.
 - **Perspective and tense:** Address the reader as "you." Use active voice and
   present tense (e.g., "The API returns...").
 - **Tone:** Professional, friendly, and direct. 
-- **Clarity:** Use simple vocabulary. Avoid jargon, slang, and marketing.
+- **Clarity:** Use simple vocabulary. Avoid jargon, slang, and marketing hype.
+- **Global Audience:** Write in standard US English. Avoid idioms and cultural
+  references.
 - **Requirements:** Be clear about requirements ("must") vs. recommendations
   ("we recommend"). Avoid "should."
 - **Word Choice:** Avoid "please" and anthropomorphism (e.g., "the server
@@ -55,10 +57,13 @@ accessible.
   `the Gemini CLI`).
 - **Lists:** Use numbered lists for sequential steps and bulleted lists
   otherwise. Keep list items parallel in structure.
-- **UI & Code:** Use **bold** for UI elements and `code font` for filenames,
-  snippets, commands, and API elements.
+- **UI and code:** Use **bold** for UI elements and `code font` for filenames,
+  snippets, commands, and API elements. Focus on the task when discussing
+  interaction.
 - **Links:** Use descriptive anchor text; avoid "click here." Ensure the link
   makes sense out of context.
+- **Accessibility:** Use semantic HTML elements correctly (headings, lists, 
+  tables).
 - **Media:** Use lowercase hyphenated filenames. Provide descriptive alt text
   for all images.
 
@@ -91,6 +96,8 @@ project's quality standards.
 #### Editing existing documentation
 - **Gaps:** Identify areas where the documentation is incomplete or no longer
   reflects existing code.
+- **Structure:** Apply "Structure (New Docs)" rules (BLUF, headings, etc.) when 
+  adding new sections to existing pages.
 - **Tone:** Ensure the tone is active and engaging. Use "you" and contractions.
 - **Clarity:** Correct awkward wording, spelling, and grammar. Rephrase
   sentences to make them easier for users to understand.
@@ -99,8 +106,12 @@ project's quality standards.
 
 #### Structure (New Docs)
 - **BLUF:** Start with an introduction explaining what to expect.
+- **Experimental features:** If a feature is experimental, add the following
+  note immediately after the introductory paragraph:
+  `> **Note:** This feature is in preview and may be under active development.`
 - **Headings:** Use hierarchical headings to support the user journey.
 - **Procedures:** 
+  - Introduce lists of steps with a complete sentence.
   - Start each step with an imperative verb.
   - Number sequential steps; use bullets for non-sequential lists.
   - Put conditions before instructions (e.g., "On the Settings page, click...").
@@ -111,7 +122,8 @@ project's quality standards.
 - **Next steps:** Conclude with a "Next steps" section if applicable.
 
 #### Verification
-- Ensure content accurately reflects the implementation.
+- **Accuracy:** Ensure content accurately reflects the implementation and
+  technical behavior.
 
 ## Phase 4: Verification and finalization
 Perform a final quality check to ensure that all changes are correctly formatted
@@ -120,4 +132,6 @@ and that all links are functional.
 1.  **Self-review:** Re-read changes for formatting, correctness, and flow.
 2.  **Link Check:** Verify all new and existing links leading to or from modified
     pages.
-3.  **Format:** Propose `npm run format` after completing all changes.
+3.  **Format:** Once all changes are complete, ask to execute `npm run format`
+    to ensure consistent formatting across the project. If the user confirms,
+    execute the command.
