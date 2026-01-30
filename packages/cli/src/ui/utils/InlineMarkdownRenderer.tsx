@@ -45,6 +45,8 @@ export function stripTrailingPunctuation(url: string): {
         break;
       }
       closeParens--;
+      i--;
+      continue;
     }
 
     if (TRAILING_CHARS_REGEX.test(lastChar)) {
