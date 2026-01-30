@@ -73,7 +73,7 @@ accessible.
 - **BLUF:** Start with an introduction explaining what to expect.
 - **Experimental features:** If a feature is clearly noted as experimental,
 add the following note immediately after the introductory paragraph:
-  `> **Note:** This feature is in preview and may be under active development.`
+  `> **Note:** This is a preview feature currently under active development.`
 - **Headings:** Use hierarchical headings to support the user journey.
 - **Procedures:** 
   - Introduce lists of steps with a complete sentence.
@@ -84,6 +84,8 @@ add the following note immediately after the introductory paragraph:
   - Indicate optional steps clearly (e.g., "Optional: ...").
 - **Elements:** Use bullet lists, tables, notes (`> **Note:**`), and warnings 
   (`> **Warning:**`).
+- **Avoid using a table of contents:** If a table of contents is present, remove
+  it.
 - **Next steps:** Conclude with a "Next steps" section if applicable.
 
 ## Phase 2: Preparation
