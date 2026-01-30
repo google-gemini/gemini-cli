@@ -182,7 +182,7 @@ export class ReadFileTool extends BaseDeclarativeTool<
           },
           limit: {
             description:
-              "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. When checking for context or verifying changes, always set this to a small value (e.g. 50) to avoid reading the entire file.",
+              "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. Minimize unnecessarily large reads. Set the offset and limit large enough to read the continguous block needed for your task, plus 50-100 lines of margin.",
             type: 'number',
           },
         },

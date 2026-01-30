@@ -135,7 +135,7 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
   return `
 # Core Mandates
 
-- **Context Efficiency:** Minimize context usage. Do not read entire files unless necessary. Use '${GREP_TOOL_NAME}' or '${READ_FILE_TOOL_NAME}' with 'limit' to inspect large files.
+- **Context Efficiency:** Minimize unnecessary context usage by reading as much as is needed to solve the problem best, but no more. Use '${GREP_TOOL_NAME}' to find matching lines and '${READ_FILE_TOOL_NAME}' with 'limit' to read only the necessary large files.
 - **Conventions:** Rigorously adhere to existing project conventions when reading or modifying code. Analyze surrounding code, tests, and configuration first.
 - **Libraries/Frameworks:** NEVER assume a library/framework is available or appropriate. Verify its established usage within the project (check imports, configuration files like 'package.json', 'Cargo.toml', 'requirements.txt', 'build.gradle', etc., or observe neighboring files) before employing it.
 - **Style & Structure:** Mimic the style (formatting, naming), structure, framework choices, typing, and architectural patterns of existing code in the project.
