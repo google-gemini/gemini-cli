@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import {
@@ -66,19 +66,22 @@ export function EditorSettingsDialog({
 
   const currentPreference =
     settings.forScope(selectedScope).settings.general?.preferredEditor;
-  let editorIndex = currentPreference
-    ? editorItems.findIndex(
-        (item: EditorDisplay) => item.type === currentPreference,
-      )
-    : 0;
+
+  // Derive editorIndex and isInvalidEditor using useMemo to avoid mutation during render
+  const [editorIndex, isInvalidEditor] = useMemo(() => {
+    const idx = currentPreference
+      ? editorItems.findIndex(
+          (item: EditorDisplay) => item.type === currentPreference,
+        )
+      : 0;
+    const isInvalid = idx === -1;
+    // Default to 0 for invalid editors
+    const finalIndex = isInvalid ? 0 : idx;
+    return [finalIndex, isInvalid];
+  }, [currentPreference, editorItems]);
 
   // Track which invalid editors we've already warned about to prevent spam
   const warnedEditorsRef = useRef<Set<string>>(new Set());
-
-  const isInvalidEditor = editorIndex === -1;
-  if (isInvalidEditor) {
-    editorIndex = 0;
-  }
 
   // Emit error only once per invalid editor preference
   useEffect(() => {
