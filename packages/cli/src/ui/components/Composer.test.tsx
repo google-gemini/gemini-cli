@@ -19,7 +19,7 @@ import { SettingsContext } from '../contexts/SettingsContext.js';
 vi.mock('../contexts/VimModeContext.js', () => ({
   useVimMode: vi.fn(() => ({
     vimEnabled: false,
-    vimMode: 'NORMAL',
+    vimMode: 'INSERT',
   })),
 }));
 import { ApprovalMode } from '@google/gemini-cli-core';
@@ -54,7 +54,9 @@ vi.mock('./DetailedMessagesDisplay.js', () => ({
 }));
 
 vi.mock('./InputPrompt.js', () => ({
-  InputPrompt: () => <Text>InputPrompt</Text>,
+  InputPrompt: ({ placeholder }: { placeholder?: string }) => (
+    <Text>InputPrompt: {placeholder}</Text>
+  ),
   calculatePromptWidths: vi.fn(() => ({
     inputWidth: 80,
     suggestionsWidth: 40,
@@ -513,6 +515,42 @@ describe('Composer', () => {
       const { lastFrame } = renderComposer(uiState);
 
       expect(lastFrame()).not.toContain('DetailedMessagesDisplay');
+    });
+  });
+
+  describe('Vim Mode Placeholders', () => {
+    it('shows correct placeholder in INSERT mode', async () => {
+      const uiState = createMockUIState({ isInputActive: true });
+      const { useVimMode } = await import('../contexts/VimModeContext.js');
+      vi.mocked(useVimMode).mockReturnValue({
+        vimEnabled: true,
+        vimMode: 'INSERT',
+        toggleVimEnabled: vi.fn(),
+        setVimMode: vi.fn(),
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).toContain(
+        "InputPrompt:   Press 'Esc' for NORMAL mode.",
+      );
+    });
+
+    it('shows correct placeholder in NORMAL mode', async () => {
+      const uiState = createMockUIState({ isInputActive: true });
+      const { useVimMode } = await import('../contexts/VimModeContext.js');
+      vi.mocked(useVimMode).mockReturnValue({
+        vimEnabled: true,
+        vimMode: 'NORMAL',
+        toggleVimEnabled: vi.fn(),
+        setVimMode: vi.fn(),
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).toContain(
+        "InputPrompt:   Press 'i' for INSERT mode.",
+      );
     });
   });
 });

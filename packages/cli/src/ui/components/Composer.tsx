@@ -35,7 +35,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
   const uiState = useUIState();
   const uiActions = useUIActions();
-  const { vimEnabled } = useVimMode();
+  const { vimEnabled, vimMode } = useVimMode();
   const terminalWidth = process.stdout.columns;
   const isNarrow = isNarrowWidth(terminalWidth);
   const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
@@ -143,7 +143,9 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           popAllMessages={uiActions.popAllMessages}
           placeholder={
             vimEnabled
-              ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."
+              ? vimMode === 'INSERT'
+                ? "  Press 'Esc' for NORMAL mode."
+                : "  Press 'i' for INSERT mode."
               : uiState.shellModeActive
                 ? '  Type your shell command'
                 : '  Type your message or @path/to/file'

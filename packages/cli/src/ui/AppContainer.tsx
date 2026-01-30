@@ -27,6 +27,7 @@ import {
   type HistoryItemWithoutId,
   type HistoryItemToolGroup,
   AuthState,
+  type ConfirmationRequest,
 } from './types.js';
 import { MessageType, StreamingState } from './types.js';
 import { ToolActionsProvider } from './contexts/ToolActionsContext.js';
@@ -68,6 +69,7 @@ import {
   SessionStartSource,
   SessionEndReason,
   generateSummary,
+  type ConsentRequestPayload,
   MessageBusType,
   type AskUserRequest,
   type AgentsDiscoveredPayload,
@@ -912,7 +914,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     slashCommands,
     pendingHistoryItems: pendingSlashCommandHistoryItems,
     commandContext,
-    confirmationRequest,
+    confirmationRequest: commandConfirmationRequest,
   } = useSlashCommandProcessor(
     config,
     settings,
@@ -928,6 +930,26 @@ Logging in with Google... Restarting Gemini CLI to continue.
     setBannerVisible,
     setCustomDialog,
   );
+
+  const [authConsentRequest, setAuthConsentRequest] =
+    useState<ConfirmationRequest | null>(null);
+
+  useEffect(() => {
+    const handleConsentRequest = (payload: ConsentRequestPayload) => {
+      setAuthConsentRequest({
+        prompt: payload.prompt,
+        onConfirm: (confirmed: boolean) => {
+          setAuthConsentRequest(null);
+          payload.onConfirm(confirmed);
+        },
+      });
+    };
+
+    coreEvents.on(CoreEvent.ConsentRequest, handleConsentRequest);
+    return () => {
+      coreEvents.off(CoreEvent.ConsentRequest, handleConsentRequest);
+    };
+  }, []);
 
   const performMemoryRefresh = useCallback(async () => {
     historyManager.addItem(
@@ -1700,7 +1722,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     const paddedTitle = computeTerminalTitle({
       streamingState,
       thoughtSubject: thought?.subject,
-      isConfirming: !!confirmationRequest || shouldShowActionRequiredTitle,
+      isConfirming:
+        !!commandConfirmationRequest || shouldShowActionRequiredTitle,
       isSilentWorking: shouldShowSilentWorkingTitle,
       folderName: basename(config.getTargetDir()),
       showThoughts: !!settings.merged.ui.showStatusInTitle,
@@ -1716,7 +1739,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, [
     streamingState,
     thought,
-    confirmationRequest,
+    commandConfirmationRequest,
     shouldShowActionRequiredTitle,
     shouldShowSilentWorkingTitle,
     settings.merged.ui.showStatusInTitle,
@@ -1796,7 +1819,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     shouldShowIdePrompt ||
     isFolderTrustDialogOpen ||
     adminSettingsChanged ||
-    !!confirmationRequest ||
+    !!commandConfirmationRequest ||
+    !!authConsentRequest ||
     !!customDialog ||
     confirmUpdateExtensionRequests.length > 0 ||
     !!loopDetectionConfirmationRequest ||
@@ -1906,7 +1930,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       slashCommands,
       pendingSlashCommandHistoryItems,
       commandContext,
-      confirmationRequest,
+      commandConfirmationRequest,
+      authConsentRequest,
       confirmUpdateExtensionRequests,
       loopDetectionConfirmationRequest,
       geminiMdFileCount,
@@ -2010,7 +2035,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       slashCommands,
       pendingSlashCommandHistoryItems,
       commandContext,
-      confirmationRequest,
+      commandConfirmationRequest,
+      authConsentRequest,
       confirmUpdateExtensionRequests,
       loopDetectionConfirmationRequest,
       geminiMdFileCount,
