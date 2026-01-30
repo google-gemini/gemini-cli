@@ -25,6 +25,7 @@ import {
   type RetrieveUserQuotaResponse,
   VALID_GEMINI_MODELS,
 } from '@google/gemini-cli-core';
+import { useSettings } from '../contexts/SettingsContext.js';
 
 // A more flexible and powerful StatRow component
 interface StatRowProps {
@@ -364,17 +365,25 @@ interface StatsDisplayProps {
   duration: string;
   title?: string;
   quotas?: RetrieveUserQuotaResponse;
+  selectedAuthType?: string;
+  userEmail?: string;
+  tier?: string;
 }
 
 export const StatsDisplay: React.FC<StatsDisplayProps> = ({
   duration,
   title,
   quotas,
+  selectedAuthType,
+  userEmail,
+  tier,
 }) => {
   const { stats } = useSessionStats();
   const { metrics } = stats;
   const { models, tools, files } = metrics;
   const computed = computeSessionStats(metrics);
+  const settings = useSettings();
+  const showUserIdentity = settings.merged.ui.showUserIdentity;
 
   const successThresholds = {
     green: TOOL_SUCCESS_RATE_HIGH,
@@ -417,6 +426,22 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
         <StatRow title="Session ID:">
           <Text color={theme.text.primary}>{stats.sessionId}</Text>
         </StatRow>
+        {showUserIdentity && selectedAuthType && (
+          <StatRow title="Auth Method:">
+            <Text color={theme.text.primary}>
+              {selectedAuthType.startsWith('oauth')
+                ? userEmail
+                  ? `Logged in with Google (${userEmail})`
+                  : 'Logged in with Google'
+                : selectedAuthType}
+            </Text>
+          </StatRow>
+        )}
+        {showUserIdentity && tier && (
+          <StatRow title="Tier:">
+            <Text color={theme.text.primary}>{tier}</Text>
+          </StatRow>
+        )}
         <StatRow title="Tool Calls:">
           <Text color={theme.text.primary}>
             {tools.totalCalls} ({' '}

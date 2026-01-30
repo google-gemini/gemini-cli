@@ -348,7 +348,12 @@ export class LoadedSettings {
 
   setRemoteAdminSettings(remoteSettings: FetchAdminControlsResponse): void {
     const admin: Settings['admin'] = {};
-    const { secureModeEnabled, mcpSetting, cliFeatureSetting } = remoteSettings;
+    const {
+      secureModeEnabled,
+      strictModeDisabled,
+      mcpSetting,
+      cliFeatureSetting,
+    } = remoteSettings;
 
     if (Object.keys(remoteSettings).length === 0) {
       this._remoteAdminSettings = { admin };
@@ -356,15 +361,20 @@ export class LoadedSettings {
       return;
     }
 
-    admin.secureModeEnabled = secureModeEnabled ?? false;
+    if (strictModeDisabled !== undefined) {
+      admin.secureModeEnabled = !strictModeDisabled;
+    } else if (secureModeEnabled !== undefined) {
+      admin.secureModeEnabled = secureModeEnabled;
+    } else {
+      admin.secureModeEnabled = true;
+    }
     admin.mcp = { enabled: mcpSetting?.mcpEnabled ?? false };
     admin.extensions = {
       enabled: cliFeatureSetting?.extensionsSetting?.extensionsEnabled ?? false,
     };
-
-    if (cliFeatureSetting?.advancedFeaturesEnabled !== undefined) {
-      admin.skills = { enabled: cliFeatureSetting.advancedFeaturesEnabled };
-    }
+    admin.skills = {
+      enabled: cliFeatureSetting?.unmanagedCapabilitiesEnabled ?? false,
+    };
 
     this._remoteAdminSettings = { admin };
     this._merged = this.computeMergedSettings();

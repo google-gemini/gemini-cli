@@ -112,7 +112,7 @@ export async function maybePromptForSettings(
   const nonSensitiveSettings: Record<string, string> = {};
   for (const setting of settings) {
     const value = allSettings[setting.envVar];
-    if (value === undefined) {
+    if (value === undefined || value === '') {
       continue;
     }
     if (setting.sensitive) {
@@ -207,7 +207,7 @@ export async function updateSetting(
   settingKey: string,
   requestSetting: (setting: ExtensionSetting) => Promise<string>,
   scope: ExtensionSettingScope,
-  workspaceDir?: string,
+  workspaceDir: string,
 ): Promise<void> {
   const { name: extensionName, settings } = extensionConfig;
   if (!settings || settings.length === 0) {
@@ -230,7 +230,15 @@ export async function updateSetting(
   );
 
   if (settingToUpdate.sensitive) {
-    await keychain.setSecret(settingToUpdate.envVar, newValue);
+    if (newValue) {
+      await keychain.setSecret(settingToUpdate.envVar, newValue);
+    } else {
+      try {
+        await keychain.deleteSecret(settingToUpdate.envVar);
+      } catch {
+        // Ignore if secret does not exist
+      }
+    }
     return;
   }
 

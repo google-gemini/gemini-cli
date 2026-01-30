@@ -29,7 +29,7 @@ export const TOOL_STATUS = {
 // Maximum number of MCP resources to display per server before truncating
 export const MAX_MCP_RESOURCES_TO_SHOW = 10;
 
-export const WARNING_PROMPT_DURATION_MS = 1000;
+export const WARNING_PROMPT_DURATION_MS = 3000;
 export const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
 export const SHELL_ACTION_REQUIRED_TITLE_DELAY_MS = 30000;
 export const SHELL_SILENT_WORKING_TITLE_DELAY_MS = 120000;

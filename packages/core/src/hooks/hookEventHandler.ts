@@ -49,6 +49,13 @@ export class HookEventHandler {
   private readonly hookRunner: HookRunner;
   private readonly hookAggregator: HookAggregator;
 
+  /**
+   * Track reported failures to suppress duplicate warnings during streaming.
+   * Uses a WeakMap with the original request object as a key to ensure
+   * failures are only reported once per logical model interaction.
+   */
+  private readonly reportedFailures = new WeakMap<object, Set<string>>();
+
   constructor(
     config: Config,
     hookPlanner: HookPlanner,
@@ -210,7 +217,12 @@ export class HookEventHandler {
       llm_request: defaultHookTranslator.toHookLLMRequest(llmRequest),
     };
 
-    return this.executeHooks(HookEventName.BeforeModel, input);
+    return this.executeHooks(
+      HookEventName.BeforeModel,
+      input,
+      undefined,
+      llmRequest,
+    );
   }
 
   /**
@@ -227,7 +239,12 @@ export class HookEventHandler {
       llm_response: defaultHookTranslator.toHookLLMResponse(llmResponse),
     };
 
-    return this.executeHooks(HookEventName.AfterModel, input);
+    return this.executeHooks(
+      HookEventName.AfterModel,
+      input,
+      undefined,
+      llmRequest,
+    );
   }
 
   /**
@@ -242,7 +259,12 @@ export class HookEventHandler {
       llm_request: defaultHookTranslator.toHookLLMRequest(llmRequest),
     };
 
-    return this.executeHooks(HookEventName.BeforeToolSelection, input);
+    return this.executeHooks(
+      HookEventName.BeforeToolSelection,
+      input,
+      undefined,
+      llmRequest,
+    );
   }
 
   /**
@@ -253,6 +275,7 @@ export class HookEventHandler {
     eventName: HookEventName,
     input: HookInput,
     context?: HookEventContext,
+    requestContext?: object,
   ): Promise<AggregatedHookResult> {
     try {
       // Create execution plan
@@ -311,7 +334,13 @@ export class HookEventHandler {
       this.processCommonHookOutputFields(aggregated);
 
       // Log hook execution
-      this.logHookExecution(eventName, input, results, aggregated);
+      this.logHookExecution(
+        eventName,
+        input,
+        results,
+        aggregated,
+        requestContext,
+      );
 
       return aggregated;
     } catch (error) {
@@ -354,6 +383,7 @@ export class HookEventHandler {
     input: HookInput,
     results: HookExecutionResult[],
     aggregated: AggregatedHookResult,
+    requestContext?: object,
   ): void {
     const failedHooks = results.filter((r) => !r.success);
     const successCount = results.length - failedHooks.length;
@@ -364,15 +394,33 @@ export class HookEventHandler {
         .map((r) => this.getHookNameFromResult(r))
         .join(', ');
 
+      let shouldEmit = true;
+      if (requestContext) {
+        let reportedSet = this.reportedFailures.get(requestContext);
+        if (!reportedSet) {
+          reportedSet = new Set<string>();
+          this.reportedFailures.set(requestContext, reportedSet);
+        }
+
+        const failureKey = `${eventName}:${failedNames}`;
+        if (reportedSet.has(failureKey)) {
+          shouldEmit = false;
+        } else {
+          reportedSet.add(failureKey);
+        }
+      }
+
       debugLogger.warn(
         `Hook execution for ${eventName}: ${successCount} succeeded, ${errorCount} failed (${failedNames}), ` +
           `total duration: ${aggregated.totalDuration}ms`,
       );
 
-      coreEvents.emitFeedback(
-        'warning',
-        `Hook(s) [${failedNames}] failed for event ${eventName}. Press F12 to see the debug drawer for more details.\n`,
-      );
+      if (shouldEmit) {
+        coreEvents.emitFeedback(
+          'warning',
+          `Hook(s) [${failedNames}] failed for event ${eventName}. Press F12 to see the debug drawer for more details.\n`,
+        );
+      }
     } else {
       debugLogger.debug(
         `Hook execution for ${eventName}: ${successCount} hooks executed successfully, ` +

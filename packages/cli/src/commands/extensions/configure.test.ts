@@ -22,6 +22,7 @@ import {
   type ExtensionSetting,
 } from '../../config/extensions/extensionSettings.js';
 import prompts from 'prompts';
+import * as fs from 'node:fs';
 
 const {
   mockExtensionManager,
@@ -79,11 +80,15 @@ vi.mock('../../config/settings.js', () => ({
 }));
 
 describe('extensions configure command', () => {
+  let tempWorkspaceDir: string;
+
   beforeEach(() => {
     vi.spyOn(debugLogger, 'log');
     vi.spyOn(debugLogger, 'error');
     vi.clearAllMocks();
 
+    tempWorkspaceDir = fs.mkdtempSync('gemini-cli-test-workspace');
+    vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
     // Default behaviors
     mockLoadSettings.mockReturnValue({ merged: {} });
     mockGetExtensionAndManager.mockResolvedValue({
@@ -141,6 +146,7 @@ describe('extensions configure command', () => {
         'TEST_VAR',
         promptForSetting,
         'user',
+        tempWorkspaceDir,
       );
     });
 
@@ -186,6 +192,7 @@ describe('extensions configure command', () => {
         'VAR_1',
         promptForSetting,
         'user',
+        tempWorkspaceDir,
       );
     });
 

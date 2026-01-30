@@ -72,7 +72,8 @@ powerful tool for developers.
 
 ## Documentation
 
+- Always use the `docs-writer` skill when you are asked to write, edit, or
+  review any documentation.
+- Documentation is located in the `docs/` directory.
 - Suggest documentation updates when code changes render existing documentation
   obsolete or incomplete.
-- Located in the `docs/` directory.
-- Use the `docs-writer` skill.

@@ -27,6 +27,7 @@ import {
   type HistoryItemWithoutId,
   type HistoryItemToolGroup,
   AuthState,
+  type ConfirmationRequest,
 } from './types.js';
 import { MessageType, StreamingState } from './types.js';
 import { ToolActionsProvider } from './contexts/ToolActionsContext.js';
@@ -47,6 +48,7 @@ import {
   getErrorMessage,
   getAllGeminiMdFilenames,
   AuthType,
+  UserAccountManager,
   clearCachedCredentialFile,
   type ResumedSessionData,
   recordExitFail,
@@ -67,6 +69,7 @@ import {
   SessionStartSource,
   SessionEndReason,
   generateSummary,
+  type ConsentRequestPayload,
   MessageBusType,
   type AskUserRequest,
   type AgentsDiscoveredPayload,
@@ -186,11 +189,58 @@ const SHELL_HEIGHT_PADDING = 10;
 
 export const AppContainer = (props: AppContainerProps) => {
   const { config, initializationResult, resumedSessionData } = props;
+  const settings = useSettings();
+
   const historyManager = useHistory({
     chatRecordingService: config.getGeminiClient()?.getChatRecordingService(),
   });
+  const { addItem } = historyManager;
+
+  const authCheckPerformed = useRef(false);
+  useEffect(() => {
+    if (authCheckPerformed.current) return;
+    authCheckPerformed.current = true;
+
+    if (resumedSessionData || settings.merged.ui.showUserIdentity === false) {
+      return;
+    }
+    const authType = config.getContentGeneratorConfig()?.authType;
+
+    // Run this asynchronously to avoid blocking the event loop.
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    (async () => {
+      try {
+        const userAccountManager = new UserAccountManager();
+        const email = userAccountManager.getCachedGoogleAccount();
+        const tierName = config.getUserTierName();
+
+        if (authType) {
+          let message =
+            authType === AuthType.LOGIN_WITH_GOOGLE
+              ? email
+                ? `Logged in with Google: ${email}`
+                : 'Logged in with Google'
+              : `Authenticated with ${authType}`;
+          if (tierName) {
+            message += ` (Plan: ${tierName})`;
+          }
+          addItem({
+            type: MessageType.INFO,
+            text: message,
+          });
+        }
+      } catch (_e) {
+        // Ignore errors during initial auth check
+      }
+    })();
+  }, [
+    config,
+    resumedSessionData,
+    settings.merged.ui.showUserIdentity,
+    addItem,
+  ]);
+
   useMemoryMonitor(historyManager);
-  const settings = useSettings();
   const isAlternateBuffer = useAlternateBuffer();
   const [corgiMode, setCorgiMode] = useState(false);
   const [debugMessage, setDebugMessage] = useState<string>('');
@@ -837,7 +887,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     slashCommands,
     pendingHistoryItems: pendingSlashCommandHistoryItems,
     commandContext,
-    confirmationRequest,
+    confirmationRequest: commandConfirmationRequest,
   } = useSlashCommandProcessor(
     config,
     settings,
@@ -853,6 +903,26 @@ Logging in with Google... Restarting Gemini CLI to continue.
     setBannerVisible,
     setCustomDialog,
   );
+
+  const [authConsentRequest, setAuthConsentRequest] =
+    useState<ConfirmationRequest | null>(null);
+
+  useEffect(() => {
+    const handleConsentRequest = (payload: ConsentRequestPayload) => {
+      setAuthConsentRequest({
+        prompt: payload.prompt,
+        onConfirm: (confirmed: boolean) => {
+          setAuthConsentRequest(null);
+          payload.onConfirm(confirmed);
+        },
+      });
+    };
+
+    coreEvents.on(CoreEvent.ConsentRequest, handleConsentRequest);
+    return () => {
+      coreEvents.off(CoreEvent.ConsentRequest, handleConsentRequest);
+    };
+  }, []);
 
   const performMemoryRefresh = useCallback(async () => {
     historyManager.addItem(
@@ -1443,6 +1513,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       if (keyMatchers[Command.SHOW_ERROR_DETAILS](key)) {
         setShowErrorDetails((prev) => !prev);
         return true;
+      } else if (keyMatchers[Command.SUSPEND_APP](key)) {
+        handleWarning('Undo has been moved to Cmd + Z or Alt/Opt + Z');
+        return true;
       } else if (keyMatchers[Command.SHOW_FULL_TODOS](key)) {
         setShowFullTodos((prev) => !prev);
         return true;
@@ -1535,7 +1608,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     const paddedTitle = computeTerminalTitle({
       streamingState,
       thoughtSubject: thought?.subject,
-      isConfirming: !!confirmationRequest || shouldShowActionRequiredTitle,
+      isConfirming:
+        !!commandConfirmationRequest || shouldShowActionRequiredTitle,
       isSilentWorking: shouldShowSilentWorkingTitle,
       folderName: basename(config.getTargetDir()),
       showThoughts: !!settings.merged.ui.showStatusInTitle,
@@ -1551,7 +1625,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, [
     streamingState,
     thought,
-    confirmationRequest,
+    commandConfirmationRequest,
     shouldShowActionRequiredTitle,
     shouldShowSilentWorkingTitle,
     settings.merged.ui.showStatusInTitle,
@@ -1631,7 +1705,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     shouldShowIdePrompt ||
     isFolderTrustDialogOpen ||
     adminSettingsChanged ||
-    !!confirmationRequest ||
+    !!commandConfirmationRequest ||
+    !!authConsentRequest ||
     !!customDialog ||
     confirmUpdateExtensionRequests.length > 0 ||
     !!loopDetectionConfirmationRequest ||
@@ -1741,7 +1816,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       slashCommands,
       pendingSlashCommandHistoryItems,
       commandContext,
-      confirmationRequest,
+      commandConfirmationRequest,
+      authConsentRequest,
       confirmUpdateExtensionRequests,
       loopDetectionConfirmationRequest,
       geminiMdFileCount,
@@ -1839,7 +1915,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       slashCommands,
       pendingSlashCommandHistoryItems,
       commandContext,
-      confirmationRequest,
+      commandConfirmationRequest,
+      authConsentRequest,
       confirmUpdateExtensionRequests,
       loopDetectionConfirmationRequest,
       geminiMdFileCount,

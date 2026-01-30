@@ -596,9 +596,9 @@ describe('parseArguments', () => {
 
   it('should set isCommand to true for hooks command', async () => {
     process.argv = ['node', 'script.js', 'hooks', 'migrate'];
-    // Hooks command enabled via tools settings
+    // Hooks command enabled via hooksConfig settings
     const settings = createTestMergedSettings({
-      tools: { enableHooks: true },
+      hooksConfig: { enabled: true },
     });
     const argv = await parseArguments(settings);
     expect(argv.isCommand).toBe(true);

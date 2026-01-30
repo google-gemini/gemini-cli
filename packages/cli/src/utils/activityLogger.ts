@@ -323,13 +323,17 @@ export class ActivityLogger extends EventEmitter {
 }
 
 /**
- * Registers the activity logger if debug mode and interactive session are enabled.
+ * Registers the activity logger.
  * Captures network and console logs to a session-specific JSONL file.
+ *
+ * The log file location can be overridden via the GEMINI_CLI_ACTIVITY_LOG_FILE
+ * environment variable. If not set, defaults to logs/session-{sessionId}.jsonl
+ * in the project's temp directory.
  *
  * @param config The CLI configuration
  */
 export function registerActivityLogger(config: Config) {
-  if (config.isInteractive() && config.storage && config.getDebugMode()) {
+  if (config.storage) {
     const capture = ActivityLogger.getInstance();
     capture.enable();
 
@@ -338,10 +342,10 @@ export function registerActivityLogger(config: Config) {
       fs.mkdirSync(logsDir, { recursive: true });
     }
 
-    const logFile = path.join(
-      logsDir,
-      `session-${config.getSessionId()}.jsonl`,
-    );
+    const logFile =
+      process.env['GEMINI_CLI_ACTIVITY_LOG_FILE'] ||
+      path.join(logsDir, `session-${config.getSessionId()}.jsonl`);
+
     const writeToLog = (type: 'console' | 'network', payload: unknown) => {
       try {
         const entry =

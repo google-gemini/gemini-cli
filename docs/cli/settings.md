@@ -57,6 +57,7 @@ they appear in the UI.
 | Show Line Numbers              | `ui.showLineNumbers`                    | Show line numbers in the chat.                                                                                                                                    | `true`  |
 | Show Citations                 | `ui.showCitations`                      | Show citations for generated text in the chat.                                                                                                                    | `false` |
 | Show Model Info In Chat        | `ui.showModelInfoInChat`                | Show the model name in the chat for each model turn.                                                                                                              | `false` |
+| Show User Identity             | `ui.showUserIdentity`                   | Show the logged-in user's identity (e.g. email) in the UI.                                                                                                        | `true`  |
 | Use Alternate Screen Buffer    | `ui.useAlternateBuffer`                 | Use an alternate screen buffer for the UI, preserving shell history.                                                                                              | `false` |
 | Use Background Color           | `ui.useBackgroundColor`                 | Whether to use background colors in the UI.                                                                                                                       | `true`  |
 | Incremental Rendering          | `ui.incrementalRendering`               | Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled. | `true`  |
@@ -129,8 +130,9 @@ they appear in the UI.
 
 ### HooksConfig
 
-| UI Label           | Setting                     | Description                                      | Default |
-| ------------------ | --------------------------- | ------------------------------------------------ | ------- |
-| Hook Notifications | `hooksConfig.notifications` | Show visual indicators when hooks are executing. | `true`  |
+| UI Label           | Setting                     | Description                                                                      | Default |
+| ------------------ | --------------------------- | -------------------------------------------------------------------------------- | ------- |
+| Enable Hooks       | `hooksConfig.enabled`       | Canonical toggle for the hooks system. When disabled, no hooks will be executed. | `true`  |
+| Hook Notifications | `hooksConfig.notifications` | Show visual indicators when hooks are executing.                                 | `true`  |
 
 <!-- SETTINGS-AUTOGEN:END -->

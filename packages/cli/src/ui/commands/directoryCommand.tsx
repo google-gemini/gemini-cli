@@ -57,6 +57,13 @@ async function finishAddingDirectories(
     const gemini = config.getGeminiClient();
     if (gemini) {
       await gemini.addDirectoryContext();
+
+      // Persist directories to session file for resume support
+      const chatRecordingService = gemini.getChatRecordingService();
+      const workspaceContext = config.getWorkspaceContext();
+      chatRecordingService?.recordDirectories(
+        workspaceContext.getDirectories(),
+      );
     }
     addItem({
       type: MessageType.INFO,

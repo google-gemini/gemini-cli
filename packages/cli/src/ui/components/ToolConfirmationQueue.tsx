@@ -26,17 +26,23 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
 }) => {
   const config = useConfig();
   const isAlternateBuffer = useAlternateBuffer();
-  const { mainAreaWidth, terminalHeight, constrainHeight } = useUIState();
+  const {
+    mainAreaWidth,
+    terminalHeight,
+    constrainHeight,
+    availableTerminalHeight: uiAvailableHeight,
+  } = useUIState();
   const { tool, index, total } = confirmingTool;
 
   // Safety check: ToolConfirmationMessage requires confirmationDetails
   if (!tool.confirmationDetails) return null;
 
-  // V1: Constrain the queue to at most 50% of the terminal height to ensure
-  // some history is always visible and to prevent flickering.
-  // We pass this to ToolConfirmationMessage so it can calculate internal
-  // truncation while keeping buttons visible.
-  const maxHeight = Math.floor(terminalHeight * 0.5);
+  // Render up to 100% of the available terminal height (minus 1 line for safety)
+  // to maximize space for diffs and other content.
+  const maxHeight =
+    uiAvailableHeight !== undefined
+      ? Math.max(uiAvailableHeight - 1, 4)
+      : Math.floor(terminalHeight * 0.5);
 
   // ToolConfirmationMessage needs to know the height available for its OWN content.
   // We subtract the lines used by the Queue wrapper:

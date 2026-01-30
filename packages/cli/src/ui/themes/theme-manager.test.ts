@@ -11,7 +11,7 @@ if (process.env['NO_COLOR'] !== undefined) {
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { themeManager, DEFAULT_THEME } from './theme-manager.js';
-import type { CustomTheme } from './theme.js';
+import type { CustomTheme } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import type * as osActual from 'node:os';
@@ -186,6 +186,56 @@ describe('ThemeManager', () => {
       );
 
       consoleWarnSpy.mockRestore();
+    });
+  });
+
+  describe('extension themes', () => {
+    it('should register and unregister themes from extensions with namespacing', () => {
+      const extTheme: CustomTheme = {
+        ...validCustomTheme,
+        name: 'ExtensionTheme',
+      };
+      const extensionName = 'test-extension';
+      const namespacedName = `ExtensionTheme (${extensionName})`;
+
+      themeManager.registerExtensionThemes(extensionName, [extTheme]);
+      expect(themeManager.getCustomThemeNames()).toContain(namespacedName);
+      expect(themeManager.isCustomTheme(namespacedName)).toBe(true);
+
+      themeManager.unregisterExtensionThemes(extensionName, [extTheme]);
+      expect(themeManager.getCustomThemeNames()).not.toContain(namespacedName);
+      expect(themeManager.isCustomTheme(namespacedName)).toBe(false);
+    });
+
+    it('should not allow extension themes to overwrite built-in themes even with prefixing', () => {
+      // availableThemes has 'Ayu'.
+      // We verify that it DOES prefix, so it won't collide even if extension name is similar.
+      themeManager.registerExtensionThemes('Ext', [
+        { ...validCustomTheme, name: 'Theme' },
+      ]);
+      expect(themeManager.getCustomThemeNames()).toContain('Theme (Ext)');
+    });
+
+    it('should allow extension themes and settings themes to coexist', () => {
+      const extTheme: CustomTheme = {
+        ...validCustomTheme,
+        name: 'ExtensionTheme',
+      };
+      const settingsTheme: CustomTheme = {
+        ...validCustomTheme,
+        name: 'SettingsTheme',
+      };
+
+      themeManager.registerExtensionThemes('Ext', [extTheme]);
+      themeManager.loadCustomThemes({ SettingsTheme: settingsTheme });
+
+      expect(themeManager.getCustomThemeNames()).toContain(
+        'ExtensionTheme (Ext)',
+      );
+      expect(themeManager.getCustomThemeNames()).toContain('SettingsTheme');
+
+      expect(themeManager.isCustomTheme('ExtensionTheme (Ext)')).toBe(true);
+      expect(themeManager.isCustomTheme('SettingsTheme')).toBe(true);
     });
   });
 });

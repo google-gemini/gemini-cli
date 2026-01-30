@@ -157,10 +157,16 @@ export type HistoryItemStats = HistoryItemBase & {
   type: 'stats';
   duration: string;
   quotas?: RetrieveUserQuotaResponse;
+  selectedAuthType?: string;
+  userEmail?: string;
+  tier?: string;
 };
 
 export type HistoryItemModelStats = HistoryItemBase & {
   type: 'model_stats';
+  selectedAuthType?: string;
+  userEmail?: string;
+  tier?: string;
 };
 
 export type HistoryItemToolStats = HistoryItemBase & {

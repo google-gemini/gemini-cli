@@ -34,11 +34,24 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   });
 
   // Ensure table fits within terminal width
-  const totalWidth = columnWidths.reduce((sum, width) => sum + width + 1, 1);
+  // We calculate scale based on content width vs available width (terminal - borders)
+  // First, extract content widths by removing the 2-char padding.
+  const contentWidths = columnWidths.map((width) => Math.max(0, width - 2));
+  const totalContentWidth = contentWidths.reduce(
+    (sum, width) => sum + width,
+    0,
+  );
+
+  // Fixed overhead includes padding (2 per column) and separators (1 per column + 1 final).
+  const fixedOverhead = headers.length * 2 + (headers.length + 1);
+
+  // Subtract 1 from available width to avoid edge-case wrapping on some terminals
+  const availableWidth = Math.max(0, terminalWidth - fixedOverhead - 1);
+
   const scaleFactor =
-    totalWidth > terminalWidth ? terminalWidth / totalWidth : 1;
-  const adjustedWidths = columnWidths.map((width) =>
-    Math.floor(width * scaleFactor),
+    totalContentWidth > availableWidth ? availableWidth / totalContentWidth : 1;
+  const adjustedWidths = contentWidths.map(
+    (width) => Math.floor(width * scaleFactor) + 2,
   );
 
   // Helper function to render a cell with proper width
@@ -70,7 +83,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
           const candidate = content.substring(0, mid);
           const candidateWidth = getPlainTextLength(candidate);
 
-          if (candidateWidth <= contentWidth - 3) {
+          if (candidateWidth <= contentWidth - 1) {
             bestTruncated = candidate;
             left = mid + 1;
           } else {
@@ -78,7 +91,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
           }
         }
 
-        cellContent = bestTruncated + '...';
+        cellContent = bestTruncated + '…';
       }
     }
 
@@ -124,14 +137,16 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
 
     return (
       <Text color={theme.text.primary}>
-        │{' '}
+        <Text color={theme.border.default}>│</Text>{' '}
         {renderedCells.map((cell, index) => (
           <React.Fragment key={index}>
             {cell}
-            {index < renderedCells.length - 1 ? ' │ ' : ''}
+            {index < renderedCells.length - 1 && (
+              <Text color={theme.border.default}>{' │ '}</Text>
+            )}
           </React.Fragment>
         ))}{' '}
-        │
+        <Text color={theme.border.default}>│</Text>
       </Text>
     );
   };

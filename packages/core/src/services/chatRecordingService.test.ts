@@ -402,6 +402,77 @@ describe('ChatRecordingService', () => {
     });
   });
 
+  describe('recordDirectories', () => {
+    beforeEach(() => {
+      chatRecordingService.initialize();
+    });
+
+    it('should save directories to the conversation', () => {
+      const writeFileSyncSpy = vi
+        .spyOn(fs, 'writeFileSync')
+        .mockImplementation(() => undefined);
+      const initialConversation = {
+        sessionId: 'test-session-id',
+        projectHash: 'test-project-hash',
+        messages: [
+          {
+            id: '1',
+            type: 'user',
+            content: 'Hello',
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      };
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(
+        JSON.stringify(initialConversation),
+      );
+
+      chatRecordingService.recordDirectories([
+        '/path/to/dir1',
+        '/path/to/dir2',
+      ]);
+
+      expect(writeFileSyncSpy).toHaveBeenCalled();
+      const conversation = JSON.parse(
+        writeFileSyncSpy.mock.calls[0][1] as string,
+      ) as ConversationRecord;
+      expect(conversation.directories).toEqual([
+        '/path/to/dir1',
+        '/path/to/dir2',
+      ]);
+    });
+
+    it('should overwrite existing directories', () => {
+      const writeFileSyncSpy = vi
+        .spyOn(fs, 'writeFileSync')
+        .mockImplementation(() => undefined);
+      const initialConversation = {
+        sessionId: 'test-session-id',
+        projectHash: 'test-project-hash',
+        messages: [
+          {
+            id: '1',
+            type: 'user',
+            content: 'Hello',
+            timestamp: new Date().toISOString(),
+          },
+        ],
+        directories: ['/old/dir'],
+      };
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(
+        JSON.stringify(initialConversation),
+      );
+
+      chatRecordingService.recordDirectories(['/new/dir1', '/new/dir2']);
+
+      expect(writeFileSyncSpy).toHaveBeenCalled();
+      const conversation = JSON.parse(
+        writeFileSyncSpy.mock.calls[0][1] as string,
+      ) as ConversationRecord;
+      expect(conversation.directories).toEqual(['/new/dir1', '/new/dir2']);
+    });
+  });
+
   describe('rewindTo', () => {
     it('should rewind the conversation to a specific message ID', () => {
       chatRecordingService.initialize();

@@ -177,6 +177,84 @@ describe('useSessionResume', () => {
       expect(mockRefreshStatic).toHaveBeenCalledTimes(1);
       expect(mockGeminiClient.resumeChat).toHaveBeenCalledWith([], resumedData);
     });
+
+    it('should restore directories from resumed session data', async () => {
+      const mockAddDirectories = vi
+        .fn()
+        .mockReturnValue({ added: [], failed: [] });
+      const mockWorkspaceContext = {
+        addDirectories: mockAddDirectories,
+      };
+      const configWithWorkspace = {
+        ...mockConfig,
+        getWorkspaceContext: vi.fn().mockReturnValue(mockWorkspaceContext),
+      };
+
+      const { result } = renderHook(() =>
+        useSessionResume({
+          ...getDefaultProps(),
+          config: configWithWorkspace as unknown as Config,
+        }),
+      );
+
+      const resumedData: ResumedSessionData = {
+        conversation: {
+          sessionId: 'test-123',
+          projectHash: 'project-123',
+          startTime: '2025-01-01T00:00:00Z',
+          lastUpdated: '2025-01-01T01:00:00Z',
+          messages: [] as MessageRecord[],
+          directories: ['/restored/dir1', '/restored/dir2'],
+        },
+        filePath: '/path/to/session.json',
+      };
+
+      await act(async () => {
+        await result.current.loadHistoryForResume([], [], resumedData);
+      });
+
+      expect(configWithWorkspace.getWorkspaceContext).toHaveBeenCalled();
+      expect(mockAddDirectories).toHaveBeenCalledWith([
+        '/restored/dir1',
+        '/restored/dir2',
+      ]);
+    });
+
+    it('should not call addDirectories when no directories in resumed session', async () => {
+      const mockAddDirectories = vi.fn();
+      const mockWorkspaceContext = {
+        addDirectories: mockAddDirectories,
+      };
+      const configWithWorkspace = {
+        ...mockConfig,
+        getWorkspaceContext: vi.fn().mockReturnValue(mockWorkspaceContext),
+      };
+
+      const { result } = renderHook(() =>
+        useSessionResume({
+          ...getDefaultProps(),
+          config: configWithWorkspace as unknown as Config,
+        }),
+      );
+
+      const resumedData: ResumedSessionData = {
+        conversation: {
+          sessionId: 'test-123',
+          projectHash: 'project-123',
+          startTime: '2025-01-01T00:00:00Z',
+          lastUpdated: '2025-01-01T01:00:00Z',
+          messages: [] as MessageRecord[],
+          // No directories field
+        },
+        filePath: '/path/to/session.json',
+      };
+
+      await act(async () => {
+        await result.current.loadHistoryForResume([], [], resumedData);
+      });
+
+      expect(mockAddDirectories).not.toHaveBeenCalled();
+    });
   });
 
   describe('callback stability', () => {

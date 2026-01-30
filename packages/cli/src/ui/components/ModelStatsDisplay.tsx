@@ -15,6 +15,7 @@ import {
 } from '../utils/computeStats.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { Table, type Column } from './Table.js';
+import { useSettings } from '../contexts/SettingsContext.js';
 
 interface StatRowData {
   metric: string;
@@ -24,9 +25,21 @@ interface StatRowData {
   [key: string]: string | React.ReactNode | boolean | undefined;
 }
 
-export const ModelStatsDisplay: React.FC = () => {
+interface ModelStatsDisplayProps {
+  selectedAuthType?: string;
+  userEmail?: string;
+  tier?: string;
+}
+
+export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
+  selectedAuthType,
+  userEmail,
+  tier,
+}) => {
   const { stats } = useSessionStats();
   const { models } = stats.metrics;
+  const settings = useSettings();
+  const showUserIdentity = settings.merged.ui.showUserIdentity;
   const activeModels = Object.entries(models).filter(
     ([, metrics]) => metrics.api.totalRequests > 0,
   );
@@ -75,10 +88,12 @@ export const ModelStatsDisplay: React.FC = () => {
     return row;
   };
 
-  const rows: StatRowData[] = [
-    // API Section
-    { metric: 'API', isSection: true },
-    createRow('Requests', (m) => m.api.totalRequests.toLocaleString()),
+  const rows: StatRowData[] = [];
+
+  // API Section
+  rows.push({ metric: 'API', isSection: true });
+  rows.push(createRow('Requests', (m) => m.api.totalRequests.toLocaleString()));
+  rows.push(
     createRow('Errors', (m) => {
       const errorRate = calculateErrorRate(m);
       return (
@@ -91,18 +106,24 @@ export const ModelStatsDisplay: React.FC = () => {
         </Text>
       );
     }),
+  );
+  rows.push(
     createRow('Avg Latency', (m) => formatDuration(calculateAverageLatency(m))),
+  );
 
-    // Spacer
-    { metric: '' },
+  // Spacer
+  rows.push({ metric: '' });
 
-    // Tokens Section
-    { metric: 'Tokens', isSection: true },
+  // Tokens Section
+  rows.push({ metric: 'Tokens', isSection: true });
+  rows.push(
     createRow('Total', (m) => (
       <Text color={theme.text.secondary}>
         {m.tokens.total.toLocaleString()}
       </Text>
     )),
+  );
+  rows.push(
     createRow(
       'Input',
       (m) => (
@@ -112,7 +133,7 @@ export const ModelStatsDisplay: React.FC = () => {
       ),
       { isSubtle: true },
     ),
-  ];
+  );
 
   if (hasCached) {
     rows.push(
@@ -214,6 +235,31 @@ export const ModelStatsDisplay: React.FC = () => {
         Model Stats For Nerds
       </Text>
       <Box height={1} />
+
+      {showUserIdentity && selectedAuthType && (
+        <Box>
+          <Box width={28}>
+            <Text color={theme.text.link}>Auth Method:</Text>
+          </Box>
+          <Text color={theme.text.primary}>
+            {selectedAuthType.startsWith('oauth')
+              ? userEmail
+                ? `Logged in with Google (${userEmail})`
+                : 'Logged in with Google'
+              : selectedAuthType}
+          </Text>
+        </Box>
+      )}
+      {showUserIdentity && tier && (
+        <Box>
+          <Box width={28}>
+            <Text color={theme.text.link}>Tier:</Text>
+          </Box>
+          <Text color={theme.text.primary}>{tier}</Text>
+        </Box>
+      )}
+      {showUserIdentity && (selectedAuthType || tier) && <Box height={1} />}
+
       <Table data={rows} columns={columns} />
     </Box>
   );

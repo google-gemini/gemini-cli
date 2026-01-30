@@ -3419,7 +3419,7 @@ export interface TextBuffer {
   /**
    * High level "handleInput" – receives what Ink gives us.
    */
-  handleInput: (key: Key) => void;
+  handleInput: (key: Key) => boolean;
   /**
    * Opens the current buffer contents in the user's preferred terminal text
    * editor ($VISUAL or $EDITOR, falling back to "vi").  The method blocks

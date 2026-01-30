@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type {
+  GenerateContentParameters,
+  GenerateContentResponse,
+} from '@google/genai';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { HookEventHandler } from './hookEventHandler.js';
 import type { Config } from '../config/config.js';
@@ -773,6 +777,68 @@ describe('HookEventHandler', () => {
       );
 
       expect(result).toBe(mockAggregated);
+    });
+  });
+
+  describe('failure suppression', () => {
+    it('should suppress duplicate feedback for the same failing hook and request context', async () => {
+      const mockHook: HookConfig = {
+        type: HookType.Command,
+        command: './fail.sh',
+        name: 'failing-hook',
+      };
+      const mockResults: HookExecutionResult[] = [
+        {
+          success: false,
+          duration: 10,
+          hookConfig: mockHook,
+          eventName: HookEventName.AfterModel,
+          error: new Error('Failed'),
+        },
+      ];
+      const mockAggregated = {
+        success: false,
+        allOutputs: [],
+        errors: [new Error('Failed')],
+        totalDuration: 10,
+      };
+
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+        eventName: HookEventName.AfterModel,
+        hookConfigs: [mockHook],
+        sequential: false,
+      });
+      vi.mocked(mockHookRunner.executeHooksParallel).mockResolvedValue(
+        mockResults,
+      );
+      vi.mocked(mockHookAggregator.aggregateResults).mockReturnValue(
+        mockAggregated,
+      );
+
+      const llmRequest = { model: 'test', contents: [] };
+      const llmResponse = { candidates: [] };
+
+      // First call - should emit feedback
+      await hookEventHandler.fireAfterModelEvent(
+        llmRequest as unknown as GenerateContentParameters,
+        llmResponse as unknown as GenerateContentResponse,
+      );
+      expect(mockCoreEvents.emitFeedback).toHaveBeenCalledTimes(1);
+
+      // Second call with SAME request - should NOT emit feedback
+      await hookEventHandler.fireAfterModelEvent(
+        llmRequest as unknown as GenerateContentParameters,
+        llmResponse as unknown as GenerateContentResponse,
+      );
+      expect(mockCoreEvents.emitFeedback).toHaveBeenCalledTimes(1);
+
+      // Third call with DIFFERENT request - should emit feedback again
+      const differentRequest = { model: 'different', contents: [] };
+      await hookEventHandler.fireAfterModelEvent(
+        differentRequest as unknown as GenerateContentParameters,
+        llmResponse as unknown as GenerateContentResponse,
+      );
+      expect(mockCoreEvents.emitFeedback).toHaveBeenCalledTimes(2);
     });
   });
 
