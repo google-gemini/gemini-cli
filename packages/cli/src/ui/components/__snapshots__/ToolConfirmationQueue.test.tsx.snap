@@ -2,7 +2,7 @@
 
 exports[`ToolConfirmationQueue > calculates availableContentHeight based on availableTerminalHeight from UI state 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ Action Required                                                       1 of 1 │
+│ Action Required                                                              │
 │                                                                              │
 │ ?  replace edit file                                                         │
 │                                                                              │
@@ -22,7 +22,7 @@ exports[`ToolConfirmationQueue > calculates availableContentHeight based on avai
 
 exports[`ToolConfirmationQueue > does not render expansion hint when constrainHeight is false 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ Action Required                                                       1 of 1 │
+│ Action Required                                                              │
 │                                                                              │
 │ ?  replace edit file                                                         │
 │                                                                              │
@@ -44,7 +44,7 @@ exports[`ToolConfirmationQueue > does not render expansion hint when constrainHe
 
 exports[`ToolConfirmationQueue > renders expansion hint when content is long and constrained 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ Action Required                                                       1 of 1 │
+│ Action Required                                                              │
 │                                                                              │
 │ ?  replace edit file                                                         │
 │                                                                              │
