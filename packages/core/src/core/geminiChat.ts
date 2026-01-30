@@ -818,13 +818,11 @@ export class GeminiChat {
         if (content?.parts) {
           if (content.parts.some((part) => part.thought)) {
             // Record thoughts
+            hasThoughts = true;
             this.recordThoughtFromContent(content);
           }
           if (content.parts.some((part) => part.functionCall)) {
             hasToolCall = true;
-          }
-          if (content.parts.some((part) => part.thought)) {
-            hasThoughts = true;
           }
 
           modelResponseParts.push(
