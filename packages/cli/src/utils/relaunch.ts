@@ -52,11 +52,26 @@ export async function relaunchAppInChildProcess(
     // process.argv is [node, script, ...args]
     // We want to construct [ ...nodeArgs, script, ...scriptArgs]
     const script = process.argv[1];
-    const scriptArgs = process.argv.slice(2);
+    let scriptArgs = process.argv.slice(2);
 
     // Include any pending restart args (e.g., --resume <sessionId> from /restart command)
     const restartArgs = pendingRestartArgs;
     pendingRestartArgs = []; // Clear after use
+
+    // If restarting with new args, filter out any existing --resume args to avoid duplicates
+    if (restartArgs.length > 0) {
+      const filteredArgs: string[] = [];
+      for (let i = 0; i < scriptArgs.length; i++) {
+        if (scriptArgs[i] === '--resume') {
+          i++; // Skip the flag and its value
+        } else if (scriptArgs[i]?.startsWith('--resume=')) {
+          // Skip the combined flag=value form
+        } else {
+          filteredArgs.push(scriptArgs[i]);
+        }
+      }
+      scriptArgs = filteredArgs;
+    }
 
     const nodeArgs = [
       ...process.execArgv,
