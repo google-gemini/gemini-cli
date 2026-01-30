@@ -158,6 +158,17 @@ export interface LogoutActionReturn {
   type: 'logout';
 }
 
+/**
+ * The return type for a command action that restarts the CLI,
+ * optionally resuming the current session.
+ */
+export interface RestartActionReturn {
+  type: 'restart';
+  /** The session ID to resume after restart, if any. */
+  sessionId?: string;
+  messages: HistoryItem[];
+}
+
 export type SlashCommandActionReturn =
   | CommandActionReturn<HistoryItemWithoutId[]>
   | QuitActionReturn
@@ -165,7 +176,8 @@ export type SlashCommandActionReturn =
   | ConfirmShellCommandsActionReturn
   | ConfirmActionReturn
   | OpenCustomDialogActionReturn
-  | LogoutActionReturn;
+  | LogoutActionReturn
+  | RestartActionReturn;
 
 export enum CommandKind {
   BUILT_IN = 'built-in',

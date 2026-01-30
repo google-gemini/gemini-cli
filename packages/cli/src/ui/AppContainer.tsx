@@ -855,6 +855,29 @@ Logging in with Google... Restarting Gemini CLI to continue.
           process.exit(0);
         }, 100);
       },
+      restart: (messages: HistoryItem[], sessionId?: string) => {
+        setQuittingMessages(messages);
+        setTimeout(async () => {
+          // Send restart args to parent process for relaunch with --resume
+          if (process.send && sessionId) {
+            process.send({
+              type: 'restart-args',
+              args: ['--resume', sessionId],
+            });
+          }
+          if (process.send) {
+            const remoteSettings = config.getRemoteAdminSettings();
+            if (remoteSettings) {
+              process.send({
+                type: 'admin-settings-update',
+                settings: remoteSettings,
+              });
+            }
+          }
+          await runExitCleanup();
+          process.exit(RELAUNCH_EXIT_CODE);
+        }, 100);
+      },
       setDebugMessage,
       toggleCorgiMode: () => setCorgiMode((prev) => !prev),
       toggleDebugProfiler,
@@ -879,6 +902,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       addConfirmUpdateExtensionRequest,
       toggleDebugProfiler,
       buffer,
+      config,
     ],
   );
 

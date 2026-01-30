@@ -11,6 +11,12 @@ import {
   type FetchAdminControlsResponse,
 } from '@google/gemini-cli-core';
 
+/**
+ * Arguments to pass to the next relaunch.
+ * This is set by sending a 'restart-args' message from the child process.
+ */
+let pendingRestartArgs: string[] = [];
+
 export async function relaunchOnExitCode(runner: () => Promise<number>) {
   while (true) {
     try {
@@ -46,13 +52,33 @@ export async function relaunchAppInChildProcess(
     // process.argv is [node, script, ...args]
     // We want to construct [ ...nodeArgs, script, ...scriptArgs]
     const script = process.argv[1];
-    const scriptArgs = process.argv.slice(2);
+    let scriptArgs = process.argv.slice(2);
+
+    // Include any pending restart args (e.g., --resume <sessionId> from /restart command)
+    const restartArgs = pendingRestartArgs;
+    pendingRestartArgs = []; // Clear after use
+
+    // If restarting with new args, filter out any existing --resume args to avoid duplicates
+    if (restartArgs.length > 0) {
+      const filteredArgs: string[] = [];
+      for (let i = 0; i < scriptArgs.length; i++) {
+        if (scriptArgs[i] === '--resume') {
+          i++; // Skip the flag and its value
+        } else if (scriptArgs[i]?.startsWith('--resume=')) {
+          // Skip the combined flag=value form
+        } else {
+          filteredArgs.push(scriptArgs[i]);
+        }
+      }
+      scriptArgs = filteredArgs;
+    }
 
     const nodeArgs = [
       ...process.execArgv,
       ...additionalNodeArgs,
       script,
       ...additionalScriptArgs,
+      ...restartArgs,
       ...scriptArgs,
     ];
     const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
@@ -69,11 +95,16 @@ export async function relaunchAppInChildProcess(
       child.send({ type: 'admin-settings', settings: latestAdminSettings });
     }
 
-    child.on('message', (msg: { type?: string; settings?: unknown }) => {
-      if (msg.type === 'admin-settings-update' && msg.settings) {
-        latestAdminSettings = msg.settings as FetchAdminControlsResponse;
-      }
-    });
+    child.on(
+      'message',
+      (msg: { type?: string; settings?: unknown; args?: string[] }) => {
+        if (msg.type === 'admin-settings-update' && msg.settings) {
+          latestAdminSettings = msg.settings as FetchAdminControlsResponse;
+        } else if (msg.type === 'restart-args' && Array.isArray(msg.args)) {
+          pendingRestartArgs = msg.args;
+        }
+      },
+    );
 
     return new Promise<number>((resolve, reject) => {
       child.on('error', reject);
