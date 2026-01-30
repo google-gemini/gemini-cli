@@ -176,6 +176,8 @@ vi.mock('../utils/cleanup.js', () => ({
   registerSyncCleanup: vi.fn(() => () => {}),
   registerTelemetryConfig: vi.fn(),
   cleanupCheckpoints: vi.fn(),
+  registerSyncCleanup: vi.fn(() => () => {}),
+  registerTelemetryConfig: vi.fn(),
 }));
 
 import { useHistory } from './hooks/useHistoryManager.js';
