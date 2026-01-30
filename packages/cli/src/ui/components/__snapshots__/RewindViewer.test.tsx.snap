@@ -34,6 +34,23 @@ exports[`RewindViewer > Content Filtering > 'strips expanded MCP resource conten
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
+exports[`RewindViewer > Content Filtering > 'uses displayContent if present and do…' 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                                      │
+│ > Rewind                                                                                                             │
+│                                                                                                                      │
+│   clean display content                                                                                              │
+│   No files have been changed                                                                                         │
+│                                                                                                                      │
+│ ● Stay at current position                                                                                           │
+│   Cancel rewind and stay here                                                                                        │
+│                                                                                                                      │
+│                                                                                                                      │
+│ (Use Enter to select a message, Esc to close, Right/Left to expand/collapse)                                         │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
 exports[`RewindViewer > Interaction Selection > 'cancels on Escape' > confirmation-dialog 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                                      │

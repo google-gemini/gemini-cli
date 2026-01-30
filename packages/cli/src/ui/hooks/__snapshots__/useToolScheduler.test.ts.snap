@@ -4,6 +4,7 @@ exports[`useReactToolScheduler > should handle live output updates 1`] = `
 {
   "callId": "liveCall",
   "contentLength": 12,
+  "data": undefined,
   "error": undefined,
   "errorType": undefined,
   "outputFile": undefined,
@@ -26,6 +27,7 @@ exports[`useReactToolScheduler > should handle tool requiring confirmation - app
 {
   "callId": "callConfirm",
   "contentLength": 16,
+  "data": undefined,
   "error": undefined,
   "errorType": undefined,
   "outputFile": undefined,
@@ -75,6 +77,7 @@ exports[`useReactToolScheduler > should schedule and execute a tool call success
 {
   "callId": "call1",
   "contentLength": 11,
+  "data": undefined,
   "error": undefined,
   "errorType": undefined,
   "outputFile": undefined,
