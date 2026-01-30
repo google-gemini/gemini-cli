@@ -1398,6 +1398,100 @@ describe('PolicyEngine', () => {
     });
   });
 
+  describe('shell command parsing failure', () => {
+    it('should return ALLOW in YOLO mode even if shell command parsing fails', async () => {
+      const { splitCommands } = await import('../utils/shell-utils.js');
+      const rules: PolicyRule[] = [
+        {
+          decision: PolicyDecision.ALLOW,
+          priority: 999,
+          modes: [ApprovalMode.YOLO],
+        },
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ASK_USER,
+          priority: 10,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+      });
+
+      // Simulate parsing failure (splitCommands returning empty array)
+      vi.mocked(splitCommands).mockReturnValueOnce([]);
+
+      const result = await engine.check(
+        { name: 'run_shell_command', args: { command: 'complex command' } },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+      expect(result.rule).toBeDefined();
+      expect(result.rule?.priority).toBe(999);
+    });
+
+    it('should return DENY in YOLO mode if shell command parsing fails and a higher priority rule says DENY', async () => {
+      const { splitCommands } = await import('../utils/shell-utils.js');
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.DENY,
+          priority: 2000, // Very high priority DENY (e.g. Admin)
+        },
+        {
+          decision: PolicyDecision.ALLOW,
+          priority: 999,
+          modes: [ApprovalMode.YOLO],
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+      });
+
+      // Simulate parsing failure
+      vi.mocked(splitCommands).mockReturnValueOnce([]);
+
+      const result = await engine.check(
+        { name: 'run_shell_command', args: { command: 'complex command' } },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.DENY);
+    });
+
+    it('should return ASK_USER in non-YOLO mode if shell command parsing fails', async () => {
+      const { splitCommands } = await import('../utils/shell-utils.js');
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.DEFAULT,
+      });
+
+      // Simulate parsing failure
+      vi.mocked(splitCommands).mockReturnValueOnce([]);
+
+      const result = await engine.check(
+        { name: 'run_shell_command', args: { command: 'complex command' } },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+      expect(result.rule).toBeDefined();
+      expect(result.rule?.priority).toBe(20);
+    });
+  });
+
   describe('safety checker integration', () => {
     it('should call checker when rule allows and has safety_checker', async () => {
       const rules: PolicyRule[] = [
