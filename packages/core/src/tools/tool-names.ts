@@ -26,7 +26,16 @@ export const EDIT_TOOL_NAMES = new Set([EDIT_TOOL_NAME, WRITE_FILE_TOOL_NAME]);
 export const ASK_USER_TOOL_NAME = 'ask_user';
 export const ASK_USER_DISPLAY_NAME = 'Ask User';
 
-/** Prefix used for tools discovered via the toolDiscoveryCommand. */
+/**
+ * Mapping of legacy tool names to their current names.
+ * This ensures backward compatibility for user-defined policies, skills, and hooks.
+ */
+export const TOOL_LEGACY_ALIASES: Record<string, string> = {
+  // Aliases for backward compatibility
+  legacy_read: READ_FILE_TOOL_NAME,
+};
+
+/** Prefix used for tools discovered via the tool DiscoveryCommand. */
 export const DISCOVERED_TOOL_PREFIX = 'discovered_tool_';
 
 /**
@@ -73,6 +82,11 @@ export function isValidToolName(
 ): boolean {
   // Built-in tools
   if ((ALL_BUILTIN_TOOL_NAMES as readonly string[]).includes(name)) {
+    return true;
+  }
+
+  // Legacy aliases
+  if (TOOL_LEGACY_ALIASES[name]) {
     return true;
   }
 

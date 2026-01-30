@@ -24,6 +24,7 @@ import {
   splitCommands,
   hasRedirection,
 } from '../utils/shell-utils.js';
+import { TOOL_LEGACY_ALIASES } from '../tools/tool-names.js';
 
 function ruleMatches(
   rule: PolicyRule | SafetyCheckerRule,
@@ -308,12 +309,35 @@ export class PolicyEngine {
 
     // For tools with a server name, we want to try matching both the
     // original name and the fully qualified name (server__tool).
-    const toolCallsToTry: FunctionCall[] = [toolCall];
-    if (serverName && toolCall.name && !toolCall.name.includes('__')) {
-      toolCallsToTry.push({
-        ...toolCall,
-        name: `${serverName}__${toolCall.name}`,
-      });
+    // We also want to check legacy aliases for the tool name.
+    const toolNamesToTry = new Set<string>();
+    if (toolCall.name) {
+      toolNamesToTry.add(toolCall.name);
+
+      // Add legacy names that point to this tool
+      for (const [legacyName, currentName] of Object.entries(
+        TOOL_LEGACY_ALIASES,
+      )) {
+        if (currentName === toolCall.name) {
+          toolNamesToTry.add(legacyName);
+        }
+      }
+
+      // Add the tool name's own legacy alias if it has one (for forward compatibility of old skills)
+      if (TOOL_LEGACY_ALIASES[toolCall.name]) {
+        toolNamesToTry.add(TOOL_LEGACY_ALIASES[toolCall.name]);
+      }
+    }
+
+    const toolCallsToTry: FunctionCall[] = [];
+    for (const name of toolNamesToTry) {
+      toolCallsToTry.push({ ...toolCall, name });
+      if (serverName && !name.includes('__')) {
+        toolCallsToTry.push({
+          ...toolCall,
+          name: `${serverName}__${name}`,
+        });
+      }
     }
 
     for (const rule of this.rules) {

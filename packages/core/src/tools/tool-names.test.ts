@@ -30,6 +30,13 @@ describe('tool-names', () => {
       expect(isValidToolName('my-server__my-tool')).toBe(true);
     });
 
+    it('should validate legacy tool aliases', async () => {
+      const { TOOL_LEGACY_ALIASES } = await import('./tool-names.js');
+      for (const legacyName of Object.keys(TOOL_LEGACY_ALIASES)) {
+        expect(isValidToolName(legacyName)).toBe(true);
+      }
+    });
+
     it('should reject invalid tool names', () => {
       expect(isValidToolName('')).toBe(false);
       expect(isValidToolName('invalid-name')).toBe(false);

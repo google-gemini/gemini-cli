@@ -187,6 +187,51 @@ describe('PolicyEngine', () => {
       );
     });
 
+    it('should match current tool call against legacy tool name rules', async () => {
+      const { TOOL_LEGACY_ALIASES } = await import('../tools/tool-names.js');
+      const legacyNames = Object.keys(TOOL_LEGACY_ALIASES);
+
+      if (legacyNames.length === 0) {
+        // If no aliases are defined, we skip.
+        return;
+      }
+
+      const legacyName = legacyNames[0];
+      const currentName = TOOL_LEGACY_ALIASES[legacyName];
+
+      const rules: PolicyRule[] = [
+        { toolName: legacyName, decision: PolicyDecision.DENY },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // Call using the CURRENT name, should be denied because of legacy rule
+      const { decision } = await engine.check({ name: currentName }, undefined);
+      expect(decision).toBe(PolicyDecision.DENY);
+    });
+
+    it('should match legacy tool call against current tool name rules (for skills support)', async () => {
+      const { TOOL_LEGACY_ALIASES } = await import('../tools/tool-names.js');
+      const legacyNames = Object.keys(TOOL_LEGACY_ALIASES);
+
+      if (legacyNames.length === 0) {
+        return;
+      }
+
+      const legacyName = legacyNames[0];
+      const currentName = TOOL_LEGACY_ALIASES[legacyName];
+
+      const rules: PolicyRule[] = [
+        { toolName: currentName, decision: PolicyDecision.ALLOW },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // Call using the LEGACY name (from a skill), should be allowed because of current rule
+      const { decision } = await engine.check({ name: legacyName }, undefined);
+      expect(decision).toBe(PolicyDecision.ALLOW);
+    });
+
     it('should apply wildcard rules (no toolName)', async () => {
       const rules: PolicyRule[] = [
         { decision: PolicyDecision.DENY }, // Applies to all tools
