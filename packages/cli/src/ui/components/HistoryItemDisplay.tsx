@@ -218,7 +218,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         <ChatList chats={itemForDisplay.chats} />
       )}
       {itemForDisplay.type === 'hooks_list' && (
-        <HooksList hooks={itemForDisplay.hooks} />
+        <HooksList hooks={itemForDisplay.hooks} terminalWidth={terminalWidth} />
       )}
     </Box>
   );
