@@ -12,7 +12,11 @@ import {
   type CommandContext,
 } from '../ui/commands/types.js';
 import type { MessageActionReturn, Config } from '@google/gemini-cli-core';
-import { isNightly, startupProfiler } from '@google/gemini-cli-core';
+import {
+  isNightly,
+  startupProfiler,
+  getAdminErrorMessage,
+} from '@google/gemini-cli-core';
 import { aboutCommand } from '../ui/commands/aboutCommand.js';
 import { agentsCommand } from '../ui/commands/agentsCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
@@ -47,6 +51,7 @@ import { themeCommand } from '../ui/commands/themeCommand.js';
 import { toolsCommand } from '../ui/commands/toolsCommand.js';
 import { skillsCommand } from '../ui/commands/skillsCommand.js';
 import { settingsCommand } from '../ui/commands/settingsCommand.js';
+import { shellsCommand } from '../ui/commands/shellsCommand.js';
 import { vimCommand } from '../ui/commands/vimCommand.js';
 import { setupGithubCommand } from '../ui/commands/setupGithubCommand.js';
 import { terminalSetupCommand } from '../ui/commands/terminalSetupCommand.js';
@@ -101,7 +106,10 @@ export class BuiltinCommandLoader implements ICommandLoader {
               ): Promise<MessageActionReturn> => ({
                 type: 'message',
                 messageType: 'error',
-                content: 'Extensions are disabled by your admin.',
+                content: getAdminErrorMessage(
+                  'Extensions',
+                  this.config ?? undefined,
+                ),
               }),
             },
           ]
@@ -126,7 +134,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
               ): Promise<MessageActionReturn> => ({
                 type: 'message',
                 messageType: 'error',
-                content: 'MCP is disabled by your admin.',
+                content: getAdminErrorMessage('MCP', this.config ?? undefined),
               }),
             },
           ]
@@ -157,13 +165,17 @@ export class BuiltinCommandLoader implements ICommandLoader {
                 ): Promise<MessageActionReturn> => ({
                   type: 'message',
                   messageType: 'error',
-                  content: 'Agent skills are disabled by your admin.',
+                  content: getAdminErrorMessage(
+                    'Agent skills',
+                    this.config ?? undefined,
+                  ),
                 }),
               },
             ]
           : [skillsCommand]
         : []),
       settingsCommand,
+      shellsCommand,
       vimCommand,
       setupGithubCommand,
       terminalSetupCommand,

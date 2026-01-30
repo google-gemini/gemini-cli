@@ -15,6 +15,7 @@ import type {
 } from '@google/gemini-cli-core';
 import type { Part } from '@google/genai';
 import { partListUnionToString, coreEvents } from '@google/gemini-cli-core';
+import { checkExhaustive } from '../../utils/checks.js';
 import type { SessionInfo } from '../../utils/sessionUtils.js';
 import { MessageType, ToolCallStatus } from '../types.js';
 
@@ -125,8 +126,13 @@ export function convertSessionToHistoryFormats(
 
   for (const msg of messages) {
     // Add the message only if it has content
+    const displayContentString = msg.displayContent
+      ? partListUnionToString(msg.displayContent)
+      : undefined;
     const contentString = partListUnionToString(msg.content);
-    if (msg.content && contentString.trim()) {
+    const uiText = displayContentString || contentString;
+
+    if (uiText.trim()) {
       let messageType: MessageType;
       switch (msg.type) {
         case 'user':
@@ -141,14 +147,18 @@ export function convertSessionToHistoryFormats(
         case 'warning':
           messageType = MessageType.WARNING;
           break;
+        case 'gemini':
+          messageType = MessageType.GEMINI;
+          break;
         default:
+          checkExhaustive(msg);
           messageType = MessageType.GEMINI;
           break;
       }
 
       uiHistory.push({
         type: messageType,
-        text: contentString,
+        text: uiText,
       });
     }
 
@@ -199,7 +209,9 @@ export function convertSessionToHistoryFormats(
       // Add regular user message
       clientHistory.push({
         role: 'user',
-        parts: [{ text: contentString }],
+        parts: Array.isArray(msg.content)
+          ? (msg.content as Part[])
+          : [{ text: contentString }],
       });
     } else if (msg.type === 'gemini') {
       // Handle Gemini messages with potential tool calls

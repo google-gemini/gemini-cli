@@ -101,33 +101,33 @@ describe('retryWithBackoff', () => {
     expect(mockFn).toHaveBeenCalledTimes(3);
   });
 
-  it('should default to 10 maxAttempts if no options are provided', async () => {
-    // This function will fail more than 10 times to ensure all retries are used.
-    const mockFn = createFailingFunction(15);
+  it('should default to 3 maxAttempts if no options are provided', async () => {
+    // This function will fail more than 3 times to ensure all retries are used.
+    const mockFn = createFailingFunction(5);
 
     const promise = retryWithBackoff(mockFn);
 
     await Promise.all([
-      expect(promise).rejects.toThrow('Simulated error attempt 10'),
+      expect(promise).rejects.toThrow('Simulated error attempt 3'),
       vi.runAllTimersAsync(),
     ]);
 
-    expect(mockFn).toHaveBeenCalledTimes(10);
+    expect(mockFn).toHaveBeenCalledTimes(3);
   });
 
-  it('should default to 10 maxAttempts if options.maxAttempts is undefined', async () => {
-    // This function will fail more than 10 times to ensure all retries are used.
-    const mockFn = createFailingFunction(15);
+  it('should default to 3 maxAttempts if options.maxAttempts is undefined', async () => {
+    // This function will fail more than 3 times to ensure all retries are used.
+    const mockFn = createFailingFunction(5);
 
     const promise = retryWithBackoff(mockFn, { maxAttempts: undefined });
 
-    // Expect it to fail with the error from the 10th attempt.
+    // Expect it to fail with the error from the 3rd attempt.
     await Promise.all([
-      expect(promise).rejects.toThrow('Simulated error attempt 10'),
+      expect(promise).rejects.toThrow('Simulated error attempt 3'),
       vi.runAllTimersAsync(),
     ]);
 
-    expect(mockFn).toHaveBeenCalledTimes(10);
+    expect(mockFn).toHaveBeenCalledTimes(3);
   });
 
   it('should not retry if shouldRetry returns false', async () => {

@@ -130,6 +130,7 @@ describe('ChatRecordingService', () => {
       chatRecordingService.recordMessage({
         type: 'user',
         content: 'Hello',
+        displayContent: 'User Hello',
         model: 'gemini-pro',
       });
       expect(mkdirSyncSpy).toHaveBeenCalled();
@@ -139,6 +140,7 @@ describe('ChatRecordingService', () => {
       ) as ConversationRecord;
       expect(conversation.messages).toHaveLength(1);
       expect(conversation.messages[0].content).toBe('Hello');
+      expect(conversation.messages[0].displayContent).toBe('User Hello');
       expect(conversation.messages[0].type).toBe('user');
     });
 
