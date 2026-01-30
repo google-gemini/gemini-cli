@@ -361,6 +361,16 @@ const SETTINGS_SCHEMA = {
           'Automatically switch between default light and dark themes based on terminal background color.',
         showInDialog: true,
       },
+      terminalBackgroundPollingInterval: {
+        type: 'number',
+        label: 'Terminal Background Polling Interval',
+        category: 'UI',
+        requiresRestart: false,
+        default: 60000,
+        description:
+          'Interval in milliseconds to poll the terminal background color.',
+        showInDialog: true,
+      },
       customThemes: {
         type: 'object',
         label: 'Custom Themes',

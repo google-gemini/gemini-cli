@@ -309,6 +309,43 @@ export function getLuminance(backgroundColor: string): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
+// Hysteresis thresholds to prevent flickering when the background color
+// is ambiguous (near the midpoint).
+export const LIGHT_THEME_LUMINANCE_THRESHOLD = 140;
+export const DARK_THEME_LUMINANCE_THRESHOLD = 110;
+
+/**
+ * Determines if the theme should be switched based on background luminance.
+ * Uses hysteresis to prevent flickering.
+ *
+ * @param currentThemeName The name of the currently active theme
+ * @param luminance The calculated relative luminance of the background (0-255)
+ * @param defaultThemeName The name of the default (dark) theme
+ * @param defaultLightThemeName The name of the default light theme
+ * @returns The name of the theme to switch to, or undefined if no switch is needed.
+ */
+export function shouldSwitchTheme(
+  currentThemeName: string | undefined,
+  luminance: number,
+  defaultThemeName: string,
+  defaultLightThemeName: string,
+): string | undefined {
+  const isDefaultTheme =
+    currentThemeName === defaultThemeName || currentThemeName === undefined;
+  const isDefaultLightTheme = currentThemeName === defaultLightThemeName;
+
+  if (luminance > LIGHT_THEME_LUMINANCE_THRESHOLD && isDefaultTheme) {
+    return defaultLightThemeName;
+  } else if (
+    luminance < DARK_THEME_LUMINANCE_THRESHOLD &&
+    isDefaultLightTheme
+  ) {
+    return defaultThemeName;
+  }
+
+  return undefined;
+}
+
 /**
  * Parses an X11 RGB string (e.g. from OSC 11) into a hex color string.
  * Supports 1-4 digit hex values per channel (e.g., F, FF, FFF, FFFF).

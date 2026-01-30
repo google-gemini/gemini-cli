@@ -14,6 +14,7 @@ import {
   getThemeTypeFromBackgroundColor,
   getLuminance,
   parseColor,
+  shouldSwitchTheme,
 } from './color-utils.js';
 
 describe('Color Utils', () => {
@@ -337,6 +338,93 @@ describe('Color Utils', () => {
     it('should handle mixed case', () => {
       expect(parseColor('FFFF', 'FFFF', 'FFFF')).toBe('#ffffff');
       expect(parseColor('Ffff', 'fFFF', 'ffFF')).toBe('#ffffff');
+    });
+  });
+
+  describe('shouldSwitchTheme', () => {
+    const DEFAULT_THEME = 'default';
+    const DEFAULT_LIGHT_THEME = 'default-light';
+    const LIGHT_THRESHOLD = 140;
+    const DARK_THRESHOLD = 110;
+
+    it('should switch to light theme if luminance > threshold and current is default', () => {
+      // 141 > 140
+      expect(
+        shouldSwitchTheme(
+          DEFAULT_THEME,
+          LIGHT_THRESHOLD + 1,
+          DEFAULT_THEME,
+          DEFAULT_LIGHT_THEME,
+        ),
+      ).toBe(DEFAULT_LIGHT_THEME);
+
+      // Undefined current theme counts as default
+      expect(
+        shouldSwitchTheme(
+          undefined,
+          LIGHT_THRESHOLD + 1,
+          DEFAULT_THEME,
+          DEFAULT_LIGHT_THEME,
+        ),
+      ).toBe(DEFAULT_LIGHT_THEME);
+    });
+
+    it('should NOT switch to light theme if luminance <= threshold', () => {
+      // 140 <= 140
+      expect(
+        shouldSwitchTheme(
+          DEFAULT_THEME,
+          LIGHT_THRESHOLD,
+          DEFAULT_THEME,
+          DEFAULT_LIGHT_THEME,
+        ),
+      ).toBeUndefined();
+    });
+
+    it('should NOT switch to light theme if current theme is not default', () => {
+      expect(
+        shouldSwitchTheme(
+          'custom-theme',
+          LIGHT_THRESHOLD + 1,
+          DEFAULT_THEME,
+          DEFAULT_LIGHT_THEME,
+        ),
+      ).toBeUndefined();
+    });
+
+    it('should switch to dark theme if luminance < threshold and current is default light', () => {
+      // 109 < 110
+      expect(
+        shouldSwitchTheme(
+          DEFAULT_LIGHT_THEME,
+          DARK_THRESHOLD - 1,
+          DEFAULT_THEME,
+          DEFAULT_LIGHT_THEME,
+        ),
+      ).toBe(DEFAULT_THEME);
+    });
+
+    it('should NOT switch to dark theme if luminance >= threshold', () => {
+      // 110 >= 110
+      expect(
+        shouldSwitchTheme(
+          DEFAULT_LIGHT_THEME,
+          DARK_THRESHOLD,
+          DEFAULT_THEME,
+          DEFAULT_LIGHT_THEME,
+        ),
+      ).toBeUndefined();
+    });
+
+    it('should NOT switch to dark theme if current theme is not default light', () => {
+      expect(
+        shouldSwitchTheme(
+          'custom-theme',
+          DARK_THRESHOLD - 1,
+          DEFAULT_THEME,
+          DEFAULT_LIGHT_THEME,
+        ),
+      ).toBeUndefined();
     });
   });
 });

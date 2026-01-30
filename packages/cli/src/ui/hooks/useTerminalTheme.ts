@@ -6,7 +6,11 @@
 
 import { useEffect } from 'react';
 import { useStdout } from 'ink';
-import { getLuminance, parseColor } from '../themes/color-utils.js';
+import {
+  getLuminance,
+  parseColor,
+  shouldSwitchTheme,
+} from '../themes/color-utils.js';
 import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
 import { DefaultLight } from '../themes/default-light.js';
 import { useSettings } from '../contexts/SettingsContext.js';
@@ -37,7 +41,7 @@ export function useTerminalTheme(
       }
 
       stdout.write('\x1b]11;?\x1b\\');
-    }, 3000);
+    }, settings.merged.ui.terminalBackgroundPollingInterval);
 
     const handleTerminalBackground = (colorStr: string) => {
       // Parse the response "rgb:rrrr/gggg/bbbb"
@@ -51,25 +55,17 @@ export function useTerminalTheme(
       const luminance = getLuminance(hexColor);
       config.setTerminalBackground(hexColor);
 
-      // Check if we need to switch theme
       const currentThemeName = settings.merged.ui.theme;
-      const isDefaultTheme =
-        currentThemeName === DEFAULT_THEME.name ||
-        currentThemeName === undefined;
-      const isDefaultLightTheme = currentThemeName === DefaultLight.name;
 
-      // Hysteresis thresholds to prevent flickering when the background color
-      // is ambiguous (near the midpoint).
-      const LIGHT_THEME_LUMINANCE_THRESHOLD = 140;
-      const DARK_THEME_LUMINANCE_THRESHOLD = 110;
+      const newTheme = shouldSwitchTheme(
+        currentThemeName,
+        luminance,
+        DEFAULT_THEME.name,
+        DefaultLight.name,
+      );
 
-      if (luminance > LIGHT_THEME_LUMINANCE_THRESHOLD && isDefaultTheme) {
-        handleThemeSelect(DefaultLight.name, SettingScope.User);
-      } else if (
-        luminance < DARK_THEME_LUMINANCE_THRESHOLD &&
-        isDefaultLightTheme
-      ) {
-        handleThemeSelect(DEFAULT_THEME.name, SettingScope.User);
+      if (newTheme) {
+        handleThemeSelect(newTheme, SettingScope.User);
       }
     };
 
@@ -82,6 +78,7 @@ export function useTerminalTheme(
   }, [
     settings.merged.ui.theme,
     settings.merged.ui.autoThemeSwitching,
+    settings.merged.ui.terminalBackgroundPollingInterval,
     stdout,
     config,
     handleThemeSelect,

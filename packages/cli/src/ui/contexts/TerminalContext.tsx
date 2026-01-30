@@ -67,9 +67,13 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
         for (const handler of subscribers) {
           handler(colorStr);
         }
-        buffer = buffer.slice(match.index! + match[0].length);
-      } else if (buffer.length > 1024) {
-        // Safety valve to prevent infinite buffer growth
+        // Safely remove the processed part + match
+        if (match.index !== undefined) {
+          buffer = buffer.slice(match.index + match[0].length);
+        }
+      } else if (buffer.length > 4096) {
+        // Safety valve: if buffer gets too large without a match, trim it.
+        // We keep the last 1024 bytes to avoid cutting off a partial sequence.
         buffer = buffer.slice(-1024);
       }
     };
