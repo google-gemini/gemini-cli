@@ -102,6 +102,7 @@ describe('Turn', () => {
         reqParts,
         'prompt-id-1',
         expect.any(AbortSignal),
+        undefined,
       );
 
       expect(events).toEqual([

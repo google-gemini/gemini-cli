@@ -890,6 +890,7 @@ ${JSON.stringify(
         { model: 'default-routed-model' },
         initialRequest,
         expect.any(AbortSignal),
+        undefined,
       );
     });
 
@@ -1707,6 +1708,7 @@ ${JSON.stringify(
           { model: 'routed-model' },
           [{ text: 'Hi' }],
           expect.any(AbortSignal),
+          undefined,
         );
       });
 
@@ -1724,6 +1726,7 @@ ${JSON.stringify(
           { model: 'routed-model' },
           [{ text: 'Hi' }],
           expect.any(AbortSignal),
+          undefined,
         );
 
         // Second turn
@@ -1741,6 +1744,7 @@ ${JSON.stringify(
           { model: 'routed-model' },
           [{ text: 'Continue' }],
           expect.any(AbortSignal),
+          undefined,
         );
       });
 
@@ -1758,6 +1762,7 @@ ${JSON.stringify(
           { model: 'routed-model' },
           [{ text: 'Hi' }],
           expect.any(AbortSignal),
+          undefined,
         );
 
         // New prompt
@@ -1779,6 +1784,7 @@ ${JSON.stringify(
           { model: 'new-routed-model' },
           [{ text: 'A new topic' }],
           expect.any(AbortSignal),
+          undefined,
         );
       });
 
@@ -1806,6 +1812,7 @@ ${JSON.stringify(
           { model: 'original-model' },
           [{ text: 'Hi' }],
           expect.any(AbortSignal),
+          undefined,
         );
 
         mockRouterService.route.mockResolvedValue({
@@ -1828,6 +1835,7 @@ ${JSON.stringify(
           { model: 'fallback-model' },
           [{ text: 'Continue' }],
           expect.any(AbortSignal),
+          undefined,
         );
       });
     });
@@ -1912,6 +1920,7 @@ ${JSON.stringify(
         { model: 'default-routed-model' },
         initialRequest,
         expect.any(AbortSignal),
+        undefined,
       );
 
       // Second call with "Please continue."
@@ -1920,6 +1929,7 @@ ${JSON.stringify(
         { model: 'default-routed-model' },
         [{ text: 'System: Please continue.' }],
         expect.any(AbortSignal),
+        undefined,
       );
     });
 
@@ -2332,6 +2342,7 @@ ${JSON.stringify(
           expect.objectContaining({ model: 'model-a' }),
           expect.anything(),
           expect.anything(),
+          undefined,
         );
       });
 
@@ -3183,6 +3194,7 @@ ${JSON.stringify(
           expect.anything(),
           [{ text: 'Please explain' }],
           expect.anything(),
+          undefined,
         );
       });
 
