@@ -773,6 +773,13 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`security.allowedExtensions`** (array):
+  - **Description:** List of Regex patterns for allowed extensions. If nonempty,
+    only extensions that match the patterns in this list are allowed. Overrides
+    the blockGitExtensions setting.
+  - **Default:** `[]`
+  - **Requires restart:** Yes
+
 - **`security.folderTrust.enabled`** (boolean):
   - **Description:** Setting to track whether Folder trust is enabled.
   - **Default:** `false`

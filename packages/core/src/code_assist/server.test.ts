@@ -327,6 +327,22 @@ describe('CodeAssistServer', () => {
       const url = server.getMethodUrl('testMethod');
       expect(url).toBe('https://custom-endpoint.com/v1internal:testMethod');
     });
+
+    it('should use the CODE_ASSIST_API_VERSION environment variable if set', () => {
+      process.env['CODE_ASSIST_API_VERSION'] = 'v2beta';
+      const server = new CodeAssistServer({} as never);
+      const url = server.getMethodUrl('testMethod');
+      expect(url).toBe('https://cloudcode-pa.googleapis.com/v2beta:testMethod');
+    });
+
+    it('should use default value if CODE_ASSIST_API_VERSION env var is empty', () => {
+      process.env['CODE_ASSIST_API_VERSION'] = '';
+      const server = new CodeAssistServer({} as never);
+      const url = server.getMethodUrl('testMethod');
+      expect(url).toBe(
+        'https://cloudcode-pa.googleapis.com/v1internal:testMethod',
+      );
+    });
   });
 
   it('should call the generateContentStream endpoint and parse SSE', async () => {
