@@ -24,7 +24,7 @@ import {
   splitCommands,
   hasRedirection,
 } from '../utils/shell-utils.js';
-import { TOOL_LEGACY_ALIASES } from '../tools/tool-names.js';
+import { getToolAliases } from '../tools/tool-names.js';
 
 function ruleMatches(
   rule: PolicyRule | SafetyCheckerRule,
@@ -312,20 +312,9 @@ export class PolicyEngine {
     // We also want to check legacy aliases for the tool name.
     const toolNamesToTry = new Set<string>();
     if (toolCall.name) {
-      toolNamesToTry.add(toolCall.name);
-
-      // Add legacy names that point to this tool
-      for (const [legacyName, currentName] of Object.entries(
-        TOOL_LEGACY_ALIASES,
-      )) {
-        if (currentName === toolCall.name) {
-          toolNamesToTry.add(legacyName);
-        }
-      }
-
-      // Add the tool name's own legacy alias if it has one (for forward compatibility of old skills)
-      if (TOOL_LEGACY_ALIASES[toolCall.name]) {
-        toolNamesToTry.add(TOOL_LEGACY_ALIASES[toolCall.name]);
+      const aliases = getToolAliases(toolCall.name);
+      for (const alias of aliases) {
+        toolNamesToTry.add(alias);
       }
     }
 

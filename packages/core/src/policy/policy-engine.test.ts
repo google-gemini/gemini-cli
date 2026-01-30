@@ -44,15 +44,39 @@ vi.mock('../utils/shell-utils.js', async (importOriginal) => {
 });
 
 // Mock tool-names to provide a consistent alias for testing
+
 vi.mock('../tools/tool-names.js', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('../tools/tool-names.js')>();
+
+  const mockedAliases: Record<string, string> = {
+    ...actual.TOOL_LEGACY_ALIASES,
+
+    legacy_test_tool: 'current_test_tool',
+
+    another_legacy_test_tool: 'current_test_tool',
+  };
+
   return {
     ...actual,
-    TOOL_LEGACY_ALIASES: {
-      ...actual.TOOL_LEGACY_ALIASES,
-      legacy_test_tool: 'current_test_tool',
-    },
+
+    TOOL_LEGACY_ALIASES: mockedAliases,
+
+    getToolAliases: vi.fn().mockImplementation((name: string) => {
+      const aliases = new Set<string>([name]);
+
+      const canonicalName = mockedAliases[name] ?? name;
+
+      aliases.add(canonicalName);
+
+      for (const [legacyName, currentName] of Object.entries(mockedAliases)) {
+        if (currentName === canonicalName) {
+          aliases.add(legacyName);
+        }
+      }
+
+      return Array.from(aliases);
+    }),
   };
 });
 
@@ -228,6 +252,22 @@ describe('PolicyEngine', () => {
       // Call using the LEGACY name (from a skill), should be allowed because of current rule
       const { decision } = await engine.check({ name: legacyName }, undefined);
       expect(decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should match tool call using one legacy name against policy for another legacy name (same canonical tool)', async () => {
+      const legacyName1 = 'legacy_test_tool';
+      const legacyName2 = 'another_legacy_test_tool';
+
+      const rules: PolicyRule[] = [
+        { toolName: legacyName2, decision: PolicyDecision.DENY },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // Call using legacyName1, should be denied because legacyName2 has a deny rule
+      // and they both point to the same canonical tool.
+      const { decision } = await engine.check({ name: legacyName1 }, undefined);
+      expect(decision).toBe(PolicyDecision.DENY);
     });
 
     it('should apply wildcard rules (no toolName)', async () => {

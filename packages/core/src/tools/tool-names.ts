@@ -35,6 +35,28 @@ export const TOOL_LEGACY_ALIASES: Record<string, string> = {
   // 'search_file_content': GREP_TOOL_NAME,
 };
 
+/**
+ * Returns all associated names for a tool (including legacy aliases and current name).
+ * This ensures that if multiple legacy names point to the same tool, we consider all of them
+ * for policy application.
+ */
+export function getToolAliases(name: string): string[] {
+  const aliases = new Set<string>([name]);
+
+  // Determine the canonical (current) name
+  const canonicalName = TOOL_LEGACY_ALIASES[name] ?? name;
+  aliases.add(canonicalName);
+
+  // Find all other legacy aliases that point to the same canonical name
+  for (const [legacyName, currentName] of Object.entries(TOOL_LEGACY_ALIASES)) {
+    if (currentName === canonicalName) {
+      aliases.add(legacyName);
+    }
+  }
+
+  return Array.from(aliases);
+}
+
 /** Prefix used for tools discovered via the tool DiscoveryCommand. */
 export const DISCOVERED_TOOL_PREFIX = 'discovered_tool_';
 

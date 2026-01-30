@@ -7,6 +7,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   isValidToolName,
+  getToolAliases,
   ALL_BUILTIN_TOOL_NAMES,
   DISCOVERED_TOOL_PREFIX,
   LS_TOOL_NAME,
@@ -18,6 +19,7 @@ vi.mock('./tool-names.js', async (importOriginal) => {
   const mockedAliases: Record<string, string> = {
     ...actual.TOOL_LEGACY_ALIASES,
     legacy_test_tool: 'current_test_tool',
+    another_legacy_test_tool: 'current_test_tool',
   };
   return {
     ...actual,
@@ -25,6 +27,17 @@ vi.mock('./tool-names.js', async (importOriginal) => {
     isValidToolName: vi.fn().mockImplementation((name: string, options) => {
       if (mockedAliases[name]) return true;
       return actual.isValidToolName(name, options);
+    }),
+    getToolAliases: vi.fn().mockImplementation((name: string) => {
+      const aliases = new Set<string>([name]);
+      const canonicalName = mockedAliases[name] ?? name;
+      aliases.add(canonicalName);
+      for (const [legacyName, currentName] of Object.entries(mockedAliases)) {
+        if (currentName === canonicalName) {
+          aliases.add(legacyName);
+        }
+      }
+      return Array.from(aliases);
     }),
   };
 });
@@ -76,6 +89,27 @@ describe('tool-names', () => {
       expect(isValidToolName('server__tool*', { allowWildcards: true })).toBe(
         false,
       );
+    });
+  });
+
+  describe('getToolAliases', () => {
+    it('should return all associated names for a current tool', () => {
+      const aliases = getToolAliases('current_test_tool');
+      expect(aliases).toContain('current_test_tool');
+      expect(aliases).toContain('legacy_test_tool');
+      expect(aliases).toContain('another_legacy_test_tool');
+    });
+
+    it('should return all associated names for a legacy tool', () => {
+      const aliases = getToolAliases('legacy_test_tool');
+      expect(aliases).toContain('current_test_tool');
+      expect(aliases).toContain('legacy_test_tool');
+      expect(aliases).toContain('another_legacy_test_tool');
+    });
+
+    it('should return only the name itself if no aliases exist', () => {
+      const aliases = getToolAliases('unknown_tool');
+      expect(aliases).toEqual(['unknown_tool']);
     });
   });
 });
