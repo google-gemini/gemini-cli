@@ -18,8 +18,13 @@ import {
 const mockPlatform = vi.hoisted(() => vi.fn());
 
 const mockShellExecutionService = vi.hoisted(() => vi.fn());
+const mockShellBackground = vi.hoisted(() => vi.fn());
+
 vi.mock('../services/shellExecutionService.js', () => ({
-  ShellExecutionService: { execute: mockShellExecutionService },
+  ShellExecutionService: {
+    execute: mockShellExecutionService,
+    background: mockShellBackground,
+  },
 }));
 
 vi.mock('node:os', async (importOriginal) => {
@@ -38,6 +43,7 @@ vi.mock('../utils/summarizer.js');
 
 import { initializeShellParsers } from '../utils/shell-utils.js';
 import { ShellTool } from './shell.js';
+import { debugLogger } from '../index.js';
 import { type Config } from '../config/config.js';
 import {
   type ShellExecutionResult,
@@ -167,6 +173,20 @@ describe('ShellTool', () => {
           resolveExecutionPromise = resolve;
         }),
       };
+    });
+
+    mockShellBackground.mockImplementation(() => {
+      resolveExecutionPromise({
+        output: '',
+        rawOutput: Buffer.from(''),
+        exitCode: null,
+        signal: null,
+        error: null,
+        aborted: false,
+        pid: 12345,
+        executionMethod: 'child_process',
+        backgrounded: true,
+      });
     });
   });
 
@@ -305,6 +325,25 @@ describe('ShellTool', () => {
       );
     });
 
+    it('should handle is_background parameter by calling ShellExecutionService.background', async () => {
+      vi.useFakeTimers();
+      const invocation = shellTool.build({
+        command: 'sleep 10',
+        is_background: true,
+      });
+      const promise = invocation.execute(mockAbortSignal);
+
+      // We need to provide a PID for the background logic to trigger
+      resolveShellExecution({ pid: 12345 });
+
+      // Advance time to trigger the background timeout
+      await vi.advanceTimersByTimeAsync(250);
+
+      expect(mockShellBackground).toHaveBeenCalledWith(12345);
+
+      await promise;
+    });
+
     itWindowsOnly(
       'should not wrap command on windows',
       async () => {
@@ -430,8 +469,6 @@ describe('ShellTool', () => {
       // We can also verify that setTimeout was NOT called for the inactivity timeout.
       // However, since we don't have direct access to the internal `resetTimeout`,
       // we can infer success by the fact it didn't abort.
-
-      vi.useRealTimers();
     });
 
     it('should clean up the temp file on synchronous execution error', async () => {
@@ -450,10 +487,28 @@ describe('ShellTool', () => {
       expect(fs.existsSync(tmpFile)).toBe(false);
     });
 
+    it('should not log "missing pgrep output" when process is backgrounded', async () => {
+      vi.useFakeTimers();
+      const debugErrorSpy = vi.spyOn(debugLogger, 'error');
+
+      const invocation = shellTool.build({
+        command: 'sleep 10',
+        is_background: true,
+      });
+      const promise = invocation.execute(mockAbortSignal);
+
+      // Advance time to trigger backgrounding
+      await vi.advanceTimersByTimeAsync(200);
+
+      await promise;
+
+      expect(debugErrorSpy).not.toHaveBeenCalledWith('missing pgrep output');
+    });
+
     describe('Streaming to `updateOutput`', () => {
       let updateOutputMock: Mock;
       beforeEach(() => {
-        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
         updateOutputMock = vi.fn();
       });
       afterEach(() => {
@@ -501,6 +556,27 @@ describe('ShellTool', () => {
           pid: 12345,
           executionMethod: 'child_process',
         });
+        await promise;
+      });
+
+      it('should NOT call updateOutput if the command is backgrounded', async () => {
+        const invocation = shellTool.build({
+          command: 'sleep 10',
+          is_background: true,
+        });
+        const promise = invocation.execute(mockAbortSignal, updateOutputMock);
+
+        mockShellOutputCallback({ type: 'data', chunk: 'some output' });
+        expect(updateOutputMock).not.toHaveBeenCalled();
+
+        // We need to provide a PID for the background logic to trigger
+        resolveShellExecution({ pid: 12345 });
+
+        // Advance time to trigger the background timeout
+        await vi.advanceTimersByTimeAsync(250);
+
+        expect(mockShellBackground).toHaveBeenCalledWith(12345);
+
         await promise;
       });
     });

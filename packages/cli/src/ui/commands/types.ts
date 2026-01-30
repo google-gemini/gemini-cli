@@ -84,6 +84,7 @@ export interface CommandContext {
     dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
     addConfirmUpdateExtensionRequest: (value: ConfirmationRequest) => void;
     removeComponent: () => void;
+    toggleBackgroundShell: () => void;
   };
   // Session-specific data
   session: {

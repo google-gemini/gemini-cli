@@ -54,7 +54,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
       flexGrow={0}
       flexShrink={0}
     >
-      {!uiState.embeddedShellFocused && (
+      {(!uiState.embeddedShellFocused || uiState.isBackgroundShellVisible) && (
         <LoadingIndicator
           thought={
             uiState.streamingState === StreamingState.WaitingForConfirmation ||

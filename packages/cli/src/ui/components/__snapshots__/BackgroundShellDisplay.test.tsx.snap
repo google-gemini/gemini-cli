@@ -1,0 +1,56 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<BackgroundShellDisplay /> > highlights the focused state 1`] = `
+"┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
+│  1: npm star...  (PID: 1001) (Focused)                   Ctrl+B Hide | Ctrl+K Kill | Ctrl+L List │
+│ Starting server...                                                                               │
+└──────────────────────────────────────────────────────────────────────────────────────────────────┘"
+`;
+
+exports[`<BackgroundShellDisplay /> > keeps exit code status color even when selected 1`] = `
+"┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
+│  1: npm star...  (PID: 1003) (Focused)                   Ctrl+B Hide | Ctrl+K Kill | Ctrl+L List │
+│                                                                                                  │
+│ Select Process (Enter to select, Esc to cancel):                                                 │
+│                                                                                                  │
+│   1. npm start (PID: 1001)                                                                       │
+│   2. tail -f log.txt (PID: 1002)                                                                 │
+│ ● 3. exit 0 (PID: 1003) (Exit Code: 0)                                                           │
+└──────────────────────────────────────────────────────────────────────────────────────────────────┘"
+`;
+
+exports[`<BackgroundShellDisplay /> > renders tabs for multiple shells 1`] = `
+"┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
+│  1: npm start  2: tail -f log.txt  (PID: 1001)           Ctrl+B Hide | Ctrl+K Kill | Ctrl+L List │
+│ Starting server...                                                                               │
+└──────────────────────────────────────────────────────────────────────────────────────────────────┘"
+`;
+
+exports[`<BackgroundShellDisplay /> > renders the output of the active shell 1`] = `
+"┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
+│  1: npm ...  2: tail...  (PID: 1001)                     Ctrl+B Hide | Ctrl+K Kill | Ctrl+L List │
+│ Starting server...                                                                               │
+└──────────────────────────────────────────────────────────────────────────────────────────────────┘"
+`;
+
+exports[`<BackgroundShellDisplay /> > renders the process list when isListOpenProp is true 1`] = `
+"┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
+│  1: npm star...  (PID: 1001) (Focused)                   Ctrl+B Hide | Ctrl+K Kill | Ctrl+L List │
+│                                                                                                  │
+│ Select Process (Enter to select, Esc to cancel):                                                 │
+│                                                                                                  │
+│ ● 1. npm start (PID: 1001)                                                                       │
+│   2. tail -f log.txt (PID: 1002)                                                                 │
+└──────────────────────────────────────────────────────────────────────────────────────────────────┘"
+`;
+
+exports[`<BackgroundShellDisplay /> > scrolls to active shell when list opens 1`] = `
+"┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
+│  1: npm star...  (PID: 1002) (Focused)                   Ctrl+B Hide | Ctrl+K Kill | Ctrl+L List │
+│                                                                                                  │
+│ Select Process (Enter to select, Esc to cancel):                                                 │
+│                                                                                                  │
+│   1. npm start (PID: 1001)                                                                       │
+│ ● 2. tail -f log.txt (PID: 1002)                                                                 │
+└──────────────────────────────────────────────────────────────────────────────────────────────────┘"
+`;
