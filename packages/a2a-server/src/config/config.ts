@@ -135,30 +135,7 @@ export async function loadConfig(
   await config.initialize();
   startupProfiler.flush(config);
 
-  if (process.env['USE_CCPA']) {
-    logger.info('[Config] Using CCPA Auth:');
-    try {
-      if (adcFilePath) {
-        path.resolve(adcFilePath);
-      }
-    } catch (e) {
-      logger.error(
-        `[Config] USE_CCPA env var is true but unable to resolve GOOGLE_APPLICATION_CREDENTIALS file path ${adcFilePath}. Error ${e}`,
-      );
-    }
-    await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
-    logger.info(
-      `[Config] GOOGLE_CLOUD_PROJECT: ${process.env['GOOGLE_CLOUD_PROJECT']}`,
-    );
-  } else if (process.env['GEMINI_API_KEY']) {
-    logger.info('[Config] Using Gemini API Key');
-    await config.refreshAuth(AuthType.USE_GEMINI);
-  } else {
-    const errorMessage =
-      '[Config] Unable to set GeneratorConfig. Please provide a GEMINI_API_KEY or set USE_CCPA.';
-    logger.error(errorMessage);
-    throw new Error(errorMessage);
-  }
+  await refreshAuthentication(config, adcFilePath, 'Config');
 
   // Override env settings when provided admin controls.
   const codeAssistServer = getCodeAssistServer(config);
@@ -183,30 +160,7 @@ export async function loadConfig(
     await adminConfig.initialize();
     startupProfiler.flush(adminConfig);
 
-    if (process.env['USE_CCPA']) {
-      logger.info('[adminConfig] Using CCPA Auth:');
-      try {
-        if (adcFilePath) {
-          path.resolve(adcFilePath);
-        }
-      } catch (e) {
-        logger.error(
-          `[adminConfig] USE_CCPA env var is true but unable to resolve GOOGLE_APPLICATION_CREDENTIALS file path ${adcFilePath}. Error ${e}`,
-        );
-      }
-      await adminConfig.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
-      logger.info(
-        `[adminConfig] GOOGLE_CLOUD_PROJECT: ${process.env['GOOGLE_CLOUD_PROJECT']}`,
-      );
-    } else if (process.env['GEMINI_API_KEY']) {
-      logger.info('[adminConfig] Using Gemini API Key');
-      await adminConfig.refreshAuth(AuthType.USE_GEMINI);
-    } else {
-      const errorMessage =
-        '[adminConfig] Unable to set GeneratorConfig. Please provide a GEMINI_API_KEY or set USE_CCPA.';
-      logger.error(errorMessage);
-      throw new Error(errorMessage);
-    }
+    await refreshAuthentication(adminConfig, adcFilePath, 'adminConfig');
     return adminConfig;
   }
 
@@ -274,5 +228,35 @@ function findEnvFile(startDir: string): string | null {
       return null;
     }
     currentDir = parentDir;
+  }
+}
+
+async function refreshAuthentication(
+  config: Config,
+  adcFilePath: string | undefined,
+  logPrefix: string,
+): Promise<void> {
+  if (process.env['USE_CCPA']) {
+    logger.info(`[${logPrefix}] Using CCPA Auth:`);
+    try {
+      if (adcFilePath) {
+        path.resolve(adcFilePath);
+      }
+    } catch (e) {
+      logger.error(
+        `[${logPrefix}] USE_CCPA env var is true but unable to resolve GOOGLE_APPLICATION_CREDENTIALS file path ${adcFilePath}. Error ${e}`,
+      );
+    }
+    await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+    logger.info(
+      `[${logPrefix}] GOOGLE_CLOUD_PROJECT: ${process.env['GOOGLE_CLOUD_PROJECT']}`,
+    );
+  } else if (process.env['GEMINI_API_KEY']) {
+    logger.info(`[${logPrefix}] Using Gemini API Key`);
+    await config.refreshAuth(AuthType.USE_GEMINI);
+  } else {
+    const errorMessage = `[${logPrefix}] Unable to set GeneratorConfig. Please provide a GEMINI_API_KEY or set USE_CCPA.`;
+    logger.error(errorMessage);
+    throw new Error(errorMessage);
   }
 }

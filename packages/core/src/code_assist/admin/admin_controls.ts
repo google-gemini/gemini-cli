@@ -116,7 +116,7 @@ export async function fetchAdminControlsOnce(
       return {};
     }
     debugLogger.error(
-      'Failed to fetch admin controls once: ',
+      'Failed to fetch admin controls: ',
       e instanceof Error ? e.message : e,
     );
     return {};
