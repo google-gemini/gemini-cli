@@ -41,7 +41,7 @@ priority = 50
 modes = ["plan"]
 
 [[rule]]
-toolName = "search_file_content"
+toolName = "grep_search"
 decision = "allow"
 priority = 50
 modes = ["plan"]
