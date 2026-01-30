@@ -109,4 +109,4 @@ gemini skills disable my-expertise --scope workspace
 ## Creating your own skills
 
 To create your own skills, see the
-[Create Agent Skills](./guides/creating-skills-some-broken-link-2-3-4.md) guide.
+[Create Agent Skills](./guides/creating-skills-some-broken-link-2-3.md) guide.
