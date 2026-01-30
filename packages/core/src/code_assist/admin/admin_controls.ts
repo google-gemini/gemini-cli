@@ -11,6 +11,8 @@ import {
   type FetchAdminControlsResponse,
   FetchAdminControlsResponseSchema,
 } from '../types.js';
+import { getCodeAssistServer } from '../codeAssist.js';
+import type { Config } from '../../config/config.js';
 
 let pollingInterval: NodeJS.Timeout | undefined;
 let currentSettings: FetchAdminControlsResponse | undefined;
@@ -131,4 +133,21 @@ export function stopAdminControlsPolling() {
     clearInterval(pollingInterval);
     pollingInterval = undefined;
   }
+}
+
+/**
+ * Returns a standardized error message for features disabled by admin settings.
+ *
+ * @param featureName The name of the disabled feature
+ * @param config The application config
+ * @returns The formatted error message
+ */
+export function getAdminErrorMessage(
+  featureName: string,
+  config: Config | undefined,
+): string {
+  const server = config ? getCodeAssistServer(config) : undefined;
+  const projectId = server?.projectId;
+  const projectParam = projectId ? `?project=${projectId}` : '';
+  return `${featureName} is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli${projectParam}`;
 }
