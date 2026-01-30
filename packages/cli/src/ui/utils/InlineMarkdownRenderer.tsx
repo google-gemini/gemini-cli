@@ -10,6 +10,53 @@ import { theme } from '../semantic-colors.js';
 import stringWidth from 'string-width';
 import { debugLogger } from '@google/gemini-cli-core';
 
+/**
+ * Removes trailing punctuation from URLs while preserving balanced parentheses.
+ * Returns the cleaned URL and any stripped trailing punctuation.
+ *
+ * Examples:
+ * - "https://example.com." → { url: "https://example.com", trailing: "." }
+ * - "https://example.com。" → { url: "https://example.com", trailing: "。" }
+ * - "https://en.wikipedia.org/wiki/Foo_(bar)" → { url: "https://en.wikipedia.org/wiki/Foo_(bar)", trailing: "" }
+ * - "https://en.wikipedia.org/wiki/Foo_(bar))." → { url: "https://en.wikipedia.org/wiki/Foo_(bar)", trailing: ")." }
+ */
+export function stripTrailingPunctuation(url: string): {
+  url: string;
+  trailing: string;
+} {
+  let strippedUrl = url;
+  let trailing = '';
+
+  // Trailing characters to strip (ASCII and CJK punctuation)
+  const trailingCharsRegex = /[.,;:!?'")[\]>{}、。，；：！？''"")）」』》‖‧…]$/;
+
+  while (strippedUrl.length > 0) {
+    const lastChar = strippedUrl.slice(-1);
+
+    // Don't strip a closing parenthesis if it's part of a balanced pair
+    if (lastChar === ')' || lastChar === '）') {
+      const openParens = (strippedUrl.match(/[()）]/g) || []).filter(
+        (c) => c === '(',
+      ).length;
+      const closeParens = (strippedUrl.match(/[()）]/g) || []).filter(
+        (c) => c === ')' || c === '）',
+      ).length;
+      if (openParens >= closeParens) {
+        break;
+      }
+    }
+
+    if (trailingCharsRegex.test(lastChar)) {
+      trailing = lastChar + trailing;
+      strippedUrl = strippedUrl.slice(0, -1);
+    } else {
+      break;
+    }
+  }
+
+  return { url: strippedUrl, trailing };
+}
+
 // Constants for Markdown parsing
 const BOLD_MARKER_LENGTH = 2; // For "**"
 const ITALIC_MARKER_LENGTH = 1; // For "*" or "_"
@@ -138,10 +185,18 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
           </Text>
         );
       } else if (fullMatch.match(/^https?:\/\//)) {
+        const { url: cleanUrl, trailing } = stripTrailingPunctuation(fullMatch);
         renderedNode = (
-          <Text key={key} color={theme.text.link}>
-            {fullMatch}
-          </Text>
+          <>
+            <Text key={key} color={theme.text.link}>
+              {cleanUrl}
+            </Text>
+            {trailing && (
+              <Text key={`${key}-trail`} color={baseColor}>
+                {trailing}
+              </Text>
+            )}
+          </>
         );
       }
     } catch (e) {
