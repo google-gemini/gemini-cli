@@ -377,6 +377,19 @@ function* emitKeys(
           }
         }
 
+        // Check for OSC 11 (Background Color) response
+        // Format: 11;rgb:rrrr/gggg/bbbb\x1b\\ (or BEL terminated)
+        // Note: buffer contains content after `ESC ]`
+        const matchOsc11 =
+          /^11;rgb:([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})$/.exec(
+            buffer,
+          );
+        if (matchOsc11) {
+          const colorStr = `rgb:${matchOsc11[1]}/${matchOsc11[2]}/${matchOsc11[3]}`;
+          appEvents.emit(AppEvent.TerminalBackgroundResponse, colorStr);
+          continue; // resume main loop
+        }
+
         continue; // resume main loop
       } else if (ch === 'O') {
         // ESC O letter

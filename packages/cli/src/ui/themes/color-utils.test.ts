@@ -12,6 +12,7 @@ import {
   CSS_NAME_TO_HEX_MAP,
   INK_SUPPORTED_NAMES,
   getThemeTypeFromBackgroundColor,
+  parseX11Rgb,
 } from './color-utils.js';
 
 describe('Color Utils', () => {
@@ -277,6 +278,36 @@ describe('Color Utils', () => {
     it('should handle colors without # prefix', () => {
       expect(getThemeTypeFromBackgroundColor('ffffff')).toBe('light');
       expect(getThemeTypeFromBackgroundColor('000000')).toBe('dark');
+    });
+  });
+
+  describe('parseX11Rgb', () => {
+    it('should parse 1-digit components', () => {
+      // F/F/F => #ffffff
+      expect(parseX11Rgb('f', 'f', 'f')).toBe('#ffffff');
+      // 0/0/0 => #000000
+      expect(parseX11Rgb('0', '0', '0')).toBe('#000000');
+    });
+
+    it('should parse 2-digit components', () => {
+      // ff/ff/ff => #ffffff
+      expect(parseX11Rgb('ff', 'ff', 'ff')).toBe('#ffffff');
+      // 80/80/80 => #808080
+      expect(parseX11Rgb('80', '80', '80')).toBe('#808080');
+    });
+
+    it('should parse 4-digit components (standard X11)', () => {
+      // ffff/ffff/ffff => #ffffff (65535/65535 * 255 = 255)
+      expect(parseX11Rgb('ffff', 'ffff', 'ffff')).toBe('#ffffff');
+      // 0000/0000/0000 => #000000
+      expect(parseX11Rgb('0000', '0000', '0000')).toBe('#000000');
+      // 7fff/7fff/7fff => approx #7f7f7f (32767/65535 * 255 = 127.498... -> 127 -> 7f)
+      expect(parseX11Rgb('7fff', '7fff', '7fff')).toBe('#7f7f7f');
+    });
+
+    it('should handle mixed case', () => {
+      expect(parseX11Rgb('FFFF', 'FFFF', 'FFFF')).toBe('#ffffff');
+      expect(parseX11Rgb('Ffff', 'fFFF', 'ffFF')).toBe('#ffffff');
     });
   });
 });
