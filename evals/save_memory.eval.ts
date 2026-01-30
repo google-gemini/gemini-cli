@@ -27,4 +27,22 @@ describe('save_memory', () => {
       validateModelOutput(result, 'blue', 'Save memory test');
     },
   });
+  evalTest('ALWAYS_PASSES', {
+    name: 'should be able to save to memory when asking to memorize',
+    params: {
+      settings: { tools: { core: ['save_memory'] } },
+    },
+    prompt: `memorize that my favorite color is  blue.
+  
+    what is my favorite color? tell me that and surround it with $ symbol`,
+    assert: async (rig, result) => {
+      const foundToolCall = await rig.waitForToolCall('save_memory');
+      expect(
+        foundToolCall,
+        'Expected to find a save_memory tool call',
+      ).toBeTruthy();
+
+      validateModelOutput(result, 'blue', 'Save memory test');
+    },
+  });
 });
