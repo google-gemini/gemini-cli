@@ -286,9 +286,9 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`ui.enableNotifications`** (boolean):
-  - **Description:** Enable desktop notifications for user permission prompts
-    when the CLI is not in focus.
-  - **Default:** `false`
+  - **Description:** Enable notifications for user permission prompts when the
+    CLI is not in focus.
+  - **Default:** `true`
 
 #### `ide`
 
