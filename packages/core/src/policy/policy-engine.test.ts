@@ -1432,7 +1432,7 @@ describe('PolicyEngine', () => {
       expect(result.rule?.priority).toBe(999);
     });
 
-    it('should return DENY in YOLO mode if shell command parsing fails but rule says DENY', async () => {
+    it('should return DENY in YOLO mode if shell command parsing fails and a higher priority rule says DENY', async () => {
       const { splitCommands } = await import('../utils/shell-utils.js');
       const rules: PolicyRule[] = [
         {
