@@ -141,9 +141,7 @@ import {
 import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialog.js';
 import { NewAgentsChoice } from './components/NewAgentsNotification.js';
 import { isSlashCommand } from './utils/commandUtils.js';
-import { parseX11Rgb, getLuminance } from './themes/color-utils.js';
-import { DEFAULT_THEME } from './themes/theme-manager.js';
-import { DefaultLight } from './themes/default-light.js';
+import { useTerminalTheme } from './hooks/useTerminalTheme.js';
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
   return pendingHistoryItems.some((item) => {
@@ -605,67 +603,7 @@ export const AppContainer = (props: AppContainerProps) => {
   );
 
   // Poll for terminal background color changes to auto-switch theme
-  useEffect(() => {
-    const pollInterval = setInterval(() => {
-      // Only poll if we are using one of the default themes
-      const currentThemeName = settings.merged.ui.theme;
-      const isDefaultTheme =
-        currentThemeName === DEFAULT_THEME.name ||
-        currentThemeName === undefined;
-      const isDefaultLightTheme = currentThemeName === DefaultLight.name;
-
-      if (!isDefaultTheme && !isDefaultLightTheme) {
-        return;
-      }
-      stdout.write('\x1b]11;?\x1b\\');
-    }, 3000);
-
-    const handleTerminalBackgroundResponse = (colorStr: string) => {
-      // Parse the response "rgb:rrrr/gggg/bbbb"
-      const match =
-        /^rgb:([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})$/.exec(
-          colorStr,
-        );
-      if (!match) return;
-
-      const hexColor = parseX11Rgb(match[1], match[2], match[3]);
-      const luminance = getLuminance(hexColor);
-      config.setTerminalBackground(hexColor);
-
-      // Check if we need to switch theme
-      const currentThemeName = settings.merged.ui.theme;
-      const isDefaultTheme =
-        currentThemeName === DEFAULT_THEME.name ||
-        currentThemeName === undefined;
-      const isDefaultLightTheme = currentThemeName === DefaultLight.name;
-
-      // Hysteresis thresholds to prevent flickering
-      const LIGHT_THEME_LUMINANCE_THRESHOLD = 140;
-      const DARK_THEME_LUMINANCE_THRESHOLD = 110;
-
-      if (luminance > LIGHT_THEME_LUMINANCE_THRESHOLD && isDefaultTheme) {
-        handleThemeSelect(DefaultLight.name, SettingScope.User);
-      } else if (
-        luminance < DARK_THEME_LUMINANCE_THRESHOLD &&
-        isDefaultLightTheme
-      ) {
-        handleThemeSelect(DEFAULT_THEME.name, SettingScope.User);
-      }
-    };
-
-    appEvents.on(
-      AppEvent.TerminalBackgroundResponse,
-      handleTerminalBackgroundResponse,
-    );
-
-    return () => {
-      clearInterval(pollInterval);
-      appEvents.off(
-        AppEvent.TerminalBackgroundResponse,
-        handleTerminalBackgroundResponse,
-      );
-    };
-  }, [settings.merged.ui.theme, stdout, config, handleThemeSelect]);
+  useTerminalTheme(handleThemeSelect, config);
 
   const {
     authState,
