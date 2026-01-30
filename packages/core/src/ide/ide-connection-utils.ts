@@ -215,13 +215,20 @@ export async function createProxyAwareFetch(ideServerHost: string) {
     };
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const options = fetchOptions as unknown as import('undici').RequestInit;
-    const response = await fetchFn(url, options);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return new Response(response.body as ReadableStream<unknown> | null, {
-      status: response.status,
-      statusText: response.statusText,
-      headers: [...response.headers.entries()],
-    });
+    try {
+      const response = await fetchFn(url, options);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      return new Response(response.body as ReadableStream<unknown> | null, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: [...response.headers.entries()],
+      });
+    } catch (error) {
+      logger.error(
+        `IDE fetch failed for ${url instanceof URL ? url.href : url}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error;
+    }
   };
 }
 
