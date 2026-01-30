@@ -23,7 +23,7 @@ available combinations.
 | Move the cursor to the end of the line.     | `Ctrl + E`<br />`End (no Shift, Ctrl)`                       |
 | Move the cursor up one line.                | `Up Arrow (no Shift, Alt, Ctrl, Cmd)`                        |
 | Move the cursor down one line.              | `Down Arrow (no Shift, Alt, Ctrl, Cmd)`                      |
-| Move the cursor one character to the left.  | `Left Arrow (no Shift, Alt, Ctrl, Cmd)`<br />`Ctrl + B`      |
+| Move the cursor one character to the left.  | `Left Arrow (no Shift, Alt, Ctrl, Cmd)`                      |
 | Move the cursor one character to the right. | `Right Arrow (no Shift, Alt, Ctrl, Cmd)`<br />`Ctrl + F`     |
 | Move the cursor one word to the left.       | `Ctrl + Left Arrow`<br />`Alt + Left Arrow`<br />`Alt + B`   |
 | Move the cursor one word to the right.      | `Ctrl + Right Arrow`<br />`Alt + Right Arrow`<br />`Alt + F` |
@@ -106,6 +106,14 @@ available combinations.
 | Toggle YOLO (auto-approval) mode for tool calls.                                                      | `Ctrl + Y`                 |
 | Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only). | `Shift + Tab`              |
 | Expand a height-constrained response to show additional lines when not in alternate buffer mode.      | `Ctrl + O`<br />`Ctrl + S` |
+| Ctrl+B                                                                                                | `Ctrl + B`                 |
+| Ctrl+L                                                                                                | `Ctrl + L`                 |
+| Ctrl+K                                                                                                | `Ctrl + K`                 |
+| Enter                                                                                                 | `Enter`                    |
+| Esc                                                                                                   | `Esc`                      |
+| Shift+Tab                                                                                             | `Shift + Tab`              |
+| Tab                                                                                                   | `Tab (no Shift)`           |
+| Tab                                                                                                   | `Tab (no Shift)`           |
 | Focus the shell input from the gemini input.                                                          | `Tab (no Shift)`           |
 | Focus the Gemini input from the shell input.                                                          | `Tab`                      |
 | Clear the terminal screen and redraw the UI.                                                          | `Ctrl + L`                 |

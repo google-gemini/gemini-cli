@@ -100,7 +100,7 @@ export function BaseSelectionList<
   return (
     <Box flexDirection="column">
       {/* Use conditional coloring instead of conditional rendering */}
-      {showScrollArrows && (
+      {showScrollArrows && items.length > maxItemsToShow && (
         <Text
           color={scrollOffset > 0 ? theme.text.primary : theme.text.secondary}
         >
@@ -172,7 +172,7 @@ export function BaseSelectionList<
         );
       })}
 
-      {showScrollArrows && (
+      {showScrollArrows && items.length > maxItemsToShow && (
         <Text
           color={
             scrollOffset + maxItemsToShow < items.length

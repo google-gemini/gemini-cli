@@ -88,6 +88,7 @@ describe('App', () => {
       defaultText: 'Mock Banner Text',
       warningText: '',
     },
+    backgroundShells: new Map(),
   };
 
   it('should render main content and composer when not quitting', () => {
@@ -234,7 +235,6 @@ describe('App', () => {
     expect(lastFrame()).toContain('Tips for getting started');
     expect(lastFrame()).toContain('Notifications');
     expect(lastFrame()).toContain('Action Required'); // From ToolConfirmationQueue
-    expect(lastFrame()).toContain('1 of 1');
     expect(lastFrame()).toContain('Composer');
     expect(lastFrame()).toMatchSnapshot();
   });

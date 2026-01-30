@@ -15,8 +15,14 @@ import type { TextBuffer } from './shared/text-buffer.js';
 
 // Mock child components to simplify testing
 vi.mock('./ContextSummaryDisplay.js', () => ({
-  ContextSummaryDisplay: (props: { skillCount: number }) => (
-    <Text>Mock Context Summary Display (Skills: {props.skillCount})</Text>
+  ContextSummaryDisplay: (props: {
+    skillCount: number;
+    backgroundProcessCount: number;
+  }) => (
+    <Text>
+      Mock Context Summary Display (Skills: {props.skillCount}, Shells:{' '}
+      {props.backgroundProcessCount})
+    </Text>
   ),
 }));
 
@@ -41,6 +47,7 @@ const createMockUIState = (overrides: UIStateOverrides = {}): UIState =>
     ideContextState: null,
     geminiMdFileCount: 0,
     contextFileNames: [],
+    backgroundShellCount: 0,
     buffer: { text: '' },
     history: [{ id: 1, type: 'user', text: 'test' }],
     ...overrides,
@@ -226,5 +233,16 @@ describe('StatusDisplay', () => {
       settings,
     );
     expect(lastFrame()).toBe('');
+  });
+
+  it('passes backgroundShellCount to ContextSummaryDisplay', () => {
+    const uiState = createMockUIState({
+      backgroundShellCount: 3,
+    });
+    const { lastFrame } = renderStatusDisplay(
+      { hideContextSummary: false },
+      uiState,
+    );
+    expect(lastFrame()).toContain('Shells: 3');
   });
 });
