@@ -11,10 +11,10 @@ import type { Settings } from './settings.js';
 import {
   type ExtensionLoader,
   FileDiscoveryService,
+  getCodeAssistServer,
   Config,
   ExperimentFlags,
   fetchAdminControlsOnce,
-  getCodeAssistServer,
   type FetchAdminControlsResponse,
 } from '@google/gemini-cli-core';
 
@@ -24,7 +24,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
-    Config: vi.fn().mockImplementation((params: ConfigParameters) => {
+    Config: vi.fn().mockImplementation((params) => {
       const mockConfig = {
         ...params,
         initialize: vi.fn(),
@@ -38,10 +38,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         }),
         getRemoteAdminSettings: vi.fn(),
         setRemoteAdminSettings: vi.fn(),
-        fileFiltering: params.fileFiltering,
-        checkpointing: params.checkpointing,
       };
-      return mockConfig as Config;
+      return mockConfig;
     }),
     loadServerHierarchicalMemory: vi
       .fn()
@@ -89,7 +87,8 @@ describe('loadConfig', () => {
     describe('when admin controls experiment is enabled', () => {
       beforeEach(() => {
         // We need to cast to any here to modify the mock implementation
-        Config.mockImplementation((params: ConfigParameters) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (Config as any).mockImplementation((params: unknown) => {
           const mockConfig = {
             ...(params as object),
             initialize: vi.fn(),
@@ -103,10 +102,8 @@ describe('loadConfig', () => {
             }),
             getRemoteAdminSettings: vi.fn().mockReturnValue({}),
             setRemoteAdminSettings: vi.fn(),
-            fileFiltering: params.fileFiltering,
-            checkpointing: params.checkpointing,
           };
-          return mockConfig as Config;
+          return mockConfig;
         });
       });
 
@@ -134,7 +131,8 @@ describe('loadConfig', () => {
         };
         const mockCodeAssistServer = { projectId: 'test-project' };
         vi.mocked(getCodeAssistServer).mockReturnValue(
-          mockCodeAssistServer as CodeAssistServer,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          mockCodeAssistServer as any,
         );
         vi.mocked(fetchAdminControlsOnce).mockResolvedValue(mockAdminSettings);
 
@@ -159,7 +157,8 @@ describe('loadConfig', () => {
     const testPath = '/tmp/ignore';
     process.env['CUSTOM_IGNORE_FILE_PATHS'] = testPath;
     const config = await loadConfig(mockSettings, mockExtensionLoader, taskId);
-    expect((config).fileFiltering.customIgnoreFilePaths).toEqual([
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((config as any).fileFiltering.customIgnoreFilePaths).toEqual([
       testPath,
     ]);
   });
@@ -172,7 +171,8 @@ describe('loadConfig', () => {
       },
     };
     const config = await loadConfig(settings, mockExtensionLoader, taskId);
-    expect((config).fileFiltering.customIgnoreFilePaths).toEqual([
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((config as any).fileFiltering.customIgnoreFilePaths).toEqual([
       testPath,
     ]);
   });
@@ -187,7 +187,8 @@ describe('loadConfig', () => {
       },
     };
     const config = await loadConfig(settings, mockExtensionLoader, taskId);
-    expect((config).fileFiltering.customIgnoreFilePaths).toEqual([
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((config as any).fileFiltering.customIgnoreFilePaths).toEqual([
       settingsPath,
       envPath,
     ]);
@@ -197,14 +198,14 @@ describe('loadConfig', () => {
     const paths = ['/path/one', '/path/two'];
     process.env['CUSTOM_IGNORE_FILE_PATHS'] = paths.join(path.delimiter);
     const config = await loadConfig(mockSettings, mockExtensionLoader, taskId);
-    expect((config).fileFiltering.customIgnoreFilePaths).toEqual(
-      paths,
-    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((config as any).fileFiltering.customIgnoreFilePaths).toEqual(paths);
   });
 
   it('should have empty customIgnoreFilePaths when both are missing', async () => {
     const config = await loadConfig(mockSettings, mockExtensionLoader, taskId);
-    expect((config).fileFiltering.customIgnoreFilePaths).toEqual([]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((config as any).fileFiltering.customIgnoreFilePaths).toEqual([]);
   });
 
   it('should initialize FileDiscoveryService with correct options', async () => {
