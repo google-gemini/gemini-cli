@@ -54,9 +54,10 @@ function buildZodSchemaFromJsonSchema(def: any): z.ZodTypeAny {
         }
         shape[key] = propSchema;
       }
-      schema = z.object(shape).passthrough();
+      // Don't apply passthrough() here - we'll determine the behavior below
+      schema = z.object(shape);
     } else {
-      schema = z.object({}).passthrough();
+      schema = z.object({});
     }
 
     if (def.additionalProperties === false) {
@@ -65,6 +66,9 @@ function buildZodSchemaFromJsonSchema(def: any): z.ZodTypeAny {
       schema = schema.catchall(
         buildZodSchemaFromJsonSchema(def.additionalProperties),
       );
+    } else {
+      // Default to passthrough when additionalProperties is not explicitly false
+      schema = schema.passthrough();
     }
 
     return schema;
