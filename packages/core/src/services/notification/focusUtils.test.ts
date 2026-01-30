@@ -6,15 +6,15 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import process from 'node:process';
-import { execSync } from 'node:child_process';
+import { exec } from 'node:child_process';
 import { isTerminalAppFocused } from './focusUtils.js';
 
 vi.mock('node:child_process', () => ({
-  execSync: vi.fn(),
+  exec: vi.fn(),
 }));
 
 describe('focusUtils', () => {
-  const mockExecSync = execSync as unknown as ReturnType<typeof vi.fn>;
+  const mockExec = exec as unknown as ReturnType<typeof vi.fn>;
   const originalPlatform = process.platform;
   const originalEnvTermProgram = process.env['TERM_PROGRAM'];
 
@@ -27,7 +27,10 @@ describe('focusUtils', () => {
     });
     delete process.env['TERM_PROGRAM'];
     delete process.env['TERM'];
-    mockExecSync.mockReturnValue('');
+    mockExec.mockImplementation((_cmd, _opts, callback) => {
+      const cb = typeof _opts === 'function' ? _opts : callback;
+      cb(null, { stdout: '', stderr: '' });
+    });
   });
 
   afterEach(() => {
@@ -37,114 +40,145 @@ describe('focusUtils', () => {
   });
 
   describe('isTerminalAppFocused', () => {
-    it('should return null if neither TERM_PROGRAM nor TERM is set', () => {
+    it('should return null if neither TERM_PROGRAM nor TERM is set', async () => {
       delete process.env['TERM_PROGRAM'];
       delete process.env['TERM'];
-      expect(isTerminalAppFocused()).toBeNull();
+      expect(await isTerminalAppFocused()).toBeNull();
     });
 
-    it('should fallback to TERM if TERM_PROGRAM is missing (Kitty)', () => {
+    it('should fallback to TERM if TERM_PROGRAM is missing (Kitty)', async () => {
       Object.defineProperty(process, 'platform', { value: 'darwin' });
       delete process.env['TERM_PROGRAM'];
       process.env['TERM'] = 'xterm-kitty';
-      mockExecSync.mockReturnValue('kitty\n');
+      mockExec.mockImplementation((_cmd, _opts, callback) => {
+        const cb = typeof _opts === 'function' ? _opts : callback;
+        cb(null, { stdout: 'kitty\n', stderr: '' });
+      });
 
-      expect(isTerminalAppFocused()).toBe(true);
+      expect(await isTerminalAppFocused()).toBe(true);
     });
 
-    it('should fallback to TERM if TERM_PROGRAM is missing (Alacritty)', () => {
+    it('should fallback to TERM if TERM_PROGRAM is missing (Alacritty)', async () => {
       Object.defineProperty(process, 'platform', { value: 'darwin' });
       delete process.env['TERM_PROGRAM'];
       process.env['TERM'] = 'alacritty';
-      mockExecSync.mockReturnValue('Alacritty\n');
-
-      expect(isTerminalAppFocused()).toBe(true);
-    });
-
-    it('should return true on macOS for iTerm2', () => {
-      Object.defineProperty(process, 'platform', { value: 'darwin' });
-      process.env['TERM_PROGRAM'] = 'iTerm.app';
-      mockExecSync.mockReturnValue('iTerm2\n');
-
-      expect(isTerminalAppFocused()).toBe(true);
-    });
-
-    it('should return true on macOS for VS Code', () => {
-      Object.defineProperty(process, 'platform', { value: 'darwin' });
-      process.env['TERM_PROGRAM'] = 'vscode';
-      mockExecSync.mockReturnValue('Code\n');
-
-      expect(isTerminalAppFocused()).toBe(true);
-    });
-
-    it('should return true on macOS for WezTerm', () => {
-      Object.defineProperty(process, 'platform', { value: 'darwin' });
-      process.env['TERM_PROGRAM'] = 'WezTerm';
-      mockExecSync.mockReturnValue('wezterm-gui\n');
-
-      expect(isTerminalAppFocused()).toBe(true);
-    });
-
-    it('should return true on macOS if terminal is frontmost (Apple_Terminal)', () => {
-      Object.defineProperty(process, 'platform', { value: 'darwin' });
-      process.env['TERM_PROGRAM'] = 'Apple_Terminal';
-      mockExecSync.mockReturnValue('Terminal\n');
-
-      expect(isTerminalAppFocused()).toBe(true);
-      expect(mockExecSync).toHaveBeenCalledWith(
-        "lsappinfo info -only Name `lsappinfo front` | cut -d '\"' -f4",
-        expect.any(Object),
-      );
-    });
-
-    it('should return false on macOS if terminal is NOT frontmost (Apple_Terminal)', () => {
-      Object.defineProperty(process, 'platform', { value: 'darwin' });
-      process.env['TERM_PROGRAM'] = 'Apple_Terminal';
-      mockExecSync.mockReturnValue('OtherApp\n');
-
-      expect(isTerminalAppFocused()).toBe(false);
-    });
-
-    it('should return true on macOS for Warp', () => {
-      Object.defineProperty(process, 'platform', { value: 'darwin' });
-      process.env['TERM_PROGRAM'] = 'WarpTerminal';
-      mockExecSync.mockReturnValue('Warp\n');
-
-      expect(isTerminalAppFocused()).toBe(true);
-    });
-
-    it('should return true on Windows if terminal is frontmost', () => {
-      Object.defineProperty(process, 'platform', { value: 'win32' });
-      process.env['TERM_PROGRAM'] = 'Apple_Terminal';
-      mockExecSync.mockReturnValue('Terminal\n');
-
-      expect(isTerminalAppFocused()).toBe(true);
-      expect(mockExecSync).toHaveBeenCalledWith(
-        expect.stringContaining('powershell'),
-        expect.any(Object),
-      );
-    });
-
-    it('should return true on Linux if terminal is frontmost', () => {
-      Object.defineProperty(process, 'platform', { value: 'linux' });
-      process.env['TERM_PROGRAM'] = 'Apple_Terminal';
-      mockExecSync.mockReturnValue('Terminal\n');
-
-      expect(isTerminalAppFocused()).toBe(true);
-      expect(mockExecSync).toHaveBeenCalledWith(
-        "xdotool getwindowfocus getwindowname 2>/dev/null || xprop -id $(xdotool getwindowfocus) WM_CLASS 2>/dev/null | cut -d '\"' -f4",
-        expect.any(Object),
-      );
-    });
-
-    it('should return null if execSync throws', () => {
-      Object.defineProperty(process, 'platform', { value: 'darwin' });
-      process.env['TERM_PROGRAM'] = 'Apple_Terminal';
-      mockExecSync.mockImplementation(() => {
-        throw new Error('Command not found');
+      mockExec.mockImplementation((_cmd, _opts, callback) => {
+        const cb = typeof _opts === 'function' ? _opts : callback;
+        cb(null, { stdout: 'Alacritty\n', stderr: '' });
       });
 
-      expect(isTerminalAppFocused()).toBeNull();
+      expect(await isTerminalAppFocused()).toBe(true);
+    });
+
+    it('should return true on macOS for iTerm2', async () => {
+      Object.defineProperty(process, 'platform', { value: 'darwin' });
+      process.env['TERM_PROGRAM'] = 'iTerm.app';
+      mockExec.mockImplementation((_cmd, _opts, callback) => {
+        const cb = typeof _opts === 'function' ? _opts : callback;
+        cb(null, { stdout: 'iTerm2\n', stderr: '' });
+      });
+
+      expect(await isTerminalAppFocused()).toBe(true);
+    });
+
+    it('should return true on macOS for VS Code', async () => {
+      Object.defineProperty(process, 'platform', { value: 'darwin' });
+      process.env['TERM_PROGRAM'] = 'vscode';
+      mockExec.mockImplementation((_cmd, _opts, callback) => {
+        const cb = typeof _opts === 'function' ? _opts : callback;
+        cb(null, { stdout: 'Code\n', stderr: '' });
+      });
+
+      expect(await isTerminalAppFocused()).toBe(true);
+    });
+
+    it('should return true on macOS for WezTerm', async () => {
+      Object.defineProperty(process, 'platform', { value: 'darwin' });
+      process.env['TERM_PROGRAM'] = 'WezTerm';
+      mockExec.mockImplementation((_cmd, _opts, callback) => {
+        const cb = typeof _opts === 'function' ? _opts : callback;
+        cb(null, { stdout: 'wezterm-gui\n', stderr: '' });
+      });
+
+      expect(await isTerminalAppFocused()).toBe(true);
+    });
+
+    it('should return true on macOS if terminal is frontmost (Apple_Terminal)', async () => {
+      Object.defineProperty(process, 'platform', { value: 'darwin' });
+      process.env['TERM_PROGRAM'] = 'Apple_Terminal';
+      mockExec.mockImplementation((_cmd, _opts, callback) => {
+        const cb = typeof _opts === 'function' ? _opts : callback;
+        cb(null, { stdout: 'Terminal\n', stderr: '' });
+      });
+
+      expect(await isTerminalAppFocused()).toBe(true);
+      expect(mockExec).toHaveBeenCalledWith(
+        "lsappinfo info -only Name `lsappinfo front` | cut -d '\"' -f4",
+        expect.any(Function),
+      );
+    });
+
+    it('should return false on macOS if terminal is NOT frontmost (Apple_Terminal)', async () => {
+      Object.defineProperty(process, 'platform', { value: 'darwin' });
+      process.env['TERM_PROGRAM'] = 'Apple_Terminal';
+      mockExec.mockImplementation((_cmd, _opts, callback) => {
+        const cb = typeof _opts === 'function' ? _opts : callback;
+        cb(null, { stdout: 'OtherApp\n', stderr: '' });
+      });
+
+      expect(await isTerminalAppFocused()).toBe(false);
+    });
+
+    it('should return true on macOS for Warp', async () => {
+      Object.defineProperty(process, 'platform', { value: 'darwin' });
+      process.env['TERM_PROGRAM'] = 'WarpTerminal';
+      mockExec.mockImplementation((_cmd, _opts, callback) => {
+        const cb = typeof _opts === 'function' ? _opts : callback;
+        cb(null, { stdout: 'Warp\n', stderr: '' });
+      });
+
+      expect(await isTerminalAppFocused()).toBe(true);
+    });
+
+    it('should return true on Windows if terminal is frontmost', async () => {
+      Object.defineProperty(process, 'platform', { value: 'win32' });
+      process.env['TERM_PROGRAM'] = 'Apple_Terminal';
+      mockExec.mockImplementation((_cmd, _opts, callback) => {
+        const cb = typeof _opts === 'function' ? _opts : callback;
+        cb(null, { stdout: 'Terminal\n', stderr: '' });
+      });
+
+      expect(await isTerminalAppFocused()).toBe(true);
+      expect(mockExec).toHaveBeenCalledWith(
+        expect.stringContaining('powershell'),
+        expect.any(Function),
+      );
+    });
+
+    it('should return true on Linux if terminal is frontmost', async () => {
+      Object.defineProperty(process, 'platform', { value: 'linux' });
+      process.env['TERM_PROGRAM'] = 'Apple_Terminal';
+      mockExec.mockImplementation((_cmd, _opts, callback) => {
+        const cb = typeof _opts === 'function' ? _opts : callback;
+        cb(null, { stdout: 'Terminal\n', stderr: '' });
+      });
+
+      expect(await isTerminalAppFocused()).toBe(true);
+      expect(mockExec).toHaveBeenCalledWith(
+        "xdotool getwindowfocus getwindowname 2>/dev/null || xprop -id $(xdotool getwindowfocus) WM_CLASS 2>/dev/null | cut -d '\"' -f4",
+        expect.any(Function),
+      );
+    });
+
+    it('should return null if exec throws', async () => {
+      Object.defineProperty(process, 'platform', { value: 'darwin' });
+      process.env['TERM_PROGRAM'] = 'Apple_Terminal';
+      mockExec.mockImplementation((_cmd, _opts, callback) => {
+        const cb = typeof _opts === 'function' ? _opts : callback;
+        cb(new Error('Command not found'), null, null);
+      });
+
+      expect(await isTerminalAppFocused()).toBeNull();
     });
   });
 });

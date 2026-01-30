@@ -7,7 +7,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import notifier from 'node-notifier';
 import process from 'node:process';
-import { execSync } from 'node:child_process';
 import { NotificationService } from './NotificationService.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import {
@@ -17,10 +16,6 @@ import {
 } from '../../confirmation-bus/types.js';
 import { CoreEventEmitter } from '../../utils/events.js';
 import { isTerminalAppFocused } from './focusUtils.js';
-
-vi.mock('node:child_process', () => ({
-  execSync: vi.fn(),
-}));
 
 vi.mock('./focusUtils.js', () => ({
   isTerminalAppFocused: vi.fn(),
@@ -43,7 +38,6 @@ vi.mock('node-notifier', () => {
 
 describe('NotificationService', () => {
   const mockNotify = notifier.notify as unknown as ReturnType<typeof vi.fn>;
-  const mockExecSync = execSync as unknown as ReturnType<typeof vi.fn>;
   const mockIsTerminalAppFocused =
     isTerminalAppFocused as unknown as ReturnType<typeof vi.fn>;
   const originalPlatform = process.platform;
@@ -64,8 +58,7 @@ describe('NotificationService', () => {
     delete process.env['__CFBundleIdentifier'];
     delete process.env['TERM_PROGRAM'];
     mockEvents = new CoreEventEmitter();
-    mockExecSync.mockReturnValue(''); // Default to empty string (no match)
-    mockIsTerminalAppFocused.mockReturnValue(null);
+    mockIsTerminalAppFocused.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -74,11 +67,11 @@ describe('NotificationService', () => {
     vi.restoreAllMocks();
   });
 
-  it('should notify when enabled', () => {
+  it('should notify when enabled', async () => {
     const service = new NotificationService({ enabled: true }, mockEvents);
     // Unfocus to allow notification
     mockEvents.emitWindowFocusChanged(false);
-    service.notify({ message: 'Test Message' });
+    await service.notify({ message: 'Test Message' });
 
     expect(mockNotify).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -89,21 +82,21 @@ describe('NotificationService', () => {
     );
   });
 
-  it('should NOT notify when disabled', () => {
+  it('should NOT notify when disabled', async () => {
     const service = new NotificationService({ enabled: false }, mockEvents);
     mockEvents.emitWindowFocusChanged(false);
-    service.notify({ message: 'Test Message' });
+    await service.notify({ message: 'Test Message' });
 
     expect(mockNotify).not.toHaveBeenCalled();
   });
 
-  it('should include activate option on macOS if provided', () => {
+  it('should include activate option on macOS if provided', async () => {
     Object.defineProperty(process, 'platform', {
       value: 'darwin',
     });
     const service = new NotificationService({ enabled: true }, mockEvents);
     mockEvents.emitWindowFocusChanged(false);
-    service.notify({ message: 'Test', activate: 'com.test.app' });
+    await service.notify({ message: 'Test', activate: 'com.test.app' });
 
     expect(mockNotify).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -113,14 +106,14 @@ describe('NotificationService', () => {
     );
   });
 
-  it('should include activate option on macOS from env if not provided', () => {
+  it('should include activate option on macOS from env if not provided', async () => {
     Object.defineProperty(process, 'platform', {
       value: 'darwin',
     });
     process.env['__CFBundleIdentifier'] = 'com.env.app';
     const service = new NotificationService({ enabled: true }, mockEvents);
     mockEvents.emitWindowFocusChanged(false);
-    service.notify({ message: 'Test' });
+    await service.notify({ message: 'Test' });
 
     expect(mockNotify).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -130,7 +123,7 @@ describe('NotificationService', () => {
     );
   });
 
-  it('should handle MessageBus subscriptions and notify on TOOL_CONFIRMATION_REQUEST', () => {
+  it('should handle MessageBus subscriptions and notify on TOOL_CONFIRMATION_REQUEST', async () => {
     const service = new NotificationService({ enabled: true }, mockEvents);
     mockEvents.emitWindowFocusChanged(false);
     const mockBus = {
@@ -154,15 +147,18 @@ describe('NotificationService', () => {
       toolCall: { name: 'test_tool' } as never,
     });
 
-    expect(mockNotify).toHaveBeenCalledWith(
-      expect.objectContaining({
-        message: 'Require tool Permission: test_tool',
-      }),
-      expect.any(Function),
-    );
+    // Wait for the async notify to finish
+    await vi.waitFor(() => {
+      expect(mockNotify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Require tool Permission: test_tool',
+        }),
+        expect.any(Function),
+      );
+    });
   });
 
-  it('should handle NOTIFICATION_REQUEST with force flag', () => {
+  it('should handle NOTIFICATION_REQUEST with force flag', async () => {
     const service = new NotificationService({ enabled: false }, mockEvents);
     const mockBus = {
       subscribe: vi.fn(),
@@ -183,28 +179,31 @@ describe('NotificationService', () => {
       force: true,
     });
 
-    expect(mockNotify).toHaveBeenCalledWith(
-      expect.objectContaining({
-        message: 'Policy Alert',
-        force: true,
-      }),
-      expect.any(Function),
-    );
+    // Wait for the async notify to finish
+    await vi.waitFor(() => {
+      expect(mockNotify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Policy Alert',
+          force: true,
+        }),
+        expect.any(Function),
+      );
+    });
   });
 
-  it('should NOT notify if focused', () => {
+  it('should NOT notify if focused', async () => {
     const service = new NotificationService({ enabled: true }, mockEvents);
     mockEvents.emitWindowFocusChanged(true);
 
-    service.notify({ message: 'Test' });
+    await service.notify({ message: 'Test' });
     expect(mockNotify).not.toHaveBeenCalled();
   });
 
-  it('should notify if NOT focused', () => {
+  it('should notify if NOT focused', async () => {
     const service = new NotificationService({ enabled: true }, mockEvents);
     mockEvents.emitWindowFocusChanged(false);
 
-    service.notify({ message: 'Test' });
+    await service.notify({ message: 'Test' });
     expect(mockNotify).toHaveBeenCalled();
   });
 
@@ -240,147 +239,147 @@ describe('NotificationService', () => {
     );
   });
 
-  it('should NOT notify in WarpTerminal if OS check confirms focus', () => {
+  it('should NOT notify in WarpTerminal if OS check confirms focus', async () => {
     process.env['TERM_PROGRAM'] = 'WarpTerminal';
-    mockIsTerminalAppFocused.mockReturnValue(true);
+    mockIsTerminalAppFocused.mockResolvedValue(true);
 
     const service = new NotificationService({ enabled: true }, mockEvents);
     mockEvents.emitWindowFocusChanged(true);
 
-    service.notify({ message: 'Test' });
+    await service.notify({ message: 'Test' });
     expect(mockNotify).not.toHaveBeenCalled();
     expect(mockIsTerminalAppFocused).toHaveBeenCalled();
   });
 
-  it('should prioritize OS check even if ANSI reports NOT focused', () => {
-    mockIsTerminalAppFocused.mockReturnValue(true);
+  it('should prioritize OS check even if ANSI reports NOT focused', async () => {
+    mockIsTerminalAppFocused.mockResolvedValue(true);
     const service = new NotificationService({ enabled: true }, mockEvents);
     // ANSI reports NOT focused
     mockEvents.emitWindowFocusChanged(false);
 
-    service.notify({ message: 'Test' });
+    await service.notify({ message: 'Test' });
     expect(mockNotify).not.toHaveBeenCalled();
     expect(mockIsTerminalAppFocused).toHaveBeenCalled();
   });
 
-  it('should prioritize OS check even if ANSI reports focused', () => {
-    mockIsTerminalAppFocused.mockReturnValue(false);
+  it('should prioritize OS check even if ANSI reports focused', async () => {
+    mockIsTerminalAppFocused.mockResolvedValue(false);
     const service = new NotificationService({ enabled: true }, mockEvents);
     // ANSI reports focused
     mockEvents.emitWindowFocusChanged(true);
 
-    service.notify({ message: 'Test' });
+    await service.notify({ message: 'Test' });
     expect(mockNotify).toHaveBeenCalled();
     expect(mockIsTerminalAppFocused).toHaveBeenCalled();
   });
 
-  it('should fallback to ANSI when OS check returns null', () => {
-    mockIsTerminalAppFocused.mockReturnValue(null);
+  it('should fallback to ANSI when OS check returns null', async () => {
+    mockIsTerminalAppFocused.mockResolvedValue(null);
     const service = new NotificationService({ enabled: true }, mockEvents);
 
     // ANSI reports focused
     mockEvents.emitWindowFocusChanged(true);
-    service.notify({ message: 'Test 1' });
+    await service.notify({ message: 'Test 1' });
     expect(mockNotify).not.toHaveBeenCalled();
 
     // ANSI reports NOT focused
     mockEvents.emitWindowFocusChanged(false);
-    service.notify({ message: 'Test 2' });
+    await service.notify({ message: 'Test 2' });
     expect(mockNotify).toHaveBeenCalled();
   });
 
-  it('should assume NOT focused for unsupported terminal when both OS and ANSI report focused (safety check)', () => {
+  it('should assume NOT focused for unsupported terminal when both OS and ANSI report focused (safety check)', async () => {
     process.env['TERM_PROGRAM'] = 'Apple_Terminal';
-    mockIsTerminalAppFocused.mockReturnValue(null);
+    mockIsTerminalAppFocused.mockResolvedValue(null);
     const service = new NotificationService({ enabled: true }, mockEvents);
 
     // Both OS check is inconclusive (null) and ANSI reports focused
     mockEvents.emitWindowFocusChanged(true);
-    service.notify({ message: 'Test' });
+    await service.notify({ message: 'Test' });
 
     // Should NOT suppress (i.e. should notify) because it's an unsupported terminal
     expect(mockNotify).toHaveBeenCalled();
   });
 
-  it('should assume NOT focused for regular terminal when ANSI reports NOT focused and OS check is null', () => {
+  it('should assume NOT focused for regular terminal when ANSI reports NOT focused and OS check is null', async () => {
     process.env['TERM_PROGRAM'] = 'iTerm.app';
-    mockIsTerminalAppFocused.mockReturnValue(null);
+    mockIsTerminalAppFocused.mockResolvedValue(null);
     const service = new NotificationService({ enabled: true }, mockEvents);
 
     mockEvents.emitWindowFocusChanged(false);
-    service.notify({ message: 'Test' });
+    await service.notify({ message: 'Test' });
 
     expect(mockNotify).toHaveBeenCalled();
   });
 
-  it('should NOT notify on Windows if OS check confirms focus', () => {
+  it('should NOT notify on Windows if OS check confirms focus', async () => {
     process.env['TERM_PROGRAM'] = 'Apple_Terminal';
-    mockIsTerminalAppFocused.mockReturnValue(true);
+    mockIsTerminalAppFocused.mockResolvedValue(true);
 
     const service = new NotificationService({ enabled: true }, mockEvents);
     mockEvents.emitWindowFocusChanged(true);
 
-    service.notify({ message: 'Test' });
+    await service.notify({ message: 'Test' });
     expect(mockNotify).not.toHaveBeenCalled();
     expect(mockIsTerminalAppFocused).toHaveBeenCalled();
   });
 
-  it('should NOT notify on Linux if OS check confirms focus', () => {
+  it('should NOT notify on Linux if OS check confirms focus', async () => {
     process.env['TERM_PROGRAM'] = 'Apple_Terminal';
-    mockIsTerminalAppFocused.mockReturnValue(true);
+    mockIsTerminalAppFocused.mockResolvedValue(true);
 
     const service = new NotificationService({ enabled: true }, mockEvents);
     mockEvents.emitWindowFocusChanged(true);
 
-    service.notify({ message: 'Test' });
+    await service.notify({ message: 'Test' });
     expect(mockNotify).not.toHaveBeenCalled();
     expect(mockIsTerminalAppFocused).toHaveBeenCalled();
   });
 
-  it('should notify even if disabled when force is true', () => {
+  it('should notify even if disabled when force is true', async () => {
     const service = new NotificationService({ enabled: false }, mockEvents);
     mockEvents.emitWindowFocusChanged(true);
 
-    service.notify({ message: 'Test', force: true });
+    await service.notify({ message: 'Test', force: true });
     expect(mockNotify).toHaveBeenCalled();
   });
 
-  it('should notify in unsupported terminal (Apple_Terminal) even if focused, when OS check fails', () => {
+  it('should notify in unsupported terminal (Apple_Terminal) even if focused, when OS check fails', async () => {
     process.env['TERM_PROGRAM'] = 'Apple_Terminal';
     // Ensure OS check fails (returns null)
-    mockIsTerminalAppFocused.mockReturnValue(null);
+    mockIsTerminalAppFocused.mockResolvedValue(null);
 
     const service = new NotificationService({ enabled: true }, mockEvents);
     mockEvents.emitWindowFocusChanged(true);
 
-    service.notify({ message: 'Test' });
+    await service.notify({ message: 'Test' });
     expect(mockNotify).toHaveBeenCalled();
   });
 
-  it('should NOT notify in unsupported terminal (Apple_Terminal) if OS check confirms focus', () => {
+  it('should NOT notify in unsupported terminal (Apple_Terminal) if OS check confirms focus', async () => {
     process.env['TERM_PROGRAM'] = 'Apple_Terminal';
-    mockIsTerminalAppFocused.mockReturnValue(true);
+    mockIsTerminalAppFocused.mockResolvedValue(true);
 
     const service = new NotificationService({ enabled: true }, mockEvents);
     mockEvents.emitWindowFocusChanged(true);
 
-    service.notify({ message: 'Test' });
+    await service.notify({ message: 'Test' });
     expect(mockNotify).not.toHaveBeenCalled();
   });
 
-  it('should notify if OS check confirms NOT focused', () => {
+  it('should notify if OS check confirms NOT focused', async () => {
     process.env['TERM_PROGRAM'] = 'Apple_Terminal';
-    mockIsTerminalAppFocused.mockReturnValue(false);
+    mockIsTerminalAppFocused.mockResolvedValue(false);
 
     const service = new NotificationService({ enabled: true }, mockEvents);
     // Even if internal focus thinks it's true (default), the OS check says no.
     mockEvents.emitWindowFocusChanged(true);
 
-    service.notify({ message: 'Test' });
+    await service.notify({ message: 'Test' });
     expect(mockNotify).toHaveBeenCalled();
   });
 
-  it('should send OSC 9 escape sequence for iTerm', () => {
+  it('should send OSC 9 escape sequence for iTerm', async () => {
     process.env['TERM_PROGRAM'] = 'iTerm.app';
     const stdoutSpy = vi
       .spyOn(process.stdout, 'write')
@@ -388,12 +387,12 @@ describe('NotificationService', () => {
     const service = new NotificationService({ enabled: true }, mockEvents);
     mockEvents.emitWindowFocusChanged(false);
 
-    service.notify({ message: 'Test iTerm' });
+    await service.notify({ message: 'Test iTerm' });
 
     expect(stdoutSpy).toHaveBeenCalledWith('\x1b]9;Test iTerm\x07');
   });
 
-  it('should send OSC 9 escape sequence for Kitty', () => {
+  it('should send OSC 9 escape sequence for Kitty', async () => {
     process.env['TERM_PROGRAM'] = 'kitty';
     const stdoutSpy = vi
       .spyOn(process.stdout, 'write')
@@ -401,12 +400,12 @@ describe('NotificationService', () => {
     const service = new NotificationService({ enabled: true }, mockEvents);
     mockEvents.emitWindowFocusChanged(false);
 
-    service.notify({ message: 'Test Kitty' });
+    await service.notify({ message: 'Test Kitty' });
 
     expect(stdoutSpy).toHaveBeenCalledWith('\x1b]9;Test Kitty\x07');
   });
 
-  it('should sanitize message in escape sequence', () => {
+  it('should sanitize message in escape sequence', async () => {
     process.env['TERM_PROGRAM'] = 'iTerm.app';
     const stdoutSpy = vi
       .spyOn(process.stdout, 'write')
@@ -414,13 +413,13 @@ describe('NotificationService', () => {
     const service = new NotificationService({ enabled: true }, mockEvents);
     mockEvents.emitWindowFocusChanged(false);
 
-    service.notify({ message: 'Test\nMessage\x07' });
+    await service.notify({ message: 'Test\nMessage\x07' });
 
     // Newline and BEL should be removed
     expect(stdoutSpy).toHaveBeenCalledWith('\x1b]9;TestMessage\x07');
   });
 
-  it('should NOT send terminal notification if stdout is NOT a TTY', () => {
+  it('should NOT send terminal notification if stdout is NOT a TTY', async () => {
     process.env['TERM_PROGRAM'] = 'iTerm.app';
     const stdoutSpy = vi
       .spyOn(process.stdout, 'write')
@@ -434,7 +433,7 @@ describe('NotificationService', () => {
     const service = new NotificationService({ enabled: true }, mockEvents);
     mockEvents.emitWindowFocusChanged(false);
 
-    service.notify({ message: 'Test TTY' });
+    await service.notify({ message: 'Test TTY' });
 
     expect(stdoutSpy).not.toHaveBeenCalled();
 

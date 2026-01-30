@@ -85,8 +85,8 @@ export class NotificationService {
   /**
    * Triggers a system-level notification and terminal escape sequences.
    */
-  notify(options: NotificationOptions): void {
-    if (this.shouldSuppress(options)) {
+  async notify(options: NotificationOptions): Promise<void> {
+    if (await this.shouldSuppress(options)) {
       return;
     }
 
@@ -110,13 +110,13 @@ export class NotificationService {
   /**
    * Checks if the notification should be suppressed based on configuration and focus.
    */
-  private shouldSuppress(options: NotificationOptions): boolean {
+  private async shouldSuppress(options: NotificationOptions): Promise<boolean> {
     if (!this.config.enabled && !options.force) {
       debugLogger.debug('Notification suppressed (disabled in settings)');
       return true;
     }
 
-    if (!options.force && this.getEffectiveFocus()) {
+    if (!options.force && (await this.getEffectiveFocus())) {
       debugLogger.debug('Notification suppressed (window is focused)');
       return true;
     }
@@ -128,7 +128,7 @@ export class NotificationService {
    * Determines the effective focus state, accounting for terminals that do not
    * support standard focus reporting by using OS-level checks.
    */
-  private getEffectiveFocus(): boolean {
+  private async getEffectiveFocus(): Promise<boolean> {
     const termProgram = process.env['TERM_PROGRAM'];
     const unsupportedTerminals = ['Apple_Terminal', 'WarpTerminal'];
     const isUnsupportedTerminal =
@@ -137,7 +137,7 @@ export class NotificationService {
     let effectiveFocused: boolean;
 
     // 1. Prioritize OS-level check as it's more reliable across terminals.
-    const osFocused = isTerminalAppFocused();
+    const osFocused = await isTerminalAppFocused();
 
     if (osFocused !== null) {
       effectiveFocused = osFocused;
@@ -239,13 +239,13 @@ export class NotificationService {
     message: ToolConfirmationRequest,
   ): void {
     const toolName = message.toolCall.name;
-    this.notify({
+    void this.notify({
       message: `Require tool Permission: ${toolName}`,
     });
   }
 
   private handleNotificationRequest(message: NotificationRequest): void {
-    this.notify({
+    void this.notify({
       message: message.message,
       title: message.title,
       force: message.force,

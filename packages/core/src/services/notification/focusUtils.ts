@@ -5,14 +5,17 @@
  */
 
 import process from 'node:process';
-import { execSync } from 'node:child_process';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 import { debugLogger } from '../../utils/debugLogger.js';
+
+const execAsync = promisify(exec);
 
 /**
  * Returns true if the terminal emulator is the frontmost application.
  * Uses OS-specific commands to detect focus.
  */
-export function isTerminalAppFocused(): boolean | null {
+export async function isTerminalAppFocused(): Promise<boolean | null> {
   const termProgram = process.env['TERM_PROGRAM'];
   const term = process.env['TERM'];
 
@@ -59,21 +62,18 @@ export function isTerminalAppFocused(): boolean | null {
   try {
     if (platform === 'darwin') {
       // lsappinfo is faster than osascript
-      const activeApp = execSync(
+      const { stdout } = await execAsync(
         "lsappinfo info -only Name `lsappinfo front` | cut -d '\"' -f4",
-        { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] },
-      ).trim();
+      );
+      const activeApp = stdout.trim();
       return expectedApps.includes(activeApp);
     }
 
     if (platform === 'win32') {
       // Use PowerShell to get the foreground window process name
-      const command =
-        'powershell -Command "Get-Process | Where-Object { $_.MainWindowHandle -eq (Add-Type -TypeDefinition \'[DllImport("user32.dll")] public class User32 { [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow(); }\' -Name User32 -PassThru)::GetForegroundWindow() } | Select-Object -ExpandProperty Name"';
-      const activeApp = execSync(command, {
-        encoding: 'utf-8',
-        stdio: ['ignore', 'pipe', 'ignore'],
-      }).trim();
+      const command = `powershell -Command "Get-Process | Where-Object { $_.MainWindowHandle -eq (Add-Type -TypeDefinition '[DllImport(\\"user32.dll\\")] public class User32 { [DllImport(\\"user32.dll\\")] public static extern IntPtr GetForegroundWindow(); }' -Name User32 -PassThru)::GetForegroundWindow() } | Select-Object -ExpandProperty Name"`;
+      const { stdout } = await execAsync(command);
+      const activeApp = stdout.trim();
       return expectedApps.some(
         (app) => activeApp.toLowerCase() === app.toLowerCase(),
       );
@@ -81,10 +81,10 @@ export function isTerminalAppFocused(): boolean | null {
 
     if (platform === 'linux') {
       // Try xdotool if available
-      const activeApp = execSync(
+      const { stdout } = await execAsync(
         "xdotool getwindowfocus getwindowname 2>/dev/null || xprop -id $(xdotool getwindowfocus) WM_CLASS 2>/dev/null | cut -d '\"' -f4",
-        { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] },
-      ).trim();
+      );
+      const activeApp = stdout.trim();
       return expectedApps.some((app) =>
         activeApp.toLowerCase().includes(app.toLowerCase()),
       );
