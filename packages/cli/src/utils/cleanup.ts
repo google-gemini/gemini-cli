@@ -19,10 +19,22 @@ let configForTelemetry: Config | null = null;
 
 export function registerCleanup(fn: (() => void) | (() => Promise<void>)) {
   cleanupFunctions.push(fn);
+  return () => {
+    const index = cleanupFunctions.indexOf(fn);
+    if (index !== -1) {
+      cleanupFunctions.splice(index, 1);
+    }
+  };
 }
 
 export function registerSyncCleanup(fn: () => void) {
   syncCleanupFunctions.push(fn);
+  return () => {
+    const index = syncCleanupFunctions.indexOf(fn);
+    if (index !== -1) {
+      syncCleanupFunctions.splice(index, 1);
+    }
+  };
 }
 
 /**

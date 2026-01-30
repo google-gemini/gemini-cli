@@ -1442,9 +1442,9 @@ describe('startInteractiveUI', () => {
 
   vi.mock('./utils/cleanup.js', () => ({
     cleanupCheckpoints: vi.fn(() => Promise.resolve()),
-    registerCleanup: vi.fn(),
+    registerCleanup: vi.fn(() => () => {}),
     runExitCleanup: vi.fn(),
-    registerSyncCleanup: vi.fn(),
+    registerSyncCleanup: vi.fn(() => () => {}),
     registerTelemetryConfig: vi.fn(),
   }));
 

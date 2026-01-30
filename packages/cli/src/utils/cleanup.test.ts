@@ -121,4 +121,25 @@ describe('cleanup', () => {
       await expect(cleanupCheckpoints()).resolves.not.toThrow();
     });
   });
+
+  describe('cleanup registry accumulation', () => {
+    it('should verify that unregistering prevents accumulation', async () => {
+      let callCount = 0;
+      const cleanup = () => {
+        callCount++;
+      };
+
+      const unregister1 = registerCleanup(cleanup);
+      unregister1(); // Unregister immediately
+
+      registerCleanup(cleanup);
+      const unregister3 = registerCleanup(cleanup);
+      unregister3(); // Unregister this one too
+
+      await runExitCleanup();
+
+      // Only one should be remaining
+      expect(callCount).toBe(1);
+    });
+  });
 });

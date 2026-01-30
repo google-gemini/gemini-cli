@@ -170,7 +170,12 @@ vi.mock('./hooks/useHookDisplayState.js');
 vi.mock('../utils/events.js');
 vi.mock('../utils/handleAutoUpdate.js');
 vi.mock('./utils/ConsolePatcher.js');
-vi.mock('../utils/cleanup.js');
+vi.mock('../utils/cleanup.js', () => ({
+  registerCleanup: vi.fn(() => () => {}),
+  runExitCleanup: vi.fn(),
+  registerSyncCleanup: vi.fn(() => () => {}),
+  registerTelemetryConfig: vi.fn(),
+}));
 
 import { useHistory } from './hooks/useHistoryManager.js';
 import { useThemeCommand } from './hooks/useThemeCommand.js';
