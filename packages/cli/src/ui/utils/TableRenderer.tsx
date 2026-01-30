@@ -83,7 +83,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
           const candidate = content.substring(0, mid);
           const candidateWidth = getPlainTextLength(candidate);
 
-          if (candidateWidth <= contentWidth - 3) {
+          if (candidateWidth <= contentWidth - 1) {
             bestTruncated = candidate;
             left = mid + 1;
           } else {
@@ -91,7 +91,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
           }
         }
 
-        cellContent = bestTruncated + '...';
+        cellContent = bestTruncated + '…';
       }
     }
 

@@ -457,9 +457,10 @@ export async function handleAtCommand({
   const processedQueryParts: PartListUnion = [{ text: initialQueryText }];
 
   if (agentsFound.length > 0) {
+    const toolsList = agentsFound.map((agent) => `'${agent}'`).join(', ');
     const agentNudge = `\n<system_note>\nThe user has explicitly selected the following agent(s): ${agentsFound.join(
       ', ',
-    )}. Please use the 'delegate_to_agent' tool to delegate the task to the selected agent(s).\n</system_note>\n`;
+    )}. Please use the following tool(s) to delegate the task: ${toolsList}.\n</system_note>\n`;
     processedQueryParts.push({ text: agentNudge });
   }
 

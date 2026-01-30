@@ -663,6 +663,31 @@ describe('<ToolGroupMessage />', () => {
       expect(output).toMatchSnapshot();
       unmount();
     });
+
+    it('renders nothing when only tool is in-progress AskUser with borderBottom=false', () => {
+      // AskUser tools in progress are rendered by AskUserDialog, not ToolGroupMessage.
+      // When AskUser is the only tool and borderBottom=false (no border to close),
+      // the component should render nothing.
+      const toolCalls = [
+        createToolCall({
+          callId: 'ask-user-tool',
+          name: 'Ask User',
+          status: ToolCallStatus.Executing,
+        }),
+      ];
+
+      const { lastFrame, unmount } = renderWithProviders(
+        <ToolGroupMessage
+          {...baseProps}
+          toolCalls={toolCalls}
+          borderBottom={false}
+        />,
+        { config: baseMockConfig },
+      );
+      // AskUser tools in progress are rendered by AskUserDialog, so we expect nothing.
+      expect(lastFrame()).toMatchSnapshot();
+      unmount();
+    });
   });
 
   describe('Ask User Filtering', () => {

@@ -16,6 +16,7 @@ import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { GeminiChat } from '../core/geminiChat.js';
 import type { Config } from '../config/config.js';
 import * as fileUtils from '../utils/fileUtils.js';
+import { TOOL_OUTPUT_DIR } from '../utils/fileUtils.js';
 import { getInitialChatHistory } from '../utils/environmentContext.js';
 import * as tokenCalculation from '../utils/tokenCalculation.js';
 import { tokenLimit } from '../core/tokenLimits.js';
@@ -510,8 +511,9 @@ describe('ChatCompressionService', () => {
         'Output too large.',
       );
 
-      // Verify a file was actually created
-      const files = fs.readdirSync(testTempDir);
+      // Verify a file was actually created in the tool_output subdirectory
+      const toolOutputDir = path.join(testTempDir, TOOL_OUTPUT_DIR);
+      const files = fs.readdirSync(toolOutputDir);
       expect(files.length).toBeGreaterThan(0);
       expect(files[0]).toMatch(/grep_.*\.txt/);
     });

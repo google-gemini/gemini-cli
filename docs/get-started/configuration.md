@@ -901,6 +901,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Canonical toggle for the hooks system. When disabled, no
     hooks will be executed.
   - **Default:** `true`
+  - **Requires restart:** Yes
 
 - **`hooksConfig.disabled`** (array):
   - **Description:** List of hook names (commands) that should be disabled.
@@ -1184,6 +1185,10 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - **Description:** The path to your Google Application Credentials JSON file.
   - **Example:**
     `export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/credentials.json"`
+- **`GOOGLE_GENAI_API_VERSION`**:
+  - Specifies the API version to use for Gemini API requests.
+  - When set, overrides the default API version used by the SDK.
+  - Example: `export GOOGLE_GENAI_API_VERSION="v1"`
 - **`OTLP_GOOGLE_CLOUD_PROJECT`**:
   - Your Google Cloud Project ID for Telemetry in Google Cloud
   - Example: `export OTLP_GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"`.

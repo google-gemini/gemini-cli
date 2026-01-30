@@ -112,7 +112,7 @@ export async function maybePromptForSettings(
   const nonSensitiveSettings: Record<string, string> = {};
   for (const setting of settings) {
     const value = allSettings[setting.envVar];
-    if (value === undefined) {
+    if (value === undefined || value === '') {
       continue;
     }
     if (setting.sensitive) {
@@ -230,7 +230,15 @@ export async function updateSetting(
   );
 
   if (settingToUpdate.sensitive) {
-    await keychain.setSecret(settingToUpdate.envVar, newValue);
+    if (newValue) {
+      await keychain.setSecret(settingToUpdate.envVar, newValue);
+    } else {
+      try {
+        await keychain.deleteSecret(settingToUpdate.envVar);
+      } catch {
+        // Ignore if secret does not exist
+      }
+    }
     return;
   }
 

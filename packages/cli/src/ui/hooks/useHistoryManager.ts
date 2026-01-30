@@ -36,10 +36,12 @@ export interface UseHistoryManagerReturn {
  */
 export function useHistory({
   chatRecordingService,
+  initialItems = [],
 }: {
   chatRecordingService?: ChatRecordingService | null;
+  initialItems?: HistoryItem[];
 } = {}): UseHistoryManagerReturn {
-  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [history, setHistory] = useState<HistoryItem[]>(initialItems);
   const messageIdCounterRef = useRef(0);
 
   // Generates a unique message ID based on a timestamp and a counter.

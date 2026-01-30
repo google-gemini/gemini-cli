@@ -398,6 +398,35 @@ describe('extensionSettings', () => {
       expect(actualContent).toBe('VAR1="a value with spaces"\n');
     });
 
+    it('should not set sensitive settings if the value is empty during initial setup', async () => {
+      const config: ExtensionConfig = {
+        name: 'test-ext',
+        version: '1.0.0',
+        settings: [
+          {
+            name: 's1',
+            description: 'd1',
+            envVar: 'SENSITIVE_VAR',
+            sensitive: true,
+          },
+        ],
+      };
+      mockRequestSetting.mockResolvedValue('');
+
+      await maybePromptForSettings(
+        config,
+        '12345',
+        mockRequestSetting,
+        undefined,
+        undefined,
+      );
+
+      const userKeychain = new KeychainTokenStorage(
+        `Gemini CLI Extensions test-ext 12345`,
+      );
+      expect(await userKeychain.getSecret('SENSITIVE_VAR')).toBeNull();
+    });
+
     it('should not attempt to clear secrets if keychain is unavailable', async () => {
       // Arrange
       const mockIsAvailable = vi.fn().mockResolvedValue(false);
@@ -737,6 +766,43 @@ describe('extensionSettings', () => {
       // Ensure no other unexpected changes or deletions
       const lines = actualContent.split('\n').filter((line) => line.length > 0);
       expect(lines).toHaveLength(3); // Should only have the three variables
+    });
+
+    it('should delete a sensitive setting if the new value is empty', async () => {
+      mockRequestSetting.mockResolvedValue('');
+
+      await updateSetting(
+        config,
+        '12345',
+        'VAR2',
+        mockRequestSetting,
+        ExtensionSettingScope.USER,
+        tempWorkspaceDir,
+      );
+
+      const userKeychain = new KeychainTokenStorage(
+        `Gemini CLI Extensions test-ext 12345`,
+      );
+      expect(await userKeychain.getSecret('VAR2')).toBeNull();
+    });
+
+    it('should not throw if deleting a non-existent sensitive setting with empty value', async () => {
+      mockRequestSetting.mockResolvedValue('');
+      // Ensure it doesn't exist first
+      const userKeychain = new KeychainTokenStorage(
+        `Gemini CLI Extensions test-ext 12345`,
+      );
+      await userKeychain.deleteSecret('VAR2');
+
+      await updateSetting(
+        config,
+        '12345',
+        'VAR2',
+        mockRequestSetting,
+        ExtensionSettingScope.USER,
+        tempWorkspaceDir,
+      );
+      // Should complete without error
     });
   });
 });
