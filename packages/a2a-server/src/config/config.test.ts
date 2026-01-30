@@ -14,7 +14,6 @@ import {
   Config,
   ExperimentFlags,
   fetchAdminControlsOnce,
-  coreEvents,
   type FetchAdminControlsResponse,
 } from '@google/gemini-cli-core';
 
@@ -123,7 +122,6 @@ describe('loadConfig', () => {
         expect(config.setRemoteAdminSettings).toHaveBeenCalledWith(
           mockAdminSettings,
         );
-        expect(coreEvents.emitAdminSettingsChanged).toHaveBeenCalled();
       });
     });
   });

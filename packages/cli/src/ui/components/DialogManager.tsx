@@ -32,8 +32,6 @@ import process from 'node:process';
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import { AdminSettingsChangedDialog } from './AdminSettingsChangedDialog.js';
 import { IdeTrustChangeDialog } from './IdeTrustChangeDialog.js';
-import { AskUserDialog } from './AskUserDialog.js';
-import { useAskUserActions } from '../contexts/AskUserActionsContext.js';
 import { NewAgentsNotification } from './NewAgentsNotification.js';
 import { AgentConfigDialog } from './AgentConfigDialog.js';
 
@@ -58,22 +56,6 @@ export const DialogManager = ({
     staticExtraHeight,
     terminalWidth: uiTerminalWidth,
   } = uiState;
-
-  const {
-    request: askUserRequest,
-    submit: askUserSubmit,
-    cancel: askUserCancel,
-  } = useAskUserActions();
-
-  if (askUserRequest) {
-    return (
-      <AskUserDialog
-        questions={askUserRequest.questions}
-        onSubmit={askUserSubmit}
-        onCancel={askUserCancel}
-      />
-    );
-  }
 
   if (uiState.adminSettingsChanged) {
     return <AdminSettingsChangedDialog />;

@@ -24,7 +24,6 @@ import {
   PREVIEW_GEMINI_MODEL,
   homedir,
   GitService,
-  coreEvents,
   fetchAdminControlsOnce,
   getCodeAssistServer,
   ExperimentFlags,
@@ -167,13 +166,48 @@ export async function loadConfig(
     config.getExperiments()?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]
       ?.boolValue ?? false;
 
+  // If adminControlsEnabled, the previous config should be used to fetch admin
+  // controls, then a new config should be initialized with the updated fetched
+  // admin controls.
   if (adminControlsEnabled) {
     const adminSettings = await fetchAdminControlsOnce(
       codeAssistServer,
       adminControlsEnabled,
     );
-    config.setRemoteAdminSettings(adminSettings);
-    coreEvents.emitAdminSettingsChanged();
+    const adminConfig = new Config({
+      ...configParams,
+    });
+    adminConfig.setRemoteAdminSettings(adminSettings);
+
+    // Re-initialize everything but with the admin config.
+    await adminConfig.initialize();
+    startupProfiler.flush(adminConfig);
+
+    if (process.env['USE_CCPA']) {
+      logger.info('[adminConfig] Using CCPA Auth:');
+      try {
+        if (adcFilePath) {
+          path.resolve(adcFilePath);
+        }
+      } catch (e) {
+        logger.error(
+          `[adminConfig] USE_CCPA env var is true but unable to resolve GOOGLE_APPLICATION_CREDENTIALS file path ${adcFilePath}. Error ${e}`,
+        );
+      }
+      await adminConfig.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+      logger.info(
+        `[adminConfig] GOOGLE_CLOUD_PROJECT: ${process.env['GOOGLE_CLOUD_PROJECT']}`,
+      );
+    } else if (process.env['GEMINI_API_KEY']) {
+      logger.info('[adminConfig] Using Gemini API Key');
+      await adminConfig.refreshAuth(AuthType.USE_GEMINI);
+    } else {
+      const errorMessage =
+        '[adminConfig] Unable to set GeneratorConfig. Please provide a GEMINI_API_KEY or set USE_CCPA.';
+      logger.error(errorMessage);
+      throw new Error(errorMessage);
+    }
+    return adminConfig;
   }
 
   return config;
