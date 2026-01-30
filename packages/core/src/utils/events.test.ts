@@ -305,4 +305,59 @@ describe('CoreEventEmitter', () => {
       expect(listener).toHaveBeenCalledWith(payload);
     });
   });
+
+  describe('ConsentRequest Event', () => {
+    it('should emit consent request immediately when a listener is present', () => {
+      const listener = vi.fn();
+      events.on(CoreEvent.ConsentRequest, listener);
+
+      const payload = {
+        prompt: 'Do you consent?',
+        onConfirm: vi.fn(),
+      };
+
+      events.emitConsentRequest(payload);
+
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith(payload);
+    });
+
+    it('should buffer consent requests when no listener is present', () => {
+      const listener = vi.fn();
+      const payload = {
+        prompt: 'Buffered consent?',
+        onConfirm: vi.fn(),
+      };
+
+      // Emit while no listeners attached
+      events.emitConsentRequest(payload);
+      expect(listener).not.toHaveBeenCalled();
+
+      // Attach listener and drain
+      events.on(CoreEvent.ConsentRequest, listener);
+      events.drainBacklogs();
+
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith(payload);
+    });
+
+    it('should respect the backlog size limit for consent requests', () => {
+      const listener = vi.fn();
+      const MAX_BACKLOG_SIZE = 10000;
+
+      for (let i = 0; i < MAX_BACKLOG_SIZE + 10; i++) {
+        events.emitConsentRequest({
+          prompt: `Consent ${i}`,
+          onConfirm: vi.fn(),
+        });
+      }
+
+      events.on(CoreEvent.ConsentRequest, listener);
+      events.drainBacklogs();
+
+      expect(listener).toHaveBeenCalledTimes(MAX_BACKLOG_SIZE);
+      // Verify strictly that the FIRST call was Consent 10 (0-9 dropped)
+      expect(listener.mock.calls[0][0]).toMatchObject({ prompt: 'Consent 10' });
+    });
+  });
 });
