@@ -1173,8 +1173,6 @@ export const useGeminiStream = (
         async ({ metadata: spanMetadata }) => {
           spanMetadata.input = query;
 
-          const queryId = `${Date.now()}-${Math.random()}`;
-          activeQueryIdRef.current = queryId;
           // Use ref for synchronous check to prevent race conditions
           // React state batching can cause streamingState to be stale
           if (
@@ -1184,6 +1182,10 @@ export const useGeminiStream = (
             !options?.isContinuation
           )
             return;
+
+          // Only assign queryId after early return checks to prevent stale ref
+          const queryId = `${Date.now()}-${Math.random()}`;
+          activeQueryIdRef.current = queryId;
 
           const userMessageTimestamp = Date.now();
 
