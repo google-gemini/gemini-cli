@@ -137,7 +137,7 @@ export const HooksDialog: React.FC<HooksDialogProps> = ({
           {/* Security Warning */}
           <Box marginBottom={1} flexDirection="column">
             <Text color={theme.status.warning} bold underline>
-              ⚠️ Security Warning:
+              Security Warning:
             </Text>
             <Text color={theme.status.warning} wrap="wrap">
               Hooks can execute arbitrary commands on your system. Only use
