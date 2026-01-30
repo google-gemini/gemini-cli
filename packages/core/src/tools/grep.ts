@@ -228,6 +228,10 @@ class GrepToolInvocation extends BaseToolInvocation<
         signal.removeEventListener('abort', onAbort);
       }
 
+      if (allMatches.length > DEFAULT_TOTAL_MAX_MATCHES) {
+        allMatches = allMatches.slice(0, DEFAULT_TOTAL_MAX_MATCHES);
+      }
+
       let searchLocationDescription: string;
       if (searchDirAbs === null) {
         const numDirs = workspaceContext.getDirectories().length;
@@ -570,7 +574,7 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
     super(
       GrepTool.Name,
       'SearchText',
-      'Searches for a regular expression pattern within the content of files in a specified directory (or current working directory). Can filter files by a glob pattern. Returns the lines containing matches, along with their file paths and line numbers.',
+      'Searches for a regular expression pattern within file contents. Max 100 matches.',
       Kind.Search,
       {
         properties: {

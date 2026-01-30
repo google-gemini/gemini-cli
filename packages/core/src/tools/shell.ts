@@ -422,6 +422,11 @@ export class ShellToolInvocation extends BaseToolInvocation<
 }
 
 function getShellToolDescription(): string {
+  const outputGuidance = `
+
+      **Stderr Capture:** Always append \`2>&1\` to capture stderr alongside stdout, since errors and warnings are often emitted on stderr and would otherwise be lost.
+      **Large Output:** When a command is likely to produce more than ~50 lines (e.g., builds, installs, large searches), redirect to a file first (e.g., \`command > /tmp/out.log 2>&1\`) and then inspect with \`tail\`, \`head\`, or \`grep\`.`;
+
   const returnedInfo = `
 
       The following information is returned:
@@ -434,9 +439,9 @@ function getShellToolDescription(): string {
       Process Group PGID: Only included if available.`;
 
   if (os.platform() === 'win32') {
-    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. Command can start background processes using PowerShell constructs such as \`Start-Process -NoNewWindow\` or \`Start-Job\`.${returnedInfo}`;
+    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. Command can start background processes using PowerShell constructs such as \`Start-Process -NoNewWindow\` or \`Start-Job\`.${outputGuidance}${returnedInfo}`;
   } else {
-    return `This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${returnedInfo}`;
+    return `This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${outputGuidance}${returnedInfo}`;
   }
 }
 

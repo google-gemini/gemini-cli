@@ -861,6 +861,23 @@ export class TestRig {
     ).toBe(true);
   }
 
+  async expectNoToolCall(toolNames: string[]) {
+    // Wait for telemetry to be ready to ensure we have all logs
+    await this.waitForTelemetryReady();
+
+    const toolLogs = this.readToolLogs();
+    const foundTools = toolLogs
+      .map((log) => log.toolRequest.name)
+      .filter((name) => toolNames.includes(name));
+
+    expect(
+      foundTools.length,
+      `Expected NO tool calls for ${JSON.stringify(
+        toolNames,
+      )}, but found: ${JSON.stringify(foundTools)}`,
+    ).toBe(0);
+  }
+
   async waitForAnyToolCall(toolNames: string[], timeout?: number) {
     if (!timeout) {
       timeout = getDefaultTimeout();
