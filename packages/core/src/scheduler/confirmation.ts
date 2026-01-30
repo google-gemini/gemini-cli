@@ -156,7 +156,7 @@ export async function resolveConfirmation(
 
     if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
       await handleExternalModification(deps, toolCall, signal);
-    } else if (response.payload?.newContent) {
+    } else if (response.payload && 'newContent' in response.payload) {
       await handleInlineModification(deps, toolCall, response.payload, signal);
       outcome = ToolConfirmationOutcome.ProceedOnce;
     }
