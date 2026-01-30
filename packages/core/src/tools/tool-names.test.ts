@@ -15,14 +15,14 @@ import {
 // Mock tool-names to provide a consistent alias for testing
 vi.mock('./tool-names.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./tool-names.js')>();
-  const mockedAliases = {
+  const mockedAliases: Record<string, string> = {
     ...actual.TOOL_LEGACY_ALIASES,
     legacy_test_tool: 'current_test_tool',
   };
   return {
     ...actual,
     TOOL_LEGACY_ALIASES: mockedAliases,
-    isValidToolName: vi.fn().mockImplementation((name, options) => {
+    isValidToolName: vi.fn().mockImplementation((name: string, options) => {
       if (mockedAliases[name]) return true;
       return actual.isValidToolName(name, options);
     }),
