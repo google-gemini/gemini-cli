@@ -61,8 +61,7 @@
     "telemetry": "node scripts/telemetry.js",
     "check:lockfile": "node scripts/check-lockfile.js",
     "clean": "node scripts/clean.js",
-    "pre-commit": "node scripts/pre-commit.js",
-    "postinstall": "patch-package"
+    "pre-commit": "node scripts/pre-commit.js"
   },
   "overrides": {
     "ink": "npm:@jrichman/ink@6.4.8",
@@ -114,7 +113,6 @@
     "mock-fs": "^5.5.0",
     "msw": "^2.10.4",
     "npm-run-all": "^4.1.5",
-    "patch-package": "^8.0.1",
     "prettier": "^3.5.3",
     "react-devtools-core": "^6.1.2",
     "semver": "^7.7.2",
@@ -128,9 +126,7 @@
   "dependencies": {
     "ink": "npm:@jrichman/ink@6.4.8",
     "latest-version": "^9.0.0",
-    "punycode": "^2.3.1",
-    "simple-git": "^3.28.0",
-    "whatwg-url": "^5.0.0"
+    "simple-git": "^3.28.0"
   },
   "optionalDependencies": {
     "@lydell/node-pty": "1.1.0",

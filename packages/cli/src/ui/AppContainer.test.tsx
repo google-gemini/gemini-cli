@@ -2510,6 +2510,59 @@ describe('AppContainer State Management', () => {
       expect(capturedUIState.activeHooks).toEqual(mockHooks);
       unmount!();
     });
+
+    it('handles consent request events', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      const handler = mockCoreEvents.on.mock.calls.find(
+        (call: unknown[]) => call[0] === CoreEvent.ConsentRequest,
+      )?.[1];
+      expect(handler).toBeDefined();
+
+      const onConfirm = vi.fn();
+      const payload = {
+        prompt: 'Do you consent?',
+        onConfirm,
+      };
+
+      act(() => {
+        handler(payload);
+      });
+
+      expect(capturedUIState.authConsentRequest).toBeDefined();
+      expect(capturedUIState.authConsentRequest?.prompt).toBe(
+        'Do you consent?',
+      );
+
+      act(() => {
+        capturedUIState.authConsentRequest?.onConfirm(true);
+      });
+
+      expect(onConfirm).toHaveBeenCalledWith(true);
+      expect(capturedUIState.authConsentRequest).toBeNull();
+      unmount!();
+    });
+
+    it('unsubscribes from ConsentRequest on unmount', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      unmount!();
+
+      expect(mockCoreEvents.off).toHaveBeenCalledWith(
+        CoreEvent.ConsentRequest,
+        expect.any(Function),
+      );
+    });
   });
 
   describe('Shell Interaction', () => {
