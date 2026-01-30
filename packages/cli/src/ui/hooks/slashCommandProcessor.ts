@@ -77,6 +77,7 @@ interface SlashCommandProcessorActions {
   ) => void;
   openPermissionsDialog: (props?: { targetDirectory?: string }) => void;
   quit: (messages: HistoryItem[]) => void;
+  restart: (messages: HistoryItem[], sessionId?: string) => void;
   setDebugMessage: (message: string) => void;
   toggleCorgiMode: () => void;
   toggleDebugProfiler: () => void;
@@ -504,6 +505,10 @@ export const useSlashCommandProcessor = (
                 }
                 case 'quit':
                   actions.quit(result.messages);
+                  return { type: 'handled' };
+
+                case 'restart':
+                  actions.restart(result.messages, result.sessionId);
                   return { type: 'handled' };
 
                 case 'submit_prompt':
