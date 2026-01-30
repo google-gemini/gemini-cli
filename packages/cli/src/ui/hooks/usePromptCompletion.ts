@@ -114,9 +114,7 @@ export function usePromptCompletion({
 
     // Proactive Quota Check (20% Guardrail)
     // We call refreshUserQuota which will use the cached value if within 60s
-    await config?.refreshUserQuota();
-
-    const lastQuota = config?.getCachedQuota();
+    const lastQuota = await config?.refreshUserQuota();
     const liteBucket = lastQuota?.buckets?.find(
       (b) => b.modelId === PROMPT_COMPLETION_MODEL_ID,
     );

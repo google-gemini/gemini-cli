@@ -119,6 +119,8 @@ import {
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 import { isSubpath } from '../utils/paths.js';
 
+const QUOTA_REFRESH_THROTTLE_MS = 60000;
+
 export interface AccessibilitySettings {
   enableLoadingPhrases?: boolean;
   screenReader?: boolean;
@@ -534,7 +536,7 @@ export class Config {
   private previewFeatures: boolean | undefined;
   private hasAccessToPreviewModel: boolean = false;
   private cachedQuota?: RetrieveUserQuotaResponse;
-  private lastQuotaFetchTime?: number;
+  private lastQuotaAttemptTime?: number;
   private readonly noBrowser: boolean;
   private readonly folderTrust: boolean;
   private ideMode: boolean;
@@ -1284,13 +1286,12 @@ export class Config {
     force: boolean = false,
   ): Promise<RetrieveUserQuotaResponse | undefined> {
     const now = Date.now();
-    const THROTTLE_MS = 60000;
 
     if (
       !force &&
       this.cachedQuota &&
-      this.lastQuotaFetchTime &&
-      now - this.lastQuotaFetchTime < THROTTLE_MS
+      this.lastQuotaAttemptTime &&
+      now - this.lastQuotaAttemptTime < QUOTA_REFRESH_THROTTLE_MS
     ) {
       return this.cachedQuota;
     }
@@ -1308,10 +1309,11 @@ export class Config {
       this.setHasAccessToPreviewModel(hasAccess);
 
       this.cachedQuota = quota;
-      this.lastQuotaFetchTime = now;
+      this.lastQuotaAttemptTime = now;
 
       return quota;
     } catch (e) {
+      this.lastQuotaAttemptTime = now;
       debugLogger.debug('Failed to retrieve user quota', e);
       return undefined;
     }
