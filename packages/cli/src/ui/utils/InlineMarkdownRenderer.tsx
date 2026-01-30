@@ -23,38 +23,39 @@ export function stripTrailingPunctuation(url: string): {
   url: string;
   trailing: string;
 } {
-  let strippedUrl = url;
-  let trailing = '';
-
   // Trailing characters to strip (common sentence-ending punctuation)
   // Excludes []{}>"' which can be valid parts of URLs
-  const trailingCharsRegex = /[.,;:!?)）、。，；：！？‖‧…]$/;
+  const trailingCharsRegex = /[.,;:!?)）、。，；：！？‖‧…]/;
 
-  while (strippedUrl.length > 0) {
-    const lastChar = strippedUrl.slice(-1);
+  // Count parentheses once upfront to avoid O(N²) complexity
+  const allParens = url.match(/[()（）]/g) || [];
+  const openParens = allParens.filter((c) => c === '(' || c === '（').length;
+  let closeParens = allParens.filter((c) => c === ')' || c === '）').length;
+
+  let i = url.length - 1;
+  while (i >= 0) {
+    const lastChar = url[i];
 
     // Don't strip a closing parenthesis if it's part of a balanced pair
     if (lastChar === ')' || lastChar === '）') {
-      const openParens = (strippedUrl.match(/[()）]/g) || []).filter(
-        (c) => c === '(',
-      ).length;
-      const closeParens = (strippedUrl.match(/[()）]/g) || []).filter(
-        (c) => c === ')' || c === '）',
-      ).length;
       if (openParens >= closeParens) {
         break;
       }
+      closeParens--;
     }
 
     if (trailingCharsRegex.test(lastChar)) {
-      trailing = lastChar + trailing;
-      strippedUrl = strippedUrl.slice(0, -1);
+      i--;
     } else {
       break;
     }
   }
 
-  return { url: strippedUrl, trailing };
+  const splitIndex = i + 1;
+  return {
+    url: url.slice(0, splitIndex),
+    trailing: url.slice(splitIndex),
+  };
 }
 
 // Constants for Markdown parsing
