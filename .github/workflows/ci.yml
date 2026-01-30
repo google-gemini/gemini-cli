@@ -177,6 +177,15 @@ jobs:
       - name: 'Smoke test bundle'
         run: 'node ./bundle/gemini.js --version'
 
+      - name: 'Smoke test npx installation'
+        run: |
+          # Create a temporary directory to avoid picking up local node_modules
+          mkdir -p ../npx-test
+          cd ../npx-test
+          # Run npx pointing to the checkout directory. This simulates a user
+          # installing the package from a git reference.
+          npx ${{ github.workspace }} --version
+
       - name: 'Wait for file system sync'
         run: 'sleep 2'
 
@@ -251,6 +260,15 @@ jobs:
 
       - name: 'Smoke test bundle'
         run: 'node ./bundle/gemini.js --version'
+
+      - name: 'Smoke test npx installation'
+        run: |
+          # Create a temporary directory to avoid picking up local node_modules
+          mkdir -p ../npx-test
+          cd ../npx-test
+          # Run npx pointing to the checkout directory. This simulates a user
+          # installing the package from a git reference.
+          npx ${{ github.workspace }} --version
 
       - name: 'Wait for file system sync'
         run: 'sleep 2'
@@ -394,6 +412,16 @@ jobs:
 
       - name: 'Smoke test bundle'
         run: 'node ./bundle/gemini.js --version'
+        shell: 'pwsh'
+
+      - name: 'Smoke test npx installation'
+        run: |
+          # Create a temporary directory to avoid picking up local node_modules
+          New-Item -ItemType Directory -Force -Path ../npx-test
+          Set-Location ../npx-test
+          # Run npx pointing to the checkout directory. This simulates a user
+          # installing the package from a git reference.
+          npx ${{ github.workspace }} --version
         shell: 'pwsh'
 
   ci:
