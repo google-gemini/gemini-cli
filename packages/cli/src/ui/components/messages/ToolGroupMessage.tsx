@@ -105,7 +105,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   const borderDimColor =
     hasPending && (!isShellCommand || !isEmbeddedShellFocused);
 
-  const staticHeight = /* border */ 2 + /* marginBottom */ 1;
+  const staticHeight = /* border */ 2;
 
   // Inline confirmations are ONLY used when the Global Queue is disabled.
   const toolAwaitingApproval = useMemo(
@@ -155,6 +155,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         cause tearing.
       */
       width={terminalWidth}
+      marginBottom={1}
     >
       {visibleToolCalls.map((tool, index) => {
         const isConfirming = toolAwaitingApproval?.callId === tool.callId;
