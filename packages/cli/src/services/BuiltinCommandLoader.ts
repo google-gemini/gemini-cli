@@ -12,7 +12,11 @@ import {
   type CommandContext,
 } from '../ui/commands/types.js';
 import type { MessageActionReturn, Config } from '@google/gemini-cli-core';
-import { isNightly, startupProfiler } from '@google/gemini-cli-core';
+import {
+  isNightly,
+  startupProfiler,
+  getAdminErrorMessage,
+} from '@google/gemini-cli-core';
 import { aboutCommand } from '../ui/commands/aboutCommand.js';
 import { agentsCommand } from '../ui/commands/agentsCommand.js';
 import { authCommand } from '../ui/commands/authCommand.js';
@@ -102,7 +106,10 @@ export class BuiltinCommandLoader implements ICommandLoader {
               ): Promise<MessageActionReturn> => ({
                 type: 'message',
                 messageType: 'error',
-                content: 'Extensions are disabled by your admin.',
+                content: getAdminErrorMessage(
+                  'Extensions',
+                  this.config ?? undefined,
+                ),
               }),
             },
           ]
@@ -127,7 +134,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
               ): Promise<MessageActionReturn> => ({
                 type: 'message',
                 messageType: 'error',
-                content: 'MCP is disabled by your admin.',
+                content: getAdminErrorMessage('MCP', this.config ?? undefined),
               }),
             },
           ]
@@ -158,7 +165,10 @@ export class BuiltinCommandLoader implements ICommandLoader {
                 ): Promise<MessageActionReturn> => ({
                   type: 'message',
                   messageType: 'error',
-                  content: 'Agent skills are disabled by your admin.',
+                  content: getAdminErrorMessage(
+                    'Agent skills',
+                    this.config ?? undefined,
+                  ),
                 }),
               },
             ]

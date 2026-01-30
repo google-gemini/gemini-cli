@@ -64,6 +64,7 @@ they appear in the UI.
 | Show Spinner                   | `ui.showSpinner`                        | Show the spinner during operations.                                                                                                                               | `true`  |
 | Enable Loading Phrases         | `ui.accessibility.enableLoadingPhrases` | Enable loading phrases during operations.                                                                                                                         | `true`  |
 | Screen Reader Mode             | `ui.accessibility.screenReader`         | Render output in plain-text to be more screen reader accessible                                                                                                   | `false` |
+| Enable Notifications           | `ui.enableNotifications`                | Enable notifications for user permission prompts when the CLI is not in focus.                                                                                    | `true`  |
 
 ### IDE
 
