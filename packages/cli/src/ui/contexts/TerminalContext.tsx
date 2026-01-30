@@ -39,6 +39,7 @@ export function useTerminalContext() {
 export function TerminalProvider({ children }: { children: React.ReactNode }) {
   const { stdin } = useStdin();
   const subscribers = useRef<Set<TerminalEventHandler>>(new Set()).current;
+  const bufferRef = useRef('');
 
   const subscribe = useCallback(
     (handler: TerminalEventHandler) => {
@@ -55,13 +56,14 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
   );
 
   useEffect(() => {
-    let buffer = '';
-
     const handleData = (data: Buffer | string) => {
-      buffer += typeof data === 'string' ? data : data.toString('utf-8');
+      bufferRef.current +=
+        typeof data === 'string' ? data : data.toString('utf-8');
 
       // Check for OSC 11 response
-      const match = buffer.match(TerminalCapabilityManager.OSC_11_REGEX);
+      const match = bufferRef.current.match(
+        TerminalCapabilityManager.OSC_11_REGEX,
+      );
       if (match) {
         const colorStr = `rgb:${match[1]}/${match[2]}/${match[3]}`;
         for (const handler of subscribers) {
@@ -69,12 +71,14 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
         }
         // Safely remove the processed part + match
         if (match.index !== undefined) {
-          buffer = buffer.slice(match.index + match[0].length);
+          bufferRef.current = bufferRef.current.slice(
+            match.index + match[0].length,
+          );
         }
-      } else if (buffer.length > 4096) {
+      } else if (bufferRef.current.length > 4096) {
         // Safety valve: if buffer gets too large without a match, trim it.
         // We keep the last 1024 bytes to avoid cutting off a partial sequence.
-        buffer = buffer.slice(-1024);
+        bufferRef.current = bufferRef.current.slice(-1024);
       }
     };
 

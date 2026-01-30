@@ -7,8 +7,9 @@
 import { render } from '../../test-utils/render.js';
 import { TerminalProvider, useTerminalContext } from './TerminalContext.js';
 import { vi, describe, it, expect } from 'vitest';
-import { useEffect , act } from 'react';
+import { useEffect, act } from 'react';
 import { EventEmitter } from 'node:events';
+import { waitFor } from '../../test-utils/async.js';
 
 const mockStdin = new EventEmitter() as unknown as NodeJS.ReadStream &
   EventEmitter;
@@ -39,7 +40,7 @@ const TestComponent = ({ onColor }: { onColor: (c: string) => void }) => {
 };
 
 describe('TerminalContext', () => {
-  it('should parse OSC 11 response', () => {
+  it('should parse OSC 11 response', async () => {
     const handleColor = vi.fn();
     render(
       <TerminalProvider>
@@ -51,10 +52,12 @@ describe('TerminalContext', () => {
       mockStdin.emit('data', '\x1b]11;rgb:ffff/ffff/ffff\x1b\\');
     });
 
-    expect(handleColor).toHaveBeenCalledWith('rgb:ffff/ffff/ffff');
+    await waitFor(() => {
+      expect(handleColor).toHaveBeenCalledWith('rgb:ffff/ffff/ffff');
+    });
   });
 
-  it('should handle partial chunks', () => {
+  it('should handle partial chunks', async () => {
     const handleColor = vi.fn();
     render(
       <TerminalProvider>
@@ -71,6 +74,8 @@ describe('TerminalContext', () => {
       mockStdin.emit('data', '0000/0000\x1b\\');
     });
 
-    expect(handleColor).toHaveBeenCalledWith('rgb:0000/0000/0000');
+    await waitFor(() => {
+      expect(handleColor).toHaveBeenCalledWith('rgb:0000/0000/0000');
+    });
   });
 });
