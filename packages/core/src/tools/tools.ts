@@ -693,13 +693,17 @@ export interface ToolEditConfirmationDetails {
   ideConfirmation?: Promise<DiffUpdateResult>;
 }
 
-export interface ToolConfirmationPayload {
-  // used to override `modifiedProposedContent` for modifiable tools in the
-  // inline modify flow
-  newContent?: string;
-  // used for askuser tool to return user's answers
-  answers?: { [questionIndex: string]: string };
+export interface ToolEditConfirmationPayload {
+  newContent: string;
 }
+
+export interface ToolAskUserConfirmationPayload {
+  answers: { [questionIndex: string]: string };
+}
+
+export type ToolConfirmationPayload =
+  | ToolEditConfirmationPayload
+  | ToolAskUserConfirmationPayload;
 
 export interface ToolExecuteConfirmationDetails {
   type: 'exec';
