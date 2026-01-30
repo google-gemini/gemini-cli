@@ -88,6 +88,7 @@ describe('App', () => {
       defaultText: 'Mock Banner Text',
       warningText: '',
     },
+    backgroundShells: new Map(),
   };
 
   it('should render main content and composer when not quitting', () => {

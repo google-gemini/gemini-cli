@@ -157,6 +157,9 @@ const baseMockUiState = {
   terminalHeight: 40,
   currentModel: 'gemini-pro',
   terminalBackgroundColor: undefined,
+  activePtyId: undefined,
+  backgroundShells: new Map(),
+  backgroundShellHeight: 0,
 };
 
 export const mockAppState: AppState = {
@@ -201,7 +204,11 @@ const mockUIActions: UIActions = {
   handleApiKeyCancel: vi.fn(),
   setBannerVisible: vi.fn(),
   setEmbeddedShellFocused: vi.fn(),
+  dismissBackgroundShell: vi.fn(),
+  setActiveBackgroundShellPid: vi.fn(),
+  setIsBackgroundShellListOpen: vi.fn(),
   setAuthContext: vi.fn(),
+  handleWarning: vi.fn(),
   handleRestart: vi.fn(),
   handleNewAgentsSelect: vi.fn(),
 };
