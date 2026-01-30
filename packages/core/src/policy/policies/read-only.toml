@@ -49,8 +49,3 @@ priority = 50
 toolName = "google_web_search"
 decision = "allow"
 priority = 50
-
-[[rule]]
-toolName = "SubagentInvocation"
-decision = "allow"
-priority = 50
