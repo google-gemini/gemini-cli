@@ -338,6 +338,10 @@ export class LoadedSettings {
   }
 
   setValue(scope: LoadableSettingScope, key: string, value: unknown): void {
+    coreEvents.emitFeedback(
+      'info',
+      'saving: ' + key + ', ' + value + ', scope: ' + scope,
+    );
     const settingsFile = this.forScope(scope);
     setNestedProperty(settingsFile.settings, key, value);
     setNestedProperty(settingsFile.originalSettings, key, value);
@@ -727,6 +731,10 @@ export function migrateDeprecatedSettings(
       }
 
       if (modified) {
+        coreEvents.emitFeedback(
+          'info',
+          'setting new general for scope:' + scope,
+        );
         loadedSettings.setValue(scope, 'general', newGeneral);
         anyModified = true;
       }
@@ -847,6 +855,7 @@ export function saveSettings(settingsFile: SettingsFile): void {
       settingsToSave as Record<string, unknown>,
     );
   } catch (error) {
+    coreEvents.emitFeedback('error', 'here' + error, error);
     coreEvents.emitFeedback(
       'error',
       'There was an error saving your latest settings changes.',

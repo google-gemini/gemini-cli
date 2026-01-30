@@ -371,6 +371,7 @@ export async function main() {
       process.env['CLOUD_SHELL'] === 'true' ||
       process.env['GEMINI_CLI_USE_COMPUTE_ADC'] === 'true'
     ) {
+      coreEvents.emitFeedback('info', 'saving compute_adc');
       settings.setValue(
         SettingScope.User,
         'security.auth.selectedType',
