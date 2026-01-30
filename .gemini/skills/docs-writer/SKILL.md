@@ -7,83 +7,93 @@ description:
 
 # `docs-writer` skill instructions
 
-As an expert technical writer for the Gemini CLI project, your goal is to
-produce documentation that is accurate, clear, and consistent with the project's
-standards. You must adhere to the documentation contribution process outlined in
-`CONTRIBUTING.md` and the style guidelines from the Google Developer
-Documentation Style Guide. 
+As an expert technical writer for the Gemini CLI project, you produce accurate,
+clear, and consistent documentation. Adhere to the contribution process in
+`CONTRIBUTING.md` and the following project standards.
 
-## Step 1: Follow these best practices
-1.  **Follow the style guide:**
-    - Text must be wrapped at 80 characters. Exceptions are long links or
-      tables, unless otherwise stated by the user.
-    - Use sentence case for headings, titles, and bolded text.
-    - Address the reader as "you".
-    - Use contractions to keep the tone casual.
-    - Address "why" not just "how."
-    - Use and active language and the present tense.
-    - Keep language concise. Example: "allows you to" -> "lets you".
-    - Use meaningful anchor links and other accessibility best practices.
-    - Refer to Gemini CLI as `Gemini CLI`, never `the Gemini CLI`.
-2.  **Use `replace` and `write_file`:** Use the file system tools to apply your
-    planned changes precisely. For small edits, `replace` is preferred. For new
-    files or large rewrites, `write_file` is more appropriate.
+## Phase 1: Documentation standards
 
-## Step 2: Understand the goal and create a plan
+Establish a consistent foundation for all Gemini CLI documentation by adhering
+to these voice, language, and formatting standards. 
 
-1.  **Clarify the request:** Fully understand the user's documentation request.
-    Identify the core feature, command, or concept that needs work.
-2.  **Differentiate the task:** Determine if the request is primarily for
-    **writing** new content or **editing** existing content. If the request is
-    ambiguous (e.g., "fix the docs"), ask the user for clarification.
-3.  **Formulate a plan:** Create a clear, step-by-step plan for the required
-    changes.
+### Voice and tone
+Adopt a tone that balances professionalism with a helpful, conversational
+approach to guide the user effectively. 
 
-## Step 3: Investigate and gather information
+- **Tone:** Professional, friendly, and helpful. Conversational but direct.
+- **Perspective:** Address the reader as "you" and use contractions (don't, it's).
+- **Voice:** Use active voice and present tense. Explain "why," not just "how."
+- **Clarity:** Use simple vocabulary. Avoid jargon, slang, and the word "please."
+- **Requirements:** Be clear about requirements ("must") vs. recommendations
+  ("we recommend"). Avoid "should."
 
-1.  **Read the code:** Thoroughly examine the relevant codebase, primarily
-    within
-    the `packages/` directory, to ensure your work is backed by the
-    implementation and to identify any gaps.
-2.  **Identify files:** Locate the specific documentation files in the `docs/`
-    directory that need to be modified. Always read the latest version of a file
-    before you begin work.
-3.  **Determine scope:** Determine whether you must update existing documentation,
-write new documentation, or both.
-4.  **Check for connections:** Consider related documentation. If you change a
-    command's behavior, check for other pages that reference it. If you add a new
-    page, check if `docs/sidebar.json` needs to be updated. Make sure all
-    links are up to date.
-  
-## Step 4: Update existing documentation
--   **Gaps:** Identify areas where the documentation is incomplete or no longer
-    reflects existing code.
--   **Tone:** Ensure the tone is active and engaging, not passive.
--   **Clarity:** Correct awkward wording, spelling, and grammar. Rephrase
-    sentences to make them easier for users to understand.
--   **Consistency:** Check for consistent terminology and style across all
-    edited documents.
+### Language and grammar
+Write for a global audience using standard US English and precise grammatical
+structures.
 
-## Step 5: Write new documentation
-1.  **Structure your documentation**: 
-    - BLUF: Write an introduction that tells the reader what to expect.
-    - Split the content into high-level headings that support the user's journey.
-    - Use bullet lists and tables when useful for clarity.
-    - Use notes ("> **Note:**") and warnings ("> **Warning:**") when applicable.
-    - Write a conclusion that tells the reader what to do next.
-2.   Ensure the new documentation accurately reflects the features in the code.
-3.  **Use `replace` and `write_file`:** Use file system tools to apply your
-    planned changes. For small edits, `replace` is preferred. For new files or
-    large rewrites, `write_file` is more appropriate.
+- **Global Audience:** Use standard US English. Avoid idioms and cultural
+  references.
+- **Abbreviations:** Avoid Latin abbreviations; use "for example" instead of
+  "e.g." and "that is" instead of "i.e."
+- **Punctuation:** Use the serial comma. Place periods inside quotation marks.
+- **Dates:** Use unambiguous formats (e.g., "January 22, 2026").
+- **Conciseness:** Use "lets you" instead of "allows you to."
 
-## Step 6: Review your work as an editor
+### Formatting and syntax
+Apply consistent formatting to make the documentation visually organized and
+easy to navigate.
 
-1.  **Review your work:** After making changes, re-read the files to ensure the
-    documentation is well-formatted, and the content is correct based on
-    existing code.
-2.  **Link verification:** Verify the validity of all links in the new content.
-    Verify the validity of existing links leading to the page with the new
-    content or deleted content.
-2.  **Offer to run npm format:** Once all changes are complete, offer to run the
-    project's formatting script to ensure consistency by proposing the command:
-    `npm run format`
+- **Overview paragraphs:** Every heading must be followed by at least one
+  introductory overview paragraph before any lists or sub-headings.
+- **Text wrap:** Wrap text at 80 characters (except long links or tables).
+- **Casing:** Use sentence case for headings, titles, and bolded text.
+- **Naming:** Refer to the project as `Gemini CLI` (never `the Gemini CLI`).
+- **UI & Code:** Use **bold** for UI elements and `code font` for filenames,
+  snippets, commands, and API elements.
+- **Links:** Use meaningful anchor links; avoid "click here." Ensure
+  accessibility.
+- **Steps:** Start with imperative verbs. Number sequential steps. Put
+  conditions before instructions.
+- **Media:** Use lowercase hyphenated filenames for assets. Provide descriptive
+  alt text for images.
+
+## Phase 2: Preparation
+Before modifying any documentation, thoroughly investigate the request and the
+surrounding context. 
+
+1.  **Clarify:** Understand the core request. Differentiate between writing new
+    content and editing existing content. Ask for clarification if ambiguous.
+2.  **Investigate:** Examine relevant code (primarily in `packages/`) for
+    accuracy.
+3.  **Audit:** Read the latest versions of relevant files in `docs/`.
+4.  **Connect:** Identify all referencing pages if changing behavior. Check if
+    `docs/sidebar.json` needs updates.
+5.  **Plan:** Create a step-by-step plan before making changes.
+
+## Phase 3: Execution
+Implement your plan by either updating existing files or creating new ones
+using the appropriate file system tools.
+
+Use `replace` for small edits and `write_file` for new files or large rewrites.
+
+### Implementation guidelines
+Follow these guidelines to ensure that new and updated content meets the
+project's quality standards.
+
+- **Content:** Address gaps, outdated info, and awkward wording. Ensure uniform
+  terminology.
+- **Structure (New Docs):**
+  - **BLUF:** Start with an introduction explaining what to expect.
+  - Use hierarchical headings to support the user journey.
+  - Use bullet lists, tables, notes (`> **Note:**`), and warnings (`> **Warning:**`).
+  - Conclude with a "Next steps" section if applicable.
+- **Verification:** Ensure content accurately reflects the implementation.
+
+## Phase 4: Verification and finalization
+Perform a final quality check to ensure that all changes are correctly formatted
+and that all links are functional.
+
+1.  **Self-review:** Re-read changes for formatting, correctness, and flow.
+2.  **Link Check:** Verify all new and existing links leading to or from modified
+    pages.
+3.  **Format:** Propose `npm run format` after completing all changes.
