@@ -499,6 +499,23 @@ describe('InputPrompt', () => {
     unmount();
   });
 
+  it('should clear the buffer and reset completion on Ctrl+C', async () => {
+    mockBuffer.text = 'some text';
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    await act(async () => {
+      stdin.write('\u0003'); // Ctrl+C
+    });
+
+    await waitFor(() => {
+      expect(mockBuffer.setText).toHaveBeenCalledWith('');
+      expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
+    });
+    unmount();
+  });
+
   describe('clipboard image paste', () => {
     beforeEach(() => {
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);

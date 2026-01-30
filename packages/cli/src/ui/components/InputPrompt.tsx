@@ -604,6 +604,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
+      if (keyMatchers[Command.EXIT](key)) {
+        const [row, col] = buffer.cursor;
+        const isAtEnd =
+          row === buffer.lines.length - 1 &&
+          col === cpLen(buffer.lines[row] ?? '');
+        if (isAtEnd) {
+          return false;
+        }
+      }
+
       if (shellModeActive && keyMatchers[Command.REVERSE_SEARCH](key)) {
         setReverseSearchActive(true);
         setTextBeforeReverseSearch(buffer.text);
@@ -886,6 +896,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         if (buffer.text.length > 0) {
           buffer.setText('');
           resetCompletionState();
+          return true;
         }
         return false;
       }
@@ -982,7 +993,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     ],
   );
 
-  useKeypress(handleInput, { isActive: !isEmbeddedShellFocused });
+  useKeypress(handleInput, {
+    isActive: !isEmbeddedShellFocused,
+    priority: true,
+  });
 
   const linesToRender = buffer.viewportVisualLines;
   const [cursorVisualRowAbsolute, cursorVisualColAbsolute] =
