@@ -564,11 +564,17 @@ describe('run_shell_command', () => {
 
   it('rejects invalid shell expressions', async () => {
     await rig.setup('rejects invalid shell expressions', {
-      settings: { tools: { core: ['run_shell_command'] } },
+      settings: {
+        tools: {
+          core: ['run_shell_command'],
+          allowed: ['run_shell_command(echo)'], // Specifically allow echo
+        },
+      },
     });
     const invalidCommand = getInvalidCommand();
     const result = await rig.run({
       args: `I am testing the error handling of the run_shell_command tool. Please attempt to run the following command, which I know has invalid syntax: \`${invalidCommand}\`. If the command fails as expected, please return the word FAIL, otherwise return the word SUCCESS.`,
+      approvalMode: 'default', // Use default mode so safety fallback triggers confirmation
     });
     expect(result).toContain('FAIL');
 
