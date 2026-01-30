@@ -16,13 +16,15 @@ import type { Config } from '@google/gemini-cli-core';
 const cleanupFunctions: Array<{ id: number; fn: CleanupFunction }> = [];
 const syncCleanupFunctions: Array<{ id: number; fn: SyncCleanupFunction }> = [];
 let configForTelemetry: Config | null = null;
+let nextId = 0;
 type CleanupFunction = (() => void) | (() => Promise<void>);
 type SyncCleanupFunction = () => void;
 
 export function registerCleanup(fn: (() => void) | (() => Promise<void>)) {
-  cleanupFunctions.push(fn);
+  const id = nextId++;
+  cleanupFunctions.push({ id, fn });
   return () => {
-    const index = cleanupFunctions.indexOf(fn);
+    const index = cleanupFunctions.findIndex((item) => item.id === id);
     if (index !== -1) {
       cleanupFunctions.splice(index, 1);
     }
@@ -30,9 +32,10 @@ export function registerCleanup(fn: (() => void) | (() => Promise<void>)) {
 }
 
 export function registerSyncCleanup(fn: () => void) {
-  syncCleanupFunctions.push(fn);
+  const id = nextId++;
+  syncCleanupFunctions.push({ id, fn });
   return () => {
-    const index = syncCleanupFunctions.indexOf(fn);
+    const index = syncCleanupFunctions.findIndex((item) => item.id === id);
     if (index !== -1) {
       syncCleanupFunctions.splice(index, 1);
     }
