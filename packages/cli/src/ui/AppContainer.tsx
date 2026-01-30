@@ -141,10 +141,7 @@ import {
 import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialog.js';
 import { NewAgentsChoice } from './components/NewAgentsNotification.js';
 import { isSlashCommand } from './utils/commandUtils.js';
-import {
-  parseX11Rgb,
-  getThemeTypeFromBackgroundColor,
-} from './themes/color-utils.js';
+import { parseX11Rgb, getLuminance } from './themes/color-utils.js';
 import { DEFAULT_THEME } from './themes/theme-manager.js';
 import { DefaultLight } from './themes/default-light.js';
 
@@ -632,7 +629,7 @@ export const AppContainer = (props: AppContainerProps) => {
       if (!match) return;
 
       const hexColor = parseX11Rgb(match[1], match[2], match[3]);
-      const themeType = getThemeTypeFromBackgroundColor(hexColor);
+      const luminance = getLuminance(hexColor);
       config.setTerminalBackground(hexColor);
 
       // Check if we need to switch theme
@@ -642,9 +639,16 @@ export const AppContainer = (props: AppContainerProps) => {
         currentThemeName === undefined;
       const isDefaultLightTheme = currentThemeName === DefaultLight.name;
 
-      if (themeType === 'light' && isDefaultTheme) {
+      // Hysteresis thresholds to prevent flickering
+      const LIGHT_THEME_LUMINANCE_THRESHOLD = 140;
+      const DARK_THEME_LUMINANCE_THRESHOLD = 110;
+
+      if (luminance > LIGHT_THEME_LUMINANCE_THRESHOLD && isDefaultTheme) {
         handleThemeSelect(DefaultLight.name, SettingScope.User);
-      } else if (themeType === 'dark' && isDefaultLightTheme) {
+      } else if (
+        luminance < DARK_THEME_LUMINANCE_THRESHOLD &&
+        isDefaultLightTheme
+      ) {
         handleThemeSelect(DEFAULT_THEME.name, SettingScope.User);
       }
     };

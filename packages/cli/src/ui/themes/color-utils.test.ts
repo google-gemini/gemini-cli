@@ -13,6 +13,7 @@ import {
   INK_SUPPORTED_NAMES,
   getThemeTypeFromBackgroundColor,
   parseX11Rgb,
+  getLuminance,
 } from './color-utils.js';
 
 describe('Color Utils', () => {
@@ -278,6 +279,25 @@ describe('Color Utils', () => {
     it('should handle colors without # prefix', () => {
       expect(getThemeTypeFromBackgroundColor('ffffff')).toBe('light');
       expect(getThemeTypeFromBackgroundColor('000000')).toBe('dark');
+    });
+  });
+
+  describe('getLuminance', () => {
+    it('should calculate luminance correctly', () => {
+      // White: 0.2126*255 + 0.7152*255 + 0.0722*255 = 255
+      expect(getLuminance('#ffffff')).toBeCloseTo(255);
+      // Black: 0.2126*0 + 0.7152*0 + 0.0722*0 = 0
+      expect(getLuminance('#000000')).toBeCloseTo(0);
+      // Pure Red: 0.2126*255 = 54.213
+      expect(getLuminance('#ff0000')).toBeCloseTo(54.213);
+      // Pure Green: 0.7152*255 = 182.376
+      expect(getLuminance('#00ff00')).toBeCloseTo(182.376);
+      // Pure Blue: 0.0722*255 = 18.411
+      expect(getLuminance('#0000ff')).toBeCloseTo(18.411);
+    });
+
+    it('should handle colors without # prefix', () => {
+      expect(getLuminance('ffffff')).toBeCloseTo(255);
     });
   });
 

@@ -286,16 +286,24 @@ export function getThemeTypeFromBackgroundColor(
     return undefined;
   }
 
-  // Parse hex color
+  const luminance = getLuminance(backgroundColor);
+  return luminance > 128 ? 'light' : 'dark';
+}
+
+/**
+ * Calculates the relative luminance of a color.
+ * See https://www.w3.org/TR/WCAG20/#relativeluminancedef
+ *
+ * @param backgroundColor Hex color string (with or without #)
+ * @returns Luminance value (0-255)
+ */
+export function getLuminance(backgroundColor: string): number {
   const hex = backgroundColor.replace(/^#/, '');
   const r = parseInt(hex.substring(0, 2), 16);
   const g = parseInt(hex.substring(2, 4), 16);
   const b = parseInt(hex.substring(4, 6), 16);
 
-  // Calculate luminance
-  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-
-  return luminance > 128 ? 'light' : 'dark';
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
 /**
