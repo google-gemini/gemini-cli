@@ -55,6 +55,17 @@ export function isBinary(
 }
 
 /**
+ * Detects the line ending style of a string.
+ * @param content The string content to analyze.
+ * @returns '\r\n' for Windows-style, '\n' for Unix-style.
+ */
+export function detectLineEnding(content: string): '\r\n' | '\n' {
+  // If a Carriage Return is found, assume Windows-style endings.
+  // This is a simple but effective heuristic.
+  return content.includes('\r\n') ? '\r\n' : '\n';
+}
+
+/**
  * Truncates a string to a maximum length, appending a suffix if truncated.
  * @param str The string to truncate.
  * @param maxLength The maximum length of the string.

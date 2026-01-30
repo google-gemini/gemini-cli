@@ -130,6 +130,7 @@ describe('ChatRecordingService', () => {
       chatRecordingService.recordMessage({
         type: 'user',
         content: 'Hello',
+        displayContent: 'User Hello',
         model: 'gemini-pro',
       });
       expect(mkdirSyncSpy).toHaveBeenCalled();
@@ -139,6 +140,7 @@ describe('ChatRecordingService', () => {
       ) as ConversationRecord;
       expect(conversation.messages).toHaveLength(1);
       expect(conversation.messages[0].content).toBe('Hello');
+      expect(conversation.messages[0].displayContent).toBe('User Hello');
       expect(conversation.messages[0].type).toBe('user');
     });
 
@@ -399,6 +401,77 @@ describe('ChatRecordingService', () => {
       expect(unlinkSyncSpy).toHaveBeenCalledWith(
         '/test/project/root/.gemini/tmp/chats/test-session-id.json',
       );
+    });
+  });
+
+  describe('recordDirectories', () => {
+    beforeEach(() => {
+      chatRecordingService.initialize();
+    });
+
+    it('should save directories to the conversation', () => {
+      const writeFileSyncSpy = vi
+        .spyOn(fs, 'writeFileSync')
+        .mockImplementation(() => undefined);
+      const initialConversation = {
+        sessionId: 'test-session-id',
+        projectHash: 'test-project-hash',
+        messages: [
+          {
+            id: '1',
+            type: 'user',
+            content: 'Hello',
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      };
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(
+        JSON.stringify(initialConversation),
+      );
+
+      chatRecordingService.recordDirectories([
+        '/path/to/dir1',
+        '/path/to/dir2',
+      ]);
+
+      expect(writeFileSyncSpy).toHaveBeenCalled();
+      const conversation = JSON.parse(
+        writeFileSyncSpy.mock.calls[0][1] as string,
+      ) as ConversationRecord;
+      expect(conversation.directories).toEqual([
+        '/path/to/dir1',
+        '/path/to/dir2',
+      ]);
+    });
+
+    it('should overwrite existing directories', () => {
+      const writeFileSyncSpy = vi
+        .spyOn(fs, 'writeFileSync')
+        .mockImplementation(() => undefined);
+      const initialConversation = {
+        sessionId: 'test-session-id',
+        projectHash: 'test-project-hash',
+        messages: [
+          {
+            id: '1',
+            type: 'user',
+            content: 'Hello',
+            timestamp: new Date().toISOString(),
+          },
+        ],
+        directories: ['/old/dir'],
+      };
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(
+        JSON.stringify(initialConversation),
+      );
+
+      chatRecordingService.recordDirectories(['/new/dir1', '/new/dir2']);
+
+      expect(writeFileSyncSpy).toHaveBeenCalled();
+      const conversation = JSON.parse(
+        writeFileSyncSpy.mock.calls[0][1] as string,
+      ) as ConversationRecord;
+      expect(conversation.directories).toEqual(['/new/dir1', '/new/dir2']);
     });
   });
 

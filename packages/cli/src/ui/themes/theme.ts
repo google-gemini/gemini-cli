@@ -5,12 +5,18 @@
  */
 
 import type { CSSProperties } from 'react';
+
 import type { SemanticColors } from './semantic-tokens.js';
+
 import {
   resolveColor,
   interpolateColor,
   getThemeTypeFromBackgroundColor,
 } from './color-utils.js';
+
+import type { CustomTheme } from '@google/gemini-cli-core';
+
+export type { CustomTheme };
 
 export type ThemeType = 'light' | 'dark' | 'ansi' | 'custom';
 
@@ -30,57 +36,6 @@ export interface ColorsTheme {
   Comment: string;
   Gray: string;
   DarkGray: string;
-  GradientColors?: string[];
-}
-
-export interface CustomTheme {
-  type: 'custom';
-  name: string;
-
-  text?: {
-    primary?: string;
-    secondary?: string;
-    link?: string;
-    accent?: string;
-    response?: string;
-  };
-  background?: {
-    primary?: string;
-    diff?: {
-      added?: string;
-      removed?: string;
-    };
-  };
-  border?: {
-    default?: string;
-    focused?: string;
-  };
-  ui?: {
-    comment?: string;
-    symbol?: string;
-    gradient?: string[];
-  };
-  status?: {
-    error?: string;
-    success?: string;
-    warning?: string;
-  };
-
-  // Legacy properties (all optional)
-  Background?: string;
-  Foreground?: string;
-  LightBlue?: string;
-  AccentBlue?: string;
-  AccentPurple?: string;
-  AccentCyan?: string;
-  AccentGreen?: string;
-  AccentYellow?: string;
-  AccentRed?: string;
-  DiffAdded?: string;
-  DiffRemoved?: string;
-  Comment?: string;
-  Gray?: string;
-  DarkGray?: string;
   GradientColors?: string[];
 }
 

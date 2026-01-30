@@ -42,6 +42,8 @@ describe('AskUserDialog', () => {
         questions={authQuestion}
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
+        width={120}
+        availableHeight={20}
       />,
       { width: 120 },
     );
@@ -106,6 +108,8 @@ describe('AskUserDialog', () => {
           questions={questions}
           onSubmit={onSubmit}
           onCancel={vi.fn()}
+          width={120}
+          availableHeight={20}
         />,
         { width: 120 },
       );
@@ -125,6 +129,8 @@ describe('AskUserDialog', () => {
         questions={authQuestion}
         onSubmit={onSubmit}
         onCancel={vi.fn()}
+        width={120}
+        availableHeight={20}
       />,
       { width: 120 },
     );
@@ -154,12 +160,42 @@ describe('AskUserDialog', () => {
     });
   });
 
+  it('shows scroll arrows when options exceed available height', async () => {
+    const questions: Question[] = [
+      {
+        question: 'Choose an option',
+        header: 'Scroll Test',
+        options: Array.from({ length: 15 }, (_, i) => ({
+          label: `Option ${i + 1}`,
+          description: `Description ${i + 1}`,
+        })),
+        multiSelect: false,
+      },
+    ];
+
+    const { lastFrame } = renderWithProviders(
+      <AskUserDialog
+        questions={questions}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+        width={80}
+        availableHeight={10} // Small height to force scrolling
+      />,
+    );
+
+    await waitFor(() => {
+      expect(lastFrame()).toMatchSnapshot();
+    });
+  });
+
   it('navigates to custom option when typing unbound characters (Type-to-Jump)', async () => {
     const { stdin, lastFrame } = renderWithProviders(
       <AskUserDialog
         questions={authQuestion}
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
+        width={120}
+        availableHeight={20}
       />,
       { width: 120 },
     );
@@ -210,6 +246,8 @@ describe('AskUserDialog', () => {
         questions={multiQuestions}
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
+        width={120}
+        availableHeight={20}
       />,
       { width: 120 },
     );
@@ -223,6 +261,8 @@ describe('AskUserDialog', () => {
         questions={authQuestion}
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
+        width={120}
+        availableHeight={20}
       />,
       { width: 120 },
     );
@@ -236,6 +276,8 @@ describe('AskUserDialog', () => {
         questions={authQuestion}
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
+        width={120}
+        availableHeight={20}
       />,
       { width: 120 },
     );
@@ -266,6 +308,8 @@ describe('AskUserDialog', () => {
         questions={multiQuestions}
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
+        width={120}
+        availableHeight={20}
       />,
       { width: 120 },
     );
@@ -307,6 +351,8 @@ describe('AskUserDialog', () => {
         questions={multiQuestions}
         onSubmit={onSubmit}
         onCancel={vi.fn()}
+        width={120}
+        availableHeight={20}
       />,
       { width: 120 },
     );
@@ -374,6 +420,8 @@ describe('AskUserDialog', () => {
         questions={multiQuestions}
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
+        width={120}
+        availableHeight={20}
       />,
       { width: 120 },
     );
@@ -402,6 +450,8 @@ describe('AskUserDialog', () => {
         questions={multiQuestions}
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
+        width={120}
+        availableHeight={20}
       />,
       { width: 120 },
     );
@@ -446,6 +496,8 @@ describe('AskUserDialog', () => {
         questions={multiQuestions}
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
+        width={120}
+        availableHeight={20}
       />,
       { width: 120 },
     );
@@ -481,6 +533,8 @@ describe('AskUserDialog', () => {
         questions={multiQuestions}
         onSubmit={onSubmit}
         onCancel={vi.fn()}
+        width={120}
+        availableHeight={20}
       />,
       { width: 120 },
     );
@@ -513,6 +567,8 @@ describe('AskUserDialog', () => {
           questions={textQuestion}
           onSubmit={vi.fn()}
           onCancel={vi.fn()}
+          width={120}
+          availableHeight={20}
         />,
         { width: 120 },
       );
@@ -534,6 +590,8 @@ describe('AskUserDialog', () => {
           questions={textQuestion}
           onSubmit={vi.fn()}
           onCancel={vi.fn()}
+          width={120}
+          availableHeight={20}
         />,
         { width: 120 },
       );
@@ -555,6 +613,8 @@ describe('AskUserDialog', () => {
           questions={textQuestion}
           onSubmit={vi.fn()}
           onCancel={vi.fn()}
+          width={120}
+          availableHeight={20}
         />,
         { width: 120 },
       );
@@ -589,6 +649,8 @@ describe('AskUserDialog', () => {
           questions={textQuestion}
           onSubmit={vi.fn()}
           onCancel={vi.fn()}
+          width={120}
+          availableHeight={20}
         />,
         { width: 120 },
       );
@@ -619,6 +681,8 @@ describe('AskUserDialog', () => {
           questions={mixedQuestions}
           onSubmit={vi.fn()}
           onCancel={vi.fn()}
+          width={120}
+          availableHeight={20}
         />,
         { width: 120 },
       );
@@ -665,6 +729,8 @@ describe('AskUserDialog', () => {
           questions={mixedQuestions}
           onSubmit={onSubmit}
           onCancel={vi.fn()}
+          width={120}
+          availableHeight={20}
         />,
         { width: 120 },
       );
@@ -714,6 +780,8 @@ describe('AskUserDialog', () => {
           questions={textQuestion}
           onSubmit={onSubmit}
           onCancel={vi.fn()}
+          width={120}
+          availableHeight={20}
         />,
         { width: 120 },
       );
@@ -739,6 +807,8 @@ describe('AskUserDialog', () => {
           questions={textQuestion}
           onSubmit={vi.fn()}
           onCancel={onCancel}
+          width={120}
+          availableHeight={20}
         />,
         { width: 120 },
       );
@@ -784,6 +854,8 @@ describe('AskUserDialog', () => {
           questions={multiQuestions}
           onSubmit={vi.fn()}
           onCancel={vi.fn()}
+          width={120}
+          availableHeight={20}
         />,
         { width: 120 },
       );
@@ -842,6 +914,8 @@ describe('AskUserDialog', () => {
           questions={multiQuestions}
           onSubmit={onSubmit}
           onCancel={vi.fn()}
+          width={120}
+          availableHeight={20}
         />,
         { width: 120 },
       );
@@ -890,6 +964,8 @@ describe('AskUserDialog', () => {
           questions={questions}
           onSubmit={vi.fn()}
           onCancel={vi.fn()}
+          width={120}
+          availableHeight={40}
         />,
         { width: 120 },
       );
@@ -917,6 +993,8 @@ describe('AskUserDialog', () => {
           questions={questions}
           onSubmit={vi.fn()}
           onCancel={vi.fn()}
+          width={120}
+          availableHeight={40}
         />,
         { width: 120 },
       );

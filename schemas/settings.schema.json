@@ -302,6 +302,13 @@
           "default": false,
           "type": "boolean"
         },
+        "showUserIdentity": {
+          "title": "Show User Identity",
+          "description": "Show the logged-in user's identity (e.g. email) in the UI.",
+          "markdownDescription": "Show the logged-in user's identity (e.g. email) in the UI.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "useAlternateBuffer": {
           "title": "Use Alternate Screen Buffer",
           "description": "Use an alternate screen buffer for the UI, preserving shell history.",
@@ -1193,13 +1200,6 @@
           "markdownDescription": "Disable LLM-based error correction for edit tools. When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `true`",
           "default": true,
           "type": "boolean"
-        },
-        "enableHooks": {
-          "title": "Enable Hooks System (Experimental)",
-          "description": "Enables the hooks system experiment. When disabled, the hooks system is completely deactivated regardless of other settings.",
-          "markdownDescription": "Enables the hooks system experiment. When disabled, the hooks system is completely deactivated regardless of other settings.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `true`",
-          "default": true,
-          "type": "boolean"
         }
       },
       "additionalProperties": false
@@ -1272,6 +1272,16 @@
           "markdownDescription": "Blocks installing and loading extensions from Git.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
+        },
+        "allowedExtensions": {
+          "title": "Extension Source Regex Allowlist",
+          "description": "List of Regex patterns for allowed extensions. If nonempty, only extensions that match the patterns in this list are allowed. Overrides the blockGitExtensions setting.",
+          "markdownDescription": "List of Regex patterns for allowed extensions. If nonempty, only extensions that match the patterns in this list are allowed. Overrides the blockGitExtensions setting.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `[]`",
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         },
         "folderTrust": {
           "title": "Folder Trust",
@@ -1530,7 +1540,7 @@
         "enabled": {
           "title": "Enable Hooks",
           "description": "Canonical toggle for the hooks system. When disabled, no hooks will be executed.",
-          "markdownDescription": "Canonical toggle for the hooks system. When disabled, no hooks will be executed.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `true`",
+          "markdownDescription": "Canonical toggle for the hooks system. When disabled, no hooks will be executed.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
