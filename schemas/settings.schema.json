@@ -373,8 +373,8 @@
         },
         "enableNotifications": {
           "title": "Enable Notifications",
-          "description": "Enable notifications for user permission prompts when the CLI is not in focus.",
-          "markdownDescription": "Enable notifications for user permission prompts when the CLI is not in focus.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "description": "Enable notifications for user permission prompts when the CLI is not in focus. Tested on mac, experimental on win/linux",
+          "markdownDescription": "Enable notifications for user permission prompts when the CLI is not in focus. Tested on mac, experimental on win/linux\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         }

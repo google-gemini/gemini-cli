@@ -622,7 +622,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: true,
         description:
-          'Enable notifications for user permission prompts when the CLI is not in focus.',
+          'Enable notifications for user permission prompts when the CLI is not in focus. Tested on mac, experimental on win/linux',
         showInDialog: true,
       },
     },
