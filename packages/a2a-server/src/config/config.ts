@@ -134,21 +134,6 @@ export async function loadConfig(
 
   // Needed to initialize ToolRegistry, and git checkpointing if enabled
   await config.initialize();
-
-  // Override env settings when provided admin controls.
-  const codeAssistServer = getCodeAssistServer(config);
-  const adminControlsEnabled =
-    config.getExperiments()?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]
-      ?.boolValue ?? false;
-
-  if (adminControlsEnabled) {
-    const adminSettings = await fetchAdminControlsOnce(
-      codeAssistServer,
-      adminControlsEnabled,
-    );
-    config.setRemoteAdminSettings(adminSettings);
-    coreEvents.emitAdminSettingsChanged();
-  }
   startupProfiler.flush(config);
 
   if (process.env['USE_CCPA']) {
@@ -174,6 +159,21 @@ export async function loadConfig(
       '[Config] Unable to set GeneratorConfig. Please provide a GEMINI_API_KEY or set USE_CCPA.';
     logger.error(errorMessage);
     throw new Error(errorMessage);
+  }
+
+  // Override env settings when provided admin controls.
+  const codeAssistServer = getCodeAssistServer(config);
+  const adminControlsEnabled =
+    config.getExperiments()?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]
+      ?.boolValue ?? false;
+
+  if (adminControlsEnabled) {
+    const adminSettings = await fetchAdminControlsOnce(
+      codeAssistServer,
+      adminControlsEnabled,
+    );
+    config.setRemoteAdminSettings(adminSettings);
+    coreEvents.emitAdminSettingsChanged();
   }
 
   return config;
