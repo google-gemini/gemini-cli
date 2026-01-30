@@ -66,7 +66,12 @@ export interface ToolConfirmationResponse {
  * Data-only versions of ToolCallConfirmationDetails for bus transmission.
  */
 export type SerializableConfirmationDetails =
-  | { type: 'info'; title: string; prompt: string; urls?: string[] }
+  | {
+      type: 'info';
+      title: string;
+      prompt: string;
+      urls?: string[];
+    }
   | {
       type: 'edit';
       title: string;
@@ -91,6 +96,11 @@ export type SerializableConfirmationDetails =
       serverName: string;
       toolName: string;
       toolDisplayName: string;
+    }
+  | {
+      type: 'ask_user';
+      title: string;
+      questions: Question[];
     };
 
 export interface UpdatePolicy {
