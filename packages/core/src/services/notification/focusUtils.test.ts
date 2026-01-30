@@ -18,23 +18,71 @@ describe('focusUtils', () => {
   const originalPlatform = process.platform;
   const originalEnvTermProgram = process.env['TERM_PROGRAM'];
 
+  const originalEnvTerm = process.env['TERM'];
+
   beforeEach(() => {
     vi.resetAllMocks();
     Object.defineProperty(process, 'platform', {
       value: originalPlatform,
     });
     delete process.env['TERM_PROGRAM'];
+    delete process.env['TERM'];
     mockExecSync.mockReturnValue('');
   });
 
   afterEach(() => {
     process.env['TERM_PROGRAM'] = originalEnvTermProgram;
+    process.env['TERM'] = originalEnvTerm;
     vi.restoreAllMocks();
   });
 
   describe('isTerminalAppFocused', () => {
-    it('should return null if TERM_PROGRAM is not set', () => {
+    it('should return null if neither TERM_PROGRAM nor TERM is set', () => {
+      delete process.env['TERM_PROGRAM'];
+      delete process.env['TERM'];
       expect(isTerminalAppFocused()).toBeNull();
+    });
+
+    it('should fallback to TERM if TERM_PROGRAM is missing (Kitty)', () => {
+      Object.defineProperty(process, 'platform', { value: 'darwin' });
+      delete process.env['TERM_PROGRAM'];
+      process.env['TERM'] = 'xterm-kitty';
+      mockExecSync.mockReturnValue('kitty\n');
+
+      expect(isTerminalAppFocused()).toBe(true);
+    });
+
+    it('should fallback to TERM if TERM_PROGRAM is missing (Alacritty)', () => {
+      Object.defineProperty(process, 'platform', { value: 'darwin' });
+      delete process.env['TERM_PROGRAM'];
+      process.env['TERM'] = 'alacritty';
+      mockExecSync.mockReturnValue('Alacritty\n');
+
+      expect(isTerminalAppFocused()).toBe(true);
+    });
+
+    it('should return true on macOS for iTerm2', () => {
+      Object.defineProperty(process, 'platform', { value: 'darwin' });
+      process.env['TERM_PROGRAM'] = 'iTerm.app';
+      mockExecSync.mockReturnValue('iTerm2\n');
+
+      expect(isTerminalAppFocused()).toBe(true);
+    });
+
+    it('should return true on macOS for VS Code', () => {
+      Object.defineProperty(process, 'platform', { value: 'darwin' });
+      process.env['TERM_PROGRAM'] = 'vscode';
+      mockExecSync.mockReturnValue('Code\n');
+
+      expect(isTerminalAppFocused()).toBe(true);
+    });
+
+    it('should return true on macOS for WezTerm', () => {
+      Object.defineProperty(process, 'platform', { value: 'darwin' });
+      process.env['TERM_PROGRAM'] = 'WezTerm';
+      mockExecSync.mockReturnValue('wezterm-gui\n');
+
+      expect(isTerminalAppFocused()).toBe(true);
     });
 
     it('should return true on macOS if terminal is frontmost (Apple_Terminal)', () => {

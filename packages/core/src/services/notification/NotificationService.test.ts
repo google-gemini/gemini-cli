@@ -56,6 +56,11 @@ describe('NotificationService', () => {
     Object.defineProperty(process, 'platform', {
       value: originalPlatform,
     });
+    // Mock isTTY to true by default for tests
+    Object.defineProperty(process.stdout, 'isTTY', {
+      value: true,
+      configurable: true,
+    });
     delete process.env['__CFBundleIdentifier'];
     delete process.env['TERM_PROGRAM'];
     mockEvents = new CoreEventEmitter();
@@ -203,6 +208,38 @@ describe('NotificationService', () => {
     expect(mockNotify).toHaveBeenCalled();
   });
 
+  it('should remove listener on dispose', () => {
+    const offSpy = vi.spyOn(mockEvents, 'off');
+    const service = new NotificationService({ enabled: true }, mockEvents);
+
+    service.dispose();
+
+    expect(offSpy).toHaveBeenCalledWith(
+      'window-focus-changed',
+      expect.any(Function),
+    );
+  });
+
+  it('should unsubscribe from MessageBus on dispose', () => {
+    const service = new NotificationService({ enabled: true }, mockEvents);
+    const mockBus = {
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+    } as unknown as MessageBus;
+
+    service.subscribeToBus(mockBus);
+    service.dispose();
+
+    expect(mockBus.unsubscribe).toHaveBeenCalledWith(
+      MessageBusType.TOOL_CONFIRMATION_REQUEST,
+      expect.any(Function),
+    );
+    expect(mockBus.unsubscribe).toHaveBeenCalledWith(
+      MessageBusType.NOTIFICATION_REQUEST,
+      expect.any(Function),
+    );
+  });
+
   it('should NOT notify in WarpTerminal if OS check confirms focus', () => {
     process.env['TERM_PROGRAM'] = 'WarpTerminal';
     mockIsTerminalAppFocused.mockReturnValue(true);
@@ -215,14 +252,64 @@ describe('NotificationService', () => {
     expect(mockIsTerminalAppFocused).toHaveBeenCalled();
   });
 
-  it('should notify in WarpTerminal if OS check confirms NOT focused', () => {
-    process.env['TERM_PROGRAM'] = 'WarpTerminal';
-    mockIsTerminalAppFocused.mockReturnValue(false);
-
+  it('should prioritize OS check even if ANSI reports NOT focused', () => {
+    mockIsTerminalAppFocused.mockReturnValue(true);
     const service = new NotificationService({ enabled: true }, mockEvents);
+    // ANSI reports NOT focused
+    mockEvents.emitWindowFocusChanged(false);
+
+    service.notify({ message: 'Test' });
+    expect(mockNotify).not.toHaveBeenCalled();
+    expect(mockIsTerminalAppFocused).toHaveBeenCalled();
+  });
+
+  it('should prioritize OS check even if ANSI reports focused', () => {
+    mockIsTerminalAppFocused.mockReturnValue(false);
+    const service = new NotificationService({ enabled: true }, mockEvents);
+    // ANSI reports focused
     mockEvents.emitWindowFocusChanged(true);
 
     service.notify({ message: 'Test' });
+    expect(mockNotify).toHaveBeenCalled();
+    expect(mockIsTerminalAppFocused).toHaveBeenCalled();
+  });
+
+  it('should fallback to ANSI when OS check returns null', () => {
+    mockIsTerminalAppFocused.mockReturnValue(null);
+    const service = new NotificationService({ enabled: true }, mockEvents);
+
+    // ANSI reports focused
+    mockEvents.emitWindowFocusChanged(true);
+    service.notify({ message: 'Test 1' });
+    expect(mockNotify).not.toHaveBeenCalled();
+
+    // ANSI reports NOT focused
+    mockEvents.emitWindowFocusChanged(false);
+    service.notify({ message: 'Test 2' });
+    expect(mockNotify).toHaveBeenCalled();
+  });
+
+  it('should assume NOT focused for unsupported terminal when both OS and ANSI report focused (safety check)', () => {
+    process.env['TERM_PROGRAM'] = 'Apple_Terminal';
+    mockIsTerminalAppFocused.mockReturnValue(null);
+    const service = new NotificationService({ enabled: true }, mockEvents);
+
+    // Both OS check is inconclusive (null) and ANSI reports focused
+    mockEvents.emitWindowFocusChanged(true);
+    service.notify({ message: 'Test' });
+
+    // Should NOT suppress (i.e. should notify) because it's an unsupported terminal
+    expect(mockNotify).toHaveBeenCalled();
+  });
+
+  it('should assume NOT focused for regular terminal when ANSI reports NOT focused and OS check is null', () => {
+    process.env['TERM_PROGRAM'] = 'iTerm.app';
+    mockIsTerminalAppFocused.mockReturnValue(null);
+    const service = new NotificationService({ enabled: true }, mockEvents);
+
+    mockEvents.emitWindowFocusChanged(false);
+    service.notify({ message: 'Test' });
+
     expect(mockNotify).toHaveBeenCalled();
   });
 
@@ -331,5 +418,30 @@ describe('NotificationService', () => {
 
     // Newline and BEL should be removed
     expect(stdoutSpy).toHaveBeenCalledWith('\x1b]9;TestMessage\x07');
+  });
+
+  it('should NOT send terminal notification if stdout is NOT a TTY', () => {
+    process.env['TERM_PROGRAM'] = 'iTerm.app';
+    const stdoutSpy = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation(() => true);
+    // Force isTTY to false
+    Object.defineProperty(process.stdout, 'isTTY', {
+      value: false,
+      configurable: true,
+    });
+
+    const service = new NotificationService({ enabled: true }, mockEvents);
+    mockEvents.emitWindowFocusChanged(false);
+
+    service.notify({ message: 'Test TTY' });
+
+    expect(stdoutSpy).not.toHaveBeenCalled();
+
+    // Reset isTTY back to true for other tests
+    Object.defineProperty(process.stdout, 'isTTY', {
+      value: true,
+      configurable: true,
+    });
   });
 });

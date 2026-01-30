@@ -287,8 +287,8 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`ui.enableNotifications`** (boolean):
   - **Description:** Enable desktop notifications for user permission prompts
-    when the CLI is not in focus.
-  - **Default:** `false`
+    when the CLI is not in focus. Tested on mac, experimental on win/linux
+  - **Default:** `true`
 
 #### `ide`
 

@@ -37,60 +37,141 @@ export interface NotificationOptions {
   force?: boolean;
 }
 
+/**
+ * Service responsible for sending system-level and terminal-specific notifications.
+ * It handles focus detection to suppress notifications when the terminal is already focused,
+ * and supports policy-mandated "force" notifications that bypass these checks.
+ *
+ * This service subscribes to the MessageBus to handle:
+ * - TOOL_CONFIRMATION_REQUEST: Notifies the user when a tool requires explicit permission to execute.
+ * - NOTIFICATION_REQUEST: General notification requests, often used for policy-mandated alerts.
+ */
 export class NotificationService {
   private isFocused = true; // Default to focused
+  private bus?: MessageBus;
+  private onFocusChanged = (payload: { focused: boolean }) => {
+    this.isFocused = payload.focused;
+  };
 
   constructor(
     private config: NotificationConfig,
-    eventEmitter: CoreEventEmitter = coreEvents,
+    private eventEmitter: CoreEventEmitter = coreEvents,
   ) {
-    eventEmitter.on(CoreEvent.WindowFocusChanged, (payload) => {
-      this.isFocused = payload.focused;
-    });
+    this.eventEmitter.on(CoreEvent.WindowFocusChanged, this.onFocusChanged);
   }
 
+  private onToolConfirmationRequest = (message: ToolConfirmationRequest) => {
+    this.handleToolConfirmationRequest(message);
+  };
+
+  private onNotificationRequest = (message: NotificationRequest) => {
+    this.handleNotificationRequest(message);
+  };
+
+  dispose(): void {
+    this.eventEmitter.off(CoreEvent.WindowFocusChanged, this.onFocusChanged);
+    if (this.bus) {
+      this.bus.unsubscribe(
+        MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        this.onToolConfirmationRequest,
+      );
+      this.bus.unsubscribe(
+        MessageBusType.NOTIFICATION_REQUEST,
+        this.onNotificationRequest,
+      );
+    }
+  }
+
+  /**
+   * Triggers a system-level notification and terminal escape sequences.
+   */
   notify(options: NotificationOptions): void {
-    if (!this.config.enabled && !options.force) {
-      debugLogger.debug('Notification suppressed (disabled in settings)');
+    if (this.shouldSuppress(options)) {
       return;
     }
 
-    if (!options.force) {
-      // List of terminals that do not properly support focus detection reporting (ANSI ?1004h).
-      // In these terminals, we use an OS-level check to see if the terminal app is frontmost.
-      const unsupportedTerminals = ['Apple_Terminal', 'WarpTerminal'];
-      const termProgram = process.env['TERM_PROGRAM'];
-      const isUnsupportedTerminal =
-        termProgram && unsupportedTerminals.includes(termProgram);
+    try {
+      const notifierOptions = this.prepareNotifierOptions(options);
 
-      let focused = this.isFocused;
-
-      // If the terminal doesn't support focus reporting, or if we want to double-check,
-      // we use the OS-level focus check.
-      if (isUnsupportedTerminal) {
-        const osFocused = isTerminalAppFocused();
-        if (osFocused !== null) {
-          focused = osFocused;
-        } else {
-          // If we can't determine OS-level focus for an unsupported terminal,
-          // we assume NOT focused to be safe and send the notification.
-          focused = false;
+      notifier.notify(notifierOptions, (error, response, meta) => {
+        if (error) {
+          debugLogger.warn('Failed to send system notification', error);
         }
-      }
+        debugLogger.debug('Notification callback', { response, meta });
+      });
 
+      this.sendTerminalNotification(options);
+      debugLogger.debug(`Notification sent: ${options.message}`);
+    } catch (error) {
+      debugLogger.warn('Failed to initiate notification', error);
+    }
+  }
+
+  /**
+   * Checks if the notification should be suppressed based on configuration and focus.
+   */
+  private shouldSuppress(options: NotificationOptions): boolean {
+    if (!this.config.enabled && !options.force) {
+      debugLogger.debug('Notification suppressed (disabled in settings)');
+      return true;
+    }
+
+    if (!options.force && this.getEffectiveFocus()) {
+      debugLogger.debug('Notification suppressed (window is focused)');
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Determines the effective focus state, accounting for terminals that do not
+   * support standard focus reporting by using OS-level checks.
+   */
+  private getEffectiveFocus(): boolean {
+    const termProgram = process.env['TERM_PROGRAM'];
+    const unsupportedTerminals = ['Apple_Terminal', 'WarpTerminal'];
+    const isUnsupportedTerminal =
+      termProgram && unsupportedTerminals.includes(termProgram);
+
+    let effectiveFocused: boolean;
+
+    // 1. Prioritize OS-level check as it's more reliable across terminals.
+    const osFocused = isTerminalAppFocused();
+
+    if (osFocused !== null) {
+      effectiveFocused = osFocused;
       debugLogger.debug(
-        `Notification check: isFocused=${this.isFocused}, isUnsupportedTerminal=${isUnsupportedTerminal}, effectiveFocused=${focused}`,
+        `Focus check (OS-level): focused=${effectiveFocused}, termProgram=${termProgram}`,
       );
+    } else {
+      // 2. Fallback to ANSI-based focus detection (from UI).
+      effectiveFocused = this.isFocused;
 
-      if (focused) {
-        debugLogger.debug('Notification suppressed (window is focused)');
-        return;
+      // 3. Safety check for known problematic terminals.
+      // If both checks fail (osFocused is null, and ANSI reports focus, which could be a false positive),
+      // we assume NOT focused for known problematic terminals to be safe.
+      if (effectiveFocused && isUnsupportedTerminal) {
+        effectiveFocused = false;
+        debugLogger.debug(
+          `Focus check (Fallback): Suppressing ANSI focus for unsupported terminal ${termProgram}`,
+        );
+      } else {
+        debugLogger.debug(
+          `Focus check (Fallback): focused=${effectiveFocused} (ANSI), termProgram=${termProgram}`,
+        );
       }
     }
 
-    const platform = process.platform;
-    const isMac = platform === 'darwin';
+    return effectiveFocused;
+  }
 
+  /**
+   * Prepares the options for node-notifier, applying defaults and platform-specific tweaks.
+   */
+  private prepareNotifierOptions(
+    options: NotificationOptions,
+  ): NotificationOptions {
     const notifierOptions: NotificationOptions = {
       title: options.title || 'Gemini CLI',
       message: options.message || 'Requires Permission to Execute Command',
@@ -99,7 +180,7 @@ export class NotificationService {
       force: !!options.force,
     };
 
-    if (isMac) {
+    if (process.platform === 'darwin') {
       const bundleId = process.env['__CFBundleIdentifier'];
 
       if (options.activate) {
@@ -109,18 +190,7 @@ export class NotificationService {
       }
     }
 
-    try {
-      notifier.notify(notifierOptions, (error, response, meta) => {
-        if (error) {
-          debugLogger.warn('Failed to send system notification', error);
-        }
-        debugLogger.debug('Notification callback', { response, meta });
-      });
-      this.sendTerminalNotification(options);
-      debugLogger.debug(`Notification sent: ${options.message}`);
-    } catch (error) {
-      debugLogger.warn('Failed to initiate notification', error);
-    }
+    return notifierOptions;
   }
 
   /**
@@ -128,6 +198,10 @@ export class NotificationService {
    * These are handled by the terminal emulator itself.
    */
   private sendTerminalNotification(options: NotificationOptions): void {
+    if (!process.stdout.isTTY) {
+      return;
+    }
+
     const termProgram = process.env['TERM_PROGRAM'];
     const term = process.env['TERM'];
 
@@ -149,18 +223,15 @@ export class NotificationService {
   }
 
   subscribeToBus(bus: MessageBus): void {
+    this.bus = bus;
     bus.subscribe(
       MessageBusType.TOOL_CONFIRMATION_REQUEST,
-      (message: ToolConfirmationRequest) => {
-        this.handleToolConfirmationRequest(message);
-      },
+      this.onToolConfirmationRequest,
     );
 
     bus.subscribe(
       MessageBusType.NOTIFICATION_REQUEST,
-      (message: NotificationRequest) => {
-        this.handleNotificationRequest(message);
-      },
+      this.onNotificationRequest,
     );
   }
 

@@ -14,25 +14,44 @@ import { debugLogger } from '../../utils/debugLogger.js';
  */
 export function isTerminalAppFocused(): boolean | null {
   const termProgram = process.env['TERM_PROGRAM'];
-  if (!termProgram) return null;
+  const term = process.env['TERM'];
+
+  if (!termProgram && !term) return null;
 
   let expectedApps: string[] = [];
-  switch (termProgram) {
-    case 'Apple_Terminal':
-      expectedApps = ['Terminal'];
-      break;
-    case 'iTerm.app':
-      expectedApps = ['iTerm2'];
-      break;
-    case 'vscode':
-      expectedApps = ['Code', 'Code - Insiders'];
-      break;
-    case 'WarpTerminal':
-      expectedApps = ['Warp'];
-      break;
-    default:
-      expectedApps = [termProgram];
-      break;
+
+  if (termProgram) {
+    switch (termProgram) {
+      case 'Apple_Terminal':
+        expectedApps = ['Terminal'];
+        break;
+      case 'iTerm.app':
+        expectedApps = ['iTerm2'];
+        break;
+      case 'vscode':
+        expectedApps = ['Code', 'Code - Insiders'];
+        break;
+      case 'WarpTerminal':
+        expectedApps = ['Warp'];
+        break;
+      case 'WezTerm':
+        expectedApps = ['wezterm', 'wezterm-gui'];
+        break;
+      case 'Hyper':
+        expectedApps = ['Hyper'];
+        break;
+      default:
+        expectedApps = [termProgram];
+        break;
+    }
+  } else if (term) {
+    if (term.includes('kitty')) {
+      expectedApps = ['kitty'];
+    } else if (term.includes('alacritty')) {
+      expectedApps = ['Alacritty'];
+    } else {
+      return null;
+    }
   }
 
   const platform = process.platform;
