@@ -6,11 +6,21 @@
 
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { HalfLinePaddedBox } from './HalfLinePaddedBox.js';
-import { Text } from 'ink';
+import { Text, useIsScreenReaderEnabled } from 'ink';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { isITerm2 } from '../../utils/terminalUtils.js';
 
+vi.mock('ink', async () => {
+  const actual = await vi.importActual('ink');
+  return {
+    ...actual,
+    useIsScreenReaderEnabled: vi.fn(() => false),
+  };
+});
+
 describe('<HalfLinePaddedBox />', () => {
+  const mockUseIsScreenReaderEnabled = vi.mocked(useIsScreenReaderEnabled);
+
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -52,6 +62,21 @@ describe('<HalfLinePaddedBox />', () => {
         backgroundOpacity={0.5}
         useBackgroundColor={false}
       >
+        <Text>Content</Text>
+      </HalfLinePaddedBox>,
+      { width: 10 },
+    );
+
+    expect(lastFrame()).toMatchSnapshot();
+
+    unmount();
+  });
+
+  it('renders nothing when screen reader is enabled', async () => {
+    mockUseIsScreenReaderEnabled.mockReturnValue(true);
+
+    const { lastFrame, unmount } = renderWithProviders(
+      <HalfLinePaddedBox backgroundBaseColor="blue" backgroundOpacity={0.5}>
         <Text>Content</Text>
       </HalfLinePaddedBox>,
       { width: 10 },
