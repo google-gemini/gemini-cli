@@ -165,16 +165,7 @@ export async function createManualCheckpoint<HistoryType>(
   geminiClient: GeminiClient,
   history?: HistoryType,
 ): Promise<{ fileName: string; content: string }> {
-  let commitHash: string | undefined;
-  try {
-    commitHash = await gitService.createFileSnapshot(`Checkpoint: ${name}`);
-  } catch (_error) {
-    commitHash = await gitService.getCurrentCommitHash();
-  }
-
-  if (!commitHash) {
-    throw new Error('Failed to create snapshot for checkpoint.');
-  }
+  const commitHash = await gitService.createFileSnapshot(`Checkpoint: ${name}`);
 
   const timestamp = new Date()
     .toISOString()
