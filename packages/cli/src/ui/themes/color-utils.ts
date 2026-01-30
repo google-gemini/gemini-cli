@@ -297,3 +297,30 @@ export function getThemeTypeFromBackgroundColor(
 
   return luminance > 128 ? 'light' : 'dark';
 }
+
+/**
+ * Parses an X11 RGB string (e.g. from OSC 11) into a hex color string.
+ * Supports 1-4 digit hex values per channel (e.g., F, FF, FFF, FFFF).
+ *
+ * @param rHex Red component as hex string
+ * @param gHex Green component as hex string
+ * @param bHex Blue component as hex string
+ * @returns Hex color string (e.g. #RRGGBB)
+ */
+export function parseX11Rgb(rHex: string, gHex: string, bHex: string): string {
+  const parseComponent = (hex: string) => {
+    const val = parseInt(hex, 16);
+    if (hex.length === 1) return (val / 15) * 255;
+    if (hex.length === 2) return val;
+    if (hex.length === 3) return (val / 4095) * 255;
+    if (hex.length === 4) return (val / 65535) * 255;
+    return val;
+  };
+
+  const r = parseComponent(rHex);
+  const g = parseComponent(gHex);
+  const b = parseComponent(bHex);
+
+  const toHex = (c: number) => Math.round(c).toString(16).padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
