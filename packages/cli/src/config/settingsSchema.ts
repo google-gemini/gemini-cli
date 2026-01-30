@@ -696,7 +696,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: undefined as string | undefined,
         description: 'The Gemini model to use for conversations.',
-        showInDialog: false,
+        showInDialog: true,
       },
       maxSessionTurns: {
         type: 'number',
