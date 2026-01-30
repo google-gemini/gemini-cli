@@ -10,6 +10,12 @@ import { theme } from '../semantic-colors.js';
 import stringWidth from 'string-width';
 import { debugLogger } from '@google/gemini-cli-core';
 
+// Regex constants defined at module level for performance (avoid recompilation)
+// Trailing characters to strip (common sentence-ending punctuation)
+// Excludes []{}>"' which can be valid parts of URLs
+const TRAILING_CHARS_REGEX = /[.,;:!?)）、。，；：！？‖‧…]/;
+const PARENS_REGEX = /[()（）]/g;
+
 /**
  * Removes trailing punctuation from URLs while preserving balanced parentheses.
  * Returns the cleaned URL and any stripped trailing punctuation.
@@ -24,12 +30,8 @@ export function stripTrailingPunctuation(url: string): {
   url: string;
   trailing: string;
 } {
-  // Trailing characters to strip (common sentence-ending punctuation)
-  // Excludes []{}>"' which can be valid parts of URLs
-  const trailingCharsRegex = /[.,;:!?)）、。，；：！？‖‧…]/;
-
   // Count parentheses once upfront to avoid O(N²) complexity
-  const allParens = url.match(/[()（）]/g) || [];
+  const allParens = url.match(PARENS_REGEX) || [];
   const openParens = allParens.filter((c) => c === '(' || c === '（').length;
   let closeParens = allParens.filter((c) => c === ')' || c === '）').length;
 
@@ -45,7 +47,7 @@ export function stripTrailingPunctuation(url: string): {
       closeParens--;
     }
 
-    if (trailingCharsRegex.test(lastChar)) {
+    if (TRAILING_CHARS_REGEX.test(lastChar)) {
       i--;
     } else {
       break;
