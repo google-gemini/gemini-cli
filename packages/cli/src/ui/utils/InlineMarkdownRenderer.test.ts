@@ -65,6 +65,20 @@ describe('stripTrailingPunctuation', () => {
       'https://en.wikipedia.org/wiki/Foo_(bar)',
       ')',
     ],
+    // Full-width parentheses (CJK)
+    [
+      'https://example.com/page（test）',
+      'https://example.com/page（test）',
+      '',
+    ],
+    // Unbalanced full-width parentheses
+    [
+      'https://example.com/page（test））',
+      'https://example.com/page（test）',
+      '）',
+    ],
+    // Mixed parentheses
+    ['https://example.com/page(test）', 'https://example.com/page(test）', ''],
     // URL with query params ending in punctuation
     ['https://example.com?q=test.', 'https://example.com?q=test', '.'],
   ])(
