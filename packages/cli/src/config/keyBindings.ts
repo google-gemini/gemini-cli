@@ -88,8 +88,7 @@ export enum Command {
   SUSPEND_APP = 'app.suspend',
 
   // Prompt Stashing
-  STASH_PROMPT = 'edit.stashPrompt',
-  POP_STASH = 'edit.popStash',
+  TOGGLE_STASH = 'edit.toggleStash',
 }
 
 /**
@@ -279,9 +278,8 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.RESTART_APP]: [{ key: 'r' }],
   [Command.SUSPEND_APP]: [{ key: 'z', ctrl: true }],
 
-  // Prompt Stashing - Ctrl+Q toggles (same key for stash/pop)
-  [Command.STASH_PROMPT]: [{ key: 'q', ctrl: true }],
-  [Command.POP_STASH]: [{ key: 'q', ctrl: true }],
+  // Prompt Stashing - Ctrl+Q toggles stash/restore
+  [Command.TOGGLE_STASH]: [{ key: 'q', ctrl: true }],
 };
 
 interface CommandCategory {
@@ -322,8 +320,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.DELETE_CHAR_RIGHT,
       Command.UNDO,
       Command.REDO,
-      Command.STASH_PROMPT,
-      Command.POP_STASH,
+      Command.TOGGLE_STASH,
     ],
   },
   {
@@ -487,6 +484,6 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.SUSPEND_APP]: 'Suspend the application (not yet implemented).',
 
   // Prompt Stashing
-  [Command.STASH_PROMPT]: 'Stash the current input to restore later.',
-  [Command.POP_STASH]: 'Restore the previously stashed input.',
+  [Command.TOGGLE_STASH]:
+    'Toggle stash: save current input or restore stashed input.',
 };

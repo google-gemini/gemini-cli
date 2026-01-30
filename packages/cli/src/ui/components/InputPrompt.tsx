@@ -521,35 +521,32 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
-      // Prompt stashing - Ctrl+Q to stash/pop (toggle)
-      if (keyMatchers[Command.STASH_PROMPT](key)) {
-        if (buffer.text.trim()) {
-          if (promptStash.stash(buffer.text)) {
-            buffer.setText('');
-            resetCompletionState();
-            return; // Only return if we actually stashed
-          }
-        }
-        // If no text to stash, fall through to pop handler
-      }
+      // Prompt stashing - Ctrl+Q to toggle stash/restore
+      if (keyMatchers[Command.TOGGLE_STASH](key)) {
+        const currentText = buffer.text.trim();
 
-      // Pop stash - Ctrl+Q to restore stashed input (same key toggles)
-      if (keyMatchers[Command.POP_STASH](key)) {
-        const stashed = promptStash.pop();
-        if (stashed) {
-          // If there's current input, swap it with the stash
-          const currentText = buffer.text.trim();
-          buffer.setText(stashed);
-          if (currentText) {
-            // Re-stash the current input so user can swap back
+        if (currentText) {
+          // Has text: stash it (or swap if stash exists)
+          if (promptStash.hasStash) {
+            // Swap current with stashed
+            const stashed = promptStash.pop();
             promptStash.stash(currentText);
-            // Notify user that content was swapped
+            buffer.setText(stashed!);
             setQueueErrorMessage(
-              '📌 Swapped with stash (press again to swap back)',
+              'Swapped with stash (press again to swap back)',
             );
+          } else {
+            // Stash current, clear input
+            promptStash.stash(currentText);
+            buffer.setText('');
           }
-          resetCompletionState();
+        } else if (promptStash.hasStash) {
+          // No text but stash exists: restore it
+          const stashed = promptStash.pop();
+          buffer.setText(stashed!);
         }
+
+        resetCompletionState();
         return;
       }
 
@@ -1256,7 +1253,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           borderLeft={!useBackgroundColor}
           borderRight={!useBackgroundColor}
         >
-          {promptStash.hasStash && <Text color={theme.status.warning}>📌</Text>}
+          {promptStash.hasStash && (
+            <Text color={theme.status.warning}>stashed </Text>
+          )}
           <Text
             color={statusColor ?? theme.text.accent}
             aria-label={statusText || undefined}

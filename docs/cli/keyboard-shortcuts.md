@@ -41,8 +41,7 @@ available combinations.
 | Delete the character to the right.               | `Delete`<br />`Ctrl + D`                                         |
 | Undo the most recent text edit.                  | `Cmd + Z (no Shift)`<br />`Alt + Z (no Shift)`                   |
 | Redo the most recent undone text edit.           | `Shift + Ctrl + Z`<br />`Shift + Cmd + Z`<br />`Shift + Alt + Z` |
-| Stash the current input to restore later.        | `Ctrl + Q`                                                       |
-| Restore the previously stashed input.            | `Ctrl + Q`                                                       |
+| Toggle stash: save current input or restore.     | `Ctrl + Q`                                                       |
 
 #### Scrolling
 
