@@ -338,6 +338,15 @@ export class LoadedSettings {
   }
 
   setValue(scope: LoadableSettingScope, key: string, value: unknown): void {
+    coreEvents.emitFeedback(
+      'warning',
+      'scope: ' +
+        scope +
+        ', key: ' +
+        key +
+        ', value: ' +
+        JSON.stringify(value, null, 2),
+    );
     const settingsFile = this.forScope(scope);
     setNestedProperty(settingsFile.settings, key, value);
     setNestedProperty(settingsFile.originalSettings, key, value);
@@ -675,7 +684,23 @@ export function migrateDeprecatedSettings(
 ): boolean {
   let anyModified = false;
   const processScope = (scope: LoadableSettingScope) => {
-    const settings = loadedSettings.forScope(scope).settings;
+    const settingsFile = loadedSettings.forScope(scope);
+
+    // If we don't have write access to the specific settings file, show the reason
+    // instead of showing every failure.
+    try {
+      if (fs.existsSync(settingsFile.path)) {
+        fs.accessSync(settingsFile.path, fs.constants.W_OK);
+      }
+    } catch (_e) {
+      coreEvents.emitFeedback(
+        'warning',
+        'You do not have permission to update: ' + settingsFile.path,
+      );
+      // return;
+    }
+
+    const settings = settingsFile.settings;
 
     // Migrate inverted boolean settings (disableX -> enableX)
     // These settings were renamed and their boolean logic inverted
