@@ -789,7 +789,12 @@ export class CoreToolScheduler {
     } else {
       // If the client provided new content, apply it and wait for
       // re-confirmation.
-      if (payload?.newContent && toolCall) {
+      if (
+        payload &&
+        'newContent' in payload &&
+        payload.newContent &&
+        toolCall
+      ) {
         const result = await this.toolModifier.applyInlineModify(
           toolCall as WaitingToolCall,
           payload,

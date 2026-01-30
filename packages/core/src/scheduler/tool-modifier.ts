@@ -70,6 +70,7 @@ export class ToolModificationHandler {
   ): Promise<ModificationResult | undefined> {
     if (
       toolCall.confirmationDetails.type !== 'edit' ||
+      !('newContent' in payload) ||
       !payload.newContent ||
       !isModifiableDeclarativeTool(toolCall.tool)
     ) {
