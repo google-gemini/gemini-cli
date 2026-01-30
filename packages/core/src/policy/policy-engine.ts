@@ -152,14 +152,28 @@ export class PolicyEngine {
     const subCommands = splitCommands(command);
 
     if (subCommands.length === 0) {
+      // If the matched rule says DENY, we should respect it immediately even if parsing fails.
+      if (ruleDecision === PolicyDecision.DENY) {
+        return { decision: PolicyDecision.DENY, rule };
+      }
+
+      // In YOLO mode, we should proceed anyway even if we can't parse the command.
+      if (this.approvalMode === ApprovalMode.YOLO) {
+        return {
+          decision: PolicyDecision.ALLOW,
+          rule,
+        };
+      }
+
       debugLogger.debug(
         `[PolicyEngine.check] Command parsing failed for: ${command}. Falling back to ASK_USER.`,
       );
+
       // Parsing logic failed, we can't trust it. Force ASK_USER (or DENY).
-      // We don't blame a specific rule here, unless the input rule was stricter.
+      // We return the rule that matched so the evaluation loop terminates.
       return {
         decision: this.applyNonInteractiveMode(PolicyDecision.ASK_USER),
-        rule: undefined,
+        rule,
       };
     }
 
