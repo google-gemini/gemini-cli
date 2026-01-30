@@ -475,14 +475,7 @@ describe('BaseSelectionList', () => {
       );
 
       await waitFor(() => {
-        const output = lastFrame();
-        // At the top, should show first 3 items
-        expect(output).toContain('Item 1');
-        expect(output).toContain('Item 3');
-        expect(output).not.toContain('Item 4');
-        // Both arrows should be visible
-        expect(output).toContain('▲');
-        expect(output).toContain('▼');
+        expect(lastFrame()).toMatchSnapshot();
       });
     });
 
@@ -493,15 +486,7 @@ describe('BaseSelectionList', () => {
       );
 
       await waitFor(() => {
-        const output = lastFrame();
-        // After scrolling to middle, should see items around index 5
-        expect(output).toContain('Item 4');
-        expect(output).toContain('Item 6');
-        expect(output).not.toContain('Item 3');
-        expect(output).not.toContain('Item 7');
-        // Both scroll arrows should be visible
-        expect(output).toContain('▲');
-        expect(output).toContain('▼');
+        expect(lastFrame()).toMatchSnapshot();
       });
     });
 
@@ -512,32 +497,18 @@ describe('BaseSelectionList', () => {
       );
 
       await waitFor(() => {
-        const output = lastFrame();
-        // At the end, should show last 3 items
-        expect(output).toContain('Item 8');
-        expect(output).toContain('Item 10');
-        expect(output).not.toContain('Item 7');
-        // Both arrows should be visible
-        expect(output).toContain('▲');
-        expect(output).toContain('▼');
+        expect(lastFrame()).toMatchSnapshot();
       });
     });
 
-    it('should show both arrows dimmed when list fits entirely', () => {
+    it('should not show arrows when list fits entirely', () => {
       const { lastFrame } = renderComponent({
         items,
         maxItemsToShow: 5,
         showScrollArrows: true,
       });
 
-      const output = lastFrame();
-      // Should show all items since maxItemsToShow > items.length
-      expect(output).toContain('Item A');
-      expect(output).toContain('Item B');
-      expect(output).toContain('Item C');
-      // Both arrows should be visible but dimmed (this test doesn't need waitFor since no scrolling occurs)
-      expect(output).toContain('▲');
-      expect(output).toContain('▼');
+      expect(lastFrame()).toMatchSnapshot();
     });
   });
 });

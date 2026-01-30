@@ -150,6 +150,10 @@ export async function resolveConfirmation(
     );
     outcome = response.outcome;
 
+    if ('onConfirm' in details && typeof details.onConfirm === 'function') {
+      await details.onConfirm(outcome, response.payload);
+    }
+
     if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
       await handleExternalModification(deps, toolCall, signal);
     } else if (response.payload?.newContent) {
