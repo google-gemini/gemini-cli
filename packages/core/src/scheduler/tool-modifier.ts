@@ -71,7 +71,6 @@ export class ToolModificationHandler {
     if (
       toolCall.confirmationDetails.type !== 'edit' ||
       !('newContent' in payload) ||
-      !payload.newContent ||
       !isModifiableDeclarativeTool(toolCall.tool)
     ) {
       return undefined;
