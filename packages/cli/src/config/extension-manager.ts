@@ -639,10 +639,7 @@ Would you like to attempt to install via "git clone" instead?`,
       };
 
       let hooks: { [K in HookEventName]?: HookDefinition[] } | undefined;
-      if (
-        this.settings.tools.enableHooks &&
-        this.settings.hooksConfig.enabled
-      ) {
+      if (this.settings.hooksConfig.enabled) {
         hooks = await this.loadExtensionHooks(
           effectiveExtensionPath,
           hydrationContext,
