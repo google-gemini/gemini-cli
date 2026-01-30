@@ -622,6 +622,7 @@ describe('extension tests', () => {
     });
 
     it('should not load github extensions if blockGitExtensions is set', async () => {
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       createExtension({
         extensionsDir: userExtensionsDir,
         name: 'my-ext',
@@ -645,6 +646,73 @@ describe('extension tests', () => {
       const extension = extensions.find((e) => e.name === 'my-ext');
 
       expect(extension).toBeUndefined();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'Extensions from remote sources is disallowed by your current settings.',
+        ),
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it('should load allowed extensions if the allowlist is set.', async () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'my-ext',
+        version: '1.0.0',
+        installMetadata: {
+          type: 'git',
+          source: 'http://allowed.com/foo/bar',
+        },
+      });
+      const extensionAllowlistSetting = createTestMergedSettings({
+        security: {
+          allowedExtensions: ['\\b(https?:\\/\\/)?(www\\.)?allowed\\.com\\S*'],
+        },
+      });
+      extensionManager = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        requestConsent: mockRequestConsent,
+        requestSetting: mockPromptForSettings,
+        settings: extensionAllowlistSetting,
+      });
+      const extensions = await extensionManager.loadExtensions();
+
+      expect(extensions).toHaveLength(1);
+      expect(extensions[0].name).toBe('my-ext');
+    });
+
+    it('should not load disallowed extensions if the allowlist is set.', async () => {
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'my-ext',
+        version: '1.0.0',
+        installMetadata: {
+          type: 'git',
+          source: 'http://notallowed.com/foo/bar',
+        },
+      });
+      const extensionAllowlistSetting = createTestMergedSettings({
+        security: {
+          allowedExtensions: ['\\b(https?:\\/\\/)?(www\\.)?allowed\\.com\\S*'],
+        },
+      });
+      extensionManager = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        requestConsent: mockRequestConsent,
+        requestSetting: mockPromptForSettings,
+        settings: extensionAllowlistSetting,
+      });
+      const extensions = await extensionManager.loadExtensions();
+      const extension = extensions.find((e) => e.name === 'my-ext');
+
+      expect(extension).toBeUndefined();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'This extension is not allowed by the "allowedExtensions" security setting',
+        ),
+      );
+      consoleSpy.mockRestore();
     });
 
     it('should not load any extensions if admin.extensions.enabled is false', async () => {
@@ -1113,6 +1181,30 @@ describe('extension tests', () => {
         }),
       ).rejects.toThrow(
         'Installing extensions from remote sources is disallowed by your current settings.',
+      );
+    });
+
+    it('should not install a disallowed extension if the allowlist is set', async () => {
+      const gitUrl = 'https://somehost.com/somerepo.git';
+      const allowedExtensionsSetting = createTestMergedSettings({
+        security: {
+          allowedExtensions: ['\\b(https?:\\/\\/)?(www\\.)?allowed\\.com\\S*'],
+        },
+      });
+      extensionManager = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        requestConsent: mockRequestConsent,
+        requestSetting: mockPromptForSettings,
+        settings: allowedExtensionsSetting,
+      });
+      await extensionManager.loadExtensions();
+      await expect(
+        extensionManager.installOrUpdateExtension({
+          source: gitUrl,
+          type: 'git',
+        }),
+      ).rejects.toThrow(
+        `Installing extension from source "${gitUrl}" is not allowed by the "allowedExtensions" security setting.`,
       );
     });
 
