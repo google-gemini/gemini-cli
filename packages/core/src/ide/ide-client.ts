@@ -692,7 +692,8 @@ export class IdeClient {
       } catch (error) {
         // Log fetch errors to help diagnose IDE connection issues
         logger.error(
-          `IDE fetch failed for ${url instanceof URL ? url.href : url}: ${error instanceof Error ? error.message : String(error)}`,
+          `IDE fetch failed for ${url instanceof URL ? url.href : url}`,
+          error,
         );
         throw error;
       }
