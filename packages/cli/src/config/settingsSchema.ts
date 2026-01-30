@@ -1268,6 +1268,17 @@ const SETTINGS_SCHEMA = {
         description: 'Blocks installing and loading extensions from Git.',
         showInDialog: true,
       },
+      allowedExtensions: {
+        type: 'array',
+        label: 'Extension Source Regex Allowlist',
+        category: 'Security',
+        requiresRestart: true,
+        default: [] as string[],
+        description:
+          'List of Regex patterns for allowed extensions. If nonempty, only extensions that match the patterns in this list are allowed. Overrides the blockGitExtensions setting.',
+        showInDialog: true,
+        items: { type: 'string' },
+      },
       folderTrust: {
         type: 'object',
         label: 'Folder Trust',
