@@ -81,6 +81,18 @@ vi.mock('@google/genai', async () => {
   };
 });
 
+// Mock tool-names to provide a consistent alias for testing
+vi.mock('./tool-names.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./tool-names.js')>();
+  return {
+    ...actual,
+    TOOL_LEGACY_ALIASES: {
+      ...actual.TOOL_LEGACY_ALIASES,
+      legacy_test_tool: 'current_test_tool',
+    },
+  };
+});
+
 // Helper to create a mock CallableTool for specific test needs
 const createMockCallableTool = (
   toolDeclarations: FunctionDeclaration[],
@@ -586,21 +598,8 @@ describe('ToolRegistry', () => {
     });
 
     it('should retrieve a tool using its legacy alias', async () => {
-      // Import the aliases mapping to find a valid test case
-      const { TOOL_LEGACY_ALIASES } = await import('./tool-names.js');
-      const legacyNames = Object.keys(TOOL_LEGACY_ALIASES);
-
-      if (legacyNames.length === 0) {
-        // If no aliases are defined in the real file yet, we skip or mock.
-        // For testing, let's assume we want to verify the logic.
-        // Since we can't easily mock the constant in the imported file for this test
-        // without more complex setup, let's verify if there is at least one.
-        // Actually, I just added 'legacy_read' in my previous turns, but I removed it.
-        return;
-      }
-
-      const legacyName = legacyNames[0];
-      const currentName = TOOL_LEGACY_ALIASES[legacyName];
+      const legacyName = 'legacy_test_tool';
+      const currentName = 'current_test_tool';
 
       const mockTool = new MockTool({
         name: currentName,

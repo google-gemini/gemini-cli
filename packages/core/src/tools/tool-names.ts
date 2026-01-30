@@ -31,8 +31,8 @@ export const ASK_USER_DISPLAY_NAME = 'Ask User';
  * This ensures backward compatibility for user-defined policies, skills, and hooks.
  */
 export const TOOL_LEGACY_ALIASES: Record<string, string> = {
-  // Aliases for backward compatibility
-  legacy_read: READ_FILE_TOOL_NAME,
+  // Add future renames here, e.g.:
+  // 'search_file_content': GREP_TOOL_NAME,
 };
 
 /** Prefix used for tools discovered via the tool DiscoveryCommand. */

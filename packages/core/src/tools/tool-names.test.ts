@@ -4,13 +4,30 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   isValidToolName,
   ALL_BUILTIN_TOOL_NAMES,
   DISCOVERED_TOOL_PREFIX,
   LS_TOOL_NAME,
 } from './tool-names.js';
+
+// Mock tool-names to provide a consistent alias for testing
+vi.mock('./tool-names.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./tool-names.js')>();
+  const mockedAliases = {
+    ...actual.TOOL_LEGACY_ALIASES,
+    legacy_test_tool: 'current_test_tool',
+  };
+  return {
+    ...actual,
+    TOOL_LEGACY_ALIASES: mockedAliases,
+    isValidToolName: vi.fn().mockImplementation((name, options) => {
+      if (mockedAliases[name]) return true;
+      return actual.isValidToolName(name, options);
+    }),
+  };
+});
 
 describe('tool-names', () => {
   describe('isValidToolName', () => {

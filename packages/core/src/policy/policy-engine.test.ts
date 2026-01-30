@@ -43,6 +43,19 @@ vi.mock('../utils/shell-utils.js', async (importOriginal) => {
   };
 });
 
+// Mock tool-names to provide a consistent alias for testing
+vi.mock('../tools/tool-names.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../tools/tool-names.js')>();
+  return {
+    ...actual,
+    TOOL_LEGACY_ALIASES: {
+      ...actual.TOOL_LEGACY_ALIASES,
+      legacy_test_tool: 'current_test_tool',
+    },
+  };
+});
+
 describe('PolicyEngine', () => {
   let engine: PolicyEngine;
   let mockCheckerRunner: CheckerRunner;
@@ -188,16 +201,8 @@ describe('PolicyEngine', () => {
     });
 
     it('should match current tool call against legacy tool name rules', async () => {
-      const { TOOL_LEGACY_ALIASES } = await import('../tools/tool-names.js');
-      const legacyNames = Object.keys(TOOL_LEGACY_ALIASES);
-
-      if (legacyNames.length === 0) {
-        // If no aliases are defined, we skip.
-        return;
-      }
-
-      const legacyName = legacyNames[0];
-      const currentName = TOOL_LEGACY_ALIASES[legacyName];
+      const legacyName = 'legacy_test_tool';
+      const currentName = 'current_test_tool';
 
       const rules: PolicyRule[] = [
         { toolName: legacyName, decision: PolicyDecision.DENY },
@@ -211,15 +216,8 @@ describe('PolicyEngine', () => {
     });
 
     it('should match legacy tool call against current tool name rules (for skills support)', async () => {
-      const { TOOL_LEGACY_ALIASES } = await import('../tools/tool-names.js');
-      const legacyNames = Object.keys(TOOL_LEGACY_ALIASES);
-
-      if (legacyNames.length === 0) {
-        return;
-      }
-
-      const legacyName = legacyNames[0];
-      const currentName = TOOL_LEGACY_ALIASES[legacyName];
+      const legacyName = 'legacy_test_tool';
+      const currentName = 'current_test_tool';
 
       const rules: PolicyRule[] = [
         { toolName: currentName, decision: PolicyDecision.ALLOW },
