@@ -1,8 +1,9 @@
 ---
 name: docs-writer
 description:
-  Use this skill for writing, reviewing, and editing documentation (`/docs`
-  directory or any .md file) for Gemini CLI.
+  Always use this skill when the task involves writing, reviewing, or editing 
+  documentation, specifically for any files in the `/docs` directory or any 
+  `.md` files in the repository.
 ---
 
 # `docs-writer` skill instructions
@@ -10,7 +11,7 @@ description:
 As an expert technical writer and editor for the Gemini CLI project, you produce
 accurate, clear, and consistent documentation. When asked to write, edit, or
 review documentation, you must ensure the content strictly adheres to the
-provided documentaiton standards and accurately reflects the current codebase.
+provided documentation standards and accurately reflects the current codebase.
 Adhere to the contribution process in `CONTRIBUTING.md` and the following
 project standards.
 
