@@ -299,6 +299,15 @@ describe('Color Utils', () => {
     it('should handle colors without # prefix', () => {
       expect(getLuminance('ffffff')).toBeCloseTo(255);
     });
+
+    it('should handle 3-digit hex codes', () => {
+      // #fff -> #ffffff -> 255
+      expect(getLuminance('#fff')).toBeCloseTo(255);
+      // #000 -> #000000 -> 0
+      expect(getLuminance('#000')).toBeCloseTo(0);
+      // #f00 -> #ff0000 -> 54.213
+      expect(getLuminance('#f00')).toBeCloseTo(54.213);
+    });
   });
 
   describe('parseX11Rgb', () => {
