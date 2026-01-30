@@ -7,7 +7,7 @@
 import { renderHook } from '../../test-utils/render.js';
 import { useTerminalTheme } from './useTerminalTheme.js';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { makeFakeConfig } from '@google/gemini-cli-core';
+import { makeFakeConfig, type Config } from '@google/gemini-cli-core';
 import os from 'node:os';
 
 // Mocks
@@ -18,12 +18,12 @@ const mockHandleThemeSelect = vi.fn();
 const mockSetTerminalBackground = vi.fn();
 
 vi.mock('ink', async () => ({
-    useStdout: () => ({
-      stdout: {
-        write: mockWrite,
-      },
-    }),
-  }));
+  useStdout: () => ({
+    stdout: {
+      write: mockWrite,
+    },
+  }),
+}));
 
 vi.mock('../contexts/TerminalContext.js', () => ({
   useTerminalContext: () => ({
