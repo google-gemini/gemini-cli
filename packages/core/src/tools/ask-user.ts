@@ -180,7 +180,7 @@ export class AskUserInvocation extends BaseToolInvocation<
         payload?: ToolConfirmationPayload,
       ) => {
         this.confirmationOutcome = outcome;
-        if (payload?.answers) {
+        if (payload && 'answers' in payload) {
           this.userAnswers = payload.answers;
         }
       },

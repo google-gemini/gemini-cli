@@ -13,6 +13,7 @@ import {
   type SerializableConfirmationDetails,
   type ToolCallConfirmationDetails,
   type Config,
+  type ToolConfirmationPayload,
   ToolConfirmationOutcome,
   hasRedirection,
   debugLogger,
@@ -65,10 +66,7 @@ export const ToolConfirmationMessage: React.FC<
   const isTrustedFolder = config.isTrustedFolder();
 
   const handleConfirm = useCallback(
-    (
-      outcome: ToolConfirmationOutcome,
-      payload?: { answers?: { [questionIndex: string]: string } },
-    ) => {
+    (outcome: ToolConfirmationOutcome, payload?: ToolConfirmationPayload) => {
       void confirm(callId, outcome, payload).catch((error: unknown) => {
         debugLogger.error(
           `Failed to handle tool confirmation for ${callId}:`,
