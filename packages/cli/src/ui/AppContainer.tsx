@@ -837,6 +837,21 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const { toggleVimEnabled } = useVimMode();
 
+  // Shared relaunch logic for newSession and handleRestart
+  const performRelaunch = useCallback(async () => {
+    if (process.send) {
+      const remoteSettings = config.getRemoteAdminSettings();
+      if (remoteSettings) {
+        process.send({
+          type: 'admin-settings-update',
+          settings: remoteSettings,
+        });
+      }
+    }
+    await runExitCleanup();
+    process.exit(RELAUNCH_EXIT_CODE);
+  }, [config]);
+
   const slashCommandActions = useMemo(
     () => ({
       openAuthDialog: () => setAuthState(AuthState.Updating),
@@ -854,6 +869,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
           await runExitCleanup();
           process.exit(0);
         }, 100);
+      },
+      newSession: (messages: HistoryItem[]) => {
+        setQuittingMessages(messages);
+        setTimeout(performRelaunch, 100);
       },
       setDebugMessage,
       toggleCorgiMode: () => setCorgiMode((prev) => !prev),
@@ -879,6 +898,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       addConfirmUpdateExtensionRequest,
       toggleDebugProfiler,
       buffer,
+      performRelaunch,
     ],
   );
 
@@ -2038,19 +2058,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setBannerVisible,
       setEmbeddedShellFocused,
       setAuthContext,
-      handleRestart: async () => {
-        if (process.send) {
-          const remoteSettings = config.getRemoteAdminSettings();
-          if (remoteSettings) {
-            process.send({
-              type: 'admin-settings-update',
-              settings: remoteSettings,
-            });
-          }
-        }
-        await runExitCleanup();
-        process.exit(RELAUNCH_EXIT_CODE);
-      },
+      handleRestart: performRelaunch,
       handleNewAgentsSelect: async (choice: NewAgentsChoice) => {
         if (newAgents && choice === NewAgentsChoice.ACKNOWLEDGE) {
           const registry = config.getAgentRegistry();
@@ -2113,6 +2121,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       newAgents,
       config,
       historyManager,
+      performRelaunch,
     ],
   );
 

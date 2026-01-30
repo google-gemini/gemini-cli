@@ -208,6 +208,7 @@ describe('useSlashCommandProcessor', () => {
             openAgentConfigDialog,
             openPermissionsDialog: vi.fn(),
             quit: mockSetQuittingMessages,
+            newSession: vi.fn(),
             setDebugMessage: vi.fn(),
             toggleCorgiMode: vi.fn(),
             toggleDebugProfiler: vi.fn(),

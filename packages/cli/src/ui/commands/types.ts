@@ -158,6 +158,15 @@ export interface LogoutActionReturn {
   type: 'logout';
 }
 
+/**
+ * The return type for a command action that starts a new session,
+ * saving the current session for later resume.
+ */
+export interface NewSessionActionReturn {
+  type: 'new_session';
+  messages: HistoryItem[];
+}
+
 export type SlashCommandActionReturn =
   | CommandActionReturn<HistoryItemWithoutId[]>
   | QuitActionReturn
@@ -165,7 +174,8 @@ export type SlashCommandActionReturn =
   | ConfirmShellCommandsActionReturn
   | ConfirmActionReturn
   | OpenCustomDialogActionReturn
-  | LogoutActionReturn;
+  | LogoutActionReturn
+  | NewSessionActionReturn;
 
 export enum CommandKind {
   BUILT_IN = 'built-in',
