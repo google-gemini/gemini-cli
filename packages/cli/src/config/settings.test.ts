@@ -1707,15 +1707,20 @@ describe('Settings Loading and Merging', () => {
       isWorkspaceTrustedValue = true as boolean | undefined,
     }) {
       delete process.env['TESTTEST']; // reset
-      const geminiEnvPath = path.join(MOCK_WORKSPACE_DIR, GEMINI_DIR, '.env');
+      const geminiEnvPath = path.resolve(
+        path.join(MOCK_WORKSPACE_DIR, GEMINI_DIR, '.env'),
+      );
 
       vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
         isTrusted: isWorkspaceTrustedValue,
         source: 'file',
       });
-      (mockFsExistsSync as Mock).mockImplementation((p: fs.PathLike) =>
-        [USER_SETTINGS_PATH, geminiEnvPath].includes(p.toString()),
-      );
+      (mockFsExistsSync as Mock).mockImplementation((p: fs.PathLike) => {
+        const normalizedP = path.resolve(p.toString());
+        return [path.resolve(USER_SETTINGS_PATH), geminiEnvPath].includes(
+          normalizedP,
+        );
+      });
       const userSettingsContent: Settings = {
         ui: {
           theme: 'dark',
@@ -1731,9 +1736,10 @@ describe('Settings Loading and Merging', () => {
       };
       (fs.readFileSync as Mock).mockImplementation(
         (p: fs.PathOrFileDescriptor) => {
-          if (p === USER_SETTINGS_PATH)
+          const normalizedP = path.resolve(p.toString());
+          if (normalizedP === path.resolve(USER_SETTINGS_PATH))
             return JSON.stringify(userSettingsContent);
-          if (p === geminiEnvPath) return 'TESTTEST=1234';
+          if (normalizedP === geminiEnvPath) return 'TESTTEST=1234';
           return '{}';
         },
       );
