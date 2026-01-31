@@ -28,7 +28,7 @@ const buildShortcutRows = (): ShortcutItem[][] => {
         key: 'Shift+Tab',
         description: 'cycle mode',
       },
-      { key: 'Ctrl+G', description: 'IDE context details' },
+      { key: 'Ctrl+V', description: 'paste images' },
     ],
     [
       { key: '@', description: 'select file or folder' },
