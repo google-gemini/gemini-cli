@@ -2930,6 +2930,13 @@ export function useTextBuffer({
         move('end');
         return true;
       }
+      if (keyMatchers[Command.CLEAR_INPUT](key)) {
+        if (text.length > 0) {
+          setText('');
+          return true;
+        }
+        return false;
+      }
       if (keyMatchers[Command.DELETE_WORD_BACKWARD](key)) {
         deleteWordLeft();
         return true;
@@ -2943,6 +2950,13 @@ export function useTextBuffer({
         return true;
       }
       if (keyMatchers[Command.DELETE_CHAR_RIGHT](key)) {
+        const lastLineIdx = lines.length - 1;
+        if (
+          cursorRow === lastLineIdx &&
+          cursorCol === cpLen(lines[lastLineIdx] ?? '')
+        ) {
+          return false;
+        }
         del();
         return true;
       }
@@ -2974,6 +2988,8 @@ export function useTextBuffer({
       cursorCol,
       lines,
       singleLine,
+      setText,
+      text,
     ],
   );
 
