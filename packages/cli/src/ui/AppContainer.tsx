@@ -532,6 +532,14 @@ export const AppContainer = (props: AppContainerProps) => {
     shellModeActive,
     getPreferredEditor,
   });
+  const bufferRef = useRef(buffer);
+  useEffect(() => {
+    bufferRef.current = buffer;
+  }, [buffer]);
+
+  const stableSetText = useCallback((text: string) => {
+    bufferRef.current.setText(text);
+  }, []);
 
   // Initialize input history from logger (past sessions)
   useEffect(() => {
@@ -826,7 +834,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
           }
         }
       },
-      setText: (text: string) => buffer.setText(text),
+      setText: stableSetText,
     }),
     [
       setAuthState,
@@ -844,7 +852,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       openPermissionsDialog,
       addConfirmUpdateExtensionRequest,
       toggleDebugProfiler,
-      buffer,
+      stableSetText,
     ],
   );
 
@@ -1405,7 +1413,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     if (ctrlCPressCount > 1) {
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
       handleSlashCommand('/quit', undefined, undefined, false);
-    } else {
+    } else if (ctrlCPressCount > 0) {
       ctrlCTimerRef.current = setTimeout(() => {
         setCtrlCPressCount(0);
         ctrlCTimerRef.current = null;
@@ -1424,7 +1432,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     if (ctrlDPressCount > 1) {
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
       handleSlashCommand('/quit', undefined, undefined, false);
-    } else {
+    } else if (ctrlDPressCount > 0) {
       ctrlDTimerRef.current = setTimeout(() => {
         setCtrlDPressCount(0);
         ctrlDTimerRef.current = null;
@@ -1465,7 +1473,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   });
 
   const handleGlobalKeypress = useCallback(
-    (key: Key) => {
+    (key: Key): boolean => {
       if (copyModeEnabled) {
         setCopyModeEnabled(false);
         enableMouseEvents();
@@ -1492,9 +1500,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setCtrlCPressCount((prev) => prev + 1);
         return true;
       } else if (keyMatchers[Command.EXIT](key)) {
-        if (buffer.text.length > 0) {
-          return false;
-        }
         setCtrlDPressCount((prev) => prev + 1);
         return true;
       }
@@ -1538,9 +1543,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return true;
       } else if (
         keyMatchers[Command.FOCUS_SHELL_INPUT](key) &&
-        (activePtyId ||
-          (isBackgroundShellVisible && backgroundShells.size > 0)) &&
-        buffer.text.length === 0
+        (activePtyId || (isBackgroundShellVisible && backgroundShells.size > 0))
       ) {
         if (key.name === 'tab' && key.shift) {
           // Always change focus
@@ -1625,7 +1628,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       config,
       ideContextState,
       setCtrlCPressCount,
-      buffer.text.length,
       setCtrlDPressCount,
       handleSlashCommand,
       cancelOngoingRequest,
@@ -1647,7 +1649,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     ],
   );
 
-  useKeypress(handleGlobalKeypress, { isActive: true, priority: true });
+  useKeypress(handleGlobalKeypress, { isActive: true });
 
   useEffect(() => {
     // Respect hideWindowTitle settings
