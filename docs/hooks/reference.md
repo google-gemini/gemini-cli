@@ -70,7 +70,7 @@ Most hooks support these fields in their `stdout` JSON:
 | `continue`       | `boolean` | If `false`, stops the entire agent loop immediately.                                                                                                                         |
 | `stopReason`     | `string`  | Displayed to the user when `continue` is `false`.                                                                                                                            |
 | `decision`       | `string`  | `"allow"`, `"deny"` (alias `"block"`), or `"ask_user"`. For `"ask_user"`, the CLI prompts the user for confirmation before proceeding. Specific impact depends on the event. |
-| `reason`         | `string`  | The feedback/error message for a `"deny"` decision, or the explanation for an `"ask_user"` prompt.                                                                           |
+| `reason`         | `string`  | he feedback/error message for a `"deny"` decision, or the explanation for an `"ask_user"` prompt.                                                                            |
 
 ---
 
