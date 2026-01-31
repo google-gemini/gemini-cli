@@ -17,6 +17,7 @@ import * as fileUtils from '../utils/fileUtils.js';
 import * as coreToolHookTriggers from '../core/coreToolHookTriggers.js';
 import { ShellToolInvocation } from '../tools/shell.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import { initMockProjectRegistry } from 'src/test-utils/mockProjectRegistry.js';
 
 // Mock file utils
 vi.mock('../utils/fileUtils.js', () => ({
@@ -49,6 +50,7 @@ describe('ToolExecutor', () => {
     vi.mocked(fileUtils.formatTruncatedToolOutput).mockReturnValue(
       'TruncatedContent...',
     );
+    initMockProjectRegistry();
   });
 
   afterEach(() => {
