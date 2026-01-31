@@ -63,14 +63,22 @@ All hooks receive these common fields via `stdin`:
 
 Most hooks support these fields in their `stdout` JSON:
 
-| Field            | Type      | Description                                                                                                                                                                  |
-| :--------------- | :-------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `systemMessage`  | `string`  | Displayed immediately to the user in the terminal.                                                                                                                           |
-| `suppressOutput` | `boolean` | If `true`, hides internal hook metadata from logs/telemetry.                                                                                                                 |
-| `continue`       | `boolean` | If `false`, stops the entire agent loop immediately.                                                                                                                         |
-| `stopReason`     | `string`  | Displayed to the user when `continue` is `false`.                                                                                                                            |
-| `decision`       | `string`  | `"allow"`, `"deny"` (alias `"block"`), or `"ask_user"`. For `"ask_user"`, the CLI prompts the user for confirmation before proceeding. Specific impact depends on the event. |
-| `reason`         | `string`  | he feedback/error message for a `"deny"` decision, or the explanation for an `"ask_user"` prompt.                                                                            |
+| Field            | Type      | Description                                          |
+| :--------------- | :-------- | :--------------------------------------------------- |
+| `systemMessage`  | `string`  | Displayed immediately to the user in the terminal.   |
+| `suppressOutput` | `boolean` | If `true`, hides hook metadata from logs/telemetry.  |
+| `continue`       | `boolean` | If `false`, stops the agent loop immediately.        |
+| `stopReason`     | `string`  | Displayed to the user when `continue` is `false`.    |
+| `decision`       | `string`  | `"allow"`, `"deny"` (or `"block"`), or `"ask_user"`. |
+| `reason`         | `string`  | Explanation for `"deny"` or `"ask_user"` decisions.  |
+
+### Decision behavior
+
+- **`"allow"`**: Permits the action to proceed.
+- **`"deny"` / `"block"`**: Blocks the action. The `reason` is sent to the model
+  as an error.
+- **`"ask_user"`**: Prompts the user for confirmation before proceeding. The
+  `reason` explains why confirmation is needed.
 
 ---
 
