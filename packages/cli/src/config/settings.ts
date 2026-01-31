@@ -469,7 +469,7 @@ export function loadEnvironment(
           }
 
           // Load variable only if it's not already set in the environment or if it's an empty string.
-          if (!process.env[key]) {
+          if (!Object.hasOwn(process.env, key)) {
             process.env[key] = parsedEnv[key];
           }
         }
