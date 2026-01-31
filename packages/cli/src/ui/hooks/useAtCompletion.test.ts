@@ -55,6 +55,7 @@ describe('useAtCompletion', () => {
       getResourceRegistry: vi.fn().mockReturnValue({
         getAllResources: () => [],
       }),
+      getWorkspaceContext: () => undefined,
     } as unknown as Config;
     vi.clearAllMocks();
   });
