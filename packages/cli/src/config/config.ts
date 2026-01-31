@@ -184,7 +184,8 @@ export async function parseArguments(
         .option('schema-file', {
           type: 'string',
           string: true,
-          description: 'A user defined JSON schema file location.',
+          description:
+            'Path to a JSON schema file for structured output. Implies --output-format json. Tools are disabled by default.',
           coerce: (filePath: string) => {
             if (!fs.existsSync(filePath)) {
               throw new Error(`Schema file not found: ${filePath}`);
@@ -205,19 +206,17 @@ export async function parseArguments(
 
             if (!schema.type && !schema.properties) {
               throw new Error(
-                'Invalid JSON schema: must have name "type" or "properties"',
+                'Invalid JSON schema: must have "type" or "properties"',
               );
             }
 
-            if (Object.keys(schema).length === 0) {
-              throw new Error('JSON Schema must not be empty');
-            }
             return schema;
           },
         })
         .option('enable-tools', {
           type: 'boolean',
-          description: 'Enable tool usage when specifying a custom JSON schema',
+          description:
+            'Re-enable tool usage when using --schema-file (tools are disabled by default with schemas)',
         })
         .option('extensions', {
           alias: 'e',
@@ -835,7 +834,10 @@ export async function loadCliConfig(
     eventEmitter: coreEvents,
     useWriteTodos: argv.useWriteTodos ?? settings.useWriteTodos,
     output: {
-      format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
+      // --schema-file implies --output-format json
+      format: (argv.schemaFile
+        ? 'json'
+        : (argv.outputFormat ?? settings.output?.format)) as OutputFormat,
     },
     fakeResponses: argv.fakeResponses,
     recordResponses: argv.recordResponses,

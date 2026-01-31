@@ -4,7 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  beforeAll,
+  afterAll,
+} from 'vitest';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import {
@@ -3061,5 +3070,531 @@ describe('loadCliConfig mcpEnabled', () => {
     expect(config.getMcpServers()).toEqual({ serverA: { url: 'http://a' } });
     expect(config.getAllowedMcpServers()).toEqual(['serverA']);
     expect(config.getBlockedMcpServers()).toEqual(['serverB']);
+  });
+});
+
+describe('--schema-file flag', () => {
+  const originalArgv = process.argv;
+  // Use the real fs module (not mocked) for creating temp files
+  let actualFs: typeof import('fs');
+  let tmpDir: string;
+
+  // Helper to create real temp files for testing
+  const createTempFile = (filename: string, content: string): string => {
+    const filePath = path.join(tmpDir, filename);
+    actualFs.writeFileSync(filePath, content, 'utf-8');
+    return filePath;
+  };
+
+  beforeAll(async () => {
+    actualFs = await vi.importActual<typeof import('fs')>('fs');
+    tmpDir = actualFs.mkdtempSync(path.join(os.tmpdir(), 'schema-test-'));
+  });
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+  });
+
+  afterAll(() => {
+    // Clean up temp directory
+    actualFs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('should parse a valid schema file', async () => {
+    const validSchema = {
+      type: 'object',
+      properties: { answer: { type: 'string' } },
+    };
+    const schemaPath = createTempFile(
+      'valid-schema.json',
+      JSON.stringify(validSchema),
+    );
+
+    process.argv = [
+      'node',
+      'script.js',
+      '--schema-file',
+      schemaPath,
+      '-p',
+      'test',
+    ];
+    const argv = await parseArguments(createTestMergedSettings());
+
+    expect(argv.schemaFile).toEqual(validSchema);
+  });
+
+  it('should error when schema file is not found', async () => {
+    const missingPath = path.join(tmpDir, 'does-not-exist.json');
+
+    process.argv = [
+      'node',
+      'script.js',
+      '--schema-file',
+      missingPath,
+      '-p',
+      'test',
+    ];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const debugErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
+
+    await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+      'process.exit called',
+    );
+    expect(debugErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Schema file not found'),
+    );
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
+    debugErrorSpy.mockRestore();
+  });
+
+  it('should error when schema file contains invalid JSON', async () => {
+    const schemaPath = createTempFile('invalid.json', 'not valid json {{{');
+
+    process.argv = [
+      'node',
+      'script.js',
+      '--schema-file',
+      schemaPath,
+      '-p',
+      'test',
+    ];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const debugErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
+
+    await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+      'process.exit called',
+    );
+    expect(debugErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Invalid JSON in schema file'),
+    );
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
+    debugErrorSpy.mockRestore();
+  });
+
+  it('should error when schema is missing type and properties', async () => {
+    const invalidSchema = { description: 'no type or properties' };
+    const schemaPath = createTempFile(
+      'no-type.json',
+      JSON.stringify(invalidSchema),
+    );
+
+    process.argv = [
+      'node',
+      'script.js',
+      '--schema-file',
+      schemaPath,
+      '-p',
+      'test',
+    ];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const debugErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
+
+    await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+      'process.exit called',
+    );
+    expect(debugErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Invalid JSON schema: must have "type" or "properties"',
+      ),
+    );
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
+    debugErrorSpy.mockRestore();
+  });
+
+  it('should error when --schema-file is used with --output-format text', async () => {
+    const validSchema = {
+      type: 'object',
+      properties: { answer: { type: 'string' } },
+    };
+    const schemaPath = createTempFile(
+      'schema-text-conflict.json',
+      JSON.stringify(validSchema),
+    );
+
+    process.argv = [
+      'node',
+      'script.js',
+      '--schema-file',
+      schemaPath,
+      '--output-format',
+      'text',
+      '-p',
+      'test',
+    ];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const debugErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
+
+    await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+      'process.exit called',
+    );
+    expect(debugErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Cannot use --schema-file with --output-format text or stream-json',
+      ),
+    );
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
+    debugErrorSpy.mockRestore();
+  });
+
+  it('should error when --schema-file is used with --output-format stream-json', async () => {
+    const validSchema = {
+      type: 'object',
+      properties: { answer: { type: 'string' } },
+    };
+    const schemaPath = createTempFile(
+      'schema-stream-conflict.json',
+      JSON.stringify(validSchema),
+    );
+
+    process.argv = [
+      'node',
+      'script.js',
+      '--schema-file',
+      schemaPath,
+      '--output-format',
+      'stream-json',
+      '-p',
+      'test',
+    ];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const debugErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
+
+    await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+      'process.exit called',
+    );
+    expect(debugErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Cannot use --schema-file with --output-format text or stream-json',
+      ),
+    );
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
+    debugErrorSpy.mockRestore();
+  });
+
+  it('should error when --enable-tools is used without --schema-file', async () => {
+    process.argv = ['node', 'script.js', '--enable-tools', '-p', 'test'];
+
+    const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+    const mockConsoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const debugErrorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
+
+    await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+      'process.exit called',
+    );
+    expect(debugErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('--enable-tools requires --schema-file'),
+    );
+
+    mockExit.mockRestore();
+    mockConsoleError.mockRestore();
+    debugErrorSpy.mockRestore();
+  });
+
+  it('should accept --enable-tools with --schema-file', async () => {
+    const validSchema = {
+      type: 'object',
+      properties: { answer: { type: 'string' } },
+    };
+    const schemaPath = createTempFile(
+      'schema-with-tools.json',
+      JSON.stringify(validSchema),
+    );
+
+    process.argv = [
+      'node',
+      'script.js',
+      '--schema-file',
+      schemaPath,
+      '--enable-tools',
+      '-p',
+      'test',
+    ];
+    const argv = await parseArguments(createTestMergedSettings());
+
+    expect(argv.schemaFile).toEqual(validSchema);
+    expect(argv.enableTools).toBe(true);
+  });
+
+  it('should accept schema with only type field', async () => {
+    const schemaWithTypeOnly = { type: 'string' };
+    const schemaPath = createTempFile(
+      'type-only.json',
+      JSON.stringify(schemaWithTypeOnly),
+    );
+
+    process.argv = [
+      'node',
+      'script.js',
+      '--schema-file',
+      schemaPath,
+      '-p',
+      'test',
+    ];
+    const argv = await parseArguments(createTestMergedSettings());
+
+    expect(argv.schemaFile).toEqual(schemaWithTypeOnly);
+  });
+
+  it('should accept schema with only properties field', async () => {
+    const schemaWithPropsOnly = { properties: { name: { type: 'string' } } };
+    const schemaPath = createTempFile(
+      'props-only.json',
+      JSON.stringify(schemaWithPropsOnly),
+    );
+
+    process.argv = [
+      'node',
+      'script.js',
+      '--schema-file',
+      schemaPath,
+      '-p',
+      'test',
+    ];
+    const argv = await parseArguments(createTestMergedSettings());
+
+    expect(argv.schemaFile).toEqual(schemaWithPropsOnly);
+  });
+
+  it('should work with --schema-file and --output-format json', async () => {
+    const validSchema = {
+      type: 'object',
+      properties: { result: { type: 'number' } },
+    };
+    const schemaPath = createTempFile(
+      'schema-json-format.json',
+      JSON.stringify(validSchema),
+    );
+
+    process.argv = [
+      'node',
+      'script.js',
+      '--schema-file',
+      schemaPath,
+      '--output-format',
+      'json',
+      '-p',
+      'test',
+    ];
+    const argv = await parseArguments(createTestMergedSettings());
+
+    expect(argv.schemaFile).toEqual(validSchema);
+    expect(argv.outputFormat).toBe('json');
+  });
+
+  it('should set enableTools to undefined when not provided', async () => {
+    const validSchema = {
+      type: 'object',
+      properties: { answer: { type: 'string' } },
+    };
+    const schemaPath = createTempFile(
+      'schema-no-tools.json',
+      JSON.stringify(validSchema),
+    );
+
+    process.argv = [
+      'node',
+      'script.js',
+      '--schema-file',
+      schemaPath,
+      '-p',
+      'test',
+    ];
+    const argv = await parseArguments(createTestMergedSettings());
+
+    expect(argv.schemaFile).toEqual(validSchema);
+    expect(argv.enableTools).toBeUndefined();
+  });
+});
+
+describe('--schema-file with loadCliConfig', () => {
+  const originalArgv = process.argv;
+  // Use the real fs module (not mocked) for creating temp files
+  let actualFs: typeof import('fs');
+  let tmpDir: string;
+
+  const createTempFile = (filename: string, content: string): string => {
+    const filePath = path.join(tmpDir, filename);
+    actualFs.writeFileSync(filePath, content, 'utf-8');
+    return filePath;
+  };
+
+  beforeAll(async () => {
+    actualFs = await vi.importActual<typeof import('fs')>('fs');
+    tmpDir = actualFs.mkdtempSync(
+      path.join(os.tmpdir(), 'schema-config-test-'),
+    );
+  });
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    process.argv = originalArgv;
+  });
+
+  afterAll(() => {
+    actualFs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('should pass jsonSchema to Config', async () => {
+    const validSchema = {
+      type: 'object',
+      properties: { answer: { type: 'string' } },
+    };
+    const schemaPath = createTempFile(
+      'config-schema.json',
+      JSON.stringify(validSchema),
+    );
+
+    process.argv = [
+      'node',
+      'script.js',
+      '--schema-file',
+      schemaPath,
+      '-p',
+      'test',
+    ];
+    const argv = await parseArguments(createTestMergedSettings());
+    const config = await loadCliConfig(
+      createTestMergedSettings(),
+      'test-session',
+      argv,
+    );
+
+    expect(config.getJsonSchema()).toEqual(validSchema);
+  });
+
+  it('should pass enableTools to Config', async () => {
+    const validSchema = {
+      type: 'object',
+      properties: { answer: { type: 'string' } },
+    };
+    const schemaPath = createTempFile(
+      'config-enable-tools.json',
+      JSON.stringify(validSchema),
+    );
+
+    process.argv = [
+      'node',
+      'script.js',
+      '--schema-file',
+      schemaPath,
+      '--enable-tools',
+      '-p',
+      'test',
+    ];
+    const argv = await parseArguments(createTestMergedSettings());
+    const config = await loadCliConfig(
+      createTestMergedSettings(),
+      'test-session',
+      argv,
+    );
+
+    expect(config.getJsonSchema()).toEqual(validSchema);
+    expect(config.getEnableTools()).toBe(true);
+  });
+
+  it('should have undefined jsonSchema when --schema-file not provided', async () => {
+    process.argv = ['node', 'script.js', '-p', 'test'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const config = await loadCliConfig(
+      createTestMergedSettings(),
+      'test-session',
+      argv,
+    );
+
+    expect(config.getJsonSchema()).toBeUndefined();
+    expect(config.getEnableTools()).toBeUndefined();
+  });
+
+  it('should imply output format json when --schema-file is used', async () => {
+    const validSchema = {
+      type: 'object',
+      properties: { answer: { type: 'string' } },
+    };
+    const schemaPath = createTempFile(
+      'config-imply-json.json',
+      JSON.stringify(validSchema),
+    );
+
+    process.argv = [
+      'node',
+      'script.js',
+      '--schema-file',
+      schemaPath,
+      '-p',
+      'test',
+    ];
+    const argv = await parseArguments(createTestMergedSettings());
+    const config = await loadCliConfig(
+      createTestMergedSettings(),
+      'test-session',
+      argv,
+    );
+
+    expect(config.getOutputFormat()).toBe(OutputFormat.JSON);
   });
 });

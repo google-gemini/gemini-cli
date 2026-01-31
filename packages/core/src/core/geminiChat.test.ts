@@ -182,6 +182,8 @@ describe('GeminiChat', () => {
       getModelAvailabilityService: vi
         .fn()
         .mockReturnValue(createAvailabilityServiceMock()),
+      getJsonSchema: vi.fn().mockReturnValue(undefined),
+      getEnableTools: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     // Use proper MessageBus mocking for Phase 3 preparation
@@ -1011,6 +1013,87 @@ describe('GeminiChat', () => {
         }),
         'prompt-id-thinking-budget',
       );
+    });
+
+    it('should add responseJsonSchema and responseMimeType when jsonSchema is set', async () => {
+      const testSchema = {
+        type: 'object',
+        properties: { answer: { type: 'string' } },
+      };
+      vi.mocked(mockConfig.getJsonSchema).mockReturnValue(testSchema);
+
+      const response = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                parts: [{ text: '{"answer": "test"}' }],
+                role: 'model',
+              },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        response,
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'test-model' },
+        'hello',
+        'prompt-id-schema',
+        new AbortController().signal,
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      expect(mockContentGenerator.generateContentStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            responseJsonSchema: testSchema,
+            responseMimeType: 'application/json',
+          }),
+        }),
+        'prompt-id-schema',
+      );
+
+      // Reset mock
+      vi.mocked(mockConfig.getJsonSchema).mockReturnValue(undefined);
+    });
+
+    it('should not add responseJsonSchema when jsonSchema is not set', async () => {
+      vi.mocked(mockConfig.getJsonSchema).mockReturnValue(undefined);
+
+      const response = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: { parts: [{ text: 'response' }], role: 'model' },
+              finishReason: 'STOP',
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        response,
+      );
+
+      const stream = await chat.sendMessageStream(
+        { model: 'test-model' },
+        'hello',
+        'prompt-id-no-schema',
+        new AbortController().signal,
+      );
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      const callArgs = vi.mocked(mockContentGenerator.generateContentStream)
+        .mock.calls[0][0];
+      expect(callArgs.config?.responseJsonSchema).toBeUndefined();
+      expect(callArgs.config?.responseMimeType).toBeUndefined();
     });
   });
 
