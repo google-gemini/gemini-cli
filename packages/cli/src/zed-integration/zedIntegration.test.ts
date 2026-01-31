@@ -148,6 +148,9 @@ describe('GeminiAgent', () => {
   });
 
   it('should create a new session', async () => {
+    mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
+      apiKey: 'test-key',
+    });
     const response = await agent.newSession({
       cwd: '/tmp',
       mcpServers: [],
@@ -157,6 +160,22 @@ describe('GeminiAgent', () => {
     expect(loadCliConfig).toHaveBeenCalled();
     expect(mockConfig.initialize).toHaveBeenCalled();
     expect(mockConfig.getGeminiClient).toHaveBeenCalled();
+  });
+
+  it('should fail session creation if Gemini API key is missing', async () => {
+    mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
+      apiKey: undefined,
+    });
+    mockSettings.merged.security.auth.selectedType = AuthType.USE_GEMINI;
+
+    await expect(
+      agent.newSession({
+        cwd: '/tmp',
+        mcpServers: [],
+      }),
+    ).rejects.toMatchObject({
+      message: 'Authentication required',
+    });
   });
 
   it('should create a new session with mcp servers', async () => {

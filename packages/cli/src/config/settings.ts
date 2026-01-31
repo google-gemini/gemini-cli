@@ -432,10 +432,13 @@ export function setUpCloudShellEnvironment(envFilePath: string | null): void {
   }
 }
 
-export function loadEnvironment(settings: Settings): void {
-  const envFilePath = findEnvFile(process.cwd());
+export function loadEnvironment(
+  settings: Settings,
+  workspaceDir: string,
+): void {
+  const envFilePath = findEnvFile(workspaceDir);
 
-  if (!isWorkspaceTrusted(settings).isTrusted) {
+  if (!isWorkspaceTrusted(settings, workspaceDir).isTrusted) {
     return;
   }
 
@@ -600,7 +603,8 @@ export function loadSettings(
     userSettings,
   );
   const isTrusted =
-    isWorkspaceTrusted(initialTrustCheckSettings as Settings).isTrusted ?? true;
+    isWorkspaceTrusted(initialTrustCheckSettings as Settings, workspaceDir)
+      .isTrusted ?? true;
 
   // Create a temporary merged settings object to pass to loadEnvironment.
   const tempMergedSettings = mergeSettings(
@@ -613,7 +617,7 @@ export function loadSettings(
 
   // loadEnvironment depends on settings so we have to create a temp version of
   // the settings to avoid a cycle
-  loadEnvironment(tempMergedSettings);
+  loadEnvironment(tempMergedSettings, workspaceDir);
 
   // Check for any fatal errors before proceeding
   const fatalErrors = settingsErrors.filter((e) => e.severity === 'error');

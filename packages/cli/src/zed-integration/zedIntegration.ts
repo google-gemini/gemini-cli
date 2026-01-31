@@ -155,6 +155,15 @@ export class GeminiAgent {
           this.settings.merged.security.auth.selectedType,
         );
         isAuthenticated = true;
+
+        // Extra validation for Gemini API key
+        if (
+          this.settings.merged.security.auth.selectedType ===
+            AuthType.USE_GEMINI &&
+          !config.getContentGeneratorConfig().apiKey
+        ) {
+          isAuthenticated = false;
+        }
       } catch (e) {
         debugLogger.error(`Authentication failed: ${e}`);
       }

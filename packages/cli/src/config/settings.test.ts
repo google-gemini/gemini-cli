@@ -1674,7 +1674,7 @@ describe('Settings Loading and Merging', () => {
       isWorkspaceTrustedValue = true,
     }) {
       delete process.env['TESTTEST']; // reset
-      const geminiEnvPath = path.resolve(path.join(GEMINI_DIR, '.env'));
+      const geminiEnvPath = path.join(MOCK_WORKSPACE_DIR, GEMINI_DIR, '.env');
 
       vi.mocked(isWorkspaceTrusted).mockReturnValue({
         isTrusted: isWorkspaceTrustedValue,
@@ -1708,14 +1708,20 @@ describe('Settings Loading and Merging', () => {
 
     it('sets environment variables from .env files', () => {
       setup({ isFolderTrustEnabled: false, isWorkspaceTrustedValue: true });
-      loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
+      loadEnvironment(
+        loadSettings(MOCK_WORKSPACE_DIR).merged,
+        MOCK_WORKSPACE_DIR,
+      );
 
       expect(process.env['TESTTEST']).toEqual('1234');
     });
 
     it('does not load env files from untrusted spaces', () => {
       setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: false });
-      loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
+      loadEnvironment(
+        loadSettings(MOCK_WORKSPACE_DIR).merged,
+        MOCK_WORKSPACE_DIR,
+      );
 
       expect(process.env['TESTTEST']).not.toEqual('1234');
     });
