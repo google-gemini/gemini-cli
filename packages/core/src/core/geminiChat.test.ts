@@ -1012,6 +1012,57 @@ describe('GeminiChat', () => {
         'prompt-id-thinking-budget',
       );
     });
+
+    it('should throw ETIMEDOUT when request times out', async () => {
+      // 1. Mock AbortSignal.timeout to return a manually controllable signal
+      const manualTimeoutController = new AbortController();
+      const timeoutSpy = vi
+        .spyOn(AbortSignal, 'timeout')
+        .mockReturnValue(manualTimeoutController.signal);
+
+      // 2. Mock generateContentStream to hang UNTIL aborted
+      vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
+        (request) => new Promise((resolve, reject) => {
+            const config = request?.config;
+            if (config?.abortSignal) {
+              if (config.abortSignal.aborted) {
+                reject(new Error('Aborted'));
+                return;
+              }
+              config.abortSignal.addEventListener('abort', () => {
+                reject(new Error('Aborted'));
+              });
+            }
+          }),
+      );
+
+      // 3. Start the request
+      const streamPromise = chat.sendMessageStream(
+        { model: 'gemini-2.0-flash' },
+        'test timeout',
+        'prompt-id-timeout',
+        new AbortController().signal,
+      );
+
+      // 4. Simulate timeout by aborting the signal
+      // We need to wait a tick to ensure the promise starts executing
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      manualTimeoutController.abort();
+
+      // 5. Assert it throws ETIMEDOUT
+      await expect(async () => {
+        for await (const _ of await streamPromise) {
+          // consume
+        }
+      }).rejects.toThrowError(
+        expect.objectContaining({
+          message: expect.stringContaining('Request timed out'),
+          code: 'ETIMEDOUT',
+        }),
+      );
+
+      timeoutSpy.mockRestore();
+    });
   });
 
   describe('addHistory', () => {

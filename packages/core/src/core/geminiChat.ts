@@ -88,6 +88,12 @@ const INVALID_CONTENT_RETRY_OPTIONS: ContentRetryOptions = {
 export const SYNTHETIC_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
 
 /**
+ * Timeout for API calls in milliseconds.
+ * Defaulting to 60 seconds (configurable in future).
+ */
+const TIMEOUT_MS = 60000;
+
+/**
  * Returns true if the response is valid, false otherwise.
  */
 function isValidResponse(response: GenerateContentResponse): boolean {
@@ -505,13 +511,18 @@ export class GeminiChat {
       }
 
       lastModelToUse = modelToUse;
+
+      // Create a timeout signal to prevent long hanging requests.
+      const timeoutSignal = AbortSignal.timeout(TIMEOUT_MS);
+      const combinedSignal = AbortSignal.any([abortSignal, timeoutSignal]);
+
       const config: GenerateContentConfig = {
         ...currentGenerateContentConfig,
         // TODO(12622): Ensure we don't overrwrite these when they are
         // passed via config.
         systemInstruction: this.systemInstruction,
         tools: this.tools,
-        abortSignal,
+        abortSignal: combinedSignal,
       };
 
       let contentsToUse = isPreviewModel(modelToUse)
@@ -580,14 +591,25 @@ export class GeminiChat {
       lastConfig = config;
       lastContentsToUse = contentsToUse;
 
-      return this.config.getContentGenerator().generateContentStream(
-        {
-          model: modelToUse,
-          contents: contentsToUse,
-          config,
-        },
-        prompt_id,
-      );
+      try {
+        return await this.config.getContentGenerator().generateContentStream(
+          {
+            model: modelToUse,
+            contents: contentsToUse,
+            config,
+          },
+          prompt_id,
+        );
+      } catch (error) {
+        if (timeoutSignal.aborted) {
+          const timeoutError = new Error(
+            `Request timed out after ${TIMEOUT_MS}ms`,
+          );
+          (timeoutError as unknown as { code: string }).code = 'ETIMEDOUT';
+          throw timeoutError;
+        }
+        throw error;
+      }
     };
 
     const onPersistent429Callback = async (
