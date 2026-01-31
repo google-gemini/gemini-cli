@@ -125,7 +125,7 @@ import {
 } from '../telemetry/loggers.js';
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 import { isSubpath } from '../utils/paths.js';
-import { ApprovalMode, InProcessCheckerType } from '../policy/types.js';
+
 import { CheckerRunner } from '../safety/checker-runner.js';
 import { ContextBuilder } from '../safety/context-builder.js';
 import { CheckerRegistry } from '../safety/registry.js';
@@ -858,7 +858,11 @@ export class Config {
     });
 
     this.policyEngine = new PolicyEngine(
-      params.policyEngineConfig,
+      {
+        ...params.policyEngineConfig,
+        approvalMode:
+          params.approvalMode ?? params.policyEngineConfig?.approvalMode,
+      },
       checkerRunner,
     );
 
