@@ -253,6 +253,7 @@ describe('useGeminiStream', () => {
     getUserMemory: vi.fn(() => ''),
     getIdeMode: vi.fn(() => false),
     getEnableHooks: vi.fn(() => false),
+    getDisableLoopDetection: vi.fn(() => false),
   } as unknown as Config;
 
   beforeEach(() => {
