@@ -9,7 +9,7 @@ import { render } from '../../../test-utils/render.js';
 import { ThinkingMessage } from './ThinkingMessage.js';
 
 describe('ThinkingMessage', () => {
-  it('renders thinking header', () => {
+  it('renders thinking subject', () => {
     const { lastFrame } = render(
       <ThinkingMessage
         thought={{ subject: 'Planning', description: 'test' }}
@@ -17,7 +17,7 @@ describe('ThinkingMessage', () => {
       />,
     );
 
-    expect(lastFrame()).toContain('Thinking');
+    expect(lastFrame()).toContain('Planning');
   });
 
   it('renders with thought subject', () => {
@@ -54,6 +54,6 @@ describe('ThinkingMessage', () => {
       />,
     );
 
-    expect(lastFrame()).toContain('Thinking');
+    expect(lastFrame()).not.toContain('Planning');
   });
 });

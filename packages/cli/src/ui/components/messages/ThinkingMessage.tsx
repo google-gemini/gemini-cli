@@ -6,6 +6,7 @@
 
 import type React from 'react';
 import { Box, Text } from 'ink';
+import process from 'node:process';
 import type { ThoughtSummary } from '@google/gemini-cli-core';
 import { MaxSizedBox, MINIMUM_MAX_HEIGHT } from '../shared/MaxSizedBox.js';
 
@@ -22,10 +23,13 @@ export const ThinkingMessage: React.FC<ThinkingMessageProps> = ({
 }) => {
   const subject = thought.subject.trim();
   const description = thought.description.trim();
+  const headerText = subject || description;
+  const bodyText = subject ? description : '';
   const contentMaxHeight =
     availableTerminalHeight !== undefined
       ? Math.max(availableTerminalHeight - 4, MINIMUM_MAX_HEIGHT)
       : undefined;
+  const bubbleIcon = shouldUseEmojiBubble() ? '💬' : '◆';
 
   return (
     <Box
@@ -41,17 +45,34 @@ export const ThinkingMessage: React.FC<ThinkingMessageProps> = ({
         maxWidth={terminalWidth - 2}
         overflowDirection="top"
       >
-        {(subject || description) && (
+        {headerText && (
           <Box flexDirection="column">
-            {subject && (
-              <Text bold color="magenta">
-                ◆ {subject}
-              </Text>
-            )}
-            {description && <Text>{description}</Text>}
+            <Text bold color="magenta">
+              {bubbleIcon} {headerText}
+            </Text>
+            {bodyText && <Text>{bodyText}</Text>}
           </Box>
         )}
       </MaxSizedBox>
     </Box>
   );
 };
+
+function shouldUseEmojiBubble(): boolean {
+  const locale = (
+    process.env['LC_ALL'] ||
+    process.env['LC_CTYPE'] ||
+    process.env['LANG'] ||
+    ''
+  ).toLowerCase();
+  const supportsUtf8 = locale.includes('utf-8') || locale.includes('utf8');
+  if (!supportsUtf8) {
+    return false;
+  }
+
+  if (process.env['TERM'] === 'linux') {
+    return false;
+  }
+
+  return true;
+}
