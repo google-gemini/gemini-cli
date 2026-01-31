@@ -381,7 +381,7 @@ const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Show model thinking summaries inline in the conversation (deprecated; prefer the specific thinking modes).',
-        showInDialog: true,
+        showInDialog: false,
       },
       showInlineThinkingFull: {
         type: 'boolean',

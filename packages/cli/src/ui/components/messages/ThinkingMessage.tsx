@@ -36,22 +36,16 @@ export const ThinkingMessage: React.FC<ThinkingMessageProps> = ({
       marginBottom={1}
       flexDirection="column"
     >
-      <Box>
-        <Text color="magenta">◆ </Text>
-        <Text bold color="magenta">
-          Thinking
-        </Text>
-      </Box>
       <MaxSizedBox
         maxHeight={contentMaxHeight}
         maxWidth={terminalWidth - 2}
         overflowDirection="top"
       >
         {(subject || description) && (
-          <Box marginTop={1} flexDirection="column">
+          <Box flexDirection="column">
             {subject && (
               <Text bold color="magenta">
-                {subject}
+                ◆ {subject}
               </Text>
             )}
             {description && <Text>{description}</Text>}
