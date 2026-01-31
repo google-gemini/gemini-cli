@@ -132,6 +132,7 @@ import { UserHintService } from './userHintService.js';
 import { WORKSPACE_POLICY_TIER } from '../policy/config.js';
 import { loadPoliciesFromToml } from '../policy/toml-loader.js';
 import { ApprovalMode, InProcessCheckerType } from '../policy/types.js';
+
 import { CheckerRunner } from '../safety/checker-runner.js';
 import { ContextBuilder } from '../safety/context-builder.js';
 import { CheckerRegistry } from '../safety/registry.js';
@@ -895,7 +896,11 @@ export class Config {
       params.policyUpdateConfirmationRequest;
 
     this.policyEngine = new PolicyEngine(
-      params.policyEngineConfig,
+      {
+        ...params.policyEngineConfig,
+        approvalMode:
+          params.approvalMode ?? params.policyEngineConfig?.approvalMode,
+      },
       checkerRunner,
     );
 
