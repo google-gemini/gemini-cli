@@ -31,19 +31,19 @@ const buildShortcutRows = (): ShortcutItem[][] => {
       { key: 'Ctrl+G', description: 'IDE context details' },
     ],
     [
-      { key: '/shells', description: 'background shells view' },
-      { key: 'Ctrl+Y', description: 'toggle YOLO mode' },
-      { key: 'Ctrl+R', description: 'reverse-search shell history' },
+      { key: '/', description: 'commands' },
+      { key: 'Ctrl+Y', description: 'YOLO mode' },
+      { key: 'Ctrl+R', description: 'reverse-search history' },
     ],
     [
-      { key: '/dir add', description: 'add workspace directories' },
+      { key: '@', description: 'file paths' },
       { key: `${altLabel}+M`, description: 'raw markdown mode' },
       { key: 'Ctrl+X', description: 'open external editor' },
     ],
     [
-      { key: '@path', description: 'attach file or folder' },
-      { key: '/vim', description: 'toggle vim keybindings' },
       { key: 'Esc Esc', description: 'clear prompt / rewind' },
+      { key: '/vim', description: 'toggle vim keybindings' },
+      { key: '/shells', description: 'background shells view' },
     ],
   ];
 };
@@ -85,6 +85,7 @@ export const ShortcutsHelp: React.FC = () => {
   const gap = 2;
   const columnWidth = Math.max(18, Math.floor((terminalWidth - gap * 2) / 3));
   const backgroundColor = theme.ui.dark;
+  const keyColor = theme.text.accent;
 
   if (isNarrow) {
     return (
@@ -98,7 +99,8 @@ export const ShortcutsHelp: React.FC = () => {
               backgroundColor={backgroundColor}
               color={theme.text.primary}
             >
-              {text}
+              <Text color={keyColor}>{item.key}</Text>
+              {text.slice(item.key.length)}
             </Text>
           );
         })}
@@ -116,21 +118,46 @@ export const ShortcutsHelp: React.FC = () => {
         const lineCount = Math.max(...cellLines.map((lines) => lines.length));
 
         return Array.from({ length: lineCount }).map((_, lineIndex) => {
-          const line =
-            padToWidth(cellLines[0][lineIndex] ?? '', columnWidth) +
-            ' '.repeat(gap) +
-            padToWidth(cellLines[1][lineIndex] ?? '', columnWidth) +
-            ' '.repeat(gap) +
-            padToWidth(cellLines[2][lineIndex] ?? '', columnWidth);
+          const segments = row.map((item, colIndex) => {
+            const lineText = cellLines[colIndex][lineIndex] ?? '';
+            const keyWidth = stringWidth(item.key);
+
+            if (lineIndex === 0) {
+              const rest = lineText.slice(item.key.length);
+              const restPadded = padToWidth(
+                rest,
+                Math.max(0, columnWidth - keyWidth),
+              );
+              return (
+                <Text key={`${item.key}-${colIndex}`}>
+                  <Text color={keyColor}>{item.key}</Text>
+                  {restPadded}
+                </Text>
+              );
+            }
+
+            const spacer = ' '.repeat(keyWidth);
+            const padded = padToWidth(`${spacer}${lineText}`, columnWidth);
+            return <Text key={`${item.key}-${colIndex}`}>{padded}</Text>;
+          });
 
           return (
-            <Text
+            <Box
               key={`row-${rowIndex}-line-${lineIndex}`}
+              width={terminalWidth}
               backgroundColor={backgroundColor}
-              color={theme.text.primary}
+              flexDirection="row"
             >
-              {padToWidth(line, terminalWidth)}
-            </Text>
+              <Box width={columnWidth}>{segments[0]}</Box>
+              <Box width={gap}>
+                <Text>{' '.repeat(gap)}</Text>
+              </Box>
+              <Box width={columnWidth}>{segments[1]}</Box>
+              <Box width={gap}>
+                <Text>{' '.repeat(gap)}</Text>
+              </Box>
+              <Box width={columnWidth}>{segments[2]}</Box>
+            </Box>
           );
         });
       })}
