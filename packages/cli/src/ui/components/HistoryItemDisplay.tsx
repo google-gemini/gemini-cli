@@ -70,6 +70,9 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         <ThinkingMessage
           thoughts={itemForDisplay.thoughts}
           terminalWidth={terminalWidth}
+          availableTerminalHeight={
+            isPending ? availableTerminalHeight : undefined
+          }
         />
       )}
       {itemForDisplay.type === 'user' && (
