@@ -512,6 +512,10 @@ export class GeminiChat {
         systemInstruction: this.systemInstruction,
         tools: this.tools,
         abortSignal,
+        ...(this.config.getJsonSchema() && {
+          responseJsonSchema: this.config.getJsonSchema(),
+          responseMimeType: 'application/json',
+        }),
       };
 
       let contentsToUse = isPreviewModel(modelToUse)

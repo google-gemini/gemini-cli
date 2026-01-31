@@ -7,6 +7,7 @@
 import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
+import fs from 'node:fs';
 import { mcpCommand } from '../commands/mcp.js';
 import { extensionsCommand } from '../commands/extensions.js';
 import { skillsCommand } from '../commands/skills.js';
@@ -73,6 +74,8 @@ export interface CliArgs {
   approvalMode: string | undefined;
   allowedMcpServerNames: string[] | undefined;
   allowedTools: string[] | undefined;
+  enableTools: boolean | undefined;
+  schemaFile: object | undefined;
   experimentalAcp: boolean | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
@@ -177,6 +180,44 @@ export async function parseArguments(
           coerce: (tools: string[]) =>
             // Handle comma-separated values
             tools.flatMap((tool) => tool.split(',').map((t) => t.trim())),
+        })
+        .option('schema-file', {
+          type: 'string',
+          string: true,
+          description: 'A user defined JSON schema file location.',
+          coerce: (filePath: string) => {
+            if (!fs.existsSync(filePath)) {
+              throw new Error(`Schema file not found: ${filePath}`);
+            }
+
+            const stats = fs.statSync(filePath);
+            const ONE_MB = 1024 * 1024;
+            if (stats.size > ONE_MB) {
+              throw new Error('Schema file too large (max 1MB)');
+            }
+
+            let schema;
+            try {
+              schema = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+            } catch (_e) {
+              throw new Error(`Invalid JSON in schema file: ${filePath}`);
+            }
+
+            if (!schema.type && !schema.properties) {
+              throw new Error(
+                'Invalid JSON schema: must have name "type" or "properties"',
+              );
+            }
+
+            if (Object.keys(schema).length === 0) {
+              throw new Error('JSON Schema must not be empty');
+            }
+            return schema;
+          },
+        })
+        .option('enable-tools', {
+          type: 'boolean',
+          description: 'Enable tool usage when specifying a custom JSON schema',
         })
         .option('extensions', {
           alias: 'e',
@@ -297,6 +338,18 @@ export async function parseArguments(
         )
       ) {
         return `Invalid values:\n  Argument: output-format, Given: "${argv['outputFormat']}", Choices: "text", "json", "stream-json"`;
+      }
+      if (argv['enableTools'] && !argv['schemaFile']) {
+        throw new Error('--enable-tools requires --schema-file');
+      }
+      if (
+        argv['schemaFile'] &&
+        (argv['outputFormat'] === 'text' ||
+          argv['outputFormat'] === 'stream-json')
+      ) {
+        throw new Error(
+          'Cannot use --schema-file with --output-format text or stream-json',
+        );
       }
       return true;
     });
@@ -699,6 +752,8 @@ export async function loadCliConfig(
     allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
     policyEngineConfig,
     excludeTools,
+    enableTools: argv.enableTools,
+    jsonSchema: argv.schemaFile,
     toolDiscoveryCommand: settings.tools?.discoveryCommand,
     toolCallCommand: settings.tools?.callCommand,
     mcpServerCommand: mcpEnabled ? settings.mcp?.serverCommand : undefined,
