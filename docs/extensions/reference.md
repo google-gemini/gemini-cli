@@ -30,7 +30,7 @@ installed on your machine. See
 for help.
 
 ```
-gemini extensions install <source> [--ref <ref>] [--auto-update] [--pre-release] [--consent]
+gemini extensions install <source> [--ref <ref>] [--auto-update] [--pre-release] [--consent] [--skip-settings]
 ```
 
 - `<source>`: The github URL or local path of the extension to install.
@@ -39,6 +39,7 @@ gemini extensions install <source> [--ref <ref>] [--auto-update] [--pre-release]
 - `--pre-release`: Enable pre-release versions for this extension.
 - `--consent`: Acknowledge the security risks of installing an extension and
   skip the confirmation prompt.
+- `--skip-settings`: Skip the configuration on install process.
 
 ### Uninstalling an extension
 
