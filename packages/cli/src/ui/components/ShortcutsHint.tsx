@@ -14,15 +14,11 @@ export const ShortcutsHint: React.FC = () => {
   const highlightColor = shortcutsHelpVisible
     ? theme.text.accent
     : theme.text.secondary;
-  const separatorColor = shortcutsHelpVisible
-    ? theme.text.accent
-    : theme.text.secondary;
 
   return (
     <Text color={theme.text.secondary}>
       <Text color={highlightColor}> ?</Text>
       <Text color={highlightColor}> for shortcuts</Text>
-      <Text color={separatorColor}> |</Text>
     </Text>
   );
 };
