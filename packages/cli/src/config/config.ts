@@ -50,7 +50,6 @@ import {
   saveModelChange,
   loadSettings,
 } from './settings.js';
-import { getSettingsSchema } from './settingsSchema.js';
 
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';

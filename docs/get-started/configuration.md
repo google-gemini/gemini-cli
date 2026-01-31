@@ -312,16 +312,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
-#### `safety`
-
-- **`safety.enableConseca`** (boolean):
-  - **Description:** Enable the context-aware safety checker. This feature uses
-    an LLM to dynamically generate and enforce security policies for tool use
-    based on your prompt, providing an additional layer of protection against
-    unintended actions.
-  - **Default:** `false`
-  - **Requires restart:** Yes
-
 #### `model`
 
 - **`model.name`** (string):
@@ -835,6 +825,14 @@ their corresponding top-level category object in your `settings.json` file.
 - **`security.auth.useExternal`** (boolean):
   - **Description:** Whether to use an external authentication flow.
   - **Default:** `undefined`
+  - **Requires restart:** Yes
+
+- **`security.enableConseca`** (boolean):
+  - **Description:** Enable the context-aware security checker. This feature
+    uses an LLM to dynamically generate and enforce security policies for tool
+    use based on your prompt, providing an additional layer of protection
+    against unintended actions.
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 #### `advanced`
