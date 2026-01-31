@@ -186,12 +186,15 @@ export async function parseArguments(
           string: true,
           description:
             'Path to a JSON schema file for structured output. Implies --output-format json. Tools are disabled by default.',
-          coerce: (filePath: string) => {
-            if (!fs.existsSync(filePath)) {
-              throw new Error(`Schema file not found: ${filePath}`);
+          coerce: async (filePath: string) => {
+            const resolvedPath = resolvePath(filePath);
+            try {
+              await fs.promises.access(resolvedPath, fs.constants.F_OK);
+            } catch (_e) {
+              throw new Error(`Schema file not found: ${resolvedPath}`);
             }
 
-            const stats = fs.statSync(filePath);
+            const stats = await fs.promises.stat(resolvedPath);
             const ONE_MB = 1024 * 1024;
             if (stats.size > ONE_MB) {
               throw new Error('Schema file too large (max 1MB)');
@@ -199,9 +202,13 @@ export async function parseArguments(
 
             let schema;
             try {
-              schema = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+              const fileContent = await fs.promises.readFile(
+                resolvedPath,
+                'utf-8',
+              );
+              schema = JSON.parse(fileContent);
             } catch (_e) {
-              throw new Error(`Invalid JSON in schema file: ${filePath}`);
+              throw new Error(`Invalid JSON in schema file: ${resolvedPath}`);
             }
 
             if (!schema.type && !schema.properties) {
