@@ -12,10 +12,18 @@ import type {
 import {
   partListUnionToString,
   SESSION_FILE_PREFIX,
-} from '@google/gemini-cli-core';
+
+  SessionEndReason,
+  SessionStartSource,
+  flushTelemetry,
+  uiTelemetryService} from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { stripUnsafeCharacters } from '../ui/utils/textUtils.js';
+import { randomUUID } from 'node:crypto';
+import { type CommandContext } from '../ui/commands/types.js';
+import { MessageType } from '../ui/types.js';
+
 
 /**
  * Constant for the resume "latest" identifier.
@@ -512,5 +520,88 @@ export class SessionSelector {
         `Failed to load session ${sessionInfo.id}: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
+  }
+}
+
+/**
+ * Starts a new session by:
+ * 1. Firing SessionEnd event
+ * 2. Resetting the chat client
+ * 3. Generating a new session ID
+ * 4. Initializing chat recording
+ * 5. Firing SessionStart event
+ * 6. Flushing telemetry
+ *
+ * @param context - The command context
+ * @param source - The source of the session start (e.g., 'clear' or 'new') (default: 'clear' as it shares behavior)
+ * @param clearScreen - Whether to clear the screen (default: false)
+ */
+export async function startNewSession(
+  context: CommandContext,
+  source: SessionStartSource = SessionStartSource.Clear,
+  clearScreen = false,
+): Promise<void> {
+  const geminiClient = context.services.config?.getGeminiClient();
+  const config = context.services.config;
+  const chatRecordingService = context.services.config
+    ?.getGeminiClient()
+    ?.getChat()
+    .getChatRecordingService();
+
+  // Fire SessionEnd hook before starting new session
+  await config?.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Clear);
+
+  if (geminiClient) {
+    if (clearScreen) {
+      context.ui.setDebugMessage('Clearing terminal and resetting chat.');
+    } else {
+      context.ui.setDebugMessage('Resetting chat for new session.');
+    }
+    await geminiClient.resetChat();
+  } else if (clearScreen) {
+    context.ui.setDebugMessage('Clearing terminal.');
+  }
+
+  // Start a new conversation recording with a new session ID
+  if (config && chatRecordingService) {
+    const newSessionId = randomUUID();
+    config.setSessionId(newSessionId);
+    chatRecordingService.initialize();
+  }
+
+  // Fire SessionStart hook after clearing
+  const result = await config?.getHookSystem()?.fireSessionStartEvent(source);
+
+  // Give the event loop a chance to process any pending telemetry operations
+  await new Promise((resolve) => setImmediate(resolve));
+
+  // Flush telemetry
+  if (config) {
+    await flushTelemetry(config);
+  }
+
+  uiTelemetryService.setLastPromptTokenCount(0);
+
+  if (clearScreen) {
+    context.ui.clear();
+  } else {
+    // Notify user if not clearing screen
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: 'Started a new chat session. Previous session saved.',
+      },
+      Date.now(),
+    );
+  }
+
+  if (result?.finalOutput?.systemMessage) {
+    context.ui.addItem(
+      {
+        type: MessageType.INFO,
+        text: result.finalOutput.systemMessage,
+      },
+      Date.now(),
+    );
   }
 }
