@@ -97,6 +97,7 @@ export const MainContent = () => {
             isFocused={!uiState.isEditorDialogOpen}
             activeShellPtyId={uiState.activePtyId}
             embeddedShellFocused={uiState.embeddedShellFocused}
+            inlineEnabled={inlineEnabled}
           />
         ))}
         {showConfirmationQueue && confirmingTool && (
@@ -110,6 +111,7 @@ export const MainContent = () => {
       isAlternateBuffer,
       availableTerminalHeight,
       mainAreaWidth,
+      inlineEnabled,
       uiState.isEditorDialogOpen,
       uiState.activePtyId,
       uiState.embeddedShellFocused,
@@ -141,13 +143,20 @@ export const MainContent = () => {
             item={item.item}
             isPending={false}
             commands={uiState.slashCommands}
+            inlineEnabled={inlineEnabled}
           />
         );
       } else {
         return pendingItems;
       }
     },
-    [version, mainAreaWidth, uiState.slashCommands, pendingItems],
+    [
+      version,
+      mainAreaWidth,
+      uiState.slashCommands,
+      inlineEnabled,
+      pendingItems,
+    ],
   );
 
   if (isAlternateBuffer) {
