@@ -163,7 +163,7 @@ describe('HookAggregator', () => {
       );
     });
 
-    it('should treat ask_user as non-blocking and default to allow', () => {
+    it('should preserve ask_user decision to ensure user confirmation', () => {
       const results: HookExecutionResult[] = [
         {
           hookConfig: {
@@ -184,12 +184,12 @@ describe('HookAggregator', () => {
       );
 
       expect(aggregated.success).toBe(true);
-      // ask_user is not a blocking decision, so final decision defaults to 'allow'
-      expect(aggregated.finalOutput?.decision).toBe('allow');
+      // ask_user must be preserved to ensure user is prompted for confirmation
+      expect(aggregated.finalOutput?.decision).toBe('ask_user');
       expect(aggregated.finalOutput?.reason).toBe('Hook wants to ask user');
     });
 
-    it('should handle ask_user with allow decisions', () => {
+    it('should prioritize ask_user over allow decisions', () => {
       const results: HookExecutionResult[] = [
         {
           hookConfig: {
@@ -221,8 +221,50 @@ describe('HookAggregator', () => {
       );
 
       expect(aggregated.success).toBe(true);
-      // Neither ask_user nor allow is blocking, so defaults to allow
-      expect(aggregated.finalOutput?.decision).toBe('allow');
+      // ask_user takes priority over allow to ensure user confirmation is not bypassed
+      expect(aggregated.finalOutput?.decision).toBe('ask_user');
+      expect(aggregated.finalOutput?.reason).toBe(
+        'Hook 1 allowed\nHook 2 wants to ask user',
+      );
+    });
+
+    it('should prioritize blocking decisions over ask_user', () => {
+      const results: HookExecutionResult[] = [
+        {
+          hookConfig: {
+            type: HookType.Command,
+            command: 'test-command',
+            timeout: 30000,
+          },
+          eventName: HookEventName.BeforeTool,
+          success: true,
+          output: { decision: 'ask_user', reason: 'Hook 1 wants to ask user' },
+          duration: 100,
+        },
+        {
+          hookConfig: {
+            type: HookType.Command,
+            command: 'test-command',
+            timeout: 30000,
+          },
+          eventName: HookEventName.BeforeTool,
+          success: true,
+          output: { decision: 'deny', reason: 'Hook 2 denied' },
+          duration: 150,
+        },
+      ];
+
+      const aggregated = aggregator.aggregateResults(
+        results,
+        HookEventName.BeforeTool,
+      );
+
+      expect(aggregated.success).toBe(true);
+      // Blocking decisions (deny/block) take priority over ask_user
+      expect(aggregated.finalOutput?.decision).toBe('deny');
+      expect(aggregated.finalOutput?.reason).toBe(
+        'Hook 1 wants to ask user\nHook 2 denied',
+      );
     });
 
     it('should handle continue=false with precedence', () => {
