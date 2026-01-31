@@ -226,6 +226,15 @@ export class ToolRegistry {
   }
 
   /**
+   * Unregisters a tool definition by name.
+   *
+   * @param name - The name of the tool to unregister.
+   */
+  unregisterTool(name: string): void {
+    this.allKnownTools.delete(name);
+  }
+
+  /**
    * Sorts tools as:
    * 1. Built in tools.
    * 2. Discovered tools.
@@ -479,8 +488,8 @@ export class ToolRegistry {
   getFunctionDeclarationsFiltered(toolNames: string[]): FunctionDeclaration[] {
     const declarations: FunctionDeclaration[] = [];
     for (const name of toolNames) {
-      const tool = this.allKnownTools.get(name);
-      if (tool && this.isActiveTool(tool)) {
+      const tool = this.getTool(name);
+      if (tool) {
         declarations.push(tool.schema);
       }
     }
@@ -521,7 +530,18 @@ export class ToolRegistry {
    * Get the definition of a specific tool.
    */
   getTool(name: string): AnyDeclarativeTool | undefined {
-    const tool = this.allKnownTools.get(name);
+    let tool = this.allKnownTools.get(name);
+    if (!tool && name.includes('__')) {
+      for (const t of this.allKnownTools.values()) {
+        if (t instanceof DiscoveredMCPTool) {
+          if (t.getFullyQualifiedName() === name) {
+            tool = t;
+            break;
+          }
+        }
+      }
+    }
+
     if (tool && this.isActiveTool(tool)) {
       return tool;
     }

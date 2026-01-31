@@ -127,7 +127,7 @@ describe('createPolicyUpdater', () => {
     expect(addedRule).toBeDefined();
     expect(addedRule?.priority).toBe(2.95);
     expect(addedRule?.argsPattern).toEqual(
-      new RegExp(`"command":"git\\ status(?:[\\s"]|$)`),
+      new RegExp(`"command":"git\\ status(?:[\\s"]|\\\\")`),
     );
 
     // Verify file written

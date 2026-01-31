@@ -24,9 +24,11 @@ export function createNonInteractiveUI(): CommandContext['ui'] {
     toggleDebugProfiler: () => {},
     toggleVimEnabled: async () => false,
     reloadCommands: () => {},
+    openAgentConfigDialog: () => {},
     extensionsUpdateState: new Map(),
     dispatchExtensionStateUpdate: (_action: ExtensionUpdateAction) => {},
     addConfirmUpdateExtensionRequest: (_request) => {},
     removeComponent: () => {},
+    toggleBackgroundShell: () => {},
   };
 }

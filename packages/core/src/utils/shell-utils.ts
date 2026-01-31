@@ -5,13 +5,16 @@
  */
 
 import os from 'node:os';
+import fs from 'node:fs';
+import path from 'node:path';
 import { quote } from 'shell-quote';
 import {
   spawn,
   spawnSync,
   type SpawnOptionsWithoutStdio,
 } from 'node:child_process';
-import type { Node } from 'web-tree-sitter';
+import * as readline from 'node:readline';
+import type { Node, Tree } from 'web-tree-sitter';
 import { Language, Parser, Query } from 'web-tree-sitter';
 import { loadWasmBinary } from './fileUtils.js';
 import { debugLogger } from './debugLogger.js';
@@ -35,6 +38,35 @@ export interface ShellConfiguration {
   argsPrefix: string[];
   /** An identifier for the shell type. */
   shell: ShellType;
+}
+
+export async function resolveExecutable(
+  exe: string,
+): Promise<string | undefined> {
+  if (path.isAbsolute(exe)) {
+    try {
+      await fs.promises.access(exe, fs.constants.X_OK);
+      return exe;
+    } catch {
+      return undefined;
+    }
+  }
+  const paths = (process.env['PATH'] || '').split(path.delimiter);
+  const extensions =
+    os.platform() === 'win32' ? ['.exe', '.cmd', '.bat', ''] : [''];
+
+  for (const p of paths) {
+    for (const ext of extensions) {
+      const fullPath = path.join(p, exe + ext);
+      try {
+        await fs.promises.access(fullPath, fs.constants.X_OK);
+        return fullPath;
+      } catch {
+        continue;
+      }
+    }
+  }
+  return undefined;
 }
 
 let bashLanguage: Language | null = null;
@@ -110,6 +142,7 @@ export async function initializeShellParsers(): Promise<void> {
 export interface ParsedCommandDetail {
   name: string;
   text: string;
+  startIndex: number;
 }
 
 interface CommandParseResult {
@@ -119,6 +152,7 @@ interface CommandParseResult {
 }
 
 const POWERSHELL_COMMAND_ENV = '__GCLI_POWERSHELL_COMMAND__';
+const PARSE_TIMEOUT_MICROS = 1000 * 1000; // 1 second
 
 // Encode the parser script as UTF-16LE base64 so we can pass it via PowerShell's -EncodedCommand flag;
 // this avoids brittle quoting/escaping when spawning PowerShell and ensures the script is received byte-for-byte.
@@ -162,6 +196,13 @@ foreach ($commandAst in $commandAsts) {
   'utf16le',
 ).toString('base64');
 
+const REDIRECTION_NAMES = new Set([
+  'redirection (<)',
+  'redirection (>)',
+  'heredoc (<<)',
+  'herestring (<<<)',
+]);
+
 function createParser(): Parser | null {
   if (!bashLanguage) {
     if (treeSitterInitializationError) {
@@ -179,14 +220,35 @@ function createParser(): Parser | null {
   }
 }
 
-function parseCommandTree(command: string) {
+function parseCommandTree(
+  command: string,
+  timeoutMicros: number = PARSE_TIMEOUT_MICROS,
+): Tree | null {
   const parser = createParser();
   if (!parser || !command.trim()) {
     return null;
   }
 
+  const deadline = performance.now() + timeoutMicros / 1000;
+  let timedOut = false;
+
   try {
-    return parser.parse(command);
+    const tree = parser.parse(command, null, {
+      progressCallback: () => {
+        if (performance.now() > deadline) {
+          timedOut = true;
+          return true as unknown as void; // Returning true cancels parsing, but type says void
+        }
+      },
+    });
+
+    if (timedOut) {
+      debugLogger.error('Bash command parsing timed out for command:', command);
+      // Returning a partial tree could be risky so we return null to be safe.
+      return null;
+    }
+
+    return tree;
   } catch {
     return null;
   }
@@ -225,6 +287,24 @@ function extractNameFromNode(node: Node): string | null {
       }
       return normalizeCommandName(firstChild.text);
     }
+    case 'file_redirect': {
+      // The first child might be a file descriptor (e.g., '2>').
+      // We iterate to find the actual operator token.
+      for (let i = 0; i < node.childCount; i++) {
+        const child = node.child(i);
+        if (child && child.text.includes('<')) {
+          return 'redirection (<)';
+        }
+        if (child && child.text.includes('>')) {
+          return 'redirection (>)';
+        }
+      }
+      return 'redirection (>)';
+    }
+    case 'heredoc_redirect':
+      return 'heredoc (<<)';
+    case 'herestring_redirect':
+      return 'herestring (<<<)';
     default:
       return null;
   }
@@ -240,43 +320,19 @@ function collectCommandDetails(
   while (stack.length > 0) {
     const current = stack.pop()!;
 
-    let name: string | null = null;
-    let ignoreChildId: number | undefined;
-
-    if (current.type === 'redirected_statement') {
-      const body = current.childForFieldName('body');
-      if (body) {
-        const bodyName = extractNameFromNode(body);
-        if (bodyName) {
-          name = bodyName;
-          ignoreChildId = body.id;
-
-          // If we ignore the body node (because we used it to name the redirected_statement),
-          // we must still traverse its children to find nested commands (e.g. command substitution).
-          for (let i = body.namedChildCount - 1; i >= 0; i -= 1) {
-            const grandChild = body.namedChild(i);
-            if (grandChild) {
-              stack.push(grandChild);
-            }
-          }
-        }
-      }
-    }
-
-    if (!name) {
-      name = extractNameFromNode(current);
-    }
-
+    const name = extractNameFromNode(current);
     if (name) {
       details.push({
         name,
         text: source.slice(current.startIndex, current.endIndex).trim(),
+        startIndex: current.startIndex,
       });
     }
 
-    for (let i = current.namedChildCount - 1; i >= 0; i -= 1) {
-      const child = current.namedChild(i);
-      if (child && child.id !== ignoreChildId) {
+    // Traverse all children to find all sub-components (commands, redirections, etc.)
+    for (let i = current.childCount - 1; i >= 0; i -= 1) {
+      const child = current.child(i);
+      if (child) {
         stack.push(child);
       }
     }
@@ -371,7 +427,7 @@ function parseBashCommandDetails(command: string): CommandParseResult | null {
     }
   }
   return {
-    details,
+    details: details.sort((a, b) => a.startIndex - b.startIndex),
     hasError,
   };
 }
@@ -446,6 +502,7 @@ function parsePowerShellCommandDetails(
         return {
           name,
           text,
+          startIndex: 0,
         };
       })
       .filter((detail): detail is ParsedCommandDetail => detail !== null);
@@ -557,6 +614,12 @@ export function escapeShellArg(arg: string, shell: ShellType): string {
  */
 export function hasRedirection(command: string): boolean {
   const fallbackCheck = () => /[><]/.test(command);
+
+  // If there are no redirection characters at all, we can skip parsing.
+  if (!fallbackCheck()) {
+    return false;
+  }
+
   const configuration = getShellConfiguration();
 
   if (configuration.shell === 'powershell') {
@@ -631,7 +694,10 @@ export function getCommandRoots(command: string): string[] {
     return [];
   }
 
-  return parsed.details.map((detail) => detail.name).filter(Boolean);
+  return parsed.details
+    .map((detail) => detail.name)
+    .filter((name) => !REDIRECTION_NAMES.has(name))
+    .filter(Boolean);
 }
 
 export function stripShellWrapper(command: string): string {
@@ -700,3 +766,123 @@ export const spawnAsync = (
       reject(err);
     });
   });
+
+/**
+ * Executes a command and yields lines of output as they appear.
+ * Use for large outputs where buffering is not feasible.
+ *
+ * @param command The executable to run
+ * @param args Arguments for the executable
+ * @param options Spawn options (cwd, env, etc.)
+ */
+export async function* execStreaming(
+  command: string,
+  args: string[],
+  options?: SpawnOptionsWithoutStdio & {
+    signal?: AbortSignal;
+    allowedExitCodes?: number[];
+  },
+): AsyncGenerator<string, void, void> {
+  const child = spawn(command, args, {
+    ...options,
+    // ensure we don't open a window on windows if possible/relevant
+    windowsHide: true,
+  });
+
+  const rl = readline.createInterface({
+    input: child.stdout,
+    terminal: false,
+  });
+
+  const errorChunks: Buffer[] = [];
+  let stderrTotalBytes = 0;
+  const MAX_STDERR_BYTES = 20 * 1024; // 20KB limit
+
+  child.stderr.on('data', (chunk) => {
+    if (stderrTotalBytes < MAX_STDERR_BYTES) {
+      errorChunks.push(chunk);
+      stderrTotalBytes += chunk.length;
+    }
+  });
+
+  let error: Error | null = null;
+  child.on('error', (err) => {
+    error = err;
+  });
+
+  const onAbort = () => {
+    // If manually aborted by signal, we kill immediately.
+    if (!child.killed) child.kill();
+  };
+
+  if (options?.signal?.aborted) {
+    onAbort();
+  } else {
+    options?.signal?.addEventListener('abort', onAbort);
+  }
+
+  let finished = false;
+  try {
+    for await (const line of rl) {
+      if (options?.signal?.aborted) break;
+      yield line;
+    }
+    finished = true;
+  } finally {
+    rl.close();
+    options?.signal?.removeEventListener('abort', onAbort);
+
+    // Ensure process is killed when the generator is closed (consumer breaks loop)
+    let killedByGenerator = false;
+    if (!finished && child.exitCode === null && !child.killed) {
+      try {
+        child.kill();
+      } catch (_e) {
+        // ignore error if process is already dead
+      }
+      killedByGenerator = true;
+    }
+
+    // Ensure we wait for the process to exit to check codes
+    await new Promise<void>((resolve, reject) => {
+      // If an error occurred before we got here (e.g. spawn failure), reject immediately.
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      function checkExit(code: number | null) {
+        // If we aborted or killed it manually, we treat it as success (stop waiting)
+        if (options?.signal?.aborted || killedByGenerator) {
+          resolve();
+          return;
+        }
+
+        const allowed = options?.allowedExitCodes ?? [0];
+        if (code !== null && allowed.includes(code)) {
+          resolve();
+        } else {
+          // If we have an accumulated error or explicit error event
+          if (error) reject(error);
+          else {
+            const stderr = Buffer.concat(errorChunks).toString('utf8');
+            const truncatedMsg =
+              stderrTotalBytes >= MAX_STDERR_BYTES ? '...[truncated]' : '';
+            reject(
+              new Error(
+                `Process exited with code ${code}: ${stderr}${truncatedMsg}`,
+              ),
+            );
+          }
+        }
+      }
+
+      if (child.exitCode !== null) {
+        checkExit(child.exitCode);
+      } else {
+        child.on('close', (code) => checkExit(code));
+        child.on('error', (err) => reject(err));
+      }
+    });
+  }
+}

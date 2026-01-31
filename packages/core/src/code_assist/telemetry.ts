@@ -9,6 +9,7 @@ import { getCitations } from '../utils/generateContentResponseUtilities.js';
 import {
   ActionStatus,
   ConversationInteractionInteraction,
+  InitiationMethod,
   type ConversationInteraction,
   type ConversationOffered,
   type StreamingLatency,
@@ -96,6 +97,7 @@ export function createConversationOffered(
     traceId,
     streamingLatency,
     isAgentic: true,
+    initiationMethod: InitiationMethod.COMMAND,
   };
 }
 

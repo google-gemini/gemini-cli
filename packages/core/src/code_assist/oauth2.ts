@@ -269,6 +269,11 @@ async function initOauthClient(
 
     await triggerPostAuthCallbacks(client.credentials);
   } else {
+    const userConsent = await getConsentForOauth();
+    if (!userConsent) {
+      throw new FatalCancellationError('Authentication cancelled by user.');
+    }
+
     const webLogin = await authWithWeb(client);
 
     coreEvents.emit(CoreEvent.UserFeedback, {
@@ -325,7 +330,41 @@ async function initOauthClient(
       }, authTimeout);
     });
 
-    await Promise.race([webLogin.loginCompletePromise, timeoutPromise]);
+    // Listen for SIGINT to stop waiting for auth so the terminal doesn't hang
+    // if the user chooses not to auth.
+    let sigIntHandler: (() => void) | undefined;
+    let stdinHandler: ((data: Buffer) => void) | undefined;
+    const cancellationPromise = new Promise<never>((_, reject) => {
+      sigIntHandler = () =>
+        reject(new FatalCancellationError('Authentication cancelled by user.'));
+      process.on('SIGINT', sigIntHandler);
+
+      // Note that SIGINT might not get raised on Ctrl+C in raw mode
+      // so we also need to look for Ctrl+C directly in stdin.
+      stdinHandler = (data: Buffer) => {
+        if (data.includes(0x03)) {
+          reject(
+            new FatalCancellationError('Authentication cancelled by user.'),
+          );
+        }
+      };
+      process.stdin.on('data', stdinHandler);
+    });
+
+    try {
+      await Promise.race([
+        webLogin.loginCompletePromise,
+        timeoutPromise,
+        cancellationPromise,
+      ]);
+    } finally {
+      if (sigIntHandler) {
+        process.removeListener('SIGINT', sigIntHandler);
+      }
+      if (stdinHandler) {
+        process.stdin.removeListener('data', stdinHandler);
+      }
+    }
 
     coreEvents.emit(CoreEvent.UserFeedback, {
       severity: 'info',
@@ -336,6 +375,53 @@ async function initOauthClient(
   }
 
   return client;
+}
+
+export async function getConsentForOauth(): Promise<boolean> {
+  const prompt =
+    'Code Assist login required. Opening authentication page in your browser. ';
+
+  if (coreEvents.listenerCount(CoreEvent.ConsentRequest) === 0) {
+    if (!process.stdin.isTTY) {
+      throw new FatalAuthenticationError(
+        'Code Assist login required, but interactive consent could not be obtained.\n' +
+          'Please run Gemini CLI in an interactive terminal to authenticate, or use NO_BROWSER=true for manual authentication.',
+      );
+    }
+    return getOauthConsentNonInteractive(prompt);
+  }
+
+  return getOauthConsentInteractive(prompt);
+}
+
+async function getOauthConsentNonInteractive(prompt: string) {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: createWorkingStdio().stdout,
+    terminal: true,
+  });
+
+  const fullPrompt = prompt + 'Do you want to continue? [Y/n]: ';
+  writeToStdout(`\n${fullPrompt}`);
+
+  return new Promise<boolean>((resolve) => {
+    rl.on('line', (answer) => {
+      rl.close();
+      resolve(['y', ''].includes(answer.trim().toLowerCase()));
+    });
+  });
+}
+
+async function getOauthConsentInteractive(prompt: string) {
+  const fullPrompt = prompt + '\n\nDo you want to continue?';
+  return new Promise<boolean>((resolve) => {
+    coreEvents.emitConsentRequest({
+      prompt: fullPrompt,
+      onConfirm: (confirmed: boolean) => {
+        resolve(confirmed);
+      },
+    });
+  });
 }
 
 export async function getOauthClient(
@@ -425,12 +511,12 @@ async function authWithUserCode(client: OAuth2Client): Promise<boolean> {
 async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
   const port = await getAvailablePort();
   // The hostname used for the HTTP server binding (e.g., '0.0.0.0' in Docker).
-  const host = process.env['OAUTH_CALLBACK_HOST'] || 'localhost';
+  const host = process.env['OAUTH_CALLBACK_HOST'] || '127.0.0.1';
   // The `redirectUri` sent to Google's authorization server MUST use a loopback IP literal
   // (i.e., 'localhost' or '127.0.0.1'). This is a strict security policy for credentials of
   // type 'Desktop app' or 'Web application' (when using loopback flow) to mitigate
   // authorization code interception attacks.
-  const redirectUri = `http://localhost:${port}/oauth2callback`;
+  const redirectUri = `http://127.0.0.1:${port}/oauth2callback`;
   const state = crypto.randomBytes(32).toString('hex');
   const authUrl = client.generateAuthUrl({
     redirect_uri: redirectUri,
@@ -452,7 +538,7 @@ async function authWithWeb(client: OAuth2Client): Promise<OauthWebLogin> {
           );
         }
         // acquire the code from the querystring, and close the web server.
-        const qs = new url.URL(req.url!, 'http://localhost:3000').searchParams;
+        const qs = new url.URL(req.url!, 'http://127.0.0.1:3000').searchParams;
         if (qs.get('error')) {
           res.writeHead(HTTP_REDIRECT, { Location: SIGN_IN_FAILURE_URL });
           res.end();

@@ -233,6 +233,33 @@ export function resolveColor(colorValue: string): string | undefined {
   return undefined;
 }
 
+/**
+ * Returns a "safe" background color to use in low-color terminals if the
+ * terminal background is a standard black or white.
+ * Returns undefined if no safe background color is available for the given
+ * terminal background.
+ */
+export function getSafeLowColorBackground(
+  terminalBg: string,
+): string | undefined {
+  const resolvedTerminalBg = resolveColor(terminalBg) || terminalBg;
+  if (
+    resolvedTerminalBg === 'black' ||
+    resolvedTerminalBg === '#000000' ||
+    resolvedTerminalBg === '#000'
+  ) {
+    return '#1c1c1c';
+  }
+  if (
+    resolvedTerminalBg === 'white' ||
+    resolvedTerminalBg === '#ffffff' ||
+    resolvedTerminalBg === '#fff'
+  ) {
+    return '#eeeeee';
+  }
+  return undefined;
+}
+
 export function interpolateColor(
   color1: string,
   color2: string,

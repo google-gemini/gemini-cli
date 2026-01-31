@@ -28,6 +28,13 @@ topics on:
     - **Organizational Users:** Contact your Google Cloud administrator to be
       added to your organization's Gemini Code Assist subscription.
 
+- **Error:
+  `Failed to login. Message: Your current account is not eligible... because it is not currently available in your location.`**
+  - **Cause:** Gemini CLI does not currently support your location. For a full
+    list of supported locations, see the following pages:
+    - Gemini Code Assist for individuals:
+      [Available locations](https://developers.google.com/gemini-code-assist/resources/available-locations#americas)
+
 - **Error: `Failed to login. Message: Request contains an invalid argument`**
   - **Cause:** Users with Google Workspace accounts or Google Cloud accounts
     associated with their Gmail accounts may not be able to activate the free
@@ -43,9 +50,15 @@ topics on:
   - **Cause:** You may be on a corporate network with a firewall that intercepts
     and inspects SSL/TLS traffic. This often requires a custom root CA
     certificate to be trusted by Node.js.
-  - **Solution:** Set the `NODE_EXTRA_CA_CERTS` environment variable to the
-    absolute path of your corporate root CA certificate file.
-    - Example: `export NODE_EXTRA_CA_CERTS=/path/to/your/corporate-ca.crt`
+  - **Solution:** First try setting `NODE_USE_SYSTEM_CA`; if that does not
+    resolve the issue, set `NODE_EXTRA_CA_CERTS`.
+    - Set the `NODE_USE_SYSTEM_CA=1` environment variable to tell Node.js to use
+      the operating system's native certificate store (where corporate
+      certificates are typically already installed).
+      - Example: `export NODE_USE_SYSTEM_CA=1`
+    - Set the `NODE_EXTRA_CA_CERTS` environment variable to the absolute path of
+      your corporate root CA certificate file.
+      - Example: `export NODE_EXTRA_CA_CERTS=/path/to/your/corporate-ca.crt`
 
 ## Common error messages and solutions
 
@@ -124,13 +137,15 @@ This is especially useful for scripting and automation.
 ## Debugging tips
 
 - **CLI debugging:**
-  - Use the `--debug` flag for more detailed output.
+  - Use the `--debug` flag for more detailed output. In interactive mode, press
+    F12 to view the debug console.
   - Check the CLI logs, often found in a user-specific configuration or cache
     directory.
 
 - **Core debugging:**
   - Check the server console output for error messages or stack traces.
-  - Increase log verbosity if configurable.
+  - Increase log verbosity if configurable. For example, set the `DEBUG_MODE`
+    environment variable to `true` or `1`.
   - Use Node.js debugging tools (e.g., `node --inspect`) if you need to step
     through server-side code.
 

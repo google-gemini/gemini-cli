@@ -32,6 +32,7 @@ interface ModelDialogProps {
 export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const config = useContext(ConfigContext);
   const [view, setView] = useState<'main' | 'manual'>('main');
+  const [persistMode, setPersistMode] = useState(false);
 
   // Determine the Preferred Model (read once when the dialog opens).
   const preferredModel = config?.getModel() || DEFAULT_GEMINI_MODEL_AUTO;
@@ -61,7 +62,13 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         } else {
           onClose();
         }
+        return true;
       }
+      if (key.name === 'tab') {
+        setPersistMode((prev) => !prev);
+        return true;
+      }
+      return false;
     },
     { isActive: true },
   );
@@ -157,13 +164,13 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       }
 
       if (config) {
-        config.setModel(model);
+        config.setModel(model, persistMode ? false : true);
         const event = new ModelSlashCommandEvent(model);
         logModelSlashCommand(config, event);
       }
       onClose();
     },
-    [config, onClose],
+    [config, onClose, persistMode],
   );
 
   let header;
@@ -213,9 +220,15 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         />
       </Box>
       <Box marginTop={1} flexDirection="column">
-        <Text color={theme.text.secondary}>
-          Applies to this session and future Gemini CLI sessions.
-        </Text>
+        <Box>
+          <Text color={theme.text.primary}>
+            Remember model for future sessions:{' '}
+          </Text>
+          <Text color={theme.status.success}>
+            {persistMode ? 'true' : 'false'}
+          </Text>
+        </Box>
+        <Text color={theme.text.secondary}>(Press Tab to toggle)</Text>
       </Box>
       <Box marginTop={1} flexDirection="column">
         <Text color={theme.text.secondary}>

@@ -230,8 +230,10 @@ export async function handleMigrateFromClaude() {
   const settings = loadSettings(workingDir);
 
   // Merge migrated hooks with existing hooks
-  const existingHooks =
-    (settings.merged.hooks as Record<string, unknown>) || {};
+  const existingHooks = (settings.merged?.hooks || {}) as Record<
+    string,
+    unknown
+  >;
   const mergedHooks = { ...existingHooks, ...migratedHooks };
 
   // Update settings (setValue automatically saves)
@@ -241,9 +243,6 @@ export async function handleMigrateFromClaude() {
     debugLogger.log('✓ Hooks successfully migrated to .gemini/settings.json');
     debugLogger.log(
       '\nMigration complete! Please review the migrated hooks in .gemini/settings.json',
-    );
-    debugLogger.log(
-      'Note: Set tools.enableHooks to true in your settings to enable the hook system.',
     );
   } catch (error) {
     debugLogger.error(`Error saving migrated hooks: ${getErrorMessage(error)}`);

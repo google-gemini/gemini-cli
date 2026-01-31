@@ -11,7 +11,7 @@ import type {
   Tool,
   GenerateContentResponse,
 } from '@google/genai';
-import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { createUserContent } from '@google/genai';
 import {
   getDirectoryContextString,
   getInitialChatHistory,
@@ -25,6 +25,7 @@ import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
 import { retryWithBackoff } from '../utils/retry.js';
+import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { tokenLimit } from './tokenLimits.js';
 import type {
@@ -39,11 +40,10 @@ import {
   logContentRetryFailure,
   logNextSpeakerCheck,
 } from '../telemetry/loggers.js';
-import {
-  fireBeforeAgentHook,
-  fireAfterAgentHook,
-} from './clientHookTriggers.js';
-import type { DefaultHookOutput } from '../hooks/types.js';
+import type {
+  DefaultHookOutput,
+  AfterAgentHookOutput,
+} from '../hooks/types.js';
 import {
   ContentRetryFailureEvent,
   NextSpeakerCheckEvent,
@@ -59,14 +59,21 @@ import {
   applyModelSelection,
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
+import { resolveModel } from '../config/models.js';
 import type { RetryAvailabilityContext } from '../utils/retry.js';
+import { partToString } from '../utils/partUtils.js';
+import { coreEvents, CoreEvent } from '../utils/events.js';
 
 const MAX_TURNS = 100;
 
 type BeforeAgentHookReturn =
   | {
-      type: GeminiEventType.Error;
-      value: { error: Error };
+      type: GeminiEventType.AgentExecutionStopped;
+      value: { reason: string; systemMessage?: string };
+    }
+  | {
+      type: GeminiEventType.AgentExecutionBlocked;
+      value: { reason: string; systemMessage?: string };
     }
   | { additionalContext: string | undefined }
   | undefined;
@@ -92,7 +99,13 @@ export class GeminiClient {
     this.loopDetector = new LoopDetectionService(config);
     this.compressionService = new ChatCompressionService();
     this.lastPromptId = this.config.getSessionId();
+
+    coreEvents.on(CoreEvent.ModelChanged, this.handleModelChanged);
   }
+
+  private handleModelChanged = () => {
+    this.currentSequenceModel = null;
+  };
 
   // Hook state to deduplicate BeforeAgent calls and track response for
   // AfterAgent
@@ -107,7 +120,6 @@ export class GeminiClient {
   >();
 
   private async fireBeforeAgentHookSafe(
-    messageBus: MessageBus,
     request: PartListUnion,
     prompt_id: string,
   ): Promise<BeforeAgentHookReturn> {
@@ -132,16 +144,27 @@ export class GeminiClient {
       return undefined;
     }
 
-    const hookOutput = await fireBeforeAgentHook(messageBus, request);
+    const hookOutput = await this.config
+      .getHookSystem()
+      ?.fireBeforeAgentEvent(partToString(request));
     hookState.hasFiredBeforeAgent = true;
 
-    if (hookOutput?.isBlockingDecision() || hookOutput?.shouldStopExecution()) {
+    if (hookOutput?.shouldStopExecution()) {
       return {
-        type: GeminiEventType.Error,
+        type: GeminiEventType.AgentExecutionStopped,
         value: {
-          error: new Error(
-            `BeforeAgent hook blocked processing: ${hookOutput.getEffectiveReason()}`,
-          ),
+          reason: hookOutput.getEffectiveReason(),
+          systemMessage: hookOutput.systemMessage,
+        },
+      };
+    }
+
+    if (hookOutput?.isBlockingDecision()) {
+      return {
+        type: GeminiEventType.AgentExecutionBlocked,
+        value: {
+          reason: hookOutput.getEffectiveReason(),
+          systemMessage: hookOutput.systemMessage,
         },
       };
     }
@@ -154,7 +177,6 @@ export class GeminiClient {
   }
 
   private async fireAfterAgentHookSafe(
-    messageBus: MessageBus,
     currentRequest: PartListUnion,
     prompt_id: string,
     turn?: Turn,
@@ -175,11 +197,10 @@ export class GeminiClient {
       '[no response text]';
     const finalRequest = hookState.originalRequest || currentRequest;
 
-    const hookOutput = await fireAfterAgentHook(
-      messageBus,
-      finalRequest,
-      finalResponseText,
-    );
+    const hookOutput = await this.config
+      .getHookSystem()
+      ?.fireAfterAgentEvent(partToString(finalRequest), finalResponseText);
+
     return hookOutput;
   }
 
@@ -228,6 +249,7 @@ export class GeminiClient {
 
   setHistory(history: Content[]) {
     this.getChat().setHistory(history);
+    this.updateTelemetryTokenCount();
     this.forceFullIdeContext = true;
   }
 
@@ -243,11 +265,16 @@ export class GeminiClient {
     this.updateTelemetryTokenCount();
   }
 
+  dispose() {
+    coreEvents.off(CoreEvent.ModelChanged, this.handleModelChanged);
+  }
+
   async resumeChat(
     history: Content[],
     resumedSessionData?: ResumedSessionData,
   ): Promise<void> {
     this.chat = await this.startChat(history, resumedSessionData);
+    this.updateTelemetryTokenCount();
   }
 
   getChatRecordingService(): ChatRecordingService | undefined {
@@ -273,7 +300,7 @@ export class GeminiClient {
     });
   }
 
-  async updateSystemInstruction(): Promise<void> {
+  updateSystemInstruction(): void {
     if (!this.isInitialized()) {
       return;
     }
@@ -496,7 +523,7 @@ export class GeminiClient {
 
     // Availability logic: The configured model is the source of truth,
     // including any permanent fallbacks (config.setModel) or manual overrides.
-    return this.config.getActiveModel();
+    return resolveModel(this.config.getActiveModel());
   }
 
   private async *processTurn(
@@ -505,6 +532,7 @@ export class GeminiClient {
     prompt_id: string,
     boundedTurns: number,
     isInvalidStreamRetry: boolean,
+    displayContent?: PartListUnion,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     // Re-initialize turn (it was empty before if in loop, or new instance)
     let turn = new Turn(this.getChat(), prompt_id);
@@ -525,6 +553,15 @@ export class GeminiClient {
     // Check for context window overflow
     const modelForLimitCheck = this._getActiveModelForCurrentTurn();
 
+    const compressed = await this.tryCompressChat(prompt_id, false);
+
+    if (compressed.compressionStatus === CompressionStatus.COMPRESSED) {
+      yield { type: GeminiEventType.ChatCompressed, value: compressed };
+    }
+
+    const remainingTokenCount =
+      tokenLimit(modelForLimitCheck) - this.getChat().getLastPromptTokenCount();
+
     // Estimate tokens. For text-only requests, we estimate based on character length.
     // For requests with non-text parts (like images, tools), we use the countTokens API.
     const estimatedRequestTokenCount = await calculateRequestTokenCount(
@@ -533,21 +570,12 @@ export class GeminiClient {
       modelForLimitCheck,
     );
 
-    const remainingTokenCount =
-      tokenLimit(modelForLimitCheck) - this.getChat().getLastPromptTokenCount();
-
-    if (estimatedRequestTokenCount > remainingTokenCount * 0.95) {
+    if (estimatedRequestTokenCount > remainingTokenCount) {
       yield {
         type: GeminiEventType.ContextWindowWillOverflow,
         value: { estimatedRequestTokenCount, remainingTokenCount },
       };
       return turn;
-    }
-
-    const compressed = await this.tryCompressChat(prompt_id, false);
-
-    if (compressed.compressionStatus === CompressionStatus.COMPRESSED) {
-      yield { type: GeminiEventType.ChatCompressed, value: compressed };
     }
 
     // Prevent context updates from being sent while a tool call is
@@ -593,6 +621,7 @@ export class GeminiClient {
       history: this.getChat().getHistory(/*curated=*/ true),
       request,
       signal,
+      requestedModel: this.config.getModel(),
     };
 
     let modelToUse: string;
@@ -615,10 +644,16 @@ export class GeminiClient {
     );
     modelToUse = finalModel;
 
+    if (!signal.aborted && !this.currentSequenceModel) {
+      yield { type: GeminiEventType.ModelInfo, value: modelToUse };
+    }
     this.currentSequenceModel = modelToUse;
-    yield { type: GeminiEventType.ModelInfo, value: modelToUse };
-
-    const resultStream = turn.run(modelConfigKey, request, linkedSignal);
+    const resultStream = turn.run(
+      modelConfigKey,
+      request,
+      linkedSignal,
+      displayContent,
+    );
     let isError = false;
     let isInvalidStream = false;
 
@@ -679,6 +714,7 @@ export class GeminiClient {
           prompt_id,
           boundedTurns - 1,
           true,
+          displayContent,
         );
         return turn;
       }
@@ -710,7 +746,8 @@ export class GeminiClient {
             signal,
             prompt_id,
             boundedTurns - 1,
-            // isInvalidStreamRetry is false
+            false, // isInvalidStreamRetry is false
+            displayContent,
           );
           return turn;
         }
@@ -725,6 +762,7 @@ export class GeminiClient {
     prompt_id: string,
     turns: number = MAX_TURNS,
     isInvalidStreamRetry: boolean = false,
+    displayContent?: PartListUnion,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (!isInvalidStreamRetry) {
       this.config.resetTurn();
@@ -741,20 +779,30 @@ export class GeminiClient {
     }
 
     if (hooksEnabled && messageBus) {
-      const hookResult = await this.fireBeforeAgentHookSafe(
-        messageBus,
-        request,
-        prompt_id,
-      );
+      const hookResult = await this.fireBeforeAgentHookSafe(request, prompt_id);
       if (hookResult) {
-        if ('type' in hookResult && hookResult.type === GeminiEventType.Error) {
+        if (
+          'type' in hookResult &&
+          hookResult.type === GeminiEventType.AgentExecutionStopped
+        ) {
+          // Add user message to history before returning so it's kept in the transcript
+          this.getChat().addHistory(createUserContent(request));
+          yield hookResult;
+          return new Turn(this.getChat(), prompt_id);
+        } else if (
+          'type' in hookResult &&
+          hookResult.type === GeminiEventType.AgentExecutionBlocked
+        ) {
           yield hookResult;
           return new Turn(this.getChat(), prompt_id);
         } else if ('additionalContext' in hookResult) {
           const additionalContext = hookResult.additionalContext;
           if (additionalContext) {
             const requestArray = Array.isArray(request) ? request : [request];
-            request = [...requestArray, { text: additionalContext }];
+            request = [
+              ...requestArray,
+              { text: `<hook_context>${additionalContext}</hook_context>` },
+            ];
           }
         }
       }
@@ -770,28 +818,60 @@ export class GeminiClient {
         prompt_id,
         boundedTurns,
         isInvalidStreamRetry,
+        displayContent,
       );
 
       // Fire AfterAgent hook if we have a turn and no pending tools
       if (hooksEnabled && messageBus) {
         const hookOutput = await this.fireAfterAgentHookSafe(
-          messageBus,
           request,
           prompt_id,
           turn,
         );
 
-        if (
-          hookOutput?.isBlockingDecision() ||
-          hookOutput?.shouldStopExecution()
-        ) {
-          const continueReason = hookOutput.getEffectiveReason();
+        // Cast to AfterAgentHookOutput for access to shouldClearContext()
+        const afterAgentOutput = hookOutput as AfterAgentHookOutput | undefined;
+
+        if (afterAgentOutput?.shouldStopExecution()) {
+          const contextCleared = afterAgentOutput.shouldClearContext();
+          yield {
+            type: GeminiEventType.AgentExecutionStopped,
+            value: {
+              reason: afterAgentOutput.getEffectiveReason(),
+              systemMessage: afterAgentOutput.systemMessage,
+              contextCleared,
+            },
+          };
+          // Clear context if requested (honor both stop + clear)
+          if (contextCleared) {
+            await this.resetChat();
+          }
+          return turn;
+        }
+
+        if (afterAgentOutput?.isBlockingDecision()) {
+          const continueReason = afterAgentOutput.getEffectiveReason();
+          const contextCleared = afterAgentOutput.shouldClearContext();
+          yield {
+            type: GeminiEventType.AgentExecutionBlocked,
+            value: {
+              reason: continueReason,
+              systemMessage: afterAgentOutput.systemMessage,
+              contextCleared,
+            },
+          };
+          // Clear context if requested
+          if (contextCleared) {
+            await this.resetChat();
+          }
           const continueRequest = [{ text: continueReason }];
           yield* this.sendMessageStream(
             continueRequest,
             signal,
             prompt_id,
             boundedTurns - 1,
+            false,
+            displayContent,
           );
         }
       }
@@ -881,8 +961,29 @@ export class GeminiClient {
         // Pass the captured model to the centralized handler.
         handleFallback(this.config, currentAttemptModel, authType, error);
 
+      const onValidationRequiredCallback = async (
+        validationError: ValidationRequiredError,
+      ) => {
+        // Suppress validation dialog for background calls (e.g. prompt-completion)
+        // to prevent the dialog from appearing on startup or during typing.
+        if (modelConfigKey.model === 'prompt-completion') {
+          throw validationError;
+        }
+
+        const handler = this.config.getValidationHandler();
+        if (typeof handler !== 'function') {
+          throw validationError;
+        }
+        return handler(
+          validationError.validationLink,
+          validationError.validationDescription,
+          validationError.learnMoreUrl,
+        );
+      };
+
       const result = await retryWithBackoff(apiCall, {
         onPersistent429: onPersistent429Callback,
+        onValidationRequired: onValidationRequiredCallback,
         authType: this.config.getContentGeneratorConfig()?.authType,
         maxAttempts: availabilityMaxAttempts,
         getAvailabilityContext,
@@ -935,7 +1036,19 @@ export class GeminiClient {
         this.hasFailedCompressionAttempt || !force;
     } else if (info.compressionStatus === CompressionStatus.COMPRESSED) {
       if (newHistory) {
-        this.chat = await this.startChat(newHistory);
+        // capture current session data before resetting
+        const currentRecordingService =
+          this.getChat().getChatRecordingService();
+        const conversation = currentRecordingService.getConversation();
+        const filePath = currentRecordingService.getConversationFilePath();
+
+        let resumedData: ResumedSessionData | undefined;
+
+        if (conversation && filePath) {
+          resumedData = { conversation, filePath };
+        }
+
+        this.chat = await this.startChat(newHistory, resumedData);
         this.updateTelemetryTokenCount();
         this.forceFullIdeContext = true;
       }

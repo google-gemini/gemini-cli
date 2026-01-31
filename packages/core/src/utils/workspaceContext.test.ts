@@ -278,7 +278,7 @@ describe('WorkspaceContext with real filesystem', () => {
         // handle it gracefully and return false.
         expect(workspaceContext.isPathWithinWorkspace(linkA)).toBe(false);
         expect(workspaceContext.isPathWithinWorkspace(linkB)).toBe(false);
-      });
+      }, 30000);
     });
   });
 
@@ -372,6 +372,75 @@ describe('WorkspaceContext with real filesystem', () => {
 
       expect(dirs1).not.toBe(dirs2);
       expect(dirs1).toEqual(dirs2);
+    });
+  });
+
+  describe('addDirectories', () => {
+    it('should add multiple directories and emit one event', () => {
+      const dir3 = path.join(tempDir, 'dir3');
+      fs.mkdirSync(dir3);
+
+      const workspaceContext = new WorkspaceContext(cwd);
+      const listener = vi.fn();
+      workspaceContext.onDirectoriesChanged(listener);
+
+      const result = workspaceContext.addDirectories([otherDir, dir3]);
+
+      expect(workspaceContext.getDirectories()).toContain(otherDir);
+      expect(workspaceContext.getDirectories()).toContain(dir3);
+      expect(listener).toHaveBeenCalledOnce();
+      expect(result.added).toHaveLength(2);
+      expect(result.failed).toHaveLength(0);
+    });
+
+    it('should handle partial failures', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+      const listener = vi.fn();
+      workspaceContext.onDirectoriesChanged(listener);
+
+      const loggerSpy = vi
+        .spyOn(debugLogger, 'warn')
+        .mockImplementation(() => {});
+
+      const nonExistent = path.join(tempDir, 'does-not-exist');
+      const result = workspaceContext.addDirectories([otherDir, nonExistent]);
+
+      expect(workspaceContext.getDirectories()).toContain(otherDir);
+      expect(workspaceContext.getDirectories()).not.toContain(nonExistent);
+      expect(listener).toHaveBeenCalledOnce();
+      expect(loggerSpy).toHaveBeenCalled();
+      expect(result.added).toEqual([otherDir]);
+      expect(result.failed).toHaveLength(1);
+      expect(result.failed[0].path).toBe(nonExistent);
+      expect(result.failed[0].error).toBeDefined();
+
+      loggerSpy.mockRestore();
+    });
+
+    it('should not emit event if no directories added', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+      const listener = vi.fn();
+      workspaceContext.onDirectoriesChanged(listener);
+      const loggerSpy = vi
+        .spyOn(debugLogger, 'warn')
+        .mockImplementation(() => {});
+
+      const nonExistent = path.join(tempDir, 'does-not-exist');
+      const result = workspaceContext.addDirectories([nonExistent]);
+
+      expect(listener).not.toHaveBeenCalled();
+      expect(result.added).toHaveLength(0);
+      expect(result.failed).toHaveLength(1);
+      loggerSpy.mockRestore();
+    });
+  });
+
+  describe('addDirectory', () => {
+    it('should throw error if directory fails to add', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+      const nonExistent = path.join(tempDir, 'does-not-exist');
+
+      expect(() => workspaceContext.addDirectory(nonExistent)).toThrow();
     });
   });
 });

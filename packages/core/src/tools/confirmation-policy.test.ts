@@ -8,7 +8,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EditTool } from './edit.js';
-import { SmartEditTool } from './smart-edit.js';
 import { WriteFileTool } from './write-file.js';
 import { WebFetchTool } from './web-fetch.js';
 import { ToolConfirmationOutcome } from './tools.js';
@@ -17,13 +16,14 @@ import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { Config } from '../config/config.js';
 import path from 'node:path';
+import { isSubpath } from '../utils/paths.js';
 import fs from 'node:fs';
 import os from 'node:os';
 
 // Mock telemetry loggers to avoid failures
 vi.mock('../telemetry/loggers.js', () => ({
-  logSmartEditStrategy: vi.fn(),
-  logSmartEditCorrectionEvent: vi.fn(),
+  logEditStrategy: vi.fn(),
+  logEditCorrectionEvent: vi.fn(),
   logFileOperation: vi.fn(),
 }));
 
@@ -65,11 +65,33 @@ describe('Tool Confirmation Policy Updates', () => {
       getFileFilteringOptions: () => ({}),
       getGeminiClient: () => ({}),
       getBaseLlmClient: () => ({}),
+      getDisableLLMCorrection: () => true,
       getIdeMode: () => false,
       getWorkspaceContext: () => ({
         isPathWithinWorkspace: () => true,
         getDirectories: () => [rootDir],
       }),
+      storage: {
+        getProjectTempDir: () => path.join(os.tmpdir(), 'gemini-cli-temp'),
+      },
+      isPathAllowed(this: Config, absolutePath: string): boolean {
+        const workspaceContext = this.getWorkspaceContext();
+        if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+          return true;
+        }
+
+        const projectTempDir = this.storage.getProjectTempDir();
+        return isSubpath(path.resolve(projectTempDir), absolutePath);
+      },
+      validatePathAccess(this: Config, absolutePath: string): string | null {
+        if (this.isPathAllowed(absolutePath)) {
+          return null;
+        }
+
+        const workspaceDirs = this.getWorkspaceContext().getDirectories();
+        const projectTempDir = this.storage.getProjectTempDir();
+        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+      },
     };
   });
 
@@ -84,16 +106,6 @@ describe('Tool Confirmation Policy Updates', () => {
     {
       name: 'EditTool',
       create: (config: Config, bus: MessageBus) => new EditTool(config, bus),
-      params: {
-        file_path: 'test.txt',
-        old_string: 'existing',
-        new_string: 'new',
-      },
-    },
-    {
-      name: 'SmartEditTool',
-      create: (config: Config, bus: MessageBus) =>
-        new SmartEditTool(config, bus),
       params: {
         file_path: 'test.txt',
         instruction: 'change content',

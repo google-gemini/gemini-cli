@@ -18,24 +18,32 @@ export const SkillsList: React.FC<SkillsListProps> = ({
   skills,
   showDescriptions,
 }) => {
-  const enabledSkills = skills
-    .filter((s) => !s.disabled)
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const sortSkills = (a: SkillDefinition, b: SkillDefinition) => {
+    if (a.isBuiltin === b.isBuiltin) {
+      return a.name.localeCompare(b.name);
+    }
+    return a.isBuiltin ? 1 : -1;
+  };
 
-  const disabledSkills = skills
-    .filter((s) => s.disabled)
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const enabledSkills = skills.filter((s) => !s.disabled).sort(sortSkills);
+
+  const disabledSkills = skills.filter((s) => s.disabled).sort(sortSkills);
 
   const renderSkill = (skill: SkillDefinition) => (
     <Box key={skill.name} flexDirection="row">
       <Text color={theme.text.primary}>{'  '}- </Text>
       <Box flexDirection="column">
-        <Text
-          bold
-          color={skill.disabled ? theme.text.secondary : theme.text.link}
-        >
-          {skill.name}
-        </Text>
+        <Box flexDirection="row">
+          <Text
+            bold
+            color={skill.disabled ? theme.text.secondary : theme.text.link}
+          >
+            {skill.name}
+          </Text>
+          {skill.isBuiltin && (
+            <Text color={theme.text.secondary}>{' [Built-in]'}</Text>
+          )}
+        </Box>
         {showDescriptions && skill.description && (
           <Box marginLeft={2}>
             <Text

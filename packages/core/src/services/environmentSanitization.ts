@@ -14,7 +14,12 @@ export function sanitizeEnvironment(
   processEnv: NodeJS.ProcessEnv,
   config: EnvironmentSanitizationConfig,
 ): NodeJS.ProcessEnv {
-  if (!config.enableEnvironmentVariableRedaction) {
+  // Enable strict sanitization in GitHub actions.
+  const isStrictSanitization =
+    !!processEnv['GITHUB_SHA'] || processEnv['SURFACE'] === 'Github';
+
+  // Always sanitize when in GitHub actions.
+  if (!config.enableEnvironmentVariableRedaction && !isStrictSanitization) {
     return { ...processEnv };
   }
 
@@ -26,9 +31,6 @@ export function sanitizeEnvironment(
   const blockedSet = new Set(
     (config.blockedEnvironmentVariables || []).map((k) => k.toUpperCase()),
   );
-
-  // Enable strict sanitization in GitHub actions.
-  const isStrictSanitization = !!processEnv['GITHUB_SHA'];
 
   for (const key in processEnv) {
     const value = processEnv[key];
@@ -101,6 +103,9 @@ export const NEVER_ALLOWED_ENVIRONMENT_VARIABLES: ReadonlySet<string> = new Set(
     'GOOGLE_CLOUD_PROJECT',
     'GOOGLE_CLOUD_ACCOUNT',
     'FIREBASE_PROJECT_ID',
+    'GEMINI_API_KEY',
+    'GOOGLE_API_KEY',
+    'GOOGLE_APPLICATION_CREDENTIALS',
   ],
 );
 

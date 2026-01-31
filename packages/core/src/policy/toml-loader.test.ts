@@ -53,6 +53,7 @@ priority = 100
         toolName: 'glob',
         decision: PolicyDecision.ALLOW,
         priority: 1.1, // tier 1 + 100/1000
+        source: 'Default: test.toml',
       });
       expect(result.checkers).toHaveLength(0);
       expect(result.errors).toHaveLength(0);
@@ -172,7 +173,23 @@ allow_redirection = true
       expect(result.errors).toHaveLength(0);
     });
 
-    it('should return error if modes property is used for Tier 2 and Tier 3 policies', async () => {
+    it('should parse deny_message property', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "rm"
+decision = "deny"
+priority = 100
+deny_message = "Deletion is permanent"
+`);
+
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].toolName).toBe('rm');
+      expect(result.rules[0].decision).toBe(PolicyDecision.DENY);
+      expect(result.rules[0].denyMessage).toBe('Deletion is permanent');
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('should support modes property for Tier 2 and Tier 3 policies', async () => {
       await fs.writeFile(
         path.join(tempDir, 'tier2.toml'),
         `
@@ -187,13 +204,11 @@ modes = ["autoEdit"]
       const getPolicyTier = (_dir: string) => 2; // Tier 2
       const result = await loadPoliciesFromToml([tempDir], getPolicyTier);
 
-      // It still transforms the rule, but it should also report an error
       expect(result.rules).toHaveLength(1);
       expect(result.rules[0].toolName).toBe('tier2-tool');
-      expect(result.rules[0].modes).toBeUndefined(); // Should be restricted
-      expect(result.errors).toHaveLength(1);
-      expect(result.errors[0].errorType).toBe('rule_validation');
-      expect(result.errors[0].message).toContain('Restricted property "modes"');
+      expect(result.rules[0].modes).toEqual(['autoEdit']);
+      expect(result.rules[0].source).toBe('User: tier2.toml');
+      expect(result.errors).toHaveLength(0);
     });
 
     it('should handle TOML parse errors', async () => {

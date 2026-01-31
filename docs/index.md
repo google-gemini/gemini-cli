@@ -56,6 +56,8 @@ This documentation is organized into the following sections:
   commands with `/model`.
 - **[Sandbox](./cli/sandbox.md):** Isolate tool execution in a secure,
   containerized environment.
+- **[Agent Skills](./cli/skills.md):** Extend the CLI with specialized expertise
+  and procedural workflows.
 - **[Settings](./cli/settings.md):** Configure various aspects of the CLI's
   behavior and appearance with `/settings`.
 - **[Telemetry](./cli/telemetry.md):** Overview of telemetry in the CLI.
@@ -100,10 +102,10 @@ This documentation is organized into the following sections:
 
 - **[Introduction: Extensions](./extensions/index.md):** How to extend the CLI
   with new functionality.
-- **[Get Started with extensions](./extensions/getting-started-extensions.md):**
-  Learn how to build your own extension.
-- **[Extension releasing](./extensions/extension-releasing.md):** How to release
-  Gemini CLI extensions.
+- **[Writing extensions](./extensions/writing-extensions.md):** Learn how to
+  build your own extension.
+- **[Extension releasing](./extensions/releasing.md):** How to release Gemini
+  CLI extensions.
 
 ### Hooks
 

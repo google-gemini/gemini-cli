@@ -27,11 +27,25 @@ const mockReadline = vi.hoisted(() => ({
   }),
 }));
 
+const mockReaddir = vi.hoisted(() => vi.fn());
+const originalReaddir = vi.hoisted(() => ({
+  current: null as typeof fs.readdir | null,
+}));
+
 // Mocking readline for non-interactive prompts
 vi.mock('node:readline', () => ({
   default: mockReadline,
   createInterface: mockReadline.createInterface,
 }));
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>();
+  originalReaddir.current = actual.readdir;
+  return {
+    ...actual,
+    readdir: mockReaddir,
+  };
+});
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -49,6 +63,10 @@ describe('consent', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    if (originalReaddir.current) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mockReaddir.mockImplementation(originalReaddir.current as any);
+    }
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'consent-test-'));
   });
 
@@ -173,12 +191,13 @@ describe('consent', () => {
 
         const expectedConsentString = [
           'Installing extension "test-ext".',
-          INSTALL_WARNING_MESSAGE,
           'This extension will run the following MCP servers:',
           '  * server1 (local): npm start',
           '  * server2 (remote): https://remote.com',
           'This extension will append info to your gemini.md context using my-context.md',
           'This extension will exclude the following core tools: tool1,tool2',
+          '',
+          INSTALL_WARNING_MESSAGE,
         ].join('\n');
 
         expect(requestConsent).toHaveBeenCalledWith(expectedConsentString);
@@ -306,7 +325,6 @@ describe('consent', () => {
 
         const expectedConsentString = [
           'Installing extension "test-ext".',
-          INSTALL_WARNING_MESSAGE,
           'This extension will run the following MCP servers:',
           '  * server1 (local): npm start',
           '  * server2 (remote): https://remote.com',
@@ -314,13 +332,17 @@ describe('consent', () => {
           'This extension will exclude the following core tools: tool1,tool2',
           '',
           chalk.bold('Agent Skills:'),
-          SKILLS_WARNING_MESSAGE,
-          'This extension will install the following agent skills:',
+          '\nThis extension will install the following agent skills:\n',
           `  * ${chalk.bold('skill1')}: desc1`,
-          `    (Location: ${skill1.location}) (2 items in directory)`,
-          `  * ${chalk.bold('skill2')}: desc2`,
-          `    (Location: ${skill2.location}) (1 items in directory)`,
+          chalk.dim(`    (Source: ${skill1.location}) (2 items in directory)`),
           '',
+          `  * ${chalk.bold('skill2')}: desc2`,
+          chalk.dim(`    (Source: ${skill2.location}) (1 items in directory)`),
+          '',
+          '',
+          INSTALL_WARNING_MESSAGE,
+          '',
+          SKILLS_WARNING_MESSAGE,
         ].join('\n');
 
         expect(requestConsent).toHaveBeenCalledWith(expectedConsentString);
@@ -328,7 +350,7 @@ describe('consent', () => {
 
       it('should show a warning if the skill directory cannot be read', async () => {
         const lockedDir = path.join(tempDir, 'locked');
-        await fs.mkdir(lockedDir, { recursive: true, mode: 0o000 });
+        await fs.mkdir(lockedDir, { recursive: true });
 
         const skill: SkillDefinition = {
           name: 'locked-skill',
@@ -337,27 +359,62 @@ describe('consent', () => {
           body: 'body',
         };
 
-        const requestConsent = vi.fn().mockResolvedValue(true);
-        try {
-          await maybeRequestConsentOrFail(
-            baseConfig,
-            requestConsent,
-            false,
-            undefined,
-            false,
-            [skill],
-          );
+        // Mock readdir to simulate a permission error.
+        // We do this instead of using fs.mkdir(..., { mode: 0o000 }) because
+        // directory permissions work differently on Windows and 0o000 doesn't
+        // effectively block access there, leading to test failures in Windows CI.
+        mockReaddir.mockRejectedValueOnce(
+          new Error('EACCES: permission denied, scandir'),
+        );
 
-          expect(requestConsent).toHaveBeenCalledWith(
-            expect.stringContaining(
-              `    (Location: ${skill.location}) ${chalk.red('⚠️ (Could not count items in directory)')}`,
-            ),
-          );
-        } finally {
-          // Restore permissions so cleanup works
-          await fs.chmod(lockedDir, 0o700);
-        }
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          baseConfig,
+          requestConsent,
+          false,
+          undefined,
+          false,
+          [skill],
+        );
+
+        expect(requestConsent).toHaveBeenCalledWith(
+          expect.stringContaining(
+            `    (Source: ${skill.location}) ${chalk.red('⚠️ (Could not count items in directory)')}`,
+          ),
+        );
       });
+    });
+  });
+
+  describe('skillsConsentString', () => {
+    it('should generate a consent string for skills', async () => {
+      const skill1Dir = path.join(tempDir, 'skill1');
+      await fs.mkdir(skill1Dir, { recursive: true });
+      await fs.writeFile(path.join(skill1Dir, 'SKILL.md'), 'body1');
+
+      const skill1: SkillDefinition = {
+        name: 'skill1',
+        description: 'desc1',
+        location: path.join(skill1Dir, 'SKILL.md'),
+        body: 'body1',
+      };
+
+      const { skillsConsentString } = await import('./consent.js');
+      const consentString = await skillsConsentString(
+        [skill1],
+        'https://example.com/repo.git',
+        '/mock/target/dir',
+      );
+
+      expect(consentString).toContain(
+        'Installing agent skill(s) from "https://example.com/repo.git".',
+      );
+      expect(consentString).toContain('Install Destination: /mock/target/dir');
+      expect(consentString).toContain('\n' + SKILLS_WARNING_MESSAGE);
+      expect(consentString).toContain(`  * ${chalk.bold('skill1')}: desc1`);
+      expect(consentString).toContain(
+        chalk.dim(`(Source: ${skill1.location}) (1 items in directory)`),
+      );
     });
   });
 });

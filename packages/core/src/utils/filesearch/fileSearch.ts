@@ -13,17 +13,18 @@ import { crawl } from './crawler.js';
 import type { FzfResultItem } from 'fzf';
 import { AsyncFzf } from 'fzf';
 import { unescapePath } from '../paths.js';
+import type { FileDiscoveryService } from '../../services/fileDiscoveryService.js';
 
 export interface FileSearchOptions {
   projectRoot: string;
   ignoreDirs: string[];
-  useGitignore: boolean;
-  useGeminiignore: boolean;
+  fileDiscoveryService: FileDiscoveryService;
   cache: boolean;
   cacheTtl: number;
   enableRecursiveFileSearch: boolean;
-  disableFuzzySearch: boolean;
+  enableFuzzySearch: boolean;
   maxDepth?: number;
+  maxFiles?: number;
 }
 
 export class AbortError extends Error {
@@ -100,7 +101,10 @@ class RecursiveFileSearch implements FileSearch {
   constructor(private readonly options: FileSearchOptions) {}
 
   async initialize(): Promise<void> {
-    this.ignore = loadIgnoreRules(this.options);
+    this.ignore = loadIgnoreRules(
+      this.options.fileDiscoveryService,
+      this.options.ignoreDirs,
+    );
 
     this.allFiles = await crawl({
       crawlDirectory: this.options.projectRoot,
@@ -109,7 +113,9 @@ class RecursiveFileSearch implements FileSearch {
       cache: this.options.cache,
       cacheTtl: this.options.cacheTtl,
       maxDepth: this.options.maxDepth,
+      maxFiles: this.options.maxFiles ?? 20000,
     });
+
     this.buildResultCache();
   }
 
@@ -119,7 +125,7 @@ class RecursiveFileSearch implements FileSearch {
   ): Promise<string[]> {
     if (
       !this.resultCache ||
-      (!this.fzf && !this.options.disableFuzzySearch) ||
+      (!this.fzf && this.options.enableFuzzySearch) ||
       !this.ignore
     ) {
       throw new Error('Engine not initialized. Call initialize() first.');
@@ -180,7 +186,7 @@ class RecursiveFileSearch implements FileSearch {
 
   private buildResultCache(): void {
     this.resultCache = new ResultCache(this.allFiles);
-    if (!this.options.disableFuzzySearch) {
+    if (this.options.enableFuzzySearch) {
       // The v1 algorithm is much faster since it only looks at the first
       // occurrence of the pattern. We use it for search spaces that have >20k
       // files, because the v2 algorithm is just too slow in those cases.
@@ -197,7 +203,10 @@ class DirectoryFileSearch implements FileSearch {
   constructor(private readonly options: FileSearchOptions) {}
 
   async initialize(): Promise<void> {
-    this.ignore = loadIgnoreRules(this.options);
+    this.ignore = loadIgnoreRules(
+      this.options.fileDiscoveryService,
+      this.options.ignoreDirs,
+    );
   }
 
   async search(

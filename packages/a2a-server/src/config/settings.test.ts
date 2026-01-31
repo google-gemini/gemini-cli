@@ -27,13 +27,21 @@ vi.mock('node:os', async (importOriginal) => {
   };
 });
 
-vi.mock('@google/gemini-cli-core', () => ({
-  GEMINI_DIR: '.gemini',
-  debugLogger: {
-    error: vi.fn(),
-  },
-  getErrorMessage: (error: unknown) => String(error),
-}));
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  const path = await import('node:path');
+  const os = await import('node:os');
+  return {
+    ...actual,
+    GEMINI_DIR: '.gemini',
+    debugLogger: {
+      error: vi.fn(),
+    },
+    getErrorMessage: (error: unknown) => String(error),
+    homedir: () => path.join(os.tmpdir(), `gemini-home-${mocks.suffix}`),
+  };
+});
 
 describe('loadSettings', () => {
   const mockHomeDir = path.join(os.tmpdir(), `gemini-home-${mocks.suffix}`);

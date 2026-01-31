@@ -14,7 +14,7 @@ import type {
   TaskStatusUpdateEvent,
   SendStreamingMessageSuccessResponse,
 } from '@a2a-js/sdk';
-import type express from 'express';
+import express from 'express';
 import type { Server } from 'node:http';
 import request from 'supertest';
 import {
@@ -27,7 +27,7 @@ import {
   it,
   vi,
 } from 'vitest';
-import { createApp } from './app.js';
+import { createApp, main } from './app.js';
 import { commandRegistry } from '../commands/command-registry.js';
 import {
   assertUniqueFinalEventIsLast,
@@ -1174,6 +1174,45 @@ describe('E2E Tests', () => {
 
         expect(res.body).toEqual({ name: 'non-stream-test', data: 'done' });
       });
+    });
+  });
+
+  describe('main', () => {
+    it('should listen on localhost only', async () => {
+      const listenSpy = vi
+        .spyOn(express.application, 'listen')
+        .mockImplementation((...args: unknown[]) => {
+          // Trigger the callback passed to listen
+          const callback = args.find(
+            (arg): arg is () => void => typeof arg === 'function',
+          );
+          if (callback) {
+            callback();
+          }
+
+          return {
+            address: () => ({ port: 1234 }),
+            on: vi.fn(),
+            once: vi.fn(),
+            emit: vi.fn(),
+          } as unknown as Server;
+        });
+
+      // Avoid process.exit if possible, or mock it if main might fail
+      const exitSpy = vi
+        .spyOn(process, 'exit')
+        .mockImplementation(() => undefined as never);
+
+      await main();
+
+      expect(listenSpy).toHaveBeenCalledWith(
+        expect.any(Number),
+        'localhost',
+        expect.any(Function),
+      );
+
+      listenSpy.mockRestore();
+      exitSpy.mockRestore();
     });
   });
 });
