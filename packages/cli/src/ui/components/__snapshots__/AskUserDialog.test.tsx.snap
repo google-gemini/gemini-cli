@@ -1,5 +1,56 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`AskUserDialog > Scroll Arrows (useAlternateBuffer: false) > shows scroll arrows correctly when useAlternateBuffer is false 1`] = `
+"Choose an option
+
+▲
+●  1.  Option 1
+       Description 1
+   2.  Option 2
+       Description 2
+▼
+
+Enter to select · ↑/↓ to navigate · Esc to cancel"
+`;
+
+exports[`AskUserDialog > Scroll Arrows (useAlternateBuffer: true) > shows scroll arrows correctly when useAlternateBuffer is true 1`] = `
+"Choose an option
+
+●  1.  Option 1
+       Description 1
+   2.  Option 2
+       Description 2
+   3.  Option 3
+       Description 3
+   4.  Option 4
+       Description 4
+   5.  Option 5
+       Description 5
+   6.  Option 6
+       Description 6
+   7.  Option 7
+       Description 7
+   8.  Option 8
+       Description 8
+   9.  Option 9
+       Description 9
+  10.  Option 10
+       Description 10
+  11.  Option 11
+       Description 11
+  12.  Option 12
+       Description 12
+  13.  Option 13
+       Description 13
+  14.  Option 14
+       Description 14
+  15.  Option 15
+       Description 15
+  16.  Enter a custom value
+
+Enter to select · ↑/↓ to navigate · Esc to cancel"
+`;
+
 exports[`AskUserDialog > Text type questions > renders text input for type: "text" 1`] = `
 "What should we name this component?
 
@@ -102,19 +153,6 @@ Which database should we use?
   3.  Enter a custom value
 
 Enter to select · ←/→ to switch questions · Esc to cancel"
-`;
-
-exports[`AskUserDialog > shows scroll arrows when options exceed available height 1`] = `
-"Choose an option
-
-▲
-●  1.  Option 1
-       Description 1
-   2.  Option 2
-       Description 2
-▼
-
-Enter to select · ↑/↓ to navigate · Esc to cancel"
 `;
 
 exports[`AskUserDialog > shows warning for unanswered questions on Review tab 1`] = `

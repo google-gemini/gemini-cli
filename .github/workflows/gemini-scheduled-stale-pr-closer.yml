@@ -48,14 +48,15 @@ jobs:
                 org: context.repo.owner,
                 team_slug: 'gemini-cli-maintainers'
               });
-              maintainerLogins = new Set(members.map(m => m.login));
+              maintainerLogins = new Set(members.map(m => m.login.toLowerCase()));
             } catch (e) {
               core.warning('Failed to fetch team members');
             }
 
             const isMaintainer = (login, assoc) => {
-              if (maintainerLogins.size > 0) return maintainerLogins.has(login);
-              return ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(assoc);
+              const isTeamMember = maintainerLogins.has(login.toLowerCase());
+              const isRepoMaintainer = ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(assoc);
+              return isTeamMember || isRepoMaintainer;
             };
 
             // 2. Determine which PRs to check
