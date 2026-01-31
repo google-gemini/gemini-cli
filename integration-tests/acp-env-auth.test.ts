@@ -47,7 +47,7 @@ describe('ACP Environment and Auth', () => {
 
       // Create a project directory with a .env file
       const projectDir = join(rig.testDir!, 'project');
-      mkdirSync(projectDir);
+      mkdirSync(projectDir, { recursive: true });
       writeFileSync(
         join(projectDir, '.env'),
         'GEMINI_API_KEY=test-key-from-env\n',
@@ -87,9 +87,18 @@ describe('ACP Environment and Auth', () => {
         });
       } catch (error) {
         if (error instanceof Error) {
-          expect(error.message).not.toContain('Authentication required');
+          if (error.message.includes('Authentication required')) {
+            throw new Error(
+              `Expected session to be authenticated via .env, but got: ${error.message}`,
+            );
+          }
         } else {
-          throw error;
+          const errorMsg = String(error);
+          if (errorMsg.includes('Authentication required')) {
+            throw new Error(
+              `Expected session to be authenticated via .env, but got: ${errorMsg}`,
+            );
+          }
         }
       }
 

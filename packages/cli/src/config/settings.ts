@@ -438,7 +438,7 @@ export function loadEnvironment(
 ): void {
   const envFilePath = findEnvFile(workspaceDir);
 
-  if (!isWorkspaceTrusted(settings, workspaceDir).isTrusted) {
+  if (isWorkspaceTrusted(settings, workspaceDir).isTrusted === false) {
     return;
   }
 
