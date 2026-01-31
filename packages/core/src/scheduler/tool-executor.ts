@@ -253,6 +253,7 @@ export class ToolExecutor {
       errorType: undefined,
       outputFile,
       contentLength: typeof content === 'string' ? content.length : undefined,
+      data: toolResult.data,
     };
 
     const startTime = 'startTime' in call ? call.startTime : undefined;

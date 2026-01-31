@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import type { ArgumentsCamelCase, CommandModule } from 'yargs';
-import { debugLogger, ExitCodes } from '@google/gemini-cli-core';
+import {
+  coreEvents,
+  ExitCodes,
+  getAdminErrorMessage,
+} from '@google/gemini-cli-core';
 import { runExitCleanup } from './utils/cleanup.js';
 import type { MergedSettings } from './config/settings.js';
 import process from 'node:process';
@@ -30,7 +34,10 @@ export async function runDeferredCommand(settings: MergedSettings) {
   const commandName = deferredCommand.commandName;
 
   if (commandName === 'mcp' && adminSettings?.mcp?.enabled === false) {
-    debugLogger.error('Error: MCP is disabled by your admin.');
+    coreEvents.emitFeedback(
+      'error',
+      getAdminErrorMessage('MCP', undefined /* config */),
+    );
     await runExitCleanup();
     process.exit(ExitCodes.FATAL_CONFIG_ERROR);
   }
@@ -39,13 +46,19 @@ export async function runDeferredCommand(settings: MergedSettings) {
     commandName === 'extensions' &&
     adminSettings?.extensions?.enabled === false
   ) {
-    debugLogger.error('Error: Extensions are disabled by your admin.');
+    coreEvents.emitFeedback(
+      'error',
+      getAdminErrorMessage('Extensions', undefined /* config */),
+    );
     await runExitCleanup();
     process.exit(ExitCodes.FATAL_CONFIG_ERROR);
   }
 
   if (commandName === 'skills' && adminSettings?.skills?.enabled === false) {
-    debugLogger.error('Error: Agent skills are disabled by your admin.');
+    coreEvents.emitFeedback(
+      'error',
+      getAdminErrorMessage('Agent skills', undefined /* config */),
+    );
     await runExitCleanup();
     process.exit(ExitCodes.FATAL_CONFIG_ERROR);
   }
