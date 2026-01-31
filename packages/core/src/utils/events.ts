@@ -126,6 +126,13 @@ export interface AgentsDiscoveredPayload {
   agents: AgentDefinition[];
 }
 
+/**
+ * Payload for the 'window-focus-changed' event.
+ */
+export interface WindowFocusChangedPayload {
+  focused: boolean;
+}
+
 export enum CoreEvent {
   UserFeedback = 'user-feedback',
   ModelChanged = 'model-changed',
@@ -143,6 +150,7 @@ export enum CoreEvent {
   RetryAttempt = 'retry-attempt',
   ConsentRequest = 'consent-request',
   AgentsDiscovered = 'agents-discovered',
+  WindowFocusChanged = 'window-focus-changed',
 }
 
 export interface CoreEvents extends ExtensionEvents {
@@ -162,6 +170,7 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.RetryAttempt]: [RetryAttemptPayload];
   [CoreEvent.ConsentRequest]: [ConsentRequestPayload];
   [CoreEvent.AgentsDiscovered]: [AgentsDiscoveredPayload];
+  [CoreEvent.WindowFocusChanged]: [WindowFocusChangedPayload];
 }
 
 type EventBacklogItem = {
@@ -297,6 +306,14 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   emitAgentsDiscovered(agents: AgentDefinition[]): void {
     const payload: AgentsDiscoveredPayload = { agents };
     this._emitOrQueue(CoreEvent.AgentsDiscovered, payload);
+  }
+
+  /**
+   * Notifies subscribers that the window focus has changed.
+   */
+  emitWindowFocusChanged(focused: boolean): void {
+    const payload: WindowFocusChangedPayload = { focused };
+    this.emit(CoreEvent.WindowFocusChanged, payload);
   }
 
   /**

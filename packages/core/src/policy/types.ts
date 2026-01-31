@@ -138,6 +138,12 @@ export interface PolicyRule {
   allowRedirection?: boolean;
 
   /**
+   * If true, triggers a system notification when this rule matches.
+   * Useful for auditing or high-risk actions that are auto-approved.
+   */
+  notify?: boolean;
+
+  /**
    * Effect of the rule's source.
    * e.g. "my-policies.toml", "Settings (MCP Trusted)", etc.
    */

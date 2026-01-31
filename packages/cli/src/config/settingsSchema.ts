@@ -615,6 +615,16 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      enableNotifications: {
+        type: 'boolean',
+        label: 'Enable Notifications',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Enable notifications for user permission prompts when the CLI is not in focus. Tested on mac, experimental on win/linux',
+        showInDialog: true,
+      },
     },
   },
 
