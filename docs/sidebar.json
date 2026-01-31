@@ -21,7 +21,8 @@
       { "label": "Shell commands", "slug": "docs/tools/shell" },
       { "label": "Session management", "slug": "docs/cli/session-management" },
       { "label": "Todos", "slug": "docs/tools/todos" },
-      { "label": "Web search and fetch", "slug": "docs/tools/web-search" }
+      { "label": "Web search", "slug": "docs/tools/web-search" },
+      { "label": "Web fetch", "slug": "docs/tools/web-fetch" }
     ]
   },
   {
