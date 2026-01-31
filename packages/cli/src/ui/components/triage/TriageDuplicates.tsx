@@ -7,7 +7,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
-import type { Config } from '@google/gemini-cli-core';
+import commandExists from 'command-exists';
+import { type Config } from '@google/gemini-cli-core';
 import { debugLogger, spawnAsync } from '@google/gemini-cli-core';
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../../keyMatchers.js';
@@ -436,6 +437,10 @@ Return a JSON object with:
 
   const fetchIssues = useCallback(async (limit: number) => {
     try {
+      if (!commandExists.sync('gh')) {
+        throw new Error(`Missing gh command. Please install GitHub CLI.`);
+      }
+
       const { stdout } = await spawnAsync('gh', [
         'issue',
         'list',
