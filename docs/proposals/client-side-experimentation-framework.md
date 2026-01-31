@@ -45,9 +45,9 @@ protecting users who don't opt-in.
 | Agents                 | `experimental.enableAgents`               | `false` | Enable subagent system         |
 | JIT Context            | `experimental.jitContext`                 | `false` | Just-in-time context loading   |
 | Event-Driven Scheduler | `experimental.enableEventDrivenScheduler` | `true`  | Event-based task orchestration |
-| Extension Reloading    | `experimental.extensionReloading`         | `false` | Runtime extension loading      |
-| Extension Config       | `experimental.extensionConfig`            | `false` | Extension settings management  |
-| Extension Management   | `experimental.extensionManagement`        | `true`  | Extension management features  |
+| Plugin Hot-Reload      | `experimental.extensionReloading`         | `false` | Runtime plugin loading         |
+| Plugin Configuration   | `experimental.extensionConfig`            | `false` | Plugin settings management     |
+| Plugin Management      | `experimental.extensionManagement`        | `true`  | Plugin lifecycle features      |
 | Plan Mode              | `experimental.plan`                       | `false` | Read-only planning mode        |
 | OSC 52 Paste           | `experimental.useOSC52Paste`              | `false` | Remote session clipboard       |
 | Preview Models         | `general.previewFeatures`                 | `false` | Access to preview models       |

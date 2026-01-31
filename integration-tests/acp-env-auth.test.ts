@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TestRig } from './test-helper.js';
 import { spawn, ChildProcess } from 'node:child_process';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { Writable, Readable } from 'node:stream';
 import { env } from 'node:process';
@@ -46,7 +46,7 @@ describe('ACP Environment and Auth', () => {
       rig.setup('acp-env-loading');
 
       // Create a project directory with a .env file containing a recognizable invalid key
-      const projectDir = join(rig.testDir!, 'project');
+      const projectDir = resolve(join(rig.testDir!, 'project'));
       mkdirSync(projectDir, { recursive: true });
       writeFileSync(
         join(projectDir, '.env'),
@@ -148,7 +148,7 @@ describe('ACP Environment and Auth', () => {
 
       await expect(
         connection.newSession({
-          cwd: rig.testDir!,
+          cwd: resolve(rig.testDir!),
           mcpServers: [],
         }),
       ).rejects.toMatchObject({
