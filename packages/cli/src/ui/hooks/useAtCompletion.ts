@@ -203,7 +203,7 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
     setIsLoadingSuggestions,
   } = props;
   const [state, dispatch] = useReducer(atCompletionReducer, initialState);
-  const fileSearch = useRef<FileSearch | null>(null);
+  const fileSearchers = useRef<FileSearch[]>([]);
   const searchAbortController = useRef<AbortController | null>(null);
   const slowSearchTimer = useRef<NodeJS.Timeout | null>(null);
 
@@ -267,7 +267,7 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
           maxFiles: config?.getFileFilteringOptions()?.maxFileCount,
         });
         await searcher.initialize();
-        fileSearch.current = searcher;
+        fileSearchers.current = [searcher];
         dispatch({ type: 'INITIALIZE_SUCCESS' });
         if (state.pattern !== null) {
           dispatch({ type: 'SEARCH', payload: state.pattern });
@@ -278,7 +278,7 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
     };
 
     const search = async () => {
-      if (!fileSearch.current || state.pattern === null) {
+      if (fileSearchers.current.length === 0 || state.pattern === null) {
         return;
       }
 
@@ -310,10 +310,15 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
       })();
 
       try {
-        const results = await fileSearch.current.search(state.pattern, {
-          signal: controller.signal,
-          maxResults: MAX_SUGGESTIONS_TO_SHOW * 3,
-        });
+        // Search across all roots
+        const searchResults = await Promise.all(
+          fileSearchers.current.map((searcher) =>
+            searcher.search(state.pattern!, {
+              signal: controller.signal,
+              maxResults: MAX_SUGGESTIONS_TO_SHOW * 3,
+            }),
+          ),
+        );
 
         if (slowSearchTimer.current) {
           clearTimeout(slowSearchTimer.current);
@@ -323,7 +328,10 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
           return;
         }
 
-        const fileSuggestions = results.map((p) => ({
+        // Flatten and deduplicate results
+        const combinedFiles = Array.from(new Set(searchResults.flat()));
+
+        const fileSuggestions = combinedFiles.map((p) => ({
           label: p,
           value: escapePath(p),
         }));
