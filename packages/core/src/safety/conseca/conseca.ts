@@ -27,7 +27,10 @@ export class ConsecaSafetyChecker implements InProcessChecker {
   private activeUserPrompt: string | null = null;
   private config: Config | null = null;
 
-  private constructor() {}
+  /**
+   * Public for testing purposes. Use `getInstance()` in production.
+   */
+  constructor() {}
 
   static getInstance(): ConsecaSafetyChecker {
     if (!ConsecaSafetyChecker.instance) {
@@ -140,14 +143,11 @@ export class ConsecaSafetyChecker implements InProcessChecker {
   }
 
   private extractUserPrompt(input: SafetyCheckInput): string | null {
-    if (input.context.history && input.context.history.turns.length > 0) {
-      const lastTurn =
-        input.context.history.turns[input.context.history.turns.length - 1];
-      return lastTurn.user.text;
+    const prompt = input.context.history?.turns.at(-1)?.user.text;
+    if (prompt) {
+      return prompt;
     }
-    debugLogger.debug(
-      `[Conseca] extractUserPrompt failed. History length: ${input.context.history?.turns?.length}`,
-    );
+    debugLogger.debug(`[Conseca] extractUserPrompt failed.`);
     return null;
   }
 

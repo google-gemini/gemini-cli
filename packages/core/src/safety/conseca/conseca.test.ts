@@ -31,13 +31,13 @@ describe('ConsecaSafetyChecker', () => {
   let mockConfig: Config;
 
   beforeEach(() => {
-    // Reset instance for testing if possible, or just get the singleton
-    checker = ConsecaSafetyChecker.getInstance();
+    // Reset instance for testing using direct instantiation
+    checker = new ConsecaSafetyChecker();
     // Reset state (since it's a singleton, we need to be careful)
     // We can't easily reset private state without a helper or recreating.
     // For now, we rely on the fact that we can set a new prompt.
     mockConfig = {
-      safety: { enableConseca: true },
+      enableConseca: true,
       getToolRegistry: vi.fn().mockReturnValue({
         getFunctionDeclarations: vi.fn().mockReturnValue([]),
       }),
@@ -58,7 +58,7 @@ describe('ConsecaSafetyChecker', () => {
     expect(instance1).toBe(instance2);
   });
 
-  it('should implement InProcessChecker interface', async () => {
+  it('should return ALLOW when no user prompt is present in context', async () => {
     const input: SafetyCheckInput = {
       protocolVersion: '1.0.0',
       toolCall: { name: 'testTool' },
@@ -73,7 +73,7 @@ describe('ConsecaSafetyChecker', () => {
 
   it('should return ALLOW if enableConseca is false', async () => {
     const disabledConfig = {
-      safety: { enableConseca: false },
+      enableConseca: false,
     } as unknown as Config;
     checker.setConfig(disabledConfig);
 

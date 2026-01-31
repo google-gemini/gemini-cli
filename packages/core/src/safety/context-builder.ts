@@ -24,7 +24,7 @@ export class ContextBuilder {
     debugLogger.debug(
       `[ContextBuilder] buildFullContext called. History is: ${JSON.stringify(this.conversationHistory)}`,
     );
-    //TODO: Conversation history is does not contain the user prompt. We need to add it.
+    // Conversation history does not contain the user prompt. We need to add it.
     const history = [...this.conversationHistory];
     const currentQuestion = this.config.getQuestion();
     if (currentQuestion && history.length === 0) {

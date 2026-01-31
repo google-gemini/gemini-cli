@@ -128,7 +128,8 @@ export async function enforcePolicy(
     }
 
     try {
-      const parsed = JSON.parse(responseText);
+      const parsed: z.infer<typeof EnforcementResultSchema> =
+        JSON.parse(responseText);
       debugLogger.debug(`[Conseca] Enforcement Parsed:`, parsed);
 
       let decision: SafetyCheckDecision;
