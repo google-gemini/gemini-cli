@@ -457,6 +457,288 @@ describe('useAtCompletion', () => {
     });
   });
 
+  describe('Multiple Directory Support', () => {
+    it('should search across multiple directories when workspace context provides multiple roots', async () => {
+      // Create two separate directory structures
+      const structure1: FileSystemStructure = {
+        'project1-file.txt': '',
+        src: {
+          'component1.tsx': '',
+        },
+      };
+      const structure2: FileSystemStructure = {
+        'project2-file.txt': '',
+        lib: {
+          'utility.ts': '',
+        },
+      };
+
+      const rootDir1 = await createTmpDir(structure1);
+      const rootDir2 = await createTmpDir(structure2);
+
+      const multiDirConfig = {
+        getFileFilteringOptions: vi.fn(() => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+        })),
+        getEnableRecursiveFileSearch: () => true,
+        getFileFilteringEnableFuzzySearch: () => true,
+        getResourceRegistry: vi.fn().mockReturnValue({
+          getAllResources: () => [],
+        }),
+        getWorkspaceContext: () => ({
+          getDirectories: () => [rootDir1, rootDir2],
+        }),
+      } as unknown as Config;
+
+      const { result } = renderHook(() =>
+        useTestHarnessForAtCompletion(true, '', multiDirConfig, rootDir1),
+      );
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBeGreaterThan(0);
+      });
+
+      const suggestionValues = result.current.suggestions.map((s) => s.value);
+
+      // Should contain files from both directories
+      expect(suggestionValues).toContain('project1-file.txt');
+      expect(suggestionValues).toContain('project2-file.txt');
+      expect(suggestionValues).toContain('src/component1.tsx');
+      expect(suggestionValues).toContain('lib/utility.ts');
+
+      await cleanupTmpDir(rootDir1);
+      await cleanupTmpDir(rootDir2);
+    });
+
+    it('should deduplicate files with the same path from multiple directories', async () => {
+      // Create two directories with files that have the same relative path
+      const structure: FileSystemStructure = {
+        'common-file.txt': '',
+        src: {
+          'index.ts': '',
+        },
+      };
+
+      const rootDir1 = await createTmpDir(structure);
+      const rootDir2 = await createTmpDir(structure);
+
+      const multiDirConfig = {
+        getFileFilteringOptions: vi.fn(() => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+        })),
+        getEnableRecursiveFileSearch: () => true,
+        getFileFilteringEnableFuzzySearch: () => true,
+        getResourceRegistry: vi.fn().mockReturnValue({
+          getAllResources: () => [],
+        }),
+        getWorkspaceContext: () => ({
+          getDirectories: () => [rootDir1, rootDir2],
+        }),
+      } as unknown as Config;
+
+      const { result } = renderHook(() =>
+        useTestHarnessForAtCompletion(true, '', multiDirConfig, rootDir1),
+      );
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBeGreaterThan(0);
+      });
+
+      const suggestionValues = result.current.suggestions.map((s) => s.value);
+
+      // Count occurrences of each file path
+      const commonFileCount = suggestionValues.filter(
+        (v) => v === 'common-file.txt',
+      ).length;
+      const srcDirCount = suggestionValues.filter((v) => v === 'src/').length;
+      const indexFileCount = suggestionValues.filter(
+        (v) => v === 'src/index.ts',
+      ).length;
+
+      // Each unique path should appear only once despite being in multiple directories
+      expect(commonFileCount).toBe(1);
+      expect(srcDirCount).toBe(1);
+      expect(indexFileCount).toBe(1);
+
+      await cleanupTmpDir(rootDir1);
+      await cleanupTmpDir(rootDir2);
+    });
+
+    it('should filter search results across multiple directories based on pattern', async () => {
+      const structure1: FileSystemStructure = {
+        'test.txt': '',
+        'production.txt': '',
+      };
+      const structure2: FileSystemStructure = {
+        'test-helper.ts': '',
+        'main.ts': '',
+      };
+
+      const rootDir1 = await createTmpDir(structure1);
+      const rootDir2 = await createTmpDir(structure2);
+
+      const multiDirConfig = {
+        getFileFilteringOptions: vi.fn(() => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+        })),
+        getEnableRecursiveFileSearch: () => true,
+        getFileFilteringEnableFuzzySearch: () => true,
+        getResourceRegistry: vi.fn().mockReturnValue({
+          getAllResources: () => [],
+        }),
+        getWorkspaceContext: () => ({
+          getDirectories: () => [rootDir1, rootDir2],
+        }),
+      } as unknown as Config;
+
+      const { result } = renderHook(() =>
+        useTestHarnessForAtCompletion(true, 'test', multiDirConfig, rootDir1),
+      );
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBeGreaterThan(0);
+      });
+
+      const suggestionValues = result.current.suggestions.map((s) => s.value);
+
+      // Should only contain files matching the pattern from both directories
+      expect(suggestionValues).toContain('test.txt');
+      expect(suggestionValues).toContain('test-helper.ts');
+      expect(suggestionValues).not.toContain('production.txt');
+      expect(suggestionValues).not.toContain('main.ts');
+
+      await cleanupTmpDir(rootDir1);
+      await cleanupTmpDir(rootDir2);
+    });
+
+    it('should default to cwd when workspace context returns undefined', async () => {
+      const structure: FileSystemStructure = {
+        'file.txt': '',
+      };
+      testRootDir = await createTmpDir(structure);
+
+      const configWithUndefinedWorkspace = {
+        getFileFilteringOptions: vi.fn(() => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+        })),
+        getEnableRecursiveFileSearch: () => true,
+        getFileFilteringEnableFuzzySearch: () => true,
+        getResourceRegistry: vi.fn().mockReturnValue({
+          getAllResources: () => [],
+        }),
+        getWorkspaceContext: () => undefined,
+      } as unknown as Config;
+
+      const { result } = renderHook(() =>
+        useTestHarnessForAtCompletion(
+          true,
+          '',
+          configWithUndefinedWorkspace,
+          testRootDir,
+        ),
+      );
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBeGreaterThan(0);
+      });
+
+      expect(result.current.suggestions.map((s) => s.value)).toEqual([
+        'file.txt',
+      ]);
+    });
+
+    it('should handle empty directories array by creating no searchers', async () => {
+      const structure: FileSystemStructure = {
+        'file.txt': '',
+      };
+      testRootDir = await createTmpDir(structure);
+
+      const configWithEmptyDirs = {
+        getFileFilteringOptions: vi.fn(() => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+        })),
+        getEnableRecursiveFileSearch: () => true,
+        getFileFilteringEnableFuzzySearch: () => true,
+        getResourceRegistry: vi.fn().mockReturnValue({
+          getAllResources: () => [],
+        }),
+        getWorkspaceContext: () => ({
+          getDirectories: () => [],
+        }),
+      } as unknown as Config;
+
+      const { result } = renderHook(() =>
+        useTestHarnessForAtCompletion(
+          true,
+          '',
+          configWithEmptyDirs,
+          testRootDir,
+        ),
+      );
+
+      // Wait for initialization to complete
+      await waitFor(() => {
+        expect(result.current.isLoadingSuggestions).toBe(false);
+      });
+
+      // With empty directories array, no searchers are created, so no suggestions
+      expect(result.current.suggestions).toEqual([]);
+    });
+
+    it('should create multiple searchers for multiple directories', async () => {
+      const structure1: FileSystemStructure = {
+        'unique1.txt': '',
+      };
+      const structure2: FileSystemStructure = {
+        'unique2.txt': '',
+      };
+
+      const rootDir1 = await createTmpDir(structure1);
+      const rootDir2 = await createTmpDir(structure2);
+
+      const createSpy = vi.spyOn(FileSearchFactory, 'create');
+
+      const multiDirConfig = {
+        getFileFilteringOptions: vi.fn(() => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+        })),
+        getEnableRecursiveFileSearch: () => true,
+        getFileFilteringEnableFuzzySearch: () => true,
+        getResourceRegistry: vi.fn().mockReturnValue({
+          getAllResources: () => [],
+        }),
+        getWorkspaceContext: () => ({
+          getDirectories: () => [rootDir1, rootDir2],
+        }),
+      } as unknown as Config;
+
+      const { result } = renderHook(() =>
+        useTestHarnessForAtCompletion(true, '', multiDirConfig, rootDir1),
+      );
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBeGreaterThan(0);
+      });
+
+      // Verify that FileSearchFactory.create was called for each directory
+      expect(createSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ projectRoot: rootDir1 }),
+      );
+      expect(createSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ projectRoot: rootDir2 }),
+      );
+
+      await cleanupTmpDir(rootDir1);
+      await cleanupTmpDir(rootDir2);
+    });
+  });
+
   describe('Filtering and Configuration', () => {
     it('should respect .gitignore files', async () => {
       const gitignoreContent = ['dist/', '*.log'].join('\n');
@@ -567,6 +849,7 @@ describe('useAtCompletion', () => {
           respectGeminiIgnore: true,
         })),
         getFileFilteringEnableFuzzySearch: () => true,
+        getWorkspaceContext: () => undefined,
       } as unknown as Config;
 
       const { result } = renderHook(() =>
