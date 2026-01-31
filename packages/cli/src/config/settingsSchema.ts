@@ -689,28 +689,6 @@ const SETTINGS_SCHEMA = {
     },
   },
 
-  safety: {
-    type: 'object',
-    label: 'Safety',
-    category: 'Safety',
-    requiresRestart: true,
-    default: {},
-    description: 'Safety settings.',
-    showInDialog: false,
-    properties: {
-      enableConseca: {
-        type: 'boolean',
-        label: 'Enable Context-Aware Safety',
-        category: 'Safety',
-        requiresRestart: true,
-        default: false,
-        description:
-          'Enable the context-aware safety checker. This feature uses an LLM to dynamically generate and enforce security policies for tool use based on your prompt, providing an additional layer of protection against unintended actions.',
-        showInDialog: true,
-      },
-    },
-  },
-
   telemetry: {
     type: 'object',
     label: 'Telemetry',
@@ -1420,6 +1398,16 @@ const SETTINGS_SCHEMA = {
             showInDialog: false,
           },
         },
+      },
+      enableConseca: {
+        type: 'boolean',
+        label: 'Enable Context-Aware Security',
+        category: 'Security',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable the context-aware security checker. This feature uses an LLM to dynamically generate and enforce security policies for tool use based on your prompt, providing an additional layer of protection against unintended actions.',
+        showInDialog: true,
       },
     },
   },
