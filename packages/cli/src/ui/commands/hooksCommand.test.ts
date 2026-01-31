@@ -29,9 +29,6 @@ describe('hooksCommand', () => {
       hooksConfig?: {
         disabled?: string[];
       };
-      tools?: {
-        enableHooks?: boolean;
-      };
     };
     setValue: ReturnType<typeof vi.fn>;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -179,8 +176,8 @@ describe('hooksCommand', () => {
     it('should return custom_dialog when no hooks are configured', async () => {
       mockHookSystem.getAllHooks.mockReturnValue([]);
       (mockContext.services.settings.merged as Record<string, unknown>)[
-        'tools'
-      ] = { enableHooks: true };
+        'hooksConfig'
+      ] = { enabled: true };
 
       const panelCmd = hooksCommand.subCommands!.find(
         (cmd) => cmd.name === 'panel',
@@ -203,8 +200,8 @@ describe('hooksCommand', () => {
 
       mockHookSystem.getAllHooks.mockReturnValue(mockHooks);
       (mockContext.services.settings.merged as Record<string, unknown>)[
-        'tools'
-      ] = { enableHooks: true };
+        'hooksConfig'
+      ] = { enabled: true };
 
       const panelCmd = hooksCommand.subCommands!.find(
         (cmd) => cmd.name === 'panel',

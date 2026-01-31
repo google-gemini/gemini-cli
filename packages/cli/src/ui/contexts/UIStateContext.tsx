@@ -50,6 +50,7 @@ export interface ValidationDialogRequest {
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import { type RestartReason } from '../hooks/useIdeTrustListener.js';
 import type { TerminalBackgroundColor } from '../utils/terminalCapabilityManager.js';
+import type { BackgroundShell } from '../hooks/shellCommandProcessor.js';
 
 export interface UIState {
   history: HistoryItem[];
@@ -80,7 +81,8 @@ export interface UIState {
   slashCommands: readonly SlashCommand[] | undefined;
   pendingSlashCommandHistoryItems: HistoryItemWithoutId[];
   commandContext: CommandContext;
-  confirmationRequest: ConfirmationRequest | null;
+  commandConfirmationRequest: ConfirmationRequest | null;
+  authConsentRequest: ConfirmationRequest | null;
   confirmUpdateExtensionRequests: ConfirmationRequest[];
   loopDetectionConfirmationRequest: LoopDetectionConfirmationRequest | null;
   geminiMdFileCount: number;
@@ -141,6 +143,8 @@ export interface UIState {
   isRestarting: boolean;
   extensionsUpdateState: Map<string, ExtensionUpdateState>;
   activePtyId: number | undefined;
+  backgroundShellCount: number;
+  isBackgroundShellVisible: boolean;
   embeddedShellFocused: boolean;
   showDebugProfiler: boolean;
   showFullTodos: boolean;
@@ -154,6 +158,10 @@ export interface UIState {
   customDialog: React.ReactNode | null;
   terminalBackgroundColor: TerminalBackgroundColor;
   settingsNonce: number;
+  backgroundShells: Map<number, BackgroundShell>;
+  activeBackgroundShellPid: number | null;
+  backgroundShellHeight: number;
+  isBackgroundShellListOpen: boolean;
   adminSettingsChanged: boolean;
   newAgents: AgentDefinition[] | null;
 }

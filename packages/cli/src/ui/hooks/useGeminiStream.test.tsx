@@ -68,6 +68,9 @@ const MockedGeminiClientClass = vi.hoisted(() =>
       recordToolCalls: vi.fn(),
       getConversationFile: vi.fn(),
     });
+    this.getCurrentSequenceModel = vi
+      .fn()
+      .mockReturnValue('gemini-2.0-flash-exp');
   }),
 );
 
@@ -652,6 +655,9 @@ describe('useGeminiStream', () => {
       expectedMergedResponse,
       expect.any(AbortSignal),
       'prompt-id-2',
+      undefined,
+      false,
+      expectedMergedResponse,
     );
   });
 
@@ -1054,6 +1060,9 @@ describe('useGeminiStream', () => {
         toolCallResponseParts,
         expect.any(AbortSignal),
         'prompt-id-4',
+        undefined,
+        false,
+        toolCallResponseParts,
       );
     });
 
@@ -1495,6 +1504,9 @@ describe('useGeminiStream', () => {
           'This is the actual prompt from the command file.',
           expect.any(AbortSignal),
           expect.any(String),
+          undefined,
+          false,
+          '/my-custom-command',
         );
 
         expect(mockScheduleToolCalls).not.toHaveBeenCalled();
@@ -1521,6 +1533,9 @@ describe('useGeminiStream', () => {
           '',
           expect.any(AbortSignal),
           expect.any(String),
+          undefined,
+          false,
+          '/emptycmd',
         );
       });
     });
@@ -1539,6 +1554,9 @@ describe('useGeminiStream', () => {
           '// This is a line comment',
           expect.any(AbortSignal),
           expect.any(String),
+          undefined,
+          false,
+          '// This is a line comment',
         );
       });
     });
@@ -1557,6 +1575,9 @@ describe('useGeminiStream', () => {
           '/* This is a block comment */',
           expect.any(AbortSignal),
           expect.any(String),
+          undefined,
+          false,
+          '/* This is a block comment */',
         );
       });
     });
@@ -2389,6 +2410,9 @@ describe('useGeminiStream', () => {
       processedQueryParts, // Argument 1: The parts array directly
       expect.any(AbortSignal), // Argument 2: An AbortSignal
       expect.any(String), // Argument 3: The prompt_id string
+      undefined,
+      false,
+      rawQuery,
     );
   });
 
@@ -2928,6 +2952,9 @@ describe('useGeminiStream', () => {
           'test query',
           expect.any(AbortSignal),
           expect.any(String),
+          undefined,
+          false,
+          'test query',
         );
       });
     });
@@ -3075,6 +3102,9 @@ describe('useGeminiStream', () => {
           'second query',
           expect.any(AbortSignal),
           expect.any(String),
+          undefined,
+          false,
+          'second query',
         );
       });
     });

@@ -152,14 +152,28 @@ export class PolicyEngine {
     const subCommands = splitCommands(command);
 
     if (subCommands.length === 0) {
+      // If the matched rule says DENY, we should respect it immediately even if parsing fails.
+      if (ruleDecision === PolicyDecision.DENY) {
+        return { decision: PolicyDecision.DENY, rule };
+      }
+
+      // In YOLO mode, we should proceed anyway even if we can't parse the command.
+      if (this.approvalMode === ApprovalMode.YOLO) {
+        return {
+          decision: PolicyDecision.ALLOW,
+          rule,
+        };
+      }
+
       debugLogger.debug(
         `[PolicyEngine.check] Command parsing failed for: ${command}. Falling back to ASK_USER.`,
       );
+
       // Parsing logic failed, we can't trust it. Force ASK_USER (or DENY).
-      // We don't blame a specific rule here, unless the input rule was stricter.
+      // We return the rule that matched so the evaluation loop terminates.
       return {
         decision: this.applyNonInteractiveMode(PolicyDecision.ASK_USER),
-        rule: undefined,
+        rule,
       };
     }
 
@@ -439,9 +453,14 @@ export class PolicyEngine {
 
   /**
    * Remove rules for a specific tool.
+   * If source is provided, only rules matching that source are removed.
    */
-  removeRulesForTool(toolName: string): void {
-    this.rules = this.rules.filter((rule) => rule.toolName !== toolName);
+  removeRulesForTool(toolName: string, source?: string): void {
+    this.rules = this.rules.filter(
+      (rule) =>
+        rule.toolName !== toolName ||
+        (source !== undefined && rule.source !== source),
+    );
   }
 
   /**
@@ -449,6 +468,18 @@ export class PolicyEngine {
    */
   getRules(): readonly PolicyRule[] {
     return this.rules;
+  }
+
+  /**
+   * Check if a rule for a specific tool already exists.
+   * If ignoreDynamic is true, it only returns true if a rule exists that was NOT added by AgentRegistry.
+   */
+  hasRuleForTool(toolName: string, ignoreDynamic = false): boolean {
+    return this.rules.some(
+      (rule) =>
+        rule.toolName === toolName &&
+        (!ignoreDynamic || rule.source !== 'AgentRegistry (Dynamic)'),
+    );
   }
 
   getCheckers(): readonly SafetyCheckerRule[] {

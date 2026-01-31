@@ -178,6 +178,30 @@ describe('convertSessionToHistoryFormats', () => {
     });
   });
 
+  it('should prioritize displayContent for UI history but use content for client history', () => {
+    const messages: MessageRecord[] = [
+      {
+        type: 'user',
+        content: [{ text: 'Expanded content' }],
+        displayContent: [{ text: 'User input' }],
+      } as MessageRecord,
+    ];
+
+    const result = convertSessionToHistoryFormats(messages);
+
+    expect(result.uiHistory).toHaveLength(1);
+    expect(result.uiHistory[0]).toMatchObject({
+      type: 'user',
+      text: 'User input',
+    });
+
+    expect(result.clientHistory).toHaveLength(1);
+    expect(result.clientHistory[0]).toEqual({
+      role: 'user',
+      parts: [{ text: 'Expanded content' }],
+    });
+  });
+
   it('should filter out slash commands from client history but keep in UI', () => {
     const messages: MessageRecord[] = [
       { type: 'user', content: '/help' } as MessageRecord,

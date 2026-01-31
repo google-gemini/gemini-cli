@@ -733,12 +733,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
-- **`tools.enableHooks`** (boolean):
-  - **Description:** Enables the hooks system experiment. When disabled, the
-    hooks system is completely deactivated regardless of other settings.
-  - **Default:** `true`
-  - **Requires restart:** Yes
-
 #### `mcp`
 
 - **`mcp.serverCommand`** (string):
@@ -777,6 +771,13 @@ their corresponding top-level category object in your `settings.json` file.
 - **`security.blockGitExtensions`** (boolean):
   - **Description:** Blocks installing and loading extensions from Git.
   - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`security.allowedExtensions`** (array):
+  - **Description:** List of Regex patterns for allowed extensions. If nonempty,
+    only extensions that match the patterns in this list are allowed. Overrides
+    the blockGitExtensions setting.
+  - **Default:** `[]`
   - **Requires restart:** Yes
 
 - **`security.folderTrust.enabled`** (boolean):

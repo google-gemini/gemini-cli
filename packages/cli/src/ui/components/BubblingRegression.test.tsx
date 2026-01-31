@@ -34,6 +34,8 @@ describe('Key Bubbling Regression', () => {
         questions={choiceQuestion}
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
+        width={120}
+        availableHeight={20}
       />,
       { width: 120 },
     );

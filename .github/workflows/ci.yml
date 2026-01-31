@@ -177,6 +177,19 @@ jobs:
       - name: 'Smoke test bundle'
         run: 'node ./bundle/gemini.js --version'
 
+      - name: 'Smoke test npx installation'
+        run: |
+          # 1. Package the project into a tarball
+          TARBALL=$(npm pack | tail -n 1)
+
+          # 2. Move to a fresh directory for isolation
+          mkdir -p ../smoke-test-dir
+          mv "$TARBALL" ../smoke-test-dir/
+          cd ../smoke-test-dir
+
+          # 3. Run npx from the tarball
+          npx "./$TARBALL" --version
+
       - name: 'Wait for file system sync'
         run: 'sleep 2'
 
@@ -251,6 +264,19 @@ jobs:
 
       - name: 'Smoke test bundle'
         run: 'node ./bundle/gemini.js --version'
+
+      - name: 'Smoke test npx installation'
+        run: |
+          # 1. Package the project into a tarball
+          TARBALL=$(npm pack | tail -n 1)
+
+          # 2. Move to a fresh directory for isolation
+          mkdir -p ../smoke-test-dir
+          mv "$TARBALL" ../smoke-test-dir/
+          cd ../smoke-test-dir
+
+          # 3. Run npx from the tarball
+          npx "./$TARBALL" --version
 
       - name: 'Wait for file system sync'
         run: 'sleep 2'
@@ -394,6 +420,21 @@ jobs:
 
       - name: 'Smoke test bundle'
         run: 'node ./bundle/gemini.js --version'
+        shell: 'pwsh'
+
+      - name: 'Smoke test npx installation'
+        run: |
+          # 1. Package the project into a tarball
+          $PACK_OUTPUT = npm pack
+          $TARBALL = $PACK_OUTPUT[-1]
+
+          # 2. Move to a fresh directory for isolation
+          New-Item -ItemType Directory -Force -Path ../smoke-test-dir
+          Move-Item $TARBALL ../smoke-test-dir/
+          Set-Location ../smoke-test-dir
+
+          # 3. Run npx from the tarball
+          npx "./$TARBALL" --version
         shell: 'pwsh'
 
   ci:

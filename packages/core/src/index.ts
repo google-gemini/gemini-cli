@@ -50,6 +50,7 @@ export * from './code_assist/server.js';
 export * from './code_assist/setup.js';
 export * from './code_assist/types.js';
 export * from './code_assist/telemetry.js';
+export * from './code_assist/admin/admin_controls.js';
 export * from './core/apiKeyCredentialStorage.js';
 
 // Export utilities

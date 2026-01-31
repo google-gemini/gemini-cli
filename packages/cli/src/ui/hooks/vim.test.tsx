@@ -22,7 +22,7 @@ import { textBufferReducer } from '../components/shared/text-buffer.js';
 // Mock the VimModeContext
 const mockVimContext = {
   vimEnabled: true,
-  vimMode: 'NORMAL' as VimMode,
+  vimMode: 'INSERT' as VimMode,
   toggleVimEnabled: vi.fn(),
   setVimMode: vi.fn(),
 };
@@ -91,6 +91,8 @@ const TEST_SEQUENCES = {
   LINE_END: createKey({ sequence: '$' }),
   REPEAT: createKey({ sequence: '.' }),
   CTRL_C: createKey({ sequence: '\x03', name: 'c', ctrl: true }),
+  CTRL_X: createKey({ sequence: '\x18', name: 'x', ctrl: true }),
+  F12: createKey({ sequence: '\u001b[24~', name: 'f12' }),
 } as const;
 
 describe('useVim hook', () => {
@@ -134,6 +136,7 @@ describe('useVim hook', () => {
       replaceRangeByOffset: vi.fn(),
       handleInput: vi.fn(),
       setText: vi.fn(),
+      openInExternalEditor: vi.fn(),
       // Vim-specific methods
       vimDeleteWordForward: vi.fn(),
       vimDeleteWordBackward: vi.fn(),
@@ -207,19 +210,22 @@ describe('useVim hook', () => {
     mockBuffer = createMockBuffer();
     // Reset mock context to default state
     mockVimContext.vimEnabled = true;
-    mockVimContext.vimMode = 'NORMAL';
+    mockVimContext.vimMode = 'INSERT';
     mockVimContext.toggleVimEnabled.mockClear();
     mockVimContext.setVimMode.mockClear();
   });
 
   describe('Mode switching', () => {
-    it('should start in NORMAL mode', () => {
+    it('should start in INSERT mode', () => {
       const { result } = renderVimHook();
-      expect(result.current.mode).toBe('NORMAL');
+      expect(result.current.mode).toBe('INSERT');
     });
 
     it('should switch to INSERT mode with i command', () => {
       const { result } = renderVimHook();
+
+      exitInsertMode(result);
+      expect(result.current.mode).toBe('NORMAL');
 
       act(() => {
         result.current.handleInput(TEST_SEQUENCES.INSERT);
@@ -266,6 +272,7 @@ describe('useVim hook', () => {
   describe('Navigation commands', () => {
     it('should handle h (left movement)', () => {
       const { result } = renderVimHook();
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'h' }));
@@ -276,6 +283,7 @@ describe('useVim hook', () => {
 
     it('should handle l (right movement)', () => {
       const { result } = renderVimHook();
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'l' }));
@@ -287,6 +295,7 @@ describe('useVim hook', () => {
     it('should handle j (down movement)', () => {
       const testBuffer = createMockBuffer('first line\nsecond line');
       const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'j' }));
@@ -298,6 +307,7 @@ describe('useVim hook', () => {
     it('should handle k (up movement)', () => {
       const testBuffer = createMockBuffer('first line\nsecond line');
       const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'k' }));
@@ -308,6 +318,7 @@ describe('useVim hook', () => {
 
     it('should handle 0 (move to start of line)', () => {
       const { result } = renderVimHook();
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: '0' }));
@@ -318,6 +329,7 @@ describe('useVim hook', () => {
 
     it('should handle $ (move to end of line)', () => {
       const { result } = renderVimHook();
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: '$' }));
@@ -330,6 +342,7 @@ describe('useVim hook', () => {
   describe('Mode switching commands', () => {
     it('should handle a (append after cursor)', () => {
       const { result } = renderVimHook();
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'a' }));
@@ -341,6 +354,7 @@ describe('useVim hook', () => {
 
     it('should handle A (append at end of line)', () => {
       const { result } = renderVimHook();
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'A' }));
@@ -352,6 +366,7 @@ describe('useVim hook', () => {
 
     it('should handle o (open line below)', () => {
       const { result } = renderVimHook();
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'o' }));
@@ -363,6 +378,7 @@ describe('useVim hook', () => {
 
     it('should handle O (open line above)', () => {
       const { result } = renderVimHook();
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'O' }));
@@ -376,6 +392,7 @@ describe('useVim hook', () => {
   describe('Edit commands', () => {
     it('should handle x (delete character)', () => {
       const { result } = renderVimHook();
+      exitInsertMode(result);
       vi.clearAllMocks();
 
       act(() => {
@@ -388,6 +405,7 @@ describe('useVim hook', () => {
     it('should move cursor left when deleting last character on line (vim behavior)', () => {
       const testBuffer = createMockBuffer('hello', [0, 4]);
       const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'x' }));
@@ -398,6 +416,7 @@ describe('useVim hook', () => {
 
     it('should handle first d key (sets pending state)', () => {
       const { result } = renderVimHook();
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'd' }));
@@ -410,6 +429,7 @@ describe('useVim hook', () => {
   describe('Count handling', () => {
     it('should handle count input and return to count 0 after command', () => {
       const { result } = renderVimHook();
+      exitInsertMode(result);
 
       act(() => {
         const handled = result.current.handleInput(
@@ -431,6 +451,7 @@ describe('useVim hook', () => {
     it('should only delete 1 character with x command when no count is specified', () => {
       const testBuffer = createMockBuffer();
       const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'x' }));
@@ -446,7 +467,7 @@ describe('useVim hook', () => {
       const { result } = renderVimHook(testBuffer);
 
       expect(result.current.vimModeEnabled).toBe(true);
-      expect(result.current.mode).toBe('NORMAL');
+      expect(result.current.mode).toBe('INSERT');
       expect(result.current.handleInput).toBeDefined();
     });
 
@@ -458,7 +479,7 @@ describe('useVim hook', () => {
       const { result } = renderVimHook(testBuffer);
 
       expect(result.current.vimModeEnabled).toBe(true);
-      expect(result.current.mode).toBe('NORMAL');
+      expect(result.current.mode).toBe('INSERT');
       expect(result.current.handleInput).toBeDefined();
       expect(testBuffer.replaceRangeByOffset).toBeDefined();
       expect(testBuffer.moveToOffset).toBeDefined();
@@ -467,6 +488,7 @@ describe('useVim hook', () => {
     it('should handle w (next word)', () => {
       const testBuffer = createMockBuffer('hello world test');
       const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'w' }));
@@ -478,6 +500,7 @@ describe('useVim hook', () => {
     it('should handle b (previous word)', () => {
       const testBuffer = createMockBuffer('hello world test', [0, 6]);
       const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'b' }));
@@ -489,6 +512,7 @@ describe('useVim hook', () => {
     it('should handle e (end of word)', () => {
       const testBuffer = createMockBuffer('hello world test');
       const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'e' }));
@@ -500,6 +524,7 @@ describe('useVim hook', () => {
     it('should handle w when cursor is on the last word', () => {
       const testBuffer = createMockBuffer('hello world', [0, 8]);
       const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'w' }));
@@ -510,6 +535,7 @@ describe('useVim hook', () => {
 
     it('should handle first c key (sets pending change state)', () => {
       const { result } = renderVimHook();
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'c' }));
@@ -563,6 +589,7 @@ describe('useVim hook', () => {
     it('should repeat x command from current cursor position', () => {
       const testBuffer = createMockBuffer('abcd\nefgh\nijkl', [0, 1]);
       const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'x' }));
@@ -580,6 +607,7 @@ describe('useVim hook', () => {
     it('should repeat dd command from current position', () => {
       const testBuffer = createMockBuffer('line1\nline2\nline3', [1, 0]);
       const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'd' }));
@@ -601,6 +629,7 @@ describe('useVim hook', () => {
     it('should repeat ce command from current position', () => {
       const testBuffer = createMockBuffer('word', [0, 0]);
       const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'c' }));
@@ -625,6 +654,7 @@ describe('useVim hook', () => {
     it('should repeat cc command from current position', () => {
       const testBuffer = createMockBuffer('line1\nline2\nline3', [1, 2]);
       const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'c' }));
@@ -649,6 +679,7 @@ describe('useVim hook', () => {
     it('should repeat cw command from current position', () => {
       const testBuffer = createMockBuffer('hello world test', [0, 6]);
       const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'c' }));
@@ -673,6 +704,7 @@ describe('useVim hook', () => {
     it('should repeat D command from current position', () => {
       const testBuffer = createMockBuffer('hello world test', [0, 6]);
       const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'D' }));
@@ -692,6 +724,7 @@ describe('useVim hook', () => {
     it('should repeat C command from current position', () => {
       const testBuffer = createMockBuffer('hello world test', [0, 6]);
       const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'C' }));
@@ -713,6 +746,7 @@ describe('useVim hook', () => {
     it('should repeat command after cursor movement', () => {
       const testBuffer = createMockBuffer('test text', [0, 0]);
       const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'x' }));
@@ -728,8 +762,10 @@ describe('useVim hook', () => {
     });
 
     it('should move cursor to the correct position after exiting INSERT mode with "a"', () => {
-      const testBuffer = createMockBuffer('hello world', [0, 10]);
+      const testBuffer = createMockBuffer('hello world', [0, 11]);
       const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
+      expect(testBuffer.cursor).toEqual([0, 10]);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'a' }));
@@ -747,6 +783,7 @@ describe('useVim hook', () => {
     it('should handle ^ (move to first non-whitespace character)', () => {
       const testBuffer = createMockBuffer('   hello world', [0, 5]);
       const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: '^' }));
@@ -758,6 +795,7 @@ describe('useVim hook', () => {
     it('should handle G without count (go to last line)', () => {
       const testBuffer = createMockBuffer('line1\nline2\nline3', [0, 0]);
       const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'G' }));
@@ -769,6 +807,7 @@ describe('useVim hook', () => {
     it('should handle gg (go to first line)', () => {
       const testBuffer = createMockBuffer('line1\nline2\nline3', [2, 0]);
       const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
 
       // First 'g' sets pending state
       act(() => {
@@ -786,6 +825,7 @@ describe('useVim hook', () => {
     it('should handle count with movement commands', () => {
       const testBuffer = createMockBuffer('hello world test', [0, 0]);
       const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: '3' }));
@@ -804,6 +844,7 @@ describe('useVim hook', () => {
       it('should delete from cursor to start of next word', () => {
         const testBuffer = createMockBuffer('hello world test', [0, 0]);
         const { result } = renderVimHook(testBuffer);
+        exitInsertMode(result);
 
         act(() => {
           result.current.handleInput(createKey({ sequence: 'd' }));
@@ -888,6 +929,7 @@ describe('useVim hook', () => {
       it('should delete multiple words with count', () => {
         const testBuffer = createMockBuffer('one two three four', [0, 0]);
         const { result } = renderVimHook(testBuffer);
+        exitInsertMode(result);
 
         act(() => {
           result.current.handleInput(createKey({ sequence: '2' }));
@@ -905,6 +947,7 @@ describe('useVim hook', () => {
       it('should record command for repeat with dot', () => {
         const testBuffer = createMockBuffer('hello world test', [0, 0]);
         const { result } = renderVimHook(testBuffer);
+        exitInsertMode(result);
 
         // Execute dw
         act(() => {
@@ -929,6 +972,7 @@ describe('useVim hook', () => {
       it('should delete from cursor to end of current word', () => {
         const testBuffer = createMockBuffer('hello world test', [0, 1]);
         const { result } = renderVimHook(testBuffer);
+        exitInsertMode(result);
 
         act(() => {
           result.current.handleInput(createKey({ sequence: 'd' }));
@@ -943,6 +987,7 @@ describe('useVim hook', () => {
       it('should handle count with de', () => {
         const testBuffer = createMockBuffer('one two three four', [0, 0]);
         const { result } = renderVimHook(testBuffer);
+        exitInsertMode(result);
 
         act(() => {
           result.current.handleInput(createKey({ sequence: '3' }));
@@ -962,6 +1007,7 @@ describe('useVim hook', () => {
       it('should change from cursor to start of next word and enter INSERT mode', () => {
         const testBuffer = createMockBuffer('hello world test', [0, 0]);
         const { result } = renderVimHook(testBuffer);
+        exitInsertMode(result);
 
         act(() => {
           result.current.handleInput(createKey({ sequence: 'c' }));
@@ -978,6 +1024,7 @@ describe('useVim hook', () => {
       it('should handle count with cw', () => {
         const testBuffer = createMockBuffer('one two three four', [0, 0]);
         const { result } = renderVimHook(testBuffer);
+        exitInsertMode(result);
 
         act(() => {
           result.current.handleInput(createKey({ sequence: '2' }));
@@ -996,6 +1043,7 @@ describe('useVim hook', () => {
       it('should be repeatable with dot', () => {
         const testBuffer = createMockBuffer('hello world test more', [0, 0]);
         const { result } = renderVimHook(testBuffer);
+        exitInsertMode(result);
 
         // Execute cw
         act(() => {
@@ -1025,6 +1073,7 @@ describe('useVim hook', () => {
       it('should change from cursor to end of word and enter INSERT mode', () => {
         const testBuffer = createMockBuffer('hello world test', [0, 1]);
         const { result } = renderVimHook(testBuffer);
+        exitInsertMode(result);
 
         act(() => {
           result.current.handleInput(createKey({ sequence: 'c' }));
@@ -1040,6 +1089,7 @@ describe('useVim hook', () => {
       it('should handle count with ce', () => {
         const testBuffer = createMockBuffer('one two three four', [0, 0]);
         const { result } = renderVimHook(testBuffer);
+        exitInsertMode(result);
 
         act(() => {
           result.current.handleInput(createKey({ sequence: '2' }));
@@ -1060,6 +1110,7 @@ describe('useVim hook', () => {
       it('should change entire line and enter INSERT mode', () => {
         const testBuffer = createMockBuffer('hello world\nsecond line', [0, 5]);
         const { result } = renderVimHook(testBuffer);
+        exitInsertMode(result);
 
         act(() => {
           result.current.handleInput(createKey({ sequence: 'c' }));
@@ -1078,6 +1129,7 @@ describe('useVim hook', () => {
           [1, 0],
         );
         const { result } = renderVimHook(testBuffer);
+        exitInsertMode(result);
 
         act(() => {
           result.current.handleInput(createKey({ sequence: '3' }));
@@ -1096,6 +1148,7 @@ describe('useVim hook', () => {
       it('should be repeatable with dot', () => {
         const testBuffer = createMockBuffer('line1\nline2\nline3', [0, 0]);
         const { result } = renderVimHook(testBuffer);
+        exitInsertMode(result);
 
         // Execute cc
         act(() => {
@@ -1125,6 +1178,7 @@ describe('useVim hook', () => {
       it('should delete from cursor to start of previous word', () => {
         const testBuffer = createMockBuffer('hello world test', [0, 11]);
         const { result } = renderVimHook(testBuffer);
+        exitInsertMode(result);
 
         act(() => {
           result.current.handleInput(createKey({ sequence: 'd' }));
@@ -1139,6 +1193,7 @@ describe('useVim hook', () => {
       it('should handle count with db', () => {
         const testBuffer = createMockBuffer('one two three four', [0, 18]);
         const { result } = renderVimHook(testBuffer);
+        exitInsertMode(result);
 
         act(() => {
           result.current.handleInput(createKey({ sequence: '2' }));
@@ -1158,6 +1213,7 @@ describe('useVim hook', () => {
       it('should change from cursor to start of previous word and enter INSERT mode', () => {
         const testBuffer = createMockBuffer('hello world test', [0, 11]);
         const { result } = renderVimHook(testBuffer);
+        exitInsertMode(result);
 
         act(() => {
           result.current.handleInput(createKey({ sequence: 'c' }));
@@ -1173,6 +1229,7 @@ describe('useVim hook', () => {
       it('should handle count with cb', () => {
         const testBuffer = createMockBuffer('one two three four', [0, 18]);
         const { result } = renderVimHook(testBuffer);
+        exitInsertMode(result);
 
         act(() => {
           result.current.handleInput(createKey({ sequence: '3' }));
@@ -1193,6 +1250,7 @@ describe('useVim hook', () => {
       it('should clear pending delete state after dw', () => {
         const testBuffer = createMockBuffer('hello world', [0, 0]);
         const { result } = renderVimHook(testBuffer);
+        exitInsertMode(result);
 
         // Press 'd' to enter pending delete state
         act(() => {
@@ -1220,6 +1278,7 @@ describe('useVim hook', () => {
       it('should clear pending change state after cw', () => {
         const testBuffer = createMockBuffer('hello world', [0, 0]);
         const { result } = renderVimHook(testBuffer);
+        exitInsertMode(result);
 
         // Execute cw
         act(() => {
@@ -1246,6 +1305,7 @@ describe('useVim hook', () => {
       it('should clear pending state with escape', () => {
         const testBuffer = createMockBuffer('hello world', [0, 0]);
         const { result } = renderVimHook(testBuffer);
+        exitInsertMode(result);
 
         // Enter pending delete state
         act(() => {
@@ -1621,7 +1681,7 @@ describe('useVim hook', () => {
     beforeEach(() => {
       mockBuffer = createMockBuffer('hello world');
       mockVimContext.vimEnabled = true;
-      mockVimContext.vimMode = 'NORMAL';
+      mockVimContext.vimMode = 'INSERT';
       mockHandleFinalSubmit = vi.fn();
       vi.useFakeTimers();
     });
@@ -1634,6 +1694,11 @@ describe('useVim hook', () => {
       const { result } = renderHook(() =>
         useVim(mockBuffer as TextBuffer, mockHandleFinalSubmit),
       );
+      exitInsertMode(result);
+      // Wait to clear escape history
+      await act(async () => {
+        vi.advanceTimersByTime(600);
+      });
 
       // First escape - should pass through (return false)
       let handled: boolean;
@@ -1651,7 +1716,6 @@ describe('useVim hook', () => {
     });
 
     it('should clear buffer on double-escape in INSERT mode', async () => {
-      mockVimContext.vimMode = 'INSERT';
       const { result } = renderHook(() =>
         useVim(mockBuffer as TextBuffer, mockHandleFinalSubmit),
       );
@@ -1676,6 +1740,11 @@ describe('useVim hook', () => {
       const { result } = renderHook(() =>
         useVim(mockBuffer as TextBuffer, mockHandleFinalSubmit),
       );
+      exitInsertMode(result);
+      // Wait to clear escape history
+      await act(async () => {
+        vi.advanceTimersByTime(600);
+      });
 
       // First escape
       await act(async () => {
@@ -1701,6 +1770,11 @@ describe('useVim hook', () => {
       const { result } = renderHook(() =>
         useVim(mockBuffer as TextBuffer, mockHandleFinalSubmit),
       );
+      exitInsertMode(result);
+      // Wait to clear escape history
+      await act(async () => {
+        vi.advanceTimersByTime(600);
+      });
 
       // First escape
       await act(async () => {
@@ -1730,6 +1804,7 @@ describe('useVim hook', () => {
       const { result } = renderHook(() =>
         useVim(mockBuffer as TextBuffer, mockHandleFinalSubmit),
       );
+      exitInsertMode(result);
 
       let handled: boolean;
       await act(async () => {
@@ -1740,7 +1815,6 @@ describe('useVim hook', () => {
     });
 
     it('should pass Ctrl+C through to InputPrompt in INSERT mode', async () => {
-      mockVimContext.vimMode = 'INSERT';
       const { result } = renderHook(() =>
         useVim(mockBuffer as TextBuffer, mockHandleFinalSubmit),
       );

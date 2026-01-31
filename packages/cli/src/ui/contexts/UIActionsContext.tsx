@@ -67,7 +67,11 @@ export interface UIActions {
   handleApiKeySubmit: (apiKey: string) => Promise<void>;
   handleApiKeyCancel: () => void;
   setBannerVisible: (visible: boolean) => void;
+  handleWarning: (message: string) => void;
   setEmbeddedShellFocused: (value: boolean) => void;
+  dismissBackgroundShell: (pid: number) => void;
+  setActiveBackgroundShellPid: (pid: number) => void;
+  setIsBackgroundShellListOpen: (isOpen: boolean) => void;
   setAuthContext: (context: { requiresRestart?: boolean }) => void;
   handleRestart: () => void;
   handleNewAgentsSelect: (choice: NewAgentsChoice) => Promise<void>;
