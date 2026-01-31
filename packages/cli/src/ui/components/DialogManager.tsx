@@ -8,7 +8,6 @@ import { Box, Text } from 'ink';
 import { IdeIntegrationNudge } from '../IdeIntegrationNudge.js';
 import { LoopDetectionConfirmation } from './LoopDetectionConfirmation.js';
 import { FolderTrustDialog } from './FolderTrustDialog.js';
-import { ShellConfirmationDialog } from './ShellConfirmationDialog.js';
 import { ConsentPrompt } from './ConsentPrompt.js';
 import { ThemeDialog } from './ThemeDialog.js';
 import { SettingsDialog } from './SettingsDialog.js';
@@ -18,6 +17,7 @@ import { ApiAuthDialog } from '../auth/ApiAuthDialog.js';
 import { EditorSettingsDialog } from './EditorSettingsDialog.js';
 import { PrivacyNotice } from '../privacy/PrivacyNotice.js';
 import { ProQuotaDialog } from './ProQuotaDialog.js';
+import { ValidationDialog } from './ValidationDialog.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
 import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
 import { SessionBrowser } from './SessionBrowser.js';
@@ -30,7 +30,10 @@ import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import process from 'node:process';
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
+import { AdminSettingsChangedDialog } from './AdminSettingsChangedDialog.js';
 import { IdeTrustChangeDialog } from './IdeTrustChangeDialog.js';
+import { NewAgentsNotification } from './NewAgentsNotification.js';
+import { AgentConfigDialog } from './AgentConfigDialog.js';
 
 interface DialogManagerProps {
   addItem: UseHistoryManagerReturn['addItem'];
@@ -47,11 +50,26 @@ export const DialogManager = ({
 
   const uiState = useUIState();
   const uiActions = useUIActions();
-  const { constrainHeight, terminalHeight, staticExtraHeight, mainAreaWidth } =
-    uiState;
+  const {
+    constrainHeight,
+    terminalHeight,
+    staticExtraHeight,
+    terminalWidth: uiTerminalWidth,
+  } = uiState;
 
+  if (uiState.adminSettingsChanged) {
+    return <AdminSettingsChangedDialog />;
+  }
   if (uiState.showIdeRestartPrompt) {
     return <IdeTrustChangeDialog reason={uiState.ideTrustRestartReason} />;
+  }
+  if (uiState.newAgents) {
+    return (
+      <NewAgentsNotification
+        agents={uiState.newAgents}
+        onSelect={uiActions.handleNewAgentsSelect}
+      />
+    );
   }
   if (uiState.proQuotaRequest) {
     return (
@@ -62,6 +80,16 @@ export const DialogManager = ({
         isTerminalQuotaError={uiState.proQuotaRequest.isTerminalQuotaError}
         isModelNotFoundError={!!uiState.proQuotaRequest.isModelNotFoundError}
         onChoice={uiActions.handleProQuotaChoice}
+      />
+    );
+  }
+  if (uiState.validationRequest) {
+    return (
+      <ValidationDialog
+        validationLink={uiState.validationRequest.validationLink}
+        validationDescription={uiState.validationRequest.validationDescription}
+        learnMoreUrl={uiState.validationRequest.learnMoreUrl}
+        onChoice={uiActions.handleValidationChoice}
       />
     );
   }
@@ -81,11 +109,6 @@ export const DialogManager = ({
       />
     );
   }
-  if (uiState.shellConfirmationRequest) {
-    return (
-      <ShellConfirmationDialog request={uiState.shellConfirmationRequest} />
-    );
-  }
   if (uiState.loopDetectionConfirmationRequest) {
     return (
       <LoopDetectionConfirmation
@@ -93,11 +116,24 @@ export const DialogManager = ({
       />
     );
   }
-  if (uiState.confirmationRequest) {
+
+  // commandConfirmationRequest and authConsentRequest are kept separate
+  // to avoid focus deadlocks and state race conditions between the
+  // synchronous command loop and the asynchronous auth flow.
+  if (uiState.commandConfirmationRequest) {
     return (
       <ConsentPrompt
-        prompt={uiState.confirmationRequest.prompt}
-        onConfirm={uiState.confirmationRequest.onConfirm}
+        prompt={uiState.commandConfirmationRequest.prompt}
+        onConfirm={uiState.commandConfirmationRequest.onConfirm}
+        terminalWidth={terminalWidth}
+      />
+    );
+  }
+  if (uiState.authConsentRequest) {
+    return (
+      <ConsentPrompt
+        prompt={uiState.authConsentRequest.prompt}
+        onConfirm={uiState.authConsentRequest.onConfirm}
         terminalWidth={terminalWidth}
       />
     );
@@ -128,7 +164,7 @@ export const DialogManager = ({
           availableTerminalHeight={
             constrainHeight ? terminalHeight - staticExtraHeight : undefined
           }
-          terminalWidth={mainAreaWidth}
+          terminalWidth={uiTerminalWidth}
         />
       </Box>
     );
@@ -151,6 +187,31 @@ export const DialogManager = ({
   }
   if (uiState.isModelDialogOpen) {
     return <ModelDialog onClose={uiActions.closeModelDialog} />;
+  }
+  if (
+    uiState.isAgentConfigDialogOpen &&
+    uiState.selectedAgentName &&
+    uiState.selectedAgentDisplayName &&
+    uiState.selectedAgentDefinition
+  ) {
+    return (
+      <Box flexDirection="column">
+        <AgentConfigDialog
+          agentName={uiState.selectedAgentName}
+          displayName={uiState.selectedAgentDisplayName}
+          definition={uiState.selectedAgentDefinition}
+          settings={settings}
+          onClose={uiActions.closeAgentConfigDialog}
+          onSave={async () => {
+            // Reload agent registry to pick up changes
+            const agentRegistry = config?.getAgentRegistry();
+            if (agentRegistry) {
+              await agentRegistry.reload();
+            }
+          }}
+        />
+      </Box>
+    );
   }
   if (uiState.isAuthenticating) {
     return (

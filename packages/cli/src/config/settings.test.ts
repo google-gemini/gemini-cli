@@ -44,7 +44,7 @@ vi.mock('./settingsSchema.js', async (importOriginal) => {
 });
 
 // NOW import everything else, including the (now effectively re-exported) settings.js
-import * as pathActual from 'node:path'; // Restored for MOCK_WORKSPACE_SETTINGS_PATH
+import * as path from 'node:path'; // Restored for MOCK_WORKSPACE_SETTINGS_PATH
 import {
   describe,
   it,
@@ -69,6 +69,10 @@ import {
   saveSettings,
   type SettingsFile,
   getDefaultsFromSchema,
+  loadEnvironment,
+  migrateDeprecatedSettings,
+  SettingScope,
+  LoadedSettings,
 } from './settings.js';
 import { FatalConfigError, GEMINI_DIR } from '@google/gemini-cli-core';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
@@ -80,7 +84,7 @@ import {
 
 const MOCK_WORKSPACE_DIR = '/mock/workspace';
 // Use the (mocked) GEMINI_DIR for consistency
-const MOCK_WORKSPACE_SETTINGS_PATH = pathActual.join(
+const MOCK_WORKSPACE_SETTINGS_PATH = path.join(
   MOCK_WORKSPACE_DIR,
   GEMINI_DIR,
   'settings.json',
@@ -1602,6 +1606,464 @@ describe('Settings Loading and Merging', () => {
     });
   });
 
+  describe('with workspace trust', () => {
+    it('should merge workspace settings when workspace is trusted', () => {
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const userSettingsContent = {
+        ui: { theme: 'dark' },
+        tools: { sandbox: false },
+      };
+      const workspaceSettingsContent = {
+        tools: { sandbox: true },
+        context: { fileName: 'WORKSPACE.md' },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect(settings.merged.tools?.sandbox).toBe(true);
+      expect(settings.merged.context?.fileName).toBe('WORKSPACE.md');
+      expect(settings.merged.ui?.theme).toBe('dark');
+    });
+
+    it('should NOT merge workspace settings when workspace is not trusted', () => {
+      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        isTrusted: false,
+        source: 'file',
+      });
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const userSettingsContent = {
+        ui: { theme: 'dark' },
+        tools: { sandbox: false },
+        context: { fileName: 'USER.md' },
+      };
+      const workspaceSettingsContent = {
+        tools: { sandbox: true },
+        context: { fileName: 'WORKSPACE.md' },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.tools?.sandbox).toBe(false); // User setting
+      expect(settings.merged.context?.fileName).toBe('USER.md'); // User setting
+      expect(settings.merged.ui?.theme).toBe('dark'); // User setting
+    });
+  });
+
+  describe('loadEnvironment', () => {
+    function setup({
+      isFolderTrustEnabled = true,
+      isWorkspaceTrustedValue = true,
+    }) {
+      delete process.env['TESTTEST']; // reset
+      const geminiEnvPath = path.resolve(path.join(GEMINI_DIR, '.env'));
+
+      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        isTrusted: isWorkspaceTrustedValue,
+        source: 'file',
+      });
+      (mockFsExistsSync as Mock).mockImplementation((p: fs.PathLike) =>
+        [USER_SETTINGS_PATH, geminiEnvPath].includes(p.toString()),
+      );
+      const userSettingsContent: Settings = {
+        ui: {
+          theme: 'dark',
+        },
+        security: {
+          folderTrust: {
+            enabled: isFolderTrustEnabled,
+          },
+        },
+        context: {
+          fileName: 'USER_CONTEXT.md',
+        },
+      };
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === geminiEnvPath) return 'TESTTEST=1234';
+          return '{}';
+        },
+      );
+    }
+
+    it('sets environment variables from .env files', () => {
+      setup({ isFolderTrustEnabled: false, isWorkspaceTrustedValue: true });
+      loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
+
+      expect(process.env['TESTTEST']).toEqual('1234');
+    });
+
+    it('does not load env files from untrusted spaces', () => {
+      setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: false });
+      loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
+
+      expect(process.env['TESTTEST']).not.toEqual('1234');
+    });
+  });
+
+  describe('migrateDeprecatedSettings', () => {
+    let mockFsExistsSync: Mock;
+    let mockFsReadFileSync: Mock;
+
+    beforeEach(() => {
+      vi.resetAllMocks();
+      mockFsExistsSync = vi.mocked(fs.existsSync);
+      mockFsExistsSync.mockReturnValue(true);
+      mockFsReadFileSync = vi.mocked(fs.readFileSync);
+      mockFsReadFileSync.mockReturnValue('{}');
+      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+        isTrusted: true,
+        source: undefined,
+      });
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('should not do anything if there are no deprecated settings', () => {
+      const userSettingsContent = {
+        extensions: {
+          enabled: ['user-ext-1'],
+        },
+      };
+      const workspaceSettingsContent = {
+        someOtherSetting: 'value',
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const setValueSpy = vi.spyOn(LoadedSettings.prototype, 'setValue');
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      setValueSpy.mockClear();
+
+      migrateDeprecatedSettings(loadedSettings, true);
+
+      expect(setValueSpy).not.toHaveBeenCalled();
+    });
+
+    it('should migrate general.disableAutoUpdate to general.enableAutoUpdate with inverted value', () => {
+      const userSettingsContent = {
+        general: {
+          disableAutoUpdate: true,
+        },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const setValueSpy = vi.spyOn(LoadedSettings.prototype, 'setValue');
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      migrateDeprecatedSettings(loadedSettings, true);
+
+      // Should set new value to false (inverted from true)
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'general',
+        expect.objectContaining({ enableAutoUpdate: false }),
+      );
+    });
+
+    it('should migrate all 4 inverted boolean settings', () => {
+      const userSettingsContent = {
+        general: {
+          disableAutoUpdate: false,
+          disableUpdateNag: true,
+        },
+        context: {
+          fileFiltering: {
+            disableFuzzySearch: false,
+          },
+        },
+        ui: {
+          accessibility: {
+            disableLoadingPhrases: true,
+          },
+        },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const setValueSpy = vi.spyOn(LoadedSettings.prototype, 'setValue');
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      migrateDeprecatedSettings(loadedSettings, true);
+
+      // Check that general settings were migrated with inverted values
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'general',
+        expect.objectContaining({ enableAutoUpdate: true }),
+      );
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'general',
+        expect.objectContaining({ enableAutoUpdateNotification: false }),
+      );
+
+      // Check context.fileFiltering was migrated
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'context',
+        expect.objectContaining({
+          fileFiltering: expect.objectContaining({ enableFuzzySearch: true }),
+        }),
+      );
+
+      // Check ui.accessibility was migrated
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'ui',
+        expect.objectContaining({
+          accessibility: expect.objectContaining({
+            enableLoadingPhrases: false,
+          }),
+        }),
+      );
+    });
+
+    it('should prioritize new settings over deprecated ones and respect removeDeprecated flag', () => {
+      const userSettingsContent = {
+        general: {
+          disableAutoUpdate: true,
+          enableAutoUpdate: true, // Trust this (true) over disableAutoUpdate (true -> false)
+        },
+        context: {
+          fileFiltering: {
+            disableFuzzySearch: false,
+            enableFuzzySearch: false, // Trust this (false) over disableFuzzySearch (false -> true)
+          },
+        },
+      };
+
+      const loadedSettings = new LoadedSettings(
+        {
+          path: getSystemSettingsPath(),
+          settings: {},
+          originalSettings: {},
+        },
+        {
+          path: getSystemDefaultsPath(),
+          settings: {},
+          originalSettings: {},
+        },
+        {
+          path: USER_SETTINGS_PATH,
+          settings: userSettingsContent as unknown as Settings,
+          originalSettings: userSettingsContent as unknown as Settings,
+        },
+        {
+          path: MOCK_WORKSPACE_SETTINGS_PATH,
+          settings: {},
+          originalSettings: {},
+        },
+        true,
+      );
+
+      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
+
+      // 1. removeDeprecated = false (default)
+      migrateDeprecatedSettings(loadedSettings);
+
+      // Should still have old settings
+      expect(
+        loadedSettings.forScope(SettingScope.User).settings.general,
+      ).toHaveProperty('disableAutoUpdate');
+      expect(
+        (
+          loadedSettings.forScope(SettingScope.User).settings.context as {
+            fileFiltering: { disableFuzzySearch: boolean };
+          }
+        ).fileFiltering,
+      ).toHaveProperty('disableFuzzySearch');
+
+      // 2. removeDeprecated = true
+      migrateDeprecatedSettings(loadedSettings, true);
+
+      // Should remove disableAutoUpdate and trust enableAutoUpdate: true
+      expect(setValueSpy).toHaveBeenCalledWith(SettingScope.User, 'general', {
+        enableAutoUpdate: true,
+      });
+
+      // Should remove disableFuzzySearch and trust enableFuzzySearch: false
+      expect(setValueSpy).toHaveBeenCalledWith(SettingScope.User, 'context', {
+        fileFiltering: { enableFuzzySearch: false },
+      });
+    });
+
+    it('should trigger migration automatically during loadSettings', () => {
+      mockFsExistsSync.mockImplementation(
+        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+      );
+      const userSettingsContent = {
+        general: {
+          disableAutoUpdate: true,
+        },
+      };
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      // Verify it was migrated in the merged settings
+      expect(settings.merged.general?.enableAutoUpdate).toBe(false);
+
+      // Verify it was saved back to disk (via setValue calling updateSettingsFilePreservingFormat)
+      expect(updateSettingsFilePreservingFormat).toHaveBeenCalledWith(
+        USER_SETTINGS_PATH,
+        expect.objectContaining({
+          general: expect.objectContaining({ enableAutoUpdate: false }),
+        }),
+      );
+    });
+
+    it('should migrate disableUpdateNag to enableAutoUpdateNotification in system and system defaults settings', () => {
+      const systemSettingsContent = {
+        general: {
+          disableUpdateNag: true,
+        },
+      };
+      const systemDefaultsContent = {
+        general: {
+          disableUpdateNag: false,
+        },
+      };
+
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === getSystemSettingsPath()) {
+            return JSON.stringify(systemSettingsContent);
+          }
+          if (p === getSystemDefaultsPath()) {
+            return JSON.stringify(systemDefaultsContent);
+          }
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      // Verify system settings were migrated
+      expect(settings.system.settings.general).toHaveProperty(
+        'enableAutoUpdateNotification',
+      );
+      expect(
+        (settings.system.settings.general as Record<string, unknown>)[
+          'enableAutoUpdateNotification'
+        ],
+      ).toBe(false);
+
+      // Verify system defaults settings were migrated
+      expect(settings.systemDefaults.settings.general).toHaveProperty(
+        'enableAutoUpdateNotification',
+      );
+      expect(
+        (settings.systemDefaults.settings.general as Record<string, unknown>)[
+          'enableAutoUpdateNotification'
+        ],
+      ).toBe(true);
+
+      // Merged should also reflect it (system overrides defaults, but both are migrated)
+      expect(settings.merged.general?.enableAutoUpdateNotification).toBe(false);
+    });
+
+    it('should migrate experimental agent settings to agents overrides', () => {
+      const userSettingsContent = {
+        experimental: {
+          codebaseInvestigatorSettings: {
+            enabled: true,
+            maxNumTurns: 15,
+            maxTimeMinutes: 5,
+            thinkingBudget: 16384,
+            model: 'gemini-1.5-pro',
+          },
+          cliHelpAgentSettings: {
+            enabled: false,
+          },
+        },
+      };
+
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      // Verify migration to agents.overrides
+      expect(settings.user.settings.agents?.overrides).toMatchObject({
+        codebase_investigator: {
+          enabled: true,
+          runConfig: {
+            maxTurns: 15,
+            maxTimeMinutes: 5,
+          },
+          modelConfig: {
+            model: 'gemini-1.5-pro',
+            generateContentConfig: {
+              thinkingConfig: {
+                thinkingBudget: 16384,
+              },
+            },
+          },
+        },
+        cli_help: {
+          enabled: false,
+        },
+      });
+    });
+  });
+
   describe('saveSettings', () => {
     it('should save settings using updateSettingsFilePreservingFormat', () => {
       const mockUpdateSettings = vi.mocked(updateSettingsFilePreservingFormat);
@@ -1694,7 +2156,7 @@ describe('Settings Loading and Merging', () => {
 
       // 2. Now, set remote admin settings.
       loadedSettings.setRemoteAdminSettings({
-        secureModeEnabled: true,
+        strictModeDisabled: false,
         mcpSetting: { mcpEnabled: false },
         cliFeatureSetting: { extensionsSetting: { extensionsEnabled: false } },
       });
@@ -1735,7 +2197,7 @@ describe('Settings Loading and Merging', () => {
       expect(loadedSettings.merged.ui?.theme).toBe('initial-theme');
 
       const newRemoteSettings = {
-        secureModeEnabled: true,
+        strictModeDisabled: false,
         mcpSetting: { mcpEnabled: false },
         cliFeatureSetting: { extensionsSetting: { extensionsEnabled: false } },
       };
@@ -1751,10 +2213,10 @@ describe('Settings Loading and Merging', () => {
 
       // Verify that calling setRemoteAdminSettings with partial data overwrites previous remote settings
       // and missing properties revert to schema defaults.
-      loadedSettings.setRemoteAdminSettings({ secureModeEnabled: false });
+      loadedSettings.setRemoteAdminSettings({ strictModeDisabled: true });
       expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true); // Reverts to default: true
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true); // Reverts to default: true
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false); // Defaulting to false if missing
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false); // Defaulting to false if missing
     });
 
     it('should correctly handle undefined remote admin settings', () => {
@@ -1809,25 +2271,25 @@ describe('Settings Loading and Merging', () => {
       expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
 
-      // Set remote settings with only secureModeEnabled
+      // Set remote settings with only strictModeDisabled (false -> secureModeEnabled: true)
       loadedSettings.setRemoteAdminSettings({
-        secureModeEnabled: true,
+        strictModeDisabled: false,
       });
 
-      // Verify secureModeEnabled is updated, others remain defaults
+      // Verify secureModeEnabled is updated, others default to false
       expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
 
       // Set remote settings with only mcpSetting.mcpEnabled
       loadedSettings.setRemoteAdminSettings({
         mcpSetting: { mcpEnabled: false },
       });
 
-      // Verify mcpEnabled is updated, others remain defaults (secureModeEnabled reverts to default:false)
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
+      // Verify mcpEnabled is updated, others remain defaults (secureModeEnabled defaults to true if strictModeDisabled is missing)
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
       expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
 
       // Set remote settings with only cliFeatureSetting.extensionsSetting.extensionsEnabled
       loadedSettings.setRemoteAdminSettings({
@@ -1835,9 +2297,106 @@ describe('Settings Loading and Merging', () => {
       });
 
       // Verify extensionsEnabled is updated, others remain defaults
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
+
+      // Verify that missing strictModeDisabled falls back to secureModeEnabled
+      loadedSettings.setRemoteAdminSettings({
+        secureModeEnabled: false,
+      });
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
+
+      loadedSettings.setRemoteAdminSettings({
+        secureModeEnabled: true,
+      });
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
+
+      // Verify strictModeDisabled takes precedence over secureModeEnabled
+      loadedSettings.setRemoteAdminSettings({
+        strictModeDisabled: false,
+        secureModeEnabled: false,
+      });
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
+
+      loadedSettings.setRemoteAdminSettings({
+        strictModeDisabled: true,
+        secureModeEnabled: true,
+      });
+      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
+    });
+
+    it('should set skills based on unmanagedCapabilitiesEnabled', () => {
+      const loadedSettings = loadSettings();
+      loadedSettings.setRemoteAdminSettings({
+        cliFeatureSetting: {
+          unmanagedCapabilitiesEnabled: true,
+        },
+      });
+      expect(loadedSettings.merged.admin.skills?.enabled).toBe(true);
+
+      loadedSettings.setRemoteAdminSettings({
+        cliFeatureSetting: {
+          unmanagedCapabilitiesEnabled: false,
+        },
+      });
+      expect(loadedSettings.merged.admin.skills?.enabled).toBe(false);
+    });
+
+    it('should default mcp.enabled to false if mcpSetting is present but mcpEnabled is undefined', () => {
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      loadedSettings.setRemoteAdminSettings({
+        mcpSetting: {},
+      });
+      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
+    });
+
+    it('should default extensions.enabled to false if extensionsSetting is present but extensionsEnabled is undefined', () => {
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      loadedSettings.setRemoteAdminSettings({
+        cliFeatureSetting: {
+          extensionsSetting: {},
+        },
+      });
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
+    });
+
+    it('should force secureModeEnabled to true if undefined, overriding schema defaults', () => {
+      // Mock schema to have secureModeEnabled default to false to verify the override
+      const originalSchema = getSettingsSchema();
+      const modifiedSchema = JSON.parse(JSON.stringify(originalSchema));
+      if (modifiedSchema.admin?.properties?.secureModeEnabled) {
+        modifiedSchema.admin.properties.secureModeEnabled.default = false;
+      }
+      vi.mocked(getSettingsSchema).mockReturnValue(modifiedSchema);
+
+      try {
+        (mockFsExistsSync as Mock).mockReturnValue(true);
+        (fs.readFileSync as Mock).mockImplementation(() => '{}');
+
+        const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+
+        // Pass a non-empty object that doesn't have strictModeDisabled
+        loadedSettings.setRemoteAdminSettings({
+          mcpSetting: {},
+        });
+
+        // It should be forced to true by the logic (default secure), overriding the mock default of false
+        expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
+      } finally {
+        vi.mocked(getSettingsSchema).mockReturnValue(originalSchema);
+      }
+    });
+
+    it('should handle completely empty remote admin settings response', () => {
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      loadedSettings.setRemoteAdminSettings({});
+
+      // Should default to schema defaults (standard defaults)
       expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
       expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
+      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
     });
   });
 

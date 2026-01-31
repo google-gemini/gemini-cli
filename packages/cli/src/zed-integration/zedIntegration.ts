@@ -27,9 +27,11 @@ import {
   ToolCallEvent,
   debugLogger,
   ReadManyFilesTool,
+  REFERENCE_CONTENT_START,
   resolveModel,
   createWorkingStdio,
   startupProfiler,
+  Kind,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -462,7 +464,7 @@ export class Session {
             title: invocation.getDescription(),
             content,
             locations: invocation.toolLocations(),
-            kind: tool.kind,
+            kind: toAcpToolKind(tool.kind),
           },
         };
 
@@ -501,7 +503,7 @@ export class Session {
           title: invocation.getDescription(),
           content: [],
           locations: invocation.toolLocations(),
-          kind: tool.kind,
+          kind: toAcpToolKind(tool.kind),
         });
       }
 
@@ -797,7 +799,7 @@ export class Session {
           title: invocation.getDescription(),
           content: [],
           locations: invocation.toolLocations(),
-          kind: readManyFilesTool.kind,
+          kind: toAcpToolKind(readManyFilesTool.kind),
         });
 
         const result = await invocation.execute(abortSignal);
@@ -817,7 +819,7 @@ export class Session {
         if (Array.isArray(result.llmContent)) {
           const fileContentRegex = /^--- (.*?) ---\n\n([\s\S]*?)\n\n$/;
           processedQueryParts.push({
-            text: '\n--- Content from referenced files ---',
+            text: `\n${REFERENCE_CONTENT_START}`,
           });
           for (const part of result.llmContent) {
             if (typeof part === 'string') {
@@ -981,9 +983,34 @@ function toPermissionOptions(
         },
         ...basicPermissionOptions,
       ];
+    case 'ask_user':
+      // askuser doesn't need "always allow" options since it's asking questions
+      return [...basicPermissionOptions];
     default: {
       const unreachable: never = confirmation;
       throw new Error(`Unexpected: ${unreachable}`);
     }
+  }
+}
+
+/**
+ * Maps our internal tool kind to the ACP ToolKind.
+ * Fallback to 'other' for kinds that are not supported by the ACP protocol.
+ */
+function toAcpToolKind(kind: Kind): acp.ToolKind {
+  switch (kind) {
+    case Kind.Read:
+    case Kind.Edit:
+    case Kind.Delete:
+    case Kind.Move:
+    case Kind.Search:
+    case Kind.Execute:
+    case Kind.Think:
+    case Kind.Fetch:
+    case Kind.Other:
+      return kind as acp.ToolKind;
+    case Kind.Communicate:
+    default:
+      return 'other';
   }
 }

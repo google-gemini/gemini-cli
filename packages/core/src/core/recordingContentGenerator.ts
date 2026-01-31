@@ -25,12 +25,18 @@ import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 //
 // Note that only the "interesting" bits of the responses are actually kept.
 export class RecordingContentGenerator implements ContentGenerator {
-  userTier?: UserTierId;
-
   constructor(
     private readonly realGenerator: ContentGenerator,
     private readonly filePath: string,
   ) {}
+
+  get userTier(): UserTierId | undefined {
+    return this.realGenerator.userTier;
+  }
+
+  get userTierName(): string | undefined {
+    return this.realGenerator.userTierName;
+  }
 
   async generateContent(
     request: GenerateContentParameters,

@@ -7,6 +7,8 @@ requests sent from `packages/cli`. For a general overview of Gemini CLI, see the
 
 ## Navigating this section
 
+- **[Sub-agents (experimental)](./subagents.md):** Learn how to create and use
+  specialized sub-agents for complex tasks.
 - **[Core tools API](./tools-api.md):** Information on how tools are defined,
   registered, and used by the core.
 - **[Memory Import Processor](./memport.md):** Documentation for the modular
@@ -67,6 +69,10 @@ to use the CLI even if the default "pro" model is rate-limited.
 If you are using the default "pro" model and the CLI detects that you are being
 rate-limited, it automatically switches to the "flash" model for the current
 session. This allows you to continue working without interruption.
+
+Internal utility calls that use `gemini-2.5-flash-lite` (for example, prompt
+completion and classification) silently fall back to `gemini-2.5-flash` and
+`gemini-2.5-pro` when quota is exhausted, without changing the configured model.
 
 ## File discovery service
 

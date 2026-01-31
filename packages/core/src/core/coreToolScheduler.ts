@@ -14,7 +14,7 @@ import {
 } from '../tools/tools.js';
 import type { EditorType } from '../utils/editor.js';
 import type { Config } from '../config/config.js';
-import { PolicyDecision } from '../policy/types.js';
+import { PolicyDecision, ApprovalMode } from '../policy/types.js';
 import { logToolCall } from '../telemetry/loggers.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { ToolCallEvent } from '../telemetry/types.js';
@@ -24,7 +24,6 @@ import { getToolSuggestion } from '../utils/tool-utils.js';
 import type { ToolConfirmationRequest } from '../confirmation-bus/types.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import { fireToolNotificationHook } from './coreToolHookTriggers.js';
 import {
   type ToolCall,
   type ValidatingToolCall,
@@ -64,6 +63,9 @@ export type {
   ToolCallRequestInfo,
   ToolCallResponseInfo,
 };
+
+export const PLAN_MODE_DENIAL_MESSAGE =
+  'You are in Plan Mode - adjust your prompt to only use read and search tools.';
 
 const createErrorResponse = (
   request: ToolCallRequestInfo,
@@ -592,7 +594,6 @@ export class CoreToolScheduler {
           name: toolCall.request.name,
           args: toolCall.request.args,
         };
-
         const serverName =
           toolCall.tool instanceof DiscoveredMCPTool
             ? toolCall.tool.serverName
@@ -603,16 +604,18 @@ export class CoreToolScheduler {
           .check(toolCallForPolicy, serverName);
 
         if (decision === PolicyDecision.DENY) {
-          const errorMessage = `Tool execution denied by policy.`;
+          let errorMessage = `Tool execution denied by policy.`;
+          let errorType = ToolErrorType.POLICY_VIOLATION;
+
+          if (this.config.getApprovalMode() === ApprovalMode.PLAN) {
+            errorMessage = PLAN_MODE_DENIAL_MESSAGE;
+            errorType = ToolErrorType.STOP_EXECUTION;
+          }
           this.setStatusInternal(
             reqInfo.callId,
             'error',
             signal,
-            createErrorResponse(
-              reqInfo,
-              new Error(errorMessage),
-              ToolErrorType.POLICY_VIOLATION,
-            ),
+            createErrorResponse(reqInfo, new Error(errorMessage), errorType),
           );
           await this.checkAndNotifyCompletion(signal);
           return;
@@ -647,10 +650,9 @@ export class CoreToolScheduler {
             }
 
             // Fire Notification hook before showing confirmation to user
-            const messageBus = this.config.getMessageBus();
-            const hooksEnabled = this.config.getEnableHooks();
-            if (hooksEnabled && messageBus) {
-              await fireToolNotificationHook(messageBus, confirmationDetails);
+            const hookSystem = this.config.getHookSystem();
+            if (hookSystem) {
+              await hookSystem.fireToolNotificationEvent(confirmationDetails);
             }
 
             // Allow IDE to resolve confirmation
@@ -787,7 +789,7 @@ export class CoreToolScheduler {
     } else {
       // If the client provided new content, apply it and wait for
       // re-confirmation.
-      if (payload?.newContent && toolCall) {
+      if (payload && 'newContent' in payload && toolCall) {
         const result = await this.toolModifier.applyInlineModify(
           toolCall as WaitingToolCall,
           payload,

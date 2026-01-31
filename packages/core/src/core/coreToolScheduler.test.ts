@@ -7,7 +7,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Mock } from 'vitest';
 import type { CallableTool } from '@google/genai';
-import { CoreToolScheduler } from './coreToolScheduler.js';
+import {
+  CoreToolScheduler,
+  PLAN_MODE_DENIAL_MESSAGE,
+} from './coreToolScheduler.js';
 import type {
   ToolCall,
   WaitingToolCall,
@@ -32,6 +35,7 @@ import {
   ApprovalMode,
   HookSystem,
   PolicyDecision,
+  ToolErrorType,
 } from '../index.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import {
@@ -1843,6 +1847,83 @@ describe('CoreToolScheduler Sequential Execution', () => {
     modifyWithEditorSpy.mockRestore();
   });
 
+  it('should handle inline modify with empty new content', async () => {
+    // Mock the modifiable check to return true for this test
+    const isModifiableSpy = vi
+      .spyOn(modifiableToolModule, 'isModifiableDeclarativeTool')
+      .mockReturnValue(true);
+
+    const mockTool = new MockModifiableTool();
+    const mockToolRegistry = {
+      getTool: () => mockTool,
+      getAllToolNames: () => [],
+    } as unknown as ToolRegistry;
+
+    const mockConfig = createMockConfig({
+      getToolRegistry: () => mockToolRegistry,
+      isInteractive: () => true,
+    });
+    mockConfig.getHookSystem = vi.fn().mockReturnValue(undefined);
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      getPreferredEditor: () => 'vscode',
+    });
+
+    // Manually inject a waiting tool call
+    const callId = 'call-1';
+    const toolCall: WaitingToolCall = {
+      status: 'awaiting_approval',
+      request: {
+        callId,
+        name: 'mockModifiableTool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'p1',
+      },
+      tool: mockTool,
+      invocation: {} as unknown as ToolInvocation<
+        Record<string, unknown>,
+        ToolResult
+      >,
+      confirmationDetails: {
+        type: 'edit',
+        title: 'Confirm',
+        fileName: 'test.txt',
+        filePath: 'test.txt',
+        fileDiff: 'diff',
+        originalContent: 'old',
+        newContent: 'new',
+        onConfirm: async () => {},
+      },
+      startTime: Date.now(),
+    };
+
+    const schedulerInternals = scheduler as unknown as {
+      toolCalls: ToolCall[];
+      toolModifier: { applyInlineModify: Mock };
+    };
+    schedulerInternals.toolCalls = [toolCall];
+
+    const applyInlineModifySpy = vi
+      .spyOn(schedulerInternals.toolModifier, 'applyInlineModify')
+      .mockResolvedValue({
+        updatedParams: { content: '' },
+        updatedDiff: 'diff-empty',
+      });
+
+    await scheduler.handleConfirmationResponse(
+      callId,
+      async () => {},
+      ToolConfirmationOutcome.ProceedOnce,
+      new AbortController().signal,
+      { newContent: '' } as ToolConfirmationPayload,
+    );
+
+    expect(applyInlineModifySpy).toHaveBeenCalled();
+    isModifiableSpy.mockRestore();
+  });
+
   it('should pass serverName to policy engine for DiscoveredMCPTool', async () => {
     const mockMcpTool = {
       tool: async () => ({ functionDeclarations: [] }),
@@ -1885,6 +1966,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
         }) as unknown as PolicyEngine,
       isInteractive: () => false,
     });
+    mockConfig.getHookSystem = vi.fn().mockReturnValue(undefined);
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
@@ -2014,6 +2096,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
       getApprovalMode: () => ApprovalMode.YOLO,
       isInteractive: () => false,
     });
+    mockConfig.getHookSystem = vi.fn().mockReturnValue(undefined);
 
     const scheduler = new CoreToolScheduler({
       config: mockConfig,
@@ -2077,5 +2160,55 @@ describe('CoreToolScheduler Sequential Execution', () => {
     expect(allStatuses).toEqual(['success', 'success']);
 
     expect(onAllToolCallsComplete).toHaveBeenCalledTimes(1);
+  });
+
+  describe('Policy Decisions in Plan Mode', () => {
+    it('should return STOP_EXECUTION error type and informative message when denied in Plan Mode', async () => {
+      const mockTool = new MockTool({
+        name: 'dangerous_tool',
+        displayName: 'Dangerous Tool',
+        description: 'Does risky stuff',
+      });
+      const mockToolRegistry = {
+        getTool: () => mockTool,
+        getAllToolNames: () => ['dangerous_tool'],
+      } as unknown as ToolRegistry;
+
+      const onAllToolCallsComplete = vi.fn();
+
+      const mockConfig = createMockConfig({
+        getToolRegistry: () => mockToolRegistry,
+        getApprovalMode: () => ApprovalMode.PLAN,
+        getPolicyEngine: () =>
+          ({
+            check: async () => ({ decision: PolicyDecision.DENY }),
+          }) as unknown as PolicyEngine,
+      });
+      mockConfig.getHookSystem = vi.fn().mockReturnValue(undefined);
+
+      const scheduler = new CoreToolScheduler({
+        config: mockConfig,
+        onAllToolCallsComplete,
+        getPreferredEditor: () => 'vscode',
+      });
+
+      const request = {
+        callId: 'call-1',
+        name: 'dangerous_tool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-1',
+      };
+
+      await scheduler.schedule(request, new AbortController().signal);
+
+      expect(onAllToolCallsComplete).toHaveBeenCalledTimes(1);
+      const reportedTools = onAllToolCallsComplete.mock.calls[0][0];
+      const result = reportedTools[0];
+
+      expect(result.status).toBe('error');
+      expect(result.response.errorType).toBe(ToolErrorType.STOP_EXECUTION);
+      expect(result.response.error.message).toBe(PLAN_MODE_DENIAL_MESSAGE);
+    });
   });
 });

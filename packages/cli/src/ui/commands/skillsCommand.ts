@@ -11,13 +11,15 @@ import {
   CommandKind,
 } from './types.js';
 import {
-  MessageType,
-  type HistoryItemSkillsList,
   type HistoryItemInfo,
+  type HistoryItemSkillsList,
+  MessageType,
 } from '../types.js';
-import { SettingScope } from '../../config/settings.js';
-import { enableSkill, disableSkill } from '../../utils/skillSettings.js';
+import { disableSkill, enableSkill } from '../../utils/skillSettings.js';
+
+import { getAdminErrorMessage } from '@google/gemini-cli-core';
 import { renderSkillActionFeedback } from '../../utils/skillUtils.js';
+import { SettingScope } from '../../config/settings.js';
 
 async function listAction(
   context: CommandContext,
@@ -83,7 +85,10 @@ async function disableAction(
     context.ui.addItem(
       {
         type: MessageType.ERROR,
-        text: 'Agent skills are disabled by your admin.',
+        text: getAdminErrorMessage(
+          'Agent skills',
+          context.services.config ?? undefined,
+        ),
       },
       Date.now(),
     );
@@ -112,8 +117,9 @@ async function disableAction(
     result,
     (label, path) => `${label} (${path})`,
   );
-  if (result.status === 'success') {
-    feedback += ' Use "/skills reload" for it to take effect.';
+  if (result.status === 'success' || result.status === 'no-op') {
+    feedback +=
+      ' You can run "/skills reload" to refresh your current instance.';
   }
 
   context.ui.addItem({
@@ -140,7 +146,10 @@ async function enableAction(
     context.ui.addItem(
       {
         type: MessageType.ERROR,
-        text: 'Agent skills are disabled by your admin.',
+        text: getAdminErrorMessage(
+          'Agent skills',
+          context.services.config ?? undefined,
+        ),
       },
       Date.now(),
     );
@@ -153,8 +162,9 @@ async function enableAction(
     result,
     (label, path) => `${label} (${path})`,
   );
-  if (result.status === 'success') {
-    feedback += ' Use "/skills reload" for it to take effect.';
+  if (result.status === 'success' || result.status === 'no-op') {
+    feedback +=
+      ' You can run "/skills reload" to refresh your current instance.';
   }
 
   context.ui.addItem({

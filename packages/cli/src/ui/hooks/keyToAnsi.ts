@@ -69,7 +69,7 @@ export function keyToAnsi(key: Key): string | null {
   }
 
   // If it's a simple character, return it.
-  if (!key.ctrl && !key.meta && key.sequence) {
+  if (!key.ctrl && !key.cmd && key.sequence) {
     return key.sequence;
   }
 

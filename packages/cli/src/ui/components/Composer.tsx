@@ -8,7 +8,7 @@ import { useState } from 'react';
 import { Box, useIsScreenReaderEnabled } from 'ink';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { StatusDisplay } from './StatusDisplay.js';
-import { AutoAcceptIndicator } from './AutoAcceptIndicator.js';
+import { ApprovalModeIndicator } from './ApprovalModeIndicator.js';
 import { ShellModeIndicator } from './ShellModeIndicator.js';
 import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
 import { RawMarkdownIndicator } from './RawMarkdownIndicator.js';
@@ -29,20 +29,20 @@ import { StreamingState } from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
 
-export const Composer = () => {
+export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const config = useConfig();
   const settings = useSettings();
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
   const uiState = useUIState();
   const uiActions = useUIActions();
-  const { vimEnabled } = useVimMode();
+  const { vimEnabled, vimMode } = useVimMode();
   const terminalWidth = process.stdout.columns;
   const isNarrow = isNarrowWidth(terminalWidth);
   const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
   const [suggestionsVisible, setSuggestionsVisible] = useState(false);
 
   const isAlternateBuffer = useAlternateBuffer();
-  const { showAutoAcceptIndicator } = uiState;
+  const { showApprovalModeIndicator } = uiState;
   const suggestionsPosition = isAlternateBuffer ? 'above' : 'below';
   const hideContextSummary =
     suggestionsVisible && suggestionsPosition === 'above';
@@ -50,20 +50,20 @@ export const Composer = () => {
   return (
     <Box
       flexDirection="column"
-      width={uiState.mainAreaWidth}
+      width={uiState.terminalWidth}
       flexGrow={0}
       flexShrink={0}
     >
-      {!uiState.embeddedShellFocused && (
+      {(!uiState.embeddedShellFocused || uiState.isBackgroundShellVisible) && (
         <LoadingIndicator
           thought={
             uiState.streamingState === StreamingState.WaitingForConfirmation ||
-            config.getAccessibility()?.disableLoadingPhrases
+            config.getAccessibility()?.enableLoadingPhrases === false
               ? undefined
               : uiState.thought
           }
           currentLoadingPhrase={
-            config.getAccessibility()?.disableLoadingPhrases
+            config.getAccessibility()?.enableLoadingPhrases === false
               ? undefined
               : uiState.currentLoadingPhrase
           }
@@ -71,8 +71,12 @@ export const Composer = () => {
         />
       )}
 
-      {(!uiState.slashCommands || !uiState.isConfigInitialized) && (
-        <ConfigInitDisplay />
+      {(!uiState.slashCommands ||
+        !uiState.isConfigInitialized ||
+        uiState.isResuming) && (
+        <ConfigInitDisplay
+          message={uiState.isResuming ? 'Resuming session...' : undefined}
+        />
       )}
 
       <QueuedMessageDisplay messageQueue={uiState.messageQueue} />
@@ -92,9 +96,9 @@ export const Composer = () => {
           <StatusDisplay hideContextSummary={hideContextSummary} />
         </Box>
         <Box paddingTop={isNarrow ? 1 : 0}>
-          {showAutoAcceptIndicator !== ApprovalMode.DEFAULT &&
+          {showApprovalModeIndicator !== ApprovalMode.DEFAULT &&
             !uiState.shellModeActive && (
-              <AutoAcceptIndicator approvalMode={showAutoAcceptIndicator} />
+              <ApprovalModeIndicator approvalMode={showApprovalModeIndicator} />
             )}
           {uiState.shellModeActive && <ShellModeIndicator />}
           {!uiState.renderMarkdown && <RawMarkdownIndicator />}
@@ -109,7 +113,7 @@ export const Composer = () => {
               maxHeight={
                 uiState.constrainHeight ? debugConsoleMaxHeight : undefined
               }
-              width={uiState.mainAreaWidth}
+              width={uiState.terminalWidth}
               hasFocus={uiState.showErrorDetails}
             />
             <ShowMoreLines constrainHeight={uiState.constrainHeight} />
@@ -131,15 +135,17 @@ export const Composer = () => {
           commandContext={uiState.commandContext}
           shellModeActive={uiState.shellModeActive}
           setShellModeActive={uiActions.setShellModeActive}
-          approvalMode={showAutoAcceptIndicator}
+          approvalMode={showApprovalModeIndicator}
           onEscapePromptChange={uiActions.onEscapePromptChange}
-          focus={true}
+          focus={isFocused}
           vimHandleInput={uiActions.vimHandleInput}
           isEmbeddedShellFocused={uiState.embeddedShellFocused}
           popAllMessages={uiActions.popAllMessages}
           placeholder={
             vimEnabled
-              ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."
+              ? vimMode === 'INSERT'
+                ? "  Press 'Esc' for NORMAL mode."
+                : "  Press 'i' for INSERT mode."
               : uiState.shellModeActive
                 ? '  Type your shell command'
                 : '  Type your message or @path/to/file'

@@ -5,7 +5,7 @@
  */
 
 import * as fs from 'node:fs';
-import { isSubpath } from '../utils/paths.js';
+import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import { detectIde, type IdeInfo } from '../ide/detect-ide.js';
 import { ideContextStore } from './ideContext.js';
 import {
@@ -64,16 +64,6 @@ type ConnectionConfig = {
   authToken?: string;
   stdio?: StdioConfig;
 };
-
-function getRealPath(path: string): string {
-  try {
-    return fs.realpathSync(path);
-  } catch (_e) {
-    // If realpathSync fails, it might be because the path doesn't exist.
-    // In that case, we can fall back to the original path.
-    return path;
-  }
-}
 
 /**
  * Manages the connection to and interaction with the IDE server.
@@ -521,12 +511,14 @@ export class IdeClient {
       };
     }
 
-    const ideWorkspacePaths = ideWorkspacePath.split(path.delimiter);
-    const realCwd = getRealPath(cwd);
-    const isWithinWorkspace = ideWorkspacePaths.some((workspacePath) => {
-      const idePath = getRealPath(workspacePath);
-      return isSubpath(idePath, realCwd);
-    });
+    const ideWorkspacePaths = ideWorkspacePath
+      .split(path.delimiter)
+      .map((p) => resolveToRealPath(p))
+      .filter((e) => !!e);
+    const realCwd = resolveToRealPath(cwd);
+    const isWithinWorkspace = ideWorkspacePaths.some((workspacePath) =>
+      isSubpath(workspacePath, realCwd),
+    );
 
     if (!isWithinWorkspace) {
       return {
@@ -585,6 +577,8 @@ export class IdeClient {
     try {
       const portFile = path.join(
         os.tmpdir(),
+        'gemini',
+        'ide',
         `gemini-ide-server-${this.ideProcessInfo.pid}.json`,
       );
       const portFileContents = await fs.promises.readFile(portFile, 'utf8');
@@ -671,11 +665,11 @@ export class IdeClient {
     return validWorkspaces[0];
   }
 
-  private createProxyAwareFetch() {
-    // ignore proxy for '127.0.0.1' by default to allow connecting to the ide mcp server
+  private async createProxyAwareFetch(ideServerHost: string) {
+    // ignore proxy for the IDE server host to allow connecting to the ide mcp server
     const existingNoProxy = process.env['NO_PROXY'] || '';
     const agent = new EnvHttpProxyAgent({
-      noProxy: [existingNoProxy, '127.0.0.1'].filter(Boolean).join(','),
+      noProxy: [existingNoProxy, ideServerHost].filter(Boolean).join(','),
     });
     const undiciPromise = import('undici');
     // Suppress unhandled rejection if the promise is not awaited immediately.
@@ -777,23 +771,28 @@ export class IdeClient {
   private async establishHttpConnection(port: string): Promise<boolean> {
     let transport: StreamableHTTPClientTransport | undefined;
     try {
+      const ideServerHost = getIdeServerHost();
+      const portNumber = parseInt(port, 10);
+      // validate port to prevent Server-Side Request Forgery (SSRF) vulnerability
+      if (isNaN(portNumber) || portNumber <= 0 || portNumber > 65535) {
+        return false;
+      }
+      const serverUrl = `http://${ideServerHost}:${portNumber}/mcp`;
       logger.debug('Attempting to connect to IDE via HTTP SSE');
+      logger.debug(`Server URL: ${serverUrl}`);
       this.client = new Client({
         name: 'streamable-http-client',
         // TODO(#3487): use the CLI version here.
         version: '1.0.0',
       });
-      transport = new StreamableHTTPClientTransport(
-        new URL(`http://${getIdeServerHost()}:${port}/mcp`),
-        {
-          fetch: this.createProxyAwareFetch(),
-          requestInit: {
-            headers: this.authToken
-              ? { Authorization: `Bearer ${this.authToken}` }
-              : {},
-          },
+      transport = new StreamableHTTPClientTransport(new URL(serverUrl), {
+        fetch: await this.createProxyAwareFetch(ideServerHost),
+        requestInit: {
+          headers: this.authToken
+            ? { Authorization: `Bearer ${this.authToken}` }
+            : {},
         },
-      );
+      });
       await this.client.connect(transport);
       this.registerClientHandlers();
       await this.discoverTools();
@@ -846,8 +845,31 @@ export class IdeClient {
   }
 }
 
-function getIdeServerHost() {
-  const isInContainer =
-    fs.existsSync('/.dockerenv') || fs.existsSync('/run/.containerenv');
-  return isInContainer ? 'host.docker.internal' : '127.0.0.1';
+export function getIdeServerHost() {
+  let host: string;
+  host = '127.0.0.1';
+  if (isInContainer()) {
+    // when ssh-connection (e.g. remote-ssh) or devcontainer setup:
+    // --> host must be '127.0.0.1' to have cli companion working
+    if (!isSshConnected() && !isDevContainer()) {
+      host = 'host.docker.internal';
+    }
+  }
+  logger.debug(`[getIdeServerHost] Mapping IdeServerHost to '${host}'`);
+  return host;
+}
+
+function isInContainer() {
+  return fs.existsSync('/.dockerenv') || fs.existsSync('/run/.containerenv');
+}
+
+function isSshConnected() {
+  return !!process.env['SSH_CONNECTION'];
+}
+
+function isDevContainer() {
+  return !!(
+    process.env['VSCODE_REMOTE_CONTAINERS_SESSION'] ||
+    process.env['REMOTE_CONTAINERS']
+  );
 }

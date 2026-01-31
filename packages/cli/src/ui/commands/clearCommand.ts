@@ -14,7 +14,62 @@ export const clearCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context, _args) => {
-    // clearScreen is true for /clear
-    await startNewSession(context, SessionStartSource.Clear, true);
+    const geminiClient = context.services.config?.getGeminiClient();
+    const config = context.services.config;
+    const chatRecordingService = context.services.config
+      ?.getGeminiClient()
+      ?.getChat()
+      .getChatRecordingService();
+
+    // Fire SessionEnd hook before clearing
+    const hookSystem = config?.getHookSystem();
+    if (hookSystem) {
+      await hookSystem.fireSessionEndEvent(SessionEndReason.Clear);
+    }
+
+    if (geminiClient) {
+      context.ui.setDebugMessage('Clearing terminal and resetting chat.');
+      // If resetChat fails, the exception will propagate and halt the command,
+      // which is the correct behavior to signal a failure to the user.
+      await geminiClient.resetChat();
+    } else {
+      context.ui.setDebugMessage('Clearing terminal.');
+    }
+
+    // Start a new conversation recording with a new session ID
+    if (config && chatRecordingService) {
+      const newSessionId = randomUUID();
+      config.setSessionId(newSessionId);
+      chatRecordingService.initialize();
+    }
+
+    // Fire SessionStart hook after clearing
+    let result;
+    if (hookSystem) {
+      result = await hookSystem.fireSessionStartEvent(SessionStartSource.Clear);
+    }
+
+    // Give the event loop a chance to process any pending telemetry operations
+    // This ensures logger.emit() calls have fully propagated to the BatchLogRecordProcessor
+    await new Promise((resolve) => setImmediate(resolve));
+
+    // Flush telemetry to ensure hooks are written to disk immediately
+    // This is critical for tests and environments with I/O latency
+    if (config) {
+      await flushTelemetry(config);
+    }
+
+    uiTelemetryService.setLastPromptTokenCount(0);
+    context.ui.clear();
+
+    if (result?.systemMessage) {
+      context.ui.addItem(
+        {
+          type: MessageType.INFO,
+          text: result.systemMessage,
+        },
+        Date.now(),
+      );
+    }
   },
 };

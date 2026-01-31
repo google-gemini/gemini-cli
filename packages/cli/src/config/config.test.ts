@@ -34,6 +34,10 @@ vi.mock('./sandboxConfig.js', () => ({
   loadSandboxConfig: vi.fn(async () => undefined),
 }));
 
+vi.mock('../commands/utils.js', () => ({
+  exitCli: vi.fn(),
+}));
+
 vi.mock('fs', async (importOriginal) => {
   const actualFs = await importOriginal<typeof import('fs')>();
   const pathMod = await import('node:path');
@@ -53,7 +57,9 @@ vi.mock('fs', async (importOriginal) => {
 
   return {
     ...actualFs,
-    mkdirSync: vi.fn(),
+    mkdirSync: vi.fn((p) => {
+      mockPaths.add(p.toString());
+    }),
     writeFileSync: vi.fn(),
     existsSync: vi.fn((p) => mockPaths.has(p.toString())),
     statSync: vi.fn((p) => {
@@ -120,10 +126,12 @@ vi.mock('@google/gemini-cli-core', async () => {
     DEFAULT_MEMORY_FILE_FILTERING_OPTIONS: {
       respectGitIgnore: false,
       respectGeminiIgnore: true,
+      customIgnoreFilePaths: [],
     },
     DEFAULT_FILE_FILTERING_OPTIONS: {
       respectGitIgnore: true,
       respectGeminiIgnore: true,
+      customIgnoreFilePaths: [],
     },
     createPolicyEngineConfig: vi.fn(async () => ({
       rules: [],
@@ -134,7 +142,12 @@ vi.mock('@google/gemini-cli-core', async () => {
   };
 });
 
-vi.mock('./extension-manager.js');
+vi.mock('./extension-manager.js', () => {
+  const ExtensionManager = vi.fn();
+  ExtensionManager.prototype.loadExtensions = vi.fn();
+  ExtensionManager.prototype.getExtensions = vi.fn().mockReturnValue([]);
+  return { ExtensionManager };
+});
 
 // Global setup to ensure clean environment for all tests in this file
 const originalArgv = process.argv;
@@ -142,6 +155,11 @@ const originalGeminiModel = process.env['GEMINI_MODEL'];
 
 beforeEach(() => {
   delete process.env['GEMINI_MODEL'];
+  // Restore ExtensionManager mocks by re-assigning them
+  ExtensionManager.prototype.getExtensions = vi.fn().mockReturnValue([]);
+  ExtensionManager.prototype.loadExtensions = vi
+    .fn()
+    .mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -357,6 +375,21 @@ describe('parseArguments', () => {
         }
       },
     );
+
+    it('should include a startup message when converting positional query to interactive prompt', async () => {
+      const originalIsTTY = process.stdin.isTTY;
+      process.stdin.isTTY = true;
+      process.argv = ['node', 'script.js', 'hello'];
+
+      try {
+        const argv = await parseArguments(createTestMergedSettings());
+        expect(argv.startupMessages).toContain(
+          'Positional arguments now default to interactive mode. To run in non-interactive mode, use the --prompt (-p) flag.',
+        );
+      } finally {
+        process.stdin.isTTY = originalIsTTY;
+      }
+    });
   });
 
   it.each([
@@ -534,6 +567,42 @@ describe('parseArguments', () => {
       'Use whoami to write a poem in file poem.md about my username in pig latin and use wc to tell me how many lines are in the poem you wrote.',
     );
   });
+
+  it('should set isCommand to true for mcp command', async () => {
+    process.argv = ['node', 'script.js', 'mcp', 'list'];
+    const argv = await parseArguments(createTestMergedSettings());
+    expect(argv.isCommand).toBe(true);
+  });
+
+  it('should set isCommand to true for extensions command', async () => {
+    process.argv = ['node', 'script.js', 'extensions', 'list'];
+    // Extensions command uses experimental settings
+    const settings = createTestMergedSettings({
+      experimental: { extensionManagement: true },
+    });
+    const argv = await parseArguments(settings);
+    expect(argv.isCommand).toBe(true);
+  });
+
+  it('should set isCommand to true for skills command', async () => {
+    process.argv = ['node', 'script.js', 'skills', 'list'];
+    // Skills command enabled by default or via experimental
+    const settings = createTestMergedSettings({
+      skills: { enabled: true },
+    });
+    const argv = await parseArguments(settings);
+    expect(argv.isCommand).toBe(true);
+  });
+
+  it('should set isCommand to true for hooks command', async () => {
+    process.argv = ['node', 'script.js', 'hooks', 'migrate'];
+    // Hooks command enabled via hooksConfig settings
+    const settings = createTestMergedSettings({
+      hooksConfig: { enabled: true },
+    });
+    const argv = await parseArguments(settings);
+    expect(argv.isCommand).toBe(true);
+  });
 });
 
 describe('loadCliConfig', () => {
@@ -637,13 +706,36 @@ describe('loadCliConfig', () => {
     expect(config.getFileFilteringRespectGeminiIgnore()).toBe(
       DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
     );
+    expect(config.getCustomIgnoreFilePaths()).toEqual(
+      DEFAULT_FILE_FILTERING_OPTIONS.customIgnoreFilePaths,
+    );
     expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
+  });
+
+  it('should be non-interactive when isCommand is set', async () => {
+    process.argv = ['node', 'script.js', 'mcp', 'list'];
+    const argv = await parseArguments(createTestMergedSettings());
+    argv.isCommand = true; // explicitly set it as if middleware ran (it does in parseArguments but we want to be sure for this isolated test if we were mocking argv)
+
+    // reset tty for this test
+    process.stdin.isTTY = true;
+
+    const settings = createTestMergedSettings();
+    const config = await loadCliConfig(settings, 'test-session', argv);
+
+    expect(config.isInteractive()).toBe(false);
   });
 });
 
 describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    // Restore ExtensionManager mocks that were reset
+    ExtensionManager.prototype.getExtensions = vi.fn().mockReturnValue([]);
+    ExtensionManager.prototype.loadExtensions = vi
+      .fn()
+      .mockResolvedValue(undefined);
+
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     // Other common mocks would be reset here.
   });
@@ -699,6 +791,63 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
         respectGeminiIgnore: true,
       }),
       200, // maxDirs
+    );
+  });
+
+  it('should pass includeDirectories to loadServerHierarchicalMemory when loadMemoryFromIncludeDirectories is true', async () => {
+    process.argv = ['node', 'script.js'];
+    const includeDir = path.resolve(path.sep, 'path', 'to', 'include');
+    const settings = createTestMergedSettings({
+      context: {
+        includeDirectories: [includeDir],
+        loadMemoryFromIncludeDirectories: true,
+      },
+    });
+
+    const argv = await parseArguments(settings);
+    await loadCliConfig(settings, 'session-id', argv);
+
+    expect(ServerConfig.loadServerHierarchicalMemory).toHaveBeenCalledWith(
+      expect.any(String),
+      [includeDir],
+      false,
+      expect.any(Object),
+      expect.any(ExtensionManager),
+      true,
+      'tree',
+      expect.objectContaining({
+        respectGitIgnore: true,
+        respectGeminiIgnore: true,
+      }),
+      200,
+    );
+  });
+
+  it('should NOT pass includeDirectories to loadServerHierarchicalMemory when loadMemoryFromIncludeDirectories is false', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings = createTestMergedSettings({
+      context: {
+        includeDirectories: ['/path/to/include'],
+        loadMemoryFromIncludeDirectories: false,
+      },
+    });
+
+    const argv = await parseArguments(settings);
+    await loadCliConfig(settings, 'session-id', argv);
+
+    expect(ServerConfig.loadServerHierarchicalMemory).toHaveBeenCalledWith(
+      expect.any(String),
+      [],
+      false,
+      expect.any(Object),
+      expect.any(ExtensionManager),
+      true,
+      'tree',
+      expect.objectContaining({
+        respectGitIgnore: true,
+        respectGeminiIgnore: true,
+      }),
+      200,
     );
   });
 });
@@ -1106,7 +1255,7 @@ describe('Approval mode tool exclusion logic', () => {
     });
 
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'Cannot start in YOLO mode since it is disabled by your admin',
+      'YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
     );
   });
 
@@ -1826,7 +1975,7 @@ describe('loadCliConfig interactive', () => {
     expect(config.isInteractive()).toBe(false);
   });
 
-  it('should not be interactive if positional prompt words are provided with other flags', async () => {
+  it('should be interactive if positional prompt words are provided with other flags', async () => {
     process.stdin.isTTY = true;
     process.argv = ['node', 'script.js', '--model', 'gemini-2.5-pro', 'Hello'];
     const argv = await parseArguments(createTestMergedSettings());
@@ -1835,10 +1984,10 @@ describe('loadCliConfig interactive', () => {
       'test-session',
       argv,
     );
-    expect(config.isInteractive()).toBe(false);
+    expect(config.isInteractive()).toBe(true);
   });
 
-  it('should not be interactive if positional prompt words are provided with multiple flags', async () => {
+  it('should be interactive if positional prompt words are provided with multiple flags', async () => {
     process.stdin.isTTY = true;
     process.argv = [
       'node',
@@ -1854,13 +2003,13 @@ describe('loadCliConfig interactive', () => {
       'test-session',
       argv,
     );
-    expect(config.isInteractive()).toBe(false);
+    expect(config.isInteractive()).toBe(true);
     // Verify the question is preserved for one-shot execution
-    expect(argv.prompt).toBe('Hello world');
-    expect(argv.promptInteractive).toBeUndefined();
+    expect(argv.prompt).toBeUndefined();
+    expect(argv.promptInteractive).toBe('Hello world');
   });
 
-  it('should not be interactive if positional prompt words are provided with extensions flag', async () => {
+  it('should be interactive if positional prompt words are provided with extensions flag', async () => {
     process.stdin.isTTY = true;
     process.argv = ['node', 'script.js', '-e', 'none', 'hello'];
     const argv = await parseArguments(createTestMergedSettings());
@@ -1869,8 +2018,9 @@ describe('loadCliConfig interactive', () => {
       'test-session',
       argv,
     );
-    expect(config.isInteractive()).toBe(false);
+    expect(config.isInteractive()).toBe(true);
     expect(argv.query).toBe('hello');
+    expect(argv.promptInteractive).toBe('hello');
     expect(argv.extensions).toEqual(['none']);
   });
 
@@ -1883,9 +2033,9 @@ describe('loadCliConfig interactive', () => {
       'test-session',
       argv,
     );
-    expect(config.isInteractive()).toBe(false);
+    expect(config.isInteractive()).toBe(true);
     expect(argv.query).toBe('hello world how are you');
-    expect(argv.prompt).toBe('hello world how are you');
+    expect(argv.promptInteractive).toBe('hello world how are you');
   });
 
   it('should handle multiple positional words with flags', async () => {
@@ -1908,8 +2058,9 @@ describe('loadCliConfig interactive', () => {
       'test-session',
       argv,
     );
-    expect(config.isInteractive()).toBe(false);
+    expect(config.isInteractive()).toBe(true);
     expect(argv.query).toBe('write a function to sort array');
+    expect(argv.promptInteractive).toBe('write a function to sort array');
     expect(argv.model).toBe('gemini-2.5-pro');
   });
 
@@ -1945,8 +2096,9 @@ describe('loadCliConfig interactive', () => {
       'test-session',
       argv,
     );
-    expect(config.isInteractive()).toBe(false);
+    expect(config.isInteractive()).toBe(true);
     expect(argv.query).toBe('hello world how are you');
+    expect(argv.promptInteractive).toBe('hello world how are you');
     expect(argv.extensions).toEqual(['none']);
   });
 
@@ -2088,6 +2240,19 @@ describe('loadCliConfig approval mode', () => {
     expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.PLAN);
   });
 
+  it('should ignore "yolo" in settings.tools.approvalMode and fall back to DEFAULT', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings = createTestMergedSettings({
+      tools: {
+        // @ts-expect-error: testing invalid value
+        approvalMode: 'yolo',
+      },
+    });
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
+  });
+
   it('should throw error when --approval-mode=plan is used but experimental.plan is disabled', async () => {
     process.argv = ['node', 'script.js', '--approval-mode', 'plan'];
     const argv = await parseArguments(createTestMergedSettings());
@@ -2165,6 +2330,67 @@ describe('loadCliConfig approval mode', () => {
       expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.DEFAULT);
     });
   });
+
+  describe('Persistent approvalMode setting', () => {
+    it('should use approvalMode from settings when no CLI flags are set', async () => {
+      process.argv = ['node', 'script.js'];
+      const settings = createTestMergedSettings({
+        tools: { approvalMode: 'auto_edit' },
+      });
+      const argv = await parseArguments(settings);
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.getApprovalMode()).toBe(
+        ServerConfig.ApprovalMode.AUTO_EDIT,
+      );
+    });
+
+    it('should prioritize --approval-mode flag over settings', async () => {
+      process.argv = ['node', 'script.js', '--approval-mode', 'auto_edit'];
+      const settings = createTestMergedSettings({
+        tools: { approvalMode: 'default' },
+      });
+      const argv = await parseArguments(settings);
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.getApprovalMode()).toBe(
+        ServerConfig.ApprovalMode.AUTO_EDIT,
+      );
+    });
+
+    it('should prioritize --yolo flag over settings', async () => {
+      process.argv = ['node', 'script.js', '--yolo'];
+      const settings = createTestMergedSettings({
+        tools: { approvalMode: 'auto_edit' },
+      });
+      const argv = await parseArguments(settings);
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.YOLO);
+    });
+
+    it('should respect plan mode from settings when experimental.plan is enabled', async () => {
+      process.argv = ['node', 'script.js'];
+      const settings = createTestMergedSettings({
+        tools: { approvalMode: 'plan' },
+        experimental: { plan: true },
+      });
+      const argv = await parseArguments(settings);
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.getApprovalMode()).toBe(ServerConfig.ApprovalMode.PLAN);
+    });
+
+    it('should throw error if plan mode is in settings but experimental.plan is disabled', async () => {
+      process.argv = ['node', 'script.js'];
+      const settings = createTestMergedSettings({
+        tools: { approvalMode: 'plan' },
+        experimental: { plan: false },
+      });
+      const argv = await parseArguments(settings);
+      await expect(
+        loadCliConfig(settings, 'test-session', argv),
+      ).rejects.toThrow(
+        'Approval mode "plan" is only available when experimental.plan is enabled.',
+      );
+    });
+  });
 });
 
 describe('loadCliConfig fileFiltering', () => {
@@ -2193,13 +2419,13 @@ describe('loadCliConfig fileFiltering', () => {
     value: boolean;
   }> = [
     {
-      property: 'disableFuzzySearch',
-      getter: (c) => c.getFileFilteringDisableFuzzySearch(),
+      property: 'enableFuzzySearch',
+      getter: (c) => c.getFileFilteringEnableFuzzySearch(),
       value: true,
     },
     {
-      property: 'disableFuzzySearch',
-      getter: (c) => c.getFileFilteringDisableFuzzySearch(),
+      property: 'enableFuzzySearch',
+      getter: (c) => c.getFileFilteringEnableFuzzySearch(),
       value: false,
     },
     {
@@ -2581,9 +2807,9 @@ describe('PolicyEngine nonInteractive wiring', () => {
     vi.restoreAllMocks();
   });
 
-  it('should set nonInteractive to true in one-shot mode', async () => {
+  it('should set nonInteractive to true when -p flag is used', async () => {
     process.stdin.isTTY = true;
-    process.argv = ['node', 'script.js', 'echo hello']; // Positional query makes it one-shot
+    process.argv = ['node', 'script.js', '-p', 'echo hello'];
     const argv = await parseArguments(createTestMergedSettings());
     const config = await loadCliConfig(
       createTestMergedSettings(),
@@ -2702,7 +2928,7 @@ describe('loadCliConfig disableYoloMode', () => {
       security: { disableYoloMode: true },
     });
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'Cannot start in YOLO mode since it is disabled by your admin',
+      'YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
     );
   });
 });
@@ -2734,7 +2960,7 @@ describe('loadCliConfig secureModeEnabled', () => {
     });
 
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'Cannot start in YOLO mode since it is disabled by your admin',
+      'YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
     );
   });
 
@@ -2748,7 +2974,7 @@ describe('loadCliConfig secureModeEnabled', () => {
     });
 
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'Cannot start in YOLO mode since it is disabled by your admin',
+      'YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
     );
   });
 

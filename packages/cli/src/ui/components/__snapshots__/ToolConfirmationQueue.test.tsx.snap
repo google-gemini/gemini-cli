@@ -1,0 +1,93 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ToolConfirmationQueue > calculates availableContentHeight based on availableTerminalHeight from UI state 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ Action Required                                                              │
+│                                                                              │
+│ ?  replace edit file                                                         │
+│                                                                              │
+│ ... first 49 lines hidden ...                                                │
+│ 50 line                                                                      │
+│ Apply this change?                                                           │
+│                                                                              │
+│ ● 1. Allow once                                                              │
+│   2. Allow for this session                                                  │
+│   3. Modify with external editor                                             │
+│   4. No, suggest changes (esc)                                               │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  Press ctrl-o to show more lines
+"
+`;
+
+exports[`ToolConfirmationQueue > does not render expansion hint when constrainHeight is false 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ Action Required                                                              │
+│                                                                              │
+│ ?  replace edit file                                                         │
+│                                                                              │
+│ ╭──────────────────────────────────────────────────────────────────────────╮ │
+│ │                                                                          │ │
+│ │ No changes detected.                                                     │ │
+│ │                                                                          │ │
+│ ╰──────────────────────────────────────────────────────────────────────────╯ │
+│ Apply this change?                                                           │
+│                                                                              │
+│ ● 1. Allow once                                                              │
+│   2. Allow for this session                                                  │
+│   3. Modify with external editor                                             │
+│   4. No, suggest changes (esc)                                               │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`ToolConfirmationQueue > renders expansion hint when content is long and constrained 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ Action Required                                                              │
+│                                                                              │
+│ ?  replace edit file                                                         │
+│                                                                              │
+│ ... first 49 lines hidden ...                                                │
+│ 50 line                                                                      │
+│ Apply this change?                                                           │
+│                                                                              │
+│ ● 1. Allow once                                                              │
+│   2. Allow for this session                                                  │
+│   3. Modify with external editor                                             │
+│   4. No, suggest changes (esc)                                               │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+  Press ctrl-o to show more lines
+
+
+
+
+
+
+
+
+
+
+
+
+
+"
+`;
+
+exports[`ToolConfirmationQueue > renders the confirming tool with progress indicator 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ Action Required                                                       1 of 3 │
+│                                                                              │
+│ ?  ls list files                                                             │
+│                                                                              │
+│ ls                                                                           │
+│ Allow execution of: 'ls'?                                                    │
+│                                                                              │
+│ ● 1. Allow once                                                              │
+│   2. Allow for this session                                                  │
+│   3. No, suggest changes (esc)                                               │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
+`;

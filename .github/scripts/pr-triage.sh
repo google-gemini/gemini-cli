@@ -9,10 +9,10 @@ set -euo pipefail
 PRS_NEEDING_COMMENT=""
 
 # Global cache for issue labels (compatible with Bash 3.2)
-# Stores "ISSUE_NUM:LABELS" pairs separated by spaces
-ISSUE_LABELS_CACHE_FLAT=""
+# Stores "|ISSUE_NUM:LABELS|" segments
+ISSUE_LABELS_CACHE_FLAT="|"
 
-# Function to get area and priority labels from an issue (with caching)
+# Function to get labels from an issue (with caching)
 get_issue_labels() {
     local ISSUE_NUM="${1}"
     if [[ -z "${ISSUE_NUM}" || "${ISSUE_NUM}" == "null" || "${ISSUE_NUM}" == "" ]]; then
@@ -20,10 +20,10 @@ get_issue_labels() {
     fi
 
     # Check cache
-    case " ${ISSUE_LABELS_CACHE_FLAT} " in
-        *" ${ISSUE_NUM}:"*) 
-            local suffix="${ISSUE_LABELS_CACHE_FLAT#* " ${ISSUE_NUM}:"}"
-            echo "${suffix%% *}"
+    case "${ISSUE_LABELS_CACHE_FLAT}" in
+        *"|${ISSUE_NUM}:"*) 
+            local suffix="${ISSUE_LABELS_CACHE_FLAT#*|${ISSUE_NUM}:}"
+            echo "${suffix%%|*}"
             return
             ;; 
         *)
@@ -31,19 +31,19 @@ get_issue_labels() {
             ;;
     esac
 
-    echo "   📥 Fetching area and priority labels from issue #${ISSUE_NUM}" >&2
+    echo "   📥 Fetching labels from issue #${ISSUE_NUM}" >&2
     local gh_output
     if ! gh_output=$(gh issue view "${ISSUE_NUM}" --repo "${GITHUB_REPOSITORY}" --json labels -q '.labels[].name' 2>/dev/null); then
         echo "      ⚠️ Could not fetch issue #${ISSUE_NUM}" >&2
-        ISSUE_LABELS_CACHE_FLAT="${ISSUE_LABELS_CACHE_FLAT} ${ISSUE_NUM}:"
+        ISSUE_LABELS_CACHE_FLAT="${ISSUE_LABELS_CACHE_FLAT}${ISSUE_NUM}:|"
         return
     fi
 
     local labels
-    labels=$(echo "${gh_output}" | grep -E '^(area|priority)/' | tr '\n' ',' | sed 's/,$//' || echo "")
+    labels=$(echo "${gh_output}" | grep -x -E '(area|priority)/.*|help wanted|🔒 maintainer only' | tr '\n' ',' | sed 's/,$//' || echo "")
     
     # Save to flat cache
-    ISSUE_LABELS_CACHE_FLAT="${ISSUE_LABELS_CACHE_FLAT} ${ISSUE_NUM}:${labels}"
+    ISSUE_LABELS_CACHE_FLAT="${ISSUE_LABELS_CACHE_FLAT}${ISSUE_NUM}:${labels}|"
     echo "${labels}"
 }
 
@@ -121,7 +121,7 @@ done
             EDIT_CMD+=("--remove-label" "${LABELS_TO_REMOVE}")
         fi
         
-        ("${EDIT_CMD[@]}" 2>/dev/null || true)
+        ("${EDIT_CMD[@]}" || true)
     fi
 }
 
@@ -142,7 +142,7 @@ JQ_EXTRACT_FIELDS='{
     labels: [.labels[].name] | join(",")
 }'
 
-JQ_TSV_FORMAT='"\((.number | tostring))\t\(.isDraft)\t\((.issue // \"null\") | tostring)\t\(.labels)"' # Corrected escaping for quotes within the string literal
+JQ_TSV_FORMAT='"\((.number | tostring))\t\(.isDraft)\t\((.issue // null) | tostring)\t\(.labels)"'
 
 if [[ -n "${PR_NUMBER:-}" ]]; then
     echo "🔄 Processing single PR #${PR_NUMBER}"

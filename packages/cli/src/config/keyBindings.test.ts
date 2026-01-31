@@ -33,14 +33,17 @@ describe('keyBindings config', () => {
           expect(binding.key.length).toBeGreaterThan(0);
 
           // Modifier properties should be boolean or undefined
-          if (binding.ctrl !== undefined) {
-            expect(typeof binding.ctrl).toBe('boolean');
-          }
           if (binding.shift !== undefined) {
             expect(typeof binding.shift).toBe('boolean');
           }
-          if (binding.command !== undefined) {
-            expect(typeof binding.command).toBe('boolean');
+          if (binding.alt !== undefined) {
+            expect(typeof binding.alt).toBe('boolean');
+          }
+          if (binding.ctrl !== undefined) {
+            expect(typeof binding.ctrl).toBe('boolean');
+          }
+          if (binding.cmd !== undefined) {
+            expect(typeof binding.cmd).toBe('boolean');
           }
         }
       }
@@ -73,9 +76,27 @@ describe('keyBindings config', () => {
       expect(dialogNavDown).toContainEqual({ key: 'down', shift: false });
       expect(dialogNavDown).toContainEqual({ key: 'j', shift: false });
 
-      // Verify physical home/end keys
-      expect(defaultKeyBindings[Command.HOME]).toContainEqual({ key: 'home' });
-      expect(defaultKeyBindings[Command.END]).toContainEqual({ key: 'end' });
+      // Verify physical home/end keys for cursor movement
+      expect(defaultKeyBindings[Command.HOME]).toContainEqual({
+        key: 'home',
+        ctrl: false,
+        shift: false,
+      });
+      expect(defaultKeyBindings[Command.END]).toContainEqual({
+        key: 'end',
+        ctrl: false,
+        shift: false,
+      });
+
+      // Verify physical home/end keys for scrolling
+      expect(defaultKeyBindings[Command.SCROLL_HOME]).toContainEqual({
+        key: 'home',
+        ctrl: true,
+      });
+      expect(defaultKeyBindings[Command.SCROLL_END]).toContainEqual({
+        key: 'end',
+        ctrl: true,
+      });
     });
   });
 

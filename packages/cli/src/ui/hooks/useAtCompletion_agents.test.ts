@@ -63,6 +63,8 @@ describe('useAtCompletion with Agents', () => {
       })),
       getEnableRecursiveFileSearch: () => true,
       getFileFilteringDisableFuzzySearch: () => false,
+      getFileFilteringEnableFuzzySearch: () => true,
+      getAgentsSettings: () => ({}),
       getResourceRegistry: vi.fn().mockReturnValue({
         getAllResources: () => [],
       }),

@@ -15,7 +15,6 @@ import {
   READ_MANY_FILES_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
 } from '../tools/tool-names.js';
-import { LruCache } from './LruCache.js';
 import {
   isFunctionResponse,
   isFunctionCall,
@@ -23,6 +22,7 @@ import {
 import * as fs from 'node:fs';
 import { promptIdContext } from './promptIdContext.js';
 import { debugLogger } from './debugLogger.js';
+import { LRUCache } from 'mnemonist';
 
 const CODE_CORRECTION_SYSTEM_PROMPT = `
 You are an expert code-editing assistant. Your task is to analyze a failed edit attempt and provide a corrected version of the text snippets.
@@ -39,12 +39,12 @@ function getPromptId(): string {
 const MAX_CACHE_SIZE = 50;
 
 // Cache for ensureCorrectEdit results
-const editCorrectionCache = new LruCache<string, CorrectedEditResult>(
+const editCorrectionCache = new LRUCache<string, CorrectedEditResult>(
   MAX_CACHE_SIZE,
 );
 
 // Cache for ensureCorrectFileContent results
-const fileContentCorrectionCache = new LruCache<string, string>(MAX_CACHE_SIZE);
+const fileContentCorrectionCache = new LRUCache<string, string>(MAX_CACHE_SIZE);
 
 /**
  * Defines the structure of the parameters within CorrectedEditResult
@@ -357,7 +357,7 @@ export async function ensureCorrectFileContent(
   content: string,
   baseLlmClient: BaseLlmClient,
   abortSignal: AbortSignal,
-  disableLLMCorrection: boolean = false,
+  disableLLMCorrection: boolean = true,
 ): Promise<string> {
   const cachedResult = fileContentCorrectionCache.get(content);
   if (cachedResult) {
@@ -689,13 +689,20 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
   }
 }
 
+function trimPreservingTrailingNewline(str: string): string {
+  const trimmedEnd = str.trimEnd();
+  const trailingWhitespace = str.slice(trimmedEnd.length);
+  const trailingNewlines = trailingWhitespace.replace(/[^\r\n]/g, '');
+  return str.trim() + trailingNewlines;
+}
+
 function trimPairIfPossible(
   target: string,
   trimIfTargetTrims: string,
   currentContent: string,
   expectedReplacements: number,
 ) {
-  const trimmedTargetString = target.trim();
+  const trimmedTargetString = trimPreservingTrailingNewline(target);
   if (target.length !== trimmedTargetString.length) {
     const trimmedTargetOccurrences = countOccurrences(
       currentContent,
@@ -703,7 +710,8 @@ function trimPairIfPossible(
     );
 
     if (trimmedTargetOccurrences === expectedReplacements) {
-      const trimmedReactiveString = trimIfTargetTrims.trim();
+      const trimmedReactiveString =
+        trimPreservingTrailingNewline(trimIfTargetTrims);
       return {
         targetString: trimmedTargetString,
         pair: trimmedReactiveString,

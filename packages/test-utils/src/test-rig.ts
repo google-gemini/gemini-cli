@@ -400,14 +400,14 @@ export class TestRig {
     args?: string | string[];
     stdin?: string;
     stdinDoesNotEnd?: boolean;
-    yolo?: boolean;
+    approvalMode?: 'default' | 'auto_edit' | 'yolo' | 'plan';
     timeout?: number;
     env?: Record<string, string | undefined>;
   }): Promise<string> {
-    const yolo = options.yolo !== false;
-    const { command, initialArgs } = this._getCommandAndArgs(
-      yolo ? ['--yolo'] : [],
-    );
+    const approvalMode = options.approvalMode ?? 'yolo';
+    const { command, initialArgs } = this._getCommandAndArgs([
+      `--approval-mode=${approvalMode}`,
+    ]);
     const commandArgs = [...initialArgs];
     const execOptions: {
       cwd: string;
@@ -469,7 +469,7 @@ export class TestRig {
       }
     });
 
-    const timeout = options.timeout ?? 120000;
+    const timeout = options.timeout ?? 300000;
     const promise = new Promise<string>((resolve, reject) => {
       const timer = setTimeout(() => {
         child.kill('SIGKILL');
@@ -555,6 +555,48 @@ export class TestRig {
     return filteredLines.join('\n');
   }
 
+  /**
+   * Runs the CLI and returns stdout and stderr separately.
+   * Useful for tests that need to verify correct stream routing.
+   */
+  runWithStreams(
+    args: string[],
+    options?: { signal?: AbortSignal },
+  ): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
+    return new Promise((resolve, reject) => {
+      const { command, initialArgs } = this._getCommandAndArgs([
+        '--approval-mode=yolo',
+      ]);
+
+      const allArgs = [...initialArgs, ...args];
+
+      const child = spawn(command, allArgs, {
+        cwd: this.testDir!,
+        stdio: 'pipe',
+        env: { ...process.env, GEMINI_CLI_HOME: this.homeDir! },
+        signal: options?.signal,
+      });
+      this._spawnedProcesses.push(child);
+
+      let stdout = '';
+      let stderr = '';
+
+      child.on('error', reject);
+
+      child.stdout!.on('data', (chunk) => {
+        stdout += chunk;
+      });
+      child.stderr!.on('data', (chunk) => {
+        stderr += chunk;
+      });
+
+      child.stdin!.end();
+      child.on('close', (exitCode) => {
+        resolve({ stdout, stderr, exitCode });
+      });
+    });
+  }
+
   runCommand(
     args: string[],
     options: {
@@ -601,7 +643,7 @@ export class TestRig {
       }
     });
 
-    const timeout = options.timeout ?? 120000;
+    const timeout = options.timeout ?? 300000;
     const promise = new Promise<string>((resolve, reject) => {
       const timer = setTimeout(() => {
         child.kill('SIGKILL');
@@ -1128,13 +1170,13 @@ export class TestRig {
 
   async runInteractive(options?: {
     args?: string | string[];
-    yolo?: boolean;
+    approvalMode?: 'default' | 'auto_edit' | 'yolo' | 'plan';
     env?: Record<string, string | undefined>;
   }): Promise<InteractiveRun> {
-    const yolo = options?.yolo !== false;
-    const { command, initialArgs } = this._getCommandAndArgs(
-      yolo ? ['--yolo'] : [],
-    );
+    const approvalMode = options?.approvalMode ?? 'yolo';
+    const { command, initialArgs } = this._getCommandAndArgs([
+      `--approval-mode=${approvalMode}`,
+    ]);
     const commandArgs = [...initialArgs];
 
     const envVars = {

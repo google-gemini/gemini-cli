@@ -11,11 +11,18 @@ import { StatusDisplay } from './StatusDisplay.js';
 import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
 import { ConfigContext } from '../contexts/ConfigContext.js';
 import { SettingsContext } from '../contexts/SettingsContext.js';
+import type { TextBuffer } from './shared/text-buffer.js';
 
 // Mock child components to simplify testing
 vi.mock('./ContextSummaryDisplay.js', () => ({
-  ContextSummaryDisplay: (props: { skillCount: number }) => (
-    <Text>Mock Context Summary Display (Skills: {props.skillCount})</Text>
+  ContextSummaryDisplay: (props: {
+    skillCount: number;
+    backgroundProcessCount: number;
+  }) => (
+    <Text>
+      Mock Context Summary Display (Skills: {props.skillCount}, Shells:{' '}
+      {props.backgroundProcessCount})
+    </Text>
   ),
 }));
 
@@ -23,8 +30,13 @@ vi.mock('./HookStatusDisplay.js', () => ({
   HookStatusDisplay: () => <Text>Mock Hook Status Display</Text>,
 }));
 
+// Use a type that allows partial buffer for mocking purposes
+type UIStateOverrides = Partial<Omit<UIState, 'buffer'>> & {
+  buffer?: Partial<TextBuffer>;
+};
+
 // Create mock context providers
-const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
+const createMockUIState = (overrides: UIStateOverrides = {}): UIState =>
   ({
     ctrlCPressedOnce: false,
     warningMessage: null,
@@ -35,6 +47,9 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     ideContextState: null,
     geminiMdFileCount: 0,
     contextFileNames: [],
+    backgroundShellCount: 0,
+    buffer: { text: '' },
+    history: [{ id: 1, type: 'user', text: 'test' }],
     ...overrides,
   }) as UIState;
 
@@ -52,7 +67,7 @@ const createMockConfig = (overrides = {}) => ({
 
 const createMockSettings = (merged = {}) => ({
   merged: {
-    hooks: { notifications: true },
+    hooksConfig: { notifications: true },
     ui: { hideContextSummary: false },
     ...merged,
   },
@@ -147,9 +162,22 @@ describe('StatusDisplay', () => {
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('renders Escape prompt', () => {
+  it('renders Escape prompt when buffer is empty', () => {
     const uiState = createMockUIState({
       showEscapePrompt: true,
+      buffer: { text: '' },
+    });
+    const { lastFrame } = renderStatusDisplay(
+      { hideContextSummary: false },
+      uiState,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('renders Escape prompt when buffer is NOT empty', () => {
+    const uiState = createMockUIState({
+      showEscapePrompt: true,
+      buffer: { text: 'some text' },
     });
     const { lastFrame } = renderStatusDisplay(
       { hideContextSummary: false },
@@ -185,7 +213,7 @@ describe('StatusDisplay', () => {
       activeHooks: [{ name: 'hook', eventName: 'event' }],
     });
     const settings = createMockSettings({
-      hooks: { notifications: false },
+      hooksConfig: { notifications: false },
     });
     const { lastFrame } = renderStatusDisplay(
       { hideContextSummary: false },
@@ -205,5 +233,16 @@ describe('StatusDisplay', () => {
       settings,
     );
     expect(lastFrame()).toBe('');
+  });
+
+  it('passes backgroundShellCount to ContextSummaryDisplay', () => {
+    const uiState = createMockUIState({
+      backgroundShellCount: 3,
+    });
+    const { lastFrame } = renderStatusDisplay(
+      { hideContextSummary: false },
+      uiState,
+    );
+    expect(lastFrame()).toContain('Shells: 3');
   });
 });

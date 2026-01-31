@@ -18,9 +18,12 @@ import {
   getCommandRoots,
   getShellConfiguration,
   initializeShellParsers,
+  parseCommandDetails,
   stripShellWrapper,
   hasRedirection,
+  resolveExecutable,
 } from './shell-utils.js';
+import path from 'node:path';
 
 const mockPlatform = vi.hoisted(() => vi.fn());
 const mockHomedir = vi.hoisted(() => vi.fn());
@@ -31,6 +34,20 @@ vi.mock('os', () => ({
   },
   platform: mockPlatform,
   homedir: mockHomedir,
+}));
+
+const mockAccess = vi.hoisted(() => vi.fn());
+vi.mock('node:fs', () => ({
+  default: {
+    promises: {
+      access: mockAccess,
+    },
+    constants: { X_OK: 1 },
+  },
+  promises: {
+    access: mockAccess,
+  },
+  constants: { X_OK: 1 },
 }));
 
 const mockSpawnSync = vi.hoisted(() => vi.fn());
@@ -152,6 +169,20 @@ describe('getCommandRoots', () => {
     expect(result).toEqual(['echo', 'cat']);
   });
 
+  it('should correctly identify input redirection with explicit file descriptor', () => {
+    const result = parseCommandDetails('ls 2< input.txt');
+    const redirection = result?.details.find((d) =>
+      d.name.startsWith('redirection'),
+    );
+    expect(redirection?.name).toBe('redirection (<)');
+  });
+
+  it('should filter out all redirections from getCommandRoots', () => {
+    expect(getCommandRoots('cat < input.txt')).toEqual(['cat']);
+    expect(getCommandRoots('ls 2> error.log')).toEqual(['ls']);
+    expect(getCommandRoots('exec 3<&0')).toEqual(['exec']);
+  });
+
   it('should handle parser initialization failures gracefully', async () => {
     // Reset modules to clear singleton state
     vi.resetModules();
@@ -204,6 +235,11 @@ describe('hasRedirection', () => {
     expect(hasRedirection('cat < input')).toBe(true);
   });
 
+  it('should detect redirection with explicit file descriptor', () => {
+    expect(hasRedirection('ls 2> error.log')).toBe(true);
+    expect(hasRedirection('exec 3<&0')).toBe(true);
+  });
+
   it('should detect append redirection', () => {
     expect(hasRedirection('echo hello >> world')).toBe(true);
   });
@@ -225,6 +261,11 @@ describe('hasRedirection', () => {
     // However, the current implementation checks for 'redirected_statement' nodes.
     // A pipe is a 'pipeline' node.
     expect(hasRedirection('echo hello | cat')).toBe(false);
+  });
+
+  it('should return false when redirection characters are inside quotes in bash', () => {
+    mockPlatform.mockReturnValue('linux');
+    expect(hasRedirection('echo "a > b"')).toBe(false);
   });
 });
 
@@ -461,5 +502,67 @@ describe('hasRedirection (PowerShell via mock)', () => {
     });
     // Fallback regex sees '>' in arrow
     expect(hasRedirection('echo "-> arrow"')).toBe(true);
+  });
+});
+
+describe('resolveExecutable', () => {
+  const originalEnv = process.env;
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+    mockAccess.mockReset();
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  it('should return the absolute path if it exists and is executable', async () => {
+    const absPath = path.resolve('/usr/bin/git');
+    mockAccess.mockResolvedValue(undefined); // success
+    expect(await resolveExecutable(absPath)).toBe(absPath);
+    expect(mockAccess).toHaveBeenCalledWith(absPath, 1);
+  });
+
+  it('should return undefined for absolute path if it does not exist', async () => {
+    const absPath = path.resolve('/usr/bin/nonexistent');
+    mockAccess.mockRejectedValue(new Error('ENOENT'));
+    expect(await resolveExecutable(absPath)).toBeUndefined();
+  });
+
+  it('should resolve executable in PATH', async () => {
+    const binDir = path.resolve('/bin');
+    const usrBinDir = path.resolve('/usr/bin');
+    process.env['PATH'] = `${binDir}${path.delimiter}${usrBinDir}`;
+    mockPlatform.mockReturnValue('linux');
+
+    const targetPath = path.join(usrBinDir, 'ls');
+    mockAccess.mockImplementation(async (p: string) => {
+      if (p === targetPath) return undefined;
+      throw new Error('ENOENT');
+    });
+
+    expect(await resolveExecutable('ls')).toBe(targetPath);
+  });
+
+  it('should try extensions on Windows', async () => {
+    const sys32 = path.resolve('C:\\Windows\\System32');
+    process.env['PATH'] = sys32;
+    mockPlatform.mockReturnValue('win32');
+    mockAccess.mockImplementation(async (p: string) => {
+      // Use includes because on Windows path separators might differ
+      if (p.includes('cmd.exe')) return undefined;
+      throw new Error('ENOENT');
+    });
+
+    expect(await resolveExecutable('cmd')).toContain('cmd.exe');
+  });
+
+  it('should return undefined if not found in PATH', async () => {
+    process.env['PATH'] = path.resolve('/bin');
+    mockPlatform.mockReturnValue('linux');
+    mockAccess.mockRejectedValue(new Error('ENOENT'));
+
+    expect(await resolveExecutable('unknown')).toBeUndefined();
   });
 });

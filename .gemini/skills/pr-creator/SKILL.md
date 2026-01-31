@@ -14,16 +14,25 @@ repository's standards.
 
 Follow these steps to create a Pull Request:
 
-1.  **Locate Template**: Search for a pull request template in the repository.
+1.  **Branch Management**: Check the current branch to avoid working directly
+    on `main`.
+    - Run `git branch --show-current`.
+    - If the current branch is `main`, create and switch to a new descriptive
+      branch:
+      ```bash
+      git checkout -b <new-branch-name>
+      ```
+
+2.  **Locate Template**: Search for a pull request template in the repository.
     - Check `.github/pull_request_template.md`
     - Check `.github/PULL_REQUEST_TEMPLATE.md`
     - If multiple templates exist (e.g., in `.github/PULL_REQUEST_TEMPLATE/`),
       ask the user which one to use or select the most appropriate one based on
       the context (e.g., `bug_fix.md` vs `feature.md`).
 
-2.  **Read Template**: Read the content of the identified template file.
+3.  **Read Template**: Read the content of the identified template file.
 
-3.  **Draft Description**: Create a PR description that strictly follows the
+4.  **Draft Description**: Create a PR description that strictly follows the
     template's structure.
     - **Headings**: Keep all headings from the template.
     - **Checklists**: Review each item. Mark with `[x]` if completed. If an item
@@ -35,7 +44,14 @@ Follow these steps to create a Pull Request:
     - **Related Issues**: Link any issues fixed or related to this PR (e.g.,
       "Fixes #123").
 
-4.  **Create PR**: Use the `gh` CLI to create the PR. To avoid shell escaping
+5.  **Preflight Check**: Before creating the PR, run the workspace preflight
+    script to ensure all build, lint, and test checks pass.
+    ```bash
+    npm run preflight
+    ```
+    If any checks fail, address the issues before proceeding to create the PR.
+
+6.  **Create PR**: Use the `gh` CLI to create the PR. To avoid shell escaping
     issues with multi-line Markdown, write the description to a temporary file
     first.
     ```bash

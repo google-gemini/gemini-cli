@@ -142,6 +142,12 @@ export interface PolicyRule {
    * e.g. "my-policies.toml", "Settings (MCP Trusted)", etc.
    */
   source?: string;
+
+  /**
+   * Optional message to display when this rule results in a DENY decision.
+   * This message will be returned to the model/user.
+   */
+  denyMessage?: string;
 }
 
 export interface SafetyCheckerRule {
@@ -264,4 +270,9 @@ export interface PolicySettings {
     allowed?: string[];
   };
   mcpServers?: Record<string, { trust?: boolean }>;
+}
+
+export interface CheckResult {
+  decision: PolicyDecision;
+  rule?: PolicyRule;
 }

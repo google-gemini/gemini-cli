@@ -9,6 +9,7 @@ import { ApiError } from '@google/genai';
 import {
   TerminalQuotaError,
   RetryableQuotaError,
+  ValidationRequiredError,
   classifyGoogleError,
 } from './googleQuotaErrors.js';
 import { delay, createAbortError } from './delay.js';
@@ -28,6 +29,9 @@ export interface RetryOptions {
     authType?: string,
     error?: unknown,
   ) => Promise<string | boolean | null>;
+  onValidationRequired?: (
+    error: ValidationRequiredError,
+  ) => Promise<'verify' | 'change_auth' | 'cancel'>;
   authType?: string;
   retryFetchErrors?: boolean;
   signal?: AbortSignal;
@@ -36,7 +40,7 @@ export interface RetryOptions {
 }
 
 const DEFAULT_RETRY_OPTIONS: RetryOptions = {
-  maxAttempts: 10,
+  maxAttempts: 3,
   initialDelayMs: 5000,
   maxDelayMs: 30000, // 30 seconds
   shouldRetryOnError: isRetryableError,
@@ -144,6 +148,7 @@ export async function retryWithBackoff<T>(
     initialDelayMs,
     maxDelayMs,
     onPersistent429,
+    onValidationRequired,
     authType,
     shouldRetryOnError,
     shouldRetryOnContent,
@@ -218,6 +223,26 @@ export async function retryWithBackoff<T>(
         }
         // Terminal/not_found already recorded; nothing else to mark here.
         throw classifiedError; // Throw if no fallback or fallback failed.
+      }
+
+      // Handle ValidationRequiredError - user needs to verify before proceeding
+      if (classifiedError instanceof ValidationRequiredError) {
+        if (onValidationRequired) {
+          try {
+            const intent = await onValidationRequired(classifiedError);
+            if (intent === 'verify') {
+              // User verified, retry the request
+              attempt = 0;
+              currentDelay = initialDelayMs;
+              continue;
+            }
+            // 'change_auth' or 'cancel' - mark as handled and throw
+            classifiedError.userHandled = true;
+          } catch (validationError) {
+            debugLogger.warn('Validation handler failed:', validationError);
+          }
+        }
+        throw classifiedError;
       }
 
       const is500 =

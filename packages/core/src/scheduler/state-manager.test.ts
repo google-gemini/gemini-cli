@@ -23,6 +23,7 @@ import {
 } from '../tools/tools.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { ROOT_SCHEDULER_ID } from './types.js';
 
 describe('SchedulerStateManager', () => {
   const mockRequest: ToolCallRequestInfo = {
@@ -81,6 +82,60 @@ describe('SchedulerStateManager', () => {
     });
 
     stateManager = new SchedulerStateManager(mockMessageBus);
+  });
+
+  describe('Observer Callback', () => {
+    it('should trigger onTerminalCall when finalizing a call', () => {
+      const onTerminalCall = vi.fn();
+      const manager = new SchedulerStateManager(
+        mockMessageBus,
+        ROOT_SCHEDULER_ID,
+        onTerminalCall,
+      );
+      const call = createValidatingCall();
+      manager.enqueue([call]);
+      manager.dequeue();
+      manager.updateStatus(
+        call.request.callId,
+        'success',
+        createMockResponse(call.request.callId),
+      );
+      manager.finalizeCall(call.request.callId);
+
+      expect(onTerminalCall).toHaveBeenCalledTimes(1);
+      expect(onTerminalCall).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'success',
+          request: expect.objectContaining({ callId: call.request.callId }),
+        }),
+      );
+    });
+
+    it('should trigger onTerminalCall for every call in cancelAllQueued', () => {
+      const onTerminalCall = vi.fn();
+      const manager = new SchedulerStateManager(
+        mockMessageBus,
+        ROOT_SCHEDULER_ID,
+        onTerminalCall,
+      );
+      manager.enqueue([createValidatingCall('1'), createValidatingCall('2')]);
+
+      manager.cancelAllQueued('Test cancel');
+
+      expect(onTerminalCall).toHaveBeenCalledTimes(2);
+      expect(onTerminalCall).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'cancelled',
+          request: expect.objectContaining({ callId: '1' }),
+        }),
+      );
+      expect(onTerminalCall).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'cancelled',
+          request: expect.objectContaining({ callId: '2' }),
+        }),
+      );
+    });
   });
 
   describe('Initialization', () => {
@@ -188,8 +243,13 @@ describe('SchedulerStateManager', () => {
         errorType: undefined,
       };
 
+      vi.mocked(onUpdate).mockClear();
       stateManager.updateStatus(call.request.callId, 'success', response);
+      expect(onUpdate).toHaveBeenCalledTimes(1);
+
+      vi.mocked(onUpdate).mockClear();
       stateManager.finalizeCall(call.request.callId);
+      expect(onUpdate).toHaveBeenCalledTimes(1);
 
       expect(stateManager.isActive).toBe(false);
       expect(stateManager.completedBatch).toHaveLength(1);
@@ -455,6 +515,7 @@ describe('SchedulerStateManager', () => {
         createValidatingCall('2'),
       ]);
 
+      vi.mocked(onUpdate).mockClear();
       stateManager.cancelAllQueued('Batch cancel');
 
       expect(stateManager.queueLength).toBe(0);
@@ -462,6 +523,13 @@ describe('SchedulerStateManager', () => {
       expect(
         stateManager.completedBatch.every((c) => c.status === 'cancelled'),
       ).toBe(true);
+      expect(onUpdate).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not notify if cancelAllQueued is called on an empty queue', () => {
+      vi.mocked(onUpdate).mockClear();
+      stateManager.cancelAllQueued('Batch cancel');
+      expect(onUpdate).not.toHaveBeenCalled();
     });
 
     it('should clear batch and notify', () => {
