@@ -1515,6 +1515,50 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).text).toBe('');
     });
 
+    it('should handle CLEAR_INPUT (Ctrl+C)', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: 'hello',
+          viewport,
+          isValidPath: () => false,
+        }),
+      );
+      expect(getBufferState(result).text).toBe('hello');
+      let handled = false;
+      act(() => {
+        handled = result.current.handleInput({
+          name: 'c',
+          shift: false,
+          alt: false,
+          ctrl: true,
+          cmd: false,
+          insertable: false,
+          sequence: '\u0003',
+        });
+      });
+      expect(handled).toBe(true);
+      expect(getBufferState(result).text).toBe('');
+    });
+
+    it('should NOT handle CLEAR_INPUT if buffer is empty', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+      let handled = true;
+      act(() => {
+        handled = result.current.handleInput({
+          name: 'c',
+          shift: false,
+          alt: false,
+          ctrl: true,
+          cmd: false,
+          insertable: false,
+          sequence: '\u0003',
+        });
+      });
+      expect(handled).toBe(false);
+    });
+
     it('should handle "Backspace" key', () => {
       const { result } = renderHook(() =>
         useTextBuffer({
