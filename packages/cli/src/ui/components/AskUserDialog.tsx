@@ -5,7 +5,14 @@
  */
 
 import type React from 'react';
-import { useCallback, useMemo, useRef, useEffect, useReducer } from 'react';
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  useEffect,
+  useReducer,
+  useContext,
+} from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import type { Question } from '@google/gemini-cli-core';
@@ -21,6 +28,8 @@ import { getCachedStringWidth } from '../utils/textUtils.js';
 import { useTabbedNavigation } from '../hooks/useTabbedNavigation.js';
 import { DialogFooter } from './shared/DialogFooter.js';
 import { MaxSizedBox } from './shared/MaxSizedBox.js';
+import { UIStateContext } from '../contexts/UIStateContext.js';
+import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 
 interface AskUserDialogState {
   answers: { [key: string]: string };
@@ -121,7 +130,7 @@ interface AskUserDialogProps {
   /**
    * Height constraint for scrollable content.
    */
-  availableHeight: number;
+  availableHeight?: number;
 }
 
 interface ReviewViewProps {
@@ -199,7 +208,7 @@ interface TextQuestionViewProps {
   onSelectionChange?: (answer: string) => void;
   onEditingCustomOption?: (editing: boolean) => void;
   availableWidth: number;
-  availableHeight: number;
+  availableHeight?: number;
   initialAnswer?: string;
   progressHeader?: React.ReactNode;
   keyboardHints?: React.ReactNode;
@@ -216,6 +225,7 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
   progressHeader,
   keyboardHints,
 }) => {
+  const isAlternateBuffer = useAlternateBuffer();
   const prefix = '> ';
   const horizontalPadding = 1; // 1 for cursor
   const bufferWidth =
@@ -279,13 +289,20 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
   const INPUT_HEIGHT = 2; // TextInput + margin
   const FOOTER_HEIGHT = 2; // DialogFooter + margin
   const overhead = HEADER_HEIGHT + INPUT_HEIGHT + FOOTER_HEIGHT;
-  const questionHeight = Math.max(1, availableHeight - overhead);
+  const questionHeight =
+    availableHeight && !isAlternateBuffer
+      ? Math.max(1, availableHeight - overhead)
+      : undefined;
 
   return (
     <Box flexDirection="column">
       {progressHeader}
       <Box marginBottom={1}>
-        <MaxSizedBox maxHeight={questionHeight} maxWidth={availableWidth}>
+        <MaxSizedBox
+          maxHeight={questionHeight}
+          maxWidth={availableWidth}
+          overflowDirection="bottom"
+        >
           <Text bold color={theme.text.primary}>
             {question.question}
           </Text>
@@ -389,7 +406,7 @@ interface ChoiceQuestionViewProps {
   onSelectionChange?: (answer: string) => void;
   onEditingCustomOption?: (editing: boolean) => void;
   availableWidth: number;
-  availableHeight: number;
+  availableHeight?: number;
   initialAnswer?: string;
   progressHeader?: React.ReactNode;
   keyboardHints?: React.ReactNode;
@@ -406,6 +423,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
   progressHeader,
   keyboardHints,
 }) => {
+  const isAlternateBuffer = useAlternateBuffer();
   const numOptions =
     (question.options?.length ?? 0) + (question.type !== 'yesno' ? 1 : 0);
   const numLen = String(numOptions).length;
@@ -711,18 +729,27 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
   const TITLE_MARGIN = 1;
   const FOOTER_HEIGHT = 2; // DialogFooter + margin
   const overhead = HEADER_HEIGHT + TITLE_MARGIN + FOOTER_HEIGHT;
-  const listHeight = Math.max(1, availableHeight - overhead);
-  const questionHeight = Math.min(3, Math.max(1, listHeight - 4));
-  const maxItemsToShow = Math.max(
-    1,
-    Math.floor((listHeight - questionHeight) / 2),
-  );
+  const listHeight = availableHeight
+    ? Math.max(1, availableHeight - overhead)
+    : undefined;
+  const questionHeight =
+    listHeight && !isAlternateBuffer
+      ? Math.min(15, Math.max(1, listHeight - 4))
+      : undefined;
+  const maxItemsToShow =
+    listHeight && questionHeight
+      ? Math.max(1, Math.floor((listHeight - questionHeight) / 2))
+      : selectionItems.length;
 
   return (
     <Box flexDirection="column">
       {progressHeader}
       <Box marginBottom={TITLE_MARGIN}>
-        <MaxSizedBox maxHeight={questionHeight} maxWidth={availableWidth}>
+        <MaxSizedBox
+          maxHeight={questionHeight}
+          maxWidth={availableWidth}
+          overflowDirection="bottom"
+        >
           <Text bold color={theme.text.primary}>
             {question.question}
             {question.multiSelect && (
@@ -824,8 +851,15 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
   onCancel,
   onActiveTextInputChange,
   width,
-  availableHeight,
+  availableHeight: availableHeightProp,
 }) => {
+  const uiState = useContext(UIStateContext);
+  const availableHeight =
+    availableHeightProp ??
+    (uiState?.constrainHeight !== false
+      ? uiState?.availableTerminalHeight
+      : undefined);
+
   const [state, dispatch] = useReducer(askUserDialogReducerLogic, initialState);
   const { answers, isEditingCustomOption, submitted } = state;
 
