@@ -271,7 +271,7 @@ export const ToolConfirmationMessage: React.FC<
             handleConfirm(ToolConfirmationOutcome.Cancel);
           }}
           width={terminalWidth}
-          availableHeight={availableBodyContentHeight() ?? 10}
+          availableHeight={availableBodyContentHeight()}
         />
       );
       return { question: '', bodyContent, options: [] };
