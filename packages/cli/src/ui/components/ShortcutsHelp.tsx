@@ -26,24 +26,19 @@ const buildShortcutRows = (): ShortcutItem[][] => {
       { key: '!', description: 'shell mode' },
       {
         key: 'Shift+Tab',
-        description: 'cycle approval (plan / accept edits)',
+        description: 'cycle mode',
       },
       { key: 'Ctrl+G', description: 'IDE context details' },
     ],
     [
-      { key: '/', description: 'commands' },
+      { key: '@', description: 'select file or folder' },
       { key: 'Ctrl+Y', description: 'YOLO mode' },
       { key: 'Ctrl+R', description: 'reverse-search history' },
     ],
     [
-      { key: '@', description: 'file paths' },
+      { key: 'Esc Esc', description: 'clear prompt / rewind' },
       { key: `${altLabel}+M`, description: 'raw markdown mode' },
       { key: 'Ctrl+X', description: 'open external editor' },
-    ],
-    [
-      { key: 'Esc Esc', description: 'clear prompt / rewind' },
-      { key: '/vim', description: 'toggle vim keybindings' },
-      { key: '/shells', description: 'background shells view' },
     ],
   ];
 };
@@ -90,7 +85,7 @@ export const ShortcutsHelp: React.FC = () => {
   if (isNarrow) {
     return (
       <Box flexDirection="column">
-        <SectionHeader title="Shortcuts" />
+        <SectionHeader title="Shortcuts (for more see /help)" />
         {shortcutRows.flat().map((item, index) => {
           const text = padToWidth(renderItem(item), terminalWidth);
           return (
@@ -110,7 +105,7 @@ export const ShortcutsHelp: React.FC = () => {
 
   return (
     <Box flexDirection="column">
-      <SectionHeader title="Shortcuts" />
+      <SectionHeader title="Shortcuts (for more see /help)" />
       {shortcutRows.map((row, rowIndex) => {
         const cellLines = row.map((item) =>
           wrapText(renderItem(item), columnWidth),

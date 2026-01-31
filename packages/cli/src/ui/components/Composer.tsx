@@ -94,9 +94,16 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
         flexDirection={isNarrow ? 'column' : 'row'}
         alignItems={isNarrow ? 'flex-start' : 'center'}
       >
-        <Box marginRight={1} flexDirection="row" alignItems="center">
+        <Box
+          marginRight={1}
+          flexDirection="row"
+          alignItems="center"
+          flexGrow={1}
+          justifyContent="space-between"
+          width="100%"
+        >
           <ShortcutsHint />
-          <Box marginLeft={1}>
+          <Box flexGrow={1} justifyContent="flex-end" flexDirection="row">
             <StatusDisplay hideContextSummary={hideContextSummary} />
           </Box>
         </Box>
