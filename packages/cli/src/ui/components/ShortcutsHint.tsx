@@ -7,9 +7,22 @@
 import type React from 'react';
 import { Text } from 'ink';
 import { theme } from '../semantic-colors.js';
+import { useUIState } from '../contexts/UIStateContext.js';
 
-export const ShortcutsHint: React.FC = () => (
-  <Text color={theme.text.secondary}>
-    <Text color={theme.text.accent}> ?</Text> for shortcuts
-  </Text>
-);
+export const ShortcutsHint: React.FC = () => {
+  const { shortcutsHelpVisible } = useUIState();
+  const highlightColor = shortcutsHelpVisible
+    ? theme.text.accent
+    : theme.text.secondary;
+  const separatorColor = shortcutsHelpVisible
+    ? theme.text.accent
+    : theme.text.secondary;
+
+  return (
+    <Text color={theme.text.secondary}>
+      <Text color={highlightColor}> ?</Text>
+      <Text color={highlightColor}> for shortcuts</Text>
+      <Text color={separatorColor}> |</Text>
+    </Text>
+  );
+};
