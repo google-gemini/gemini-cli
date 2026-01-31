@@ -37,7 +37,7 @@ const mockSettings = {
     ui: {
       theme: 'default', // DEFAULT_THEME.name
       autoThemeSwitching: true,
-      terminalBackgroundPollingInterval: 100, // Short interval for testing
+      terminalBackgroundPollingInterval: 1, // 1 second
     },
   },
 };
@@ -76,6 +76,9 @@ describe('useTerminalTheme', () => {
     mockUnsubscribe.mockClear();
     mockHandleThemeSelect.mockClear();
     mockSetTerminalBackground.mockClear();
+    // Reset any settings modifications
+    mockSettings.merged.ui.autoThemeSwitching = true;
+    mockSettings.merged.ui.theme = 'default';
   });
 
   afterEach(() => {
@@ -99,9 +102,74 @@ describe('useTerminalTheme', () => {
   it('should poll for terminal background', () => {
     renderHook(() => useTerminalTheme(mockHandleThemeSelect, config));
 
-    // Fast-forward time
-    vi.advanceTimersByTime(100);
+    // Fast-forward time (1 second)
+    vi.advanceTimersByTime(1000);
     expect(mockWrite).toHaveBeenCalledWith('\x1b]11;?\x1b\\');
+  });
+
+  it('should stop polling after 3 unacknowledged attempts', () => {
+    renderHook(() => useTerminalTheme(mockHandleThemeSelect, config));
+
+    // Attempt 1
+    vi.advanceTimersByTime(1000);
+    expect(mockWrite).toHaveBeenCalledTimes(1);
+
+    // Attempt 2
+    vi.advanceTimersByTime(1000);
+    expect(mockWrite).toHaveBeenCalledTimes(2);
+
+    // Attempt 3
+    vi.advanceTimersByTime(1000);
+    expect(mockWrite).toHaveBeenCalledTimes(3);
+
+    // Attempt 4 (should be blocked)
+    vi.advanceTimersByTime(1000);
+    expect(mockWrite).toHaveBeenCalledTimes(3);
+  });
+
+  it('should reset failure count after successful response', () => {
+    renderHook(() => useTerminalTheme(mockHandleThemeSelect, config));
+
+    const handler = mockSubscribe.mock.calls[0][0];
+
+    // Fail twice
+    vi.advanceTimersByTime(1000); // 1
+    vi.advanceTimersByTime(1000); // 2
+    expect(mockWrite).toHaveBeenCalledTimes(2);
+
+    // Succeed
+    handler('rgb:ffff/ffff/ffff');
+
+    // Should continue polling
+    vi.advanceTimersByTime(1000); // 3 (reset count, so this is new attempt 1)
+    expect(mockWrite).toHaveBeenCalledTimes(3);
+
+    // Fail 3 times from now
+    vi.advanceTimersByTime(1000); // 4 (new attempt 2)
+    vi.advanceTimersByTime(1000); // 5 (new attempt 3)
+    vi.advanceTimersByTime(1000); // 6 (new attempt 4 - blocked?)
+
+    // Total calls: 3 (before success) + 3 (after success) = 6.
+    // Wait, attempt 3 was the one after success.
+    // Let's trace carefully:
+    // 1. Poll (0->1)
+    // 2. Poll (1->2)
+    // <Success> (Reset to 0)
+    // 3. Poll (0->1)
+    // 4. Poll (1->2)
+    // 5. Poll (2->3)
+    // 6. Blocked (3->3)
+    // Total expecting 5 calls? No, 3 before success?
+    // Initial: 0.
+    // T=1000: Write (Polls=1). Calls=1.
+    // T=2000: Write (Polls=2). Calls=2.
+    // Handler called. Polls=0.
+    // T=3000: Write (Polls=1). Calls=3.
+    // T=4000: Write (Polls=2). Calls=4.
+    // T=5000: Write (Polls=3). Calls=5.
+    // T=6000: Blocked. Calls=5.
+
+    expect(mockWrite).toHaveBeenCalledTimes(5);
   });
 
   it('should switch to light theme when background is light', () => {
@@ -110,7 +178,6 @@ describe('useTerminalTheme', () => {
     const handler = mockSubscribe.mock.calls[0][0];
 
     // Simulate light background response (white)
-    // OSC 11 response format: rgb:rrrr/gggg/bbbb
     handler('rgb:ffff/ffff/ffff');
 
     expect(mockSetTerminalBackground).toHaveBeenCalledWith('#ffffff');
@@ -146,7 +213,7 @@ describe('useTerminalTheme', () => {
     renderHook(() => useTerminalTheme(mockHandleThemeSelect, config));
 
     // Poll should not happen
-    vi.advanceTimersByTime(100);
+    vi.advanceTimersByTime(1000);
     expect(mockWrite).not.toHaveBeenCalled();
 
     mockSettings.merged.ui.autoThemeSwitching = true;

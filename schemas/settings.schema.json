@@ -179,9 +179,9 @@
         },
         "terminalBackgroundPollingInterval": {
           "title": "Terminal Background Polling Interval",
-          "description": "Interval in milliseconds to poll the terminal background color.",
-          "markdownDescription": "Interval in milliseconds to poll the terminal background color.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `60000`",
-          "default": 60000,
+          "description": "Interval in seconds to poll the terminal background color.",
+          "markdownDescription": "Interval in seconds to poll the terminal background color.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `60`",
+          "default": 60,
           "type": "number"
         },
         "customThemes": {

@@ -366,9 +366,9 @@ const SETTINGS_SCHEMA = {
         label: 'Terminal Background Polling Interval',
         category: 'UI',
         requiresRestart: false,
-        default: 60000,
+        default: 60,
         description:
-          'Interval in milliseconds to poll the terminal background color.',
+          'Interval in seconds to poll the terminal background color.',
         showInDialog: true,
       },
       customThemes: {

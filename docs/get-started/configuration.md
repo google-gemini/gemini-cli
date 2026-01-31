@@ -176,9 +176,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
 
 - **`ui.terminalBackgroundPollingInterval`** (number):
-  - **Description:** Interval in milliseconds to poll the terminal background
-    color.
-  - **Default:** `60000`
+  - **Description:** Interval in seconds to poll the terminal background color.
+  - **Default:** `60`
 
 - **`ui.customThemes`** (object):
   - **Description:** Custom theme definitions.

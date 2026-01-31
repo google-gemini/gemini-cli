@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useStdout } from 'ink';
 import {
   getLuminance,
@@ -26,24 +26,35 @@ export function useTerminalTheme(
   const { stdout } = useStdout();
   const settings = useSettings();
   const { subscribe, unsubscribe } = useTerminalContext();
+  const unacknowledgedPolls = useRef(0);
 
   useEffect(() => {
-    const pollInterval = setInterval(() => {
-      // Check if auto-switching is enabled
-      if (settings.merged.ui.autoThemeSwitching === false) {
-        return;
-      }
+    // Check if auto-switching is enabled
+    if (settings.merged.ui.autoThemeSwitching === false) {
+      return;
+    }
 
+    const pollIntervalId = setInterval(() => {
       // Only poll if we are using one of the default themes
       const currentThemeName = settings.merged.ui.theme;
       if (!themeManager.isDefaultTheme(currentThemeName)) {
         return;
       }
 
+      // Stop polling if the terminal isn't responding
+      if (unacknowledgedPolls.current >= 3) {
+        clearInterval(pollIntervalId);
+        return;
+      }
+
+      unacknowledgedPolls.current += 1;
       stdout.write('\x1b]11;?\x1b\\');
-    }, settings.merged.ui.terminalBackgroundPollingInterval);
+    }, settings.merged.ui.terminalBackgroundPollingInterval * 1000);
 
     const handleTerminalBackground = (colorStr: string) => {
+      // Reset the counter since we got a response
+      unacknowledgedPolls.current = 0;
+
       // Parse the response "rgb:rrrr/gggg/bbbb"
       const match =
         /^rgb:([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})$/.exec(
@@ -72,7 +83,7 @@ export function useTerminalTheme(
     subscribe(handleTerminalBackground);
 
     return () => {
-      clearInterval(pollInterval);
+      clearInterval(pollIntervalId);
       unsubscribe(handleTerminalBackground);
     };
   }, [
