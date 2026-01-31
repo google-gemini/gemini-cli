@@ -38,7 +38,7 @@ import { AcpFileSystemService } from './fileSystemService.js';
 import { Readable, Writable } from 'node:stream';
 import type { Content, Part, FunctionCall } from '@google/genai';
 import type { LoadedSettings } from '../config/settings.js';
-import { SettingScope } from '../config/settings.js';
+import { SettingScope, loadSettings } from '../config/settings.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { z } from 'zod';
@@ -146,27 +146,34 @@ export class GeminiAgent {
     mcpServers,
   }: acp.NewSessionRequest): Promise<acp.NewSessionResponse> {
     const sessionId = randomUUID();
-    const config = await this.newSessionConfig(sessionId, cwd, mcpServers);
+    const loadedSettings = loadSettings(cwd);
+    const config = await this.newSessionConfig(
+      sessionId,
+      cwd,
+      mcpServers,
+      loadedSettings,
+    );
+
+    const authType =
+      loadedSettings.merged.security.auth.selectedType || AuthType.USE_GEMINI;
 
     let isAuthenticated = false;
-    if (this.settings.merged.security.auth.selectedType) {
-      try {
-        await config.refreshAuth(
-          this.settings.merged.security.auth.selectedType,
-        );
-        isAuthenticated = true;
+    try {
+      await config.refreshAuth(authType);
+      isAuthenticated = true;
 
-        // Extra validation for Gemini API key
-        if (
-          this.settings.merged.security.auth.selectedType ===
-            AuthType.USE_GEMINI &&
-          !config.getContentGeneratorConfig().apiKey
-        ) {
-          isAuthenticated = false;
-        }
-      } catch (e) {
-        debugLogger.error(`Authentication failed: ${e}`);
+      // Extra validation for Gemini API key
+      const contentGeneratorConfig = config.getContentGeneratorConfig();
+      if (
+        authType === AuthType.USE_GEMINI &&
+        (!contentGeneratorConfig || !contentGeneratorConfig.apiKey)
+      ) {
+        isAuthenticated = false;
       }
+    } catch (e) {
+      debugLogger.error(
+        `Authentication failed: ${e instanceof Error ? e.stack : e}`,
+      );
     }
 
     if (!isAuthenticated) {
@@ -197,8 +204,10 @@ export class GeminiAgent {
     sessionId: string,
     cwd: string,
     mcpServers: acp.McpServer[],
+    loadedSettings?: LoadedSettings,
   ): Promise<Config> {
-    const mergedMcpServers = { ...this.settings.merged.mcpServers };
+    const currentSettings = loadedSettings || this.settings;
+    const mergedMcpServers = { ...currentSettings.merged.mcpServers };
 
     for (const server of mcpServers) {
       if (
@@ -233,7 +242,10 @@ export class GeminiAgent {
       }
     }
 
-    const settings = { ...this.settings.merged, mcpServers: mergedMcpServers };
+    const settings = {
+      ...currentSettings.merged,
+      mcpServers: mergedMcpServers,
+    };
 
     const config = await loadCliConfig(settings, sessionId, this.argv, { cwd });
 

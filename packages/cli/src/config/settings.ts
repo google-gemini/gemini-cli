@@ -50,7 +50,9 @@ import {
   formatValidationError,
 } from './settings-validation.js';
 
-function getMergeStrategyForPath(path: string[]): MergeStrategy | undefined {
+export function getMergeStrategyForPath(
+  path: string[],
+): MergeStrategy | undefined {
   let current: SettingDefinition | undefined = undefined;
   let currentSchema: SettingsSchema | undefined = getSettingsSchema();
   let parent: SettingDefinition | undefined = undefined;
@@ -437,8 +439,9 @@ export function loadEnvironment(
   workspaceDir: string,
 ): void {
   const envFilePath = findEnvFile(workspaceDir);
+  const trustResult = isWorkspaceTrusted(settings, workspaceDir);
 
-  if (isWorkspaceTrusted(settings, workspaceDir).isTrusted === false) {
+  if (trustResult.isTrusted === false) {
     return;
   }
 
@@ -465,8 +468,8 @@ export function loadEnvironment(
             continue;
           }
 
-          // Load variable only if it's not already set in the environment.
-          if (!Object.hasOwn(process.env, key)) {
+          // Load variable only if it's not already set in the environment or if it's an empty string.
+          if (!process.env[key]) {
             process.env[key] = parsedEnv[key];
           }
         }

@@ -41,11 +41,11 @@ describe('ACP Environment and Auth', () => {
   });
 
   itMaybe(
-    'should load .env from project directory and fail if API key is invalid',
+    'should load .env from project directory and use the provided API key',
     async () => {
       rig.setup('acp-env-loading');
 
-      // Create a project directory with a .env file
+      // Create a project directory with a .env file containing a recognizable invalid key
       const projectDir = join(rig.testDir!, 'project');
       mkdirSync(projectDir, { recursive: true });
       writeFileSync(
@@ -61,7 +61,8 @@ describe('ACP Environment and Auth', () => {
         env: {
           ...process.env,
           GEMINI_CLI_HOME: rig.homeDir!,
-          GEMINI_API_KEY: '',
+          GEMINI_API_KEY: undefined,
+          VERBOSE: 'true',
         },
       });
 
@@ -80,27 +81,33 @@ describe('ACP Environment and Auth', () => {
         },
       });
 
-      try {
-        await connection.newSession({
-          cwd: projectDir,
-          mcpServers: [],
-        });
-      } catch (error) {
-        if (error instanceof Error) {
-          if (error.message.includes('Authentication required')) {
-            throw new Error(
-              `Expected session to be authenticated via .env, but got: ${error.message}`,
-            );
-          }
-        } else {
-          const errorMsg = String(error);
-          if (errorMsg.includes('Authentication required')) {
-            throw new Error(
-              `Expected session to be authenticated via .env, but got: ${errorMsg}`,
-            );
-          }
-        }
-      }
+      // 1. newSession should succeed because it finds the key in .env
+      const { sessionId } = await connection.newSession({
+        cwd: projectDir,
+        mcpServers: [],
+      });
+
+      expect(sessionId).toBeDefined();
+
+      // 2. prompt should fail because the key is invalid,
+      // but the error should come from the API, not the internal auth check.
+      await expect(
+        connection.prompt({
+          sessionId,
+          prompt: [{ type: 'text', text: 'hello' }],
+        }),
+      ).rejects.toSatisfy((error: unknown) => {
+        const acpError = error as acp.RequestError;
+        const errorData = acpError.data as
+          | { error?: { message?: string } }
+          | undefined;
+        const message = String(errorData?.error?.message || acpError.message);
+        // It should NOT be our internal "Authentication required" message
+        expect(message).not.toContain('Authentication required');
+        // It SHOULD be an API error mentioning the invalid key
+        expect(message).toContain('API key not valid');
+        return true;
+      });
 
       child.stdin!.end();
     },
@@ -114,12 +121,13 @@ describe('ACP Environment and Auth', () => {
       const bundlePath = join(import.meta.dirname, '..', 'bundle/gemini.js');
 
       child = spawn('node', [bundlePath, '--experimental-acp'], {
-        cwd: rig.testDir!,
+        cwd: rig.homeDir!,
         stdio: ['pipe', 'pipe', 'inherit'],
         env: {
           ...process.env,
           GEMINI_CLI_HOME: rig.homeDir!,
-          GEMINI_API_KEY: '',
+          GEMINI_API_KEY: undefined,
+          VERBOSE: 'true',
         },
       });
 
