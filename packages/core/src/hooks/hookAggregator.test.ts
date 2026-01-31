@@ -163,6 +163,68 @@ describe('HookAggregator', () => {
       );
     });
 
+    it('should treat ask_user as non-blocking and default to allow', () => {
+      const results: HookExecutionResult[] = [
+        {
+          hookConfig: {
+            type: HookType.Command,
+            command: 'test-command',
+            timeout: 30000,
+          },
+          eventName: HookEventName.BeforeTool,
+          success: true,
+          output: { decision: 'ask_user', reason: 'Hook wants to ask user' },
+          duration: 100,
+        },
+      ];
+
+      const aggregated = aggregator.aggregateResults(
+        results,
+        HookEventName.BeforeTool,
+      );
+
+      expect(aggregated.success).toBe(true);
+      // ask_user is not a blocking decision, so final decision defaults to 'allow'
+      expect(aggregated.finalOutput?.decision).toBe('allow');
+      expect(aggregated.finalOutput?.reason).toBe('Hook wants to ask user');
+    });
+
+    it('should handle ask_user with allow decisions', () => {
+      const results: HookExecutionResult[] = [
+        {
+          hookConfig: {
+            type: HookType.Command,
+            command: 'test-command',
+            timeout: 30000,
+          },
+          eventName: HookEventName.BeforeTool,
+          success: true,
+          output: { decision: 'allow', reason: 'Hook 1 allowed' },
+          duration: 100,
+        },
+        {
+          hookConfig: {
+            type: HookType.Command,
+            command: 'test-command',
+            timeout: 30000,
+          },
+          eventName: HookEventName.BeforeTool,
+          success: true,
+          output: { decision: 'ask_user', reason: 'Hook 2 wants to ask user' },
+          duration: 150,
+        },
+      ];
+
+      const aggregated = aggregator.aggregateResults(
+        results,
+        HookEventName.BeforeTool,
+      );
+
+      expect(aggregated.success).toBe(true);
+      // Neither ask_user nor allow is blocking, so defaults to allow
+      expect(aggregated.finalOutput?.decision).toBe('allow');
+    });
+
     it('should handle continue=false with precedence', () => {
       const results: HookExecutionResult[] = [
         {

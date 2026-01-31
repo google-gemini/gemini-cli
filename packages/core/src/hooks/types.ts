@@ -94,6 +94,7 @@ export function getHookKey(hook: HookConfig): string {
  */
 export type HookDecision =
   | 'ask'
+  | 'ask_user'
   | 'block'
   | 'deny'
   | 'approve'

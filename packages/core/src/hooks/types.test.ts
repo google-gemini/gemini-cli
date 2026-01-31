@@ -128,6 +128,16 @@ describe('Hook Output Classes', () => {
       expect(output2.isBlockingDecision()).toBe(false);
     });
 
+    it('should return false for isBlockingDecision if decision is ask_user', () => {
+      const output = new DefaultHookOutput({ decision: 'ask_user' });
+      expect(output.isBlockingDecision()).toBe(false);
+    });
+
+    it('should return false for isBlockingDecision if decision is ask', () => {
+      const output = new DefaultHookOutput({ decision: 'ask' });
+      expect(output.isBlockingDecision()).toBe(false);
+    });
+
     it('should return true for isBlockingDecision if decision is block or deny', () => {
       const output1 = new DefaultHookOutput({ decision: 'block' });
       expect(output1.isBlockingDecision()).toBe(true);
