@@ -49,6 +49,14 @@ vi.mock('./ShellModeIndicator.js', () => ({
   ShellModeIndicator: () => <Text>ShellModeIndicator</Text>,
 }));
 
+vi.mock('./ShortcutsHint.js', () => ({
+  ShortcutsHint: () => <Text>ShortcutsHint</Text>,
+}));
+
+vi.mock('./ShortcutsHelp.js', () => ({
+  ShortcutsHelp: () => <Text>ShortcutsHelp</Text>,
+}));
+
 vi.mock('./DetailedMessagesDisplay.js', () => ({
   DetailedMessagesDisplay: () => <Text>DetailedMessagesDisplay</Text>,
 }));
@@ -116,6 +124,7 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     ctrlCPressedOnce: false,
     ctrlDPressedOnce: false,
     showEscapePrompt: false,
+    shortcutsHelpVisible: false,
     ideContextState: null,
     geminiMdFileCount: 0,
     renderMarkdown: true,

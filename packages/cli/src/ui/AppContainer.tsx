@@ -799,6 +799,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const setIsBackgroundShellListOpenRef = useRef<(open: boolean) => void>(
     () => {},
   );
+  const [shortcutsHelpVisible, setShortcutsHelpVisible] = useState(false);
 
   const slashCommandActions = useMemo(
     () => ({
@@ -834,6 +835,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
           }
         }
       },
+      toggleShortcutsHelp: () => setShortcutsHelpVisible((visible) => !visible),
       setText: stableSetText,
     }),
     [
@@ -852,6 +854,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       openPermissionsDialog,
       addConfirmUpdateExtensionRequest,
       toggleDebugProfiler,
+      setShortcutsHelpVisible,
       stableSetText,
     ],
   );
@@ -1893,6 +1896,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       ctrlCPressedOnce: ctrlCPressCount >= 1,
       ctrlDPressedOnce: ctrlDPressCount >= 1,
       showEscapePrompt,
+      shortcutsHelpVisible,
       isFocused,
       elapsedTime,
       currentLoadingPhrase,
@@ -1998,6 +2002,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       ctrlCPressCount,
       ctrlDPressCount,
       showEscapePrompt,
+      shortcutsHelpVisible,
       isFocused,
       elapsedTime,
       currentLoadingPhrase,
@@ -2097,6 +2102,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleApiKeySubmit,
       handleApiKeyCancel,
       setBannerVisible,
+      setShortcutsHelpVisible,
       handleWarning,
       setEmbeddedShellFocused,
       dismissBackgroundShell,
@@ -2173,6 +2179,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleApiKeySubmit,
       handleApiKeyCancel,
       setBannerVisible,
+      setShortcutsHelpVisible,
       handleWarning,
       setEmbeddedShellFocused,
       dismissBackgroundShell,

@@ -151,7 +151,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const { merged: settings } = useSettings();
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
-  const { setEmbeddedShellFocused } = useUIActions();
+  const { setEmbeddedShellFocused, setShortcutsHelpVisible } = useUIActions();
   const {
     terminalWidth,
     activePtyId,
@@ -159,6 +159,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     terminalBackgroundColor,
     backgroundShells,
     backgroundShellHeight,
+    shortcutsHelpVisible,
   } = useUIState();
   const [justNavigatedHistory, setJustNavigatedHistory] = useState(false);
   const escPressCount = useRef(0);
@@ -508,6 +509,30 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
         // Ensure we never accidentally interpret paste as regular input.
         buffer.handleInput(key);
+        return true;
+      }
+
+      if (shortcutsHelpVisible) {
+        if (key.sequence === '?' && key.insertable) {
+          setShortcutsHelpVisible(false);
+          buffer.handleInput(key);
+          return true;
+        }
+        if (
+          keyMatchers[Command.ESCAPE](key) ||
+          key.name === 'backspace' ||
+          key.sequence === '\b'
+        ) {
+          setShortcutsHelpVisible(false);
+          return true;
+        }
+        if (key.insertable) {
+          setShortcutsHelpVisible(false);
+        }
+      }
+
+      if (key.sequence === '?' && key.insertable && !shortcutsHelpVisible) {
+        setShortcutsHelpVisible(true);
         return true;
       }
 
@@ -969,6 +994,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       commandSearchActive,
       commandSearchCompletion,
       kittyProtocol.enabled,
+      shortcutsHelpVisible,
+      setShortcutsHelpVisible,
       tryLoadQueuedMessages,
       setBannerVisible,
       onSubmit,

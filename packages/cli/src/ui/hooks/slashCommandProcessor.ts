@@ -83,6 +83,7 @@ interface SlashCommandProcessorActions {
   dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
   addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
   toggleBackgroundShell: () => void;
+  toggleShortcutsHelp: () => void;
   setText: (text: string) => void;
 }
 
@@ -239,6 +240,7 @@ export const useSlashCommandProcessor = (
           actions.addConfirmUpdateExtensionRequest,
         removeComponent: () => setCustomDialog(null),
         toggleBackgroundShell: actions.toggleBackgroundShell,
+        toggleShortcutsHelp: actions.toggleShortcutsHelp,
       },
       session: {
         stats: session.stats,
@@ -363,11 +365,12 @@ export const useSlashCommandProcessor = (
       }
 
       let hasError = false;
+      const normalizedQuery = trimmed === '?' ? '?shortcuts' : trimmed;
       const {
         commandToExecute,
         args,
         canonicalPath: resolvedCommandPath,
-      } = parseSlashCommand(trimmed, commands);
+      } = parseSlashCommand(normalizedQuery, commands);
 
       const subcommand =
         resolvedCommandPath.length > 1

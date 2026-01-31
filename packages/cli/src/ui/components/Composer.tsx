@@ -12,6 +12,8 @@ import { ApprovalModeIndicator } from './ApprovalModeIndicator.js';
 import { ShellModeIndicator } from './ShellModeIndicator.js';
 import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
 import { RawMarkdownIndicator } from './RawMarkdownIndicator.js';
+import { ShortcutsHint } from './ShortcutsHint.js';
+import { ShortcutsHelp } from './ShortcutsHelp.js';
 import { InputPrompt } from './InputPrompt.js';
 import { Footer } from './Footer.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
@@ -92,8 +94,11 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
         flexDirection={isNarrow ? 'column' : 'row'}
         alignItems={isNarrow ? 'flex-start' : 'center'}
       >
-        <Box marginRight={1}>
-          <StatusDisplay hideContextSummary={hideContextSummary} />
+        <Box marginRight={1} flexDirection="row" alignItems="center">
+          <ShortcutsHint />
+          <Box marginLeft={1}>
+            <StatusDisplay hideContextSummary={hideContextSummary} />
+          </Box>
         </Box>
         <Box paddingTop={isNarrow ? 1 : 0}>
           {showApprovalModeIndicator !== ApprovalMode.DEFAULT &&
@@ -119,6 +124,12 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             <ShowMoreLines constrainHeight={uiState.constrainHeight} />
           </Box>
         </OverflowProvider>
+      )}
+
+      {uiState.shortcutsHelpVisible && (
+        <Box marginTop={1}>
+          <ShortcutsHelp />
+        </Box>
       )}
 
       {uiState.isInputActive && (

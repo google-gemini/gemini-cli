@@ -30,5 +30,6 @@ export function createNonInteractiveUI(): CommandContext['ui'] {
     addConfirmUpdateExtensionRequest: (_request) => {},
     removeComponent: () => {},
     toggleBackgroundShell: () => {},
+    toggleShortcutsHelp: () => {},
   };
 }
