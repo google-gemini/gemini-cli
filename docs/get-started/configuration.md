@@ -326,6 +326,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `0.5`
   - **Requires restart:** Yes
 
+- **`model.disableLoopDetection`** (boolean):
+  - **Description:** Disable automatic detection and prevention of infinite
+    loops.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`model.skipNextSpeakerCheck`** (boolean):
   - **Description:** Skip the next speaker check.
   - **Default:** `true`
