@@ -136,10 +136,6 @@ export interface AccessibilitySettings {
   screenReader?: boolean;
 }
 
-export interface SafetySettings {
-  enableConseca?: boolean;
-}
-
 export interface BugCommandSettings {
   urlTemplate: string;
 }
@@ -486,7 +482,6 @@ export interface ConfigParameters {
   disabledSkills?: string[];
   adminSkillsEnabled?: boolean;
   enableModelAvailabilityService?: boolean;
-  safety?: SafetySettings;
   experimentalJitContext?: boolean;
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
@@ -500,6 +495,7 @@ export interface ConfigParameters {
     adminSkillsEnabled?: boolean;
     agents?: AgentSettings;
   }>;
+  enableConseca?: boolean;
 }
 
 export class Config {
@@ -527,7 +523,7 @@ export class Config {
   private workspaceContext: WorkspaceContext;
   private readonly debugMode: boolean;
   private readonly question: string | undefined;
-  readonly safety: SafetySettings;
+  readonly enableConseca: boolean;
 
   private readonly coreTools: string[] | undefined;
   /** @deprecated Use Policy Engine instead */
@@ -844,7 +840,7 @@ export class Config {
     this.eventEmitter = params.eventEmitter;
     this.hooks = params.hooks;
     this.experiments = params.experiments;
-    this.safety = params.safety ?? {};
+    this.enableConseca = params.enableConseca ?? false;
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -864,7 +860,7 @@ export class Config {
     );
 
     // Register Conseca if enabled
-    if (this.safety.enableConseca) {
+    if (this.enableConseca) {
       debugLogger.log('[SAFETY] Registering Conseca Safety Checker');
       ConsecaSafetyChecker.getInstance().setConfig(this);
     }
