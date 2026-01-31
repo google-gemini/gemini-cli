@@ -237,7 +237,7 @@ describe('<HistoryItemDisplay />', () => {
       const item: HistoryItem = {
         ...baseItem,
         type: 'thinking',
-        thoughts: [{ subject: 'Thinking', description: 'test' }],
+        thought: { subject: 'Thinking', description: 'test' },
       };
       const { lastFrame } = renderWithProviders(
         <HistoryItemDisplay {...baseItem} item={item} inlineEnabled={true} />,
@@ -250,7 +250,7 @@ describe('<HistoryItemDisplay />', () => {
       const item: HistoryItem = {
         ...baseItem,
         type: 'thinking',
-        thoughts: [{ subject: 'Thinking', description: 'test' }],
+        thought: { subject: 'Thinking', description: 'test' },
       };
       const { lastFrame } = renderWithProviders(
         <HistoryItemDisplay {...baseItem} item={item} inlineEnabled={false} />,

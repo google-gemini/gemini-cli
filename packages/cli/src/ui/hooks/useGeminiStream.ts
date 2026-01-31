@@ -63,6 +63,7 @@ import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { useShellCommandProcessor } from './shellCommandProcessor.js';
 import { handleAtCommand } from './atCommandProcessor.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
+import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 import { useStateAndRef } from './useStateAndRef.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useLogger } from './useLogger.js';
@@ -78,6 +79,29 @@ import {
 } from './useToolScheduler.js';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+
+const MAX_THOUGHT_SUMMARY_LENGTH = 140;
+
+function summarizeThought(thought: ThoughtSummary): ThoughtSummary {
+  const subject = thought.subject.trim();
+  if (subject) {
+    return { subject, description: '' };
+  }
+
+  const description = thought.description.trim();
+  if (!description) {
+    return { subject: '', description: '' };
+  }
+
+  if (description.length <= MAX_THOUGHT_SUMMARY_LENGTH) {
+    return { subject: description, description: '' };
+  }
+
+  const trimmed = description
+    .slice(0, MAX_THOUGHT_SUMMARY_LENGTH - 3)
+    .trimEnd();
+  return { subject: `${trimmed}...`, description: '' };
+}
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
 import type { LoadedSettings } from '../../config/settings.js';
@@ -762,7 +786,7 @@ export const useGeminiStream = (
         pendingHistoryItemRef.current?.type !== 'gemini' &&
         pendingHistoryItemRef.current?.type !== 'gemini_content'
       ) {
-        // Flush any pending item (including thinking items) before starting gemini content
+        // Flush any pending item before starting gemini content
         if (pendingHistoryItemRef.current) {
           addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         }
@@ -810,34 +834,25 @@ export const useGeminiStream = (
     (eventValue: ThoughtSummary, userMessageTimestamp: number) => {
       setThought(eventValue);
 
-      // Only accumulate thoughts in history if inline thinking is enabled
-      if (!settings.merged.ui?.showInlineThinking) {
+      const inlineThinkingMode = getInlineThinkingMode(settings);
+      if (inlineThinkingMode === 'off') {
         return;
       }
 
-      if (pendingHistoryItemRef.current?.type === 'thinking') {
-        // Accumulate thoughts in the existing thinking item
-        setPendingHistoryItem((prev) => ({
+      const thoughtForDisplay =
+        inlineThinkingMode === 'summary'
+          ? summarizeThought(eventValue)
+          : eventValue;
+
+      addItem(
+        {
           type: 'thinking',
-          thoughts: [...(prev as HistoryItemThinking).thoughts, eventValue],
-        }));
-      } else {
-        // Flush any existing pending item and start a new thinking item
-        if (pendingHistoryItemRef.current) {
-          addItem(pendingHistoryItemRef.current, userMessageTimestamp);
-        }
-        setPendingHistoryItem({
-          type: 'thinking',
-          thoughts: [eventValue],
-        } as HistoryItemThinking);
-      }
+          thought: thoughtForDisplay,
+        } as HistoryItemThinking,
+        userMessageTimestamp,
+      );
     },
-    [
-      addItem,
-      pendingHistoryItemRef,
-      setPendingHistoryItem,
-      settings.merged.ui?.showInlineThinking,
-    ],
+    [addItem, settings],
   );
 
   const handleUserCancelledEvent = useCallback(
@@ -1279,10 +1294,6 @@ export const useGeminiStream = (
               }
               startNewPrompt();
               setThought(null); // Reset thought when starting a new prompt
-              // Clear any pending thinking item from previous prompt
-              if (pendingHistoryItemRef.current?.type === 'thinking') {
-                setPendingHistoryItem(null);
-              }
             }
 
             setIsResponding(true);

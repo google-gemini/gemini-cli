@@ -9,38 +9,35 @@ import { render } from '../../../test-utils/render.js';
 import { ThinkingMessage } from './ThinkingMessage.js';
 
 describe('ThinkingMessage', () => {
-  it('renders thinking header with count', () => {
+  it('renders thinking header', () => {
     const { lastFrame } = render(
       <ThinkingMessage
-        thoughts={[
-          { subject: 'Planning', description: 'test' },
-          { subject: 'Analyzing', description: 'test' },
-        ]}
+        thought={{ subject: 'Planning', description: 'test' }}
         terminalWidth={80}
       />,
     );
 
     expect(lastFrame()).toContain('Thinking');
-    expect(lastFrame()).toContain('(2)');
   });
 
-  it('renders with single thought', () => {
+  it('renders with thought subject', () => {
     const { lastFrame } = render(
       <ThinkingMessage
-        thoughts={[{ subject: 'Processing', description: 'test' }]}
+        thought={{ subject: 'Processing', description: 'test' }}
         terminalWidth={80}
       />,
     );
 
-    expect(lastFrame()).toContain('(1)');
+    expect(lastFrame()).toContain('Processing');
   });
 
   it('renders thought content', () => {
     const { lastFrame } = render(
       <ThinkingMessage
-        thoughts={[
-          { subject: 'Planning', description: 'I am planning the solution.' },
-        ]}
+        thought={{
+          subject: 'Planning',
+          description: 'I am planning the solution.',
+        }}
         terminalWidth={80}
       />,
     );
@@ -51,9 +48,12 @@ describe('ThinkingMessage', () => {
 
   it('renders empty state gracefully', () => {
     const { lastFrame } = render(
-      <ThinkingMessage thoughts={[]} terminalWidth={80} />,
+      <ThinkingMessage
+        thought={{ subject: '', description: '' }}
+        terminalWidth={80}
+      />,
     );
 
-    expect(lastFrame()).toContain('(0)');
+    expect(lastFrame()).toContain('Thinking');
   });
 });

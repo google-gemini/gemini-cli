@@ -21,6 +21,7 @@ import { MAX_GEMINI_MESSAGE_LINES } from '../constants.js';
 import { useConfirmingTool } from '../hooks/useConfirmingTool.js';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
 import { useConfig } from '../contexts/ConfigContext.js';
+import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 
 const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
 const MemoizedAppHeader = memo(AppHeader);
@@ -55,7 +56,7 @@ export const MainContent = () => {
     availableTerminalHeight,
   } = uiState;
 
-  const inlineEnabled = settings.merged.ui?.showInlineThinking;
+  const inlineEnabled = getInlineThinkingMode(settings) !== 'off';
 
   const historyItems = useMemo(
     () =>

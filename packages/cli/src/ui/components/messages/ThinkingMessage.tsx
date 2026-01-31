@@ -10,16 +10,18 @@ import type { ThoughtSummary } from '@google/gemini-cli-core';
 import { MaxSizedBox, MINIMUM_MAX_HEIGHT } from '../shared/MaxSizedBox.js';
 
 interface ThinkingMessageProps {
-  thoughts: ThoughtSummary[];
+  thought: ThoughtSummary;
   terminalWidth: number;
   availableTerminalHeight?: number;
 }
 
 export const ThinkingMessage: React.FC<ThinkingMessageProps> = ({
-  thoughts,
+  thought,
   terminalWidth,
   availableTerminalHeight,
 }) => {
+  const subject = thought.subject.trim();
+  const description = thought.description.trim();
   const contentMaxHeight =
     availableTerminalHeight !== undefined
       ? Math.max(availableTerminalHeight - 4, MINIMUM_MAX_HEIGHT)
@@ -39,23 +41,22 @@ export const ThinkingMessage: React.FC<ThinkingMessageProps> = ({
         <Text bold color="magenta">
           Thinking
         </Text>
-        <Text dimColor> ({thoughts.length})</Text>
       </Box>
       <MaxSizedBox
         maxHeight={contentMaxHeight}
         maxWidth={terminalWidth - 2}
         overflowDirection="top"
       >
-        {thoughts.map((thought, index) => (
-          <Box key={index} marginTop={1} flexDirection="column">
-            {thought.subject && (
+        {(subject || description) && (
+          <Box marginTop={1} flexDirection="column">
+            {subject && (
               <Text bold color="magenta">
-                {thought.subject}
+                {subject}
               </Text>
             )}
-            <Text>{thought.description || ' '}</Text>
+            {description && <Text>{description}</Text>}
           </Box>
-        ))}
+        )}
       </MaxSizedBox>
     </Box>
   );

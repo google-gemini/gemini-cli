@@ -380,7 +380,25 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: false,
         description:
-          'Show model thinking summaries inline in the conversation.',
+          'Show model thinking summaries inline in the conversation (deprecated; prefer the specific thinking modes).',
+        showInDialog: true,
+      },
+      showInlineThinkingFull: {
+        type: 'boolean',
+        label: 'Show Inline Thinking (Full)',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description: 'Show full model thinking details inline.',
+        showInDialog: true,
+      },
+      showInlineThinkingSummary: {
+        type: 'boolean',
+        label: 'Show Inline Thinking (Summary)',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description: 'Show a short summary of model thinking inline.',
         showInDialog: true,
       },
       showStatusInTitle: {

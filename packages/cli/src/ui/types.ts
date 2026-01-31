@@ -212,7 +212,7 @@ export interface ChatDetail {
 
 export type HistoryItemThinking = HistoryItemBase & {
   type: 'thinking';
-  thoughts: ThoughtSummary[];
+  thought: ThoughtSummary;
 };
 
 export type HistoryItemChatList = HistoryItemBase & {

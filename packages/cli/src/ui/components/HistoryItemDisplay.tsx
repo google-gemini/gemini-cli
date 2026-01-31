@@ -68,7 +68,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       {/* Render standard message types */}
       {itemForDisplay.type === 'thinking' && inlineEnabled && (
         <ThinkingMessage
-          thoughts={itemForDisplay.thoughts}
+          thought={itemForDisplay.thought}
           terminalWidth={terminalWidth}
           availableTerminalHeight={
             isPending ? availableTerminalHeight : undefined
