@@ -65,6 +65,15 @@ priority = 50
 modes = ["plan"]
 
 [[rule]]
-toolName = "SubagentInvocation"
+toolName = "ask_user"
+decision = "ask_user"
+priority = 50
+modes = ["plan"]
+
+# Allow write_file for .md files in plans directory
+[[rule]]
+toolName = "write_file"
 decision = "allow"
 priority = 50
+modes = ["plan"]
+argsPattern = "\"file_path\":\"[^\"]+/\\.gemini/tmp/[a-f0-9]{64}/plans/[a-zA-Z0-9_-]+\\.md\""

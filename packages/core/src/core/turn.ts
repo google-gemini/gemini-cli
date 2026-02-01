@@ -79,6 +79,7 @@ export type ServerGeminiAgentExecutionStoppedEvent = {
   value: {
     reason: string;
     systemMessage?: string;
+    contextCleared?: boolean;
   };
 };
 
@@ -87,6 +88,7 @@ export type ServerGeminiAgentExecutionBlockedEvent = {
   value: {
     reason: string;
     systemMessage?: string;
+    contextCleared?: boolean;
   };
 };
 
@@ -246,6 +248,7 @@ export class Turn {
     modelConfigKey: ModelConfigKey,
     req: PartListUnion,
     signal: AbortSignal,
+    displayContent?: PartListUnion,
   ): AsyncGenerator<ServerGeminiStreamEvent> {
     try {
       // Note: This assumes `sendMessageStream` yields events like
@@ -255,6 +258,7 @@ export class Turn {
         req,
         this.prompt_id,
         signal,
+        displayContent,
       );
 
       for await (const streamEvent of responseStream) {

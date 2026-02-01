@@ -23,7 +23,6 @@ import type { SchedulerStateManager } from './state-manager.js';
 import type { ToolModificationHandler } from './tool-modifier.js';
 import { resolveEditorAsync, type EditorType } from '../utils/editor.js';
 import type { DiffUpdateResult } from '../ide/ide-client.js';
-import { fireToolNotificationHook } from '../core/coreToolHookTriggers.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
 
@@ -105,6 +104,7 @@ export async function resolveConfirmation(
     state: SchedulerStateManager;
     modifier: ToolModificationHandler;
     getPreferredEditor: () => EditorType | undefined;
+    schedulerId: string;
   },
 ): Promise<ResolutionResult> {
   const { state } = deps;
@@ -151,6 +151,10 @@ export async function resolveConfirmation(
     );
     outcome = response.outcome;
 
+    if ('onConfirm' in details && typeof details.onConfirm === 'function') {
+      await details.onConfirm(outcome, response.payload);
+    }
+
     if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
       const modResult = await handleExternalModification(
         deps,
@@ -183,8 +187,8 @@ async function notifyHooks(
   deps: { config: Config; messageBus: MessageBus },
   details: ToolCallConfirmationDetails,
 ): Promise<void> {
-  if (deps.config.getEnableHooks()) {
-    await fireToolNotificationHook(deps.messageBus, {
+  if (deps.config.getHookSystem()) {
+    await deps.config.getHookSystem()?.fireToolNotificationEvent({
       ...details,
       // Pass no-op onConfirm to satisfy type definition; side-effects via
       // callbacks are disallowed.

@@ -82,8 +82,8 @@ describe('editor utils', () => {
       { editor: 'emacs', commands: ['emacs'], win32Commands: ['emacs.exe'] },
       {
         editor: 'antigravity',
-        commands: ['agy'],
-        win32Commands: ['agy.cmd'],
+        commands: ['agy', 'antigravity'],
+        win32Commands: ['agy.cmd', 'antigravity.cmd', 'antigravity'],
       },
       { editor: 'hx', commands: ['hx'], win32Commands: ['hx'] },
     ];
@@ -187,8 +187,8 @@ describe('editor utils', () => {
       { editor: 'zed', commands: ['zed', 'zeditor'], win32Commands: ['zed'] },
       {
         editor: 'antigravity',
-        commands: ['agy'],
-        win32Commands: ['agy.cmd'],
+        commands: ['agy', 'antigravity'],
+        win32Commands: ['agy.cmd', 'antigravity.cmd', 'antigravity'],
       },
     ];
 

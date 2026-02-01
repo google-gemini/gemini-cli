@@ -44,6 +44,8 @@ export interface ContentGenerator {
   embedContent(request: EmbedContentParameters): Promise<EmbedContentResponse>;
 
   userTier?: UserTierId;
+
+  userTierName?: string;
 }
 
 export enum AuthType {
@@ -130,6 +132,7 @@ export async function createContentGenerator(
     const customHeadersMap = parseCustomHeaders(customHeadersEnv);
     const apiKeyAuthMechanism =
       process.env['GEMINI_API_KEY_AUTH_MECHANISM'] || 'x-goog-api-key';
+    const apiVersionEnv = process.env['GOOGLE_GENAI_API_VERSION'];
 
     const baseHeaders: Record<string, string> = {
       ...customHeadersMap,
@@ -179,6 +182,7 @@ export async function createContentGenerator(
         apiKey: config.apiKey === '' ? undefined : config.apiKey,
         vertexai: config.vertexai,
         httpOptions,
+        ...(apiVersionEnv && { apiVersion: apiVersionEnv }),
       });
       return new LoggingContentGenerator(googleGenAI.models, gcConfig);
     }

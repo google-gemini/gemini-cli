@@ -40,7 +40,10 @@ import {
   logContentRetryFailure,
   logNextSpeakerCheck,
 } from '../telemetry/loggers.js';
-import type { DefaultHookOutput } from '../hooks/types.js';
+import type {
+  DefaultHookOutput,
+  AfterAgentHookOutput,
+} from '../hooks/types.js';
 import {
   ContentRetryFailureEvent,
   NextSpeakerCheckEvent,
@@ -297,7 +300,7 @@ export class GeminiClient {
     });
   }
 
-  async updateSystemInstruction(): Promise<void> {
+  updateSystemInstruction(): void {
     if (!this.isInitialized()) {
       return;
     }
@@ -529,6 +532,7 @@ export class GeminiClient {
     prompt_id: string,
     boundedTurns: number,
     isInvalidStreamRetry: boolean,
+    displayContent?: PartListUnion,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     // Re-initialize turn (it was empty before if in loop, or new instance)
     let turn = new Turn(this.getChat(), prompt_id);
@@ -644,7 +648,12 @@ export class GeminiClient {
       yield { type: GeminiEventType.ModelInfo, value: modelToUse };
     }
     this.currentSequenceModel = modelToUse;
-    const resultStream = turn.run(modelConfigKey, request, linkedSignal);
+    const resultStream = turn.run(
+      modelConfigKey,
+      request,
+      linkedSignal,
+      displayContent,
+    );
     let isError = false;
     let isInvalidStream = false;
 
@@ -705,6 +714,7 @@ export class GeminiClient {
           prompt_id,
           boundedTurns - 1,
           true,
+          displayContent,
         );
         return turn;
       }
@@ -736,7 +746,8 @@ export class GeminiClient {
             signal,
             prompt_id,
             boundedTurns - 1,
-            // isInvalidStreamRetry is false
+            false, // isInvalidStreamRetry is false
+            displayContent,
           );
           return turn;
         }
@@ -751,6 +762,7 @@ export class GeminiClient {
     prompt_id: string,
     turns: number = MAX_TURNS,
     isInvalidStreamRetry: boolean = false,
+    displayContent?: PartListUnion,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (!isInvalidStreamRetry) {
       this.config.resetTurn();
@@ -806,6 +818,7 @@ export class GeminiClient {
         prompt_id,
         boundedTurns,
         isInvalidStreamRetry,
+        displayContent,
       );
 
       // Fire AfterAgent hook if we have a turn and no pending tools
@@ -816,32 +829,49 @@ export class GeminiClient {
           turn,
         );
 
-        if (hookOutput?.shouldStopExecution()) {
+        // Cast to AfterAgentHookOutput for access to shouldClearContext()
+        const afterAgentOutput = hookOutput as AfterAgentHookOutput | undefined;
+
+        if (afterAgentOutput?.shouldStopExecution()) {
+          const contextCleared = afterAgentOutput.shouldClearContext();
           yield {
             type: GeminiEventType.AgentExecutionStopped,
             value: {
-              reason: hookOutput.getEffectiveReason(),
-              systemMessage: hookOutput.systemMessage,
+              reason: afterAgentOutput.getEffectiveReason(),
+              systemMessage: afterAgentOutput.systemMessage,
+              contextCleared,
             },
           };
+          // Clear context if requested (honor both stop + clear)
+          if (contextCleared) {
+            await this.resetChat();
+          }
           return turn;
         }
 
-        if (hookOutput?.isBlockingDecision()) {
-          const continueReason = hookOutput.getEffectiveReason();
+        if (afterAgentOutput?.isBlockingDecision()) {
+          const continueReason = afterAgentOutput.getEffectiveReason();
+          const contextCleared = afterAgentOutput.shouldClearContext();
           yield {
             type: GeminiEventType.AgentExecutionBlocked,
             value: {
               reason: continueReason,
-              systemMessage: hookOutput.systemMessage,
+              systemMessage: afterAgentOutput.systemMessage,
+              contextCleared,
             },
           };
+          // Clear context if requested
+          if (contextCleared) {
+            await this.resetChat();
+          }
           const continueRequest = [{ text: continueReason }];
           yield* this.sendMessageStream(
             continueRequest,
             signal,
             prompt_id,
             boundedTurns - 1,
+            false,
+            displayContent,
           );
         }
       }

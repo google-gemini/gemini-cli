@@ -18,9 +18,6 @@ export enum MessageBusType {
   TOOL_EXECUTION_SUCCESS = 'tool-execution-success',
   TOOL_EXECUTION_FAILURE = 'tool-execution-failure',
   UPDATE_POLICY = 'update-policy',
-  HOOK_EXECUTION_REQUEST = 'hook-execution-request',
-  HOOK_EXECUTION_RESPONSE = 'hook-execution-response',
-  HOOK_POLICY_DECISION = 'hook-policy-decision',
   TOOL_CALLS_UPDATE = 'tool-calls-update',
   ASK_USER_REQUEST = 'ask-user-request',
   ASK_USER_RESPONSE = 'ask-user-response',
@@ -29,6 +26,7 @@ export enum MessageBusType {
 export interface ToolCallsUpdateMessage {
   type: MessageBusType.TOOL_CALLS_UPDATE;
   toolCalls: ToolCall[];
+  schedulerId: string;
 }
 
 export interface ToolConfirmationRequest {
@@ -67,7 +65,12 @@ export interface ToolConfirmationResponse {
  * Data-only versions of ToolCallConfirmationDetails for bus transmission.
  */
 export type SerializableConfirmationDetails =
-  | { type: 'info'; title: string; prompt: string; urls?: string[] }
+  | {
+      type: 'info';
+      title: string;
+      prompt: string;
+      urls?: string[];
+    }
   | {
       type: 'edit';
       title: string;
@@ -92,6 +95,11 @@ export type SerializableConfirmationDetails =
       serverName: string;
       toolName: string;
       toolDisplayName: string;
+    }
+  | {
+      type: 'ask_user';
+      title: string;
+      questions: Question[];
     };
 
 export interface UpdatePolicy {
@@ -120,29 +128,6 @@ export interface ToolExecutionFailure<E = Error> {
   error: E;
 }
 
-export interface HookExecutionRequest {
-  type: MessageBusType.HOOK_EXECUTION_REQUEST;
-  eventName: string;
-  input: Record<string, unknown>;
-  correlationId: string;
-}
-
-export interface HookExecutionResponse {
-  type: MessageBusType.HOOK_EXECUTION_RESPONSE;
-  correlationId: string;
-  success: boolean;
-  output?: Record<string, unknown>;
-  error?: Error;
-}
-
-export interface HookPolicyDecision {
-  type: MessageBusType.HOOK_POLICY_DECISION;
-  eventName: string;
-  hookSource: 'project' | 'user' | 'system' | 'extension';
-  decision: 'allow' | 'deny';
-  reason?: string;
-}
-
 export interface QuestionOption {
   label: string;
   description: string;
@@ -159,11 +144,11 @@ export interface Question {
   header: string;
   /** Question type: 'choice' renders selectable options, 'text' renders free-form input, 'yesno' renders a binary Yes/No choice. Defaults to 'choice'. */
   type?: QuestionType;
-  /** Available choices. Required when type is 'choice' (or omitted), ignored for 'text'. */
+  /** Selectable choices. REQUIRED when type='choice' or omitted. IGNORED for 'text' and 'yesno'. */
   options?: QuestionOption[];
-  /** Allow multiple selections. Only applies to 'choice' type. */
+  /** Allow multiple selections. Only applies when type='choice'. */
   multiSelect?: boolean;
-  /** Placeholder hint text for 'text' type input field. */
+  /** Placeholder hint text. Only applies when type='text'. */
   placeholder?: string;
 }
 
@@ -177,6 +162,8 @@ export interface AskUserResponse {
   type: MessageBusType.ASK_USER_RESPONSE;
   correlationId: string;
   answers: { [questionIndex: string]: string };
+  /** When true, indicates the user cancelled the dialog without submitting answers */
+  cancelled?: boolean;
 }
 
 export type Message =
@@ -186,9 +173,6 @@ export type Message =
   | ToolExecutionSuccess
   | ToolExecutionFailure
   | UpdatePolicy
-  | HookExecutionRequest
-  | HookExecutionResponse
-  | HookPolicyDecision
   | AskUserRequest
   | AskUserResponse
   | ToolCallsUpdateMessage;

@@ -36,7 +36,9 @@ import {
   type HookDefinition,
   type HookEventName,
   type OutputFormat,
+  coreEvents,
   GEMINI_MODEL_ALIAS_AUTO,
+  getAdminErrorMessage,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -47,12 +49,12 @@ import {
 
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
-import { appEvents } from '../utils/events.js';
 import { RESUME_LATEST } from '../utils/sessionUtils.js';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { createPolicyEngineConfig } from './policy.js';
 import { ExtensionManager } from './extension-manager.js';
+import { McpServerEnablementManager } from './mcp/mcpServerEnablement.js';
 import type { ExtensionEvents } from '@google/gemini-cli-core/src/utils/extensionLoader.js';
 import { requestConsentNonInteractive } from './extensions/consent.js';
 import { promptForSetting } from './extensions/extensionSettings.js';
@@ -83,6 +85,7 @@ export interface CliArgs {
   outputFormat: string | undefined;
   fakeResponses: string | undefined;
   recordResponses: string | undefined;
+  startupMessages?: string[];
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
   isCommand: boolean | undefined;
@@ -92,11 +95,12 @@ export async function parseArguments(
   settings: MergedSettings,
 ): Promise<CliArgs> {
   const rawArgv = hideBin(process.argv);
+  const startupMessages: string[] = [];
   const yargsInstance = yargs(rawArgv)
     .locale('en')
     .scriptName('gemini')
     .usage(
-      'Usage: gemini [options] [command]\n\nGemini CLI - Launch an interactive CLI, use -p/--prompt for non-interactive mode',
+      'Usage: gemini [options] [command]\n\nGemini CLI - Defaults to interactive mode. Use -p/--prompt for non-interactive (headless) mode.',
     )
     .option('debug', {
       alias: 'd',
@@ -108,7 +112,7 @@ export async function parseArguments(
       yargsInstance
         .positional('query', {
           description:
-            'Positional prompt. Defaults to one-shot; use -i/--prompt-interactive for interactive.',
+            'Initial prompt. Runs in interactive mode by default; use -p/--prompt for non-interactive.',
         })
         .option('model', {
           alias: 'm',
@@ -120,7 +124,8 @@ export async function parseArguments(
           alias: 'p',
           type: 'string',
           nargs: 1,
-          description: 'Prompt. Appended to input on stdin (if any).',
+          description:
+            'Run in non-interactive (headless) mode with the given prompt. Appended to input on stdin (if any).',
         })
         .option('prompt-interactive', {
           alias: 'i',
@@ -300,11 +305,11 @@ export async function parseArguments(
     yargsInstance.command(extensionsCommand);
   }
 
-  if (settings.experimental?.skills || (settings.skills?.enabled ?? true)) {
+  if (settings.skills?.enabled ?? true) {
     yargsInstance.command(skillsCommand);
   }
   // Register hooks command if hooks are enabled
-  if (settings.tools?.enableHooks) {
+  if (settings.hooksConfig.enabled) {
     yargsInstance.command(hooksCommand);
   }
 
@@ -341,11 +346,12 @@ export async function parseArguments(
     ? queryArg.join(' ')
     : queryArg;
 
-  // Route positional args: explicit -i flag -> interactive; else -> one-shot (even for @commands)
+  // -p/--prompt forces non-interactive mode; positional args default to interactive in TTY
   if (q && !result['prompt']) {
-    const hasExplicitInteractive =
-      result['promptInteractive'] === '' || !!result['promptInteractive'];
-    if (hasExplicitInteractive) {
+    if (process.stdin.isTTY) {
+      startupMessages.push(
+        'Positional arguments now default to interactive mode. To run in non-interactive mode, use the --prompt (-p) flag.',
+      );
       result['promptInteractive'] = q;
     } else {
       result['prompt'] = q;
@@ -354,6 +360,7 @@ export async function parseArguments(
 
   // Keep CliArgs.query as a string for downstream typing
   (result as Record<string, unknown>)['query'] = q || undefined;
+  (result as Record<string, unknown>)['startupMessages'] = startupMessages;
 
   // The import format is now only controlled by settings.memoryImportFormat
   // We no longer accept it as a CLI argument
@@ -461,7 +468,7 @@ export async function loadCliConfig(
     requestSetting: promptForSetting,
     workspaceDir: cwd,
     enabledExtensionOverrides: argv.extensions,
-    eventEmitter: appEvents as EventEmitter<ExtensionEvents>,
+    eventEmitter: coreEvents as EventEmitter<ExtensionEvents>,
     clientVersion: await getVersion(),
   });
   await extensionManager.loadExtensions();
@@ -496,9 +503,15 @@ export async function loadCliConfig(
 
   // Determine approval mode with backward compatibility
   let approvalMode: ApprovalMode;
-  if (argv.approvalMode) {
-    // New --approval-mode flag takes precedence
-    switch (argv.approvalMode) {
+  const rawApprovalMode =
+    argv.approvalMode ||
+    (argv.yolo ? 'yolo' : undefined) ||
+    ((settings.tools?.approvalMode as string) !== 'yolo'
+      ? settings.tools.approvalMode
+      : undefined);
+
+  if (rawApprovalMode) {
+    switch (rawApprovalMode) {
       case 'yolo':
         approvalMode = ApprovalMode.YOLO;
         break;
@@ -518,13 +531,11 @@ export async function loadCliConfig(
         break;
       default:
         throw new Error(
-          `Invalid approval mode: ${argv.approvalMode}. Valid values are: yolo, auto_edit, plan, default`,
+          `Invalid approval mode: ${rawApprovalMode}. Valid values are: yolo, auto_edit, plan, default`,
         );
     }
   } else {
-    // Fallback to legacy --yolo flag behavior
-    approvalMode =
-      argv.yolo || false ? ApprovalMode.YOLO : ApprovalMode.DEFAULT;
+    approvalMode = ApprovalMode.DEFAULT;
   }
 
   // Override approval mode if disableYoloMode is set.
@@ -540,7 +551,7 @@ export async function loadCliConfig(
         );
       }
       throw new FatalConfigError(
-        'Cannot start in YOLO mode since it is disabled by your admin',
+        getAdminErrorMessage('YOLO mode', undefined /* config */),
       );
     }
   } else if (approvalMode === ApprovalMode.YOLO) {
@@ -572,12 +583,12 @@ export async function loadCliConfig(
     throw err;
   }
 
-  // Interactive mode: explicit -i flag or (TTY + no args + no -p flag)
-  const hasQuery = !!argv.query;
+  // -p/--prompt forces non-interactive (headless) mode
+  // -i/--prompt-interactive forces interactive mode with an initial prompt
   const interactive =
     !!argv.promptInteractive ||
     !!argv.experimentalAcp ||
-    (process.stdin.isTTY && !hasQuery && !argv.prompt && !argv.isCommand);
+    (process.stdin.isTTY && !argv.query && !argv.prompt && !argv.isCommand);
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
   const allowedToolsSet = new Set(allowedTools);
@@ -665,6 +676,12 @@ export async function loadCliConfig(
   const extensionsEnabled = settings.admin?.extensions?.enabled ?? true;
   const adminSkillsEnabled = settings.admin?.skills?.enabled ?? true;
 
+  // Create MCP enablement manager and callbacks
+  const mcpEnablementManager = McpServerEnablementManager.getInstance();
+  const mcpEnablementCallbacks = mcpEnabled
+    ? mcpEnablementManager.getEnablementCallbacks()
+    : undefined;
+
   return new Config({
     sessionId,
     clientVersion: await getVersion(),
@@ -686,6 +703,7 @@ export async function loadCliConfig(
     toolCallCommand: settings.tools?.callCommand,
     mcpServerCommand: mcpEnabled ? settings.mcp?.serverCommand : undefined,
     mcpServers: mcpEnabled ? settings.mcpServers : {},
+    mcpEnablementCallbacks,
     mcpEnabled,
     extensionsEnabled,
     agents: settings.agents,
@@ -738,8 +756,7 @@ export async function loadCliConfig(
     plan: settings.experimental?.plan,
     enableEventDrivenScheduler:
       settings.experimental?.enableEventDrivenScheduler,
-    skillsSupport:
-      settings.experimental?.skills || (settings.skills?.enabled ?? true),
+    skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
     noBrowser: !!process.env['NO_BROWSER'],
@@ -749,6 +766,7 @@ export async function loadCliConfig(
     folderTrust,
     interactive,
     trustedFolder,
+    useBackgroundColor: settings.ui?.useBackgroundColor,
     useRipgrep: settings.tools?.useRipgrep,
     enableInteractiveShell: settings.tools?.shell?.enableInteractiveShell,
     shellToolInactivityTimeout: settings.tools?.shell?.inactivityTimeout,
@@ -759,14 +777,11 @@ export async function loadCliConfig(
     truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,
     truncateToolOutputLines: settings.tools?.truncateToolOutputLines,
     enableToolOutputTruncation: settings.tools?.enableToolOutputTruncation,
-    eventEmitter: appEvents,
+    eventEmitter: coreEvents,
     useWriteTodos: argv.useWriteTodos ?? settings.useWriteTodos,
     output: {
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
-    codebaseInvestigatorSettings:
-      settings.experimental?.codebaseInvestigatorSettings,
-    cliHelpAgentSettings: settings.experimental?.cliHelpAgentSettings,
     fakeResponses: argv.fakeResponses,
     recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors,
@@ -776,10 +791,8 @@ export async function loadCliConfig(
     acceptRawOutputRisk: argv.acceptRawOutputRisk,
     modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
-    enableHooks:
-      (settings.tools?.enableHooks ?? true) &&
-      (settings.hooksConfig?.enabled ?? true),
-    enableHooksUI: settings.tools?.enableHooks ?? true,
+    enableHooks: settings.hooksConfig.enabled,
+    enableHooksUI: settings.hooksConfig.enabled,
     hooks: settings.hooks || {},
     disabledHooks: settings.hooksConfig?.disabled || [],
     projectHooks: projectHooks || {},

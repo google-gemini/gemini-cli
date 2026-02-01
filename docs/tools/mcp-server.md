@@ -739,10 +739,21 @@ The MCP integration tracks several states:
   cautiously and only for servers you completely control
 - **Access tokens:** Be security-aware when configuring environment variables
   containing API keys or tokens
+- **Environment variable redaction:** By default, the Gemini CLI redacts
+  sensitive environment variables (such as `GEMINI_API_KEY`, `GOOGLE_API_KEY`,
+  and variables matching patterns like `*TOKEN*`, `*SECRET*`, `*PASSWORD*`) when
+  spawning MCP servers using the `stdio` transport. This prevents unintended
+  exposure of your credentials to third-party servers.
+- **Explicit environment variables:** If you need to pass a specific environment
+  variable to an MCP server, you should define it explicitly in the `env`
+  property of the server configuration in `settings.json`.
 - **Sandbox compatibility:** When using sandboxing, ensure MCP servers are
-  available within the sandbox environment
+  available within the sandbox environment.
 - **Private data:** Using broadly scoped personal access tokens can lead to
-  information leakage between repositories
+  information leakage between repositories.
+- **Untrusted servers:** Be extremely cautious when adding MCP servers from
+  untrusted or third-party sources. Malicious servers could attempt to
+  exfiltrate data or perform unauthorized actions through the tools they expose.
 
 ### Performance and resource management
 
@@ -1037,6 +1048,29 @@ gemini mcp remove my-server
 
 This will find and delete the "my-server" entry from the `mcpServers` object in
 the appropriate `settings.json` file based on the scope (`-s, --scope`).
+
+### Enabling/disabling a server (`gemini mcp enable`, `gemini mcp disable`)
+
+Temporarily disable an MCP server without removing its configuration, or
+re-enable a previously disabled server.
+
+**Commands:**
+
+```bash
+gemini mcp enable <name> [--session]
+gemini mcp disable <name> [--session]
+```
+
+**Options (flags):**
+
+- `--session`: Apply change only for this session (not persisted to file).
+
+Disabled servers appear in `/mcp` status as "Disabled" but won't connect or
+provide tools. Enablement state is stored in
+`~/.gemini/mcp-server-enablement.json`.
+
+The same commands are available as slash commands during an active session:
+`/mcp enable <name>` and `/mcp disable <name>`.
 
 ## Instructions
 

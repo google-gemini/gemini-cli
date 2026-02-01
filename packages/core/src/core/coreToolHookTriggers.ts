@@ -4,156 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import {
-  MessageBusType,
-  type HookExecutionRequest,
-  type HookExecutionResponse,
-} from '../confirmation-bus/types.js';
-import {
-  NotificationType,
-  type McpToolContext,
-  BeforeToolHookOutput,
-} from '../hooks/types.js';
+import { type McpToolContext, BeforeToolHookOutput } from '../hooks/types.js';
 import type { Config } from '../config/config.js';
-import type {
-  ToolCallConfirmationDetails,
-  ToolResult,
-  AnyDeclarativeTool,
-} from '../tools/tools.js';
+import type { ToolResult, AnyDeclarativeTool } from '../tools/tools.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { AnsiOutput, ShellExecutionConfig } from '../index.js';
 import type { AnyToolInvocation } from '../tools/tools.js';
 import { ShellToolInvocation } from '../tools/shell.js';
 import { DiscoveredMCPToolInvocation } from '../tools/mcp-tool.js';
-
-/**
- * Serializable representation of tool confirmation details for hooks.
- * Excludes function properties like onConfirm that can't be serialized.
- */
-interface SerializableConfirmationDetails {
-  type: 'edit' | 'exec' | 'mcp' | 'info';
-  title: string;
-  // Edit-specific fields
-  fileName?: string;
-  filePath?: string;
-  fileDiff?: string;
-  originalContent?: string | null;
-  newContent?: string;
-  isModifying?: boolean;
-  // Exec-specific fields
-  command?: string;
-  rootCommand?: string;
-  // MCP-specific fields
-  serverName?: string;
-  toolName?: string;
-  toolDisplayName?: string;
-  // Info-specific fields
-  prompt?: string;
-  urls?: string[];
-}
-
-/**
- * Converts ToolCallConfirmationDetails to a serializable format for hooks.
- * Excludes function properties (onConfirm, ideConfirmation) that can't be serialized.
- */
-function toSerializableDetails(
-  details: ToolCallConfirmationDetails,
-): SerializableConfirmationDetails {
-  const base: SerializableConfirmationDetails = {
-    type: details.type,
-    title: details.title,
-  };
-
-  switch (details.type) {
-    case 'edit':
-      return {
-        ...base,
-        fileName: details.fileName,
-        filePath: details.filePath,
-        fileDiff: details.fileDiff,
-        originalContent: details.originalContent,
-        newContent: details.newContent,
-        isModifying: details.isModifying,
-      };
-    case 'exec':
-      return {
-        ...base,
-        command: details.command,
-        rootCommand: details.rootCommand,
-      };
-    case 'mcp':
-      return {
-        ...base,
-        serverName: details.serverName,
-        toolName: details.toolName,
-        toolDisplayName: details.toolDisplayName,
-      };
-    case 'info':
-      return {
-        ...base,
-        prompt: details.prompt,
-        urls: details.urls,
-      };
-    default:
-      return base;
-  }
-}
-
-/**
- * Gets the message to display in the notification hook for tool confirmation.
- */
-function getNotificationMessage(
-  confirmationDetails: ToolCallConfirmationDetails,
-): string {
-  switch (confirmationDetails.type) {
-    case 'edit':
-      return `Tool ${confirmationDetails.title} requires editing`;
-    case 'exec':
-      return `Tool ${confirmationDetails.title} requires execution`;
-    case 'mcp':
-      return `Tool ${confirmationDetails.title} requires MCP`;
-    case 'info':
-      return `Tool ${confirmationDetails.title} requires information`;
-    default:
-      return `Tool requires confirmation`;
-  }
-}
-
-/**
- * Fires the ToolPermission notification hook for a tool that needs confirmation.
- *
- * @param messageBus The message bus to use for hook communication
- * @param confirmationDetails The tool confirmation details
- */
-export async function fireToolNotificationHook(
-  messageBus: MessageBus,
-  confirmationDetails: ToolCallConfirmationDetails,
-): Promise<void> {
-  try {
-    const message = getNotificationMessage(confirmationDetails);
-    const serializedDetails = toSerializableDetails(confirmationDetails);
-
-    await messageBus.request<HookExecutionRequest, HookExecutionResponse>(
-      {
-        type: MessageBusType.HOOK_EXECUTION_REQUEST,
-        eventName: 'Notification',
-        input: {
-          notification_type: NotificationType.ToolPermission,
-          message,
-          details: serializedDetails,
-        },
-      },
-      MessageBusType.HOOK_EXECUTION_RESPONSE,
-    );
-  } catch (error) {
-    debugLogger.debug(
-      `Notification hook failed for ${confirmationDetails.title}:`,
-      error,
-    );
-  }
-}
 
 /**
  * Extracts MCP context from a tool invocation if it's an MCP tool.

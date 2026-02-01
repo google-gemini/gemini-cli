@@ -8,7 +8,7 @@
 import type { Mock, MockInstance } from 'vitest';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act } from 'react';
-import { renderHook } from '../../test-utils/render.js';
+import { renderHookWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { useGeminiStream } from './useGeminiStream.js';
 import { useKeypress } from './useKeypress.js';
@@ -41,7 +41,7 @@ import {
 import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import type { SlashCommandProcessorResult } from '../types.js';
-import { MessageType, StreamingState } from '../types.js';
+import { MessageType, StreamingState, ToolCallStatus } from '../types.js';
 import type { LoadedSettings } from '../../config/settings.js';
 
 // --- MOCKS ---
@@ -56,6 +56,7 @@ const MockedGeminiClientClass = vi.hoisted(() =>
     this.startChat = mockStartChat;
     this.sendMessageStream = mockSendMessageStream;
     this.addHistory = vi.fn();
+    this.getCurrentSequenceModel = vi.fn().mockReturnValue('test-model');
     this.getChat = vi.fn().mockReturnValue({
       recordCompletedToolCalls: vi.fn(),
     });
@@ -67,6 +68,9 @@ const MockedGeminiClientClass = vi.hoisted(() =>
       recordToolCalls: vi.fn(),
       getConversationFile: vi.fn(),
     });
+    this.getCurrentSequenceModel = vi
+      .fn()
+      .mockReturnValue('gemini-2.0-flash-exp');
   }),
 );
 
@@ -75,6 +79,13 @@ const MockedUserPromptEvent = vi.hoisted(() =>
 );
 const mockParseAndFormatApiError = vi.hoisted(() => vi.fn());
 
+const MockValidationRequiredError = vi.hoisted(
+  () =>
+    class extends Error {
+      userHandled = false;
+    },
+);
+
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actualCoreModule = (await importOriginal()) as any;
   return {
@@ -82,8 +93,11 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     GitService: vi.fn(),
     GeminiClient: MockedGeminiClientClass,
     UserPromptEvent: MockedUserPromptEvent,
+    ValidationRequiredError: MockValidationRequiredError,
     parseAndFormatApiError: mockParseAndFormatApiError,
     tokenLimit: vi.fn().mockReturnValue(100), // Mock tokenLimit
+    recordToolCallInteractions: vi.fn().mockResolvedValue(undefined),
+    getCodeAssistServer: vi.fn().mockReturnValue(undefined),
   };
 });
 
@@ -158,82 +172,92 @@ vi.mock('./useAlternateBuffer.js', () => ({
 
 // --- Tests for useGeminiStream Hook ---
 describe('useGeminiStream', () => {
-  let mockAddItem: Mock;
-  let mockConfig: Config;
-  let mockOnDebugMessage: Mock;
-  let mockHandleSlashCommand: Mock;
+  let mockAddItem = vi.fn();
+  let mockOnDebugMessage = vi.fn();
+  let mockHandleSlashCommand = vi.fn().mockResolvedValue(false);
   let mockScheduleToolCalls: Mock;
   let mockCancelAllToolCalls: Mock;
   let mockMarkToolsAsSubmitted: Mock;
   let handleAtCommandSpy: MockInstance;
 
-  beforeEach(() => {
-    vi.clearAllMocks(); // Clear mocks before each test
+  const emptyHistory: any[] = [];
+  let capturedOnComplete: any = null;
+  const mockGetPreferredEditor = vi.fn(() => 'vscode' as EditorType);
+  const mockOnAuthError = vi.fn();
+  const mockPerformMemoryRefresh = vi.fn(() => Promise.resolve());
+  const mockSetModelSwitchedFromQuotaError = vi.fn();
+  const mockOnCancelSubmit = vi.fn();
+  const mockSetShellInputFocused = vi.fn();
 
-    mockAddItem = vi.fn();
-    // Define the mock for getGeminiClient
-    const mockGetGeminiClient = vi.fn().mockImplementation(() => {
-      // MockedGeminiClientClass is defined in the module scope by the previous change.
-      // It will use the mockStartChat and mockSendMessageStream that are managed within beforeEach.
-      const clientInstance = new MockedGeminiClientClass(mockConfig);
-      return clientInstance;
-    });
+  const mockGetGeminiClient = vi.fn().mockImplementation(() => {
+    const clientInstance = new MockedGeminiClientClass(mockConfig);
+    return clientInstance;
+  });
 
-    const mockMcpClientManager = {
-      getDiscoveryState: vi.fn().mockReturnValue(MCPDiscoveryState.COMPLETED),
-      getMcpServerCount: vi.fn().mockReturnValue(0),
-    };
+  const mockMcpClientManager = {
+    getDiscoveryState: vi.fn().mockReturnValue(MCPDiscoveryState.COMPLETED),
+    getMcpServerCount: vi.fn().mockReturnValue(0),
+  };
 
-    const contentGeneratorConfig = {
+  const mockConfig: Config = {
+    apiKey: 'test-api-key',
+    model: 'gemini-pro',
+    sandbox: false,
+    targetDir: '/test/dir',
+    debugMode: false,
+    question: undefined,
+    coreTools: [],
+    toolDiscoveryCommand: undefined,
+    toolCallCommand: undefined,
+    mcpServerCommand: undefined,
+    mcpServers: undefined,
+    userAgent: 'test-agent',
+    userMemory: '',
+    geminiMdFileCount: 0,
+    alwaysSkipModificationConfirmation: false,
+    vertexai: false,
+    showMemoryUsage: false,
+    contextFileName: undefined,
+    storage: {
+      getProjectTempDir: vi.fn(() => '/test/temp'),
+      getProjectTempCheckpointsDir: vi.fn(() => '/test/temp/checkpoints'),
+    } as any,
+    getToolRegistry: vi.fn(
+      () => ({ getToolSchemaList: vi.fn(() => []) }) as any,
+    ),
+    getProjectRoot: vi.fn(() => '/test/dir'),
+    getCheckpointingEnabled: vi.fn(() => false),
+    getGeminiClient: mockGetGeminiClient,
+    getMcpClientManager: () => mockMcpClientManager as any,
+    getApprovalMode: vi.fn(() => ApprovalMode.DEFAULT),
+    getUsageStatisticsEnabled: () => true,
+    getDebugMode: () => false,
+    addHistory: vi.fn(),
+    getSessionId: vi.fn(() => 'test-session-id'),
+    setQuotaErrorOccurred: vi.fn(),
+    getQuotaErrorOccurred: vi.fn(() => false),
+    getModel: vi.fn(() => 'gemini-2.5-pro'),
+    getContentGeneratorConfig: vi.fn(() => ({
       model: 'test-model',
       apiKey: 'test-key',
       vertexai: false,
       authType: AuthType.USE_GEMINI,
-    };
+    })),
+    getContentGenerator: vi.fn(),
+    isInteractive: () => false,
+    getExperiments: () => {},
+    isEventDrivenSchedulerEnabled: vi.fn(() => false),
+    getMaxSessionTurns: vi.fn(() => 100),
+    isJitContextEnabled: vi.fn(() => false),
+    getGlobalMemory: vi.fn(() => ''),
+    getUserMemory: vi.fn(() => ''),
+    getIdeMode: vi.fn(() => false),
+    getEnableHooks: vi.fn(() => false),
+  } as unknown as Config;
 
-    mockConfig = {
-      apiKey: 'test-api-key',
-      model: 'gemini-pro',
-      sandbox: false,
-      targetDir: '/test/dir',
-      debugMode: false,
-      question: undefined,
-
-      coreTools: [],
-      toolDiscoveryCommand: undefined,
-      toolCallCommand: undefined,
-      mcpServerCommand: undefined,
-      mcpServers: undefined,
-      userAgent: 'test-agent',
-      userMemory: '',
-      geminiMdFileCount: 0,
-      alwaysSkipModificationConfirmation: false,
-      vertexai: false,
-      showMemoryUsage: false,
-      contextFileName: undefined,
-      getToolRegistry: vi.fn(
-        () => ({ getToolSchemaList: vi.fn(() => []) }) as any,
-      ),
-      getProjectRoot: vi.fn(() => '/test/dir'),
-      getCheckpointingEnabled: vi.fn(() => false),
-      getGeminiClient: mockGetGeminiClient,
-      getMcpClientManager: () => mockMcpClientManager as any,
-      getApprovalMode: () => ApprovalMode.DEFAULT,
-      getUsageStatisticsEnabled: () => true,
-      getDebugMode: () => false,
-      addHistory: vi.fn(),
-      getSessionId() {
-        return 'test-session-id';
-      },
-      setQuotaErrorOccurred: vi.fn(),
-      getQuotaErrorOccurred: vi.fn(() => false),
-      getModel: vi.fn(() => 'gemini-2.5-pro'),
-      getContentGeneratorConfig: vi
-        .fn()
-        .mockReturnValue(contentGeneratorConfig),
-      isInteractive: () => false,
-      getExperiments: () => {},
-    } as unknown as Config;
+  beforeEach(() => {
+    vi.clearAllMocks(); // Clear mocks before each test
+    mockAddItem = vi.fn();
     mockOnDebugMessage = vi.fn();
     mockHandleSlashCommand = vi.fn().mockResolvedValue(false);
 
@@ -241,6 +265,10 @@ describe('useGeminiStream', () => {
     mockScheduleToolCalls = vi.fn();
     mockCancelAllToolCalls = vi.fn();
     mockMarkToolsAsSubmitted = vi.fn();
+
+    // Reset properties of mockConfig if needed
+    (mockConfig.getCheckpointingEnabled as Mock).mockReturnValue(false);
+    (mockConfig.getApprovalMode as Mock).mockReturnValue(ApprovalMode.DEFAULT);
 
     // Default mock for useReactToolScheduler to prevent toolCalls being undefined initially
     mockUseToolScheduler.mockReturnValue([
@@ -278,10 +306,11 @@ describe('useGeminiStream', () => {
     geminiClient?: any,
   ) => {
     const client = geminiClient || mockConfig.getGeminiClient();
+    let lastToolCalls = initialToolCalls;
 
     const initialProps = {
       client,
-      history: [],
+      history: emptyHistory,
       addItem: mockAddItem as unknown as UseHistoryManagerReturn['addItem'],
       config: mockConfig,
       onDebugMessage: mockOnDebugMessage,
@@ -293,31 +322,26 @@ describe('useGeminiStream', () => {
       toolCalls: initialToolCalls,
     };
 
-    const { result, rerender } = renderHook(
-      (props: typeof initialProps) => {
-        // This mock needs to be stateful. When setToolCallsForDisplay is called,
-        // it should trigger a rerender with the new state.
-        const mockSetToolCallsForDisplay = vi.fn((updater) => {
-          const newToolCalls =
-            typeof updater === 'function' ? updater(props.toolCalls) : updater;
-          rerender({ ...props, toolCalls: newToolCalls });
-        });
-
-        // Create a stateful mock for cancellation that updates the toolCalls state.
-        const statefulCancelAllToolCalls = vi.fn((...args) => {
-          // Call the original spy so `toHaveBeenCalled` checks still work.
+    mockUseToolScheduler.mockImplementation((onComplete) => {
+      capturedOnComplete = onComplete;
+      return [
+        lastToolCalls,
+        mockScheduleToolCalls,
+        mockMarkToolsAsSubmitted,
+        (updater: any) => {
+          lastToolCalls =
+            typeof updater === 'function' ? updater(lastToolCalls) : updater;
+          rerender({ ...initialProps, toolCalls: lastToolCalls });
+        },
+        (...args: any[]) => {
           mockCancelAllToolCalls(...args);
-
-          const newToolCalls = props.toolCalls.map((tc) => {
-            // Only cancel tools that are in a cancellable state.
+          lastToolCalls = lastToolCalls.map((tc) => {
             if (
               tc.status === 'awaiting_approval' ||
               tc.status === 'executing' ||
               tc.status === 'scheduled' ||
               tc.status === 'validating'
             ) {
-              // A real cancelled tool call has a response object.
-              // We need to simulate this to avoid type errors downstream.
               return {
                 ...tc,
                 status: 'cancelled',
@@ -326,23 +350,20 @@ describe('useGeminiStream', () => {
                   responseParts: [],
                   resultDisplay: 'Request cancelled.',
                 },
-                responseSubmittedToGemini: true, // Mark as "processed"
+                responseSubmittedToGemini: true,
               } as any as TrackedCancelledToolCall;
             }
             return tc;
           });
-          rerender({ ...props, toolCalls: newToolCalls });
-        });
+          rerender({ ...initialProps, toolCalls: lastToolCalls });
+        },
+        0,
+      ];
+    });
 
-        mockUseToolScheduler.mockImplementation(() => [
-          props.toolCalls,
-          mockScheduleToolCalls,
-          mockMarkToolsAsSubmitted,
-          mockSetToolCallsForDisplay,
-          statefulCancelAllToolCalls, // Use the stateful mock
-        ]);
-
-        return useGeminiStream(
+    const { result, rerender } = renderHookWithProviders(
+      (props: typeof initialProps) =>
+        useGeminiStream(
           props.client,
           props.history,
           props.addItem,
@@ -351,17 +372,16 @@ describe('useGeminiStream', () => {
           props.onDebugMessage,
           props.handleSlashCommand,
           props.shellModeActive,
-          () => 'vscode' as EditorType,
-          () => {},
-          () => Promise.resolve(),
+          mockGetPreferredEditor,
+          mockOnAuthError,
+          mockPerformMemoryRefresh,
           false,
-          () => {},
-          () => {},
-          () => {},
+          mockSetModelSwitchedFromQuotaError,
+          mockOnCancelSubmit,
+          mockSetShellInputFocused,
           80,
           24,
-        );
-      },
+        ),
       {
         initialProps,
       },
@@ -443,7 +463,7 @@ describe('useGeminiStream', () => {
       modelSwitched = false,
     } = options;
 
-    return renderHook(() =>
+    return renderHookWithProviders(() =>
       useGeminiStream(
         new MockedGeminiClientClass(mockConfig),
         [],
@@ -581,10 +601,17 @@ describe('useGeminiStream', () => {
 
     mockUseToolScheduler.mockImplementation((onComplete) => {
       capturedOnComplete = onComplete;
-      return [[], mockScheduleToolCalls, mockMarkToolsAsSubmitted, vi.fn()];
+      return [
+        [],
+        mockScheduleToolCalls,
+        mockMarkToolsAsSubmitted,
+        vi.fn(),
+        mockCancelAllToolCalls,
+        0,
+      ];
     });
 
-    renderHook(() =>
+    renderHookWithProviders(() =>
       useGeminiStream(
         new MockedGeminiClientClass(mockConfig),
         [],
@@ -609,6 +636,8 @@ describe('useGeminiStream', () => {
     // Trigger the onComplete callback with completed tools
     await act(async () => {
       if (capturedOnComplete) {
+        // Wait a tick for refs to be set up
+        await new Promise((resolve) => setTimeout(resolve, 0));
         await capturedOnComplete(completedToolCalls);
       }
     });
@@ -626,6 +655,9 @@ describe('useGeminiStream', () => {
       expectedMergedResponse,
       expect.any(AbortSignal),
       'prompt-id-2',
+      undefined,
+      false,
+      expectedMergedResponse,
     );
   });
 
@@ -663,10 +695,17 @@ describe('useGeminiStream', () => {
 
     mockUseToolScheduler.mockImplementation((onComplete) => {
       capturedOnComplete = onComplete;
-      return [[], mockScheduleToolCalls, mockMarkToolsAsSubmitted, vi.fn()];
+      return [
+        [],
+        mockScheduleToolCalls,
+        mockMarkToolsAsSubmitted,
+        vi.fn(),
+        mockCancelAllToolCalls,
+        0,
+      ];
     });
 
-    renderHook(() =>
+    renderHookWithProviders(() =>
       useGeminiStream(
         client,
         [],
@@ -691,6 +730,8 @@ describe('useGeminiStream', () => {
     // Trigger the onComplete callback with cancelled tools
     await act(async () => {
       if (capturedOnComplete) {
+        // Wait a tick for refs to be set up
+        await new Promise((resolve) => setTimeout(resolve, 0));
         await capturedOnComplete(cancelledToolCalls);
       }
     });
@@ -735,48 +776,12 @@ describe('useGeminiStream', () => {
     ];
     const client = new MockedGeminiClientClass(mockConfig);
 
-    // Capture the onComplete callback
-    let capturedOnComplete:
-      | ((completedTools: TrackedToolCall[]) => Promise<void>)
-      | null = null;
-
-    mockUseToolScheduler.mockImplementation((onComplete) => {
-      capturedOnComplete = onComplete;
-      return [
-        [],
-        mockScheduleToolCalls,
-        mockMarkToolsAsSubmitted,
-        vi.fn(),
-        mockCancelAllToolCalls,
-      ];
-    });
-
-    const { result } = renderHook(() =>
-      useGeminiStream(
-        client,
-        [],
-        mockAddItem,
-        mockConfig,
-        mockLoadedSettings,
-        mockOnDebugMessage,
-        mockHandleSlashCommand,
-        false,
-        () => 'vscode' as EditorType,
-        () => {},
-        () => Promise.resolve(),
-        false,
-        () => {},
-        () => {},
-        () => {},
-        80,
-        24,
-      ),
-    );
+    const { result } = renderTestHook([], client);
 
     // Trigger the onComplete callback with STOP_EXECUTION tool
     await act(async () => {
       if (capturedOnComplete) {
-        await (capturedOnComplete as any)(stopExecutionToolCalls);
+        await capturedOnComplete(stopExecutionToolCalls);
       }
     });
 
@@ -866,10 +871,17 @@ describe('useGeminiStream', () => {
 
     mockUseToolScheduler.mockImplementation((onComplete) => {
       capturedOnComplete = onComplete;
-      return [[], mockScheduleToolCalls, mockMarkToolsAsSubmitted, vi.fn()];
+      return [
+        [],
+        mockScheduleToolCalls,
+        mockMarkToolsAsSubmitted,
+        vi.fn(),
+        mockCancelAllToolCalls,
+        0,
+      ];
     });
 
-    renderHook(() =>
+    renderHookWithProviders(() =>
       useGeminiStream(
         client,
         [],
@@ -894,6 +906,8 @@ describe('useGeminiStream', () => {
     // Trigger the onComplete callback with multiple cancelled tools
     await act(async () => {
       if (capturedOnComplete) {
+        // Wait a tick for refs to be set up
+        await new Promise((resolve) => setTimeout(resolve, 0));
         await capturedOnComplete(allCancelledTools);
       }
     });
@@ -979,10 +993,12 @@ describe('useGeminiStream', () => {
         mockScheduleToolCalls,
         mockMarkToolsAsSubmitted,
         vi.fn(), // setToolCallsForDisplay
+        mockCancelAllToolCalls,
+        0,
       ];
     });
 
-    const { result, rerender } = renderHook(() =>
+    const { result, rerender } = renderHookWithProviders(() =>
       useGeminiStream(
         new MockedGeminiClientClass(mockConfig),
         [],
@@ -1016,6 +1032,8 @@ describe('useGeminiStream', () => {
         mockScheduleToolCalls,
         mockMarkToolsAsSubmitted,
         vi.fn(), // setToolCallsForDisplay
+        mockCancelAllToolCalls,
+        0,
       ];
     });
 
@@ -1030,6 +1048,8 @@ describe('useGeminiStream', () => {
     // 4. Trigger the onComplete callback to simulate tool completion
     await act(async () => {
       if (capturedOnComplete) {
+        // Wait a tick for refs to be set up
+        await new Promise((resolve) => setTimeout(resolve, 0));
         await capturedOnComplete(completedToolCalls);
       }
     });
@@ -1040,6 +1060,9 @@ describe('useGeminiStream', () => {
         toolCallResponseParts,
         expect.any(AbortSignal),
         'prompt-id-4',
+        undefined,
+        false,
+        toolCallResponseParts,
       );
     });
 
@@ -1113,7 +1136,7 @@ describe('useGeminiStream', () => {
       })();
       mockSendMessageStream.mockReturnValue(mockStream);
 
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useGeminiStream(
           mockConfig.getGeminiClient(),
           [],
@@ -1154,7 +1177,7 @@ describe('useGeminiStream', () => {
       })();
       mockSendMessageStream.mockReturnValue(mockStream);
 
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useGeminiStream(
           mockConfig.getGeminiClient(),
           [],
@@ -1481,6 +1504,9 @@ describe('useGeminiStream', () => {
           'This is the actual prompt from the command file.',
           expect.any(AbortSignal),
           expect.any(String),
+          undefined,
+          false,
+          '/my-custom-command',
         );
 
         expect(mockScheduleToolCalls).not.toHaveBeenCalled();
@@ -1507,6 +1533,9 @@ describe('useGeminiStream', () => {
           '',
           expect.any(AbortSignal),
           expect.any(String),
+          undefined,
+          false,
+          '/emptycmd',
         );
       });
     });
@@ -1525,6 +1554,9 @@ describe('useGeminiStream', () => {
           '// This is a line comment',
           expect.any(AbortSignal),
           expect.any(String),
+          undefined,
+          false,
+          '// This is a line comment',
         );
       });
     });
@@ -1543,12 +1575,15 @@ describe('useGeminiStream', () => {
           '/* This is a block comment */',
           expect.any(AbortSignal),
           expect.any(String),
+          undefined,
+          false,
+          '/* This is a block comment */',
         );
       });
     });
 
     it('should not call handleSlashCommand is shell mode is active', async () => {
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useGeminiStream(
           new MockedGeminiClientClass(mockConfig),
           [],
@@ -1618,10 +1653,17 @@ describe('useGeminiStream', () => {
 
       mockUseToolScheduler.mockImplementation((onComplete) => {
         capturedOnComplete = onComplete;
-        return [[], mockScheduleToolCalls, mockMarkToolsAsSubmitted, vi.fn()];
+        return [
+          [],
+          mockScheduleToolCalls,
+          mockMarkToolsAsSubmitted,
+          vi.fn(),
+          mockCancelAllToolCalls,
+          0,
+        ];
       });
 
-      renderHook(() =>
+      renderHookWithProviders(() =>
         useGeminiStream(
           new MockedGeminiClientClass(mockConfig),
           [],
@@ -1646,6 +1688,8 @@ describe('useGeminiStream', () => {
       // Trigger the onComplete callback with the completed save_memory tool
       await act(async () => {
         if (capturedOnComplete) {
+          // Wait a tick for refs to be set up
+          await new Promise((resolve) => setTimeout(resolve, 0));
           await capturedOnComplete([completedToolCall]);
         }
       });
@@ -1671,13 +1715,14 @@ describe('useGeminiStream', () => {
 
       const testConfig = {
         ...mockConfig,
+        getContentGenerator: vi.fn(),
         getContentGeneratorConfig: vi.fn(() => ({
           authType: mockAuthType,
         })),
         getModel: vi.fn(() => 'gemini-2.5-pro'),
       } as unknown as Config;
 
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useGeminiStream(
           new MockedGeminiClientClass(testConfig),
           [],
@@ -1962,73 +2007,6 @@ describe('useGeminiStream', () => {
     });
   });
 
-  describe('MCP Discovery State', () => {
-    it('should block non-slash command queries when discovery is in progress and servers exist', async () => {
-      const mockMcpClientManager = {
-        getDiscoveryState: vi
-          .fn()
-          .mockReturnValue(MCPDiscoveryState.IN_PROGRESS),
-        getMcpServerCount: vi.fn().mockReturnValue(1),
-      };
-      mockConfig.getMcpClientManager = () => mockMcpClientManager as any;
-
-      const { result } = renderTestHook();
-
-      await act(async () => {
-        await result.current.submitQuery('test query');
-      });
-
-      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
-        'info',
-        'Waiting for MCP servers to initialize... Slash commands are still available.',
-      );
-      expect(mockSendMessageStream).not.toHaveBeenCalled();
-    });
-
-    it('should NOT block queries when discovery is NOT_STARTED but there are no servers', async () => {
-      const mockMcpClientManager = {
-        getDiscoveryState: vi
-          .fn()
-          .mockReturnValue(MCPDiscoveryState.NOT_STARTED),
-        getMcpServerCount: vi.fn().mockReturnValue(0),
-      };
-      mockConfig.getMcpClientManager = () => mockMcpClientManager as any;
-
-      const { result } = renderTestHook();
-
-      await act(async () => {
-        await result.current.submitQuery('test query');
-      });
-
-      expect(coreEvents.emitFeedback).not.toHaveBeenCalledWith(
-        'info',
-        'Waiting for MCP servers to initialize... Slash commands are still available.',
-      );
-      expect(mockSendMessageStream).toHaveBeenCalled();
-    });
-
-    it('should NOT block slash commands even when discovery is in progress', async () => {
-      const mockMcpClientManager = {
-        getDiscoveryState: vi
-          .fn()
-          .mockReturnValue(MCPDiscoveryState.IN_PROGRESS),
-        getMcpServerCount: vi.fn().mockReturnValue(1),
-      };
-      mockConfig.getMcpClientManager = () => mockMcpClientManager as any;
-
-      const { result } = renderTestHook();
-
-      await act(async () => {
-        await result.current.submitQuery('/help');
-      });
-
-      expect(coreEvents.emitFeedback).not.toHaveBeenCalledWith(
-        'info',
-        'Waiting for MCP servers to initialize... Slash commands are still available.',
-      );
-    });
-  });
-
   describe('handleFinishedEvent', () => {
     it('should add info message for MAX_TOKENS finish reason', async () => {
       // Setup mock to return a stream with MAX_TOKENS finish reason
@@ -2045,7 +2023,7 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useGeminiStream(
           new MockedGeminiClientClass(mockConfig),
           [],
@@ -2150,7 +2128,7 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useGeminiStream(
           new MockedGeminiClientClass(mockConfig),
           [],
@@ -2298,6 +2276,8 @@ describe('useGeminiStream', () => {
         startTime: Date.now(),
         endTime: Date.now(),
       }));
+      // Wait a tick for refs to be set up
+      await new Promise((resolve) => setTimeout(resolve, 0));
       await capturedOnComplete(tools);
       addItemOrder.push('scheduleToolCalls_END');
     });
@@ -2319,7 +2299,7 @@ describe('useGeminiStream', () => {
       ];
     });
 
-    const { result } = renderHook(() =>
+    const { result } = renderHookWithProviders(() =>
       useGeminiStream(
         new MockedGeminiClientClass(mockConfig),
         [],
@@ -2385,7 +2365,7 @@ describe('useGeminiStream', () => {
       shouldProceed: true,
     });
 
-    const { result } = renderHook(() =>
+    const { result } = renderHookWithProviders(() =>
       useGeminiStream(
         mockConfig.getGeminiClient(),
         [],
@@ -2430,7 +2410,99 @@ describe('useGeminiStream', () => {
       processedQueryParts, // Argument 1: The parts array directly
       expect.any(AbortSignal), // Argument 2: An AbortSignal
       expect.any(String), // Argument 3: The prompt_id string
+      undefined,
+      false,
+      rawQuery,
     );
+  });
+
+  it('should display user query, then tool execution, then model response', async () => {
+    const userQuery = 'read this @file(test.txt)';
+    const toolExecutionMessage = 'Reading file: test.txt';
+    const modelResponseContent = 'The content of test.txt is: Hello World!';
+
+    // Mock handleAtCommand to simulate a tool call and add a tool_group message
+    handleAtCommandSpy.mockImplementation(
+      async ({ addItem: atCommandAddItem, messageId }) => {
+        atCommandAddItem(
+          {
+            type: 'tool_group',
+            tools: [
+              {
+                callId: 'client-read-123',
+                name: 'read_file',
+                description: toolExecutionMessage,
+                status: ToolCallStatus.Success,
+                resultDisplay: toolExecutionMessage,
+                confirmationDetails: undefined,
+              },
+            ],
+          },
+          messageId,
+        );
+        return { shouldProceed: true, processedQuery: userQuery };
+      },
+    );
+
+    // Mock the Gemini stream to return a model response after the tool
+    mockSendMessageStream.mockReturnValue(
+      (async function* () {
+        yield {
+          type: ServerGeminiEventType.Content,
+          value: modelResponseContent,
+        };
+        yield {
+          type: ServerGeminiEventType.Finished,
+          value: { reason: 'STOP' },
+        };
+      })(),
+    );
+
+    const { result } = renderTestHook();
+
+    await act(async () => {
+      await result.current.submitQuery(userQuery);
+    });
+
+    // Assert the order of messages added to the history
+    await waitFor(() => {
+      expect(mockAddItem).toHaveBeenCalledTimes(3); // User prompt + tool execution + model response
+
+      // 1. User's prompt
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          type: MessageType.USER,
+          text: userQuery,
+        }),
+        expect.any(Number),
+      );
+
+      // 2. Tool execution message
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          type: 'tool_group',
+          tools: expect.arrayContaining([
+            expect.objectContaining({
+              name: 'read_file',
+              status: ToolCallStatus.Success,
+            }),
+          ]),
+        }),
+        expect.any(Number),
+      );
+
+      // 3. Model's response
+      expect(mockAddItem).toHaveBeenNthCalledWith(
+        3,
+        expect.objectContaining({
+          type: 'gemini',
+          text: modelResponseContent,
+        }),
+        expect.any(Number),
+      );
+    });
   });
   describe('Thought Reset', () => {
     it('should reset thought to null when starting a new prompt', async () => {
@@ -2455,7 +2527,7 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useGeminiStream(
           new MockedGeminiClientClass(mockConfig),
           [],
@@ -2531,11 +2603,13 @@ describe('useGeminiStream', () => {
       mockUseToolScheduler.mockReturnValue([
         [],
         mockScheduleToolCalls,
-        mockCancelAllToolCalls,
         mockMarkToolsAsSubmitted,
+        vi.fn(),
+        mockCancelAllToolCalls,
+        0,
       ]);
 
-      const { result, rerender } = renderHook(() =>
+      const { result, rerender } = renderHookWithProviders(() =>
         useGeminiStream(
           mockConfig.getGeminiClient(),
           [],
@@ -2582,8 +2656,10 @@ describe('useGeminiStream', () => {
       mockUseToolScheduler.mockReturnValue([
         newToolCalls,
         mockScheduleToolCalls,
-        mockCancelAllToolCalls,
         mockMarkToolsAsSubmitted,
+        vi.fn(),
+        mockCancelAllToolCalls,
+        0,
       ]);
 
       rerender();
@@ -2604,7 +2680,7 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useGeminiStream(
           new MockedGeminiClientClass(mockConfig),
           [],
@@ -2661,7 +2737,7 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useGeminiStream(
           new MockedGeminiClientClass(mockConfig),
           [],
@@ -2729,7 +2805,7 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderHook(() =>
+      const { result } = renderHookWithProviders(() =>
         useGeminiStream(
           new MockedGeminiClientClass(mockConfig),
           [],
@@ -2876,6 +2952,9 @@ describe('useGeminiStream', () => {
           'test query',
           expect.any(AbortSignal),
           expect.any(String),
+          undefined,
+          false,
+          'test query',
         );
       });
     });
@@ -3023,6 +3102,9 @@ describe('useGeminiStream', () => {
           'second query',
           expect.any(AbortSignal),
           expect.any(String),
+          undefined,
+          false,
+          'second query',
         );
       });
     });
@@ -3179,70 +3261,6 @@ describe('useGeminiStream', () => {
           expect.any(Number),
         );
       });
-    });
-  });
-
-  describe('MCP Server Initialization', () => {
-    it('should allow slash commands to run while MCP servers are initializing', async () => {
-      const mockMcpClientManager = {
-        getDiscoveryState: vi
-          .fn()
-          .mockReturnValue(MCPDiscoveryState.IN_PROGRESS),
-        getMcpServerCount: vi.fn().mockReturnValue(1),
-      };
-      mockConfig.getMcpClientManager = () => mockMcpClientManager as any;
-
-      const { result } = renderTestHook();
-
-      await act(async () => {
-        await result.current.submitQuery('/help');
-      });
-
-      // Slash command should be handled, and no Gemini call should be made.
-      expect(mockHandleSlashCommand).toHaveBeenCalledWith('/help');
-      expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
-    });
-
-    it('should block normal prompts and provide feedback while MCP servers are initializing', async () => {
-      const mockMcpClientManager = {
-        getDiscoveryState: vi
-          .fn()
-          .mockReturnValue(MCPDiscoveryState.IN_PROGRESS),
-        getMcpServerCount: vi.fn().mockReturnValue(1),
-      };
-      mockConfig.getMcpClientManager = () => mockMcpClientManager as any;
-      const { result } = renderTestHook();
-
-      await act(async () => {
-        await result.current.submitQuery('a normal prompt');
-      });
-
-      // No slash command, no Gemini call, but feedback should be emitted.
-      expect(mockHandleSlashCommand).not.toHaveBeenCalled();
-      expect(mockSendMessageStream).not.toHaveBeenCalled();
-      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
-        'info',
-        'Waiting for MCP servers to initialize... Slash commands are still available.',
-      );
-    });
-
-    it('should allow normal prompts to run when MCP servers are finished initializing', async () => {
-      const mockMcpClientManager = {
-        getDiscoveryState: vi.fn().mockReturnValue(MCPDiscoveryState.COMPLETED),
-        getMcpServerCount: vi.fn().mockReturnValue(1),
-      };
-      mockConfig.getMcpClientManager = () => mockMcpClientManager as any;
-
-      const { result } = renderTestHook();
-
-      await act(async () => {
-        await result.current.submitQuery('a normal prompt');
-      });
-
-      // Prompt should be sent to Gemini.
-      expect(mockHandleSlashCommand).not.toHaveBeenCalled();
-      expect(mockSendMessageStream).toHaveBeenCalled();
-      expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
     });
   });
 });

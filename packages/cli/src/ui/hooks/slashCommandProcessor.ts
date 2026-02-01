@@ -30,6 +30,7 @@ import {
   ToolConfirmationOutcome,
   Storage,
   IdeClient,
+  coreEvents,
   addMCPStatusChangeListener,
   removeMCPStatusChangeListener,
   MCPDiscoveryState,
@@ -55,7 +56,6 @@ import {
   type ExtensionUpdateAction,
   type ExtensionUpdateStatus,
 } from '../state/extensions.js';
-import { appEvents } from '../../utils/events.js';
 import {
   LogoutConfirmationDialog,
   LogoutChoice,
@@ -82,6 +82,7 @@ interface SlashCommandProcessorActions {
   toggleDebugProfiler: () => void;
   dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
   addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
+  toggleBackgroundShell: () => void;
   setText: (text: string) => void;
 }
 
@@ -219,6 +220,7 @@ export const useSlashCommandProcessor = (
         },
         loadHistory: (history, postLoadInput) => {
           loadHistory(history);
+          refreshStatic();
           if (postLoadInput !== undefined) {
             actions.setText(postLoadInput);
           }
@@ -236,6 +238,7 @@ export const useSlashCommandProcessor = (
         addConfirmUpdateExtensionRequest:
           actions.addConfirmUpdateExtensionRequest,
         removeComponent: () => setCustomDialog(null),
+        toggleBackgroundShell: actions.toggleBackgroundShell,
       },
       session: {
         stats: session.stats,
@@ -294,8 +297,8 @@ export const useSlashCommandProcessor = (
       // starting/stopping
       reloadCommands();
     };
-    appEvents.on('extensionsStarting', extensionEventListener);
-    appEvents.on('extensionsStopping', extensionEventListener);
+    coreEvents.on('extensionsStarting', extensionEventListener);
+    coreEvents.on('extensionsStopping', extensionEventListener);
 
     return () => {
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -304,8 +307,8 @@ export const useSlashCommandProcessor = (
         ideClient.removeStatusChangeListener(listener);
       })();
       removeMCPStatusChangeListener(listener);
-      appEvents.off('extensionsStarting', extensionEventListener);
-      appEvents.off('extensionsStopping', extensionEventListener);
+      coreEvents.off('extensionsStarting', extensionEventListener);
+      coreEvents.off('extensionsStopping', extensionEventListener);
     };
   }, [config, reloadCommands]);
 

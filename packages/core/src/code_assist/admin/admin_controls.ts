@@ -11,6 +11,8 @@ import {
   type FetchAdminControlsResponse,
   FetchAdminControlsResponseSchema,
 } from '../types.js';
+import { getCodeAssistServer } from '../codeAssist.js';
+import type { Config } from '../../config/config.js';
 
 let pollingInterval: NodeJS.Timeout | undefined;
 let currentSettings: FetchAdminControlsResponse | undefined;
@@ -23,6 +25,15 @@ export function sanitizeAdminSettings(
     return {};
   }
   return result.data;
+}
+
+function isGaxiosError(error: unknown): error is { status: number } {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'status' in error &&
+    typeof (error as { status: unknown }).status === 'number'
+  );
 }
 
 /**
@@ -64,6 +75,12 @@ export async function fetchAdminControls(
     startAdminControlsPolling(server, server.projectId, onSettingsChanged);
     return sanitizedSettings;
   } catch (e) {
+    // Non-enterprise users don't have access to fetch settings.
+    if (isGaxiosError(e) && e.status === 403) {
+      stopAdminControlsPolling();
+      currentSettings = undefined;
+      return {};
+    }
     debugLogger.error('Failed to fetch admin controls: ', e);
     // If initial fetch fails, start polling to retry.
     currentSettings = {};
@@ -95,6 +112,12 @@ function startAdminControlsPolling(
           onSettingsChanged(newSettings);
         }
       } catch (e) {
+        // Non-enterprise users don't have access to fetch settings.
+        if (isGaxiosError(e) && e.status === 403) {
+          stopAdminControlsPolling();
+          currentSettings = undefined;
+          return;
+        }
         debugLogger.error('Failed to poll admin controls: ', e);
       }
     },
@@ -110,4 +133,21 @@ export function stopAdminControlsPolling() {
     clearInterval(pollingInterval);
     pollingInterval = undefined;
   }
+}
+
+/**
+ * Returns a standardized error message for features disabled by admin settings.
+ *
+ * @param featureName The name of the disabled feature
+ * @param config The application config
+ * @returns The formatted error message
+ */
+export function getAdminErrorMessage(
+  featureName: string,
+  config: Config | undefined,
+): string {
+  const server = config ? getCodeAssistServer(config) : undefined;
+  const projectId = server?.projectId;
+  const projectParam = projectId ? `?project=${projectId}` : '';
+  return `${featureName} is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli${projectParam}`;
 }

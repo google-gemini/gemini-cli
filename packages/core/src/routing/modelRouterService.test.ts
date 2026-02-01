@@ -15,6 +15,7 @@ import { CompositeStrategy } from './strategies/compositeStrategy.js';
 import { FallbackStrategy } from './strategies/fallbackStrategy.js';
 import { OverrideStrategy } from './strategies/overrideStrategy.js';
 import { ClassifierStrategy } from './strategies/classifierStrategy.js';
+import { NumericalClassifierStrategy } from './strategies/numericalClassifierStrategy.js';
 import { logModelRouting } from '../telemetry/loggers.js';
 import { ModelRoutingEvent } from '../telemetry/types.js';
 
@@ -25,6 +26,7 @@ vi.mock('./strategies/compositeStrategy.js');
 vi.mock('./strategies/fallbackStrategy.js');
 vi.mock('./strategies/overrideStrategy.js');
 vi.mock('./strategies/classifierStrategy.js');
+vi.mock('./strategies/numericalClassifierStrategy.js');
 vi.mock('../telemetry/loggers.js');
 vi.mock('../telemetry/types.js');
 
@@ -41,12 +43,15 @@ describe('ModelRouterService', () => {
     mockConfig = new Config({} as never);
     mockBaseLlmClient = {} as BaseLlmClient;
     vi.spyOn(mockConfig, 'getBaseLlmClient').mockReturnValue(mockBaseLlmClient);
+    vi.spyOn(mockConfig, 'getNumericalRoutingEnabled').mockResolvedValue(false);
+    vi.spyOn(mockConfig, 'getClassifierThreshold').mockResolvedValue(undefined);
 
     mockCompositeStrategy = new CompositeStrategy(
       [
         new FallbackStrategy(),
         new OverrideStrategy(),
         new ClassifierStrategy(),
+        new NumericalClassifierStrategy(),
         new DefaultStrategy(),
       ],
       'agent-router',
@@ -74,11 +79,12 @@ describe('ModelRouterService', () => {
     const compositeStrategyArgs = vi.mocked(CompositeStrategy).mock.calls[0];
     const childStrategies = compositeStrategyArgs[0];
 
-    expect(childStrategies.length).toBe(4);
+    expect(childStrategies.length).toBe(5);
     expect(childStrategies[0]).toBeInstanceOf(FallbackStrategy);
     expect(childStrategies[1]).toBeInstanceOf(OverrideStrategy);
     expect(childStrategies[2]).toBeInstanceOf(ClassifierStrategy);
-    expect(childStrategies[3]).toBeInstanceOf(DefaultStrategy);
+    expect(childStrategies[3]).toBeInstanceOf(NumericalClassifierStrategy);
+    expect(childStrategies[4]).toBeInstanceOf(DefaultStrategy);
     expect(compositeStrategyArgs[1]).toBe('agent-router');
   });
 
@@ -121,6 +127,8 @@ describe('ModelRouterService', () => {
         'Strategy reasoning',
         false,
         undefined,
+        false,
+        undefined,
       );
       expect(logModelRouting).toHaveBeenCalledWith(
         mockConfig,
@@ -128,12 +136,15 @@ describe('ModelRouterService', () => {
       );
     });
 
-    it('should log a telemetry event and re-throw on a failed decision', async () => {
+    it('should log a telemetry event and return fallback on a failed decision', async () => {
       const testError = new Error('Strategy failed');
       vi.spyOn(mockCompositeStrategy, 'route').mockRejectedValue(testError);
       vi.spyOn(mockConfig, 'getModel').mockReturnValue('default-model');
 
-      await expect(service.route(mockContext)).rejects.toThrow(testError);
+      const decision = await service.route(mockContext);
+
+      expect(decision.model).toBe('default-model');
+      expect(decision.metadata.source).toBe('router-exception');
 
       expect(ModelRoutingEvent).toHaveBeenCalledWith(
         'default-model',
@@ -142,6 +153,8 @@ describe('ModelRouterService', () => {
         'An exception occurred during routing.',
         true,
         'Strategy failed',
+        false,
+        undefined,
       );
       expect(logModelRouting).toHaveBeenCalledWith(
         mockConfig,

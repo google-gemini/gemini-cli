@@ -69,6 +69,7 @@ export class CodeAssistServer implements ContentGenerator {
     readonly httpOptions: HttpOptions = {},
     readonly sessionId?: string,
     readonly userTier?: UserTierId,
+    readonly userTierName?: string,
   ) {}
 
   async generateContentStream(
@@ -373,7 +374,9 @@ export class CodeAssistServer implements ContentGenerator {
   private getBaseUrl(): string {
     const endpoint =
       process.env['CODE_ASSIST_ENDPOINT'] ?? CODE_ASSIST_ENDPOINT;
-    return `${endpoint}/${CODE_ASSIST_API_VERSION}`;
+    const version =
+      process.env['CODE_ASSIST_API_VERSION'] || CODE_ASSIST_API_VERSION;
+    return `${endpoint}/${version}`;
   }
 
   getMethodUrl(method: string): string {

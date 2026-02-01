@@ -33,6 +33,10 @@ import {
   registerTelemetryConfig,
 } from './utils/cleanup.js';
 import {
+  cleanupToolOutputFiles,
+  cleanupExpiredSessions,
+} from './utils/sessionCleanup.js';
+import {
   type Config,
   type ResumedSessionData,
   type OutputPayload,
@@ -61,6 +65,8 @@ import {
   SessionStartSource,
   SessionEndReason,
   getVersion,
+  ValidationCancelledError,
+  ValidationRequiredError,
   type FetchAdminControlsResponse,
 } from '@google/gemini-cli-core';
 import {
@@ -69,7 +75,6 @@ import {
 } from './core/initializer.js';
 import { validateAuthMethod } from './config/auth.js';
 import { runZedIntegration } from './zed-integration/zedIntegration.js';
-import { cleanupExpiredSessions } from './utils/sessionCleanup.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
@@ -318,11 +323,20 @@ export async function main() {
     );
   });
 
-  await cleanupCheckpoints();
+  await Promise.all([
+    cleanupCheckpoints(),
+    cleanupToolOutputFiles(settings.merged),
+  ]);
 
   const parseArgsHandle = startupProfiler.start('parse_arguments');
   const argv = await parseArguments(settings.merged);
   parseArgsHandle?.end();
+
+  if (argv.startupMessages) {
+    argv.startupMessages.forEach((msg) => {
+      coreEvents.emitFeedback('info', msg);
+    });
+  }
 
   // Check for invalid input combinations early to prevent crashes
   if (argv.promptInteractive && !process.stdin.isTTY) {
@@ -359,7 +373,7 @@ export async function main() {
     ) {
       settings.setValue(
         SettingScope.User,
-        'selectedAuthType',
+        'security.auth.selectedType',
         AuthType.COMPUTE_ADC,
       );
     }
@@ -400,8 +414,19 @@ export async function main() {
         await partialConfig.refreshAuth(authType);
       }
     } catch (err) {
-      debugLogger.error('Error authenticating:', err);
-      initialAuthFailed = true;
+      if (err instanceof ValidationCancelledError) {
+        // User cancelled verification, exit immediately.
+        await runExitCleanup();
+        process.exit(ExitCodes.SUCCESS);
+      }
+
+      // If validation is required, we don't treat it as a fatal failure.
+      // We allow the app to start, and the React-based ValidationDialog
+      // will handle it.
+      if (!(err instanceof ValidationRequiredError)) {
+        debugLogger.error('Error authenticating:', err);
+        initialAuthFailed = true;
+      }
     }
   }
 

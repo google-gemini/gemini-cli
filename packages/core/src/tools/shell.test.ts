@@ -18,8 +18,13 @@ import {
 const mockPlatform = vi.hoisted(() => vi.fn());
 
 const mockShellExecutionService = vi.hoisted(() => vi.fn());
+const mockShellBackground = vi.hoisted(() => vi.fn());
+
 vi.mock('../services/shellExecutionService.js', () => ({
-  ShellExecutionService: { execute: mockShellExecutionService },
+  ShellExecutionService: {
+    execute: mockShellExecutionService,
+    background: mockShellBackground,
+  },
 }));
 
 vi.mock('node:os', async (importOriginal) => {
@@ -38,6 +43,7 @@ vi.mock('../utils/summarizer.js');
 
 import { initializeShellParsers } from '../utils/shell-utils.js';
 import { ShellTool } from './shell.js';
+import { debugLogger } from '../index.js';
 import { type Config } from '../config/config.js';
 import {
   type ShellExecutionResult,
@@ -47,6 +53,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import { EOL } from 'node:os';
 import * as path from 'node:path';
+import { isSubpath } from '../utils/paths.js';
 import * as crypto from 'node:crypto';
 import * as summarizer from '../utils/summarizer.js';
 import { ToolErrorType } from './tool-error.js';
@@ -99,10 +106,31 @@ describe('ShellTool', () => {
       getWorkspaceContext: vi
         .fn()
         .mockReturnValue(new WorkspaceContext(tempRootDir)),
-      getGeminiClient: vi.fn(),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+      },
+      isPathAllowed(this: Config, absolutePath: string): boolean {
+        const workspaceContext = this.getWorkspaceContext();
+        if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+          return true;
+        }
+
+        const projectTempDir = this.storage.getProjectTempDir();
+        return isSubpath(path.resolve(projectTempDir), absolutePath);
+      },
+      validatePathAccess(this: Config, absolutePath: string): string | null {
+        if (this.isPathAllowed(absolutePath)) {
+          return null;
+        }
+
+        const workspaceDirs = this.getWorkspaceContext().getDirectories();
+        const projectTempDir = this.storage.getProjectTempDir();
+        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+      },
+      getGeminiClient: vi.fn().mockReturnValue({}),
+      getShellToolInactivityTimeout: vi.fn().mockReturnValue(1000),
       getEnableInteractiveShell: vi.fn().mockReturnValue(false),
-      isInteractive: vi.fn().mockReturnValue(true),
-      getShellToolInactivityTimeout: vi.fn().mockReturnValue(300000),
+      sanitizationConfig: {},
     } as unknown as Config;
 
     const bus = createMockMessageBus();
@@ -146,6 +174,20 @@ describe('ShellTool', () => {
         }),
       };
     });
+
+    mockShellBackground.mockImplementation(() => {
+      resolveExecutionPromise({
+        output: '',
+        rawOutput: Buffer.from(''),
+        exitCode: null,
+        signal: null,
+        error: null,
+        aborted: false,
+        pid: 12345,
+        executionMethod: 'child_process',
+        backgrounded: true,
+      });
+    });
   });
 
   afterEach(() => {
@@ -183,9 +225,7 @@ describe('ShellTool', () => {
       const outsidePath = path.resolve(tempRootDir, '../outside');
       expect(() =>
         shellTool.build({ command: 'ls', dir_path: outsidePath }),
-      ).toThrow(
-        `Directory '${outsidePath}' is not within any of the registered workspace directories.`,
-      );
+      ).toThrow(/Path not in workspace/);
     });
 
     it('should return an invocation for a valid absolute directory path', () => {
@@ -235,7 +275,7 @@ describe('ShellTool', () => {
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        { pager: 'cat' },
+        { pager: 'cat', sanitizationConfig: {} },
       );
       expect(result.llmContent).toContain('Background PIDs: 54322');
       // The file should be deleted by the tool
@@ -260,7 +300,7 @@ describe('ShellTool', () => {
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        { pager: 'cat' },
+        { pager: 'cat', sanitizationConfig: {} },
       );
     });
 
@@ -281,8 +321,27 @@ describe('ShellTool', () => {
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        { pager: 'cat' },
+        { pager: 'cat', sanitizationConfig: {} },
       );
+    });
+
+    it('should handle is_background parameter by calling ShellExecutionService.background', async () => {
+      vi.useFakeTimers();
+      const invocation = shellTool.build({
+        command: 'sleep 10',
+        is_background: true,
+      });
+      const promise = invocation.execute(mockAbortSignal);
+
+      // We need to provide a PID for the background logic to trigger
+      resolveShellExecution({ pid: 12345 });
+
+      // Advance time to trigger the background timeout
+      await vi.advanceTimersByTimeAsync(250);
+
+      expect(mockShellBackground).toHaveBeenCalledWith(12345);
+
+      await promise;
     });
 
     itWindowsOnly(
@@ -308,7 +367,7 @@ describe('ShellTool', () => {
           expect.any(Function),
           expect.any(AbortSignal),
           false,
-          { pager: 'cat' },
+          { pager: 'cat', sanitizationConfig: {} },
         );
       },
       20000,
@@ -410,8 +469,6 @@ describe('ShellTool', () => {
       // We can also verify that setTimeout was NOT called for the inactivity timeout.
       // However, since we don't have direct access to the internal `resetTimeout`,
       // we can infer success by the fact it didn't abort.
-
-      vi.useRealTimers();
     });
 
     it('should clean up the temp file on synchronous execution error', async () => {
@@ -430,10 +487,28 @@ describe('ShellTool', () => {
       expect(fs.existsSync(tmpFile)).toBe(false);
     });
 
+    it('should not log "missing pgrep output" when process is backgrounded', async () => {
+      vi.useFakeTimers();
+      const debugErrorSpy = vi.spyOn(debugLogger, 'error');
+
+      const invocation = shellTool.build({
+        command: 'sleep 10',
+        is_background: true,
+      });
+      const promise = invocation.execute(mockAbortSignal);
+
+      // Advance time to trigger backgrounding
+      await vi.advanceTimersByTimeAsync(200);
+
+      await promise;
+
+      expect(debugErrorSpy).not.toHaveBeenCalledWith('missing pgrep output');
+    });
+
     describe('Streaming to `updateOutput`', () => {
       let updateOutputMock: Mock;
       beforeEach(() => {
-        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
         updateOutputMock = vi.fn();
       });
       afterEach(() => {
@@ -481,6 +556,27 @@ describe('ShellTool', () => {
           pid: 12345,
           executionMethod: 'child_process',
         });
+        await promise;
+      });
+
+      it('should NOT call updateOutput if the command is backgrounded', async () => {
+        const invocation = shellTool.build({
+          command: 'sleep 10',
+          is_background: true,
+        });
+        const promise = invocation.execute(mockAbortSignal, updateOutputMock);
+
+        mockShellOutputCallback({ type: 'data', chunk: 'some output' });
+        expect(updateOutputMock).not.toHaveBeenCalled();
+
+        // We need to provide a PID for the background logic to trigger
+        resolveShellExecution({ pid: 12345 });
+
+        // Advance time to trigger the background timeout
+        await vi.advanceTimersByTimeAsync(250);
+
+        expect(mockShellBackground).toHaveBeenCalledWith(12345);
+
         await promise;
       });
     });
@@ -536,6 +632,135 @@ describe('ShellTool', () => {
       mockPlatform.mockReturnValue('linux');
       const shellTool = new ShellTool(mockConfig, createMockMessageBus());
       expect(shellTool.description).toMatchSnapshot();
+    });
+  });
+
+  describe('llmContent output format', () => {
+    const mockAbortSignal = new AbortController().signal;
+
+    const resolveShellExecution = (
+      result: Partial<ShellExecutionResult> = {},
+    ) => {
+      const fullResult: ShellExecutionResult = {
+        rawOutput: Buffer.from(result.output || ''),
+        output: 'Success',
+        exitCode: 0,
+        signal: null,
+        error: null,
+        aborted: false,
+        pid: 12345,
+        executionMethod: 'child_process',
+        ...result,
+      };
+      resolveExecutionPromise(fullResult);
+    };
+
+    it('should not include Command in output', async () => {
+      const invocation = shellTool.build({ command: 'echo hello' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({ output: 'hello', exitCode: 0 });
+
+      const result = await promise;
+      expect(result.llmContent).not.toContain('Command:');
+    });
+
+    it('should not include Directory in output', async () => {
+      const invocation = shellTool.build({ command: 'ls', dir_path: 'subdir' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({ output: 'file.txt', exitCode: 0 });
+
+      const result = await promise;
+      expect(result.llmContent).not.toContain('Directory:');
+    });
+
+    it('should not include Exit Code when command succeeds (exit code 0)', async () => {
+      const invocation = shellTool.build({ command: 'echo hello' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({ output: 'hello', exitCode: 0 });
+
+      const result = await promise;
+      expect(result.llmContent).not.toContain('Exit Code:');
+    });
+
+    it('should include Exit Code when command fails (non-zero exit code)', async () => {
+      const invocation = shellTool.build({ command: 'false' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({ output: '', exitCode: 1 });
+
+      const result = await promise;
+      expect(result.llmContent).toContain('Exit Code: 1');
+    });
+
+    it('should not include Error when there is no process error', async () => {
+      const invocation = shellTool.build({ command: 'echo hello' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({ output: 'hello', exitCode: 0, error: null });
+
+      const result = await promise;
+      expect(result.llmContent).not.toContain('Error:');
+    });
+
+    it('should include Error when there is a process error', async () => {
+      const invocation = shellTool.build({ command: 'bad-command' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({
+        output: '',
+        exitCode: 1,
+        error: new Error('spawn ENOENT'),
+      });
+
+      const result = await promise;
+      expect(result.llmContent).toContain('Error: spawn ENOENT');
+    });
+
+    it('should not include Signal when there is no signal', async () => {
+      const invocation = shellTool.build({ command: 'echo hello' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({ output: 'hello', exitCode: 0, signal: null });
+
+      const result = await promise;
+      expect(result.llmContent).not.toContain('Signal:');
+    });
+
+    it('should include Signal when process was killed by signal', async () => {
+      const invocation = shellTool.build({ command: 'sleep 100' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({
+        output: '',
+        exitCode: null,
+        signal: 9, // SIGKILL
+      });
+
+      const result = await promise;
+      expect(result.llmContent).toContain('Signal: 9');
+    });
+
+    it('should not include Background PIDs when there are none', async () => {
+      const invocation = shellTool.build({ command: 'echo hello' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({ output: 'hello', exitCode: 0 });
+
+      const result = await promise;
+      expect(result.llmContent).not.toContain('Background PIDs:');
+    });
+
+    it('should not include Process Group PGID when pid is not set', async () => {
+      const invocation = shellTool.build({ command: 'echo hello' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({ output: 'hello', exitCode: 0, pid: undefined });
+
+      const result = await promise;
+      expect(result.llmContent).not.toContain('Process Group PGID:');
+    });
+
+    it('should have minimal output for successful command', async () => {
+      const invocation = shellTool.build({ command: 'echo hello' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({ output: 'hello', exitCode: 0, pid: undefined });
+
+      const result = await promise;
+      // Should only contain Output field
+      expect(result.llmContent).toBe('Output: hello');
     });
   });
 

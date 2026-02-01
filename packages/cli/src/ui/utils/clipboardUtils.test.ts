@@ -43,6 +43,9 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       debug: vi.fn(),
       warn: vi.fn(),
     },
+    Storage: class {
+      getProjectTempDir = vi.fn(() => '/tmp/global');
+    },
   };
 });
 
@@ -169,7 +172,7 @@ describe('clipboardUtils', () => {
 
   describe('saveClipboardImage (Linux)', () => {
     const mockTargetDir = '/tmp/target';
-    const mockTempDir = path.join(mockTargetDir, '.gemini-clipboard');
+    const mockTempDir = path.join('/tmp/global', 'images');
 
     beforeEach(() => {
       setPlatform('linux');
@@ -240,6 +243,7 @@ describe('clipboardUtils', () => {
 
       const result = await promise;
 
+      expect(result).toContain(mockTempDir);
       expect(result).toMatch(/clipboard-\d+\.png$/);
       expect(spawn).toHaveBeenCalledWith('wl-paste', expect.any(Array));
       expect(fs.mkdir).toHaveBeenCalledWith(mockTempDir, { recursive: true });
@@ -310,15 +314,18 @@ describe('clipboardUtils', () => {
 
   // Stateless functions continue to use static imports
   describe('cleanupOldClipboardImages', () => {
+    const mockTargetDir = '/tmp/target';
     it('should not throw errors', async () => {
       // Should handle missing directories gracefully
       await expect(
-        cleanupOldClipboardImages('/path/that/does/not/exist'),
+        cleanupOldClipboardImages(mockTargetDir),
       ).resolves.not.toThrow();
     });
 
     it('should complete without errors on valid directory', async () => {
-      await expect(cleanupOldClipboardImages('.')).resolves.not.toThrow();
+      await expect(
+        cleanupOldClipboardImages(mockTargetDir),
+      ).resolves.not.toThrow();
     });
   });
 

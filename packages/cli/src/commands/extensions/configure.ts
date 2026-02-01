@@ -111,6 +111,7 @@ async function configureSpecificSetting(
     settingKey,
     promptForSetting,
     scope,
+    process.cwd(),
   );
 }
 
@@ -174,6 +175,7 @@ async function configureExtensionSettings(
     extensionConfig,
     extensionId,
     scope,
+    process.cwd(),
   );
 
   let workspaceSettings: Record<string, string> = {};
@@ -182,6 +184,7 @@ async function configureExtensionSettings(
       extensionConfig,
       extensionId,
       ExtensionSettingScope.WORKSPACE,
+      process.cwd(),
     );
   }
 
@@ -216,6 +219,7 @@ async function configureExtensionSettings(
       setting.envVar,
       promptForSetting,
       scope,
+      process.cwd(),
     );
   }
 }

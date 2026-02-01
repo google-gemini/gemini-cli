@@ -10,6 +10,7 @@ import type {
   ToolResult,
   ToolCallConfirmationDetails,
   FilterFilesOptions,
+  ConversationRecord,
 } from '@google/gemini-cli-core';
 import {
   AuthType,
@@ -31,6 +32,8 @@ import {
   resolveModel,
   createWorkingStdio,
   startupProfiler,
+  Kind,
+  partListUnionToString,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -46,6 +49,10 @@ import { randomUUID } from 'node:crypto';
 import type { CliArgs } from '../config/config.js';
 import { loadCliConfig } from '../config/config.js';
 import { runExitCleanup } from '../utils/cleanup.js';
+import {
+  SessionSelector,
+  convertSessionToHistoryFormats,
+} from '../utils/sessionUtils.js';
 
 export async function runZedIntegration(
   config: Config,
@@ -106,7 +113,7 @@ export class GeminiAgent {
       protocolVersion: acp.PROTOCOL_VERSION,
       authMethods,
       agentCapabilities: {
-        loadSession: false,
+        loadSession: true,
         promptCapabilities: {
           image: true,
           audio: true,
@@ -145,23 +152,11 @@ export class GeminiAgent {
     mcpServers,
   }: acp.NewSessionRequest): Promise<acp.NewSessionResponse> {
     const sessionId = randomUUID();
-    const config = await this.newSessionConfig(sessionId, cwd, mcpServers);
-
-    let isAuthenticated = false;
-    if (this.settings.merged.security.auth.selectedType) {
-      try {
-        await config.refreshAuth(
-          this.settings.merged.security.auth.selectedType,
-        );
-        isAuthenticated = true;
-      } catch (e) {
-        debugLogger.error(`Authentication failed: ${e}`);
-      }
-    }
-
-    if (!isAuthenticated) {
-      throw acp.RequestError.authRequired();
-    }
+    const config = await this.initializeSessionConfig(
+      sessionId,
+      cwd,
+      mcpServers,
+    );
 
     if (this.clientCapabilities?.fs) {
       const acpFileSystemService = new AcpFileSystemService(
@@ -181,6 +176,88 @@ export class GeminiAgent {
     return {
       sessionId,
     };
+  }
+
+  async loadSession({
+    sessionId,
+    cwd,
+    mcpServers,
+  }: acp.LoadSessionRequest): Promise<acp.LoadSessionResponse> {
+    const config = await this.initializeSessionConfig(
+      sessionId,
+      cwd,
+      mcpServers,
+    );
+
+    const sessionSelector = new SessionSelector(config);
+    const { sessionData, sessionPath } =
+      await sessionSelector.resolveSession(sessionId);
+
+    if (this.clientCapabilities?.fs) {
+      const acpFileSystemService = new AcpFileSystemService(
+        this.connection,
+        sessionId,
+        this.clientCapabilities.fs,
+        config.getFileSystemService(),
+      );
+      config.setFileSystemService(acpFileSystemService);
+    }
+
+    const { clientHistory } = convertSessionToHistoryFormats(
+      sessionData.messages,
+    );
+
+    const geminiClient = config.getGeminiClient();
+    await geminiClient.initialize();
+    await geminiClient.resumeChat(clientHistory, {
+      conversation: sessionData,
+      filePath: sessionPath,
+    });
+
+    const session = new Session(
+      sessionId,
+      geminiClient.getChat(),
+      config,
+      this.connection,
+    );
+    this.sessions.set(sessionId, session);
+
+    // Stream history back to client
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    session.streamHistory(sessionData.messages);
+
+    return {};
+  }
+
+  private async initializeSessionConfig(
+    sessionId: string,
+    cwd: string,
+    mcpServers: acp.McpServer[],
+  ): Promise<Config> {
+    const selectedAuthType = this.settings.merged.security.auth.selectedType;
+    if (!selectedAuthType) {
+      throw acp.RequestError.authRequired();
+    }
+
+    // 1. Create config WITHOUT initializing it (no MCP servers started yet)
+    const config = await this.newSessionConfig(sessionId, cwd, mcpServers);
+
+    // 2. Authenticate BEFORE initializing configuration or starting MCP servers.
+    // This satisfies the security requirement to verify the user before executing
+    // potentially unsafe server definitions.
+    try {
+      await config.refreshAuth(selectedAuthType);
+    } catch (e) {
+      debugLogger.error(`Authentication failed: ${e}`);
+      throw acp.RequestError.authRequired();
+    }
+
+    // 3. Now that we are authenticated, it is safe to initialize the config
+    // which starts the MCP servers and other heavy resources.
+    await config.initialize();
+    startupProfiler.flush(config);
+
+    return config;
   }
 
   async newSessionConfig(
@@ -227,8 +304,6 @@ export class GeminiAgent {
 
     const config = await loadCliConfig(settings, sessionId, this.argv, { cwd });
 
-    await config.initialize();
-    startupProfiler.flush(config);
     return config;
   }
 
@@ -266,6 +341,73 @@ export class Session {
 
     this.pendingPrompt.abort();
     this.pendingPrompt = null;
+  }
+
+  async streamHistory(messages: ConversationRecord['messages']): Promise<void> {
+    for (const msg of messages) {
+      const contentString = partListUnionToString(msg.content);
+
+      if (msg.type === 'user') {
+        if (contentString.trim()) {
+          await this.sendUpdate({
+            sessionUpdate: 'user_message_chunk',
+            content: { type: 'text', text: contentString },
+          });
+        }
+      } else if (msg.type === 'gemini') {
+        // Thoughts
+        if (msg.thoughts) {
+          for (const thought of msg.thoughts) {
+            const thoughtText = `**${thought.subject}**\n${thought.description}`;
+            await this.sendUpdate({
+              sessionUpdate: 'agent_thought_chunk',
+              content: { type: 'text', text: thoughtText },
+            });
+          }
+        }
+
+        // Message text
+        if (contentString.trim()) {
+          await this.sendUpdate({
+            sessionUpdate: 'agent_message_chunk',
+            content: { type: 'text', text: contentString },
+          });
+        }
+
+        // Tool calls
+        if (msg.toolCalls) {
+          for (const toolCall of msg.toolCalls) {
+            const toolCallContent: acp.ToolCallContent[] = [];
+            if (toolCall.resultDisplay) {
+              if (typeof toolCall.resultDisplay === 'string') {
+                toolCallContent.push({
+                  type: 'content',
+                  content: { type: 'text', text: toolCall.resultDisplay },
+                });
+              } else if ('fileName' in toolCall.resultDisplay) {
+                toolCallContent.push({
+                  type: 'diff',
+                  path: toolCall.resultDisplay.fileName,
+                  oldText: toolCall.resultDisplay.originalContent,
+                  newText: toolCall.resultDisplay.newContent,
+                });
+              }
+            }
+
+            const tool = this.config.getToolRegistry().getTool(toolCall.name);
+
+            await this.sendUpdate({
+              sessionUpdate: 'tool_call',
+              toolCallId: toolCall.id,
+              status: toolCall.status === 'success' ? 'completed' : 'failed',
+              title: toolCall.displayName || toolCall.name,
+              content: toolCallContent,
+              kind: tool ? toAcpToolKind(tool.kind) : 'other',
+            });
+          }
+        }
+      }
+    }
   }
 
   async prompt(params: acp.PromptRequest): Promise<acp.PromptResponse> {
@@ -463,7 +605,7 @@ export class Session {
             title: invocation.getDescription(),
             content,
             locations: invocation.toolLocations(),
-            kind: tool.kind,
+            kind: toAcpToolKind(tool.kind),
           },
         };
 
@@ -502,7 +644,7 @@ export class Session {
           title: invocation.getDescription(),
           content: [],
           locations: invocation.toolLocations(),
-          kind: tool.kind,
+          kind: toAcpToolKind(tool.kind),
         });
       }
 
@@ -532,6 +674,33 @@ export class Session {
         ),
       );
 
+      this.chat.recordCompletedToolCalls(this.config.getActiveModel(), [
+        {
+          status: 'success',
+          request: {
+            callId,
+            name: fc.name,
+            args,
+            isClientInitiated: false,
+            prompt_id: promptId,
+          },
+          tool,
+          invocation,
+          response: {
+            callId,
+            responseParts: convertToFunctionResponse(
+              fc.name,
+              callId,
+              toolResult.llmContent,
+              this.config.getActiveModel(),
+            ),
+            resultDisplay: toolResult.returnDisplay,
+            error: undefined,
+            errorType: undefined,
+          },
+        },
+      ]);
+
       return convertToFunctionResponse(
         fc.name,
         callId,
@@ -549,6 +718,35 @@ export class Session {
           { type: 'content', content: { type: 'text', text: error.message } },
         ],
       });
+
+      this.chat.recordCompletedToolCalls(this.config.getActiveModel(), [
+        {
+          status: 'error',
+          request: {
+            callId,
+            name: fc.name,
+            args,
+            isClientInitiated: false,
+            prompt_id: promptId,
+          },
+          tool,
+          response: {
+            callId,
+            responseParts: [
+              {
+                functionResponse: {
+                  id: callId,
+                  name: fc.name ?? '',
+                  response: { error: error.message },
+                },
+              },
+            ],
+            resultDisplay: error.message,
+            error,
+            errorType: undefined,
+          },
+        },
+      ]);
 
       return errorResponse(error);
     }
@@ -798,7 +996,7 @@ export class Session {
           title: invocation.getDescription(),
           content: [],
           locations: invocation.toolLocations(),
-          kind: readManyFilesTool.kind,
+          kind: toAcpToolKind(readManyFilesTool.kind),
         });
 
         const result = await invocation.execute(abortSignal);
@@ -982,9 +1180,34 @@ function toPermissionOptions(
         },
         ...basicPermissionOptions,
       ];
+    case 'ask_user':
+      // askuser doesn't need "always allow" options since it's asking questions
+      return [...basicPermissionOptions];
     default: {
       const unreachable: never = confirmation;
       throw new Error(`Unexpected: ${unreachable}`);
     }
+  }
+}
+
+/**
+ * Maps our internal tool kind to the ACP ToolKind.
+ * Fallback to 'other' for kinds that are not supported by the ACP protocol.
+ */
+function toAcpToolKind(kind: Kind): acp.ToolKind {
+  switch (kind) {
+    case Kind.Read:
+    case Kind.Edit:
+    case Kind.Delete:
+    case Kind.Move:
+    case Kind.Search:
+    case Kind.Execute:
+    case Kind.Think:
+    case Kind.Fetch:
+    case Kind.Other:
+      return kind as acp.ToolKind;
+    case Kind.Communicate:
+    default:
+      return 'other';
   }
 }
