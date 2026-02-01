@@ -215,6 +215,7 @@ describe('useSlashCommandProcessor', () => {
             addConfirmUpdateExtensionRequest: vi.fn(),
             toggleBackgroundShell: vi.fn(),
             setText: vi.fn(),
+            toggleVoice: vi.fn(),
           },
           new Map(), // extensionsUpdateState
           true, // isConfigInitialized

@@ -84,6 +84,7 @@ interface SlashCommandProcessorActions {
   addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
   toggleBackgroundShell: () => void;
   setText: (text: string) => void;
+  toggleVoice: () => void;
 }
 
 /**
@@ -239,6 +240,7 @@ export const useSlashCommandProcessor = (
           actions.addConfirmUpdateExtensionRequest,
         removeComponent: () => setCustomDialog(null),
         toggleBackgroundShell: actions.toggleBackgroundShell,
+        toggleVoice: actions.toggleVoice,
       },
       session: {
         stats: session.stats,
