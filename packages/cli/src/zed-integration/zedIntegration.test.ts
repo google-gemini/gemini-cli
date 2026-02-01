@@ -129,7 +129,7 @@ describe('GeminiAgent', () => {
 
     expect(response.protocolVersion).toBe(acp.PROTOCOL_VERSION);
     expect(response.authMethods).toHaveLength(3);
-    expect(response.agentCapabilities?.loadSession).toBe(false);
+    expect(response.agentCapabilities?.loadSession).toBe(true);
   });
 
   it('should authenticate correctly', async () => {
