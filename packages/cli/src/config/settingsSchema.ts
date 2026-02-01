@@ -10,6 +10,7 @@
 // --------------------------------------------------------------------------
 
 import {
+  DEFAULT_TRUNCATE_PATH_HINT_THRESHOLD,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   DEFAULT_MODEL_CONFIGS,
@@ -1156,6 +1157,16 @@ const SETTINGS_SCHEMA = {
         default: true,
         description:
           'Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.',
+        showInDialog: true,
+      },
+      truncatePathHintThreshold: {
+        type: 'number',
+        label: 'Path Hint Truncation Threshold',
+        category: 'General',
+        requiresRestart: true,
+        default: DEFAULT_TRUNCATE_PATH_HINT_THRESHOLD,
+        description:
+          'Truncate the file path shown when the agent is using a tool. This helps you identify the target file while keeping the display concise. Set to -1 to disable.',
         showInDialog: true,
       },
       enableToolOutputTruncation: {
