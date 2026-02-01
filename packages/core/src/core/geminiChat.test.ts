@@ -1022,18 +1022,27 @@ describe('GeminiChat', () => {
 
       // 2. Mock generateContentStream to hang UNTIL aborted
       vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
-        (request) => new Promise((resolve, reject) => {
-            const config = request?.config;
-            if (config?.abortSignal) {
-              if (config.abortSignal.aborted) {
-                reject(new Error('Aborted'));
-                return;
+        async (request) => {
+          const signal = request.config?.abortSignal;
+          return {
+            async *[Symbol.asyncIterator]() {
+              if (signal) {
+                await new Promise((resolve, reject) => {
+                  if (signal.aborted) {
+                    reject(new Error('Aborted'));
+                    return;
+                  }
+                  signal.addEventListener('abort', () => {
+                    reject(new Error('Aborted'));
+                  });
+                });
+              } else {
+                await new Promise(() => {}); // Hang indefinitely
               }
-              config.abortSignal.addEventListener('abort', () => {
-                reject(new Error('Aborted'));
-              });
-            }
-          }),
+              yield {} as GenerateContentResponse; // Dummy yield to satisfy require-yield lint rule
+            },
+          } as AsyncGenerator<GenerateContentResponse>;
+        },
       );
 
       // 3. Start the request
