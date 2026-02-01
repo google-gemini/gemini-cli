@@ -21,9 +21,5 @@ export function getInlineThinkingMode(
     return 'summary';
   }
 
-  if (ui?.showInlineThinking) {
-    return 'full';
-  }
-
   return 'off';
 }

@@ -82,6 +82,17 @@ import path from 'node:path';
 
 const MAX_THOUGHT_SUMMARY_LENGTH = 140;
 
+function splitGraphemes(value: string): string[] {
+  if (typeof Intl !== 'undefined' && 'Segmenter' in Intl) {
+    const segmenter = new Intl.Segmenter(undefined, {
+      granularity: 'grapheme',
+    });
+    return Array.from(segmenter.segment(value), (segment) => segment.segment);
+  }
+
+  return Array.from(value);
+}
+
 function summarizeThought(thought: ThoughtSummary): ThoughtSummary {
   const subject = thought.subject.trim();
   if (subject) {
@@ -93,12 +104,14 @@ function summarizeThought(thought: ThoughtSummary): ThoughtSummary {
     return { subject: '', description: '' };
   }
 
-  if (description.length <= MAX_THOUGHT_SUMMARY_LENGTH) {
+  const descriptionGraphemes = splitGraphemes(description);
+  if (descriptionGraphemes.length <= MAX_THOUGHT_SUMMARY_LENGTH) {
     return { subject: description, description: '' };
   }
 
-  const trimmed = description
+  const trimmed = descriptionGraphemes
     .slice(0, MAX_THOUGHT_SUMMARY_LENGTH - 3)
+    .join('')
     .trimEnd();
   return { subject: `${trimmed}...`, description: '' };
 }

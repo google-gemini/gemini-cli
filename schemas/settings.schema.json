@@ -187,13 +187,6 @@
           "default": false,
           "type": "boolean"
         },
-        "showInlineThinking": {
-          "title": "Show Inline Thinking",
-          "description": "Show model thinking summaries inline in the conversation (deprecated; prefer the specific thinking modes).",
-          "markdownDescription": "Show model thinking summaries inline in the conversation (deprecated; prefer the specific thinking modes).\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
-          "type": "boolean"
-        },
         "showInlineThinkingFull": {
           "title": "Show Inline Thinking (Full)",
           "description": "Show full model thinking details inline.",

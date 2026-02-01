@@ -373,16 +373,6 @@ const SETTINGS_SCHEMA = {
         description: 'Hide the window title bar',
         showInDialog: true,
       },
-      showInlineThinking: {
-        type: 'boolean',
-        label: 'Show Inline Thinking',
-        category: 'UI',
-        requiresRestart: false,
-        default: false,
-        description:
-          'Show model thinking summaries inline in the conversation (deprecated; prefer the specific thinking modes).',
-        showInDialog: false,
-      },
       showInlineThinkingFull: {
         type: 'boolean',
         label: 'Show Inline Thinking (Full)',

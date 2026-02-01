@@ -179,17 +179,14 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
-- **`ui.showInlineThinking`** (boolean):
-  - **Description:** Show model thinking summaries inline in the conversation
-    (deprecated; prefer the specific thinking modes).
-  - **Default:** `false`
-
 - **`ui.showInlineThinkingFull`** (boolean):
-  - **Description:** Show full model thinking details inline.
+  - **Description:** Show full model thinking details inline. If both full and
+    summary modes are enabled, full mode takes precedence.
   - **Default:** `false`
 
 - **`ui.showInlineThinkingSummary`** (boolean):
-  - **Description:** Show a short summary of model thinking inline.
+  - **Description:** Show a short summary of model thinking inline. Summaries
+    truncate long content (about 140 characters) and append an ellipsis.
   - **Default:** `false`
 
 - **`ui.showStatusInTitle`** (boolean):
