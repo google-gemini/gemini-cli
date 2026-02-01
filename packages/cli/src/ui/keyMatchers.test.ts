@@ -281,8 +281,12 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.PASTE_CLIPBOARD,
-      positive: [createKey('v', { ctrl: true })],
-      negative: [createKey('v'), createKey('c', { ctrl: true })],
+      positive: [createKey('v', { ctrl: true }), createKey('v', { cmd: true })],
+      negative: [
+        createKey('v'),
+        createKey('v', { alt: true }),
+        createKey('c', { ctrl: true }),
+      ],
     },
 
     // App level bindings
@@ -331,6 +335,11 @@ describe('keyMatchers', () => {
         createKey('o', { ctrl: true }),
       ],
       negative: [createKey('s'), createKey('l', { ctrl: true })],
+    },
+    {
+      command: Command.VOICE_INPUT,
+      positive: [createKey('v', { alt: true })],
+      negative: [createKey('v'), createKey('v', { ctrl: true })],
     },
 
     // Shell commands

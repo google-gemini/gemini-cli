@@ -618,6 +618,27 @@ const SETTINGS_SCHEMA = {
     },
   },
 
+  voice: {
+    type: 'object',
+    label: 'Voice Input',
+    category: 'General',
+    requiresRestart: false,
+    default: {},
+    description: 'Settings for voice input.',
+    showInDialog: true,
+    properties: {
+      whisperPath: {
+        type: 'string',
+        label: 'Whisper Binary Path',
+        category: 'General',
+        requiresRestart: false,
+        default: undefined as string | undefined,
+        description: 'Path to the whisper executable (e.g. /path/to/whisper).',
+        showInDialog: true,
+      },
+    },
+  },
+
   ide: {
     type: 'object',
     label: 'IDE',

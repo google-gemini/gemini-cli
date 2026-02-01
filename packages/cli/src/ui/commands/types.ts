@@ -85,6 +85,7 @@ export interface CommandContext {
     addConfirmUpdateExtensionRequest: (value: ConfirmationRequest) => void;
     removeComponent: () => void;
     toggleBackgroundShell: () => void;
+    toggleVoice: () => void;
   };
   // Session-specific data
   session: {

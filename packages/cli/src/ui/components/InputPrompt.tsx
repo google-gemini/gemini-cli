@@ -65,6 +65,7 @@ import { useMouseClick } from '../hooks/useMouseClick.js';
 import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+import { useVoiceContext } from '../contexts/VoiceContext.js';
 
 /**
  * Returns if the terminal can be trusted to handle paste events atomically
@@ -239,6 +240,22 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     },
     [],
   );
+
+  // Voice input hook - MUST be before handleSubmit
+  const {
+    state: voiceState,
+    toggleRecording,
+    clearTranscript,
+  } = useVoiceContext();
+
+  // Handle voice transcript
+  useEffect(() => {
+    if (voiceState.transcript) {
+      // Insert transcribed text at cursor position
+      buffer.insert(voiceState.transcript);
+      clearTranscript();
+    }
+  }, [voiceState.transcript, buffer, clearTranscript]);
 
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {
@@ -482,14 +499,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return false;
       }
 
-      if (
-        key.name === 'escape' &&
-        (streamingState === StreamingState.Responding ||
-          streamingState === StreamingState.WaitingForConfirmation)
-      ) {
-        return false;
-      }
-
       if (key.name === 'paste') {
         // Record paste time to prevent accidental auto-submission
         if (!isTerminalPasteTrusted(kittyProtocol.enabled)) {
@@ -541,6 +550,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (keyMatchers[Command.ESCAPE](key)) {
+        if (voiceState.isRecording) {
+          void toggleRecording();
+          return true;
+        }
+
         const cancelSearch = (
           setActive: (active: boolean) => void,
           resetCompletion: () => void,
@@ -612,9 +626,22 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
+      if (keyMatchers[Command.QUIT](key)) {
+        if (voiceState.isRecording) {
+          void toggleRecording();
+          return true;
+        }
+        return false;
+      }
+
       if (keyMatchers[Command.CLEAR_SCREEN](key)) {
         setBannerVisible(false);
         onClearScreen();
+        return true;
+      }
+
+      if (keyMatchers[Command.VOICE_INPUT](key)) {
+        void toggleRecording();
         return true;
       }
 
@@ -985,7 +1012,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       backgroundShells.size,
       backgroundShellHeight,
       history,
-      streamingState,
+      toggleRecording,
     ],
   );
 
@@ -1166,6 +1193,18 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     statusText = 'Accepting edits';
   }
 
+  // Voice input status
+  if (voiceState.isRecording) {
+    statusColor = theme.status.error;
+    statusText = '🎤 Recording... (Alt+V or Ctrl+Q to stop)';
+  } else if (voiceState.isTranscribing) {
+    statusColor = theme.status.warning;
+    statusText = '🎤 Transcribing...';
+  } else if (voiceState.error) {
+    statusColor = theme.status.error;
+    statusText = `🎤 Error: ${voiceState.error}`;
+  }
+
   const suggestionsNode = shouldShowSuggestions ? (
     <Box paddingRight={2}>
       <SuggestionsDisplay
@@ -1250,6 +1289,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               <Text color={theme.text.accent}>(r:) </Text>
             ) : showYoloStyling ? (
               '*'
+            ) : voiceState.isRecording ? (
+              '🎤'
             ) : (
               '>'
             )}{' '}
