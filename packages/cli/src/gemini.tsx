@@ -524,12 +524,6 @@ export async function main() {
     const messageBus = config.getMessageBus();
     createPolicyUpdater(policyEngine, messageBus);
 
-    // Register SessionEnd hook to fire on graceful exit
-    // This runs before telemetry shutdown in runExitCleanup()
-    registerCleanup(async () => {
-      await config.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
-    });
-
     // Cleanup sessions after config initialization
     try {
       await cleanupExpiredSessions(config, settings.merged);
