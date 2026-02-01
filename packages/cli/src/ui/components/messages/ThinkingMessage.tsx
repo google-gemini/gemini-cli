@@ -25,6 +25,7 @@ export const ThinkingMessage: React.FC<ThinkingMessageProps> = ({
   const description = thought.description.trim();
   const headerText = subject || description;
   const bodyText = subject ? description : '';
+  const contentMaxWidth = Math.max(terminalWidth - 4, 1);
   const contentMaxHeight =
     availableTerminalHeight !== undefined
       ? Math.max(availableTerminalHeight - 4, MINIMUM_MAX_HEIGHT)
@@ -40,7 +41,7 @@ export const ThinkingMessage: React.FC<ThinkingMessageProps> = ({
     >
       <MaxSizedBox
         maxHeight={contentMaxHeight}
-        maxWidth={terminalWidth - 2}
+        maxWidth={contentMaxWidth}
         overflowDirection="top"
       >
         {headerText && (
