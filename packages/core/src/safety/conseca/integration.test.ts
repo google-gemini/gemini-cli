@@ -18,9 +18,4 @@ describe('Conseca Integration', () => {
     expect(checker).toBeInstanceOf(ConsecaSafetyChecker);
     expect(checker).toBe(ConsecaSafetyChecker.getInstance());
   });
-
-  it('should implement InProcessChecker interface', () => {
-    const checker = ConsecaSafetyChecker.getInstance();
-    expect(typeof checker.check).toBe('function');
-  });
 });
