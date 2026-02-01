@@ -180,13 +180,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`ui.showInlineThinkingFull`** (boolean):
-  - **Description:** Show full model thinking details inline. If both full and
-    summary modes are enabled, full mode takes precedence.
+  - **Description:** Show full model thinking details inline.
   - **Default:** `false`
 
 - **`ui.showInlineThinkingSummary`** (boolean):
-  - **Description:** Show a short summary of model thinking inline. Summaries
-    truncate long content (about 140 characters) and append an ellipsis.
+  - **Description:** Show a short summary of model thinking inline.
   - **Default:** `false`
 
 - **`ui.showStatusInTitle`** (boolean):
