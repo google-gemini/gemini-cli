@@ -456,7 +456,7 @@ describe('ReadManyFilesTool', () => {
       ).toBe(true);
       expect(result.returnDisplay).toContain('**Skipped 1 item(s):**');
       expect(result.returnDisplay).toContain(
-        '- `document.pdf` (Reason: asset file (image/pdf/audio) was not explicitly requested by name or extension)',
+        '- `document.pdf` (Reason: asset or binary file was not explicitly requested by name or extension)',
       );
     });
 
@@ -490,6 +490,20 @@ describe('ReadManyFilesTool', () => {
         },
         '\n--- End of content ---',
       ]);
+    });
+
+    it('should skip unsupported image files like gif even if requested (detected as binary)', async () => {
+      createBinaryFile('image.gif', Buffer.from('GIF89a...'));
+      const params = { include: ['image.gif'] };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.llmContent).toEqual([
+        'No files matching the criteria were found or all were skipped.',
+      ]);
+      expect(result.returnDisplay).toContain('**Skipped 1 item(s):**');
+      expect(result.returnDisplay).toContain(
+        '- `image.gif` (Reason: unsupported binary file type)',
+      );
     });
 
     it('should return error if path is ignored by a .geminiignore pattern', async () => {

@@ -18,6 +18,35 @@ import { debugLogger } from './debugLogger.js';
 
 const requireModule = createModuleRequire(import.meta.url);
 
+const SUPPORTED_IMAGE_MIME_TYPES = [
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+];
+
+const SUPPORTED_AUDIO_MIME_TYPES = [
+  'audio/wav',
+  'audio/mp3',
+  'audio/aiff',
+  'audio/aac',
+  'audio/ogg',
+  'audio/flac',
+];
+
+const SUPPORTED_VIDEO_MIME_TYPES = [
+  'video/mp4',
+  'video/mpeg',
+  'video/mov',
+  'video/avi',
+  'video/x-flv',
+  'video/mpg',
+  'video/webm',
+  'video/wmv',
+  'video/3gpp',
+];
+
 export async function readWasmBinaryFromDisk(
   specifier: string,
 ): Promise<Uint8Array> {
@@ -303,18 +332,20 @@ export async function detectFileType(
 
   const lookedUpMimeType = mime.getType(filePath); // Returns null if not found, or the mime type string
   if (lookedUpMimeType) {
-    if (lookedUpMimeType.startsWith('image/')) {
+    if (SUPPORTED_IMAGE_MIME_TYPES.includes(lookedUpMimeType)) {
       return 'image';
     }
     // Verify audio/video with content check to avoid MIME misidentification (#16888)
     if (
-      lookedUpMimeType.startsWith('audio/') ||
-      lookedUpMimeType.startsWith('video/')
+      SUPPORTED_AUDIO_MIME_TYPES.includes(lookedUpMimeType) ||
+      SUPPORTED_VIDEO_MIME_TYPES.includes(lookedUpMimeType)
     ) {
       if (!(await isBinaryFile(filePath))) {
         return 'text';
       }
-      return lookedUpMimeType.startsWith('audio/') ? 'audio' : 'video';
+      return SUPPORTED_AUDIO_MIME_TYPES.includes(lookedUpMimeType)
+        ? 'audio'
+        : 'video';
     }
     if (lookedUpMimeType === 'application/pdf') {
       return 'pdf';
