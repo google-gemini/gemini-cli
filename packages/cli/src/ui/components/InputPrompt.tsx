@@ -826,8 +826,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           return true;
         }
       } else {
-        // Shell History Navigation (only at edges, same as non-shell mode)
-        // Issue #17997: Allow cursor movement within wrapped text
+        // Issue #17997: Only trigger history at visual line boundaries
         if (
           keyMatchers[Command.NAVIGATION_UP](key) &&
           (buffer.allVisualLines.length === 1 ||

@@ -338,12 +338,10 @@ describe('InputPrompt', () => {
     unmount();
   });
 
-  it('should call buffer.handleInput for up arrow in SHELL MODE when cursor is NOT on first visual line of wrapped text (issue #17997)', async () => {
-    // This test reproduces issue #17997: in shell mode, up/down arrows should
-    // navigate within wrapped text, not just trigger history navigation
+  it('should move cursor within wrapped text on up arrow in shell mode (issue #17997)', async () => {
     props.shellModeActive = true;
     props.buffer.allVisualLines = ['This is a', 'very long', 'line'];
-    props.buffer.visualCursor = [2, 4]; // Cursor on 3rd visual line (not at top)
+    props.buffer.visualCursor = [2, 4]; // Not at top
     props.buffer.visualScrollRow = 0;
 
     const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
@@ -354,12 +352,32 @@ describe('InputPrompt', () => {
       stdin.write('\u001B[A'); // Up arrow
     });
 
-    // BUG: Currently this calls shellHistory.getPreviousCommand and returns early,
-    // even though cursor should move within the wrapped text
     await waitFor(() => {
       expect(props.buffer.handleInput).toHaveBeenCalled();
     });
     expect(mockShellHistory.getPreviousCommand).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('should move cursor within wrapped text on down arrow in shell mode (issue #17997)', async () => {
+    props.shellModeActive = true;
+    props.buffer.allVisualLines = ['This is a', 'very long', 'line'];
+    props.buffer.visualCursor = [0, 4]; // Not at bottom
+    props.buffer.visualScrollRow = 0;
+
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    await act(async () => {
+      stdin.write('\u001B[B'); // Down arrow
+    });
+
+    await waitFor(() => {
+      expect(props.buffer.handleInput).toHaveBeenCalled();
+    });
+    expect(mockShellHistory.getNextCommand).not.toHaveBeenCalled();
 
     unmount();
   });
