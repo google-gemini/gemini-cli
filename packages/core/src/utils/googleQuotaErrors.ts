@@ -256,18 +256,6 @@ export function classifyGoogleError(error: unknown): unknown {
       d['@type'] === 'type.googleapis.com/google.rpc.RetryInfo',
   );
 
-  // 1. Check for long-term limits in QuotaFailure or ErrorInfo
-  if (quotaFailure) {
-    for (const violation of quotaFailure.violations) {
-      const quotaId = violation.quotaId ?? '';
-      if (quotaId.includes('PerDay') || quotaId.includes('Daily')) {
-        return new TerminalQuotaError(
-          `You have exhausted your daily quota on this model.`,
-          googleApiError,
-        );
-      }
-    }
-  }
   let delaySeconds;
 
   if (retryInfo?.retryDelay) {
@@ -304,13 +292,26 @@ export function classifyGoogleError(error: unknown): unknown {
     }
   }
 
-  // 2. Check for delays in RetryInfo
+  // 1. Check for delays in RetryInfo - Prioritize this over long-term limits
   if (retryInfo?.retryDelay && delaySeconds) {
     return new RetryableQuotaError(
       `${googleApiError.message}\nSuggested retry after ${retryInfo.retryDelay}.`,
       googleApiError,
       delaySeconds,
     );
+  }
+
+  // 2. Check for long-term limits in QuotaFailure or ErrorInfo
+  if (quotaFailure) {
+    for (const violation of quotaFailure.violations) {
+      const quotaId = violation.quotaId ?? '';
+      if (quotaId.includes('PerDay') || quotaId.includes('Daily')) {
+        return new TerminalQuotaError(
+          `You have exhausted your daily quota on this model.`,
+          googleApiError,
+        );
+      }
+    }
   }
 
   // 3. Check for short-term limits in QuotaFailure or ErrorInfo

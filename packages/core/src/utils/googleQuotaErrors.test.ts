@@ -281,7 +281,7 @@ describe('classifyGoogleError', () => {
     expect(result).toBeInstanceOf(TerminalQuotaError);
   });
 
-  it('should prioritize daily limit over retry info', () => {
+  it('should prioritize retry info over daily limit', () => {
     const apiError: GoogleApiError = {
       code: 429,
       message: 'Quota exceeded',
@@ -304,7 +304,8 @@ describe('classifyGoogleError', () => {
     };
     vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
     const result = classifyGoogleError(new Error());
-    expect(result).toBeInstanceOf(TerminalQuotaError);
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+    expect((result as RetryableQuotaError).retryDelayMs).toBe(10000);
   });
 
   it('should return RetryableQuotaError for any 429', () => {
