@@ -885,7 +885,7 @@ export class GeminiChat {
       .trim();
 
     // Record model response text from the collected parts
-    if (responseText || hasToolCall) {
+    if (responseText) {
       this.chatRecordingService.recordMessage({
         model,
         type: 'gemini',
