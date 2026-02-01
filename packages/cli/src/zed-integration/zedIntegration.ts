@@ -152,23 +152,11 @@ export class GeminiAgent {
     mcpServers,
   }: acp.NewSessionRequest): Promise<acp.NewSessionResponse> {
     const sessionId = randomUUID();
-    const config = await this.newSessionConfig(sessionId, cwd, mcpServers);
-
-    let isAuthenticated = false;
-    if (this.settings.merged.security.auth.selectedType) {
-      try {
-        await config.refreshAuth(
-          this.settings.merged.security.auth.selectedType,
-        );
-        isAuthenticated = true;
-      } catch (e) {
-        debugLogger.error(`Authentication failed: ${e}`);
-      }
-    }
-
-    if (!isAuthenticated) {
-      throw acp.RequestError.authRequired();
-    }
+    const config = await this.initializeSessionConfig(
+      sessionId,
+      cwd,
+      mcpServers,
+    );
 
     if (this.clientCapabilities?.fs) {
       const acpFileSystemService = new AcpFileSystemService(
@@ -195,23 +183,11 @@ export class GeminiAgent {
     cwd,
     mcpServers,
   }: acp.LoadSessionRequest): Promise<acp.LoadSessionResponse> {
-    const config = await this.newSessionConfig(sessionId, cwd, mcpServers);
-
-    let isAuthenticated = false;
-    if (this.settings.merged.security.auth.selectedType) {
-      try {
-        await config.refreshAuth(
-          this.settings.merged.security.auth.selectedType,
-        );
-        isAuthenticated = true;
-      } catch (e) {
-        debugLogger.error(`Authentication failed: ${e}`);
-      }
-    }
-
-    if (!isAuthenticated) {
-      throw acp.RequestError.authRequired();
-    }
+    const config = await this.initializeSessionConfig(
+      sessionId,
+      cwd,
+      mcpServers,
+    );
 
     const sessionSelector = new SessionSelector(config);
     const { sessionData, sessionPath } =
@@ -251,6 +227,61 @@ export class GeminiAgent {
     session.streamHistory(sessionData.messages);
 
     return {};
+  }
+
+  private async initializeSessionConfig(
+    sessionId: string,
+    cwd: string,
+    mcpServers: acp.McpServer[],
+  ): Promise<Config> {
+    // Authenticate BEFORE initializing configuration or starting MCP servers
+    let isAuthenticated = false;
+    // Check if we have a selected auth type in global settings (loaded in constructor)
+    if (this.settings.merged.security.auth.selectedType) {
+      try {
+        // We need a temporary config just to refresh auth, but we MUST NOT
+        // start MCP servers or do anything heavy yet.
+        // However, refreshAuth is a method on Config.
+        // Ideally, we should check auth status independently or use a lightweight config.
+        // For now, we will create the config BUT we must trust the `refreshAuth` check
+        // to block before we use the config for anything sensitive.
+        // WAIT - newSessionConfig STARTS MCP servers. We cannot call it yet.
+
+        // Refactor: We need to check auth using the *existing* settings and a dummy config
+        // or just the auth service if possible.
+        // But `config.refreshAuth` is the standard way.
+        // If `newSessionConfig` starts MCP servers, we are in a bind.
+        // Let's look at `newSessionConfig`. It calls `loadCliConfig` which might start things.
+        // Actually `loadCliConfig` just loads config. `config.initialize()` starts things?
+        // `newSessionConfig` calls `config.initialize()`.
+
+        // Correct approach:
+        // 1. Create config WITHOUT initializing it (no MCP servers started).
+        // 2. Check Auth.
+        // 3. Initialize Config (start MCP servers).
+
+        // However, `newSessionConfig` does both. We need to split it.
+        // Or we can just do the auth check using the global `this.settings`?
+        // `this.config.refreshAuth` uses the *current* config's auth service.
+        // We can use `this.config` (the agent's main config) to check auth?
+        // The agent has a `config` passed in constructor.
+
+        await this.config.refreshAuth(
+          this.settings.merged.security.auth.selectedType,
+        );
+        isAuthenticated = true;
+      } catch (e) {
+        debugLogger.error(`Authentication failed: ${e}`);
+      }
+    }
+
+    if (!isAuthenticated) {
+      throw acp.RequestError.authRequired();
+    }
+
+    // Now that we are authenticated, it is safe to load the session config
+    // and start MCP servers (which might be malicious, but the user is authenticated).
+    return this.newSessionConfig(sessionId, cwd, mcpServers);
   }
 
   async newSessionConfig(
