@@ -365,12 +365,11 @@ export const useSlashCommandProcessor = (
       }
 
       let hasError = false;
-      const normalizedQuery = trimmed === '?' ? '?shortcuts' : trimmed;
       const {
         commandToExecute,
         args,
         canonicalPath: resolvedCommandPath,
-      } = parseSlashCommand(normalizedQuery, commands);
+      } = parseSlashCommand(trimmed, commands);
 
       const subcommand =
         resolvedCommandPath.length > 1

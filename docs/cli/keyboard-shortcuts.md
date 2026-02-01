@@ -127,6 +127,8 @@ available combinations.
 - `Option+B/F/M` (macOS only): Are interpreted as `Cmd+B/F/M` even if your
   terminal isn't configured to send Meta with Option.
 - `!` on an empty prompt: Enter or exit shell mode.
+- `?`: Toggle the shortcuts panel above the input. Press any key or `Esc` to
+  close it, and press `?` again to close and insert a `?` into the prompt.
 - `\` (at end of a line) + `Enter`: Insert a newline without leaving single-line
   mode.
 - `Esc` pressed twice quickly: Clear the input prompt if it is not empty,

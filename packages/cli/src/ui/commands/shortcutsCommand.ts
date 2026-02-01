@@ -9,7 +9,7 @@ import { CommandKind } from './types.js';
 
 export const shortcutsCommand: SlashCommand = {
   name: 'shortcuts',
-  altNames: ['keys', '?'],
+  altNames: [],
   kind: CommandKind.BUILT_IN,
   description: 'Toggle the shortcuts panel above the input',
   autoExecute: true,

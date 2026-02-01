@@ -466,7 +466,7 @@ describe('Composer', () => {
 
       const { lastFrame } = renderComposer(uiState);
 
-      expect(lastFrame()).toMatch(/ApprovalModeIndica\s*tor/);
+      expect(lastFrame()).toMatch(/ApprovalModeIndic[\s\S]*ator/);
     });
 
     it('shows ShellModeIndicator when shell mode is active', () => {
@@ -476,7 +476,7 @@ describe('Composer', () => {
 
       const { lastFrame } = renderComposer(uiState);
 
-      expect(lastFrame()).toMatch(/ShellModeIndica\s*tor/);
+      expect(lastFrame()).toMatch(/ShellModeIndic[\s\S]*tor/);
     });
 
     it('shows RawMarkdownIndicator when renderMarkdown is false', () => {

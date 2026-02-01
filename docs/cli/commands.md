@@ -113,9 +113,12 @@ Slash commands provide meta-level control over the CLI itself.
   - **Description:** Lists all active extensions in the current Gemini CLI
     session. See [Gemini CLI Extensions](../extensions/index.md).
 
-- **`/help`** (or **`/?`**)
+- **`/help`**
   - **Description:** Display help information about Gemini CLI, including
     available commands and their usage.
+
+- **`/shortcuts`**
+  - **Description:** Toggle the shortcuts panel above the input.
 
 - **`/hooks`**
   - **Description:** Manage hooks, which allow you to intercept and customize
