@@ -481,7 +481,6 @@ export interface ConfigParameters {
   skillsSupport?: boolean;
   disabledSkills?: string[];
   adminSkillsEnabled?: boolean;
-  enableModelAvailabilityService?: boolean;
   experimentalJitContext?: boolean;
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
@@ -838,13 +837,7 @@ export class Config {
     this.enablePromptCompletion = params.enablePromptCompletion ?? false;
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
-    this.hooks = params.hooks;
-    this.experiments = params.experiments;
     this.enableConseca = params.enableConseca ?? false;
-
-    if (params.contextFileName) {
-      setGeminiMdFilename(params.contextFileName);
-    }
 
     // Initialize Safety Infrastructure
     const contextBuilder = new ContextBuilder(this);
