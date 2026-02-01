@@ -88,9 +88,22 @@ describe('GeminiAgent Session Resume', () => {
           type: 'gemini',
           content: [{ text: 'Hi there' }],
           thoughts: [{ subject: 'Thinking', description: 'about greeting' }],
+          toolCalls: [
+            {
+              id: 'call-1',
+              name: 'test_tool',
+              displayName: 'Test Tool',
+              status: 'success',
+              resultDisplay: 'Tool output',
+            },
+          ],
         },
       ],
     };
+
+    mockConfig.getToolRegistry = vi.fn().mockReturnValue({
+      getTool: vi.fn().mockReturnValue({ kind: 'read' }),
+    });
 
     (SessionSelector as unknown as Mock).mockImplementation(() => ({
       resolveSession: vi.fn().mockResolvedValue({
@@ -141,6 +154,23 @@ describe('GeminiAgent Session Resume', () => {
           update: expect.objectContaining({
             sessionUpdate: 'agent_message_chunk',
             content: expect.objectContaining({ text: 'Hi there' }),
+          }),
+        }),
+      );
+      expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          update: expect.objectContaining({
+            sessionUpdate: 'tool_call',
+            toolCallId: 'call-1',
+            status: 'completed',
+            title: 'Test Tool',
+            kind: 'read',
+            content: [
+              {
+                type: 'content',
+                content: { type: 'text', text: 'Tool output' },
+              },
+            ],
           }),
         }),
       );

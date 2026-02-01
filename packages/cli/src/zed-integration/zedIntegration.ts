@@ -372,13 +372,32 @@ export class Session {
         // Tool calls
         if (msg.toolCalls) {
           for (const toolCall of msg.toolCalls) {
+            const toolCallContent: acp.ToolCallContent[] = [];
+            if (toolCall.resultDisplay) {
+              if (typeof toolCall.resultDisplay === 'string') {
+                toolCallContent.push({
+                  type: 'content',
+                  content: { type: 'text', text: toolCall.resultDisplay },
+                });
+              } else if ('fileName' in toolCall.resultDisplay) {
+                toolCallContent.push({
+                  type: 'diff',
+                  path: toolCall.resultDisplay.fileName,
+                  oldText: toolCall.resultDisplay.originalContent,
+                  newText: toolCall.resultDisplay.newContent,
+                });
+              }
+            }
+
+            const tool = this.config.getToolRegistry().getTool(toolCall.name);
+
             await this.sendUpdate({
               sessionUpdate: 'tool_call',
               toolCallId: toolCall.id,
               status: toolCall.status === 'success' ? 'completed' : 'failed',
               title: toolCall.displayName || toolCall.name,
-              content: [], // We could potentially reconstruct content here if needed
-              kind: 'other', // We don't have Kind here easily without re-resolving tools
+              content: toolCallContent,
+              kind: tool ? toAcpToolKind(tool.kind) : 'other',
             });
           }
         }
