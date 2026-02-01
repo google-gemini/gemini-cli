@@ -338,7 +338,7 @@ describe('InputPrompt', () => {
     unmount();
   });
 
-  it('should move cursor within wrapped text on up arrow in shell mode (issue #17997)', async () => {
+  it('should move cursor within wrapped text on up arrow in shell mode', async () => {
     props.shellModeActive = true;
     props.buffer.allVisualLines = ['This is a', 'very long', 'line'];
     props.buffer.visualCursor = [2, 4]; // Not at top
@@ -360,7 +360,7 @@ describe('InputPrompt', () => {
     unmount();
   });
 
-  it('should move cursor within wrapped text on down arrow in shell mode (issue #17997)', async () => {
+  it('should move cursor within wrapped text on down arrow in shell mode', async () => {
     props.shellModeActive = true;
     props.buffer.allVisualLines = ['This is a', 'very long', 'line'];
     props.buffer.visualCursor = [0, 4]; // Not at bottom

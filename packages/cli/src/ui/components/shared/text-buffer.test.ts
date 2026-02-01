@@ -1217,7 +1217,6 @@ describe('useTextBuffer', () => {
     });
 
     it('move: up/down should work on a single logical line that wraps to multiple visual lines', () => {
-      // Issue #17997: up/down arrows do not work for word-wrapped lines
       // Create a single logical line that wraps to multiple visual lines
       // With viewport width 10, "This is a very long line" should wrap to:
       // "This is a"
@@ -1260,7 +1259,7 @@ describe('useTextBuffer', () => {
     });
 
     it('move: up/down should work after typing text that wraps (via insert)', () => {
-      // Issue #17997: Test that up/down work correctly after typing (not just initial text)
+      // Test that up/down work correctly after typing (not just initial text)
       const { result } = renderHook(() =>
         useTextBuffer({
           initialText: '',
