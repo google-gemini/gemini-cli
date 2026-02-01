@@ -826,13 +826,22 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           return true;
         }
       } else {
-        // Shell History Navigation
-        if (keyMatchers[Command.NAVIGATION_UP](key)) {
+        // Shell History Navigation (only at edges, same as non-shell mode)
+        // Issue #17997: Allow cursor movement within wrapped text
+        if (
+          keyMatchers[Command.NAVIGATION_UP](key) &&
+          (buffer.allVisualLines.length === 1 ||
+            (buffer.visualCursor[0] === 0 && buffer.visualScrollRow === 0))
+        ) {
           const prevCommand = shellHistory.getPreviousCommand();
           if (prevCommand !== null) buffer.setText(prevCommand);
           return true;
         }
-        if (keyMatchers[Command.NAVIGATION_DOWN](key)) {
+        if (
+          keyMatchers[Command.NAVIGATION_DOWN](key) &&
+          (buffer.allVisualLines.length === 1 ||
+            buffer.visualCursor[0] === buffer.allVisualLines.length - 1)
+        ) {
           const nextCommand = shellHistory.getNextCommand();
           if (nextCommand !== null) buffer.setText(nextCommand);
           return true;
