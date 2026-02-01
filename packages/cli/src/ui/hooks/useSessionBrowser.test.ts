@@ -24,7 +24,14 @@ import { coreEvents } from '@google/gemini-cli-core';
 // Mock modules
 vi.mock('fs/promises');
 vi.mock('path');
-vi.mock('../../utils/sessionUtils.js');
+vi.mock('../../utils/sessionUtils.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../utils/sessionUtils.js')>();
+  return {
+    ...actual,
+    getSessionFiles: vi.fn(),
+  };
+});
 
 const MOCKED_PROJECT_TEMP_DIR = '/test/project/temp';
 const MOCKED_CHATS_DIR = '/test/project/temp/chats';
