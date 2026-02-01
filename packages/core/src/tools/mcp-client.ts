@@ -973,14 +973,6 @@ export async function connectAndDiscover(
     }
     toolRegistry.sortTools();
   } catch (error) {
-    // Close transport to prevent memory leaks
-    if (transport) {
-      try {
-        await transport.close();
-      } catch {
-        // Ignore errors when closing transport
-      }
-    }
     if (mcpClient) {
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
       mcpClient.close();
