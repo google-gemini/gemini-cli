@@ -273,6 +273,7 @@ describe('Session', () => {
     mockChat = {
       sendMessageStream: vi.fn(),
       addHistory: vi.fn(),
+      recordCompletedToolCalls: vi.fn(),
     } as unknown as Mocked<GeminiChat>;
     mockTool = {
       kind: 'native',
@@ -293,6 +294,7 @@ describe('Session', () => {
     } as unknown as Mocked<MessageBus>;
     mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getActiveModel: vi.fn().mockReturnValue('gemini-pro'),
       getPreviewFeatures: vi.fn().mockReturnValue({}),
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
       getFileService: vi.fn().mockReturnValue({

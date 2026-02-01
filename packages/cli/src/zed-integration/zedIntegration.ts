@@ -674,6 +674,33 @@ export class Session {
         ),
       );
 
+      this.chat.recordCompletedToolCalls(this.config.getActiveModel(), [
+        {
+          status: 'success',
+          request: {
+            callId,
+            name: fc.name,
+            args,
+            isClientInitiated: false,
+            prompt_id: promptId,
+          },
+          tool,
+          invocation,
+          response: {
+            callId,
+            responseParts: convertToFunctionResponse(
+              fc.name,
+              callId,
+              toolResult.llmContent,
+              this.config.getActiveModel(),
+            ),
+            resultDisplay: toolResult.returnDisplay,
+            error: undefined,
+            errorType: undefined,
+          },
+        },
+      ]);
+
       return convertToFunctionResponse(
         fc.name,
         callId,
@@ -691,6 +718,35 @@ export class Session {
           { type: 'content', content: { type: 'text', text: error.message } },
         ],
       });
+
+      this.chat.recordCompletedToolCalls(this.config.getActiveModel(), [
+        {
+          status: 'error',
+          request: {
+            callId,
+            name: fc.name,
+            args,
+            isClientInitiated: false,
+            prompt_id: promptId,
+          },
+          tool,
+          response: {
+            callId,
+            responseParts: [
+              {
+                functionResponse: {
+                  id: callId,
+                  name: fc.name ?? '',
+                  response: { error: error.message },
+                },
+              },
+            ],
+            resultDisplay: error.message,
+            error,
+            errorType: undefined,
+          },
+        },
+      ]);
 
       return errorResponse(error);
     }

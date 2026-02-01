@@ -27,10 +27,15 @@ vi.mock('../config/config.js', () => ({
   loadCliConfig: vi.fn(),
 }));
 
-vi.mock('../utils/sessionUtils.js', () => ({
-  SessionSelector: vi.fn(),
-  convertSessionToHistoryFormats: vi.fn(),
-}));
+vi.mock('../utils/sessionUtils.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../utils/sessionUtils.js')>();
+  return {
+    ...actual,
+    SessionSelector: vi.fn(),
+    convertSessionToHistoryFormats: vi.fn(),
+  };
+});
 
 describe('GeminiAgent Session Resume', () => {
   let mockConfig: Mocked<Config>;
@@ -78,7 +83,7 @@ describe('GeminiAgent Session Resume', () => {
     expect(response.agentCapabilities?.loadSession).toBe(true);
   });
 
-  it('should load an existing session and stream history', async () => {
+  it('should load a session, resume chat, and stream all message types', async () => {
     const sessionId = 'existing-session-id';
     const sessionData = {
       sessionId,
@@ -98,6 +103,19 @@ describe('GeminiAgent Session Resume', () => {
             },
           ],
         },
+        {
+          type: 'gemini',
+          content: [{ text: 'Trying a write' }],
+          toolCalls: [
+            {
+              id: 'call-2',
+              name: 'write_file',
+              displayName: 'Write File',
+              status: 'error',
+              resultDisplay: 'Permission denied',
+            },
+          ],
+        },
       ],
     };
 
@@ -112,8 +130,12 @@ describe('GeminiAgent Session Resume', () => {
       }),
     }));
 
+    const mockClientHistory = [
+      { role: 'user', parts: [{ text: 'Hello' }] },
+      { role: 'model', parts: [{ text: 'Hi there' }] },
+    ];
     (convertSessionToHistoryFormats as unknown as Mock).mockReturnValue({
-      clientHistory: [],
+      clientHistory: mockClientHistory,
       uiHistory: [],
     });
 
@@ -124,13 +146,18 @@ describe('GeminiAgent Session Resume', () => {
     });
 
     expect(response).toEqual({});
-    expect(mockConfig.getGeminiClient().resumeChat).toHaveBeenCalled();
 
-    // Verify history streaming (it's called async, so we might need to wait or use a spy on Session)
-    // In this case, we can verify mockConnection.sessionUpdate calls.
-    // Since it's not awaited in loadSession, we might need a small delay or use vi.waitFor
+    // Verify resumeChat received the correct arguments
+    expect(mockConfig.getGeminiClient().resumeChat).toHaveBeenCalledWith(
+      mockClientHistory,
+      expect.objectContaining({
+        conversation: sessionData,
+        filePath: '/path/to/session.json',
+      }),
+    );
 
     await vi.waitFor(() => {
+      // User message
       expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
           update: expect.objectContaining({
@@ -139,6 +166,8 @@ describe('GeminiAgent Session Resume', () => {
           }),
         }),
       );
+
+      // Agent thought
       expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
           update: expect.objectContaining({
@@ -149,6 +178,8 @@ describe('GeminiAgent Session Resume', () => {
           }),
         }),
       );
+
+      // Agent message
       expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
           update: expect.objectContaining({
@@ -157,6 +188,8 @@ describe('GeminiAgent Session Resume', () => {
           }),
         }),
       );
+
+      // Successful tool call → 'completed'
       expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
           update: expect.objectContaining({
@@ -171,6 +204,18 @@ describe('GeminiAgent Session Resume', () => {
                 content: { type: 'text', text: 'Tool output' },
               },
             ],
+          }),
+        }),
+      );
+
+      // Failed tool call → 'failed'
+      expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          update: expect.objectContaining({
+            sessionUpdate: 'tool_call',
+            toolCallId: 'call-2',
+            status: 'failed',
+            title: 'Write File',
           }),
         }),
       );
