@@ -180,7 +180,16 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`ui.showInlineThinking`** (boolean):
-  - **Description:** Show model thinking summaries inline in the conversation.
+  - **Description:** Show model thinking summaries inline in the conversation
+    (deprecated; prefer the specific thinking modes).
+  - **Default:** `false`
+
+- **`ui.showInlineThinkingFull`** (boolean):
+  - **Description:** Show full model thinking details inline.
+  - **Default:** `false`
+
+- **`ui.showInlineThinkingSummary`** (boolean):
+  - **Description:** Show a short summary of model thinking inline.
   - **Default:** `false`
 
 - **`ui.showStatusInTitle`** (boolean):

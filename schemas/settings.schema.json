@@ -189,8 +189,22 @@
         },
         "showInlineThinking": {
           "title": "Show Inline Thinking",
-          "description": "Show model thinking summaries inline in the conversation.",
-          "markdownDescription": "Show model thinking summaries inline in the conversation.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "description": "Show model thinking summaries inline in the conversation (deprecated; prefer the specific thinking modes).",
+          "markdownDescription": "Show model thinking summaries inline in the conversation (deprecated; prefer the specific thinking modes).\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "showInlineThinkingFull": {
+          "title": "Show Inline Thinking (Full)",
+          "description": "Show full model thinking details inline.",
+          "markdownDescription": "Show full model thinking details inline.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "showInlineThinkingSummary": {
+          "title": "Show Inline Thinking (Summary)",
+          "description": "Show a short summary of model thinking inline.",
+          "markdownDescription": "Show a short summary of model thinking inline.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
