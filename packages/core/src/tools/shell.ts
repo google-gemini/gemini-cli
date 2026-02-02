@@ -559,11 +559,13 @@ export class ShellTool extends BaseDeclarativeTool<
   ): ToolInvocation<ShellToolParams, ToolResult> {
     // In YOLO mode, force npx to be non-interactive to prevent blocking
     if (this.config.getApprovalMode() === ApprovalMode.YOLO) {
-      if (
-        /^npx\b/.test(params.command) &&
-        !/\s(-y|--yes)\b/.test(params.command)
-      ) {
-        params.command = params.command.replace(/^npx\b/, 'npx -y');
+      if (/^npx\b/.test(params.command)) {
+        const cmd = params.command;
+        const npxArgsEnd = cmd.indexOf(' -- ');
+        const npxPart = npxArgsEnd === -1 ? cmd : cmd.substring(0, npxArgsEnd);
+        if (!/\s(-y|--yes)\b/.test(npxPart)) {
+          params.command = cmd.replace(/^npx\b/, 'npx -y');
+        }
       }
     }
 

@@ -266,6 +266,14 @@ describe('ShellTool', () => {
       const invocation = shellTool.build({ command: 'npx my-package' });
       expect(invocation.params.command).toBe('npx my-package');
     });
+
+    it('should inject -y even if --yes is present after --', () => {
+      (mockConfig.getApprovalMode as Mock).mockReturnValue('yolo');
+      const invocation = shellTool.build({
+        command: 'npx my-package -- --yes',
+      });
+      expect(invocation.params.command).toBe('npx -y my-package -- --yes');
+    });
   });
 
   describe('execute', () => {
