@@ -141,7 +141,7 @@ function formatEnvContent(settings: Record<string, string>): string {
       );
     }
     const formattedValue = value.includes(' ')
-      ? `"${value.replace(/"/g, '\\"')}"`
+      ? `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
       : value;
     envContent += `${key}=${formattedValue}\n`;
   }
