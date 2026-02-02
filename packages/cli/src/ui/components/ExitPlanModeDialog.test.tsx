@@ -9,14 +9,25 @@ import { act } from 'react';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { ExitPlanModeDialog } from './ExitPlanModeDialog.js';
-import { ApprovalMode } from '@google/gemini-cli-core';
+import { ApprovalMode, validatePlanContent } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    validatePlanPath: vi.fn(() => null),
+    validatePlanContent: vi.fn(async () => null),
+  };
+});
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof fs>();
   return {
     ...actual,
     existsSync: vi.fn(),
+    realpathSync: vi.fn((p) => p),
     promises: {
       ...actual.promises,
       readFile: vi.fn(),
@@ -31,6 +42,10 @@ const writeKey = (stdin: { write: (data: string) => void }, key: string) => {
 };
 
 describe('ExitPlanModeDialog', () => {
+  const mockTargetDir = '/mock/project';
+  const mockPlansDir = '/mock/project/plans';
+  const mockPlanFullPath = '/mock/project/plans/test-plan.md';
+
   const samplePlanContent = `## Overview
 
 Add user authentication to the CLI application.
@@ -91,6 +106,7 @@ Implement a comprehensive authentication system with multiple providers.
   beforeEach(() => {
     vi.mocked(fs.promises.readFile).mockResolvedValue(samplePlanContent);
     vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.realpathSync).mockImplementation((p) => p as string);
     onApprove = vi.fn();
     onFeedback = vi.fn();
     onCancel = vi.fn();
@@ -103,14 +119,24 @@ Implement a comprehensive authentication system with multiple providers.
   const renderDialog = (options?: { useAlternateBuffer?: boolean }) =>
     renderWithProviders(
       <ExitPlanModeDialog
-        planPath="/mock/plans/test-plan.md"
+        planPath={mockPlanFullPath}
         onApprove={onApprove}
         onFeedback={onFeedback}
         onCancel={onCancel}
         width={80}
         availableHeight={24}
       />,
-      options,
+      {
+        ...options,
+        config: {
+          getTargetDir: () => mockTargetDir,
+          getIdeMode: () => false,
+          isTrustedFolder: () => true,
+          storage: {
+            getProjectTempPlansDir: () => mockPlansDir,
+          },
+        } as unknown as import('@google/gemini-cli-core').Config,
+      },
     );
 
   describe.each([{ useAlternateBuffer: true }, { useAlternateBuffer: false }])(
@@ -125,7 +151,7 @@ Implement a comprehensive authentication system with multiple providers.
 
         await waitFor(() => {
           expect(fs.promises.readFile).toHaveBeenCalledWith(
-            '/mock/plans/test-plan.md',
+            mockPlanFullPath,
             'utf8',
           );
         });
@@ -216,6 +242,18 @@ Implement a comprehensive authentication system with multiple providers.
         });
 
         expect(lastFrame()).toMatchSnapshot();
+      });
+
+      it('displays error state when plan file is empty', async () => {
+        vi.mocked(validatePlanContent).mockResolvedValue('Plan file is empty.');
+
+        const { lastFrame } = renderDialog({ useAlternateBuffer });
+
+        await waitFor(() => {
+          expect(lastFrame()).toContain(
+            'Error reading plan: Plan file is empty.',
+          );
+        });
       });
 
       it('handles long plan content appropriately', async () => {

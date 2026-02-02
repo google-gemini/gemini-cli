@@ -15,7 +15,7 @@ import {
 } from 'react';
 import { Box, Text } from 'ink';
 import * as fs from 'node:fs';
-import { ApprovalMode } from '@google/gemini-cli-core';
+import { ApprovalMode , validatePlanPath, validatePlanContent } from '@google/gemini-cli-core';
 import { theme } from '../semantic-colors.js';
 import { MarkdownDisplay } from '../utils/MarkdownDisplay.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
@@ -29,6 +29,7 @@ import { checkExhaustive } from '../../utils/checks.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { MaxSizedBox } from './shared/MaxSizedBox.js';
 import { UIStateContext } from '../contexts/UIStateContext.js';
+import { useConfig } from '../contexts/ConfigContext.js';
 
 /**
  * Layout constants for the dialog.
@@ -118,6 +119,7 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
       ? (uiState?.availableTerminalHeight ?? uiState?.terminalHeight)
       : undefined);
 
+  const config = useConfig();
   const [planState, setPlanState] = useState<PlanContentState>({
     status: 'loading',
   });
@@ -126,10 +128,28 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
   useEffect(() => {
     let ignore = false;
 
-    fs.promises
-      .readFile(planPath, 'utf8')
-      .then((content) => {
+    const pathError = validatePlanPath(
+      planPath,
+      config.storage.getProjectTempPlansDir(),
+      config.getTargetDir(),
+    );
+
+    if (pathError) {
+      setPlanState({ status: 'error', error: pathError });
+      return;
+    }
+
+    validatePlanContent(planPath)
+      .then((contentError) => {
         if (ignore) return;
+        if (contentError) {
+          setPlanState({ status: 'error', error: contentError });
+          return;
+        }
+        return fs.promises.readFile(planPath, 'utf8');
+      })
+      .then((content) => {
+        if (ignore || !content) return;
         setPlanState({ status: 'loaded', content });
       })
       .catch((err) => {
@@ -140,7 +160,7 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
     return () => {
       ignore = true;
     };
-  }, [planPath]);
+  }, [planPath, config]);
 
   const feedbackBuffer = useTextBuffer({
     initialText: '',
