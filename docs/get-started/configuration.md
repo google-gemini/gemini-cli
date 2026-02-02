@@ -728,12 +728,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
-- **`tools.enableHooks`** (boolean):
-  - **Description:** Enables the hooks system experiment. When disabled, the
-    hooks system is completely deactivated regardless of other settings.
-  - **Default:** `true`
-  - **Requires restart:** Yes
-
 #### `mcp`
 
 - **`mcp.serverCommand`** (string):
@@ -772,6 +766,13 @@ their corresponding top-level category object in your `settings.json` file.
 - **`security.blockGitExtensions`** (boolean):
   - **Description:** Blocks installing and loading extensions from Git.
   - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`security.allowedExtensions`** (array):
+  - **Description:** List of Regex patterns for allowed extensions. If nonempty,
+    only extensions that match the patterns in this list are allowed. Overrides
+    the blockGitExtensions setting.
+  - **Default:** `[]`
   - **Requires restart:** Yes
 
 - **`security.folderTrust.enabled`** (boolean):
@@ -1180,6 +1181,10 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - **Description:** The path to your Google Application Credentials JSON file.
   - **Example:**
     `export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/credentials.json"`
+- **`GOOGLE_GENAI_API_VERSION`**:
+  - Specifies the API version to use for Gemini API requests.
+  - When set, overrides the default API version used by the SDK.
+  - Example: `export GOOGLE_GENAI_API_VERSION="v1"`
 - **`OTLP_GOOGLE_CLOUD_PROJECT`**:
   - Your Google Cloud Project ID for Telemetry in Google Cloud
   - Example: `export OTLP_GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"`.
