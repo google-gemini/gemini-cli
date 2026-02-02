@@ -8,6 +8,7 @@ import {
   ACTIVATE_SKILL_TOOL_NAME,
   ASK_USER_TOOL_NAME,
   EDIT_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
   MEMORY_TOOL_NAME,
@@ -329,9 +330,9 @@ ${options.planModeToolsList}
 - After saving the plan, present the full content of the markdown file to the user for review
 
 ### Phase 4: Review & Approval
-- Ask the user if they approve the plan, want revisions, or want to reject it
-- Address feedback and iterate as needed
-- **When the user approves the plan**, prompt them to switch out of Plan Mode to begin implementation by pressing Shift+Tab to cycle to a different approval mode
+- Present the plan and request approval using \`${EXIT_PLAN_MODE_TOOL_NAME}\` tool
+- If plan is approved, you can begin implementation
+- If plan is rejected, address the feedback and iterate on the plan
 
 ## Constraints
 - You may ONLY use the read-only tools listed above
