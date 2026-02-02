@@ -15,7 +15,6 @@ const mockWrite = vi.fn();
 const mockSubscribe = vi.fn();
 const mockUnsubscribe = vi.fn();
 const mockHandleThemeSelect = vi.fn();
-const mockSetTerminalBackground = vi.fn();
 
 vi.mock('ink', async () => ({
   useStdout: () => ({
@@ -70,12 +69,15 @@ describe('useTerminalTheme', () => {
     config = makeFakeConfig({
       targetDir: os.tmpdir(),
     });
-    config.setTerminalBackground = mockSetTerminalBackground;
+    // Set initial background to ensure the hook passes the startup check.
+    config.setTerminalBackground('#000000');
+    // Spy on future updates.
+    vi.spyOn(config, 'setTerminalBackground');
+
     mockWrite.mockClear();
     mockSubscribe.mockClear();
     mockUnsubscribe.mockClear();
     mockHandleThemeSelect.mockClear();
-    mockSetTerminalBackground.mockClear();
     // Reset any settings modifications
     mockSettings.merged.ui.autoThemeSwitching = true;
     mockSettings.merged.ui.theme = 'default';
@@ -107,37 +109,13 @@ describe('useTerminalTheme', () => {
     expect(mockWrite).toHaveBeenCalledWith('\x1b]11;?\x1b\\');
   });
 
-  it('should stop polling after 1 unacknowledged attempt', () => {
+  it('should not poll if terminal background is undefined at startup', () => {
+    config.getTerminalBackground = vi.fn().mockReturnValue(undefined);
     renderHook(() => useTerminalTheme(mockHandleThemeSelect, config));
 
-    // Attempt 1
+    // Poll should not happen
     vi.advanceTimersByTime(60000);
-    expect(mockWrite).toHaveBeenCalledTimes(1);
-
-    // Attempt 2 (should be blocked)
-    vi.advanceTimersByTime(60000);
-    expect(mockWrite).toHaveBeenCalledTimes(1);
-  });
-
-  it('should reset failure count after successful response', () => {
-    renderHook(() => useTerminalTheme(mockHandleThemeSelect, config));
-
-    const handler = mockSubscribe.mock.calls[0][0];
-
-    // Attempt 1
-    vi.advanceTimersByTime(60000);
-    expect(mockWrite).toHaveBeenCalledTimes(1);
-
-    // Succeed
-    handler('rgb:ffff/ffff/ffff');
-
-    // Should continue polling (Attempt 1 after reset)
-    vi.advanceTimersByTime(60000);
-    expect(mockWrite).toHaveBeenCalledTimes(2);
-
-    // Attempt 2 after reset (should be blocked)
-    vi.advanceTimersByTime(60000);
-    expect(mockWrite).toHaveBeenCalledTimes(2);
+    expect(mockWrite).not.toHaveBeenCalled();
   });
 
   it('should switch to light theme when background is light', () => {
@@ -148,7 +126,7 @@ describe('useTerminalTheme', () => {
     // Simulate light background response (white)
     handler('rgb:ffff/ffff/ffff');
 
-    expect(mockSetTerminalBackground).toHaveBeenCalledWith('#ffffff');
+    expect(config.setTerminalBackground).toHaveBeenCalledWith('#ffffff');
     expect(mockHandleThemeSelect).toHaveBeenCalledWith(
       'default-light',
       expect.anything(),
@@ -166,7 +144,7 @@ describe('useTerminalTheme', () => {
     // Simulate dark background response (black)
     handler('rgb:0000/0000/0000');
 
-    expect(mockSetTerminalBackground).toHaveBeenCalledWith('#000000');
+    expect(config.setTerminalBackground).toHaveBeenCalledWith('#000000');
     expect(mockHandleThemeSelect).toHaveBeenCalledWith(
       'default',
       expect.anything(),

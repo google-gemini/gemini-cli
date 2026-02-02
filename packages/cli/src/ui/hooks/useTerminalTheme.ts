@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useStdout } from 'ink';
 import {
   getLuminance,
@@ -26,11 +26,14 @@ export function useTerminalTheme(
   const { stdout } = useStdout();
   const settings = useSettings();
   const { subscribe, unsubscribe } = useTerminalContext();
-  const unacknowledgedPolls = useRef(0);
 
   useEffect(() => {
-    // Check if auto-switching is enabled
     if (settings.merged.ui.autoThemeSwitching === false) {
+      return;
+    }
+
+    // Only poll for changes to the terminal background if a terminal background was detected at startup.
+    if (config.getTerminalBackground() === undefined) {
       return;
     }
 
@@ -41,20 +44,10 @@ export function useTerminalTheme(
         return;
       }
 
-      // Stop polling if the terminal isn't responding even once.
-      if (unacknowledgedPolls.current >= 1) {
-        clearInterval(pollIntervalId);
-        return;
-      }
-
-      unacknowledgedPolls.current += 1;
       stdout.write('\x1b]11;?\x1b\\');
     }, settings.merged.ui.terminalBackgroundPollingInterval * 1000);
 
     const handleTerminalBackground = (colorStr: string) => {
-      // Reset the counter since we got a response
-      unacknowledgedPolls.current = 0;
-
       // Parse the response "rgb:rrrr/gggg/bbbb"
       const match =
         /^rgb:([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})$/.exec(
