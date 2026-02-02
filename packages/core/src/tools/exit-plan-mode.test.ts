@@ -19,6 +19,7 @@ vi.mock('node:fs', async (importOriginal) => {
   return {
     ...actual,
     existsSync: vi.fn(),
+    realpathSync: vi.fn((p) => p),
     promises: {
       ...actual.promises,
       readFile: vi.fn(),
@@ -325,6 +326,24 @@ Ask the user for specific feedback on how to improve the plan.`,
         plan_path: 'plans/ghost.md',
       });
       expect(result).toContain('Plan file does not exist');
+    });
+
+    it('should reject symbolic links pointing outside the plans directory', () => {
+      const maliciousPath = 'plans/malicious.md';
+      const resolvedMaliciousPath = path.resolve(mockTargetDir, maliciousPath);
+      const outsidePath = path.resolve('/etc/passwd');
+
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.realpathSync).mockImplementation((p) => {
+        if (p === resolvedMaliciousPath) return outsidePath;
+        return p as string;
+      });
+
+      const result = tool.validateToolParams({
+        plan_path: maliciousPath,
+      });
+
+      expect(result).toContain('Access denied');
     });
 
     it('should accept valid path within plans directory', () => {

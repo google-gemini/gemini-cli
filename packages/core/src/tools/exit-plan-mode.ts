@@ -79,8 +79,13 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
       this.config.getTargetDir(),
       params.plan_path,
     );
-    if (!isWithinRoot(resolvedPath, plansDir)) {
-      return `Access denied: plan path must be within the designated plans directory (${plansDir}).`;
+
+    const realPath = fs.existsSync(resolvedPath)
+      ? fs.realpathSync(resolvedPath)
+      : resolvedPath;
+
+    if (!isWithinRoot(realPath, plansDir)) {
+      return `Access denied: plan path must be within the designated plans directory.`;
     }
 
     if (!fs.existsSync(resolvedPath)) {
