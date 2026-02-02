@@ -435,32 +435,31 @@ export function setUpCloudShellEnvironment(
   // set by the user using "gcloud config set project" we do not want to
   // use its value. So, unless the user overrides GOOGLE_CLOUD_PROJECT in
   // one of the .env files, we set the Cloud Shell-specific default here.
+  let value = 'cloudshell-gca';
+
   if (envFilePath && fs.existsSync(envFilePath)) {
     const envFileContent = fs.readFileSync(envFilePath);
     const parsedEnv = dotenv.parse(envFileContent);
     if (parsedEnv['GOOGLE_CLOUD_PROJECT']) {
       // .env file takes precedence in Cloud Shell
-      let value = parsedEnv['GOOGLE_CLOUD_PROJECT'];
+      value = parsedEnv['GOOGLE_CLOUD_PROJECT'];
       if (!isTrusted && isSandboxed) {
         value = sanitizeEnvVar(value);
       }
-      process.env['GOOGLE_CLOUD_PROJECT'] = value;
-    } else {
-      // If not in .env, set to default and override global
-      process.env['GOOGLE_CLOUD_PROJECT'] = 'cloudshell-gca';
     }
-  } else {
-    // If no .env file, set to default and override global
-    process.env['GOOGLE_CLOUD_PROJECT'] = 'cloudshell-gca';
   }
+  process.env['GOOGLE_CLOUD_PROJECT'] = value;
 }
 
 export function loadEnvironment(settings: Settings): void {
   const envFilePath = findEnvFile(process.cwd());
 
-  const isTrusted = isWorkspaceTrusted(settings).isTrusted;
+  const isTrusted = isWorkspaceTrusted(settings).isTrusted ?? false;
   // Check settings OR check process.argv directly since this might be called
-  // before arguments are fully parsed.
+  // before arguments are fully parsed. This is a best-effort sniffing approach
+  // that happens early in the CLI lifecycle. It is designed to detect the
+  // sandbox flag before the full command-line parser is initialized to ensure
+  // security constraints are applied when loading environment variables.
   const args = process.argv.slice(2);
   const doubleDashIndex = args.indexOf('--');
   const relevantArgs =
@@ -477,11 +476,7 @@ export function loadEnvironment(settings: Settings): void {
 
   // Cloud Shell environment variable handling
   if (process.env['CLOUD_SHELL'] === 'true') {
-    setUpCloudShellEnvironment(
-      envFilePath,
-      isTrusted ?? false,
-      isSandboxed ?? false,
-    );
+    setUpCloudShellEnvironment(envFilePath, isTrusted, isSandboxed);
   }
 
   if (envFilePath) {

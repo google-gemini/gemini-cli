@@ -10,7 +10,7 @@ import type React from 'react';
 import { vi } from 'vitest';
 import { act, useState } from 'react';
 import os from 'node:os';
-import { LoadedSettings, type Settings } from '../config/settings.js';
+import { LoadedSettings } from '../config/settings.js';
 import { KeypressProvider } from '../ui/contexts/KeypressContext.js';
 import { SettingsContext } from '../ui/contexts/SettingsContext.js';
 import { ShellFocusContext } from '../ui/contexts/ShellFocusContext.js';
@@ -31,6 +31,7 @@ import { AskUserActionsProvider } from '../ui/contexts/AskUserActionsContext.js'
 import { makeFakeConfig, type Config } from '@google/gemini-cli-core';
 import { FakePersistentState } from './persistentStateFake.js';
 import { AppContext, type AppState } from '../ui/contexts/AppContext.js';
+import { createMockSettings } from './settings.js';
 
 export const persistentStateMock = new FakePersistentState();
 
@@ -133,20 +134,6 @@ export const mockSettings = new LoadedSettings(
   true,
   [],
 );
-
-export const createMockSettings = (
-  overrides: Partial<Settings>,
-): LoadedSettings => {
-  const settings = overrides as Settings;
-  return new LoadedSettings(
-    { path: '', settings: {}, originalSettings: {} },
-    { path: '', settings: {}, originalSettings: {} },
-    { path: '', settings, originalSettings: settings },
-    { path: '', settings: {}, originalSettings: {} },
-    true,
-    [],
-  );
-};
 
 // A minimal mock UIState to satisfy the context provider.
 // Tests that need specific UIState values should provide their own.

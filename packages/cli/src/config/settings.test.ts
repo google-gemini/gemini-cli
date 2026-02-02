@@ -67,7 +67,6 @@ import {
   getSystemDefaultsPath,
   type Settings,
   saveSettings,
-  type SettingsFile,
   getDefaultsFromSchema,
   loadEnvironment,
   migrateDeprecatedSettings,
@@ -82,6 +81,7 @@ import {
   MergeStrategy,
   type SettingsSchema,
 } from './settingsSchema.js';
+import { createMockSettings } from '../test-utils/settings.js';
 
 const MOCK_WORKSPACE_DIR = '/mock/workspace';
 // Use the (mocked) GEMINI_DIR for consistency
@@ -1910,29 +1910,7 @@ describe('Settings Loading and Merging', () => {
         },
       };
 
-      const loadedSettings = new LoadedSettings(
-        {
-          path: getSystemSettingsPath(),
-          settings: {},
-          originalSettings: {},
-        },
-        {
-          path: getSystemDefaultsPath(),
-          settings: {},
-          originalSettings: {},
-        },
-        {
-          path: USER_SETTINGS_PATH,
-          settings: userSettingsContent as unknown as Settings,
-          originalSettings: userSettingsContent as unknown as Settings,
-        },
-        {
-          path: MOCK_WORKSPACE_SETTINGS_PATH,
-          settings: {},
-          originalSettings: {},
-        },
-        true,
-      );
+      const loadedSettings = createMockSettings(userSettingsContent);
 
       const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
 
@@ -2101,11 +2079,8 @@ describe('Settings Loading and Merging', () => {
   describe('saveSettings', () => {
     it('should save settings using updateSettingsFilePreservingFormat', () => {
       const mockUpdateSettings = vi.mocked(updateSettingsFilePreservingFormat);
-      const settingsFile = {
-        path: '/mock/settings.json',
-        settings: { ui: { theme: 'dark' } },
-        originalSettings: { ui: { theme: 'dark' } },
-      } as unknown as SettingsFile;
+      const settingsFile = createMockSettings({ ui: { theme: 'dark' } }).user;
+      settingsFile.path = '/mock/settings.json';
 
       saveSettings(settingsFile);
 
@@ -2119,11 +2094,8 @@ describe('Settings Loading and Merging', () => {
       const mockFsMkdirSync = vi.mocked(fs.mkdirSync);
       mockFsExistsSync.mockReturnValue(false);
 
-      const settingsFile = {
-        path: '/mock/new/dir/settings.json',
-        settings: {},
-        originalSettings: {},
-      } as unknown as SettingsFile;
+      const settingsFile = createMockSettings({}).user;
+      settingsFile.path = '/mock/new/dir/settings.json';
 
       saveSettings(settingsFile);
 
@@ -2140,11 +2112,8 @@ describe('Settings Loading and Merging', () => {
         throw error;
       });
 
-      const settingsFile = {
-        path: '/mock/settings.json',
-        settings: {},
-        originalSettings: {},
-      } as unknown as SettingsFile;
+      const settingsFile = createMockSettings({}).user;
+      settingsFile.path = '/mock/settings.json';
 
       saveSettings(settingsFile);
 
@@ -2508,7 +2477,9 @@ describe('Settings Loading and Merging', () => {
           'FOO=bar\nGEMINI_API_KEY=secret',
         );
 
-        loadEnvironment({ tools: { sandbox: false } } as Settings);
+        loadEnvironment(
+          createMockSettings({ tools: { sandbox: false } }).merged,
+        );
 
         // If sandboxed and untrusted, FOO should NOT be loaded, but GEMINI_API_KEY should be.
         expect(process.env['FOO']).toBeUndefined();
@@ -2524,7 +2495,9 @@ describe('Settings Loading and Merging', () => {
         vi.mocked(fs.existsSync).mockReturnValue(true);
         vi.mocked(fs.readFileSync).mockReturnValue('GEMINI_API_KEY=secret');
 
-        loadEnvironment({ tools: { sandbox: false } } as Settings);
+        loadEnvironment(
+          createMockSettings({ tools: { sandbox: false } }).merged,
+        );
 
         expect(process.env['GEMINI_API_KEY']).toBe('secret');
       });
@@ -2540,7 +2513,9 @@ describe('Settings Loading and Merging', () => {
         );
         vi.mocked(fs.readFileSync).mockReturnValue('GEMINI_API_KEY=secret');
 
-        loadEnvironment({ tools: { sandbox: false } } as Settings);
+        loadEnvironment(
+          createMockSettings({ tools: { sandbox: false } }).merged,
+        );
 
         expect(process.env['GEMINI_API_KEY']).toBeUndefined();
       });
@@ -2556,7 +2531,9 @@ describe('Settings Loading and Merging', () => {
         );
         vi.mocked(fs.readFileSync).mockReturnValue('GEMINI_API_KEY=secret');
 
-        loadEnvironment({ tools: { sandbox: false } } as Settings);
+        loadEnvironment(
+          createMockSettings({ tools: { sandbox: false } }).merged,
+        );
 
         expect(process.env['GEMINI_API_KEY']).toBeUndefined();
       });
@@ -2578,7 +2555,9 @@ MALICIOUS_VAR=should-be-ignored
 GOOGLE_API_KEY=another-secret
     `);
 
-        loadEnvironment({ tools: { sandbox: false } } as Settings);
+        loadEnvironment(
+          createMockSettings({ tools: { sandbox: false } }).merged,
+        );
 
         expect(process.env['GEMINI_API_KEY']).toBe('secret-key');
         expect(process.env['GOOGLE_API_KEY']).toBe('another-secret');
@@ -2600,7 +2579,9 @@ GOOGLE_API_KEY=another-secret
           `GEMINI_API_KEY=${maliciousPayload}`,
         );
 
-        loadEnvironment({ tools: { sandbox: false } } as Settings);
+        loadEnvironment(
+          createMockSettings({ tools: { sandbox: false } }).merged,
+        );
 
         // sanitizeEnvVar: value.replace(/[^a-zA-Z0-9\-_./]/g, '')
         expect(process.env['GEMINI_API_KEY']).toBe('key-whoami-id-');
@@ -2621,7 +2602,9 @@ GOOGLE_API_KEY=another-secret
           `GEMINI_API_KEY=${complexPayload}`,
         );
 
-        loadEnvironment({ tools: { sandbox: false } } as Settings);
+        loadEnvironment(
+          createMockSettings({ tools: { sandbox: false } }).merged,
+        );
 
         expect(process.env['GEMINI_API_KEY']).toBe(
           'secret-123/path.to/somewhererm-rf/',
@@ -2638,7 +2621,9 @@ GOOGLE_API_KEY=another-secret
 
         vi.mocked(fs.readFileSync).mockReturnValue('FOO=$(bar)');
 
-        loadEnvironment({ tools: { sandbox: false } } as Settings);
+        loadEnvironment(
+          createMockSettings({ tools: { sandbox: false } }).merged,
+        );
 
         // Trusted source, no sanitization
         expect(process.env['FOO']).toBe('$(bar)');
@@ -2658,7 +2643,9 @@ GEMINI_API_KEY=un-sanitized;key!
 MALICIOUS_VAR=allowed-because-trusted
     `);
 
-        loadEnvironment({ tools: { sandbox: false } } as Settings);
+        loadEnvironment(
+          createMockSettings({ tools: { sandbox: false } }).merged,
+        );
 
         expect(process.env['GEMINI_API_KEY']).toBe('un-sanitized;key!');
         expect(process.env['MALICIOUS_VAR']).toBe('allowed-because-trusted');
@@ -2684,7 +2671,9 @@ MALICIOUS_VAR=allowed-because-trusted
         // No .env file
         vi.mocked(fs.existsSync).mockReturnValue(false);
 
-        loadEnvironment({ tools: { sandbox: false } } as Settings);
+        loadEnvironment(
+          createMockSettings({ tools: { sandbox: false } }).merged,
+        );
 
         expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe('cloudshell-gca');
       });
@@ -2701,7 +2690,9 @@ MALICIOUS_VAR=allowed-because-trusted
           'GOOGLE_CLOUD_PROJECT=attacker-project;inject',
         );
 
-        loadEnvironment({ tools: { sandbox: false } } as Settings);
+        loadEnvironment(
+          createMockSettings({ tools: { sandbox: false } }).merged,
+        );
 
         expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe(
           'attacker-projectinject',

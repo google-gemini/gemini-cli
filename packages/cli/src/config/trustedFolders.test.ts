@@ -30,11 +30,8 @@ import {
   isWorkspaceTrusted,
   resetTrustedFoldersForTesting,
 } from './trustedFolders.js';
-import {
-  loadEnvironment,
-  loadSettings,
-  getSettingsSchema,
-} from './settings.js';
+import { loadEnvironment, getSettingsSchema } from './settings.js';
+import { createMockSettings } from '../test-utils/settings.js';
 import { validateAuthMethod } from './auth.js';
 import type { Settings } from './settings.js';
 
@@ -528,7 +525,9 @@ describe('Verification: Auth and Trust Interaction', () => {
     mockRules[mockCwd] = TrustLevel.DO_NOT_TRUST;
 
     // 2. Load environment (should return early)
-    const settings = loadSettings(mockCwd);
+    const settings = createMockSettings({
+      security: { folderTrust: { enabled: true } },
+    });
     loadEnvironment(settings.merged);
 
     // 3. Verify env var NOT loaded
