@@ -15,7 +15,7 @@ import { DEFAULT_GEMINI_MODEL, GEMINI_DIR } from '@google/gemini-cli-core';
 import fs from 'node:fs';
 import * as pty from '@lydell/node-pty';
 import stripAnsi from 'strip-ansi';
-import * as os from 'node:os';
+import * as os from 'os';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BUNDLE_PATH = join(__dirname, '..', '..', '..', 'bundle/gemini.js');
