@@ -10,7 +10,10 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execSync } from 'node:child_process';
 import { TestRig } from '@google/gemini-cli-test-utils';
-import { createUnauthorizedToolError } from '@google/gemini-cli-core';
+import {
+  createUnauthorizedToolError,
+  parseAgentMarkdown,
+} from '@google/gemini-cli-core';
 
 export * from '@google/gemini-cli-test-utils';
 
@@ -60,14 +63,22 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
               .createHash('sha256')
               .update(content)
               .digest('hex');
-            // Extract agent name from frontmatter or filename
-            const match = content.match(/^name:\s*["']?([a-z0-9-_]+)["']?$/m);
-            const agentName = match ? match[1] : path.basename(filePath, '.md');
 
-            if (!acknowledgedAgents[projectRoot]) {
-              acknowledgedAgents[projectRoot] = {};
+            try {
+              const agentDefs = await parseAgentMarkdown(fullPath, content);
+              if (agentDefs.length > 0) {
+                const agentName = agentDefs[0].name;
+                if (!acknowledgedAgents[projectRoot]) {
+                  acknowledgedAgents[projectRoot] = {};
+                }
+                acknowledgedAgents[projectRoot][agentName] = hash;
+              }
+            } catch (error) {
+              console.warn(
+                `Failed to parse agent for test acknowledgement: ${filePath}`,
+                error,
+              );
             }
-            acknowledgedAgents[projectRoot][agentName] = hash;
           }
         }
 
