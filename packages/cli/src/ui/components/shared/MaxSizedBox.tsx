@@ -123,7 +123,7 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
       <Box
         flexDirection="column"
         overflow="hidden"
-        flexGrow={1}
+        flexGrow={0}
         maxHeight={isOverflowing ? visibleContentHeight : undefined}
       >
         <Box
