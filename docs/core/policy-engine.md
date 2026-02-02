@@ -210,6 +210,10 @@ decision = "ask_user"
 # The priority of the rule, from 0 to 999.
 priority = 10
 
+# (Optional) A custom message to display when a tool call is denied by this rule.
+# This message is returned to the model and user, useful for explaining *why* it was denied.
+deny_message = "Deletion is permanent"
+
 # (Optional) An array of approval modes where this rule is active.
 modes = ["autoEdit"]
 ```
@@ -282,6 +286,7 @@ only the `mcpName`.
 mcpName = "untrusted-server"
 decision = "deny"
 priority = 500
+deny_message = "This server is not trusted by the admin."
 ```
 
 ## Default policies
@@ -290,9 +295,9 @@ The Gemini CLI ships with a set of default policies to provide a safe
 out-of-the-box experience.
 
 - **Read-only tools** (like `read_file`, `glob`) are generally **allowed**.
-- **Agent delegation** (like `delegate_to_agent`) defaults to **`ask_user`** to
-  ensure remote agents can prompt for confirmation, but local sub-agent actions
-  are executed silently and checked individually.
+- **Agent delegation** defaults to **`ask_user`** to ensure remote agents can
+  prompt for confirmation, but local sub-agent actions are executed silently and
+  checked individually.
 - **Write tools** (like `write_file`, `run_shell_command`) default to
   **`ask_user`**.
 - In **`yolo`** mode, a high-priority rule allows all tools.

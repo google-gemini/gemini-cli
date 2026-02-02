@@ -13,6 +13,7 @@ import {
   type SerializableConfirmationDetails,
   type ToolCallConfirmationDetails,
   type Config,
+  type ToolConfirmationPayload,
   ToolConfirmationOutcome,
   hasRedirection,
   debugLogger,
@@ -25,12 +26,14 @@ import { sanitizeForDisplay } from '../../utils/textUtils.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { theme } from '../../semantic-colors.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
+import { keyMatchers, Command } from '../../keyMatchers.js';
 import {
   REDIRECTION_WARNING_NOTE_LABEL,
   REDIRECTION_WARNING_NOTE_TEXT,
   REDIRECTION_WARNING_TIP_LABEL,
   REDIRECTION_WARNING_TIP_TEXT,
 } from '../../textConstants.js';
+import { AskUserDialog } from '../AskUserDialog.js';
 
 export interface ToolConfirmationMessageProps {
   callId: string;
@@ -59,9 +62,12 @@ export const ToolConfirmationMessage: React.FC<
   const allowPermanentApproval =
     settings.merged.security.enablePermanentToolApproval;
 
+  const handlesOwnUI = confirmationDetails.type === 'ask_user';
+  const isTrustedFolder = config.isTrustedFolder();
+
   const handleConfirm = useCallback(
-    (outcome: ToolConfirmationOutcome) => {
-      void confirm(callId, outcome).catch((error: unknown) => {
+    (outcome: ToolConfirmationOutcome, payload?: ToolConfirmationPayload) => {
+      void confirm(callId, outcome, payload).catch((error: unknown) => {
         debugLogger.error(
           `Failed to handle tool confirmation for ${callId}:`,
           error,
@@ -71,14 +77,17 @@ export const ToolConfirmationMessage: React.FC<
     [confirm, callId],
   );
 
-  const isTrustedFolder = config.isTrustedFolder();
-
   useKeypress(
     (key) => {
       if (!isFocused) return false;
-      if (key.name === 'escape' || (key.ctrl && key.name === 'c')) {
+      if (keyMatchers[Command.ESCAPE](key)) {
         handleConfirm(ToolConfirmationOutcome.Cancel);
         return true;
+      }
+      if (keyMatchers[Command.QUIT](key)) {
+        // Return false to let ctrl-C bubble up to AppContainer for exit flow.
+        // AppContainer will call cancelOngoingRequest which will cancel the tool.
+        return false;
       }
       return false;
     },
@@ -180,7 +189,7 @@ export const ToolConfirmationMessage: React.FC<
         value: ToolConfirmationOutcome.Cancel,
         key: 'No, suggest changes (esc)',
       });
-    } else {
+    } else if (confirmationDetails.type === 'mcp') {
       // mcp tool confirmation
       options.push({
         label: 'Allow once',
@@ -251,6 +260,23 @@ export const ToolConfirmationMessage: React.FC<
     let question = '';
     const options = getOptions();
 
+    if (confirmationDetails.type === 'ask_user') {
+      bodyContent = (
+        <AskUserDialog
+          questions={confirmationDetails.questions}
+          onSubmit={(answers) => {
+            handleConfirm(ToolConfirmationOutcome.ProceedOnce, { answers });
+          }}
+          onCancel={() => {
+            handleConfirm(ToolConfirmationOutcome.Cancel);
+          }}
+          width={terminalWidth}
+          availableHeight={availableBodyContentHeight()}
+        />
+      );
+      return { question: '', bodyContent, options: [] };
+    }
+
     if (confirmationDetails.type === 'edit') {
       if (!confirmationDetails.isModifying) {
         question = `Apply this change?`;
@@ -265,7 +291,7 @@ export const ToolConfirmationMessage: React.FC<
       }
     } else if (confirmationDetails.type === 'info') {
       question = `Do you want to proceed?`;
-    } else {
+    } else if (confirmationDetails.type === 'mcp') {
       // mcp tool confirmation
       const mcpProps = confirmationDetails;
       question = `Allow execution of MCP tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"?`;
@@ -387,7 +413,7 @@ export const ToolConfirmationMessage: React.FC<
           )}
         </Box>
       );
-    } else {
+    } else if (confirmationDetails.type === 'mcp') {
       // mcp tool confirmation
       const mcpProps = confirmationDetails;
 
@@ -405,6 +431,7 @@ export const ToolConfirmationMessage: React.FC<
     getOptions,
     availableBodyContentHeight,
     terminalWidth,
+    handleConfirm,
   ]);
 
   if (confirmationDetails.type === 'edit') {
@@ -429,32 +456,38 @@ export const ToolConfirmationMessage: React.FC<
   }
 
   return (
-    <Box flexDirection="column" paddingTop={0} paddingBottom={1}>
-      {/* Body Content (Diff Renderer or Command Info) */}
-      {/* No separate context display here anymore for edits */}
-      <Box flexGrow={1} flexShrink={1} overflow="hidden">
-        <MaxSizedBox
-          maxHeight={availableBodyContentHeight()}
-          maxWidth={terminalWidth}
-          overflowDirection="top"
-        >
-          {bodyContent}
-        </MaxSizedBox>
-      </Box>
+    <Box
+      flexDirection="column"
+      paddingTop={0}
+      paddingBottom={handlesOwnUI ? 0 : 1}
+    >
+      {handlesOwnUI ? (
+        bodyContent
+      ) : (
+        <>
+          <Box flexGrow={1} flexShrink={1} overflow="hidden">
+            <MaxSizedBox
+              maxHeight={availableBodyContentHeight()}
+              maxWidth={terminalWidth}
+              overflowDirection="top"
+            >
+              {bodyContent}
+            </MaxSizedBox>
+          </Box>
 
-      {/* Confirmation Question */}
-      <Box marginBottom={1} flexShrink={0}>
-        <Text color={theme.text.primary}>{question}</Text>
-      </Box>
+          <Box marginBottom={1} flexShrink={0}>
+            <Text color={theme.text.primary}>{question}</Text>
+          </Box>
 
-      {/* Select Input for Options */}
-      <Box flexShrink={0}>
-        <RadioButtonSelect
-          items={options}
-          onSelect={handleSelect}
-          isFocused={isFocused}
-        />
-      </Box>
+          <Box flexShrink={0}>
+            <RadioButtonSelect
+              items={options}
+              onSelect={handleSelect}
+              isFocused={isFocused}
+            />
+          </Box>
+        </>
+      )}
     </Box>
   );
 };

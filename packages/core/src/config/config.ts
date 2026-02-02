@@ -178,6 +178,57 @@ export interface AgentSettings {
   overrides?: Record<string, AgentOverride>;
 }
 
+export interface CustomTheme {
+  type: 'custom';
+  name: string;
+
+  text?: {
+    primary?: string;
+    secondary?: string;
+    link?: string;
+    accent?: string;
+    response?: string;
+  };
+  background?: {
+    primary?: string;
+    diff?: {
+      added?: string;
+      removed?: string;
+    };
+  };
+  border?: {
+    default?: string;
+    focused?: string;
+  };
+  ui?: {
+    comment?: string;
+    symbol?: string;
+    gradient?: string[];
+  };
+  status?: {
+    error?: string;
+    success?: string;
+    warning?: string;
+  };
+
+  // Legacy properties (all optional)
+  Background?: string;
+  Foreground?: string;
+  LightBlue?: string;
+  AccentBlue?: string;
+  AccentPurple?: string;
+  AccentCyan?: string;
+  AccentGreen?: string;
+  AccentYellow?: string;
+  AccentRed?: string;
+  DiffAdded?: string;
+  DiffRemoved?: string;
+  Comment?: string;
+  Gray?: string;
+  DarkGray?: string;
+  GradientColors?: string[];
+}
+
 /**
  * All information required in CLI to handle an extension. Defined in Core so
  * that the collection of loaded, active, and inactive extensions can be passed
@@ -199,6 +250,11 @@ export interface GeminiCLIExtension {
   resolvedSettings?: ResolvedExtensionSetting[];
   skills?: SkillDefinition[];
   agents?: AgentDefinition[];
+  /**
+   * Custom themes contributed by this extension.
+   * These themes will be registered when the extension is activated.
+   */
+  themes?: CustomTheme[];
 }
 
 export interface ExtensionInstallMetadata {
@@ -337,6 +393,7 @@ export interface ConfigParameters {
   includeDirectories?: string[];
   bugCommand?: BugCommandSettings;
   model: string;
+  disableLoopDetection?: boolean;
   maxSessionTurns?: number;
   experimentalZedIntegration?: boolean;
   listSessions?: boolean;
@@ -475,6 +532,7 @@ export class Config {
   private readonly cwd: string;
   private readonly bugCommand: BugCommandSettings | undefined;
   private model: string;
+  private readonly disableLoopDetection: boolean;
   private previewFeatures: boolean | undefined;
   private hasAccessToPreviewModel: boolean = false;
   private readonly noBrowser: boolean;
@@ -641,6 +699,7 @@ export class Config {
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
     this.model = params.model;
+    this.disableLoopDetection = params.disableLoopDetection ?? false;
     this._activeModel = params.model;
     this.enableAgents = params.enableAgents ?? false;
     this.agents = params.agents ?? {};
@@ -1060,6 +1119,10 @@ export class Config {
 
   getModel(): string {
     return this.model;
+  }
+
+  getDisableLoopDetection(): boolean {
+    return this.disableLoopDetection ?? false;
   }
 
   setModel(newModel: string, isTemporary: boolean = true): void {
