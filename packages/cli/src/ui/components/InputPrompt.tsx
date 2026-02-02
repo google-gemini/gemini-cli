@@ -128,6 +128,17 @@ export const calculatePromptWidths = (mainContentWidth: number) => {
 };
 
 /**
+ * Returns true if the given text exceeds the thresholds for being considered a "large paste".
+ */
+export function isLargePaste(text: string): boolean {
+  const pasteLineCount = text.split('\n').length;
+  return (
+    pasteLineCount > LARGE_PASTE_LINE_THRESHOLD ||
+    text.length > LARGE_PASTE_CHAR_THRESHOLD
+  );
+}
+
+/**
  * Attempt to toggle expansion of a paste placeholder in the buffer.
  * Returns true if a toggle action was performed, false otherwise.
  */
@@ -440,11 +451,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       } else {
         const textToInsert = await clipboardy.read();
         buffer.insert(textToInsert, { paste: true });
-        const pasteLineCount = textToInsert.split('\n').length;
-        if (
-          pasteLineCount > LARGE_PASTE_LINE_THRESHOLD ||
-          textToInsert.length > LARGE_PASTE_CHAR_THRESHOLD
-        ) {
+        if (isLargePaste(textToInsert)) {
           showTransientMessage(
             'Press Ctrl+O to expand pasted text',
             TransientMessageType.Hint,
@@ -575,17 +582,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
         // Ensure we never accidentally interpret paste as regular input.
         buffer.handleInput(key);
-        if (key.sequence) {
-          const pasteLineCount = key.sequence.split('\n').length;
-          if (
-            pasteLineCount > LARGE_PASTE_LINE_THRESHOLD ||
-            key.sequence.length > LARGE_PASTE_CHAR_THRESHOLD
-          ) {
-            showTransientMessage(
-              'Press Ctrl+O to expand pasted text',
-              TransientMessageType.Hint,
-            );
-          }
+        if (key.sequence && isLargePaste(key.sequence)) {
+          showTransientMessage(
+            'Press Ctrl+O to expand pasted text',
+            TransientMessageType.Hint,
+          );
         }
         return true;
       }
@@ -602,7 +603,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       // Ctrl+O to expand/collapse paste placeholders
-      if (keyMatchers[Command.SHOW_MORE_LINES](key)) {
+      if (keyMatchers[Command.EXPAND_PASTE](key)) {
         const handled = tryTogglePasteExpansion(buffer);
         if (handled) return true;
       }

@@ -3765,9 +3765,10 @@ describe('InputPrompt', () => {
         stdin.write('\x16'); // Ctrl+V
       });
 
-      // Give time for async paste handler
-      await act(async () => {
-        await new Promise((r) => setTimeout(r, 50));
+      await waitFor(() => {
+        expect(mockBuffer.insert).toHaveBeenCalledWith(smallText, {
+          paste: true,
+        });
       });
 
       expect(mockShowTransientMessage).not.toHaveBeenCalled();

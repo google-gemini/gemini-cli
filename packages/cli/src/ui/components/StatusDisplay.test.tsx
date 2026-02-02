@@ -149,6 +149,20 @@ describe('StatusDisplay', () => {
     expect(lastFrame()).toMatchSnapshot();
   });
 
+  it('renders hint message', () => {
+    const uiState = createMockUIState({
+      transientMessage: {
+        text: 'This is a hint',
+        type: TransientMessageType.Hint,
+      },
+    });
+    const { lastFrame } = renderStatusDisplay(
+      { hideContextSummary: false },
+      uiState,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
   it('prioritizes warning over Ctrl+D', () => {
     const uiState = createMockUIState({
       transientMessage: {
