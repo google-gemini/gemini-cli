@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { Text } from 'ink';
-import process from 'node:process';
+import { shouldUseEmoji } from '../../utils/terminalUtils.js';
 
 interface IconTextProps {
   icon: string;
@@ -30,22 +30,3 @@ export const IconText: React.FC<IconTextProps> = ({
     </Text>
   );
 };
-
-function shouldUseEmoji(): boolean {
-  const locale = (
-    process.env['LC_ALL'] ||
-    process.env['LC_CTYPE'] ||
-    process.env['LANG'] ||
-    ''
-  ).toLowerCase();
-  const supportsUtf8 = locale.includes('utf-8') || locale.includes('utf8');
-  if (!supportsUtf8) {
-    return false;
-  }
-
-  if (process.env['TERM'] === 'linux') {
-    return false;
-  }
-
-  return true;
-}

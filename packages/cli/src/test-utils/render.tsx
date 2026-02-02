@@ -42,6 +42,7 @@ vi.mock('../ui/utils/terminalUtils.js', () => ({
   isLowColorDepth: vi.fn(() => false),
   getColorDepth: vi.fn(() => 24),
   isITerm2: vi.fn(() => false),
+  shouldUseEmoji: vi.fn(() => true),
 }));
 
 // Wrapper around ink-testing-library's render that ensures act() is called
