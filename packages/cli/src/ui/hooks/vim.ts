@@ -68,7 +68,7 @@ type VimAction =
   | { type: 'ESCAPE_TO_NORMAL' };
 
 const initialVimState: VimState = {
-  mode: 'NORMAL',
+  mode: 'INSERT',
   count: 0,
   pendingOperator: null,
   lastCommand: null,
@@ -312,9 +312,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
         return true; // Handled by vim (even if no onSubmit callback)
       }
 
-      // useKeypress already provides the correct format for TextBuffer
-      buffer.handleInput(normalizedKey);
-      return true; // Handled by vim
+      return buffer.handleInput(normalizedKey);
     },
     [buffer, dispatch, updateMode, onSubmit, checkDoubleEscape],
   );
@@ -784,7 +782,9 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
             // Unknown command, clear count and pending states
             dispatch({ type: 'CLEAR_PENDING_STATES' });
-            return true; // Still handled by vim to prevent other handlers
+
+            // Not handled by vim so allow other handlers to process it.
+            return false;
           }
         }
       }
