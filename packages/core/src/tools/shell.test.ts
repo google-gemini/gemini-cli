@@ -43,7 +43,7 @@ vi.mock('../utils/summarizer.js');
 
 import { initializeShellParsers } from '../utils/shell-utils.js';
 import { ShellTool } from './shell.js';
-import { debugLogger } from '../index.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import { type Config } from '../config/config.js';
 import {
   type ShellExecutionResult,
@@ -234,6 +234,37 @@ describe('ShellTool', () => {
         dir_path: path.join(tempRootDir, 'subdir'),
       });
       expect(invocation).toBeDefined();
+    });
+
+    it('should inject -y into npx commands in YOLO mode', () => {
+      (mockConfig.getApprovalMode as Mock).mockReturnValue('yolo');
+      const invocation = shellTool.build({ command: 'npx my-package' });
+      // We expect the command in invocation.params to be modified
+      expect(invocation.params.command).toBe('npx -y my-package');
+    });
+
+    it('should not inject -y into npx commands if already present (short)', () => {
+      (mockConfig.getApprovalMode as Mock).mockReturnValue('yolo');
+      const invocation = shellTool.build({ command: 'npx -y my-package' });
+      expect(invocation.params.command).toBe('npx -y my-package');
+    });
+
+    it('should not inject -y into npx commands if already present (long)', () => {
+      (mockConfig.getApprovalMode as Mock).mockReturnValue('yolo');
+      const invocation = shellTool.build({ command: 'npx --yes my-package' });
+      expect(invocation.params.command).toBe('npx --yes my-package');
+    });
+
+    it('should not inject -y into non-npx commands in YOLO mode', () => {
+      (mockConfig.getApprovalMode as Mock).mockReturnValue('yolo');
+      const invocation = shellTool.build({ command: 'ls -la' });
+      expect(invocation.params.command).toBe('ls -la');
+    });
+
+    it('should not inject -y into npx commands in non-YOLO mode', () => {
+      (mockConfig.getApprovalMode as Mock).mockReturnValue('default');
+      const invocation = shellTool.build({ command: 'npx my-package' });
+      expect(invocation.params.command).toBe('npx my-package');
     });
   });
 

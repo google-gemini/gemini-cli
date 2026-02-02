@@ -9,7 +9,7 @@ import path from 'node:path';
 import os, { EOL } from 'node:os';
 import crypto from 'node:crypto';
 import type { Config } from '../config/config.js';
-import { debugLogger } from '../index.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import { ToolErrorType } from './tool-error.js';
 import type {
   ToolInvocation,
@@ -43,6 +43,7 @@ import {
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { ApprovalMode } from '../policy/types.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
@@ -556,6 +557,16 @@ export class ShellTool extends BaseDeclarativeTool<
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<ShellToolParams, ToolResult> {
+    // In YOLO mode, force npx to be non-interactive to prevent blocking
+    if (this.config.getApprovalMode() === ApprovalMode.YOLO) {
+      if (
+        /^npx\b/.test(params.command) &&
+        !/\s(-y|--yes)\b/.test(params.command)
+      ) {
+        params.command = params.command.replace(/^npx\b/, 'npx -y');
+      }
+    }
+
     return new ShellToolInvocation(
       this.config,
       params,
