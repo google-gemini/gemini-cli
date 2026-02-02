@@ -531,7 +531,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
       }
 
-      if (key.sequence === '?' && key.insertable && !shortcutsHelpVisible) {
+      if (
+        key.sequence === '?' &&
+        key.insertable &&
+        !shortcutsHelpVisible &&
+        buffer.text.length === 0
+      ) {
         setShortcutsHelpVisible(true);
         return true;
       }
