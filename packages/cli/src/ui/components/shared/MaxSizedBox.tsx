@@ -120,7 +120,12 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
           hidden ...
         </Text>
       )}
-      <Box flexDirection="column" overflow="hidden" flexGrow={1}>
+      <Box
+        flexDirection="column"
+        overflow="hidden"
+        flexGrow={0}
+        maxHeight={isOverflowing ? visibleContentHeight : undefined}
+      >
         <Box
           flexDirection="column"
           ref={onRefChange}
