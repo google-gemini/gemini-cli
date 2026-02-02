@@ -739,6 +739,16 @@ const SETTINGS_SCHEMA = {
           'The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).',
         showInDialog: true,
       },
+      disableLoopDetection: {
+        type: 'boolean',
+        label: 'Disable Loop Detection',
+        category: 'Model',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Disable automatic detection and prevention of infinite loops.',
+        showInDialog: true,
+      },
       skipNextSpeakerCheck: {
         type: 'boolean',
         label: 'Skip Next Speaker Check',
