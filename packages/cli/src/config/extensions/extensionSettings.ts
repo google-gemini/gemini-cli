@@ -230,7 +230,7 @@ export async function updateSetting(
   );
 
   if (settingToUpdate.sensitive) {
-    if (newValue) {
+    if (newValue !== '') {
       await keychain.setSecret(settingToUpdate.envVar, newValue);
     } else {
       try {
@@ -251,7 +251,11 @@ export async function updateSetting(
   }
 
   const parsedEnv = dotenv.parse(envContent);
-  parsedEnv[settingToUpdate.envVar] = newValue;
+  if (newValue === '') {
+    delete parsedEnv[settingToUpdate.envVar];
+  } else {
+    parsedEnv[settingToUpdate.envVar] = newValue;
+  }
 
   // We only want to write back the variables that are not sensitive.
   const nonSensitiveSettings: Record<string, string> = {};
