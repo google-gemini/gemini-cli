@@ -41,11 +41,11 @@ vi.mock('node:os');
 describe('ide-connection-utils', () => {
   beforeEach(() => {
     // Mock environment variables
-    process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = '/test/workspace';
-    delete process.env['GEMINI_CLI_IDE_SERVER_PORT'];
-    delete process.env['GEMINI_CLI_IDE_SERVER_STDIO_COMMAND'];
-    delete process.env['GEMINI_CLI_IDE_SERVER_STDIO_ARGS'];
-    delete process.env['GEMINI_CLI_IDE_AUTH_TOKEN'];
+    vi.stubEnv('GEMINI_CLI_IDE_WORKSPACE_PATH', '/test/workspace');
+    vi.stubEnv('GEMINI_CLI_IDE_SERVER_PORT', '');
+    vi.stubEnv('GEMINI_CLI_IDE_SERVER_STDIO_COMMAND', '');
+    vi.stubEnv('GEMINI_CLI_IDE_SERVER_STDIO_ARGS', '');
+    vi.stubEnv('GEMINI_CLI_IDE_AUTH_TOKEN', '');
 
     vi.spyOn(process, 'cwd').mockReturnValue('/test/workspace/sub-dir');
     vi.mocked(os.tmpdir).mockReturnValue('/tmp');
@@ -53,6 +53,7 @@ describe('ide-connection-utils', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   describe('getConnectionConfigFromFile', () => {
@@ -156,9 +157,9 @@ describe('ide-connection-utils', () => {
     });
 
     it('should prioritize the config matching the port from the environment variable', async () => {
-      process.env['GEMINI_CLI_IDE_SERVER_PORT'] = '2222';
+      vi.stubEnv('GEMINI_CLI_IDE_SERVER_PORT', '2222');
       const config1 = { port: '1111', workspacePath: '/test/workspace' };
-      const config2 = { port: '2222', workspacePath: '/test/workspace2' };
+      const config2 = { port: '2222', workspacePath: '/test/workspace' };
       vi.mocked(fs.promises.readFile).mockRejectedValueOnce(
         new Error('not found'),
       );
@@ -246,9 +247,9 @@ describe('ide-connection-utils', () => {
     });
 
     it('should match env port string to a number port in the config', async () => {
-      process.env['GEMINI_CLI_IDE_SERVER_PORT'] = '3333';
+      vi.stubEnv('GEMINI_CLI_IDE_SERVER_PORT', '3333');
       const config1 = { port: 1111, workspacePath: '/test/workspace' };
-      const config2 = { port: 3333, workspacePath: '/test/workspace2' };
+      const config2 = { port: 3333, workspacePath: '/test/workspace' };
       vi.mocked(fs.promises.readFile).mockRejectedValueOnce(
         new Error('not found'),
       );
@@ -291,7 +292,7 @@ describe('ide-connection-utils', () => {
     it('should return invalid if path is empty', () => {
       const result = validateWorkspacePath('', '/test/workspace/sub-dir');
       expect(result.isValid).toBe(false);
-      expect(result.error).toContain('Please open a workspace folder');
+      expect(result.error).toContain('please open a workspace folder');
     });
 
     it('should return invalid if cwd is not within workspace path', () => {
@@ -413,9 +414,9 @@ describe('ide-connection-utils', () => {
 
     it('should return 127.0.0.1 when not in container and no SSH_CONNECTION or Dev Container env vars', () => {
       setupFsMocks(false, false);
-      delete process.env['SSH_CONNECTION'];
-      delete process.env['VSCODE_REMOTE_CONTAINERS_SESSION'];
-      delete process.env['REMOTE_CONTAINERS'];
+      vi.stubEnv('SSH_CONNECTION', '');
+      vi.stubEnv('VSCODE_REMOTE_CONTAINERS_SESSION', '');
+      vi.stubEnv('REMOTE_CONTAINERS', '');
       expect(getIdeServerHost()).toBe('127.0.0.1');
       expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/.dockerenv');
       expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith(
@@ -425,9 +426,9 @@ describe('ide-connection-utils', () => {
 
     it('should return 127.0.0.1 when not in container but SSH_CONNECTION is set', () => {
       setupFsMocks(false, false);
-      process.env['SSH_CONNECTION'] = 'some_ssh_value';
-      delete process.env['VSCODE_REMOTE_CONTAINERS_SESSION'];
-      delete process.env['REMOTE_CONTAINERS'];
+      vi.stubEnv('SSH_CONNECTION', 'some_ssh_value');
+      vi.stubEnv('VSCODE_REMOTE_CONTAINERS_SESSION', '');
+      vi.stubEnv('REMOTE_CONTAINERS', '');
       expect(getIdeServerHost()).toBe('127.0.0.1');
       expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/.dockerenv');
       expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith(
@@ -437,9 +438,9 @@ describe('ide-connection-utils', () => {
 
     it('should return host.docker.internal when in .dockerenv container and no SSH_CONNECTION or Dev Container env vars', () => {
       setupFsMocks(true, false);
-      delete process.env['SSH_CONNECTION'];
-      delete process.env['VSCODE_REMOTE_CONTAINERS_SESSION'];
-      delete process.env['REMOTE_CONTAINERS'];
+      vi.stubEnv('SSH_CONNECTION', '');
+      vi.stubEnv('VSCODE_REMOTE_CONTAINERS_SESSION', '');
+      vi.stubEnv('REMOTE_CONTAINERS', '');
       expect(getIdeServerHost()).toBe('host.docker.internal');
       expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/.dockerenv');
       expect(vi.mocked(fs.existsSync)).not.toHaveBeenCalledWith(
@@ -449,9 +450,9 @@ describe('ide-connection-utils', () => {
 
     it('should return 127.0.0.1 when in .dockerenv container and SSH_CONNECTION is set', () => {
       setupFsMocks(true, false);
-      process.env['SSH_CONNECTION'] = 'some_ssh_value';
-      delete process.env['VSCODE_REMOTE_CONTAINERS_SESSION'];
-      delete process.env['REMOTE_CONTAINERS'];
+      vi.stubEnv('SSH_CONNECTION', 'some_ssh_value');
+      vi.stubEnv('VSCODE_REMOTE_CONTAINERS_SESSION', '');
+      vi.stubEnv('REMOTE_CONTAINERS', '');
       expect(getIdeServerHost()).toBe('127.0.0.1');
       expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/.dockerenv');
       expect(vi.mocked(fs.existsSync)).not.toHaveBeenCalledWith(
@@ -461,8 +462,8 @@ describe('ide-connection-utils', () => {
 
     it('should return 127.0.0.1 when in .dockerenv container and VSCODE_REMOTE_CONTAINERS_SESSION is set', () => {
       setupFsMocks(true, false);
-      delete process.env['SSH_CONNECTION'];
-      process.env['VSCODE_REMOTE_CONTAINERS_SESSION'] = 'some_session_id';
+      vi.stubEnv('SSH_CONNECTION', '');
+      vi.stubEnv('VSCODE_REMOTE_CONTAINERS_SESSION', 'some_session_id');
       expect(getIdeServerHost()).toBe('127.0.0.1');
       expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/.dockerenv');
       expect(vi.mocked(fs.existsSync)).not.toHaveBeenCalledWith(
@@ -472,9 +473,9 @@ describe('ide-connection-utils', () => {
 
     it('should return host.docker.internal when in .containerenv container and no SSH_CONNECTION or Dev Container env vars', () => {
       setupFsMocks(false, true);
-      delete process.env['SSH_CONNECTION'];
-      delete process.env['VSCODE_REMOTE_CONTAINERS_SESSION'];
-      delete process.env['REMOTE_CONTAINERS'];
+      vi.stubEnv('SSH_CONNECTION', '');
+      vi.stubEnv('VSCODE_REMOTE_CONTAINERS_SESSION', '');
+      vi.stubEnv('REMOTE_CONTAINERS', '');
       expect(getIdeServerHost()).toBe('host.docker.internal');
       expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/.dockerenv');
       expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith(
@@ -484,9 +485,9 @@ describe('ide-connection-utils', () => {
 
     it('should return 127.0.0.1 when in .containerenv container and SSH_CONNECTION is set', () => {
       setupFsMocks(false, true);
-      process.env['SSH_CONNECTION'] = 'some_ssh_value';
-      delete process.env['VSCODE_REMOTE_CONTAINERS_SESSION'];
-      delete process.env['REMOTE_CONTAINERS'];
+      vi.stubEnv('SSH_CONNECTION', 'some_ssh_value');
+      vi.stubEnv('VSCODE_REMOTE_CONTAINERS_SESSION', '');
+      vi.stubEnv('REMOTE_CONTAINERS', '');
       expect(getIdeServerHost()).toBe('127.0.0.1');
       expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/.dockerenv');
       expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith(
@@ -496,8 +497,8 @@ describe('ide-connection-utils', () => {
 
     it('should return 127.0.0.1 when in .containerenv container and REMOTE_CONTAINERS is set', () => {
       setupFsMocks(false, true);
-      delete process.env['SSH_CONNECTION'];
-      process.env['REMOTE_CONTAINERS'] = 'true';
+      vi.stubEnv('SSH_CONNECTION', '');
+      vi.stubEnv('REMOTE_CONTAINERS', 'true');
       expect(getIdeServerHost()).toBe('127.0.0.1');
       expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/.dockerenv');
       expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith(
@@ -507,9 +508,9 @@ describe('ide-connection-utils', () => {
 
     it('should return host.docker.internal when in both containers and no SSH_CONNECTION or Dev Container env vars', () => {
       setupFsMocks(true, true);
-      delete process.env['SSH_CONNECTION'];
-      delete process.env['VSCODE_REMOTE_CONTAINERS_SESSION'];
-      delete process.env['REMOTE_CONTAINERS'];
+      vi.stubEnv('SSH_CONNECTION', '');
+      vi.stubEnv('VSCODE_REMOTE_CONTAINERS_SESSION', '');
+      vi.stubEnv('REMOTE_CONTAINERS', '');
       expect(getIdeServerHost()).toBe('host.docker.internal');
       expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/.dockerenv');
       expect(vi.mocked(fs.existsSync)).not.toHaveBeenCalledWith(
@@ -519,9 +520,9 @@ describe('ide-connection-utils', () => {
 
     it('should return 127.0.0.1 when in both containers and SSH_CONNECTION is set', () => {
       setupFsMocks(true, true);
-      process.env['SSH_CONNECTION'] = 'some_ssh_value';
-      delete process.env['VSCODE_REMOTE_CONTAINERS_SESSION'];
-      delete process.env['REMOTE_CONTAINERS'];
+      vi.stubEnv('SSH_CONNECTION', 'some_ssh_value');
+      vi.stubEnv('VSCODE_REMOTE_CONTAINERS_SESSION', '');
+      vi.stubEnv('REMOTE_CONTAINERS', '');
       expect(getIdeServerHost()).toBe('127.0.0.1');
       expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/.dockerenv');
       expect(vi.mocked(fs.existsSync)).not.toHaveBeenCalledWith(
@@ -531,8 +532,8 @@ describe('ide-connection-utils', () => {
 
     it('should return 127.0.0.1 when in both containers and VSCODE_REMOTE_CONTAINERS_SESSION is set', () => {
       setupFsMocks(true, true);
-      delete process.env['SSH_CONNECTION'];
-      process.env['VSCODE_REMOTE_CONTAINERS_SESSION'] = 'some_session_id';
+      vi.stubEnv('SSH_CONNECTION', '');
+      vi.stubEnv('VSCODE_REMOTE_CONTAINERS_SESSION', 'some_session_id');
       expect(getIdeServerHost()).toBe('127.0.0.1');
       expect(vi.mocked(fs.existsSync)).toHaveBeenCalledWith('/.dockerenv');
       expect(vi.mocked(fs.existsSync)).not.toHaveBeenCalledWith(
