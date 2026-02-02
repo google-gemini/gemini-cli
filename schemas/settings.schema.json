@@ -457,6 +457,13 @@
           "default": 0.5,
           "type": "number"
         },
+        "disableLoopDetection": {
+          "title": "Disable Loop Detection",
+          "description": "Disable automatic detection and prevention of infinite loops.",
+          "markdownDescription": "Disable automatic detection and prevention of infinite loops.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "skipNextSpeakerCheck": {
           "title": "Skip Next Speaker Check",
           "description": "Skip the next speaker check.",
@@ -1111,13 +1118,6 @@
             }
           },
           "additionalProperties": false
-        },
-        "autoAccept": {
-          "title": "Auto Accept",
-          "description": "Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).",
-          "markdownDescription": "Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
-          "type": "boolean"
         },
         "approvalMode": {
           "title": "Approval Mode",

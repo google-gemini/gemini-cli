@@ -780,7 +780,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
 
           // Render inline text input for custom option
           if (optionItem.type === 'other') {
-            const placeholder = 'Enter a custom value';
+            const placeholder = question.placeholder || 'Enter a custom value';
             return (
               <Box flexDirection="row">
                 {showCheck && (

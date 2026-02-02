@@ -147,7 +147,7 @@ export class LoopDetectionService {
    * @returns true if a loop is detected, false otherwise
    */
   addAndCheck(event: ServerGeminiStreamEvent): boolean {
-    if (this.disabledForSession) {
+    if (this.disabledForSession || this.config.getDisableLoopDetection()) {
       return false;
     }
 
@@ -182,7 +182,7 @@ export class LoopDetectionService {
    * @returns A promise that resolves to `true` if a loop is detected, and `false` otherwise.
    */
   async turnStarted(signal: AbortSignal) {
-    if (this.disabledForSession) {
+    if (this.disabledForSession || this.config.getDisableLoopDetection()) {
       return false;
     }
     this.turnsInCurrentPrompt++;

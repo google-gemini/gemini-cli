@@ -1008,4 +1008,71 @@ describe('AskUserDialog', () => {
     // Should contain the full long question (or at least its parts)
     expect(lastFrame()).toContain('This is a very long question');
   });
+
+  describe('Choice question placeholder', () => {
+    it('uses placeholder for "Other" option when provided', async () => {
+      const questions: Question[] = [
+        {
+          question: 'Select your preferred language:',
+          header: 'Language',
+          options: [
+            { label: 'TypeScript', description: '' },
+            { label: 'JavaScript', description: '' },
+          ],
+          placeholder: 'Type another language...',
+          multiSelect: false,
+        },
+      ];
+
+      const { stdin, lastFrame } = renderWithProviders(
+        <AskUserDialog
+          questions={questions}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+          width={80}
+        />,
+        { width: 80 },
+      );
+
+      // Navigate to the "Other" option
+      writeKey(stdin, '\x1b[B'); // Down
+      writeKey(stdin, '\x1b[B'); // Down to Other
+
+      await waitFor(() => {
+        expect(lastFrame()).toMatchSnapshot();
+      });
+    });
+
+    it('uses default placeholder when not provided', async () => {
+      const questions: Question[] = [
+        {
+          question: 'Select your preferred language:',
+          header: 'Language',
+          options: [
+            { label: 'TypeScript', description: '' },
+            { label: 'JavaScript', description: '' },
+          ],
+          multiSelect: false,
+        },
+      ];
+
+      const { stdin, lastFrame } = renderWithProviders(
+        <AskUserDialog
+          questions={questions}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+          width={80}
+        />,
+        { width: 80 },
+      );
+
+      // Navigate to the "Other" option
+      writeKey(stdin, '\x1b[B'); // Down
+      writeKey(stdin, '\x1b[B'); // Down to Other
+
+      await waitFor(() => {
+        expect(lastFrame()).toMatchSnapshot();
+      });
+    });
+  });
 });
