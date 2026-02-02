@@ -18,6 +18,10 @@ import { DiscoveredMCPTool } from './mcp-tool.js';
 import { parse } from 'shell-quote';
 import { ToolErrorType } from './tool-error.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import {
+  LIST_RESOURCES_TOOL_NAME,
+  READ_RESOURCE_TOOL_NAME,
+} from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
@@ -450,6 +454,16 @@ export class ToolRegistry {
     tool: AnyDeclarativeTool,
     excludeTools?: Set<string>,
   ): boolean {
+    if (
+      tool.name === LIST_RESOURCES_TOOL_NAME ||
+      tool.name === READ_RESOURCE_TOOL_NAME
+    ) {
+      const resources = this.config.getResourceRegistry()?.getAllResources?.();
+      if (!resources || resources.length === 0) {
+        return false;
+      }
+    }
+
     excludeTools ??= this.config.getExcludeTools() ?? new Set([]);
     const normalizedClassName = tool.constructor.name.replace(/^_+/, '');
     const possibleNames = [tool.name, normalizedClassName];
