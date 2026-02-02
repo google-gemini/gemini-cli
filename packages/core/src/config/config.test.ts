@@ -13,6 +13,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { ApprovalMode } from '../policy/types.js';
 import type { HookDefinition } from '../hooks/types.js';
 import { HookType, HookEventName } from '../hooks/types.js';
+import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { setGeminiMdFilename as mockSetGeminiMdFilename } from '../tools/memoryTool.js';
@@ -23,6 +24,7 @@ import {
 import type { ContentGeneratorConfig } from '../core/contentGenerator.js';
 import {
   AuthType,
+  createContentGenerator,
   createContentGeneratorConfig,
 } from '../core/contentGenerator.js';
 import { GeminiClient } from '../core/client.js';
@@ -138,6 +140,8 @@ vi.mock('../services/gitService.js', () => {
   return { GitService: GitServiceMock };
 });
 
+vi.mock('../services/fileDiscoveryService.js');
+
 vi.mock('../ide/ide-client.js', () => ({
   IdeClient: {
     getInstance: vi.fn().mockResolvedValue({
@@ -194,6 +198,7 @@ import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import type { CodeAssistServer } from '../code_assist/server.js';
 import { ContextManager } from '../services/contextManager.js';
+import { UserTierId } from 'src/code_assist/types.js';
 
 vi.mock('../core/baseLlmClient.js');
 vi.mock('../core/tokenLimits.js', () => ({
@@ -623,6 +628,30 @@ describe('Server Config (config.ts)', () => {
     expect(config.getFileFilteringRespectGitIgnore()).toBe(false);
   });
 
+  it('should set customIgnoreFilePaths from params', () => {
+    const params: ConfigParameters = {
+      ...baseParams,
+      fileFiltering: {
+        customIgnoreFilePaths: ['/path/to/ignore/file'],
+      },
+    };
+    const config = new Config(params);
+    expect(config.getCustomIgnoreFilePaths()).toStrictEqual([
+      '/path/to/ignore/file',
+    ]);
+  });
+
+  it('should set customIgnoreFilePaths to empty array if not provided', () => {
+    const params: ConfigParameters = {
+      ...baseParams,
+      fileFiltering: {
+        respectGitIgnore: true,
+      },
+    };
+    const config = new Config(params);
+    expect(config.getCustomIgnoreFilePaths()).toStrictEqual([]);
+  });
+
   it('should initialize WorkspaceContext with includeDirectories', () => {
     const includeDirectories = ['dir1', 'dir2'];
     const paramsWithIncludeDirs: ConfigParameters = {
@@ -697,6 +726,29 @@ describe('Server Config (config.ts)', () => {
     const config = new Config(baseParams);
     const fileService = config.getFileService();
     expect(fileService).toBeDefined();
+  });
+
+  it('should pass file filtering options to FileDiscoveryService', () => {
+    const configParams = {
+      ...baseParams,
+      fileFiltering: {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+        customIgnoreFilePaths: ['.myignore'],
+      },
+    };
+
+    const config = new Config(configParams);
+    config.getFileService();
+
+    expect(FileDiscoveryService).toHaveBeenCalledWith(
+      path.resolve(TARGET_DIR),
+      {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+        customIgnoreFilePaths: ['.myignore'],
+      },
+    );
   });
 
   describe('Usage Statistics', () => {
@@ -1267,6 +1319,39 @@ describe('setApprovalMode with folder trust', () => {
     expect(() => config.setApprovalMode(ApprovalMode.YOLO)).not.toThrow();
     expect(() => config.setApprovalMode(ApprovalMode.AUTO_EDIT)).not.toThrow();
     expect(() => config.setApprovalMode(ApprovalMode.DEFAULT)).not.toThrow();
+  });
+
+  it('should update system instruction when entering Plan mode', () => {
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+    const updateSpy = vi.spyOn(config, 'updateSystemInstructionIfInitialized');
+
+    config.setApprovalMode(ApprovalMode.PLAN);
+
+    expect(updateSpy).toHaveBeenCalled();
+  });
+
+  it('should update system instruction when leaving Plan mode', () => {
+    const config = new Config({
+      ...baseParams,
+      approvalMode: ApprovalMode.PLAN,
+    });
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+    const updateSpy = vi.spyOn(config, 'updateSystemInstructionIfInitialized');
+
+    config.setApprovalMode(ApprovalMode.DEFAULT);
+
+    expect(updateSpy).toHaveBeenCalled();
+  });
+
+  it('should not update system instruction when switching between non-Plan modes', () => {
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+    const updateSpy = vi.spyOn(config, 'updateSystemInstructionIfInitialized');
+
+    config.setApprovalMode(ApprovalMode.AUTO_EDIT);
+
+    expect(updateSpy).not.toHaveBeenCalled();
   });
 
   describe('registerCoreTools', () => {
@@ -1975,6 +2060,35 @@ describe('Config Quota & Preview Model Access', () => {
       expect(result).toBeUndefined();
       // Should remain default (false)
       expect(config.getHasAccessToPreviewModel()).toBe(false);
+    });
+  });
+
+  describe('getUserTier and getUserTierName', () => {
+    it('should return undefined if contentGenerator is not initialized', () => {
+      const config = new Config(baseParams);
+      expect(config.getUserTier()).toBeUndefined();
+      expect(config.getUserTierName()).toBeUndefined();
+    });
+
+    it('should return values from contentGenerator after refreshAuth', async () => {
+      const config = new Config(baseParams);
+      const mockTier = UserTierId.STANDARD;
+      const mockTierName = 'Standard Tier';
+
+      vi.mocked(createContentGeneratorConfig).mockResolvedValue({
+        authType: AuthType.USE_GEMINI,
+      } as ContentGeneratorConfig);
+
+      vi.mocked(createContentGenerator).mockResolvedValue({
+        userTier: mockTier,
+        userTierName: mockTierName,
+      } as unknown as CodeAssistServer);
+
+      await config.refreshAuth(AuthType.USE_GEMINI);
+
+      expect(config.getUserTier()).toBe(mockTier);
+      // TODO(#1275): User tier name is disabled until re-enabled.
+      expect(config.getUserTierName()).toBeUndefined();
     });
   });
 

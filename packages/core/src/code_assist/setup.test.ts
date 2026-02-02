@@ -332,9 +332,86 @@ describe('setupUser validation', () => {
     vi.unstubAllEnvs();
   });
 
-  it('should throw error if LoadCodeAssist returns ineligible tiers and no current tier', async () => {
+  it('should throw ineligible tier error when currentTier exists but no project ID available', async () => {
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', '');
+    mockLoad.mockResolvedValue({
+      currentTier: mockPaidTier,
+      cloudaicompanionProject: undefined,
+      ineligibleTiers: [
+        {
+          reasonMessage: 'User is not eligible',
+          reasonCode: 'INELIGIBLE_ACCOUNT',
+          tierId: 'free-tier',
+          tierName: 'free',
+        },
+      ],
+    });
+
+    await expect(setupUser({} as OAuth2Client)).rejects.toThrow(
+      'User is not eligible',
+    );
+  });
+
+  it('should continue if LoadCodeAssist returns ineligible tiers but has allowed tiers', async () => {
+    const mockOnboardUser = vi.fn().mockResolvedValue({
+      done: true,
+      response: {
+        cloudaicompanionProject: {
+          id: 'server-project',
+        },
+      },
+    });
+    vi.mocked(CodeAssistServer).mockImplementation(
+      () =>
+        ({
+          loadCodeAssist: mockLoad,
+          onboardUser: mockOnboardUser,
+        }) as unknown as CodeAssistServer,
+    );
+
     mockLoad.mockResolvedValue({
       currentTier: null,
+      allowedTiers: [mockPaidTier],
+      ineligibleTiers: [
+        {
+          reasonMessage: 'Not eligible for free tier',
+          reasonCode: 'INELIGIBLE_ACCOUNT',
+          tierId: 'free-tier',
+          tierName: 'free',
+        },
+      ],
+    });
+
+    // Should not throw - should proceed to onboarding with the allowed tier
+    const result = await setupUser({} as OAuth2Client);
+    expect(result).toEqual({
+      projectId: 'server-project',
+      userTier: 'standard-tier',
+      userTierName: 'paid',
+    });
+    expect(mockOnboardUser).toHaveBeenCalled();
+  });
+
+  it('should proceed to onboarding with LEGACY tier when no currentTier and no allowedTiers', async () => {
+    const mockOnboardUser = vi.fn().mockResolvedValue({
+      done: true,
+      response: {
+        cloudaicompanionProject: {
+          id: 'server-project',
+        },
+      },
+    });
+    vi.mocked(CodeAssistServer).mockImplementation(
+      () =>
+        ({
+          loadCodeAssist: mockLoad,
+          onboardUser: mockOnboardUser,
+        }) as unknown as CodeAssistServer,
+    );
+
+    mockLoad.mockResolvedValue({
+      currentTier: null,
+      allowedTiers: undefined,
       ineligibleTiers: [
         {
           reasonMessage: 'User is not eligible',
@@ -345,8 +422,63 @@ describe('setupUser validation', () => {
       ],
     });
 
+    // Should proceed to onboarding with LEGACY tier, ignoring ineligible tier errors
+    const result = await setupUser({} as OAuth2Client);
+    expect(result).toEqual({
+      projectId: 'server-project',
+      userTier: 'legacy-tier',
+      userTierName: '',
+    });
+    expect(mockOnboardUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tierId: 'legacy-tier',
+      }),
+    );
+  });
+
+  it('should throw ValidationRequiredError even if allowed tiers exist', async () => {
+    mockLoad.mockResolvedValue({
+      currentTier: null,
+      allowedTiers: [mockPaidTier],
+      ineligibleTiers: [
+        {
+          reasonMessage: 'Please verify your account',
+          reasonCode: 'VALIDATION_REQUIRED',
+          tierId: 'free-tier',
+          tierName: 'free',
+          validationUrl: 'https://example.com/verify',
+        },
+      ],
+    });
+
     await expect(setupUser({} as OAuth2Client)).rejects.toThrow(
-      'User is not eligible',
+      ValidationRequiredError,
+    );
+  });
+
+  it('should combine multiple ineligible tier messages when currentTier exists but no project ID', async () => {
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', '');
+    mockLoad.mockResolvedValue({
+      currentTier: mockPaidTier,
+      cloudaicompanionProject: undefined,
+      ineligibleTiers: [
+        {
+          reasonMessage: 'Not eligible for standard',
+          reasonCode: 'INELIGIBLE_ACCOUNT',
+          tierId: 'standard-tier',
+          tierName: 'standard',
+        },
+        {
+          reasonMessage: 'Not eligible for free',
+          reasonCode: 'INELIGIBLE_ACCOUNT',
+          tierId: 'free-tier',
+          tierName: 'free',
+        },
+      ],
+    });
+
+    await expect(setupUser({} as OAuth2Client)).rejects.toThrow(
+      'Not eligible for standard, Not eligible for free',
     );
   });
 

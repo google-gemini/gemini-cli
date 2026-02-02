@@ -116,11 +116,24 @@ export const DialogManager = ({
       />
     );
   }
-  if (uiState.confirmationRequest) {
+
+  // commandConfirmationRequest and authConsentRequest are kept separate
+  // to avoid focus deadlocks and state race conditions between the
+  // synchronous command loop and the asynchronous auth flow.
+  if (uiState.commandConfirmationRequest) {
     return (
       <ConsentPrompt
-        prompt={uiState.confirmationRequest.prompt}
-        onConfirm={uiState.confirmationRequest.onConfirm}
+        prompt={uiState.commandConfirmationRequest.prompt}
+        onConfirm={uiState.commandConfirmationRequest.onConfirm}
+        terminalWidth={terminalWidth}
+      />
+    );
+  }
+  if (uiState.authConsentRequest) {
+    return (
+      <ConsentPrompt
+        prompt={uiState.authConsentRequest.prompt}
+        onConfirm={uiState.authConsentRequest.onConfirm}
         terminalWidth={terminalWidth}
       />
     );

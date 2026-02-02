@@ -79,6 +79,13 @@ export function cpLen(str: string): number {
   return toCodePoints(str).length;
 }
 
+/**
+ * Converts a code point index to a UTF-16 code unit offset.
+ */
+export function cpIndexToOffset(str: string, cpIndex: number): number {
+  return cpSlice(str, 0, cpIndex).length;
+}
+
 export function cpSlice(str: string, start: number, end?: number): string {
   if (isAscii(str)) {
     return str.slice(start, end);
@@ -135,18 +142,16 @@ export function stripUnsafeCharacters(str: string): string {
 }
 
 /**
- * Sanitize a string for display in list-like UI components (e.g. Help, Suggestions).
- * Removes ANSI codes, collapses whitespace characters into a single space, and optionally truncates.
+ * Sanitize a string for display in inline UI components (e.g. Help, Suggestions).
+ * Removes ANSI codes, dangerous control characters, collapses whitespace
+ * characters into a single space, and optionally truncates.
  */
-export function sanitizeForListDisplay(
-  str: string,
-  maxLength?: number,
-): string {
+export function sanitizeForDisplay(str: string, maxLength?: number): string {
   if (!str) {
     return '';
   }
 
-  let sanitized = stripAnsi(str).replace(/\s+/g, ' ');
+  let sanitized = stripUnsafeCharacters(str).replace(/\s+/g, ' ');
 
   if (maxLength && sanitized.length > maxLength) {
     sanitized = sanitized.substring(0, maxLength - 3) + '...';

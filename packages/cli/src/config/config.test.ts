@@ -126,10 +126,12 @@ vi.mock('@google/gemini-cli-core', async () => {
     DEFAULT_MEMORY_FILE_FILTERING_OPTIONS: {
       respectGitIgnore: false,
       respectGeminiIgnore: true,
+      customIgnoreFilePaths: [],
     },
     DEFAULT_FILE_FILTERING_OPTIONS: {
       respectGitIgnore: true,
       respectGeminiIgnore: true,
+      customIgnoreFilePaths: [],
     },
     createPolicyEngineConfig: vi.fn(async () => ({
       rules: [],
@@ -586,7 +588,7 @@ describe('parseArguments', () => {
     process.argv = ['node', 'script.js', 'skills', 'list'];
     // Skills command enabled by default or via experimental
     const settings = createTestMergedSettings({
-      experimental: { skills: true },
+      skills: { enabled: true },
     });
     const argv = await parseArguments(settings);
     expect(argv.isCommand).toBe(true);
@@ -594,9 +596,9 @@ describe('parseArguments', () => {
 
   it('should set isCommand to true for hooks command', async () => {
     process.argv = ['node', 'script.js', 'hooks', 'migrate'];
-    // Hooks command enabled via tools settings
+    // Hooks command enabled via hooksConfig settings
     const settings = createTestMergedSettings({
-      tools: { enableHooks: true },
+      hooksConfig: { enabled: true },
     });
     const argv = await parseArguments(settings);
     expect(argv.isCommand).toBe(true);
@@ -703,6 +705,9 @@ describe('loadCliConfig', () => {
     );
     expect(config.getFileFilteringRespectGeminiIgnore()).toBe(
       DEFAULT_FILE_FILTERING_OPTIONS.respectGeminiIgnore,
+    );
+    expect(config.getCustomIgnoreFilePaths()).toEqual(
+      DEFAULT_FILE_FILTERING_OPTIONS.customIgnoreFilePaths,
     );
     expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
   });
@@ -1250,7 +1255,7 @@ describe('Approval mode tool exclusion logic', () => {
     });
 
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'Cannot start in YOLO mode since it is disabled by your admin',
+      'YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
     );
   });
 
@@ -2923,7 +2928,7 @@ describe('loadCliConfig disableYoloMode', () => {
       security: { disableYoloMode: true },
     });
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'Cannot start in YOLO mode since it is disabled by your admin',
+      'YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
     );
   });
 });
@@ -2955,7 +2960,7 @@ describe('loadCliConfig secureModeEnabled', () => {
     });
 
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'Cannot start in YOLO mode since it is disabled by your admin',
+      'YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
     );
   });
 
@@ -2969,7 +2974,7 @@ describe('loadCliConfig secureModeEnabled', () => {
     });
 
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'Cannot start in YOLO mode since it is disabled by your admin',
+      'YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
     );
   });
 

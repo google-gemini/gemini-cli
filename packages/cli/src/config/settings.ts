@@ -385,24 +385,33 @@ export class LoadedSettings {
 
   setRemoteAdminSettings(remoteSettings: FetchAdminControlsResponse): void {
     const admin: Settings['admin'] = {};
-    const { secureModeEnabled, mcpSetting, cliFeatureSetting } = remoteSettings;
+    const {
+      secureModeEnabled,
+      strictModeDisabled,
+      mcpSetting,
+      cliFeatureSetting,
+    } = remoteSettings;
 
-    if (secureModeEnabled !== undefined) {
+    if (Object.keys(remoteSettings).length === 0) {
+      this._remoteAdminSettings = { admin };
+      this._merged = this.computeMergedSettings();
+      return;
+    }
+
+    if (strictModeDisabled !== undefined) {
+      admin.secureModeEnabled = !strictModeDisabled;
+    } else if (secureModeEnabled !== undefined) {
       admin.secureModeEnabled = secureModeEnabled;
+    } else {
+      admin.secureModeEnabled = true;
     }
-
-    if (mcpSetting?.mcpEnabled !== undefined) {
-      admin.mcp = { enabled: mcpSetting.mcpEnabled };
-    }
-
-    const extensionsSetting = cliFeatureSetting?.extensionsSetting;
-    if (extensionsSetting?.extensionsEnabled !== undefined) {
-      admin.extensions = { enabled: extensionsSetting.extensionsEnabled };
-    }
-
-    if (cliFeatureSetting?.advancedFeaturesEnabled !== undefined) {
-      admin.skills = { enabled: cliFeatureSetting.advancedFeaturesEnabled };
-    }
+    admin.mcp = { enabled: mcpSetting?.mcpEnabled ?? false };
+    admin.extensions = {
+      enabled: cliFeatureSetting?.extensionsSetting?.extensionsEnabled ?? false,
+    };
+    admin.skills = {
+      enabled: cliFeatureSetting?.unmanagedCapabilitiesEnabled ?? false,
+    };
 
     this._remoteAdminSettings = { admin };
     this._merged = this.computeMergedSettings();

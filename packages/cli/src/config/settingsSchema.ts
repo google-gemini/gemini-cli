@@ -9,19 +9,17 @@
 // to regenerate the settings reference in `docs/get-started/configuration.md`.
 // --------------------------------------------------------------------------
 
-import type {
-  MCPServerConfig,
-  BugCommandSettings,
-  TelemetrySettings,
-  AuthType,
-  AgentOverride,
-} from '@google/gemini-cli-core';
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   DEFAULT_MODEL_CONFIGS,
+  type MCPServerConfig,
+  type BugCommandSettings,
+  type TelemetrySettings,
+  type AuthType,
+  type AgentOverride,
+  type CustomTheme,
 } from '@google/gemini-cli-core';
-import type { CustomTheme } from '../ui/themes/theme.js';
 import type { SessionRetentionSettings } from './settings.js';
 import { DEFAULT_MIN_RETENTION } from '../utils/sessionCleanup.js';
 
@@ -526,6 +524,16 @@ const SETTINGS_SCHEMA = {
         description: 'Show the model name in the chat for each model turn.',
         showInDialog: true,
       },
+      showUserIdentity: {
+        type: 'boolean',
+        label: 'Show User Identity',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          "Show the logged-in user's identity (e.g. email) in the UI.",
+        showInDialog: true,
+      },
       useAlternateBuffer: {
         type: 'boolean',
         label: 'Use Alternate Screen Buffer',
@@ -553,6 +561,15 @@ const SETTINGS_SCHEMA = {
         default: true,
         description:
           'Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled.',
+        showInDialog: true,
+      },
+      showSpinner: {
+        type: 'boolean',
+        label: 'Show Spinner',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description: 'Show the spinner during operations.',
         showInDialog: true,
       },
       customWittyPhrases: {
@@ -720,6 +737,16 @@ const SETTINGS_SCHEMA = {
         default: 0.5 as number,
         description:
           'The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).',
+        showInDialog: true,
+      },
+      disableLoopDetection: {
+        type: 'boolean',
+        label: 'Disable Loop Detection',
+        category: 'Model',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Disable automatic detection and prevention of infinite loops.',
         showInDialog: true,
       },
       skipNextSpeakerCheck: {
@@ -923,6 +950,18 @@ const SETTINGS_SCHEMA = {
             description: 'Enable fuzzy search when searching for files.',
             showInDialog: true,
           },
+          customIgnoreFilePaths: {
+            type: 'array',
+            label: 'Custom Ignore File Paths',
+            category: 'Context',
+            requiresRestart: true,
+            default: [] as string[],
+            description:
+              'Additional ignore file paths to respect. These files take precedence over .geminiignore and .gitignore. Files earlier in the array take precedence over files later in the array, e.g. the first file takes precedence over the second one.',
+            showInDialog: true,
+            items: { type: 'string' },
+            mergeStrategy: MergeStrategy.UNION,
+          },
         },
       },
     },
@@ -1011,17 +1050,6 @@ const SETTINGS_SCHEMA = {
             showInDialog: false,
           },
         },
-      },
-      autoAccept: {
-        type: 'boolean',
-        label: 'Auto Accept',
-        category: 'Tools',
-        requiresRestart: false,
-        default: false,
-        description: oneLine`
-          Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).
-        `,
-        showInDialog: true,
       },
       approvalMode: {
         type: 'enum',
@@ -1150,16 +1178,6 @@ const SETTINGS_SCHEMA = {
         `,
         showInDialog: true,
       },
-      enableHooks: {
-        type: 'boolean',
-        label: 'Enable Hooks System (Experimental)',
-        category: 'Advanced',
-        requiresRestart: true,
-        default: true,
-        description:
-          'Enables the hooks system experiment. When disabled, the hooks system is completely deactivated regardless of other settings.',
-        showInDialog: false,
-      },
     },
   },
 
@@ -1248,6 +1266,17 @@ const SETTINGS_SCHEMA = {
         default: false,
         description: 'Blocks installing and loading extensions from Git.',
         showInDialog: true,
+      },
+      allowedExtensions: {
+        type: 'array',
+        label: 'Extension Source Regex Allowlist',
+        category: 'Security',
+        requiresRestart: true,
+        default: [] as string[],
+        description:
+          'List of Regex patterns for allowed extensions. If nonempty, only extensions that match the patterns in this list are allowed. Overrides the blockGitExtensions setting.',
+        showInDialog: true,
+        items: { type: 'string' },
       },
       folderTrust: {
         type: 'object',
@@ -1469,15 +1498,6 @@ const SETTINGS_SCHEMA = {
         description: 'Enable Just-In-Time (JIT) context loading.',
         showInDialog: false,
       },
-      skills: {
-        type: 'boolean',
-        label: 'Agent Skills',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: false,
-        description: 'Enable Agent Skills (experimental).',
-        showInDialog: true,
-      },
       useOSC52Paste: {
         type: 'boolean',
         label: 'Use OSC 52 Paste',
@@ -1552,7 +1572,6 @@ const SETTINGS_SCHEMA = {
         default: true,
         description: 'Enable Agent Skills.',
         showInDialog: true,
-        ignoreInDocs: true,
       },
       disabled: {
         type: 'array',
@@ -1582,11 +1601,11 @@ const SETTINGS_SCHEMA = {
         type: 'boolean',
         label: 'Enable Hooks',
         category: 'Advanced',
-        requiresRestart: false,
+        requiresRestart: true,
         default: true,
         description:
           'Canonical toggle for the hooks system. When disabled, no hooks will be executed.',
-        showInDialog: false,
+        showInDialog: true,
       },
       disabled: {
         type: 'array',

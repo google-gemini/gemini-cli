@@ -32,6 +32,7 @@ export interface BaseSelectionListProps<
   maxItemsToShow?: number;
   wrapAround?: boolean;
   focusKey?: string;
+  priority?: boolean;
   renderItem: (item: TItem, context: RenderItemContext) => React.ReactNode;
 }
 
@@ -63,6 +64,7 @@ export function BaseSelectionList<
   maxItemsToShow = 10,
   wrapAround = true,
   focusKey,
+  priority,
   renderItem,
 }: BaseSelectionListProps<T, TItem>): React.JSX.Element {
   const { activeIndex } = useSelectionList({
@@ -74,6 +76,7 @@ export function BaseSelectionList<
     showNumbers,
     wrapAround,
     focusKey,
+    priority,
   });
 
   const [scrollOffset, setScrollOffset] = useState(0);
@@ -97,7 +100,7 @@ export function BaseSelectionList<
   return (
     <Box flexDirection="column">
       {/* Use conditional coloring instead of conditional rendering */}
-      {showScrollArrows && (
+      {showScrollArrows && items.length > maxItemsToShow && (
         <Text
           color={scrollOffset > 0 ? theme.text.primary : theme.text.secondary}
         >
@@ -169,7 +172,7 @@ export function BaseSelectionList<
         );
       })}
 
-      {showScrollArrows && (
+      {showScrollArrows && items.length > maxItemsToShow && (
         <Text
           color={
             scrollOffset + maxItemsToShow < items.length

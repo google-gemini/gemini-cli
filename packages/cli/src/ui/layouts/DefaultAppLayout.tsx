@@ -15,20 +15,12 @@ import { useUIState } from '../contexts/UIStateContext.js';
 import { useFlickerDetector } from '../hooks/useFlickerDetector.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { CopyModeWarning } from '../components/CopyModeWarning.js';
-import { ToolConfirmationQueue } from '../components/ToolConfirmationQueue.js';
-import { useConfirmingTool } from '../hooks/useConfirmingTool.js';
-import { useConfig } from '../contexts/ConfigContext.js';
+import { BackgroundShellDisplay } from '../components/BackgroundShellDisplay.js';
+import { StreamingState } from '../types.js';
 
 export const DefaultAppLayout: React.FC = () => {
   const uiState = useUIState();
-  const config = useConfig();
   const isAlternateBuffer = useAlternateBuffer();
-
-  // If the event-driven scheduler is enabled AND we have a tool waiting,
-  // we switch the footer mode to "Queue".
-  const confirmingTool = useConfirmingTool();
-  const showConfirmationQueue =
-    config.isEventDrivenSchedulerEnabled() && confirmingTool !== null;
 
   const { rootUiRef, terminalHeight } = uiState;
   useFlickerDetector(rootUiRef, terminalHeight);
@@ -47,6 +39,24 @@ export const DefaultAppLayout: React.FC = () => {
     >
       <MainContent />
 
+      {uiState.isBackgroundShellVisible &&
+        uiState.backgroundShells.size > 0 &&
+        uiState.activeBackgroundShellPid &&
+        uiState.backgroundShellHeight > 0 &&
+        uiState.streamingState !== StreamingState.WaitingForConfirmation && (
+          <Box height={uiState.backgroundShellHeight} flexShrink={0}>
+            <BackgroundShellDisplay
+              shells={uiState.backgroundShells}
+              activePid={uiState.activeBackgroundShellPid}
+              width={uiState.terminalWidth}
+              height={uiState.backgroundShellHeight}
+              isFocused={
+                uiState.embeddedShellFocused && !uiState.dialogsVisible
+              }
+              isListOpenProp={uiState.isBackgroundShellListOpen}
+            />
+          </Box>
+        )}
       <Box
         flexDirection="column"
         ref={uiState.mainControlsRef}
@@ -65,12 +75,7 @@ export const DefaultAppLayout: React.FC = () => {
             addItem={uiState.historyManager.addItem}
           />
         ) : (
-          <>
-            {showConfirmationQueue && confirmingTool && (
-              <ToolConfirmationQueue confirmingTool={confirmingTool} />
-            )}
-            <Composer isFocused={!showConfirmationQueue} />
-          </>
+          <Composer isFocused={true} />
         )}
 
         <ExitWarning />
