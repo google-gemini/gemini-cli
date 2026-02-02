@@ -68,13 +68,28 @@ export const oncallCommand: SlashCommand = {
           const argArray = args.trim().split(/\s+/);
           for (let i = 0; i < argArray.length; i++) {
             const arg = argArray[i];
-            if (arg === '--until' && i + 1 < argArray.length) {
-              until = argArray[i + 1];
+            if (arg === '--until') {
+              if (i + 1 >= argArray.length) {
+                throw new Error('Flag --until requires a value (YYYY-MM-DD).');
+              }
+              const val = argArray[i + 1];
+              if (!/^\d{4}-\d{2}-\d{2}$/.test(val)) {
+                throw new Error(
+                  `Invalid date format for --until: "${val}". Expected YYYY-MM-DD.`,
+                );
+              }
+              until = val;
               i++;
+            } else if (arg.startsWith('--')) {
+              throw new Error(`Unknown flag: ${arg}`);
             } else {
               const parsedLimit = parseInt(arg, 10);
               if (!isNaN(parsedLimit) && parsedLimit > 0) {
                 limit = parsedLimit;
+              } else {
+                throw new Error(
+                  `Invalid argument: "${arg}". Expected a positive number or --until flag.`,
+                );
               }
             }
           }

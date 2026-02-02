@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
 import type { Config } from '@google/gemini-cli-core';
@@ -85,6 +85,12 @@ export const TriageIssues = ({
     [],
   );
   const [showHistory, setShowHistory] = useState(false);
+
+  const abortControllerRef = useRef<AbortController>(new AbortController());
+
+  useEffect(() => () => {
+      abortControllerRef.current.abort();
+    }, []);
 
   // Buffer for editing comment
   const commentBuffer = useTextBuffer({
@@ -212,7 +218,7 @@ Return a JSON object with:
           },
           required: ['recommendation', 'reason', 'suggested_comment'],
         },
-        abortSignal: new AbortController().signal,
+        abortSignal: abortControllerRef.current.signal,
         promptId: 'triage-issues',
       });
 
