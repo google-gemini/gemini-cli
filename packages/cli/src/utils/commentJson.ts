@@ -6,7 +6,7 @@
 
 import * as fs from 'node:fs';
 import { parse, stringify } from 'comment-json';
-import { coreEvents, getFsErrorMessage } from '@google/gemini-cli-core';
+import { coreEvents } from '@google/gemini-cli-core';
 
 /**
  * Type representing an object that may contain Symbol keys for comments.
@@ -21,31 +21,11 @@ export function updateSettingsFilePreservingFormat(
   updates: Record<string, unknown>,
 ): void {
   if (!fs.existsSync(filePath)) {
-    try {
-      fs.writeFileSync(filePath, JSON.stringify(updates, null, 2), 'utf-8');
-    } catch (error) {
-      const friendlyMessage = getFsErrorMessage(error);
-      coreEvents.emitFeedback(
-        'error',
-        `Failed to create settings file '${filePath}': ${friendlyMessage}`,
-        error,
-      );
-    }
+    fs.writeFileSync(filePath, JSON.stringify(updates, null, 2), 'utf-8');
     return;
   }
 
-  let originalContent: string;
-  try {
-    originalContent = fs.readFileSync(filePath, 'utf-8');
-  } catch (error) {
-    const friendlyMessage = getFsErrorMessage(error);
-    coreEvents.emitFeedback(
-      'error',
-      `Failed to read settings file '${filePath}': ${friendlyMessage}`,
-      error,
-    );
-    return;
-  }
+  const originalContent = fs.readFileSync(filePath, 'utf-8');
 
   let parsed: Record<string, unknown>;
   try {
@@ -54,7 +34,7 @@ export function updateSettingsFilePreservingFormat(
   } catch (error) {
     coreEvents.emitFeedback(
       'error',
-      `Error parsing settings file '${filePath}'. Please check the JSON syntax.`,
+      'Error parsing settings file. Please check the JSON syntax.',
       error,
     );
     return;
@@ -63,16 +43,7 @@ export function updateSettingsFilePreservingFormat(
   const updatedStructure = applyUpdates(parsed, updates);
   const updatedContent = stringify(updatedStructure, null, 2);
 
-  try {
-    fs.writeFileSync(filePath, updatedContent, 'utf-8');
-  } catch (error) {
-    const friendlyMessage = getFsErrorMessage(error);
-    coreEvents.emitFeedback(
-      'error',
-      `Failed to write settings file '${filePath}': ${friendlyMessage}`,
-      error,
-    );
-  }
+  fs.writeFileSync(filePath, updatedContent, 'utf-8');
 }
 
 /**
