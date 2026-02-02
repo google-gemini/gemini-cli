@@ -24,6 +24,7 @@ import { FakeContentGenerator } from './fakeContentGenerator.js';
 import { parseCustomHeaders } from '../utils/customHeaderUtils.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
 import { getVersion, resolveModel } from '../../index.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -64,6 +65,25 @@ export type ContentGeneratorConfig = {
   quotaProject?: string;
 };
 
+/**
+ * Validates GCP Project ID format (6-30 chars, lowercase/digits/hyphens).
+ * Avoids silent sanitization which creates non-existent IDs.
+ */
+const getValidatedProjectId = (id?: string): string | undefined => {
+  if (!id) return undefined;
+  const sanitized = id.trim();
+  // GCP Standard: lowercase letters, numbers, and hyphens.
+  // Must start with a letter and not end with a hyphen.
+  const gcpIdRegex = /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/;
+
+  if (!gcpIdRegex.test(sanitized)) {
+    debugLogger.warn(
+      `[SAL_AUTH] Invalid Project ID format detected: "${sanitized}". Quota attribution may fail.`,
+    );
+  }
+  return sanitized;
+};
+
 export async function createContentGeneratorConfig(
   config: Config,
   authType: AuthType | undefined,
@@ -81,7 +101,9 @@ export async function createContentGeneratorConfig(
   const contentGeneratorConfig: ContentGeneratorConfig = {
     authType,
     proxy: config?.getProxy(),
-    quotaProject: googleCloudQuotaProject || googleCloudProject,
+    quotaProject: getValidatedProjectId(
+      googleCloudQuotaProject || googleCloudProject,
+    ),
   };
 
   // If we are using Google auth or we are in Cloud Shell, there is nothing else to validate for now
