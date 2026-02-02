@@ -88,9 +88,12 @@ export const TriageIssues = ({
 
   const abortControllerRef = useRef<AbortController>(new AbortController());
 
-  useEffect(() => () => {
+  useEffect(
+    () => () => {
       abortControllerRef.current.abort();
-    }, []);
+    },
+    [],
+  );
 
   // Buffer for editing comment
   const commentBuffer = useTextBuffer({
