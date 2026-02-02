@@ -117,11 +117,10 @@ describe('run_shell_command', () => {
 
     // Validate model output - will throw if no output, warn if missing expected content
     // Model often reports exit code instead of showing output
-    validateModelOutput(
-      result,
-      ['hello-world', 'exit code 0'],
-      'Shell command test',
-    );
+    validateModelOutput(result, {
+      expectedContent: ['hello-world', 'exit code 0'],
+      testName: 'Shell command test',
+    });
   });
 
   it('should be able to run a shell command via stdin', async () => {
@@ -150,7 +149,10 @@ describe('run_shell_command', () => {
     ).toBeTruthy();
 
     // Validate model output - will throw if no output, warn if missing expected content
-    validateModelOutput(result, 'test-stdin', 'Shell command stdin test');
+    validateModelOutput(result, {
+      expectedContent: 'test-stdin',
+      testName: 'Shell command stdin test',
+    });
   });
 
   it.skip('should run allowed sub-command in non-interactive mode', async () => {
@@ -495,11 +497,10 @@ describe('run_shell_command', () => {
     expect(toolCall.toolRequest.success).toBe(true);
 
     // Validate model output - will throw if no output, warn if missing expected content
-    validateModelOutput(
-      result,
-      'test-allow-all',
-      'Shell command stdin allow all',
-    );
+    validateModelOutput(result, {
+      expectedContent: 'test-allow-all',
+      testName: 'Shell command stdin allow all',
+    });
   });
 
   it('should propagate environment variables to the child process', async () => {
@@ -528,7 +529,10 @@ describe('run_shell_command', () => {
         foundToolCall,
         'Expected to find a run_shell_command tool call',
       ).toBeTruthy();
-      validateModelOutput(result, varValue, 'Env var propagation test');
+      validateModelOutput(result, {
+        expectedContent: varValue,
+        testName: 'Env var propagation test',
+      });
       expect(result).toContain(varValue);
     } finally {
       delete process.env[varName];
@@ -558,7 +562,10 @@ describe('run_shell_command', () => {
       'Expected to find a run_shell_command tool call',
     ).toBeTruthy();
 
-    validateModelOutput(result, fileName, 'Platform-specific listing test');
+    validateModelOutput(result, {
+      expectedContent: fileName,
+      testName: 'Platform-specific listing test',
+    });
     expect(result).toContain(fileName);
   });
 

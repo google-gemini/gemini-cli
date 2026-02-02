@@ -69,6 +69,9 @@ describe('list_directory', () => {
     }
 
     // Validate model output - will throw if no output, warn if missing expected content
-    validateModelOutput(result, ['file1.txt', 'subdir'], 'List directory test');
+    validateModelOutput(result, {
+      expectedContent: ['file1.txt', 'subdir'],
+      testName: 'List directory test',
+    });
   });
 });

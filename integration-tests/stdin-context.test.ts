@@ -67,7 +67,10 @@ describe.skip('stdin context', () => {
     }
 
     // Validate model output
-    validateModelOutput(result, randomString, 'STDIN context test');
+    validateModelOutput(result, {
+      expectedContent: randomString,
+      testName: 'STDIN context test',
+    });
 
     expect(
       result.toLowerCase().includes(randomString),

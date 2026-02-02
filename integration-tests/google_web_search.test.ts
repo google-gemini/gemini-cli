@@ -69,11 +69,10 @@ describe('web search tool', () => {
     ).toBeTruthy();
 
     // Validate model output - will throw if no output, warn if missing expected content
-    const hasExpectedContent = validateModelOutput(
-      result,
-      ['weather', 'london'],
-      'Google web search test',
-    );
+    const hasExpectedContent = validateModelOutput(result, {
+      expectedContent: ['weather', 'london'],
+      testName: 'Google web search test',
+    });
 
     // If content was missing, log the search queries used
     if (!hasExpectedContent) {

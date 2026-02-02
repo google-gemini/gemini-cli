@@ -29,7 +29,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 const memoryToolSchemaData: FunctionDeclaration = {
   name: MEMORY_TOOL_NAME,
   description:
-    'Saves a specific piece of information or fact to your long-term memory. Use this when the user explicitly asks you to remember something, or when they state a clear, concise fact that seems important to retain for future interactions.',
+    'Saves a specific piece of information, fact, or user preference to your long-term memory. Use this when the user explicitly asks you to remember something, or when they state a clear, concise fact or preference that seems important to retain for future interactions. Examples: "Always lint after building", "Never run sudo commands", "Remember my address".',
   parametersJsonSchema: {
     type: 'object',
     properties: {

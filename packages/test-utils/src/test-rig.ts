@@ -108,13 +108,22 @@ export function printDebugInfo(
 // Helper to validate model output and warn about unexpected content
 export function validateModelOutput(
   result: string,
-  expectedContent: string | (string | RegExp)[] | null = null,
-  testName = '',
+  {
+    expectedContent = null,
+    testName = '',
+    forbiddenContent = null,
+  }: {
+    expectedContent?: string | (string | RegExp)[] | null;
+    testName?: string;
+    forbiddenContent?: string | (string | RegExp)[] | null;
+  } = {},
 ) {
   // First, check if there's any output at all (this should fail the test if missing)
   if (!result || result.trim().length === 0) {
     throw new Error('Expected LLM to return some output');
   }
+
+  let isValid = true;
 
   // If expectedContent is provided, check for it and warn if missing
   if (expectedContent) {
@@ -142,14 +151,42 @@ export function validateModelOutput(
       );
       console.warn('Expected content:', expectedContent);
       console.warn('Actual output:', result);
-      return false;
-    } else if (env['VERBOSE'] === 'true') {
-      console.log(`${testName}: Model output validated successfully.`);
+      isValid = false;
     }
-    return true;
   }
 
-  return true;
+  // If forbiddenContent is provided, check for it and warn if present
+  if (forbiddenContent) {
+    const contents = Array.isArray(forbiddenContent)
+      ? forbiddenContent
+      : [forbiddenContent];
+    const foundContent = contents.filter((content) => {
+      if (typeof content === 'string') {
+        return result.toLowerCase().includes(content.toLowerCase());
+      } else if (content instanceof RegExp) {
+        return content.test(result);
+      }
+      return false;
+    });
+
+    if (foundContent.length > 0) {
+      console.warn(
+        `Warning: LLM included forbidden content in response: ${foundContent.join(
+          ', ',
+        )}.`,
+        'This is not ideal but not a test failure.',
+      );
+      console.warn('Forbidden content:', forbiddenContent);
+      console.warn('Actual output:', result);
+      isValid = false;
+    }
+  }
+
+  if (isValid && env['VERBOSE'] === 'true') {
+    console.log(`${testName}: Model output validated successfully.`);
+  }
+
+  return isValid;
 }
 
 export interface ParsedLog {

@@ -44,7 +44,10 @@ describe('file-system', () => {
     ).toBeTruthy();
 
     // Validate model output - will throw if no output, warn if missing expected content
-    validateModelOutput(result, 'hello world', 'File read test');
+    validateModelOutput(result, {
+      expectedContent: 'hello world',
+      testName: 'File read test',
+    });
   });
 
   it('should be able to write a file', async () => {
@@ -75,7 +78,7 @@ describe('file-system', () => {
     ).toBeTruthy();
 
     // Validate model output - will throw if no output
-    validateModelOutput(result, null, 'File write test');
+    validateModelOutput(result, { testName: 'File write test' });
 
     const fileContent = rig.readFile('test.txt');
 

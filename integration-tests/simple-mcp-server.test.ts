@@ -227,7 +227,10 @@ describe.skip('simple-mcp-server', () => {
     expect(foundToolCall, 'Expected to find an add tool call').toBeTruthy();
 
     // Validate model output - will throw if no output, fail if missing expected content
-    validateModelOutput(output, '15', 'MCP server test');
+    validateModelOutput(output, {
+      expectedContent: '15',
+      testName: 'MCP server test',
+    });
     expect(
       output.includes('15'),
       'Expected output to contain the sum (15)',

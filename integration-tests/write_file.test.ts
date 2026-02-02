@@ -47,7 +47,10 @@ describe('write_file', () => {
     ).toBeTruthy();
 
     // Validate model output - will throw if no output, warn if missing expected content
-    validateModelOutput(result, 'dad.txt', 'Write file test');
+    validateModelOutput(result, {
+      expectedContent: 'dad.txt',
+      testName: 'Write file test',
+    });
 
     const newFilePath = 'dad.txt';
 
