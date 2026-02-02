@@ -113,11 +113,9 @@ Follow these steps to conduct a thorough review:
     * Check that services are stateless where possible, or use the centralized `Storage` service for persistence.
     * **Cross-Service Communication**: Prefer using the `coreEvents` bus (from `packages/core/src/utils/events.ts`) for asynchronous communication between services or to notify the UI of state changes. Avoid tight coupling between services.
 10. Architectural Audit (Package Boundaries):
-    * **Strict Dependency Rule**: `packages/core` MUST NOT import from `packages/cli`. This prevents circular dependencies and ensures the core remains environment-agnostic.
     * **Logic Placement**: Non-UI logic (e.g., model orchestration, tool implementation, git/filesystem operations) MUST reside in `packages/core`. `packages/cli` should only contain UI/Ink components, command-line argument parsing, and user interaction logic.
     * **Environment Isolation**: Core logic should not assume a TUI environment. Use the `ConfirmationBus` or `Output` abstractions for communicating with the user from Core.
     * **Decoupling**: Actively look for opportunities to decouple services by using `coreEvents`. If a service is importing another service just to notify it of a change, it should probably be using an event instead.
-    * **Reusability**: Ensure logic is structured to be usable by other consumers of `@google/gemini-cli-core`, such as the VS Code companion or A2A server.
 11. General Gemini CLI design principles:
     * Make sure that settings are only used for options that a user might
       consider changing.
