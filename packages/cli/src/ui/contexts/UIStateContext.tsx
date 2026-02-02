@@ -150,6 +150,7 @@ export interface UIState {
   showFullTodos: boolean;
   copyModeEnabled: boolean;
   warningMessage: string | null;
+  hintMessage: string | null;
   bannerData: {
     defaultText: string;
     warningText: string;

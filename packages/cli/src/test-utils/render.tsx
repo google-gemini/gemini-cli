@@ -160,6 +160,7 @@ const baseMockUiState = {
   activePtyId: undefined,
   backgroundShells: new Map(),
   backgroundShellHeight: 0,
+  hintMessage: null,
 };
 
 export const mockAppState: AppState = {
@@ -209,6 +210,7 @@ const mockUIActions: UIActions = {
   setIsBackgroundShellListOpen: vi.fn(),
   setAuthContext: vi.fn(),
   handleWarning: vi.fn(),
+  handleHintMessage: vi.fn(),
   handleRestart: vi.fn(),
   handleNewAgentsSelect: vi.fn(),
 };

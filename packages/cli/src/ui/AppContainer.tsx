@@ -1306,6 +1306,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const [showIdeRestartPrompt, setShowIdeRestartPrompt] = useState(false);
   const [warningMessage, setWarningMessage] = useState<string | null>(null);
+  const [hintMessage, setHintMessage] = useState<string | null>(null);
 
   const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
     useFolderTrust(settings, setIsTrustedFolder, historyManager.addItem);
@@ -1327,6 +1328,18 @@ Logging in with Google... Restarting Gemini CLI to continue.
     }
     warningTimeoutRef.current = setTimeout(() => {
       setWarningMessage(null);
+    }, WARNING_PROMPT_DURATION_MS);
+  }, []);
+
+  const hintTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleHintMessage = useCallback((message: string) => {
+    setHintMessage(message);
+    if (hintTimeoutRef.current) {
+      clearTimeout(hintTimeoutRef.current);
+    }
+    hintTimeoutRef.current = setTimeout(() => {
+      setHintMessage(null);
     }, WARNING_PROMPT_DURATION_MS);
   }, []);
 
@@ -1934,6 +1947,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       customDialog,
       copyModeEnabled,
       warningMessage,
+      hintMessage,
       bannerData,
       bannerVisible,
       terminalBackgroundColor: config.getTerminalBackground(),
@@ -2042,6 +2056,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       authState,
       copyModeEnabled,
       warningMessage,
+      hintMessage,
       bannerData,
       bannerVisible,
       config,
@@ -2098,6 +2113,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleApiKeyCancel,
       setBannerVisible,
       handleWarning,
+      handleHintMessage,
       setEmbeddedShellFocused,
       dismissBackgroundShell,
       setActiveBackgroundShellPid,
@@ -2174,6 +2190,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleApiKeyCancel,
       setBannerVisible,
       handleWarning,
+      handleHintMessage,
       setEmbeddedShellFocused,
       dismissBackgroundShell,
       setActiveBackgroundShellPid,

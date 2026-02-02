@@ -44,6 +44,10 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
     );
   }
 
+  if (uiState.hintMessage) {
+    return <Text color={theme.text.secondary}>{uiState.hintMessage}</Text>;
+  }
+
   if (uiState.showEscapePrompt) {
     const isPromptEmpty = uiState.buffer.text.length === 0;
     const hasHistory = uiState.history.length > 0;

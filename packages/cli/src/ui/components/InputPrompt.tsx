@@ -17,6 +17,8 @@ import {
   logicalPosToOffset,
   PASTED_TEXT_PLACEHOLDER_REGEX,
   getTransformUnderCursor,
+  LARGE_PASTE_LINE_THRESHOLD,
+  LARGE_PASTE_CHAR_THRESHOLD,
 } from './shared/text-buffer.js';
 import {
   cpSlice,
@@ -122,6 +124,50 @@ export const calculatePromptWidths = (mainContentWidth: number) => {
   } as const;
 };
 
+/**
+ * Attempt to toggle expansion of a paste placeholder in the buffer.
+ * Returns true if a toggle action was performed, false otherwise.
+ */
+export function tryTogglePasteExpansion(buffer: TextBuffer): boolean {
+  if (!buffer.pastedContent || Object.keys(buffer.pastedContent).length === 0) {
+    return false;
+  }
+
+  const [row, col] = buffer.cursor;
+
+  // 1. Check if cursor is on a collapsed placeholder
+  const transform = getTransformUnderCursor(
+    row,
+    col,
+    buffer.transformationsByLine,
+  );
+  if (transform?.type === 'paste' && transform.id) {
+    buffer.togglePasteExpansion(transform.id, row, col);
+    return true;
+  }
+
+  // 2. Check if cursor is inside an expanded paste region — collapse it
+  const expandedId = buffer.getExpandedPasteAtLine(row);
+  if (expandedId) {
+    buffer.togglePasteExpansion(expandedId, row, col);
+    return true;
+  }
+
+  // 3. Nothing expanded, cursor not on a placeholder — expand the first one
+  for (let r = 0; r < buffer.transformationsByLine.length; r++) {
+    const transforms = buffer.transformationsByLine[r];
+    if (!transforms) continue;
+    for (const t of transforms) {
+      if (t.type === 'paste' && t.id) {
+        buffer.togglePasteExpansion(t.id, r, t.logStart);
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 export const InputPrompt: React.FC<InputPromptProps> = ({
   buffer,
   onSubmit,
@@ -151,7 +197,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const { merged: settings } = useSettings();
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
-  const { setEmbeddedShellFocused } = useUIActions();
+  const { setEmbeddedShellFocused, handleHintMessage } = useUIActions();
   const {
     terminalWidth,
     activePtyId,
@@ -391,11 +437,18 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       } else {
         const textToInsert = await clipboardy.read();
         buffer.insert(textToInsert, { paste: true });
+        const pasteLineCount = textToInsert.split('\n').length;
+        if (
+          pasteLineCount > LARGE_PASTE_LINE_THRESHOLD ||
+          textToInsert.length > LARGE_PASTE_CHAR_THRESHOLD
+        ) {
+          handleHintMessage('Press Ctrl+O to expand pasted text');
+        }
       }
     } catch (error) {
       debugLogger.error('Error handling paste:', error);
     }
-  }, [buffer, config, stdout, settings]);
+  }, [buffer, config, stdout, settings, handleHintMessage]);
 
   useMouseClick(
     innerBoxRef,
@@ -516,6 +569,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
         // Ensure we never accidentally interpret paste as regular input.
         buffer.handleInput(key);
+        if (key.sequence) {
+          const pasteLineCount = key.sequence.split('\n').length;
+          if (
+            pasteLineCount > LARGE_PASTE_LINE_THRESHOLD ||
+            key.sequence.length > LARGE_PASTE_CHAR_THRESHOLD
+          ) {
+            handleHintMessage('Press Ctrl+O to expand pasted text');
+          }
+        }
         return true;
       }
 
@@ -528,6 +590,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         if (escPressCount.current > 0 || showEscapePrompt) {
           resetEscapeState();
         }
+      }
+
+      // Ctrl+O to expand/collapse paste placeholders
+      if (keyMatchers[Command.SHOW_MORE_LINES](key)) {
+        const handled = tryTogglePasteExpansion(buffer);
+        if (handled) return true;
       }
 
       if (
@@ -986,6 +1054,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       backgroundShellHeight,
       history,
       streamingState,
+      handleHintMessage,
     ],
   );
 
