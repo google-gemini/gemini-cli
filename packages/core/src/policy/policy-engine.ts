@@ -310,13 +310,7 @@ export class PolicyEngine {
     // For tools with a server name, we want to try matching both the
     // original name and the fully qualified name (server__tool).
     // We also want to check legacy aliases for the tool name.
-    const toolNamesToTry = new Set<string>();
-    if (toolCall.name) {
-      const aliases = getToolAliases(toolCall.name);
-      for (const alias of aliases) {
-        toolNamesToTry.add(alias);
-      }
-    }
+    const toolNamesToTry = toolCall.name ? getToolAliases(toolCall.name) : [];
 
     const toolCallsToTry: FunctionCall[] = [];
     for (const name of toolNamesToTry) {
