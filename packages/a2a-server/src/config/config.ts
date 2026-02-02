@@ -143,20 +143,27 @@ export async function loadConfig(
   // Initialize final config parameters to the previous parameters.
   // If no admin controls are needed, these will be used as-is for the final
   // config.
-  let finalConfigParams = { ...configParams };
+  const finalConfigParams = { ...configParams };
   if (adminControlsEnabled) {
     const adminSettings = await fetchAdminControlsOnce(
       codeAssistServer,
       adminControlsEnabled,
     );
+
     // Set config parameters according to what admin settings are available.
-    finalConfigParams = {
-      ...configParams,
-      disableYoloMode: adminSettings.secureModeEnabled,
-      mcpEnabled: adminSettings.mcpSetting?.mcpEnabled,
-      extensionsEnabled:
-        adminSettings.cliFeatureSetting?.extensionsSetting?.extensionsEnabled,
-    };
+    if (adminSettings.strictModeDisabled !== undefined) {
+      finalConfigParams.disableYoloMode = !adminSettings.strictModeDisabled;
+    }
+    if (adminSettings.mcpSetting?.mcpEnabled !== undefined) {
+      finalConfigParams.mcpEnabled = adminSettings.mcpSetting?.mcpEnabled;
+    }
+    if (
+      adminSettings.cliFeatureSetting?.extensionsSetting?.extensionsEnabled !==
+      undefined
+    ) {
+      finalConfigParams.extensionsEnabled =
+        adminSettings.cliFeatureSetting?.extensionsSetting?.extensionsEnabled;
+    }
   }
 
   const config = new Config(finalConfigParams);

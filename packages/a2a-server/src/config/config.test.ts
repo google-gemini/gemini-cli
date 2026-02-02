@@ -109,7 +109,6 @@ describe('loadConfig', () => {
 
       it('should fetch admin controls and apply them', async () => {
         const mockAdminSettings: FetchAdminControlsResponse = {
-          secureModeEnabled: false,
           mcpSetting: {
             mcpEnabled: false,
           },
@@ -126,7 +125,7 @@ describe('loadConfig', () => {
 
         expect(Config).toHaveBeenCalledWith(
           expect.objectContaining({
-            disableYoloMode: mockAdminSettings.secureModeEnabled,
+            disableYoloMode: !mockAdminSettings.strictModeDisabled,
             mcpEnabled: mockAdminSettings.mcpSetting?.mcpEnabled,
             extensionsEnabled:
               mockAdminSettings.cliFeatureSetting?.extensionsSetting
@@ -137,14 +136,8 @@ describe('loadConfig', () => {
 
       it('should fetch admin controls using the code assist server when available', async () => {
         const mockAdminSettings: FetchAdminControlsResponse = {
-          secureModeEnabled: true,
           mcpSetting: {
             mcpEnabled: true,
-          },
-          cliFeatureSetting: {
-            extensionsSetting: {
-              extensionsEnabled: true,
-            },
           },
           strictModeDisabled: true,
         };
@@ -163,11 +156,8 @@ describe('loadConfig', () => {
         );
         expect(Config).toHaveBeenCalledWith(
           expect.objectContaining({
-            disableYoloMode: mockAdminSettings.secureModeEnabled,
+            disableYoloMode: !mockAdminSettings.strictModeDisabled,
             mcpEnabled: mockAdminSettings.mcpSetting?.mcpEnabled,
-            extensionsEnabled:
-              mockAdminSettings.cliFeatureSetting?.extensionsSetting
-                ?.extensionsEnabled,
           }),
         );
       });
