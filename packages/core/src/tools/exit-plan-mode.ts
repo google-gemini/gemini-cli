@@ -16,10 +16,9 @@ import {
 } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import path from 'node:path';
-import * as fs from 'node:fs';
 import type { Config } from '../config/config.js';
 import { EXIT_PLAN_MODE_TOOL_NAME } from './tool-names.js';
-import { isWithinRoot } from '../utils/fileUtils.js';
+import { validatePlanPath, validatePlanContent } from '../utils/planUtils.js';
 import { ApprovalMode } from '../policy/types.js';
 
 /**
@@ -74,25 +73,11 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
       return 'plan_path is required.';
     }
 
-    const plansDir = this.config.storage.getProjectTempPlansDir();
-    const resolvedPath = path.resolve(
-      this.config.getTargetDir(),
+    return validatePlanPath(
       params.plan_path,
+      this.config.storage.getProjectTempPlansDir(),
+      this.config.getTargetDir(),
     );
-
-    const realPath = fs.existsSync(resolvedPath)
-      ? fs.realpathSync(resolvedPath)
-      : resolvedPath;
-
-    if (!isWithinRoot(realPath, plansDir)) {
-      return `Access denied: plan path must be within the designated plans directory.`;
-    }
-
-    if (!fs.existsSync(resolvedPath)) {
-      return `Plan file does not exist: ${params.plan_path}. You must create the plan file before requesting approval.`;
-    }
-
-    return null;
   }
 
   protected createInvocation(
@@ -191,19 +176,12 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
    * Sets planValidationError if validation fails.
    */
   private async validatePlanContent(planPath: string): Promise<boolean> {
-    try {
-      const content = await fs.promises.readFile(planPath, 'utf8');
-      if (!content.trim()) {
-        this.planValidationError =
-          'Plan file is empty. You must write content to the plan file before requesting approval.';
-        return false;
-      }
-      return true;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      this.planValidationError = `Failed to read plan file: ${message}`;
+    const error = await validatePlanContent(planPath);
+    if (error) {
+      this.planValidationError = error;
       return false;
     }
+    return true;
   }
 
   async execute(_signal: AbortSignal): Promise<ToolResult> {

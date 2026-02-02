@@ -229,6 +229,31 @@ export function isWithinRoot(
 }
 
 /**
+ * Safely resolves a path to its real path if it exists, otherwise returns the absolute resolved path.
+ */
+export function getRealPathSync(filePath: string): string {
+  try {
+    return fs.realpathSync(filePath);
+  } catch {
+    return path.resolve(filePath);
+  }
+}
+
+/**
+ * Checks if a file's content is empty or contains only whitespace.
+ * Honors Unicode BOM encodings.
+ */
+export async function isEmpty(filePath: string): Promise<boolean> {
+  try {
+    const content = await readFileWithEncoding(filePath);
+    return content.trim().length === 0;
+  } catch {
+    // If file is unreadable, we treat it as empty/invalid for validation purposes
+    return true;
+  }
+}
+
+/**
  * Heuristic: determine if a file is likely binary.
  * Now BOM-aware: if a Unicode BOM is detected, we treat it as text.
  * For non-BOM files, retain the existing null-byte and non-printable ratio checks.

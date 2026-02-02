@@ -27,6 +27,13 @@ vi.mock('node:fs', async (importOriginal) => {
   };
 });
 
+vi.mock('../utils/planUtils.js', () => ({
+  validatePlanPath: vi.fn(),
+  validatePlanContent: vi.fn(),
+}));
+
+import { validatePlanPath, validatePlanContent } from '../utils/planUtils.js';
+
 describe('ExitPlanModeTool', () => {
   let tool: ExitPlanModeTool;
   let mockMessageBus: ReturnType<typeof createMockMessageBus>;
@@ -40,11 +47,17 @@ describe('ExitPlanModeTool', () => {
     vi.resetAllMocks();
     mockMessageBus = createMockMessageBus();
     vi.mocked(mockMessageBus.publish).mockResolvedValue(undefined);
-    // Default: plan file has content and exists
+
+    // Default mocks for planUtils
+    vi.mocked(validatePlanPath).mockReturnValue(null);
+    vi.mocked(validatePlanContent).mockResolvedValue(null);
+
+    // Default: plan file exists and has content
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.promises.readFile).mockResolvedValue(
       '# My Plan\n\nSome content',
     );
+
     mockConfig = {
       getTargetDir: vi.fn().mockReturnValue(mockTargetDir),
       setApprovalMode: vi.fn(),
@@ -93,19 +106,7 @@ describe('ExitPlanModeTool', () => {
     });
 
     it('should return false when plan file is empty', async () => {
-      vi.mocked(fs.promises.readFile).mockResolvedValue('');
-      const planPath = 'plans/test-plan.md';
-      const invocation = tool.build({ plan_path: planPath });
-
-      const result = await invocation.shouldConfirmExecute(
-        new AbortController().signal,
-      );
-
-      expect(result).toBe(false);
-    });
-
-    it('should return false when plan file contains only whitespace', async () => {
-      vi.mocked(fs.promises.readFile).mockResolvedValue('   \n\t\n   ');
+      vi.mocked(validatePlanContent).mockResolvedValue('Plan file is empty');
       const planPath = 'plans/test-plan.md';
       const invocation = tool.build({ plan_path: planPath });
 
@@ -117,9 +118,7 @@ describe('ExitPlanModeTool', () => {
     });
 
     it('should return false when plan file cannot be read', async () => {
-      vi.mocked(fs.promises.readFile).mockRejectedValue(
-        new Error('ENOENT: no such file'),
-      );
+      vi.mocked(validatePlanContent).mockResolvedValue('Failed to read');
       const planPath = 'plans/test-plan.md';
       const invocation = tool.build({ plan_path: planPath });
 
@@ -172,7 +171,9 @@ describe('ExitPlanModeTool', () => {
 
   describe('execute with invalid plan', () => {
     it('should return error when plan file is empty', async () => {
-      vi.mocked(fs.promises.readFile).mockResolvedValue('');
+      vi.mocked(validatePlanContent).mockResolvedValue(
+        'Plan file is empty. You must write content to the plan file before requesting approval.',
+      );
       const planPath = 'plans/test-plan.md';
       const invocation = tool.build({ plan_path: planPath });
 
@@ -185,8 +186,8 @@ describe('ExitPlanModeTool', () => {
     });
 
     it('should return error when plan file cannot be read', async () => {
-      vi.mocked(fs.promises.readFile).mockRejectedValue(
-        new Error('ENOENT: no such file'),
+      vi.mocked(validatePlanContent).mockResolvedValue(
+        'Failed to read plan file: ENOENT',
       );
       const planPath = 'plans/test-plan.md';
       const invocation = tool.build({ plan_path: planPath });
@@ -343,6 +344,7 @@ Ask the user for specific feedback on how to improve the plan.`,
   });
 
   it('should throw error during build if plan path is outside plans directory', () => {
+    vi.mocked(validatePlanPath).mockReturnValue('Access denied');
     expect(() => tool.build({ plan_path: '../../../etc/passwd' })).toThrow(
       /Access denied/,
     );
@@ -360,6 +362,7 @@ Ask the user for specific feedback on how to improve the plan.`,
     });
 
     it('should reject path outside plans directory', () => {
+      vi.mocked(validatePlanPath).mockReturnValue('Access denied');
       const result = tool.validateToolParams({
         plan_path: '../../../etc/passwd',
       });
@@ -367,7 +370,7 @@ Ask the user for specific feedback on how to improve the plan.`,
     });
 
     it('should reject non-existent plan file', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(validatePlanPath).mockReturnValue('Plan file does not exist');
       const result = tool.validateToolParams({
         plan_path: 'plans/ghost.md',
       });
@@ -375,18 +378,9 @@ Ask the user for specific feedback on how to improve the plan.`,
     });
 
     it('should reject symbolic links pointing outside the plans directory', () => {
-      const maliciousPath = 'plans/malicious.md';
-      const resolvedMaliciousPath = path.resolve(mockTargetDir, maliciousPath);
-      const outsidePath = path.resolve('/etc/passwd');
-
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.realpathSync).mockImplementation((p) => {
-        if (p === resolvedMaliciousPath) return outsidePath;
-        return p as string;
-      });
-
+      vi.mocked(validatePlanPath).mockReturnValue('Access denied');
       const result = tool.validateToolParams({
-        plan_path: maliciousPath,
+        plan_path: 'plans/malicious.md',
       });
 
       expect(result).toContain('Access denied');
