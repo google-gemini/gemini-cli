@@ -295,7 +295,7 @@ ${finalExclusionPatternsForDescription
                 filePath,
                 relativePathForDisplay,
                 reason:
-                  'asset or binary file was not explicitly requested by name or extension',
+                  'asset file (image/pdf/audio/video) was not explicitly requested by name or extension',
               };
             }
           }
