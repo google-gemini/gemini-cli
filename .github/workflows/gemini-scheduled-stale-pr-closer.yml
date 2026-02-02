@@ -43,19 +43,23 @@ jobs:
 
             // 1. Fetch maintainers for verification
             let maintainerLogins = new Set();
+            let teamFetchSucceeded = false;
             try {
               const members = await github.paginate(github.rest.teams.listMembersInOrg, {
                 org: context.repo.owner,
                 team_slug: 'gemini-cli-maintainers'
               });
-              maintainerLogins = new Set(members.map(m => m.login));
+              maintainerLogins = new Set(members.map(m => m.login.toLowerCase()));
+              teamFetchSucceeded = true;
+              core.info(`Successfully fetched ${maintainerLogins.size} team members from gemini-cli-maintainers`);
             } catch (e) {
-              core.warning('Failed to fetch team members');
+              core.warning(`Failed to fetch team members from gemini-cli-maintainers: ${e.message}. Falling back to author_association only.`);
             }
 
             const isMaintainer = (login, assoc) => {
-              if (maintainerLogins.size > 0) return maintainerLogins.has(login);
-              return ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(assoc);
+              const isTeamMember = maintainerLogins.has(login.toLowerCase());
+              const isRepoMaintainer = ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(assoc);
+              return isTeamMember || isRepoMaintainer;
             };
 
             // 2. Determine which PRs to check
@@ -153,7 +157,17 @@ jobs:
                 const labels = pr.labels.map(l => l.name.toLowerCase());
                 if (labels.includes('help wanted') || labels.includes('🔒 maintainer only')) continue;
 
-                let lastActivity = new Date(0);
+                // Skip PRs that were created less than 30 days ago - they cannot be stale yet
+                const prCreatedAt = new Date(pr.created_at);
+                if (prCreatedAt > thirtyDaysAgo) {
+                  const daysOld = Math.floor((Date.now() - prCreatedAt.getTime()) / (1000 * 60 * 60 * 24));
+                  core.info(`PR #${pr.number} was created ${daysOld} days ago. Skipping staleness check.`);
+                  continue;
+                }
+
+                // Initialize lastActivity to PR creation date (not epoch) as a safety baseline.
+                // This ensures we never incorrectly mark a PR as stale due to failed activity lookups.
+                let lastActivity = new Date(pr.created_at);
                 try {
                   const reviews = await github.paginate(github.rest.pulls.listReviews, {
                     owner: context.repo.owner,
@@ -177,8 +191,12 @@ jobs:
                       if (d > lastActivity) lastActivity = d;
                     }
                   }
-                } catch (e) {}
+                } catch (e) {
+                  core.warning(`Failed to fetch reviews/comments for PR #${pr.number}: ${e.message}`);
+                }
 
+                // For maintainer PRs, the PR creation itself counts as maintainer activity.
+                // (Now redundant since we initialize to pr.created_at, but kept for clarity)
                 if (maintainerPr) {
                   const d = new Date(pr.created_at);
                   if (d > lastActivity) lastActivity = d;

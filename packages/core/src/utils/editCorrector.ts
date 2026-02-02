@@ -689,13 +689,20 @@ Return ONLY the corrected string in the specified JSON format with the key 'corr
   }
 }
 
+function trimPreservingTrailingNewline(str: string): string {
+  const trimmedEnd = str.trimEnd();
+  const trailingWhitespace = str.slice(trimmedEnd.length);
+  const trailingNewlines = trailingWhitespace.replace(/[^\r\n]/g, '');
+  return str.trim() + trailingNewlines;
+}
+
 function trimPairIfPossible(
   target: string,
   trimIfTargetTrims: string,
   currentContent: string,
   expectedReplacements: number,
 ) {
-  const trimmedTargetString = target.trim();
+  const trimmedTargetString = trimPreservingTrailingNewline(target);
   if (target.length !== trimmedTargetString.length) {
     const trimmedTargetOccurrences = countOccurrences(
       currentContent,
@@ -703,7 +710,8 @@ function trimPairIfPossible(
     );
 
     if (trimmedTargetOccurrences === expectedReplacements) {
-      const trimmedReactiveString = trimIfTargetTrims.trim();
+      const trimmedReactiveString =
+        trimPreservingTrailingNewline(trimIfTargetTrims);
       return {
         targetString: trimmedTargetString,
         pair: trimmedReactiveString,
