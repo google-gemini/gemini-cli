@@ -51,7 +51,6 @@ describe('ExtensionManager theme loading', () => {
         experimental: { extensionConfig: true },
         security: { blockGitExtensions: false },
         admin: { extensions: { enabled: true }, mcp: { enabled: true } },
-        tools: { enableHooks: true },
       }),
       requestConsent: async () => true,
       requestSetting: async () => '',

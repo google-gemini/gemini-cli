@@ -45,6 +45,8 @@ import { StreamingState } from '../types.js';
 import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 import type { UIState } from '../contexts/UIStateContext.js';
 import { isLowColorDepth } from '../utils/terminalUtils.js';
+import { keyMatchers, Command } from '../keyMatchers.js';
+import type { Key } from '../hooks/useKeypress.js';
 
 vi.mock('../hooks/useShellHistory.js');
 vi.mock('../hooks/useCommandCompletion.js');
@@ -169,7 +171,16 @@ describe('InputPrompt', () => {
       allVisualLines: [''],
       visualCursor: [0, 0],
       visualScrollRow: 0,
-      handleInput: vi.fn(),
+      handleInput: vi.fn((key: Key) => {
+        if (keyMatchers[Command.CLEAR_INPUT](key)) {
+          if (mockBuffer.text.length > 0) {
+            mockBuffer.setText('');
+            return true;
+          }
+          return false;
+        }
+        return false;
+      }),
       move: vi.fn(),
       moveToOffset: vi.fn((offset: number) => {
         mockBuffer.cursor = [0, offset];
@@ -495,6 +506,23 @@ describe('InputPrompt', () => {
     await waitFor(() => {
       expect(mockCommandCompletion.navigateUp).not.toHaveBeenCalled();
       expect(mockCommandCompletion.navigateDown).not.toHaveBeenCalled();
+    });
+    unmount();
+  });
+
+  it('should clear the buffer and reset completion on Ctrl+C', async () => {
+    mockBuffer.text = 'some text';
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    await act(async () => {
+      stdin.write('\u0003'); // Ctrl+C
+    });
+
+    await waitFor(() => {
+      expect(mockBuffer.setText).toHaveBeenCalledWith('');
+      expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
     });
     unmount();
   });
