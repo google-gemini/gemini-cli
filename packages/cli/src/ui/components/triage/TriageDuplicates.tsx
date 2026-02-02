@@ -80,7 +80,7 @@ const VISIBLE_LINES_COLLAPSED = 6;
 const VISIBLE_LINES_EXPANDED = 20;
 const VISIBLE_LINES_DETAIL = 25;
 const VISIBLE_CANDIDATES = 5;
-const MAX_CONCURRENT_ANALYSIS = 3;
+const MAX_CONCURRENT_ANALYSIS = 10;
 
 const getReactionCount = (issue: Issue | Candidate | undefined) => {
   if (!issue || !issue.reactionGroups) return 0;
@@ -336,7 +336,7 @@ Return a JSON object with:
       const issuesToAnalyze = state.issues
         .slice(
           state.currentIndex,
-          state.currentIndex + MAX_CONCURRENT_ANALYSIS + 2,
+          state.currentIndex + MAX_CONCURRENT_ANALYSIS + 20,
         ) // Look ahead a bit
         .filter(
           (issue) =>
