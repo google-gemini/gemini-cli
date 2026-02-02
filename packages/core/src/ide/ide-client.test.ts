@@ -12,10 +12,9 @@ import {
   beforeEach,
   afterEach,
   type Mocked,
-  type Mock,
 } from 'vitest';
 import { IdeClient, IDEConnectionStatus } from './ide-client.js';
-import * as fs from 'node:fs';
+import type * as fs from 'node:fs';
 import { getIdeProcessInfo } from './process-utils.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -28,6 +27,7 @@ import {
   getStdioConfigFromEnv,
   getPortFromEnv,
   validateWorkspacePath,
+  getIdeServerHost,
 } from './ide-connection-utils.js';
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -76,6 +76,7 @@ describe('IdeClient', () => {
       command: 'test-ide',
     });
     vi.mocked(os.tmpdir).mockReturnValue('/tmp');
+    vi.mocked(getIdeServerHost).mockReturnValue('127.0.0.1');
 
     // Mock MCP client and transports
     mockClient = {
@@ -560,12 +561,8 @@ describe('IdeClient', () => {
     it('should connect with an auth token if provided in the discovery file', async () => {
       const authToken = 'test-auth-token';
       const config = { port: '8080', authToken };
-      vi.mocked(fs.promises.readFile).mockResolvedValue(JSON.stringify(config));
-      (
-        vi.mocked(fs.promises.readdir) as Mock<
-          (path: fs.PathLike) => Promise<string[]>
-        >
-      ).mockResolvedValue([]);
+      vi.mocked(getConnectionConfigFromFile).mockResolvedValue(config);
+      vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
 
       const ideClient = await IdeClient.getInstance();
       await ideClient.connect();
@@ -586,15 +583,9 @@ describe('IdeClient', () => {
     });
 
     it('should connect with an auth token from environment variable if config file is missing', async () => {
-      vi.mocked(fs.promises.readFile).mockRejectedValue(
-        new Error('File not found'),
-      );
-      (
-        vi.mocked(fs.promises.readdir) as Mock<
-          (path: fs.PathLike) => Promise<string[]>
-        >
-      ).mockResolvedValue([]);
-      process.env['GEMINI_CLI_IDE_SERVER_PORT'] = '9090';
+      vi.mocked(getConnectionConfigFromFile).mockResolvedValue(undefined);
+      vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
+      vi.mocked(getPortFromEnv).mockReturnValue('9090');
       process.env['GEMINI_CLI_IDE_AUTH_TOKEN'] = 'env-auth-token';
 
       const ideClient = await IdeClient.getInstance();
@@ -614,45 +605,5 @@ describe('IdeClient', () => {
         IDEConnectionStatus.Connected,
       );
     });
-  });
-});
-
-describe('getIdeServerHost', () => {
-  let existsSyncMock: Mock;
-  let originalSshConnection: string | undefined;
-  let originalVscodeRemoteSession: string | undefined;
-  let originalRemoteContainers: string | undefined;
-
-  beforeEach(() => {
-    existsSyncMock = vi.mocked(fs.existsSync);
-    existsSyncMock.mockClear();
-    originalSshConnection = process.env['SSH_CONNECTION'];
-    originalVscodeRemoteSession =
-      process.env['VSCODE_REMOTE_CONTAINERS_SESSION'];
-    originalRemoteContainers = process.env['REMOTE_CONTAINERS'];
-
-    delete process.env['SSH_CONNECTION'];
-    delete process.env['VSCODE_REMOTE_CONTAINERS_SESSION'];
-    delete process.env['REMOTE_CONTAINERS'];
-  });
-
-  afterEach(() => {
-    vi.clearAllMocks();
-    if (originalSshConnection !== undefined) {
-      process.env['SSH_CONNECTION'] = originalSshConnection;
-    } else {
-      delete process.env['SSH_CONNECTION'];
-    }
-    if (originalVscodeRemoteSession !== undefined) {
-      process.env['VSCODE_REMOTE_CONTAINERS_SESSION'] =
-        originalVscodeRemoteSession;
-    } else {
-      delete process.env['VSCODE_REMOTE_CONTAINERS_SESSION'];
-    }
-    if (originalRemoteContainers !== undefined) {
-      process.env['REMOTE_CONTAINERS'] = originalRemoteContainers;
-    } else {
-      delete process.env['REMOTE_CONTAINERS'];
-    }
   });
 });
