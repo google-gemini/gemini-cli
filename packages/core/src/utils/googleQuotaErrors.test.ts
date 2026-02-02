@@ -325,7 +325,8 @@ describe('classifyGoogleError', () => {
     const result = classifyGoogleError(originalError);
     expect(result).toBeInstanceOf(RetryableQuotaError);
     if (result instanceof RetryableQuotaError) {
-      expect(result.retryDelayMs).toBeUndefined();
+      expect(result.retryDelayMs).toEqual(expect.any(Number));
+      expect(result.retryDelayMs).toBeGreaterThan(0);
     }
   });
 
@@ -386,7 +387,8 @@ describe('classifyGoogleError', () => {
 
     expect(result).toBeInstanceOf(RetryableQuotaError);
     if (result instanceof RetryableQuotaError) {
-      expect(result.retryDelayMs).toBeUndefined();
+      expect(result.retryDelayMs).toEqual(expect.any(Number));
+      expect(result.retryDelayMs).toBeGreaterThan(0);
     }
   });
 
@@ -403,7 +405,8 @@ describe('classifyGoogleError', () => {
 
     expect(result).toBeInstanceOf(RetryableQuotaError);
     if (result instanceof RetryableQuotaError) {
-      expect(result.retryDelayMs).toBeUndefined();
+      expect(result.retryDelayMs).toEqual(expect.any(Number));
+      expect(result.retryDelayMs).toBeGreaterThan(0);
     }
   });
 
@@ -429,7 +432,8 @@ describe('classifyGoogleError', () => {
 
     expect(result).toBeInstanceOf(RetryableQuotaError);
     if (result instanceof RetryableQuotaError) {
-      expect(result.retryDelayMs).toBeUndefined();
+      expect(result.retryDelayMs).toEqual(expect.any(Number));
+      expect(result.retryDelayMs).toBeGreaterThan(0);
     }
   });
 
@@ -617,5 +621,31 @@ describe('classifyGoogleError', () => {
     const result = classifyGoogleError(originalError);
     expect(result).toBe(originalError);
     expect(result).not.toBeInstanceOf(ValidationRequiredError);
+  });
+  it('should calculate backoff when retryDelay is missing for 429', () => {
+    const apiError = {
+      code: 429,
+      message: 'Quota exceeded',
+      details: [],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(
+      apiError as GoogleApiError,
+    );
+
+    // Attempt 1 -> 1s * 2^1 = 2s base + jitter
+    const result1 = classifyGoogleError(new Error(), 1);
+    expect(result1).toBeInstanceOf(RetryableQuotaError);
+    const delay1 = (result1 as RetryableQuotaError).retryDelayMs;
+    // 2000ms <= delay <= 2200ms (10% jitter)
+    expect(delay1).toBeGreaterThanOrEqual(2000);
+    expect(delay1).toBeLessThan(2300);
+
+    // Attempt 2 -> 1s * 2^2 = 4s base + jitter
+    const result2 = classifyGoogleError(new Error(), 2);
+    expect(result2).toBeInstanceOf(RetryableQuotaError);
+    const delay2 = (result2 as RetryableQuotaError).retryDelayMs;
+    // 4000ms <= delay <= 4400ms
+    expect(delay2).toBeGreaterThanOrEqual(4000);
+    expect(delay2).toBeLessThan(4500);
   });
 });

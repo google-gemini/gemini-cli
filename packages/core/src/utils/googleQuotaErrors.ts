@@ -167,6 +167,21 @@ function classifyValidationRequiredError(
   );
 }
 /**
+ * Calculates a backoff delay with jitter.
+ * @param attempt The current attempt number (0-indexed).
+ * @param baseDelay The base delay in milliseconds.
+ * @returns The calculated delay in seconds.
+ */
+function calculateBackoff(attempt: number, baseDelay: number = 1000): number {
+  const maxDelay = 60000; // 60s cap
+  // attempt is 1-based from retry.ts, but standard backoff is usually 0^2, 1^2... or 2^attempt
+  // Maintainer snippet: baseDelay * Math.pow(2, attempt)
+  const delay = Math.min(maxDelay, baseDelay * Math.pow(2, attempt));
+  const jitter = delay * 0.1 * Math.random(); // 10% jitter
+  return (delay + jitter) / 1000; // Return in seconds to match delaySeconds usage
+}
+
+/**
  * Analyzes a caught error and classifies it as a specific error type if applicable.
  *
  * Classification logic:
@@ -181,9 +196,13 @@ function classifyValidationRequiredError(
  *   - If the error message contains the phrase "Please retry in X[s|ms]", it's a `RetryableQuotaError`.
  *
  * @param error The error to classify.
+ * @param attempt The current retry attempt number.
  * @returns A classified error or the original `unknown` error.
  */
-export function classifyGoogleError(error: unknown): unknown {
+export function classifyGoogleError(
+  error: unknown,
+  attempt: number = 1,
+): unknown {
   const googleApiError = parseGoogleApiError(error);
   const status = googleApiError?.code ?? getErrorStatus(error);
 
@@ -226,8 +245,8 @@ export function classifyGoogleError(error: unknown): unknown {
         );
       }
     } else if (status === 429) {
-      // Fallback: If it is a 429 but doesn't have a specific "retry in" message,
-      // assume it is a temporary rate limit and retry after 5 sec (same as DEFAULT_RETRY_OPTIONS).
+      // Fallback with calculated backoff
+      const fallbackDelay = calculateBackoff(attempt);
       return new RetryableQuotaError(
         errorMessage,
         googleApiError ?? {
@@ -235,6 +254,7 @@ export function classifyGoogleError(error: unknown): unknown {
           message: errorMessage,
           details: [],
         },
+        fallbackDelay,
       );
     }
 
@@ -265,6 +285,11 @@ export function classifyGoogleError(error: unknown): unknown {
     }
   }
 
+  // Fallback if no specific delay found in RetryInfo, but it is a 429
+  if (retryInfo && !delaySeconds) {
+    delaySeconds = calculateBackoff(attempt);
+  }
+
   if (errorInfo) {
     // New Cloud Code API quota handling
     if (errorInfo.domain) {
@@ -278,7 +303,7 @@ export function classifyGoogleError(error: unknown): unknown {
           return new RetryableQuotaError(
             `${googleApiError.message}`,
             googleApiError,
-            delaySeconds ?? 10,
+            delaySeconds ?? calculateBackoff(attempt),
           );
         }
         if (errorInfo.reason === 'QUOTA_EXHAUSTED') {
@@ -293,11 +318,13 @@ export function classifyGoogleError(error: unknown): unknown {
   }
 
   // 1. Check for delays in RetryInfo - Prioritize this over long-term limits
-  if (retryInfo?.retryDelay && delaySeconds) {
+  if ((retryInfo || delaySeconds) && status === 429) {
+    // If we have a delay (either from API or calculated fallback), treat as retryable
+    const finalDelay = delaySeconds ?? calculateBackoff(attempt);
     return new RetryableQuotaError(
-      `${googleApiError.message}\nSuggested retry after ${retryInfo.retryDelay}.`,
+      `${googleApiError.message}\nSuggested retry after ${finalDelay}s.`,
       googleApiError,
-      delaySeconds,
+      finalDelay,
     );
   }
 
@@ -351,6 +378,7 @@ export function classifyGoogleError(error: unknown): unknown {
         message: errorMessage,
         details: [],
       },
+      calculateBackoff(attempt),
     );
   }
   return error; // Fallback to original error if no specific classification fits.

@@ -61,6 +61,7 @@ export type ContentGeneratorConfig = {
   vertexai?: boolean;
   authType?: AuthType;
   proxy?: string;
+  quotaProject?: string;
 };
 
 export async function createContentGeneratorConfig(
@@ -74,11 +75,13 @@ export async function createContentGeneratorConfig(
     process.env['GOOGLE_CLOUD_PROJECT'] ||
     process.env['GOOGLE_CLOUD_PROJECT_ID'] ||
     undefined;
+  const googleCloudQuotaProject = process.env['GOOGLE_CLOUD_QUOTA_PROJECT'];
   const googleCloudLocation = process.env['GOOGLE_CLOUD_LOCATION'] || undefined;
 
   const contentGeneratorConfig: ContentGeneratorConfig = {
     authType,
     proxy: config?.getProxy(),
+    quotaProject: googleCloudQuotaProject || googleCloudProject,
   };
 
   // If we are using Google auth or we are in Cloud Shell, there is nothing else to validate for now
@@ -138,6 +141,11 @@ export async function createContentGenerator(
       ...customHeadersMap,
       'User-Agent': userAgent,
     };
+
+    // Inject x-goog-user-project if configured (forces quota attribution to project)
+    if (config.quotaProject) {
+      baseHeaders['x-goog-user-project'] = config.quotaProject;
+    }
 
     if (
       apiKeyAuthMechanism === 'bearer' &&
