@@ -21,7 +21,7 @@ the full instructions and resources required to complete the task using the
 
 ## Key Benefits
 
-- **Shared Expertise:** Package complex workflows (like a specific team's PR
+- **Shared Expertise:** Package complex workflows (like a a specific team's PR
   review process) into a folder that anyone can use.
 - **Repeatable Workflows:** Ensure complex multi-step tasks are performed
   consistently by providing a procedural framework.
