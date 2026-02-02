@@ -215,6 +215,24 @@ export function renderOperationalGuidelines(
   options?: OperationalGuidelinesOptions,
 ): string {
   if (!options) return '';
+
+  const safetyRules = options.isYolo
+    ? `
+## Security and Safety Rules (YOLO MODE)
+- **Extreme Caution Required:** You are operating in YOLO mode. **All tool calls, including critical ones like shell commands and file modifications, will be automatically approved and executed without any user confirmation.**
+- **Responsibility:** You are solely responsible for the safety and correctness of your actions. Before executing any command, verify it double-check for potential destructive side effects or security risks.
+- **Security First:** Always apply security best practices. Never introduce code that exposes, logs, or commits secrets, API keys, or other sensitive information.`
+    : `
+## Security and Safety Rules
+- **Explain Critical Commands:** Before executing commands with '${SHELL_TOOL_NAME}' that modify the file system, codebase, or system state, you *must* provide a brief explanation of the command's purpose and potential impact. Prioritize user understanding and safety. You should not ask permission to use the tool; the user will be presented with a confirmation dialogue upon use (you do not need to tell them this).
+- **Security First:** Always apply security best practices. Never introduce code that exposes, logs, or commits secrets, API keys, or other sensitive information.`;
+
+  const respectUserConfirmations = options.isYolo
+    ? `
+- **Auto-Approval Active:** Most tool calls (also denoted as 'function calls') will be **automatically approved**. You do not need to wait for or respect user confirmations for these actions as they will not be prompted.`
+    : `
+- **Respect User Confirmations:** Most tool calls (also denoted as 'function calls') will first require confirmation from the user, where they will either approve or cancel the function call. If a user cancels a function call, respect their choice and do _not_ try to make the function call again. It is okay to request the tool call again _only_ if the user requests that same tool call on a subsequent prompt. When a user cancels a function call, assume best intentions from the user and consider inquiring if they prefer any alternative paths forward.`;
+
   return `
 # Operational Guidelines
 ${shellEfficiencyGuidelines(options.enableShellEfficiency)}
@@ -227,14 +245,12 @@ ${shellEfficiencyGuidelines(options.enableShellEfficiency)}
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls or code blocks unless specifically part of the required code/command itself.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly (1-2 sentences) without excessive justification. Offer alternatives if appropriate.
 
-## Security and Safety Rules
-- **Explain Critical Commands:** Before executing commands with '${SHELL_TOOL_NAME}' that modify the file system, codebase, or system state, you *must* provide a brief explanation of the command's purpose and potential impact. Prioritize user understanding and safety. You should not ask permission to use the tool; the user will be presented with a confirmation dialogue upon use (you do not need to tell them this).
-- **Security First:** Always apply security best practices. Never introduce code that exposes, logs, or commits secrets, API keys, or other sensitive information.
+${safetyRules}
 
 ## Tool Usage
 - **Parallelism:** Execute multiple independent tool calls in parallel when feasible (i.e. searching the codebase).
 - **Command Execution:** Use the '${SHELL_TOOL_NAME}' tool for running shell commands, remembering the safety rule to explain modifying commands first.${toolUsageInteractive(options.interactive)}${toolUsageRememberingFacts(options)}
-- **Respect User Confirmations:** Most tool calls (also denoted as 'function calls') will first require confirmation from the user, where they will either approve or cancel the function call. If a user cancels a function call, respect their choice and do _not_ try to make the function call again. It is okay to request the tool call again _only_ if the user requests that same tool call on a subsequent prompt. When a user cancels a function call, assume best intentions from the user and consider inquiring if they prefer any alternative paths forward.
+${respectUserConfirmations}
 
 ## Interaction Details
 - **Help Command:** The user can use '/help' to display help information.
