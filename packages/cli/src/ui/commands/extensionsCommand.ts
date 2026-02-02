@@ -590,20 +590,31 @@ async function uninstallAction(context: CommandContext, args: string) {
 async function configAction(context: CommandContext, args: string) {
   const parts = args.trim().split(/\s+/).filter(Boolean);
   let scope = ExtensionSettingScope.USER;
-  const otherArgs: string[] = [];
 
-  for (const part of parts) {
-    if (part.startsWith('--scope=')) {
-      const scopeVal = part.split('=')[1];
-      if (scopeVal === 'workspace') scope = ExtensionSettingScope.WORKSPACE;
-      else if (scopeVal === 'user') scope = ExtensionSettingScope.USER;
-    } else if (part === '--scope') {
-      // Handle next arg as scope value if needed, but simple parsing for now
-    } else {
-      otherArgs.push(part);
+  const scopeEqIndex = parts.findIndex((p) => p.startsWith('--scope='));
+  if (scopeEqIndex > -1) {
+    const scopeVal = parts[scopeEqIndex].split('=')[1];
+    if (scopeVal === 'workspace') {
+      scope = ExtensionSettingScope.WORKSPACE;
+    } else if (scopeVal === 'user') {
+      scope = ExtensionSettingScope.USER;
+    }
+    parts.splice(scopeEqIndex, 1);
+  } else {
+    const scopeIndex = parts.indexOf('--scope');
+    if (scopeIndex > -1) {
+      const scopeVal = parts[scopeIndex + 1];
+      if (scopeVal === 'workspace' || scopeVal === 'user') {
+        scope =
+          scopeVal === 'workspace'
+            ? ExtensionSettingScope.WORKSPACE
+            : ExtensionSettingScope.USER;
+        parts.splice(scopeIndex, 2);
+      }
     }
   }
 
+  const otherArgs = parts;
   const name = otherArgs[0];
   const setting = otherArgs[1];
 
