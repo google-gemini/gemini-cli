@@ -25,10 +25,12 @@ describe('save_memory', () => {
         true,
       );
 
-      validateModelOutput(result, {
-        expectedContent: 'blue',
-        testName: `${TEST_PREFIX}${testName}`,
-      });
+      expect(
+        validateModelOutput(result, {
+          expectedContent: 'blue',
+          testName: `${TEST_PREFIX}${testName}`,
+        }),
+      ).toBe(true);
     },
   });
   const testName2 = 'Remembering User Preferences - Command Restrictions';
@@ -44,10 +46,12 @@ describe('save_memory', () => {
         true,
       );
 
-      validateModelOutput(result, {
-        expectedContent: [/not run npm commands|remember|ok/i],
-        testName: `${TEST_PREFIX}${testName2}`,
-      });
+      expect(
+        validateModelOutput(result, {
+          expectedContent: [/not run npm commands|remember|ok/i],
+          testName: `${TEST_PREFIX}${testName2}`,
+        }),
+      ).toBe(true);
     },
   });
 
@@ -64,10 +68,12 @@ describe('save_memory', () => {
         true,
       );
 
-      validateModelOutput(result, {
-        expectedContent: [/always|ok|remember|will do/i],
-        testName: `${TEST_PREFIX}${testName4}`,
-      });
+      expect(
+        validateModelOutput(result, {
+          expectedContent: [/always|ok|remember|will do/i],
+          testName: `${TEST_PREFIX}${testName4}`,
+        }),
+      ).toBe(true);
     },
   });
 
@@ -86,10 +92,12 @@ describe('save_memory', () => {
         );
       }
 
-      validateModelOutput(result, {
-        testName: `${TEST_PREFIX}${testName5}`,
-        forbiddenContent: [/remember|will do/i],
-      });
+      expect(
+        validateModelOutput(result, {
+          testName: `${TEST_PREFIX}${testName5}`,
+          forbiddenContent: [/remember|will do/i],
+        }),
+      ).toBe(true);
     },
   });
 
@@ -106,10 +114,12 @@ describe('save_memory', () => {
         true,
       );
 
-      validateModelOutput(result, {
-        expectedContent: [/Buddy/i],
-        testName: `${TEST_PREFIX}${testName6}`,
-      });
+      expect(
+        validateModelOutput(result, {
+          expectedContent: [/Buddy/i],
+          testName: `${TEST_PREFIX}${testName6}`,
+        }),
+      ).toBe(true);
     },
   });
 
@@ -126,10 +136,12 @@ describe('save_memory', () => {
         true,
       );
 
-      validateModelOutput(result, {
-        expectedContent: [/npm run dev|start server|ok|remember|will do/i],
-        testName: `${TEST_PREFIX}${testName7}`,
-      });
+      expect(
+        validateModelOutput(result, {
+          expectedContent: [/npm run dev|start server|ok|remember|will do/i],
+          testName: `${TEST_PREFIX}${testName7}`,
+        }),
+      ).toBe(true);
     },
   });
 
@@ -146,10 +158,12 @@ describe('save_memory', () => {
         true,
       );
 
-      validateModelOutput(result, {
-        expectedContent: [/database schema|ok|remember|will do/i],
-        testName: `${TEST_PREFIX}${testName8}`,
-      });
+      expect(
+        validateModelOutput(result, {
+          expectedContent: [/database schema|ok|remember|will do/i],
+          testName: `${TEST_PREFIX}${testName8}`,
+        }),
+      ).toBe(true);
     },
   });
 
@@ -166,10 +180,12 @@ describe('save_memory', () => {
         true,
       );
 
-      validateModelOutput(result, {
-        expectedContent: [/tabs instead of spaces|ok|remember|will do/i],
-        testName: `${TEST_PREFIX}${testName9}`,
-      });
+      expect(
+        validateModelOutput(result, {
+          expectedContent: [/tabs instead of spaces|ok|remember|will do/i],
+          testName: `${TEST_PREFIX}${testName9}`,
+        }),
+      ).toBe(true);
     },
   });
 
@@ -186,12 +202,14 @@ describe('save_memory', () => {
         true,
       );
 
-      validateModelOutput(result, {
-        expectedContent: [
-          /command to run all backend tests|ok|remember|will do/i,
-        ],
-        testName: `${TEST_PREFIX}${testName10}`,
-      });
+      expect(
+        validateModelOutput(result, {
+          expectedContent: [
+            /command to run all backend tests|ok|remember|will do/i,
+          ],
+          testName: `${TEST_PREFIX}${testName10}`,
+        }),
+      ).toBe(true);
     },
   });
 
@@ -208,12 +226,14 @@ describe('save_memory', () => {
         true,
       );
 
-      validateModelOutput(result, {
-        expectedContent: [
-          /main entry point for this project|ok|remember|will do/i,
-        ],
-        testName: `${TEST_PREFIX}${testName11}`,
-      });
+      expect(
+        validateModelOutput(result, {
+          expectedContent: [
+            /main entry point for this project|ok|remember|will do/i,
+          ],
+          testName: `${TEST_PREFIX}${testName11}`,
+        }),
+      ).toBe(true);
     },
   });
 });
