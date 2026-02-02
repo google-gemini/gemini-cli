@@ -13,9 +13,9 @@ import {
 
 describe('save_memory', () => {
   const TEST_PREFIX = 'Save memory test: ';
-  const testName = 'Remembering Personal Details - Favorite Color';
+  const rememberingFavoriteColor = "Agent remembers user's favorite color";
   evalTest('ALWAYS_PASSES', {
-    name: testName,
+    name: rememberingFavoriteColor,
     params: {
       settings: { tools: { core: ['save_memory'] } },
     },
@@ -31,13 +31,13 @@ describe('save_memory', () => {
       assertModelHasOutput(result);
       checkModelOutputContent(result, {
         expectedContent: 'blue',
-        testName: `${TEST_PREFIX}${testName}`,
+        testName: `${TEST_PREFIX}${rememberingFavoriteColor}`,
       });
     },
   });
-  const testName2 = 'Remembering User Preferences - Command Restrictions';
+  const rememberingCommandRestrictions = 'Agent remembers command restrictions';
   evalTest('ALWAYS_PASSES', {
-    name: testName2,
+    name: rememberingCommandRestrictions,
     params: {
       settings: { tools: { core: ['save_memory'] } },
     },
@@ -51,14 +51,14 @@ describe('save_memory', () => {
       assertModelHasOutput(result);
       checkModelOutputContent(result, {
         expectedContent: [/not run npm commands|remember|ok/i],
-        testName: `${TEST_PREFIX}${testName2}`,
+        testName: `${TEST_PREFIX}${rememberingCommandRestrictions}`,
       });
     },
   });
 
-  const testName4 = 'Remembering User Preferences - Workflow';
+  const rememberingWorkflow = 'Agent remembers workflow preferences';
   evalTest('ALWAYS_PASSES', {
-    name: testName4,
+    name: rememberingWorkflow,
     params: {
       settings: { tools: { core: ['save_memory'] } },
     },
@@ -72,37 +72,37 @@ describe('save_memory', () => {
       assertModelHasOutput(result);
       checkModelOutputContent(result, {
         expectedContent: [/always|ok|remember|will do/i],
-        testName: `${TEST_PREFIX}${testName4}`,
+        testName: `${TEST_PREFIX}${rememberingWorkflow}`,
       });
     },
   });
 
-  const testName5 = 'Behavioral Checks - Ignoring Temporary Information';
+  const ignoringTemporaryInformation =
+    'Agent ignores temporary conversation details';
   evalTest('ALWAYS_PASSES', {
-    name: testName5,
+    name: ignoringTemporaryInformation,
     params: {
       settings: { tools: { core: ['save_memory'] } },
     },
     prompt: `I'm going to get a coffee.`,
     assert: async (rig, result) => {
       const wasToolCalled = await rig.waitForToolCall('save_memory', 500);
-      if (wasToolCalled) {
-        console.log(
-          `[${testName5}] INFO: save_memory was called unexpectedly.`,
-        );
-      }
+      expect(
+        wasToolCalled,
+        'save_memory should not be called for temporary information',
+      ).toBe(false);
 
       assertModelHasOutput(result);
       checkModelOutputContent(result, {
-        testName: `${TEST_PREFIX}${testName5}`,
+        testName: `${TEST_PREFIX}${ignoringTemporaryInformation}`,
         forbiddenContent: [/remember|will do/i],
       });
     },
   });
 
-  const testName6 = 'Remembering Personal Details - Pet Name';
+  const rememberingPetName = "Agent remembers user's pet's name";
   evalTest('ALWAYS_PASSES', {
-    name: testName6,
+    name: rememberingPetName,
     params: {
       settings: { tools: { core: ['save_memory'] } },
     },
@@ -116,14 +116,14 @@ describe('save_memory', () => {
       assertModelHasOutput(result);
       checkModelOutputContent(result, {
         expectedContent: [/Buddy/i],
-        testName: `${TEST_PREFIX}${testName6}`,
+        testName: `${TEST_PREFIX}${rememberingPetName}`,
       });
     },
   });
 
-  const testName7 = 'Remembering User Preferences - Command Alias';
+  const rememberingCommandAlias = 'Agent remembers custom command aliases';
   evalTest('ALWAYS_PASSES', {
-    name: testName7,
+    name: rememberingCommandAlias,
     params: {
       settings: { tools: { core: ['save_memory'] } },
     },
@@ -137,14 +137,15 @@ describe('save_memory', () => {
       assertModelHasOutput(result);
       checkModelOutputContent(result, {
         expectedContent: [/npm run dev|start server|ok|remember|will do/i],
-        testName: `${TEST_PREFIX}${testName7}`,
+        testName: `${TEST_PREFIX}${rememberingCommandAlias}`,
       });
     },
   });
 
-  const testName8 = 'Remembering Project Details - Database Schema Location';
+  const rememberingDbSchemaLocation =
+    "Agent remembers project's database schema location";
   evalTest('ALWAYS_PASSES', {
-    name: testName8,
+    name: rememberingDbSchemaLocation,
     params: {
       settings: { tools: { core: ['save_memory'] } },
     },
@@ -158,14 +159,15 @@ describe('save_memory', () => {
       assertModelHasOutput(result);
       checkModelOutputContent(result, {
         expectedContent: [/database schema|ok|remember|will do/i],
-        testName: `${TEST_PREFIX}${testName8}`,
+        testName: `${TEST_PREFIX}${rememberingDbSchemaLocation}`,
       });
     },
   });
 
-  const testName9 = 'Remembering User Preferences - Coding Style';
+  const rememberingCodingStyle =
+    "Agent remembers user's coding style preference";
   evalTest('ALWAYS_PASSES', {
-    name: testName9,
+    name: rememberingCodingStyle,
     params: {
       settings: { tools: { core: ['save_memory'] } },
     },
@@ -179,14 +181,15 @@ describe('save_memory', () => {
       assertModelHasOutput(result);
       checkModelOutputContent(result, {
         expectedContent: [/tabs instead of spaces|ok|remember|will do/i],
-        testName: `${TEST_PREFIX}${testName9}`,
+        testName: `${TEST_PREFIX}${rememberingCodingStyle}`,
       });
     },
   });
 
-  const testName10 = 'Remembering User Preferences - Test Command';
+  const rememberingTestCommand =
+    'Agent remembers specific project test command';
   evalTest('ALWAYS_PASSES', {
-    name: testName10,
+    name: rememberingTestCommand,
     params: {
       settings: { tools: { core: ['save_memory'] } },
     },
@@ -202,14 +205,15 @@ describe('save_memory', () => {
         expectedContent: [
           /command to run all backend tests|ok|remember|will do/i,
         ],
-        testName: `${TEST_PREFIX}${testName10}`,
+        testName: `${TEST_PREFIX}${rememberingTestCommand}`,
       });
     },
   });
 
-  const testName11 = 'Remembering Project Details - Main Entry Point';
+  const rememberingMainEntryPoint =
+    "Agent remembers project's main entry point";
   evalTest('ALWAYS_PASSES', {
-    name: testName11,
+    name: rememberingMainEntryPoint,
     params: {
       settings: { tools: { core: ['save_memory'] } },
     },
@@ -225,7 +229,7 @@ describe('save_memory', () => {
         expectedContent: [
           /main entry point for this project|ok|remember|will do/i,
         ],
-        testName: `${TEST_PREFIX}${testName11}`,
+        testName: `${TEST_PREFIX}${rememberingMainEntryPoint}`,
       });
     },
   });

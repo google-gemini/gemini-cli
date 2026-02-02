@@ -112,6 +112,44 @@ export function assertModelHasOutput(result: string) {
   }
 }
 
+function contentExists(result: string, content: string | RegExp): boolean {
+  if (typeof content === 'string') {
+    return result.toLowerCase().includes(content.toLowerCase());
+  } else if (content instanceof RegExp) {
+    return content.test(result);
+  }
+  return false;
+}
+
+function findMismatchedContent(
+  result: string,
+  content: string | (string | RegExp)[],
+  shouldExist: boolean,
+): (string | RegExp)[] {
+  const contents = Array.isArray(content) ? content : [content];
+  return contents.filter((c) => contentExists(result, c) !== shouldExist);
+}
+
+function logContentWarning(
+  problematicContent: (string | RegExp)[],
+  isMissing: boolean,
+  originalContent: string | (string | RegExp)[] | null | undefined,
+  result: string,
+) {
+  const message = isMissing
+    ? 'LLM did not include expected content in response'
+    : 'LLM included forbidden content in response';
+
+  console.warn(
+    `Warning: ${message}: ${problematicContent.join(', ')}.`,
+    'This is not ideal but not a test failure.',
+  );
+
+  const label = isMissing ? 'Expected content' : 'Forbidden content';
+  console.warn(`${label}:`, originalContent);
+  console.warn('Actual output:', result);
+}
+
 // Helper to check model output and warn about unexpected content
 export function checkModelOutputContent(
   result: string,
@@ -129,57 +167,20 @@ export function checkModelOutputContent(
 
   // If expectedContent is provided, check for it and warn if missing
   if (expectedContent) {
-    const contents = Array.isArray(expectedContent)
-      ? expectedContent
-      : [expectedContent];
-    const missingContent = contents.filter((content) => {
-      if (typeof content === 'string') {
-        return !result.toLowerCase().includes(content.toLowerCase());
-      } else if (content instanceof RegExp) {
-        return !content.test(result);
-      }
-      return false;
-    });
+    const missingContent = findMismatchedContent(result, expectedContent, true);
 
     if (missingContent.length > 0) {
-      console.warn(
-        `Warning: LLM did not include expected content in response: ${missingContent.join(
-          ', ',
-        )}.`,
-        'This is not ideal but not a test failure.',
-      );
-      console.warn(
-        'The tool was called successfully, which is the main requirement.',
-      );
-      console.warn('Expected content:', expectedContent);
-      console.warn('Actual output:', result);
+      logContentWarning(missingContent, true, expectedContent, result);
       isValid = false;
     }
   }
 
   // If forbiddenContent is provided, check for it and warn if present
   if (forbiddenContent) {
-    const contents = Array.isArray(forbiddenContent)
-      ? forbiddenContent
-      : [forbiddenContent];
-    const foundContent = contents.filter((content) => {
-      if (typeof content === 'string') {
-        return result.toLowerCase().includes(content.toLowerCase());
-      } else if (content instanceof RegExp) {
-        return content.test(result);
-      }
-      return false;
-    });
+    const foundContent = findMismatchedContent(result, forbiddenContent, false);
 
     if (foundContent.length > 0) {
-      console.warn(
-        `Warning: LLM included forbidden content in response: ${foundContent.join(
-          ', ',
-        )}.`,
-        'This is not ideal but not a test failure.',
-      );
-      console.warn('Forbidden content:', forbiddenContent);
-      console.warn('Actual output:', result);
+      logContentWarning(foundContent, false, forbiddenContent, result);
       isValid = false;
     }
   }
