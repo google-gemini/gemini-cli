@@ -511,6 +511,7 @@ export class TestRig {
 
       child.on('close', (code: number) => {
         clearTimeout(timer);
+        this._lastRunStderr = stderr;
         if (code === 0) {
           // Store the raw stdout for Podman telemetry parsing
           this._lastRunStdout = stdout;

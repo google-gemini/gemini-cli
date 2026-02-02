@@ -61,7 +61,7 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
               .update(content)
               .digest('hex');
             // Extract agent name from frontmatter or filename
-            const match = content.match(/name:\s*([a-z0-9-_]+)/);
+            const match = content.match(/^name:\s*["']?([a-z0-9-_]+)["']?$/m);
             const agentName = match ? match[1] : path.basename(filePath, '.md');
 
             if (!acknowledgedAgents[projectRoot]) {
