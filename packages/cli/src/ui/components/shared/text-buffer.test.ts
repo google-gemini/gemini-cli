@@ -1717,6 +1717,79 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).text).toBe('Hello World');
     });
 
+    it('should handle arrow keys for movement between visual lines of a single logical line', () => {
+      const viewport = { width: 10, height: 10 };
+      const longLine = '123456789012345'; // 15 chars
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: longLine,
+          viewport,
+          isValidPath: () => false,
+        }),
+      );
+
+      // Move cursor to the end of the logical line [0, 15]
+      act(() => result.current.moveToOffset(15));
+
+      // In a 10-wide viewport:
+      // Visual line 0: '1234567890' (10 chars)
+      // Visual line 1: '12345' (5 chars)
+      // Logical col 15 should be at visual row 1.
+
+      expect(result.current.visualCursor[0]).toBe(1);
+
+      // Move up
+      let handled = false;
+      act(() => {
+        handled = result.current.handleInput({
+          name: 'up',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          insertable: false,
+          sequence: '\x1b[A',
+        });
+      });
+
+      expect(handled).toBe(true);
+      expect(result.current.visualCursor[0]).toBe(0);
+    });
+
+    it('should handle arrow keys for movement down between visual lines of a single logical line', () => {
+      const viewport = { width: 10, height: 10 };
+      const longLine = '123456789012345'; // 15 chars
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: longLine,
+          viewport,
+          isValidPath: () => false,
+        }),
+      );
+
+      // Move cursor to the start of the logical line
+      act(() => result.current.moveToOffset(0));
+
+      expect(result.current.visualCursor[0]).toBe(0);
+
+      // Move down
+      let handled = false;
+      act(() => {
+        handled = result.current.handleInput({
+          name: 'down',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          insertable: false,
+          sequence: '\x1b[B',
+        });
+      });
+
+      expect(handled).toBe(true);
+      expect(result.current.visualCursor[0]).toBe(1);
+    });
+
     it('should handle VSCode terminal Shift+Enter as newline', () => {
       const { result } = renderHook(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),

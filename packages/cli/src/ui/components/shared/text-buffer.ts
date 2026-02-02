@@ -2905,12 +2905,12 @@ export function useTextBuffer({
         return true;
       }
       if (keyMatchers[Command.MOVE_UP](key)) {
-        if (cursorRow === 0) return false;
+        if (visualCursor[0] === 0) return false;
         move('up');
         return true;
       }
       if (keyMatchers[Command.MOVE_DOWN](key)) {
-        if (cursorRow === lines.length - 1) return false;
+        if (visualCursor[0] === visualLines.length - 1) return false;
         move('down');
         return true;
       }
@@ -2986,6 +2986,8 @@ export function useTextBuffer({
       redo,
       cursorRow,
       cursorCol,
+      visualCursor,
+      visualLines,
       lines,
       singleLine,
       setText,
