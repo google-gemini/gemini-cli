@@ -482,6 +482,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return false;
       }
 
+      if (
+        key.name === 'escape' &&
+        (streamingState === StreamingState.Responding ||
+          streamingState === StreamingState.WaitingForConfirmation)
+      ) {
+        return false;
+      }
+
       if (key.name === 'paste') {
         // Record paste time to prevent accidental auto-submission
         if (!isTerminalPasteTrusted(kittyProtocol.enabled)) {
@@ -604,16 +612,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
+      if (keyMatchers[Command.CLEAR_SCREEN](key)) {
+        setBannerVisible(false);
+        onClearScreen();
+        return true;
+      }
+
       if (shellModeActive && keyMatchers[Command.REVERSE_SEARCH](key)) {
         setReverseSearchActive(true);
         setTextBeforeReverseSearch(buffer.text);
         setCursorPosition(buffer.cursor);
-        return true;
-      }
-
-      if (keyMatchers[Command.CLEAR_SCREEN](key)) {
-        setBannerVisible(false);
-        onClearScreen();
         return true;
       }
 
@@ -881,14 +889,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         buffer.move('end');
         return true;
       }
-      // Ctrl+C (Clear input)
-      if (keyMatchers[Command.CLEAR_INPUT](key)) {
-        if (buffer.text.length > 0) {
-          buffer.setText('');
-          resetCompletionState();
-        }
-        return false;
-      }
 
       // Kill line commands
       if (keyMatchers[Command.KILL_LINE_RIGHT](key)) {
@@ -933,17 +933,23 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       // Fall back to the text buffer's default input handling for all other keys
       const handled = buffer.handleInput(key);
 
-      // Clear ghost text when user types regular characters (not navigation/control keys)
-      if (
-        completion.promptCompletion.text &&
-        key.sequence &&
-        key.sequence.length === 1 &&
-        !key.alt &&
-        !key.ctrl &&
-        !key.cmd
-      ) {
-        completion.promptCompletion.clear();
-        setExpandedSuggestionIndex(-1);
+      if (handled) {
+        if (keyMatchers[Command.CLEAR_INPUT](key)) {
+          resetCompletionState();
+        }
+
+        // Clear ghost text when user types regular characters (not navigation/control keys)
+        if (
+          completion.promptCompletion.text &&
+          key.sequence &&
+          key.sequence.length === 1 &&
+          !key.alt &&
+          !key.ctrl &&
+          !key.cmd
+        ) {
+          completion.promptCompletion.clear();
+          setExpandedSuggestionIndex(-1);
+        }
       }
       return handled;
     },
@@ -979,10 +985,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       backgroundShells.size,
       backgroundShellHeight,
       history,
+      streamingState,
     ],
   );
 
-  useKeypress(handleInput, { isActive: !isEmbeddedShellFocused });
+  useKeypress(handleInput, {
+    isActive: !isEmbeddedShellFocused,
+    priority: true,
+  });
 
   const linesToRender = buffer.viewportVisualLines;
   const [cursorVisualRowAbsolute, cursorVisualColAbsolute] =

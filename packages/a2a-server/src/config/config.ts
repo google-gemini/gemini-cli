@@ -127,42 +127,45 @@ export async function loadConfig(
   configParams.userMemory = memoryContent;
   configParams.geminiMdFileCount = fileCount;
   configParams.geminiMdFilePaths = filePaths;
-  const config = new Config({
+
+  // Set an initial config to use to get a code assist server.
+  // This is needed to fetch admin controls.
+  const initialConfig = new Config({
     ...configParams,
   });
+
+  const codeAssistServer = getCodeAssistServer(initialConfig);
+
+  const adminControlsEnabled =
+    initialConfig.getExperiments()?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]
+      ?.boolValue ?? false;
+
+  // Initialize final config parameters to the previous parameters.
+  // If no admin controls are needed, these will be used as-is for the final
+  // config.
+  let finalConfigParams = { ...configParams };
+  if (adminControlsEnabled) {
+    const adminSettings = await fetchAdminControlsOnce(
+      codeAssistServer,
+      adminControlsEnabled,
+    );
+    // Set config parameters according to what admin settings are available.
+    finalConfigParams = {
+      ...configParams,
+      disableYoloMode: adminSettings.secureModeEnabled,
+      mcpEnabled: adminSettings.mcpSetting?.mcpEnabled,
+      extensionsEnabled:
+        adminSettings.cliFeatureSetting?.extensionsSetting?.extensionsEnabled,
+    };
+  }
+
+  const config = new Config(finalConfigParams);
 
   // Needed to initialize ToolRegistry, and git checkpointing if enabled
   await config.initialize();
   startupProfiler.flush(config);
 
   await refreshAuthentication(config, adcFilePath, 'Config');
-
-  // Override env settings when provided admin controls.
-  const codeAssistServer = getCodeAssistServer(config);
-  const adminControlsEnabled =
-    config.getExperiments()?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]
-      ?.boolValue ?? false;
-
-  // If adminControlsEnabled, the previous config should be used to fetch admin
-  // controls, then a new config should be initialized with the updated fetched
-  // admin controls.
-  if (adminControlsEnabled) {
-    const adminSettings = await fetchAdminControlsOnce(
-      codeAssistServer,
-      adminControlsEnabled,
-    );
-    const adminConfig = new Config({
-      ...configParams,
-    });
-    adminConfig.setRemoteAdminSettings(adminSettings);
-
-    // Re-initialize everything but with the admin config.
-    await adminConfig.initialize();
-    startupProfiler.flush(adminConfig);
-
-    await refreshAuthentication(adminConfig, adcFilePath, 'adminConfig');
-    return adminConfig;
-  }
 
   return config;
 }

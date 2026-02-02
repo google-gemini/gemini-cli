@@ -109,24 +109,43 @@ describe('loadConfig', () => {
 
       it('should fetch admin controls and apply them', async () => {
         const mockAdminSettings: FetchAdminControlsResponse = {
+          secureModeEnabled: false,
+          mcpSetting: {
+            mcpEnabled: false,
+          },
+          cliFeatureSetting: {
+            extensionsSetting: {
+              extensionsEnabled: false,
+            },
+          },
           strictModeDisabled: false,
         };
         vi.mocked(fetchAdminControlsOnce).mockResolvedValue(mockAdminSettings);
 
-        const config = await loadConfig(
-          mockSettings,
-          mockExtensionLoader,
-          taskId,
-        );
+        await loadConfig(mockSettings, mockExtensionLoader, taskId);
 
-        expect(fetchAdminControlsOnce).toHaveBeenCalledWith(undefined, true);
-        expect(config.setRemoteAdminSettings).toHaveBeenCalledWith(
-          mockAdminSettings,
+        expect(Config).toHaveBeenCalledWith(
+          expect.objectContaining({
+            disableYoloMode: mockAdminSettings.secureModeEnabled,
+            mcpEnabled: mockAdminSettings.mcpSetting?.mcpEnabled,
+            extensionsEnabled:
+              mockAdminSettings.cliFeatureSetting?.extensionsSetting
+                ?.extensionsEnabled,
+          }),
         );
       });
 
       it('should fetch admin controls using the code assist server when available', async () => {
         const mockAdminSettings: FetchAdminControlsResponse = {
+          secureModeEnabled: true,
+          mcpSetting: {
+            mcpEnabled: true,
+          },
+          cliFeatureSetting: {
+            extensionsSetting: {
+              extensionsEnabled: true,
+            },
+          },
           strictModeDisabled: true,
         };
         const mockCodeAssistServer = { projectId: 'test-project' };
@@ -136,18 +155,20 @@ describe('loadConfig', () => {
         );
         vi.mocked(fetchAdminControlsOnce).mockResolvedValue(mockAdminSettings);
 
-        const config = await loadConfig(
-          mockSettings,
-          mockExtensionLoader,
-          taskId,
-        );
+        await loadConfig(mockSettings, mockExtensionLoader, taskId);
 
         expect(fetchAdminControlsOnce).toHaveBeenCalledWith(
           mockCodeAssistServer,
           true,
         );
-        expect(config.setRemoteAdminSettings).toHaveBeenCalledWith(
-          mockAdminSettings,
+        expect(Config).toHaveBeenCalledWith(
+          expect.objectContaining({
+            disableYoloMode: mockAdminSettings.secureModeEnabled,
+            mcpEnabled: mockAdminSettings.mcpSetting?.mcpEnabled,
+            extensionsEnabled:
+              mockAdminSettings.cliFeatureSetting?.extensionsSetting
+                ?.extensionsEnabled,
+          }),
         );
       });
     });
