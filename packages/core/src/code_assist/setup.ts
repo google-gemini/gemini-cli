@@ -7,6 +7,7 @@
 import type {
   ClientMetadata,
   GeminiUserTier,
+  IneligibleTier,
   LoadCodeAssistResponse,
   OnboardUserRequest,
 } from './types.js';
@@ -32,6 +33,16 @@ export class ProjectIdRequiredError extends Error {
 export class ValidationCancelledError extends Error {
   constructor() {
     super('User cancelled account validation');
+  }
+}
+
+export class IneligibleTierError extends Error {
+  readonly ineligibleTiers: IneligibleTier[];
+
+  constructor(ineligibleTiers: IneligibleTier[]) {
+    const reasons = ineligibleTiers.map((t) => t.reasonMessage).join(', ');
+    super(reasons);
+    this.ineligibleTiers = ineligibleTiers;
   }
 }
 
@@ -187,8 +198,7 @@ export async function setupUser(
 
 function throwIneligibleOrProjectIdError(res: LoadCodeAssistResponse): never {
   if (res.ineligibleTiers && res.ineligibleTiers.length > 0) {
-    const reasons = res.ineligibleTiers.map((t) => t.reasonMessage).join(', ');
-    throw new Error(reasons);
+    throw new IneligibleTierError(res.ineligibleTiers);
   }
   throw new ProjectIdRequiredError();
 }
