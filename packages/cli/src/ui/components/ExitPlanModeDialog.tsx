@@ -15,7 +15,11 @@ import {
 } from 'react';
 import { Box, Text } from 'ink';
 import * as fs from 'node:fs';
-import { ApprovalMode , validatePlanPath, validatePlanContent } from '@google/gemini-cli-core';
+import {
+  ApprovalMode,
+  validatePlanPath,
+  validatePlanContent,
+} from '@google/gemini-cli-core';
 import { theme } from '../semantic-colors.js';
 import { MarkdownDisplay } from '../utils/MarkdownDisplay.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
@@ -35,7 +39,7 @@ import { useConfig } from '../contexts/ConfigContext.js';
  * Layout constants for the dialog.
  */
 const MIN_PLAN_HEIGHT = 3;
-const MAX_STANDARD_PLAN_HEIGHT = 20;
+// Offset for the feedback text input width to account for radio button prefix ("● 1. ") and margins.
 const FEEDBACK_BUFFER_WIDTH_OFFSET = 6;
 const PLAN_WIDTH_OFFSET = 2;
 const QUESTION_AND_MARGIN = 2; // Question text + margin
@@ -267,10 +271,7 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
 
   const planContentHeight =
     availableHeight && !isAlternateBuffer
-      ? Math.min(
-          MAX_STANDARD_PLAN_HEIGHT,
-          Math.max(MIN_PLAN_HEIGHT, availableHeight - overhead),
-        )
+      ? Math.max(MIN_PLAN_HEIGHT, availableHeight - overhead)
       : undefined;
 
   const planContent = useMemo(() => {
