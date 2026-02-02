@@ -45,6 +45,7 @@ export class PromptProvider {
     const interactiveMode = interactiveOverride ?? config.isInteractive();
     const approvalMode = config.getApprovalMode?.() ?? ApprovalMode.DEFAULT;
     const isPlanMode = approvalMode === ApprovalMode.PLAN;
+    const isYolo = approvalMode === ApprovalMode.YOLO;
     const skills = config.getSkillManager().getSkills();
     const toolNames = config.getToolRegistry().getAllToolNames();
 
@@ -96,6 +97,7 @@ export class PromptProvider {
           interactive: interactiveMode,
           isGemini3,
           hasSkills: skills.length > 0,
+          isYolo,
         })),
         agentContexts: this.withSection('agentContexts', () =>
           config.getAgentRegistry().getDirectoryContext(),
@@ -119,6 +121,7 @@ export class PromptProvider {
               CodebaseInvestigatorAgent.name,
             ),
             enableWriteTodosTool: toolNames.includes(WRITE_TODOS_TOOL_NAME),
+            isYolo,
           }),
           !isPlanMode,
         ),
@@ -128,6 +131,7 @@ export class PromptProvider {
             interactive: interactiveMode,
             isGemini3,
             enableShellEfficiency: config.getEnableShellOutputEfficiency(),
+            isYolo,
           }),
         ),
         sandbox: this.withSection('sandbox', () => getSandboxMode()),
