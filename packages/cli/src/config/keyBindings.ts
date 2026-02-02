@@ -399,6 +399,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.TOGGLE_YOLO,
       Command.CYCLE_APPROVAL_MODE,
       Command.SHOW_MORE_LINES,
+      Command.EXPAND_PASTE,
       Command.TOGGLE_BACKGROUND_SHELL,
       Command.TOGGLE_BACKGROUND_SHELL_LIST,
       Command.KILL_BACKGROUND_SHELL,
