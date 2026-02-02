@@ -20,7 +20,7 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const mockDismissBackgroundShell = vi.fn();
 const mockSetActiveBackgroundShellPid = vi.fn();
 const mockSetIsBackgroundShellListOpen = vi.fn();
-const mockHandleWarning = vi.fn();
+const mockShowTransientMessage = vi.fn();
 const mockSetEmbeddedShellFocused = vi.fn();
 
 vi.mock('../contexts/UIActionsContext.js', () => ({
@@ -28,7 +28,7 @@ vi.mock('../contexts/UIActionsContext.js', () => ({
     dismissBackgroundShell: mockDismissBackgroundShell,
     setActiveBackgroundShellPid: mockSetActiveBackgroundShellPid,
     setIsBackgroundShellListOpen: mockSetIsBackgroundShellListOpen,
-    handleWarning: mockHandleWarning,
+    showTransientMessage: mockShowTransientMessage,
     setEmbeddedShellFocused: mockSetEmbeddedShellFocused,
   }),
 }));
@@ -451,8 +451,9 @@ describe('<BackgroundShellDisplay />', () => {
       simulateKey({ name: 'tab' });
     });
 
-    expect(mockHandleWarning).toHaveBeenCalledWith(
+    expect(mockShowTransientMessage).toHaveBeenCalledWith(
       'Press Shift+Tab to focus out.',
+      'warning',
     );
     expect(mockSetEmbeddedShellFocused).not.toHaveBeenCalled();
   });

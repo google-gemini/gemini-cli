@@ -8,7 +8,11 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render } from '../../test-utils/render.js';
 import { Text } from 'ink';
 import { StatusDisplay } from './StatusDisplay.js';
-import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
+import {
+  UIStateContext,
+  type UIState,
+  TransientMessageType,
+} from '../contexts/UIStateContext.js';
 import { ConfigContext } from '../contexts/ConfigContext.js';
 import { SettingsContext } from '../contexts/SettingsContext.js';
 import type { TextBuffer } from './shared/text-buffer.js';
@@ -39,7 +43,7 @@ type UIStateOverrides = Partial<Omit<UIState, 'buffer'>> & {
 const createMockUIState = (overrides: UIStateOverrides = {}): UIState =>
   ({
     ctrlCPressedOnce: false,
-    warningMessage: null,
+    transientMessage: null,
     ctrlDPressedOnce: false,
     showEscapePrompt: false,
     queueErrorMessage: null,
@@ -118,7 +122,10 @@ describe('StatusDisplay', () => {
   it('prioritizes Ctrl+C prompt over everything else (except system md)', () => {
     const uiState = createMockUIState({
       ctrlCPressedOnce: true,
-      warningMessage: 'Warning',
+      transientMessage: {
+        text: 'Warning',
+        type: TransientMessageType.Warning,
+      },
       activeHooks: [{ name: 'hook', eventName: 'event' }],
     });
     const { lastFrame } = renderStatusDisplay(
@@ -130,7 +137,10 @@ describe('StatusDisplay', () => {
 
   it('renders warning message', () => {
     const uiState = createMockUIState({
-      warningMessage: 'This is a warning',
+      transientMessage: {
+        text: 'This is a warning',
+        type: TransientMessageType.Warning,
+      },
     });
     const { lastFrame } = renderStatusDisplay(
       { hideContextSummary: false },
@@ -141,7 +151,10 @@ describe('StatusDisplay', () => {
 
   it('prioritizes warning over Ctrl+D', () => {
     const uiState = createMockUIState({
-      warningMessage: 'Warning',
+      transientMessage: {
+        text: 'Warning',
+        type: TransientMessageType.Warning,
+      },
       ctrlDPressedOnce: true,
     });
     const { lastFrame } = renderStatusDisplay(

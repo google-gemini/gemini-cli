@@ -31,6 +31,11 @@ import type { SessionStatsState } from '../contexts/SessionContext.js';
 import type { ExtensionUpdateState } from '../state/extensions.js';
 import type { UpdateObject } from '../utils/updateCheck.js';
 
+export enum TransientMessageType {
+  Warning = 'warning',
+  Hint = 'hint',
+}
+
 export interface ProQuotaDialogRequest {
   failedModel: string;
   fallbackModel: string;
@@ -149,8 +154,7 @@ export interface UIState {
   showDebugProfiler: boolean;
   showFullTodos: boolean;
   copyModeEnabled: boolean;
-  warningMessage: string | null;
-  hintMessage: string | null;
+  transientMessage: { text: string; type: TransientMessageType } | null;
   bannerData: {
     defaultText: string;
     warningText: string;

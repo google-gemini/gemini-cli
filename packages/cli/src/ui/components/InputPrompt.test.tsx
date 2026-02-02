@@ -3721,11 +3721,14 @@ describe('InputPrompt', () => {
       vi.mocked(clipboardy.read).mockResolvedValue(largeText);
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
 
-      const mockHandleHintMessage = vi.fn();
+      const mockShowTransientMessage = vi.fn();
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
         {
-          uiActions: { ...uiActions, handleHintMessage: mockHandleHintMessage },
+          uiActions: {
+            ...uiActions,
+            showTransientMessage: mockShowTransientMessage,
+          },
         },
       );
 
@@ -3734,8 +3737,9 @@ describe('InputPrompt', () => {
       });
 
       await waitFor(() => {
-        expect(mockHandleHintMessage).toHaveBeenCalledWith(
+        expect(mockShowTransientMessage).toHaveBeenCalledWith(
           'Press Ctrl+O to expand pasted text',
+          'hint',
         );
       });
       unmount();
@@ -3746,11 +3750,14 @@ describe('InputPrompt', () => {
       vi.mocked(clipboardy.read).mockResolvedValue(smallText);
       vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
 
-      const mockHandleHintMessage = vi.fn();
+      const mockShowTransientMessage = vi.fn();
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
         {
-          uiActions: { ...uiActions, handleHintMessage: mockHandleHintMessage },
+          uiActions: {
+            ...uiActions,
+            showTransientMessage: mockShowTransientMessage,
+          },
         },
       );
 
@@ -3763,13 +3770,13 @@ describe('InputPrompt', () => {
         await new Promise((r) => setTimeout(r, 50));
       });
 
-      expect(mockHandleHintMessage).not.toHaveBeenCalled();
+      expect(mockShowTransientMessage).not.toHaveBeenCalled();
       unmount();
     });
 
     it('hint appears on large terminal paste event', async () => {
       const largeText = 'line1\nline2\nline3\nline4\nline5\nline6';
-      const mockHandleHintMessage = vi.fn();
+      const mockShowTransientMessage = vi.fn();
       const buffer = {
         ...props.buffer,
         handleInput: vi.fn().mockReturnValue(true),
@@ -3784,7 +3791,10 @@ describe('InputPrompt', () => {
       const { stdin, unmount } = renderWithProviders(
         <InputPrompt {...props} buffer={buffer} />,
         {
-          uiActions: { ...uiActions, handleHintMessage: mockHandleHintMessage },
+          uiActions: {
+            ...uiActions,
+            showTransientMessage: mockShowTransientMessage,
+          },
         },
       );
 
@@ -3794,8 +3804,9 @@ describe('InputPrompt', () => {
       });
 
       await waitFor(() => {
-        expect(mockHandleHintMessage).toHaveBeenCalledWith(
+        expect(mockShowTransientMessage).toHaveBeenCalledWith(
           'Press Ctrl+O to expand pasted text',
+          'hint',
         );
       });
       unmount();

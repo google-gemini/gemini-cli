@@ -60,7 +60,10 @@ import { DEFAULT_BACKGROUND_OPACITY } from '../constants.js';
 import { getSafeLowColorBackground } from '../themes/color-utils.js';
 import { isLowColorDepth } from '../utils/terminalUtils.js';
 import { useShellFocusState } from '../contexts/ShellFocusContext.js';
-import { useUIState } from '../contexts/UIStateContext.js';
+import {
+  useUIState,
+  TransientMessageType,
+} from '../contexts/UIStateContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { StreamingState } from '../types.js';
 import { useMouseClick } from '../hooks/useMouseClick.js';
@@ -197,7 +200,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const { merged: settings } = useSettings();
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
-  const { setEmbeddedShellFocused, handleHintMessage } = useUIActions();
+  const { setEmbeddedShellFocused, showTransientMessage } = useUIActions();
   const {
     terminalWidth,
     activePtyId,
@@ -442,13 +445,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           pasteLineCount > LARGE_PASTE_LINE_THRESHOLD ||
           textToInsert.length > LARGE_PASTE_CHAR_THRESHOLD
         ) {
-          handleHintMessage('Press Ctrl+O to expand pasted text');
+          showTransientMessage(
+            'Press Ctrl+O to expand pasted text',
+            TransientMessageType.Hint,
+          );
         }
       }
     } catch (error) {
       debugLogger.error('Error handling paste:', error);
     }
-  }, [buffer, config, stdout, settings, handleHintMessage]);
+  }, [buffer, config, stdout, settings, showTransientMessage]);
 
   useMouseClick(
     innerBoxRef,
@@ -575,7 +581,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             pasteLineCount > LARGE_PASTE_LINE_THRESHOLD ||
             key.sequence.length > LARGE_PASTE_CHAR_THRESHOLD
           ) {
-            handleHintMessage('Press Ctrl+O to expand pasted text');
+            showTransientMessage(
+              'Press Ctrl+O to expand pasted text',
+              TransientMessageType.Hint,
+            );
           }
         }
         return true;
@@ -1054,7 +1063,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       backgroundShellHeight,
       history,
       streamingState,
-      handleHintMessage,
+      showTransientMessage,
     ],
   );
 

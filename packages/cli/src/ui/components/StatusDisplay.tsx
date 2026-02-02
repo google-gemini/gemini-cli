@@ -7,7 +7,10 @@
 import type React from 'react';
 import { Text } from 'ink';
 import { theme } from '../semantic-colors.js';
-import { useUIState } from '../contexts/UIStateContext.js';
+import {
+  useUIState,
+  TransientMessageType,
+} from '../contexts/UIStateContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { ContextSummaryDisplay } from './ContextSummaryDisplay.js';
@@ -34,18 +37,16 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
     );
   }
 
-  if (uiState.warningMessage) {
-    return <Text color={theme.status.warning}>{uiState.warningMessage}</Text>;
+  if (uiState.transientMessage?.type === TransientMessageType.Warning) {
+    return (
+      <Text color={theme.status.warning}>{uiState.transientMessage.text}</Text>
+    );
   }
 
   if (uiState.ctrlDPressedOnce) {
     return (
       <Text color={theme.status.warning}>Press Ctrl+D again to exit.</Text>
     );
-  }
-
-  if (uiState.hintMessage) {
-    return <Text color={theme.text.secondary}>{uiState.hintMessage}</Text>;
   }
 
   if (uiState.showEscapePrompt) {
@@ -60,6 +61,12 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
       <Text color={theme.text.secondary}>
         Press Esc again to {isPromptEmpty ? 'rewind' : 'clear prompt'}.
       </Text>
+    );
+  }
+
+  if (uiState.transientMessage?.type === TransientMessageType.Hint) {
+    return (
+      <Text color={theme.text.secondary}>{uiState.transientMessage.text}</Text>
     );
   }
 

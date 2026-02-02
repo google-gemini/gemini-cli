@@ -18,6 +18,7 @@ import type { AuthState } from '../types.js';
 import { type PermissionsDialogProps } from '../components/PermissionsModifyTrustDialog.js';
 import type { SessionInfo } from '../../utils/sessionUtils.js';
 import { type NewAgentsChoice } from '../components/NewAgentsNotification.js';
+import { type TransientMessageType } from './UIStateContext.js';
 
 export interface UIActions {
   handleThemeSelect: (themeName: string, scope: LoadableSettingScope) => void;
@@ -67,8 +68,7 @@ export interface UIActions {
   handleApiKeySubmit: (apiKey: string) => Promise<void>;
   handleApiKeyCancel: () => void;
   setBannerVisible: (visible: boolean) => void;
-  handleWarning: (message: string) => void;
-  handleHintMessage: (message: string) => void;
+  showTransientMessage: (message: string, type: TransientMessageType) => void;
   setEmbeddedShellFocused: (value: boolean) => void;
   dismissBackgroundShell: (pid: number) => void;
   setActiveBackgroundShellPid: (pid: number) => void;

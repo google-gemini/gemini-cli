@@ -7,6 +7,7 @@
 import { Box, Text } from 'ink';
 import { useEffect, useState, useRef } from 'react';
 import { useUIActions } from '../contexts/UIActionsContext.js';
+import { TransientMessageType } from '../contexts/UIStateContext.js';
 import { theme } from '../semantic-colors.js';
 import {
   ShellExecutionService,
@@ -64,7 +65,7 @@ export const BackgroundShellDisplay = ({
     dismissBackgroundShell,
     setActiveBackgroundShellPid,
     setIsBackgroundShellListOpen,
-    handleWarning,
+    showTransientMessage,
     setEmbeddedShellFocused,
   } = useUIActions();
   const activeShell = shells.get(activePid);
@@ -153,8 +154,9 @@ export const BackgroundShellDisplay = ({
         !isListOpenProp &&
         keyMatchers[Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING](key)
       ) {
-        handleWarning(
+        showTransientMessage(
           `Press ${commandDescriptions[Command.UNFOCUS_BACKGROUND_SHELL]} to focus out.`,
+          TransientMessageType.Warning,
         );
         // Fall through to allow Tab to be sent to the shell
       }
