@@ -31,6 +31,14 @@ Line 29
 Line 30"
 `;
 
+exports[`<MaxSizedBox /> > does not leak content after hidden indicator with bottom overflow 1`] = `
+"Plan
+
+ - Step 1: Do something important
+ - Step 2: Do something important
+... last 18 lines hidden ..."
+`;
+
 exports[`<MaxSizedBox /> > does not truncate when maxHeight is undefined 1`] = `
 "Line 1
 Line 2"
