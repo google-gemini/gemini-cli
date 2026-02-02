@@ -105,8 +105,15 @@ export function printDebugInfo(
   return allTools;
 }
 
-// Helper to validate model output and warn about unexpected content
-export function validateModelOutput(
+// Helper to assert that the model returned some output
+export function assertModelHasOutput(result: string) {
+  if (!result || result.trim().length === 0) {
+    throw new Error('Expected LLM to return some output');
+  }
+}
+
+// Helper to check model output and warn about unexpected content
+export function checkModelOutputContent(
   result: string,
   {
     expectedContent = null,
@@ -117,12 +124,7 @@ export function validateModelOutput(
     testName?: string;
     forbiddenContent?: string | (string | RegExp)[] | null;
   } = {},
-) {
-  // First, check if there's any output at all (this should fail the test if missing)
-  if (!result || result.trim().length === 0) {
-    throw new Error('Expected LLM to return some output');
-  }
-
+): boolean {
   let isValid = true;
 
   // If expectedContent is provided, check for it and warn if missing
@@ -183,7 +185,7 @@ export function validateModelOutput(
   }
 
   if (isValid && env['VERBOSE'] === 'true') {
-    console.log(`${testName}: Model output validated successfully.`);
+    console.log(`${testName}: Model output content checked successfully.`);
   }
 
   return isValid;

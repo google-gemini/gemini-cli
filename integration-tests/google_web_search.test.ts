@@ -6,7 +6,12 @@
 
 import { WEB_SEARCH_TOOL_NAME } from '../packages/core/src/tools/tool-names.js';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
+import {
+  TestRig,
+  printDebugInfo,
+  assertModelHasOutput,
+  checkModelOutputContent,
+} from './test-helper.js';
 
 describe('web search tool', () => {
   let rig: TestRig;
@@ -68,8 +73,8 @@ describe('web search tool', () => {
       `Expected to find a call to ${WEB_SEARCH_TOOL_NAME}`,
     ).toBeTruthy();
 
-    // Validate model output - will throw if no output, warn if missing expected content
-    const hasExpectedContent = validateModelOutput(result, {
+    assertModelHasOutput(result);
+    const hasExpectedContent = checkModelOutputContent(result, {
       expectedContent: ['weather', 'london'],
       testName: 'Google web search test',
     });

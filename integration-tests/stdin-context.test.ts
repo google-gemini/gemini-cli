@@ -5,7 +5,12 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
+import {
+  TestRig,
+  printDebugInfo,
+  assertModelHasOutput,
+  checkModelOutputContent,
+} from './test-helper.js';
 
 describe.skip('stdin context', () => {
   let rig: TestRig;
@@ -67,7 +72,8 @@ describe.skip('stdin context', () => {
     }
 
     // Validate model output
-    validateModelOutput(result, {
+    assertModelHasOutput(result);
+    checkModelOutputContent(result, {
       expectedContent: randomString,
       testName: 'STDIN context test',
     });

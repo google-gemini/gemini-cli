@@ -5,7 +5,12 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
+import {
+  TestRig,
+  printDebugInfo,
+  assertModelHasOutput,
+  checkModelOutputContent,
+} from './test-helper.js';
 import { getShellConfiguration } from '../packages/core/src/utils/shell-utils.js';
 
 const { shell } = getShellConfiguration();
@@ -115,9 +120,8 @@ describe('run_shell_command', () => {
       'Expected to find a run_shell_command tool call',
     ).toBeTruthy();
 
-    // Validate model output - will throw if no output, warn if missing expected content
-    // Model often reports exit code instead of showing output
-    validateModelOutput(result, {
+    assertModelHasOutput(result);
+    checkModelOutputContent(result, {
       expectedContent: ['hello-world', 'exit code 0'],
       testName: 'Shell command test',
     });
@@ -148,8 +152,8 @@ describe('run_shell_command', () => {
       'Expected to find a run_shell_command tool call',
     ).toBeTruthy();
 
-    // Validate model output - will throw if no output, warn if missing expected content
-    validateModelOutput(result, {
+    assertModelHasOutput(result);
+    checkModelOutputContent(result, {
       expectedContent: 'test-stdin',
       testName: 'Shell command stdin test',
     });
@@ -496,8 +500,8 @@ describe('run_shell_command', () => {
       )[0];
     expect(toolCall.toolRequest.success).toBe(true);
 
-    // Validate model output - will throw if no output, warn if missing expected content
-    validateModelOutput(result, {
+    assertModelHasOutput(result);
+    checkModelOutputContent(result, {
       expectedContent: 'test-allow-all',
       testName: 'Shell command stdin allow all',
     });
@@ -529,7 +533,8 @@ describe('run_shell_command', () => {
         foundToolCall,
         'Expected to find a run_shell_command tool call',
       ).toBeTruthy();
-      validateModelOutput(result, {
+      assertModelHasOutput(result);
+      checkModelOutputContent(result, {
         expectedContent: varValue,
         testName: 'Env var propagation test',
       });
@@ -562,7 +567,8 @@ describe('run_shell_command', () => {
       'Expected to find a run_shell_command tool call',
     ).toBeTruthy();
 
-    validateModelOutput(result, {
+    assertModelHasOutput(result);
+    checkModelOutputContent(result, {
       expectedContent: fileName,
       testName: 'Platform-specific listing test',
     });

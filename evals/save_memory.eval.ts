@@ -6,7 +6,10 @@
 
 import { describe, expect } from 'vitest';
 import { evalTest } from './test-helper.js';
-import { validateModelOutput } from '../integration-tests/test-helper.js';
+import {
+  assertModelHasOutput,
+  checkModelOutputContent,
+} from '../integration-tests/test-helper.js';
 
 describe('save_memory', () => {
   const TEST_PREFIX = 'Save memory test: ';
@@ -25,12 +28,11 @@ describe('save_memory', () => {
         true,
       );
 
-      expect(
-        validateModelOutput(result, {
-          expectedContent: 'blue',
-          testName: `${TEST_PREFIX}${testName}`,
-        }),
-      ).toBe(true);
+      assertModelHasOutput(result);
+      checkModelOutputContent(result, {
+        expectedContent: 'blue',
+        testName: `${TEST_PREFIX}${testName}`,
+      });
     },
   });
   const testName2 = 'Remembering User Preferences - Command Restrictions';
@@ -46,12 +48,11 @@ describe('save_memory', () => {
         true,
       );
 
-      expect(
-        validateModelOutput(result, {
-          expectedContent: [/not run npm commands|remember|ok/i],
-          testName: `${TEST_PREFIX}${testName2}`,
-        }),
-      ).toBe(true);
+      assertModelHasOutput(result);
+      checkModelOutputContent(result, {
+        expectedContent: [/not run npm commands|remember|ok/i],
+        testName: `${TEST_PREFIX}${testName2}`,
+      });
     },
   });
 
@@ -68,12 +69,11 @@ describe('save_memory', () => {
         true,
       );
 
-      expect(
-        validateModelOutput(result, {
-          expectedContent: [/always|ok|remember|will do/i],
-          testName: `${TEST_PREFIX}${testName4}`,
-        }),
-      ).toBe(true);
+      assertModelHasOutput(result);
+      checkModelOutputContent(result, {
+        expectedContent: [/always|ok|remember|will do/i],
+        testName: `${TEST_PREFIX}${testName4}`,
+      });
     },
   });
 
@@ -92,12 +92,11 @@ describe('save_memory', () => {
         );
       }
 
-      expect(
-        validateModelOutput(result, {
-          testName: `${TEST_PREFIX}${testName5}`,
-          forbiddenContent: [/remember|will do/i],
-        }),
-      ).toBe(true);
+      assertModelHasOutput(result);
+      checkModelOutputContent(result, {
+        testName: `${TEST_PREFIX}${testName5}`,
+        forbiddenContent: [/remember|will do/i],
+      });
     },
   });
 
@@ -114,12 +113,11 @@ describe('save_memory', () => {
         true,
       );
 
-      expect(
-        validateModelOutput(result, {
-          expectedContent: [/Buddy/i],
-          testName: `${TEST_PREFIX}${testName6}`,
-        }),
-      ).toBe(true);
+      assertModelHasOutput(result);
+      checkModelOutputContent(result, {
+        expectedContent: [/Buddy/i],
+        testName: `${TEST_PREFIX}${testName6}`,
+      });
     },
   });
 
@@ -136,12 +134,11 @@ describe('save_memory', () => {
         true,
       );
 
-      expect(
-        validateModelOutput(result, {
-          expectedContent: [/npm run dev|start server|ok|remember|will do/i],
-          testName: `${TEST_PREFIX}${testName7}`,
-        }),
-      ).toBe(true);
+      assertModelHasOutput(result);
+      checkModelOutputContent(result, {
+        expectedContent: [/npm run dev|start server|ok|remember|will do/i],
+        testName: `${TEST_PREFIX}${testName7}`,
+      });
     },
   });
 
@@ -158,12 +155,11 @@ describe('save_memory', () => {
         true,
       );
 
-      expect(
-        validateModelOutput(result, {
-          expectedContent: [/database schema|ok|remember|will do/i],
-          testName: `${TEST_PREFIX}${testName8}`,
-        }),
-      ).toBe(true);
+      assertModelHasOutput(result);
+      checkModelOutputContent(result, {
+        expectedContent: [/database schema|ok|remember|will do/i],
+        testName: `${TEST_PREFIX}${testName8}`,
+      });
     },
   });
 
@@ -180,12 +176,11 @@ describe('save_memory', () => {
         true,
       );
 
-      expect(
-        validateModelOutput(result, {
-          expectedContent: [/tabs instead of spaces|ok|remember|will do/i],
-          testName: `${TEST_PREFIX}${testName9}`,
-        }),
-      ).toBe(true);
+      assertModelHasOutput(result);
+      checkModelOutputContent(result, {
+        expectedContent: [/tabs instead of spaces|ok|remember|will do/i],
+        testName: `${TEST_PREFIX}${testName9}`,
+      });
     },
   });
 
@@ -202,14 +197,13 @@ describe('save_memory', () => {
         true,
       );
 
-      expect(
-        validateModelOutput(result, {
-          expectedContent: [
-            /command to run all backend tests|ok|remember|will do/i,
-          ],
-          testName: `${TEST_PREFIX}${testName10}`,
-        }),
-      ).toBe(true);
+      assertModelHasOutput(result);
+      checkModelOutputContent(result, {
+        expectedContent: [
+          /command to run all backend tests|ok|remember|will do/i,
+        ],
+        testName: `${TEST_PREFIX}${testName10}`,
+      });
     },
   });
 
@@ -226,14 +220,13 @@ describe('save_memory', () => {
         true,
       );
 
-      expect(
-        validateModelOutput(result, {
-          expectedContent: [
-            /main entry point for this project|ok|remember|will do/i,
-          ],
-          testName: `${TEST_PREFIX}${testName11}`,
-        }),
-      ).toBe(true);
+      assertModelHasOutput(result);
+      checkModelOutputContent(result, {
+        expectedContent: [
+          /main entry point for this project|ok|remember|will do/i,
+        ],
+        testName: `${TEST_PREFIX}${testName11}`,
+      });
     },
   });
 });
