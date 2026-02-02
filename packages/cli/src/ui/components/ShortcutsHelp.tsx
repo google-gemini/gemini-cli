@@ -45,6 +45,30 @@ const buildShortcutRows = (): ShortcutItem[][] => {
 
 const renderItem = (item: ShortcutItem) => `${item.key} ${item.description}`;
 
+const splitLongWord = (word: string, width: number) => {
+  if (width <= 0) return [''];
+  const parts: string[] = [];
+  let current = '';
+
+  for (const char of word) {
+    const next = current + char;
+    if (stringWidth(next) <= width) {
+      current = next;
+      continue;
+    }
+    if (current) {
+      parts.push(current);
+    }
+    current = char;
+  }
+
+  if (current) {
+    parts.push(current);
+  }
+
+  return parts.length > 0 ? parts : [''];
+};
+
 const wrapText = (text: string, width: number) => {
   if (width <= 0) return [''];
   const words = text.split(' ');
@@ -52,6 +76,17 @@ const wrapText = (text: string, width: number) => {
   let current = '';
 
   for (const word of words) {
+    if (stringWidth(word) > width) {
+      if (current) {
+        lines.push(current);
+        current = '';
+      }
+      const chunks = splitLongWord(word, width);
+      for (const chunk of chunks) {
+        lines.push(chunk);
+      }
+      continue;
+    }
     const next = current ? `${current} ${word}` : word;
     if (stringWidth(next) <= width) {
       current = next;
@@ -66,6 +101,13 @@ const wrapText = (text: string, width: number) => {
     lines.push(current);
   }
   return lines.length > 0 ? lines : [''];
+};
+
+const wrapDescription = (key: string, description: string, width: number) => {
+  const keyWidth = stringWidth(key);
+  const availableWidth = Math.max(1, width - keyWidth - 1);
+  const wrapped = wrapText(description, availableWidth);
+  return wrapped.length > 0 ? wrapped : [''];
 };
 
 const padToWidth = (text: string, width: number) => {
@@ -87,17 +129,34 @@ export const ShortcutsHelp: React.FC = () => {
       <Box flexDirection="column">
         <SectionHeader title="Shortcuts (for more see /help)" />
         {shortcutRows.flat().map((item, index) => {
-          const text = padToWidth(renderItem(item), terminalWidth);
-          return (
-            <Text
-              key={`${item.key}-${index}`}
-              backgroundColor={backgroundColor}
-              color={theme.text.primary}
-            >
-              <Text color={keyColor}>{item.key}</Text>
-              {text.slice(item.key.length)}
-            </Text>
+          const descriptionLines = wrapDescription(
+            item.key,
+            item.description,
+            terminalWidth,
           );
+          const keyWidth = stringWidth(item.key);
+
+          return descriptionLines.map((line, lineIndex) => {
+            const prefix =
+              lineIndex === 0 ? `${item.key} ` : ' '.repeat(keyWidth + 1);
+            const text = padToWidth(`${prefix}${line}`, terminalWidth);
+            return (
+              <Text
+                key={`${item.key}-${index}-${lineIndex}`}
+                backgroundColor={backgroundColor}
+                color={theme.text.primary}
+              >
+                {lineIndex === 0 ? (
+                  <>
+                    <Text color={keyColor}>{item.key}</Text>{' '}
+                    {text.slice(keyWidth + 1)}
+                  </>
+                ) : (
+                  text
+                )}
+              </Text>
+            );
+          });
         })}
       </Box>
     );
