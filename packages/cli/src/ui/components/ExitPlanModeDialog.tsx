@@ -132,20 +132,22 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
   useEffect(() => {
     let ignore = false;
 
-    const pathError = validatePlanPath(
+    validatePlanPath(
       planPath,
       config.storage.getProjectTempPlansDir(),
       config.getTargetDir(),
-    );
-
-    if (pathError) {
-      setPlanState({ status: 'error', error: pathError });
-      return;
-    }
-
-    validatePlanContent(planPath)
-      .then((contentError) => {
+    )
+      .then((pathError) => {
         if (ignore) return;
+        if (pathError) {
+          setPlanState({ status: 'error', error: pathError });
+          return;
+        }
+
+        return validatePlanContent(planPath);
+      })
+      .then((contentError) => {
+        if (ignore || contentError === undefined) return;
         if (contentError) {
           setPlanState({ status: 'error', error: contentError });
           return;

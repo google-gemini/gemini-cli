@@ -17,7 +17,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
-    validatePlanPath: vi.fn(() => null),
+    validatePlanPath: vi.fn(async () => null),
     validatePlanContent: vi.fn(async () => null),
   };
 });
