@@ -34,7 +34,7 @@ import {
   readWasmBinaryFromDisk,
   saveTruncatedToolOutput,
   formatTruncatedToolOutput,
-  getRealPathSync,
+  getRealPath,
   isEmpty,
 } from './fileUtils.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
@@ -174,18 +174,16 @@ describe('fileUtils', () => {
     );
   });
 
-  describe('getRealPathSync', () => {
+  describe('getRealPath', () => {
     it('should resolve a real path for an existing file', () => {
       const testFile = path.join(tempRootDir, 'real.txt');
       actualNodeFs.writeFileSync(testFile, 'content');
-      expect(getRealPathSync(testFile)).toBe(
-        actualNodeFs.realpathSync(testFile),
-      );
+      expect(getRealPath(testFile)).toBe(actualNodeFs.realpathSync(testFile));
     });
 
     it('should return absolute resolved path for a non-existent file', () => {
       const ghostFile = path.join(tempRootDir, 'ghost.txt');
-      expect(getRealPathSync(ghostFile)).toBe(path.resolve(ghostFile));
+      expect(getRealPath(ghostFile)).toBe(path.resolve(ghostFile));
     });
 
     it('should resolve symbolic links', () => {
@@ -194,9 +192,7 @@ describe('fileUtils', () => {
       actualNodeFs.writeFileSync(targetFile, 'content');
       actualNodeFs.symlinkSync(targetFile, linkFile);
 
-      expect(getRealPathSync(linkFile)).toBe(
-        actualNodeFs.realpathSync(targetFile),
-      );
+      expect(getRealPath(linkFile)).toBe(actualNodeFs.realpathSync(targetFile));
     });
   });
 

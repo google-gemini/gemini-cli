@@ -20,6 +20,8 @@ import type { Config } from '../config/config.js';
 import { EXIT_PLAN_MODE_TOOL_NAME } from './tool-names.js';
 import { validatePlanPath, validatePlanContent } from '../utils/planUtils.js';
 import { ApprovalMode } from '../policy/types.js';
+import { checkExhaustive } from '../utils/checks.js';
+import { isWithinRoot, getRealPath } from '../utils/fileUtils.js';
 
 /**
  * Returns a human-readable description for an approval mode.
@@ -29,8 +31,13 @@ function getApprovalModeDescription(mode: ApprovalMode): string {
     case ApprovalMode.AUTO_EDIT:
       return 'Auto-Edit mode (edits will be applied automatically)';
     case ApprovalMode.DEFAULT:
-    default:
       return 'Default mode (edits will require confirmation)';
+    case ApprovalMode.YOLO:
+    case ApprovalMode.PLAN:
+      // YOLO and PLAN are not valid modes to enter when exiting plan mode
+      throw new Error(`Unexpected approval mode: ${mode}`);
+    default:
+      checkExhaustive(mode);
   }
 }
 
@@ -73,11 +80,21 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
       return 'plan_path is required.';
     }
 
-    return validatePlanPath(
-      params.plan_path,
-      this.config.storage.getProjectTempPlansDir(),
+    // Since validateToolParamValues is synchronous, we use a basic synchronous check
+    // for path traversal safety. High-level async validation is deferred to shouldConfirmExecute.
+    const plansDir = this.config.storage.getProjectTempPlansDir();
+    const resolvedPath = path.resolve(
       this.config.getTargetDir(),
+      params.plan_path,
     );
+
+    const realPath = getRealPath(resolvedPath);
+
+    if (!isWithinRoot(realPath, plansDir)) {
+      return `Access denied: plan path must be within the designated plans directory.`;
+    }
+
+    return null;
   }
 
   protected createInvocation(
@@ -119,7 +136,19 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
   ): Promise<ToolExitPlanModeConfirmationDetails | false> {
     const resolvedPlanPath = this.getResolvedPlanPath();
 
-    if (!(await this.validatePlanContent(resolvedPlanPath))) {
+    const pathError = await validatePlanPath(
+      this.params.plan_path,
+      this.config.storage.getProjectTempPlansDir(),
+      this.config.getTargetDir(),
+    );
+    if (pathError) {
+      this.planValidationError = pathError;
+      return false;
+    }
+
+    const contentError = await validatePlanContent(resolvedPlanPath);
+    if (contentError) {
+      this.planValidationError = contentError;
       return false;
     }
 
@@ -169,19 +198,6 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
    */
   private getResolvedPlanPath(): string {
     return path.resolve(this.config.getTargetDir(), this.params.plan_path);
-  }
-
-  /**
-   * Validates that the plan file exists and has content.
-   * Sets planValidationError if validation fails.
-   */
-  private async validatePlanContent(planPath: string): Promise<boolean> {
-    const error = await validatePlanContent(planPath);
-    if (error) {
-      this.planValidationError = error;
-      return false;
-    }
-    return true;
   }
 
   async execute(_signal: AbortSignal): Promise<ToolResult> {

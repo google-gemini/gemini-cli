@@ -13,53 +13,29 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolConfirmationOutcome } from './tools.js';
 import { ApprovalMode } from '../policy/types.js';
 import * as fs from 'node:fs';
-
-vi.mock('node:fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof fs>();
-  return {
-    ...actual,
-    existsSync: vi.fn(),
-    realpathSync: vi.fn((p) => p),
-    promises: {
-      ...actual.promises,
-      readFile: vi.fn(),
-    },
-  };
-});
-
-vi.mock('../utils/planUtils.js', () => ({
-  validatePlanPath: vi.fn(),
-  validatePlanContent: vi.fn(),
-}));
-
-import { validatePlanPath, validatePlanContent } from '../utils/planUtils.js';
+import os from 'node:os';
+import { validatePlanPath } from '../utils/planUtils.js';
 
 describe('ExitPlanModeTool', () => {
   let tool: ExitPlanModeTool;
   let mockMessageBus: ReturnType<typeof createMockMessageBus>;
   let mockConfig: Partial<Config>;
-
-  const mockTargetDir = path.resolve('/mock/dir');
-  const mockPlansDir = path.resolve('/mock/dir/plans');
+  let tempRootDir: string;
+  let mockPlansDir: string;
 
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.resetAllMocks();
     mockMessageBus = createMockMessageBus();
     vi.mocked(mockMessageBus.publish).mockResolvedValue(undefined);
 
-    // Default mocks for planUtils
-    vi.mocked(validatePlanPath).mockReturnValue(null);
-    vi.mocked(validatePlanContent).mockResolvedValue(null);
-
-    // Default: plan file exists and has content
-    vi.mocked(fs.existsSync).mockReturnValue(true);
-    vi.mocked(fs.promises.readFile).mockResolvedValue(
-      '# My Plan\n\nSome content',
+    tempRootDir = fs.realpathSync(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'exit-plan-test-')),
     );
+    mockPlansDir = path.join(tempRootDir, 'plans');
+    fs.mkdirSync(mockPlansDir, { recursive: true });
 
     mockConfig = {
-      getTargetDir: vi.fn().mockReturnValue(mockTargetDir),
+      getTargetDir: vi.fn().mockReturnValue(tempRootDir),
       setApprovalMode: vi.fn(),
       storage: {
         getProjectTempPlansDir: vi.fn().mockReturnValue(mockPlansDir),
@@ -79,14 +55,23 @@ describe('ExitPlanModeTool', () => {
   });
 
   afterEach(() => {
+    if (fs.existsSync(tempRootDir)) {
+      fs.rmSync(tempRootDir, { recursive: true, force: true });
+    }
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
+  const createPlanFile = (name: string, content: string) => {
+    const filePath = path.join(mockPlansDir, name);
+    fs.writeFileSync(filePath, content);
+    return path.join('plans', name);
+  };
+
   describe('shouldConfirmExecute', () => {
     it('should return plan approval confirmation details when plan has content', async () => {
-      const planPath = 'plans/test-plan.md';
-      const invocation = tool.build({ plan_path: planPath });
+      const planRelativePath = createPlanFile('test-plan.md', '# My Plan');
+      const invocation = tool.build({ plan_path: planRelativePath });
 
       const result = await invocation.shouldConfirmExecute(
         new AbortController().signal,
@@ -98,17 +83,14 @@ describe('ExitPlanModeTool', () => {
       expect(result.type).toBe('exit_plan_mode');
       expect(result.title).toBe('Plan Approval');
       if (result.type === 'exit_plan_mode') {
-        expect(result.planPath).toBe(
-          path.resolve(mockPlansDir, 'test-plan.md'),
-        );
+        expect(result.planPath).toBe(path.join(mockPlansDir, 'test-plan.md'));
       }
       expect(typeof result.onConfirm).toBe('function');
     });
 
     it('should return false when plan file is empty', async () => {
-      vi.mocked(validatePlanContent).mockResolvedValue('Plan file is empty');
-      const planPath = 'plans/test-plan.md';
-      const invocation = tool.build({ plan_path: planPath });
+      const planRelativePath = createPlanFile('empty.md', '   ');
+      const invocation = tool.build({ plan_path: planRelativePath });
 
       const result = await invocation.shouldConfirmExecute(
         new AbortController().signal,
@@ -118,9 +100,8 @@ describe('ExitPlanModeTool', () => {
     });
 
     it('should return false when plan file cannot be read', async () => {
-      vi.mocked(validatePlanContent).mockResolvedValue('Failed to read');
-      const planPath = 'plans/test-plan.md';
-      const invocation = tool.build({ plan_path: planPath });
+      const planRelativePath = 'plans/non-existent.md';
+      const invocation = tool.build({ plan_path: planRelativePath });
 
       const result = await invocation.shouldConfirmExecute(
         new AbortController().signal,
@@ -130,8 +111,8 @@ describe('ExitPlanModeTool', () => {
     });
 
     it('should auto-approve when policy decision is ALLOW', async () => {
-      const planPath = 'plans/test-plan.md';
-      const invocation = tool.build({ plan_path: planPath });
+      const planRelativePath = createPlanFile('test.md', '# Content');
+      const invocation = tool.build({ plan_path: planRelativePath });
 
       vi.spyOn(
         invocation as unknown as {
@@ -153,8 +134,8 @@ describe('ExitPlanModeTool', () => {
     });
 
     it('should throw error when policy decision is DENY', async () => {
-      const planPath = 'plans/test-plan.md';
-      const invocation = tool.build({ plan_path: planPath });
+      const planRelativePath = createPlanFile('test.md', '# Content');
+      const invocation = tool.build({ plan_path: planRelativePath });
 
       vi.spyOn(
         invocation as unknown as {
@@ -171,13 +152,9 @@ describe('ExitPlanModeTool', () => {
 
   describe('execute with invalid plan', () => {
     it('should return error when plan file is empty', async () => {
-      vi.mocked(validatePlanContent).mockResolvedValue(
-        'Plan file is empty. You must write content to the plan file before requesting approval.',
-      );
-      const planPath = 'plans/test-plan.md';
-      const invocation = tool.build({ plan_path: planPath });
+      const planRelativePath = createPlanFile('empty.md', '');
+      const invocation = tool.build({ plan_path: planRelativePath });
 
-      // shouldConfirmExecute returns false, so execute is called directly
       await invocation.shouldConfirmExecute(new AbortController().signal);
       const result = await invocation.execute(new AbortController().signal);
 
@@ -186,40 +163,34 @@ describe('ExitPlanModeTool', () => {
     });
 
     it('should return error when plan file cannot be read', async () => {
-      vi.mocked(validatePlanContent).mockResolvedValue(
-        'Failed to read plan file: ENOENT',
-      );
-      const planPath = 'plans/test-plan.md';
-      const invocation = tool.build({ plan_path: planPath });
+      const planRelativePath = 'plans/ghost.md';
+      const invocation = tool.build({ plan_path: planRelativePath });
 
       await invocation.shouldConfirmExecute(new AbortController().signal);
       const result = await invocation.execute(new AbortController().signal);
 
-      expect(result.llmContent).toContain('Failed to read plan file');
-      expect(result.llmContent).toContain('ENOENT');
+      expect(result.llmContent).toContain('Plan file does not exist');
     });
   });
 
   describe('execute', () => {
     it('should return approval message when plan is approved with DEFAULT mode', async () => {
-      const planPath = 'plans/test-plan.md';
-      const invocation = tool.build({ plan_path: planPath });
+      const planRelativePath = createPlanFile('test.md', '# Content');
+      const invocation = tool.build({ plan_path: planRelativePath });
 
-      // Simulate the confirmation flow
       const confirmDetails = await invocation.shouldConfirmExecute(
         new AbortController().signal,
       );
       expect(confirmDetails).not.toBe(false);
       if (confirmDetails === false) return;
 
-      // Call onConfirm with approval (using default approval mode)
       await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce, {
         approved: true,
         approvalMode: ApprovalMode.DEFAULT,
       });
 
       const result = await invocation.execute(new AbortController().signal);
-      const expectedPath = path.resolve(mockPlansDir, 'test-plan.md');
+      const expectedPath = path.join(mockPlansDir, 'test.md');
 
       expect(result).toEqual({
         llmContent: `Plan approved. Switching to Default mode (edits will require confirmation).
@@ -231,24 +202,22 @@ Read and follow the plan strictly during implementation.`,
     });
 
     it('should return approval message when plan is approved with AUTO_EDIT mode', async () => {
-      const planPath = 'plans/test-plan.md';
-      const invocation = tool.build({ plan_path: planPath });
+      const planRelativePath = createPlanFile('test.md', '# Content');
+      const invocation = tool.build({ plan_path: planRelativePath });
 
-      // Simulate the confirmation flow
       const confirmDetails = await invocation.shouldConfirmExecute(
         new AbortController().signal,
       );
       expect(confirmDetails).not.toBe(false);
       if (confirmDetails === false) return;
 
-      // Call onConfirm with approval (using auto-edit approval mode)
       await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce, {
         approved: true,
         approvalMode: ApprovalMode.AUTO_EDIT,
       });
 
       const result = await invocation.execute(new AbortController().signal);
-      const expectedPath = path.resolve(mockPlansDir, 'test-plan.md');
+      const expectedPath = path.join(mockPlansDir, 'test.md');
 
       expect(result).toEqual({
         llmContent: `Plan approved. Switching to Auto-Edit mode (edits will be applied automatically).
@@ -263,24 +232,22 @@ Read and follow the plan strictly during implementation.`,
     });
 
     it('should return feedback message when plan is rejected with feedback', async () => {
-      const planPath = 'plans/test-plan.md';
-      const invocation = tool.build({ plan_path: planPath });
+      const planRelativePath = createPlanFile('test.md', '# Content');
+      const invocation = tool.build({ plan_path: planRelativePath });
 
-      // Simulate the confirmation flow
       const confirmDetails = await invocation.shouldConfirmExecute(
         new AbortController().signal,
       );
       expect(confirmDetails).not.toBe(false);
       if (confirmDetails === false) return;
 
-      // Call onConfirm with rejection and feedback
       await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce, {
         approved: false,
         feedback: 'Please add more details.',
       });
 
       const result = await invocation.execute(new AbortController().signal);
-      const expectedPath = path.resolve(mockPlansDir, 'test-plan.md');
+      const expectedPath = path.join(mockPlansDir, 'test.md');
 
       expect(result).toEqual({
         llmContent: `Plan rejected. User feedback: Please add more details.
@@ -292,23 +259,21 @@ Revise the plan based on the feedback.`,
     });
 
     it('should handle rejection without feedback gracefully', async () => {
-      const planPath = 'plans/test-plan.md';
-      const invocation = tool.build({ plan_path: planPath });
+      const planRelativePath = createPlanFile('test.md', '# Content');
+      const invocation = tool.build({ plan_path: planRelativePath });
 
-      // Simulate the confirmation flow
       const confirmDetails = await invocation.shouldConfirmExecute(
         new AbortController().signal,
       );
       expect(confirmDetails).not.toBe(false);
       if (confirmDetails === false) return;
 
-      // Call onConfirm with rejection but no feedback (edge case)
       await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce, {
         approved: false,
       });
 
       const result = await invocation.execute(new AbortController().signal);
-      const expectedPath = path.resolve(mockPlansDir, 'test-plan.md');
+      const expectedPath = path.join(mockPlansDir, 'test.md');
 
       expect(result).toEqual({
         llmContent: `Plan rejected. No feedback provided.
@@ -320,17 +285,15 @@ Ask the user for specific feedback on how to improve the plan.`,
     });
 
     it('should return cancellation message when cancelled', async () => {
-      const planPath = 'plans/test-plan.md';
-      const invocation = tool.build({ plan_path: planPath });
+      const planRelativePath = createPlanFile('test.md', '# Content');
+      const invocation = tool.build({ plan_path: planRelativePath });
 
-      // Simulate the confirmation flow
       const confirmDetails = await invocation.shouldConfirmExecute(
         new AbortController().signal,
       );
       expect(confirmDetails).not.toBe(false);
       if (confirmDetails === false) return;
 
-      // Call onConfirm with cancellation
       await confirmDetails.onConfirm(ToolConfirmationOutcome.Cancel);
 
       const result = await invocation.execute(new AbortController().signal);
@@ -343,8 +306,62 @@ Ask the user for specific feedback on how to improve the plan.`,
     });
   });
 
+  describe('getApprovalModeDescription (internal)', () => {
+    it('should handle all valid approval modes', async () => {
+      const planRelativePath = createPlanFile('test.md', '# Content');
+      const invocation = tool.build({ plan_path: planRelativePath });
+
+      const testMode = async (mode: ApprovalMode, expected: string) => {
+        const confirmDetails = await invocation.shouldConfirmExecute(
+          new AbortController().signal,
+        );
+        if (confirmDetails === false) return;
+
+        await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce, {
+          approved: true,
+          approvalMode: mode,
+        });
+
+        const result = await invocation.execute(new AbortController().signal);
+        expect(result.llmContent).toContain(expected);
+      };
+
+      await testMode(
+        ApprovalMode.AUTO_EDIT,
+        'Auto-Edit mode (edits will be applied automatically)',
+      );
+      await testMode(
+        ApprovalMode.DEFAULT,
+        'Default mode (edits will require confirmation)',
+      );
+    });
+
+    it('should throw for invalid post-planning modes', async () => {
+      const planRelativePath = createPlanFile('test.md', '# Content');
+      const invocation = tool.build({ plan_path: planRelativePath });
+
+      const testInvalidMode = async (mode: ApprovalMode) => {
+        const confirmDetails = await invocation.shouldConfirmExecute(
+          new AbortController().signal,
+        );
+        if (confirmDetails === false) return;
+
+        await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce, {
+          approved: true,
+          approvalMode: mode,
+        });
+
+        await expect(
+          invocation.execute(new AbortController().signal),
+        ).rejects.toThrow(/Unexpected approval mode/);
+      };
+
+      await testInvalidMode(ApprovalMode.YOLO);
+      await testInvalidMode(ApprovalMode.PLAN);
+    });
+  });
+
   it('should throw error during build if plan path is outside plans directory', () => {
-    vi.mocked(validatePlanPath).mockReturnValue('Access denied');
     expect(() => tool.build({ plan_path: '../../../etc/passwd' })).toThrow(
       /Access denied/,
     );
@@ -362,33 +379,40 @@ Ask the user for specific feedback on how to improve the plan.`,
     });
 
     it('should reject path outside plans directory', () => {
-      vi.mocked(validatePlanPath).mockReturnValue('Access denied');
       const result = tool.validateToolParams({
         plan_path: '../../../etc/passwd',
       });
       expect(result).toContain('Access denied');
     });
 
-    it('should reject non-existent plan file', () => {
-      vi.mocked(validatePlanPath).mockReturnValue('Plan file does not exist');
-      const result = tool.validateToolParams({
-        plan_path: 'plans/ghost.md',
-      });
+    it('should reject non-existent plan file', async () => {
+      const result = await validatePlanPath(
+        'plans/ghost.md',
+        mockPlansDir,
+        tempRootDir,
+      );
       expect(result).toContain('Plan file does not exist');
     });
 
     it('should reject symbolic links pointing outside the plans directory', () => {
-      vi.mocked(validatePlanPath).mockReturnValue('Access denied');
+      const outsideFile = path.join(tempRootDir, 'outside.txt');
+      fs.writeFileSync(outsideFile, 'secret');
+      const maliciousPath = path.join(mockPlansDir, 'malicious.md');
+      fs.symlinkSync(outsideFile, maliciousPath);
+
       const result = tool.validateToolParams({
         plan_path: 'plans/malicious.md',
       });
 
-      expect(result).toContain('Access denied');
+      expect(result).toBe(
+        'Access denied: plan path must be within the designated plans directory.',
+      );
     });
 
     it('should accept valid path within plans directory', () => {
+      createPlanFile('valid.md', '# Content');
       const result = tool.validateToolParams({
-        plan_path: 'plans/valid-plan.md',
+        plan_path: 'plans/valid.md',
       });
       expect(result).toBeNull();
     });

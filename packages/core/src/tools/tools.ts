@@ -18,7 +18,7 @@ import {
   type ToolConfirmationResponse,
   type Question,
 } from '../confirmation-bus/types.js';
-import type { ApprovalMode } from '../policy/types.js';
+import { type ApprovalMode } from '../policy/types.js';
 
 /**
  * Represents a validated and ready-to-execute tool call.

@@ -4,9 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-import { isWithinRoot, getRealPathSync, isEmpty } from './fileUtils.js';
+import { isEmpty, validatePathWithinRoot } from './fileUtils.js';
+
+/**
+ * Standard error messages for the plan approval workflow.
+ * Shared between backend tools and CLI UI for consistency.
+ */
+export const PlanErrorMessages = {
+  PATH_ACCESS_DENIED:
+    'Access denied: plan path must be within the designated plans directory.',
+  FILE_NOT_FOUND: (path: string) =>
+    `Plan file does not exist: ${path}. You must create the plan file before requesting approval.`,
+  FILE_EMPTY:
+    'Plan file is empty. You must write content to the plan file before requesting approval.',
+  READ_FAILURE: (detail: string) => `Failed to read plan file: ${detail}`,
+} as const;
 
 /**
  * Validates a plan file path for safety (traversal) and existence.
@@ -15,22 +27,21 @@ import { isWithinRoot, getRealPathSync, isEmpty } from './fileUtils.js';
  * @param targetDir The current working directory (project root).
  * @returns An error message if validation fails, or null if successful.
  */
-export function validatePlanPath(
+export async function validatePlanPath(
   planPath: string,
   plansDir: string,
   targetDir: string,
-): string | null {
-  const resolvedPath = path.resolve(targetDir, planPath);
-  const realPath = getRealPathSync(resolvedPath);
-
-  if (!isWithinRoot(realPath, plansDir)) {
-    return 'Access denied: plan path must be within the designated plans directory.';
+): Promise<string | null> {
+  const error = await validatePathWithinRoot(planPath, plansDir, targetDir);
+  if (error) {
+    if (error.includes('Access denied')) {
+      return PlanErrorMessages.PATH_ACCESS_DENIED;
+    }
+    if (error.includes('File does not exist')) {
+      return PlanErrorMessages.FILE_NOT_FOUND(planPath);
+    }
+    return error;
   }
-
-  if (!fs.existsSync(resolvedPath)) {
-    return `Plan file does not exist: ${planPath}. You must create the plan file before requesting approval.`;
-  }
-
   return null;
 }
 
@@ -44,11 +55,11 @@ export async function validatePlanContent(
 ): Promise<string | null> {
   try {
     if (await isEmpty(planPath)) {
-      return 'Plan file is empty. You must write content to the plan file before requesting approval.';
+      return PlanErrorMessages.FILE_EMPTY;
     }
     return null;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return `Failed to read plan file: ${message}`;
+    return PlanErrorMessages.READ_FAILURE(message);
   }
 }
