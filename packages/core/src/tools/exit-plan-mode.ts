@@ -130,7 +130,7 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
   }
 
   override async shouldConfirmExecute(
-    _abortSignal: AbortSignal,
+    abortSignal: AbortSignal,
   ): Promise<ToolExitPlanModeConfirmationDetails | false> {
     const resolvedPlanPath = this.getResolvedPlanPath();
 
@@ -138,6 +138,26 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
       return false;
     }
 
+    const decision = await this.getMessageBusDecision(abortSignal);
+    if (decision === 'DENY') {
+      throw new Error(
+        `Tool execution for "${
+          this._toolDisplayName || this._toolName
+        }" denied by policy.`,
+      );
+    }
+
+    if (decision === 'ALLOW') {
+      // If policy is allow, auto-approve with default settings and execute.
+      this.confirmationOutcome = ToolConfirmationOutcome.ProceedOnce;
+      this.approvalPayload = {
+        approved: true,
+        approvalMode: ApprovalMode.DEFAULT,
+      };
+      return false;
+    }
+
+    // decision is 'ASK_USER'
     return {
       type: 'exit_plan_mode',
       title: 'Plan Approval',

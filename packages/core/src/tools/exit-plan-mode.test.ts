@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ExitPlanModeTool } from './exit-plan-mode.js';
+import { ExitPlanModeTool, ExitPlanModeInvocation } from './exit-plan-mode.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import path from 'node:path';
 import type { Config } from '../config/config.js';
@@ -56,6 +56,13 @@ describe('ExitPlanModeTool', () => {
       mockConfig as Config,
       mockMessageBus as unknown as MessageBus,
     );
+    // Mock getMessageBusDecision on the invocation prototype
+    vi.spyOn(
+      ExitPlanModeInvocation.prototype as unknown as {
+        getMessageBusDecision: () => Promise<string>;
+      },
+      'getMessageBusDecision',
+    ).mockResolvedValue('ASK_USER');
   });
 
   afterEach(() => {
@@ -121,6 +128,45 @@ describe('ExitPlanModeTool', () => {
       );
 
       expect(result).toBe(false);
+    });
+
+    it('should auto-approve when policy decision is ALLOW', async () => {
+      const planPath = 'plans/test-plan.md';
+      const invocation = tool.build({ plan_path: planPath });
+
+      vi.spyOn(
+        invocation as unknown as {
+          getMessageBusDecision: () => Promise<string>;
+        },
+        'getMessageBusDecision',
+      ).mockResolvedValue('ALLOW');
+
+      const result = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+
+      expect(result).toBe(false);
+      // Verify it auto-approved internally
+      const executeResult = await invocation.execute(
+        new AbortController().signal,
+      );
+      expect(executeResult.llmContent).toContain('Plan approved');
+    });
+
+    it('should throw error when policy decision is DENY', async () => {
+      const planPath = 'plans/test-plan.md';
+      const invocation = tool.build({ plan_path: planPath });
+
+      vi.spyOn(
+        invocation as unknown as {
+          getMessageBusDecision: () => Promise<string>;
+        },
+        'getMessageBusDecision',
+      ).mockResolvedValue('DENY');
+
+      await expect(
+        invocation.shouldConfirmExecute(new AbortController().signal),
+      ).rejects.toThrow(/denied by policy/);
     });
   });
 
