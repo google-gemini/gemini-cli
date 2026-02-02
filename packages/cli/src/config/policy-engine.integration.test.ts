@@ -164,7 +164,6 @@ describe('Policy Engine Integration Tests', () => {
     it('should handle complex mixed configurations', async () => {
       const settings: Settings = {
         tools: {
-          autoAccept: true, // Allows read-only tools
           allowed: ['custom-tool', 'my-server__special-tool'],
           exclude: ['glob', 'dangerous-tool'],
         },
@@ -438,7 +437,6 @@ describe('Policy Engine Integration Tests', () => {
     it('should verify priority ordering works correctly in practice', async () => {
       const settings: Settings = {
         tools: {
-          autoAccept: true, // Priority 50
           allowed: ['specific-tool'], // Priority 100
           exclude: ['blocked-tool'], // Priority 200
         },
@@ -614,7 +612,6 @@ describe('Policy Engine Integration Tests', () => {
     it('should verify rules are created with correct priorities', async () => {
       const settings: Settings = {
         tools: {
-          autoAccept: true,
           allowed: ['tool1', 'tool2'],
           exclude: ['tool3'],
         },
