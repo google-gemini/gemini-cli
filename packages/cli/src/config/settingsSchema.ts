@@ -1041,17 +1041,6 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
-      autoAccept: {
-        type: 'boolean',
-        label: 'Auto Accept',
-        category: 'Tools',
-        requiresRestart: false,
-        default: false,
-        description: oneLine`
-          Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).
-        `,
-        showInDialog: true,
-      },
       approvalMode: {
         type: 'enum',
         label: 'Approval Mode',
@@ -1179,16 +1168,6 @@ const SETTINGS_SCHEMA = {
         `,
         showInDialog: true,
       },
-      enableHooks: {
-        type: 'boolean',
-        label: 'Enable Hooks System (Experimental)',
-        category: 'Advanced',
-        requiresRestart: true,
-        default: true,
-        description:
-          'Enables the hooks system experiment. When disabled, the hooks system is completely deactivated regardless of other settings.',
-        showInDialog: false,
-      },
     },
   },
 
@@ -1277,6 +1256,17 @@ const SETTINGS_SCHEMA = {
         default: false,
         description: 'Blocks installing and loading extensions from Git.',
         showInDialog: true,
+      },
+      allowedExtensions: {
+        type: 'array',
+        label: 'Extension Source Regex Allowlist',
+        category: 'Security',
+        requiresRestart: true,
+        default: [] as string[],
+        description:
+          'List of Regex patterns for allowed extensions. If nonempty, only extensions that match the patterns in this list are allowed. Overrides the blockGitExtensions setting.',
+        showInDialog: true,
+        items: { type: 'string' },
       },
       folderTrust: {
         type: 'object',
