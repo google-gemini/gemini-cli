@@ -41,8 +41,8 @@ export function useTerminalTheme(
         return;
       }
 
-      // Stop polling if the terminal isn't responding
-      if (unacknowledgedPolls.current >= 3) {
+      // Stop polling if the terminal isn't responding even once.
+      if (unacknowledgedPolls.current >= 1) {
         clearInterval(pollIntervalId);
         return;
       }
