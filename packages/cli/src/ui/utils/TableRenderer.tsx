@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { Text, Box } from 'ink';
+import wrapAnsi from 'wrap-ansi';
 import { theme } from '../semantic-colors.js';
 import { RenderInline, getPlainTextLength } from './InlineMarkdownRenderer.js';
 
@@ -64,7 +65,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     const displayWidth = getPlainTextLength(content);
 
     let cellContent = content;
-    if (displayWidth > contentWidth) {
+    if (isHeader && displayWidth > contentWidth) {
       if (contentWidth <= 3) {
         // Just truncate by character count
         cellContent = content.substring(
@@ -96,8 +97,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     }
 
     // Calculate exact padding needed
-    const actualDisplayWidth = getPlainTextLength(cellContent);
-    const paddingNeeded = Math.max(0, contentWidth - actualDisplayWidth);
+    const paddingNeeded = Math.max(0, contentWidth - displayWidth);
 
     return (
       <Text>
@@ -128,8 +128,11 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     return <Text color={theme.border.default}>{border}</Text>;
   };
 
-  // Helper function to render a table row
-  const renderRow = (cells: string[], isHeader = false): React.ReactNode => {
+  // Helper function to render a single visual line of a row
+  const renderVisualRow = (
+    cells: string[],
+    isHeader = false,
+  ): React.ReactNode => {
     const renderedCells = cells.map((cell, index) => {
       const width = adjustedWidths[index] || 0;
       return renderCell(cell || '', width, isHeader);
@@ -151,21 +154,53 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     );
   };
 
+  // Handles the wrapping logic for a logical data row
+  const renderDataRow = (
+    row: string[],
+    rowIndex: number,
+    isHeader = false,
+  ): React.ReactNode => {
+    const wrappedCells = row.map((cell, colIndex) => {
+      // Get the calculated width for THIS column
+      const colWidth = adjustedWidths[colIndex];
+      const contentWidth = Math.max(1, colWidth - 2); // Subtract padding
+
+      // Wrap to this specific width
+      const wrapped = wrapAnsi(cell, contentWidth, { hard: true, trim: true });
+      return wrapped.split('\n');
+    });
+
+    const maxHeight = Math.max(...wrappedCells.map((lines) => lines.length), 1);
+
+    const visualRows: React.ReactNode[] = [];
+    for (let i = 0; i < maxHeight; i++) {
+      const visualRowCells = wrappedCells.map((lines) => lines[i] || '');
+      visualRows.push(
+        <React.Fragment key={`${rowIndex}-${i}`}>
+          {renderVisualRow(visualRowCells, isHeader)}
+        </React.Fragment>,
+      );
+    }
+
+    return <React.Fragment key={rowIndex}>{visualRows}</React.Fragment>;
+  };
+
   return (
     <Box flexDirection="column" marginY={1}>
       {/* Top border */}
       {renderBorder('top')}
 
-      {/* Header row */}
-      {renderRow(headers, true)}
+      {/* 
+      Header row
+      Keep the rowIndex as -1 to differentiate from data rows
+      */}
+      {renderDataRow(headers, -1, true)}
 
       {/* Middle border */}
       {renderBorder('middle')}
 
       {/* Data rows */}
-      {rows.map((row, index) => (
-        <React.Fragment key={index}>{renderRow(row)}</React.Fragment>
-      ))}
+      {rows.map((row, index) => renderDataRow(row, index))}
 
       {/* Bottom border */}
       {renderBorder('bottom')}

@@ -61,4 +61,28 @@ describe('TableRenderer', () => {
     expect(output).toContain('Data 3.4');
     expect(output).toMatchSnapshot();
   });
+
+  it('wraps long cell content correctly', () => {
+    const headers = ['Col 1', 'Col 2'];
+    const rows = [
+      [
+        'Short',
+        'This is a very long cell content that should wrap to multiple lines',
+      ],
+    ];
+    const terminalWidth = 40;
+
+    const { lastFrame } = renderWithProviders(
+      <TableRenderer
+        headers={headers}
+        rows={rows}
+        terminalWidth={terminalWidth}
+      />,
+    );
+
+    const output = lastFrame();
+    expect(output).toContain('This is a very');
+    expect(output).toContain('long cell');
+    expect(output).toMatchSnapshot();
+  });
 });
