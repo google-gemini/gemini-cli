@@ -177,6 +177,24 @@ describe('AskUserTool', () => {
       expect(result).toBeNull();
     });
 
+    it('should accept placeholder for choice type', () => {
+      const result = tool.validateToolParams({
+        questions: [
+          {
+            question: 'Which language?',
+            header: 'Language',
+            type: QuestionType.CHOICE,
+            options: [
+              { label: 'TypeScript', description: 'Typed JavaScript' },
+              { label: 'JavaScript', description: 'Dynamic language' },
+            ],
+            placeholder: 'Type another language...',
+          },
+        ],
+      });
+      expect(result).toBeNull();
+    });
+
     it('should return error if option has empty label', () => {
       const result = tool.validateToolParams({
         questions: [
