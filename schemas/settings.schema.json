@@ -457,6 +457,13 @@
           "default": 0.5,
           "type": "number"
         },
+        "disableLoopDetection": {
+          "title": "Disable Loop Detection",
+          "description": "Disable automatic detection and prevention of infinite loops.",
+          "markdownDescription": "Disable automatic detection and prevention of infinite loops.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "skipNextSpeakerCheck": {
           "title": "Skip Next Speaker Check",
           "description": "Skip the next speaker check.",
