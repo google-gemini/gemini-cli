@@ -277,6 +277,7 @@ export class TestRig {
   homeDir: string | null = null;
   testName?: string;
   _lastRunStdout?: string;
+  _lastRunStderr?: string;
   // Path to the copied fake responses file for this test.
   fakeResponsesPath?: string;
   // Original fake responses file path for rewriting goldens in record mode.
@@ -396,6 +397,33 @@ export class TestRig {
     return { command, initialArgs };
   }
 
+  private _getCleanEnv(
+    extraEnv?: Record<string, string | undefined>,
+  ): Record<string, string | undefined> {
+    const cleanEnv: Record<string, string | undefined> = { ...process.env };
+
+    // Clear all GEMINI_ environment variables that might interfere with tests
+    // except for those we explicitly want to keep or set.
+    for (const key of Object.keys(cleanEnv)) {
+      if (
+        (key.startsWith('GEMINI_') || key.startsWith('GOOGLE_GEMINI_')) &&
+        key !== 'GEMINI_API_KEY' &&
+        key !== 'GOOGLE_API_KEY' &&
+        key !== 'GEMINI_MODEL' &&
+        key !== 'GEMINI_DEBUG' &&
+        !key.startsWith('GEMINI_CLI_ACTIVITY_LOG')
+      ) {
+        delete cleanEnv[key];
+      }
+    }
+
+    return {
+      ...cleanEnv,
+      GEMINI_CLI_HOME: this.homeDir!,
+      ...extraEnv,
+    };
+  }
+
   run(options: {
     args?: string | string[];
     stdin?: string;
@@ -433,11 +461,7 @@ export class TestRig {
     const child = spawn(command, commandArgs, {
       cwd: this.testDir!,
       stdio: 'pipe',
-      env: {
-        ...process.env,
-        GEMINI_CLI_HOME: this.homeDir!,
-        ...options.env,
-      },
+      env: this._getCleanEnv(options.env),
     });
     this._spawnedProcesses.push(child);
 
@@ -573,7 +597,7 @@ export class TestRig {
       const child = spawn(command, allArgs, {
         cwd: this.testDir!,
         stdio: 'pipe',
-        env: { ...process.env, GEMINI_CLI_HOME: this.homeDir! },
+        env: this._getCleanEnv(),
         signal: options?.signal,
       });
       this._spawnedProcesses.push(child);
@@ -611,11 +635,7 @@ export class TestRig {
     const child = spawn(command, commandArgs, {
       cwd: this.testDir!,
       stdio: 'pipe',
-      env: {
-        ...process.env,
-        GEMINI_CLI_HOME: this.homeDir!,
-        ...options.env,
-      },
+      env: this._getCleanEnv(options.env),
     });
     this._spawnedProcesses.push(child);
 
@@ -661,6 +681,7 @@ export class TestRig {
 
       child.on('close', (code: number) => {
         clearTimeout(timer);
+        this._lastRunStderr = stderr;
         if (code === 0) {
           this._lastRunStdout = stdout;
           const result = this._filterPodmanTelemetry(stdout);
@@ -1179,11 +1200,7 @@ export class TestRig {
     ]);
     const commandArgs = [...initialArgs];
 
-    const envVars = {
-      ...process.env,
-      GEMINI_CLI_HOME: this.homeDir!,
-      ...options?.env,
-    };
+    const envVars = this._getCleanEnv(options?.env);
 
     const ptyOptions: pty.IPtyForkOptions = {
       name: 'xterm-color',
