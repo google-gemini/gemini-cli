@@ -1471,7 +1471,7 @@ describe('mcp-client', () => {
         {
           command: 'test-command',
           args: ['--foo', 'bar'],
-          env: { FOO: 'bar' },
+          env: { GEMINI_CLI_FOO: 'bar' },
           cwd: 'test/cwd',
         },
         false,
@@ -1482,9 +1482,78 @@ describe('mcp-client', () => {
         command: 'test-command',
         args: ['--foo', 'bar'],
         cwd: 'test/cwd',
-        env: expect.objectContaining({ FOO: 'bar' }),
+        env: expect.objectContaining({ GEMINI_CLI_FOO: 'bar' }),
         stderr: 'pipe',
       });
+    });
+
+    it('should redact sensitive environment variables for command transport', async () => {
+      const mockedTransport = vi
+        .spyOn(SdkClientStdioLib, 'StdioClientTransport')
+        .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
+
+      const originalEnv = process.env;
+      process.env = {
+        ...originalEnv,
+        GEMINI_API_KEY: 'sensitive-key',
+        GEMINI_CLI_SAFE_VAR: 'safe-value',
+      };
+      // Ensure strict sanitization is not triggered for this test
+      delete process.env['GITHUB_SHA'];
+      delete process.env['SURFACE'];
+
+      try {
+        await createTransport(
+          'test-server',
+          {
+            command: 'test-command',
+          },
+          false,
+          EMPTY_CONFIG,
+        );
+
+        const callArgs = mockedTransport.mock.calls[0][0];
+        expect(callArgs.env).toBeDefined();
+        expect(callArgs.env!['GEMINI_CLI_SAFE_VAR']).toBe('safe-value');
+        expect(callArgs.env!['GEMINI_API_KEY']).toBeUndefined();
+      } finally {
+        process.env = originalEnv;
+      }
+    });
+
+    it('should include extension settings in environment', async () => {
+      const mockedTransport = vi
+        .spyOn(SdkClientStdioLib, 'StdioClientTransport')
+        .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
+
+      await createTransport(
+        'test-server',
+        {
+          command: 'test-command',
+          extension: {
+            name: 'test-ext',
+            resolvedSettings: [
+              {
+                envVar: 'GEMINI_CLI_EXT_VAR',
+                value: 'ext-value',
+                sensitive: false,
+                name: 'ext-setting',
+              },
+            ],
+            version: '',
+            isActive: false,
+            path: '',
+            contextFiles: [],
+            id: '',
+          },
+        },
+        false,
+        EMPTY_CONFIG,
+      );
+
+      const callArgs = mockedTransport.mock.calls[0][0];
+      expect(callArgs.env).toBeDefined();
+      expect(callArgs.env!['GEMINI_CLI_EXT_VAR']).toBe('ext-value');
     });
 
     describe('useGoogleCredentialProvider', () => {
@@ -1998,6 +2067,19 @@ describe('connectToMcpServer - OAuth with transport fallback', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
+    // Mock fetch to prevent real network calls during OAuth discovery fallback.
+    // When a 401 error lacks a www-authenticate header, the code attempts to
+    // fetch the header directly from the server, which would hang without this mock.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        status: 401,
+        headers: new Headers({
+          'www-authenticate': `Bearer realm="test", resource_metadata="http://test-server/.well-known/oauth-protected-resource"`,
+        }),
+      }),
+    );
+
     mockTokenStorage = {
       getCredentials: vi.fn().mockResolvedValue({ clientId: 'test-client' }),
     } as unknown as MCPOAuthTokenStorage;
@@ -2019,6 +2101,7 @@ describe('connectToMcpServer - OAuth with transport fallback', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it('should handle HTTP 404 → SSE 401 → OAuth → SSE+OAuth succeeds', async () => {

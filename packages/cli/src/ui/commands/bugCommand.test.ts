@@ -92,6 +92,7 @@ describe('bugCommand', () => {
               getHistory: () => [],
             }),
           }),
+          getContentGeneratorConfig: () => ({ authType: 'oauth-personal' }),
         },
       },
     });
@@ -106,6 +107,7 @@ describe('bugCommand', () => {
 * **Operating System:** test-platform v20.0.0
 * **Sandbox Environment:** test
 * **Model Version:** gemini-pro
+* **Auth Type:** oauth-personal
 * **Memory Usage:** 100 MB
 * **Terminal Name:** Test Terminal
 * **Terminal Background:** #000000
@@ -133,6 +135,7 @@ describe('bugCommand', () => {
               getHistory: () => history,
             }),
           }),
+          getContentGeneratorConfig: () => ({ authType: 'vertex-ai' }),
           storage: {
             getProjectTempDir: () => '/tmp/gemini',
           },
@@ -178,6 +181,7 @@ describe('bugCommand', () => {
               getHistory: () => [],
             }),
           }),
+          getContentGeneratorConfig: () => ({ authType: 'vertex-ai' }),
         },
       },
     });
@@ -192,6 +196,7 @@ describe('bugCommand', () => {
 * **Operating System:** test-platform v20.0.0
 * **Sandbox Environment:** test
 * **Model Version:** gemini-pro
+* **Auth Type:** vertex-ai
 * **Memory Usage:** 100 MB
 * **Terminal Name:** Test Terminal
 * **Terminal Background:** #000000

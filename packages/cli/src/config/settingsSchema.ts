@@ -9,19 +9,17 @@
 // to regenerate the settings reference in `docs/get-started/configuration.md`.
 // --------------------------------------------------------------------------
 
-import type {
-  MCPServerConfig,
-  BugCommandSettings,
-  TelemetrySettings,
-  AuthType,
-  AgentOverride,
-} from '@google/gemini-cli-core';
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   DEFAULT_MODEL_CONFIGS,
+  type MCPServerConfig,
+  type BugCommandSettings,
+  type TelemetrySettings,
+  type AuthType,
+  type AgentOverride,
+  type CustomTheme,
 } from '@google/gemini-cli-core';
-import type { CustomTheme } from '../ui/themes/theme.js';
 import type { SessionRetentionSettings } from './settings.js';
 import { DEFAULT_MIN_RETENTION } from '../utils/sessionCleanup.js';
 
@@ -524,6 +522,16 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: false,
         description: 'Show the model name in the chat for each model turn.',
+        showInDialog: true,
+      },
+      showUserIdentity: {
+        type: 'boolean',
+        label: 'Show User Identity',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          "Show the logged-in user's identity (e.g. email) in the UI.",
         showInDialog: true,
       },
       useAlternateBuffer: {
@@ -1033,17 +1041,6 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
-      autoAccept: {
-        type: 'boolean',
-        label: 'Auto Accept',
-        category: 'Tools',
-        requiresRestart: false,
-        default: false,
-        description: oneLine`
-          Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).
-        `,
-        showInDialog: true,
-      },
       approvalMode: {
         type: 'enum',
         label: 'Approval Mode',
@@ -1171,16 +1168,6 @@ const SETTINGS_SCHEMA = {
         `,
         showInDialog: true,
       },
-      enableHooks: {
-        type: 'boolean',
-        label: 'Enable Hooks System (Experimental)',
-        category: 'Advanced',
-        requiresRestart: true,
-        default: true,
-        description:
-          'Enables the hooks system experiment. When disabled, the hooks system is completely deactivated regardless of other settings.',
-        showInDialog: false,
-      },
     },
   },
 
@@ -1269,6 +1256,17 @@ const SETTINGS_SCHEMA = {
         default: false,
         description: 'Blocks installing and loading extensions from Git.',
         showInDialog: true,
+      },
+      allowedExtensions: {
+        type: 'array',
+        label: 'Extension Source Regex Allowlist',
+        category: 'Security',
+        requiresRestart: true,
+        default: [] as string[],
+        description:
+          'List of Regex patterns for allowed extensions. If nonempty, only extensions that match the patterns in this list are allowed. Overrides the blockGitExtensions setting.',
+        showInDialog: true,
+        items: { type: 'string' },
       },
       folderTrust: {
         type: 'object',
@@ -1593,11 +1591,11 @@ const SETTINGS_SCHEMA = {
         type: 'boolean',
         label: 'Enable Hooks',
         category: 'Advanced',
-        requiresRestart: false,
+        requiresRestart: true,
         default: true,
         description:
           'Canonical toggle for the hooks system. When disabled, no hooks will be executed.',
-        showInDialog: false,
+        showInDialog: true,
       },
       disabled: {
         type: 'array',

@@ -57,6 +57,7 @@ they appear in the UI.
 | Show Line Numbers              | `ui.showLineNumbers`                    | Show line numbers in the chat.                                                                                                                                    | `true`  |
 | Show Citations                 | `ui.showCitations`                      | Show citations for generated text in the chat.                                                                                                                    | `false` |
 | Show Model Info In Chat        | `ui.showModelInfoInChat`                | Show the model name in the chat for each model turn.                                                                                                              | `false` |
+| Show User Identity             | `ui.showUserIdentity`                   | Show the logged-in user's identity (e.g. email) in the UI.                                                                                                        | `true`  |
 | Use Alternate Screen Buffer    | `ui.useAlternateBuffer`                 | Use an alternate screen buffer for the UI, preserving shell history.                                                                                              | `false` |
 | Use Background Color           | `ui.useBackgroundColor`                 | Whether to use background colors in the UI.                                                                                                                       | `true`  |
 | Incremental Rendering          | `ui.incrementalRendering`               | Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled. | `true`  |
@@ -96,7 +97,6 @@ they appear in the UI.
 | -------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- |
 | Enable Interactive Shell         | `tools.shell.enableInteractiveShell` | Use node-pty for an interactive shell experience. Fallback to child_process still applies.                                                                                     | `true`      |
 | Show Color                       | `tools.shell.showColor`              | Show color in shell output.                                                                                                                                                    | `false`     |
-| Auto Accept                      | `tools.autoAccept`                   | Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).                                                                             | `false`     |
 | Approval Mode                    | `tools.approvalMode`                 | The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet. | `"default"` |
 | Use Ripgrep                      | `tools.useRipgrep`                   | Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.                                                                | `true`      |
 | Enable Tool Output Truncation    | `tools.enableToolOutputTruncation`   | Enable truncation of large tool outputs.                                                                                                                                       | `true`      |
@@ -106,13 +106,14 @@ they appear in the UI.
 
 ### Security
 
-| UI Label                              | Setting                                         | Description                                                                     | Default |
-| ------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------- | ------- |
-| Disable YOLO Mode                     | `security.disableYoloMode`                      | Disable YOLO mode, even if enabled by a flag.                                   | `false` |
-| Allow Permanent Tool Approval         | `security.enablePermanentToolApproval`          | Enable the "Allow for all future sessions" option in tool confirmation dialogs. | `false` |
-| Blocks extensions from Git            | `security.blockGitExtensions`                   | Blocks installing and loading extensions from Git.                              | `false` |
-| Folder Trust                          | `security.folderTrust.enabled`                  | Setting to track whether Folder trust is enabled.                               | `false` |
-| Enable Environment Variable Redaction | `security.environmentVariableRedaction.enabled` | Enable redaction of environment variables that may contain secrets.             | `false` |
+| UI Label                              | Setting                                         | Description                                                                                                                                                             | Default |
+| ------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| Disable YOLO Mode                     | `security.disableYoloMode`                      | Disable YOLO mode, even if enabled by a flag.                                                                                                                           | `false` |
+| Allow Permanent Tool Approval         | `security.enablePermanentToolApproval`          | Enable the "Allow for all future sessions" option in tool confirmation dialogs.                                                                                         | `false` |
+| Blocks extensions from Git            | `security.blockGitExtensions`                   | Blocks installing and loading extensions from Git.                                                                                                                      | `false` |
+| Extension Source Regex Allowlist      | `security.allowedExtensions`                    | List of Regex patterns for allowed extensions. If nonempty, only extensions that match the patterns in this list are allowed. Overrides the blockGitExtensions setting. | `[]`    |
+| Folder Trust                          | `security.folderTrust.enabled`                  | Setting to track whether Folder trust is enabled.                                                                                                                       | `false` |
+| Enable Environment Variable Redaction | `security.environmentVariableRedaction.enabled` | Enable redaction of environment variables that may contain secrets.                                                                                                     | `false` |
 
 ### Experimental
 
@@ -129,8 +130,9 @@ they appear in the UI.
 
 ### HooksConfig
 
-| UI Label           | Setting                     | Description                                      | Default |
-| ------------------ | --------------------------- | ------------------------------------------------ | ------- |
-| Hook Notifications | `hooksConfig.notifications` | Show visual indicators when hooks are executing. | `true`  |
+| UI Label           | Setting                     | Description                                                                      | Default |
+| ------------------ | --------------------------- | -------------------------------------------------------------------------------- | ------- |
+| Enable Hooks       | `hooksConfig.enabled`       | Canonical toggle for the hooks system. When disabled, no hooks will be executed. | `true`  |
+| Hook Notifications | `hooksConfig.notifications` | Show visual indicators when hooks are executing.                                 | `true`  |
 
 <!-- SETTINGS-AUTOGEN:END -->

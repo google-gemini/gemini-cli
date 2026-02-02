@@ -24,7 +24,14 @@ import { coreEvents } from '@google/gemini-cli-core';
 // Mock modules
 vi.mock('fs/promises');
 vi.mock('path');
-vi.mock('../../utils/sessionUtils.js');
+vi.mock('../../utils/sessionUtils.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../utils/sessionUtils.js')>();
+  return {
+    ...actual,
+    getSessionFiles: vi.fn(),
+  };
+});
 
 const MOCKED_PROJECT_TEMP_DIR = '/test/project/temp';
 const MOCKED_CHATS_DIR = '/test/project/temp/chats';
@@ -175,6 +182,30 @@ describe('convertSessionToHistoryFormats', () => {
     expect(result.clientHistory[1]).toEqual({
       role: 'model',
       parts: [{ text: 'Hi there' }],
+    });
+  });
+
+  it('should prioritize displayContent for UI history but use content for client history', () => {
+    const messages: MessageRecord[] = [
+      {
+        type: 'user',
+        content: [{ text: 'Expanded content' }],
+        displayContent: [{ text: 'User input' }],
+      } as MessageRecord,
+    ];
+
+    const result = convertSessionToHistoryFormats(messages);
+
+    expect(result.uiHistory).toHaveLength(1);
+    expect(result.uiHistory[0]).toMatchObject({
+      type: 'user',
+      text: 'User input',
+    });
+
+    expect(result.clientHistory).toHaveLength(1);
+    expect(result.clientHistory[0]).toEqual({
+      role: 'user',
+      parts: [{ text: 'Expanded content' }],
     });
   });
 

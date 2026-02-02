@@ -596,9 +596,9 @@ describe('parseArguments', () => {
 
   it('should set isCommand to true for hooks command', async () => {
     process.argv = ['node', 'script.js', 'hooks', 'migrate'];
-    // Hooks command enabled via tools settings
+    // Hooks command enabled via hooksConfig settings
     const settings = createTestMergedSettings({
-      tools: { enableHooks: true },
+      hooksConfig: { enabled: true },
     });
     const argv = await parseArguments(settings);
     expect(argv.isCommand).toBe(true);
@@ -1255,7 +1255,7 @@ describe('Approval mode tool exclusion logic', () => {
     });
 
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'Cannot start in YOLO mode since it is disabled by your admin',
+      'YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
     );
   });
 
@@ -2928,7 +2928,7 @@ describe('loadCliConfig disableYoloMode', () => {
       security: { disableYoloMode: true },
     });
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'Cannot start in YOLO mode since it is disabled by your admin',
+      'YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
     );
   });
 });
@@ -2960,7 +2960,7 @@ describe('loadCliConfig secureModeEnabled', () => {
     });
 
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'Cannot start in YOLO mode since it is disabled by your admin',
+      'YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
     );
   });
 
@@ -2974,7 +2974,7 @@ describe('loadCliConfig secureModeEnabled', () => {
     });
 
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'Cannot start in YOLO mode since it is disabled by your admin',
+      'YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
     );
   });
 

@@ -306,11 +306,15 @@ export async function detectFileType(
     if (lookedUpMimeType.startsWith('image/')) {
       return 'image';
     }
-    if (lookedUpMimeType.startsWith('audio/')) {
-      return 'audio';
-    }
-    if (lookedUpMimeType.startsWith('video/')) {
-      return 'video';
+    // Verify audio/video with content check to avoid MIME misidentification (#16888)
+    if (
+      lookedUpMimeType.startsWith('audio/') ||
+      lookedUpMimeType.startsWith('video/')
+    ) {
+      if (!(await isBinaryFile(filePath))) {
+        return 'text';
+      }
+      return lookedUpMimeType.startsWith('audio/') ? 'audio' : 'video';
     }
     if (lookedUpMimeType === 'application/pdf') {
       return 'pdf';
@@ -562,6 +566,8 @@ ${processedLines.join('\n')}`;
 /**
  * Saves tool output to a temporary file for later retrieval.
  */
+export const TOOL_OUTPUT_DIR = 'tool_output';
+
 export async function saveTruncatedToolOutput(
   content: string,
   toolName: string,
@@ -574,8 +580,10 @@ export async function saveTruncatedToolOutput(
     .replace(/[^a-z0-9]/gi, '_')
     .toLowerCase();
   const fileName = `${safeToolName}_${safeId}.txt`;
-  const outputFile = path.join(projectTempDir, fileName);
+  const toolOutputDir = path.join(projectTempDir, TOOL_OUTPUT_DIR);
+  const outputFile = path.join(toolOutputDir, fileName);
 
+  await fsPromises.mkdir(toolOutputDir, { recursive: true });
   await fsPromises.writeFile(outputFile, content);
 
   const lines = content.split('\n');

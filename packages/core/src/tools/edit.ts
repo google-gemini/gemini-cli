@@ -6,6 +6,7 @@
 
 import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
+import * as os from 'node:os';
 import * as crypto from 'node:crypto';
 import * as Diff from 'diff';
 import {
@@ -34,7 +35,7 @@ import {
 } from './modifiable-tool.js';
 import { IdeClient } from '../ide/ide-client.js';
 import { FixLLMEditWithInstruction } from '../utils/llm-edit-fixer.js';
-import { safeLiteralReplace } from '../utils/textUtils.js';
+import { safeLiteralReplace, detectLineEnding } from '../utils/textUtils.js';
 import { EditStrategyEvent } from '../telemetry/types.js';
 import { logEditStrategy } from '../telemetry/loggers.js';
 import { EditCorrectionEvent } from '../telemetry/types.js';
@@ -256,17 +257,6 @@ async function calculateRegexReplacement(
     finalOldString: normalizedSearch,
     finalNewString: normalizedReplace,
   };
-}
-
-/**
- * Detects the line ending style of a string.
- * @param content The string content to analyze.
- * @returns '\r\n' for Windows-style, '\n' for Unix-style.
- */
-function detectLineEnding(content: string): '\r\n' | '\n' {
-  // If a Carriage Return is found, assume Windows-style endings.
-  // This is a simple but effective heuristic.
-  return content.includes('\r\n') ? '\r\n' : '\n';
 }
 
 export async function calculateReplacement(
@@ -812,9 +802,13 @@ class EditToolInvocation
       await this.ensureParentDirectoriesExistAsync(this.params.file_path);
       let finalContent = editData.newContent;
 
-      // Restore original line endings if they were CRLF
-      if (!editData.isNewFile && editData.originalLineEnding === '\r\n') {
-        finalContent = finalContent.replace(/\n/g, '\r\n');
+      // Restore original line endings if they were CRLF, or use OS default for new files
+      const useCRLF =
+        (!editData.isNewFile && editData.originalLineEnding === '\r\n') ||
+        (editData.isNewFile && os.EOL === '\r\n');
+
+      if (useCRLF) {
+        finalContent = finalContent.replace(/\r?\n/g, '\r\n');
       }
       await this.config
         .getFileSystemService()
