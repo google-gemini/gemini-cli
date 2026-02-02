@@ -1,0 +1,237 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import {
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  type ToolResult,
+  Kind,
+  type ToolExitPlanModeConfirmationDetails,
+  type ToolConfirmationPayload,
+  type ToolExitPlanModeConfirmationPayload,
+  ToolConfirmationOutcome,
+} from './tools.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import path from 'node:path';
+import * as fs from 'node:fs';
+import type { Config } from '../config/config.js';
+import { EXIT_PLAN_MODE_TOOL_NAME } from './tool-names.js';
+import { isWithinRoot } from '../utils/fileUtils.js';
+import { ApprovalMode } from '../policy/types.js';
+
+/**
+ * Returns a human-readable description for an approval mode.
+ */
+function getApprovalModeDescription(mode: ApprovalMode): string {
+  switch (mode) {
+    case ApprovalMode.AUTO_EDIT:
+      return 'Auto-Edit mode (edits will be applied automatically)';
+    case ApprovalMode.DEFAULT:
+    default:
+      return 'Default mode (edits will require confirmation)';
+  }
+}
+
+export interface ExitPlanModeParams {
+  plan_path: string;
+}
+
+export class ExitPlanModeTool extends BaseDeclarativeTool<
+  ExitPlanModeParams,
+  ToolResult
+> {
+  constructor(
+    private config: Config,
+    messageBus: MessageBus,
+  ) {
+    super(
+      EXIT_PLAN_MODE_TOOL_NAME,
+      'Exit Plan Mode',
+      'Signals that the planning phase is complete and requests user approval to start implementation.',
+      Kind.Plan,
+      {
+        type: 'object',
+        required: ['plan_path'],
+        properties: {
+          plan_path: {
+            type: 'string',
+            description:
+              'The file path to the finalized plan (e.g., "plans/feature-x.md").',
+          },
+        },
+      },
+      messageBus,
+    );
+  }
+
+  protected override validateToolParamValues(
+    params: ExitPlanModeParams,
+  ): string | null {
+    if (!params.plan_path || params.plan_path.trim() === '') {
+      return 'plan_path is required.';
+    }
+
+    const plansDir = this.config.storage.getProjectTempPlansDir();
+    const resolvedPath = path.resolve(
+      this.config.getTargetDir(),
+      params.plan_path,
+    );
+    if (!isWithinRoot(resolvedPath, plansDir)) {
+      return `Access denied: plan path must be within the designated plans directory (${plansDir}).`;
+    }
+
+    if (!fs.existsSync(resolvedPath)) {
+      return `Plan file does not exist: ${params.plan_path}. You must create the plan file before requesting approval.`;
+    }
+
+    return null;
+  }
+
+  protected createInvocation(
+    params: ExitPlanModeParams,
+    messageBus: MessageBus,
+    toolName: string,
+    toolDisplayName: string,
+  ): ExitPlanModeInvocation {
+    return new ExitPlanModeInvocation(
+      params,
+      messageBus,
+      toolName,
+      toolDisplayName,
+      this.config,
+    );
+  }
+}
+
+export class ExitPlanModeInvocation extends BaseToolInvocation<
+  ExitPlanModeParams,
+  ToolResult
+> {
+  private confirmationOutcome: ToolConfirmationOutcome | null = null;
+  private approvalPayload: ToolExitPlanModeConfirmationPayload | null = null;
+  private planValidationError: string | null = null;
+
+  constructor(
+    params: ExitPlanModeParams,
+    messageBus: MessageBus,
+    toolName: string,
+    toolDisplayName: string,
+    private config: Config,
+  ) {
+    super(params, messageBus, toolName, toolDisplayName);
+  }
+
+  override async shouldConfirmExecute(
+    _abortSignal: AbortSignal,
+  ): Promise<ToolExitPlanModeConfirmationDetails | false> {
+    const resolvedPlanPath = this.getResolvedPlanPath();
+
+    if (!(await this.validatePlanContent(resolvedPlanPath))) {
+      return false;
+    }
+
+    return {
+      type: 'exit_plan_mode',
+      title: 'Plan Approval',
+      planPath: resolvedPlanPath,
+      onConfirm: async (
+        outcome: ToolConfirmationOutcome,
+        payload?: ToolConfirmationPayload,
+      ) => {
+        this.confirmationOutcome = outcome;
+        if (payload && 'approved' in payload) {
+          this.approvalPayload = payload;
+        }
+      },
+    };
+  }
+
+  getDescription(): string {
+    return `Requesting plan approval for: ${this.params.plan_path}`;
+  }
+
+  /**
+   * Returns the resolved plan path.
+   * Note: Validation is done in validateToolParamValues, so this assumes the path is valid.
+   */
+  private getResolvedPlanPath(): string {
+    return path.resolve(this.config.getTargetDir(), this.params.plan_path);
+  }
+
+  /**
+   * Validates that the plan file exists and has content.
+   * Sets planValidationError if validation fails.
+   */
+  private async validatePlanContent(planPath: string): Promise<boolean> {
+    try {
+      const content = await fs.promises.readFile(planPath, 'utf8');
+      if (!content.trim()) {
+        this.planValidationError =
+          'Plan file is empty. You must write content to the plan file before requesting approval.';
+        return false;
+      }
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.planValidationError = `Failed to read plan file: ${message}`;
+      return false;
+    }
+  }
+
+  async execute(_signal: AbortSignal): Promise<ToolResult> {
+    const resolvedPlanPath = this.getResolvedPlanPath();
+
+    if (this.planValidationError) {
+      return {
+        llmContent: this.planValidationError,
+        returnDisplay: 'Error: Invalid plan',
+      };
+    }
+
+    if (this.confirmationOutcome === ToolConfirmationOutcome.Cancel) {
+      return {
+        llmContent:
+          'User cancelled the plan approval dialog. The plan was not approved and you are still in Plan Mode.',
+        returnDisplay: 'Cancelled',
+      };
+    }
+
+    const payload = this.approvalPayload;
+    if (payload?.approved) {
+      const newMode = payload.approvalMode ?? ApprovalMode.DEFAULT;
+      this.config.setApprovalMode(newMode);
+
+      const description = getApprovalModeDescription(newMode);
+
+      return {
+        llmContent: `Plan approved. Switching to ${description}.
+
+The approved implementation plan is stored at: ${resolvedPlanPath}
+Read and follow the plan strictly during implementation.`,
+        returnDisplay: `Plan approved: ${resolvedPlanPath}`,
+      };
+    } else {
+      const feedback = payload?.feedback?.trim();
+      if (feedback) {
+        return {
+          llmContent: `Plan rejected. User feedback: ${feedback}
+
+The plan is stored at: ${resolvedPlanPath}
+Revise the plan based on the feedback.`,
+          returnDisplay: `Feedback: ${feedback}`,
+        };
+      } else {
+        return {
+          llmContent: `Plan rejected. No feedback provided.
+
+The plan is stored at: ${resolvedPlanPath}
+Ask the user for specific feedback on how to improve the plan.`,
+          returnDisplay: 'Rejected (no feedback)',
+        };
+      }
+    }
+  }
+}
