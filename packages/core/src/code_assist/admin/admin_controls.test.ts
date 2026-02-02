@@ -17,8 +17,15 @@ import {
   fetchAdminControls,
   sanitizeAdminSettings,
   stopAdminControlsPolling,
+  getAdminErrorMessage,
 } from './admin_controls.js';
 import type { CodeAssistServer } from '../server.js';
+import type { Config } from '../../config/config.js';
+import { getCodeAssistServer } from '../codeAssist.js';
+
+vi.mock('../codeAssist.js', () => ({
+  getCodeAssistServer: vi.fn(),
+}));
 
 describe('Admin Controls', () => {
   let mockServer: CodeAssistServer;
@@ -44,7 +51,7 @@ describe('Admin Controls', () => {
   describe('sanitizeAdminSettings', () => {
     it('should strip unknown fields', () => {
       const input = {
-        secureModeEnabled: true,
+        strictModeDisabled: false,
         extraField: 'should be removed',
         mcpSetting: {
           mcpEnabled: false,
@@ -55,7 +62,7 @@ describe('Admin Controls', () => {
       const result = sanitizeAdminSettings(input);
 
       expect(result).toEqual({
-        secureModeEnabled: true,
+        strictModeDisabled: false,
         mcpSetting: {
           mcpEnabled: false,
         },
@@ -104,7 +111,7 @@ describe('Admin Controls', () => {
     });
 
     it('should use cachedSettings and start polling if provided', async () => {
-      const cachedSettings = { secureModeEnabled: true };
+      const cachedSettings = { strictModeDisabled: false };
       const result = await fetchAdminControls(
         mockServer,
         cachedSettings,
@@ -117,7 +124,7 @@ describe('Admin Controls', () => {
 
       // Should still start polling
       (mockServer.fetchAdminControls as Mock).mockResolvedValue({
-        secureModeEnabled: false,
+        strictModeDisabled: true,
       });
       await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
 
@@ -136,7 +143,7 @@ describe('Admin Controls', () => {
     });
 
     it('should fetch from server if no cachedSettings provided', async () => {
-      const serverResponse = { secureModeEnabled: true };
+      const serverResponse = { strictModeDisabled: false };
       (mockServer.fetchAdminControls as Mock).mockResolvedValue(serverResponse);
 
       const result = await fetchAdminControls(
@@ -164,7 +171,7 @@ describe('Admin Controls', () => {
 
       // Polling should have been started and should retry
       (mockServer.fetchAdminControls as Mock).mockResolvedValue({
-        secureModeEnabled: true,
+        strictModeDisabled: false,
       });
       await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
       expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(2); // Initial + poll
@@ -191,7 +198,7 @@ describe('Admin Controls', () => {
 
     it('should sanitize server response', async () => {
       (mockServer.fetchAdminControls as Mock).mockResolvedValue({
-        secureModeEnabled: true,
+        strictModeDisabled: false,
         unknownField: 'bad',
       });
 
@@ -201,7 +208,7 @@ describe('Admin Controls', () => {
         true,
         mockOnSettingsChanged,
       );
-      expect(result).toEqual({ secureModeEnabled: true });
+      expect(result).toEqual({ strictModeDisabled: false });
       expect(
         (result as Record<string, unknown>)['unknownField'],
       ).toBeUndefined();
@@ -245,7 +252,7 @@ describe('Admin Controls', () => {
     it('should poll and emit changes', async () => {
       // Initial fetch
       (mockServer.fetchAdminControls as Mock).mockResolvedValue({
-        secureModeEnabled: false,
+        strictModeDisabled: true,
       });
       await fetchAdminControls(
         mockServer,
@@ -256,19 +263,19 @@ describe('Admin Controls', () => {
 
       // Update for next poll
       (mockServer.fetchAdminControls as Mock).mockResolvedValue({
-        secureModeEnabled: true,
+        strictModeDisabled: false,
       });
 
       // Fast forward
       await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
 
       expect(mockOnSettingsChanged).toHaveBeenCalledWith({
-        secureModeEnabled: true,
+        strictModeDisabled: false,
       });
     });
 
     it('should NOT emit if settings are deeply equal but not the same instance', async () => {
-      const settings = { secureModeEnabled: true };
+      const settings = { strictModeDisabled: false };
       (mockServer.fetchAdminControls as Mock).mockResolvedValue(settings);
 
       await fetchAdminControls(
@@ -282,7 +289,7 @@ describe('Admin Controls', () => {
 
       // Next poll returns a different object with the same values
       (mockServer.fetchAdminControls as Mock).mockResolvedValue({
-        secureModeEnabled: true,
+        strictModeDisabled: false,
       });
       await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
 
@@ -293,7 +300,7 @@ describe('Admin Controls', () => {
     it('should continue polling after a fetch error', async () => {
       // Initial fetch is successful
       (mockServer.fetchAdminControls as Mock).mockResolvedValue({
-        secureModeEnabled: false,
+        strictModeDisabled: true,
       });
       await fetchAdminControls(
         mockServer,
@@ -313,19 +320,19 @@ describe('Admin Controls', () => {
 
       // Subsequent poll succeeds with new data
       (mockServer.fetchAdminControls as Mock).mockResolvedValue({
-        secureModeEnabled: true,
+        strictModeDisabled: false,
       });
       await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
       expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(3);
       expect(mockOnSettingsChanged).toHaveBeenCalledWith({
-        secureModeEnabled: true,
+        strictModeDisabled: false,
       });
     });
 
     it('should STOP polling if server returns 403', async () => {
       // Initial fetch is successful
       (mockServer.fetchAdminControls as Mock).mockResolvedValue({
-        secureModeEnabled: false,
+        strictModeDisabled: true,
       });
       await fetchAdminControls(
         mockServer,
@@ -370,6 +377,57 @@ describe('Admin Controls', () => {
 
       // The poll should not have fired again
       expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('getAdminErrorMessage', () => {
+    let mockConfig: Config;
+
+    beforeEach(() => {
+      mockConfig = {} as Config;
+    });
+
+    it('should include feature name and project ID when present', () => {
+      vi.mocked(getCodeAssistServer).mockReturnValue({
+        projectId: 'test-project-123',
+      } as CodeAssistServer);
+
+      const message = getAdminErrorMessage('Code Completion', mockConfig);
+
+      expect(message).toBe(
+        'Code Completion is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli?project=test-project-123',
+      );
+    });
+
+    it('should include feature name but OMIT project ID when missing', () => {
+      vi.mocked(getCodeAssistServer).mockReturnValue({
+        projectId: undefined,
+      } as CodeAssistServer);
+
+      const message = getAdminErrorMessage('Chat', mockConfig);
+
+      expect(message).toBe(
+        'Chat is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
+      );
+    });
+
+    it('should include feature name but OMIT project ID when server is undefined', () => {
+      vi.mocked(getCodeAssistServer).mockReturnValue(undefined);
+
+      const message = getAdminErrorMessage('Chat', mockConfig);
+
+      expect(message).toBe(
+        'Chat is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
+      );
+    });
+
+    it('should include feature name but OMIT project ID when config is undefined', () => {
+      const message = getAdminErrorMessage('Chat', undefined);
+
+      expect(message).toBe(
+        'Chat is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
+      );
     });
   });
 });
