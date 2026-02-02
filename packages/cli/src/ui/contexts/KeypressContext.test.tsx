@@ -821,65 +821,72 @@ describe('KeypressContext', () => {
     // Terminals to test
     const terminals = ['iTerm2', 'Ghostty', 'MacTerminal', 'VSCodeTerminal'];
 
-    // Key mappings: letter -> [keycode, accented character]
-    const keys: Record<string, [number, string]> = {
-      b: [98, '\u222B'],
-      f: [102, '\u0192'],
-      m: [109, '\u00B5'],
+    // Key mappings: letter -> [keycode, accented character, shift]
+    const keys: Record<string, [number, string, boolean]> = {
+      b: [98, '\u222B', false],
+      f: [102, '\u0192', false],
+      m: [109, '\u00B5', false],
+      z: [122, '\u03A9', false],
+      Z: [122, '\u00B8', true],
     };
 
     it.each(
       terminals.flatMap((terminal) =>
-        Object.entries(keys).map(([key, [keycode, accentedChar]]) => {
-          if (terminal === 'Ghostty') {
-            // Ghostty uses kitty protocol sequences
-            return {
-              terminal,
-              key,
-              chunk: `\x1b[${keycode};3u`,
-              expected: {
-                name: key,
-                shift: false,
-                alt: true,
-                ctrl: false,
-                cmd: false,
-              },
-            };
-          } else if (terminal === 'MacTerminal') {
-            // Mac Terminal sends ESC + letter
-            return {
-              terminal,
-              key,
-              kitty: false,
-              chunk: `\x1b${key}`,
-              expected: {
-                sequence: `\x1b${key}`,
-                name: key,
-                shift: false,
-                alt: true,
-                ctrl: false,
-                cmd: false,
-              },
-            };
-          } else {
-            // iTerm2 and VSCode send accented characters (å, ø, µ)
-            // Note: µ (mu) is sent with alt:false on iTerm2/VSCode but
-            // gets converted to m with alt:true
-            return {
-              terminal,
-              key,
-              chunk: accentedChar,
-              expected: {
-                name: key,
-                shift: false,
-                alt: true, // Always expect alt:true after conversion
-                ctrl: false,
-                cmd: false,
-                sequence: accentedChar,
-              },
-            };
-          }
-        }),
+        Object.entries(keys).map(
+          ([key, [keycode, accentedChar, shiftValue]]) => {
+            if (terminal === 'Ghostty') {
+              // Ghostty uses kitty protocol sequences
+              // Modifier 3 is Alt, 4 is Shift+Alt
+              const modifier = shiftValue ? 4 : 3;
+              return {
+                terminal,
+                key,
+                chunk: `\x1b[${keycode};${modifier}u`,
+                expected: {
+                  name: key.toLowerCase(),
+                  shift: shiftValue,
+                  alt: true,
+                  ctrl: false,
+                  cmd: false,
+                },
+              };
+            } else if (terminal === 'MacTerminal') {
+              // Mac Terminal sends ESC + letter
+              const chunk = shiftValue
+                ? `\x1b${key.toUpperCase()}`
+                : `\x1b${key.toLowerCase()}`;
+              return {
+                terminal,
+                key,
+                kitty: false,
+                chunk,
+                expected: {
+                  sequence: chunk,
+                  name: key.toLowerCase(),
+                  shift: shiftValue,
+                  alt: true,
+                  ctrl: false,
+                  cmd: false,
+                },
+              };
+            } else {
+              // iTerm2 and VSCode send accented characters (å, ø, µ, Ω, ¸)
+              return {
+                terminal,
+                key,
+                chunk: accentedChar,
+                expected: {
+                  name: key.toLowerCase(),
+                  shift: shiftValue,
+                  alt: true, // Always expect alt:true after conversion
+                  ctrl: false,
+                  cmd: false,
+                  sequence: accentedChar,
+                },
+              };
+            }
+          },
+        ),
       ),
     )(
       'should handle Alt+$key in $terminal',
