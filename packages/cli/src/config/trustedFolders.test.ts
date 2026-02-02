@@ -30,7 +30,11 @@ import {
   isWorkspaceTrusted,
   resetTrustedFoldersForTesting,
 } from './trustedFolders.js';
-import { loadEnvironment, loadSettings, getSettingsSchema } from './settings.js';
+import {
+  loadEnvironment,
+  loadSettings,
+  getSettingsSchema,
+} from './settings.js';
 import { validateAuthMethod } from './auth.js';
 import type { Settings } from './settings.js';
 
@@ -507,8 +511,9 @@ describe('Verification: Auth and Trust Interaction', () => {
       }
       return '{}';
     });
-    vi.spyOn(fs, 'existsSync').mockImplementation((p) =>
-      p === getTrustedFoldersPath() || p === path.resolve(mockCwd, '.env'),
+    vi.spyOn(fs, 'existsSync').mockImplementation(
+      (p) =>
+        p === getTrustedFoldersPath() || p === path.resolve(mockCwd, '.env'),
     );
   });
 

@@ -82,6 +82,14 @@ const AUTH_ENV_VAR_WHITELIST = [
   'GOOGLE_CLOUD_LOCATION',
 ];
 
+/**
+ * Sanitizes an environment variable value to prevent shell injection.
+ * Restricts values to a safe character set: alphanumeric, -, _, ., /
+ */
+export function sanitizeEnvVar(value: string): string {
+  return value.replace(/[^a-zA-Z0-9\-_./]/g, '');
+}
+
 export function getSystemSettingsPath(): string {
   if (process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH']) {
     return process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH'];
@@ -406,7 +414,11 @@ function findEnvFile(startDir: string): string | null {
   }
 }
 
-export function setUpCloudShellEnvironment(envFilePath: string | null): void {
+export function setUpCloudShellEnvironment(
+  envFilePath: string | null,
+  isTrusted: boolean,
+  isSandboxed: boolean,
+): void {
   // Special handling for GOOGLE_CLOUD_PROJECT in Cloud Shell:
   // Because GOOGLE_CLOUD_PROJECT in Cloud Shell tracks the project
   // set by the user using "gcloud config set project" we do not want to
@@ -417,7 +429,11 @@ export function setUpCloudShellEnvironment(envFilePath: string | null): void {
     const parsedEnv = dotenv.parse(envFileContent);
     if (parsedEnv['GOOGLE_CLOUD_PROJECT']) {
       // .env file takes precedence in Cloud Shell
-      process.env['GOOGLE_CLOUD_PROJECT'] = parsedEnv['GOOGLE_CLOUD_PROJECT'];
+      let value = parsedEnv['GOOGLE_CLOUD_PROJECT'];
+      if (!isTrusted && isSandboxed) {
+        value = sanitizeEnvVar(value);
+      }
+      process.env['GOOGLE_CLOUD_PROJECT'] = value;
     } else {
       // If not in .env, set to default and override global
       process.env['GOOGLE_CLOUD_PROJECT'] = 'cloudshell-gca';
@@ -434,10 +450,15 @@ export function loadEnvironment(settings: Settings): void {
   const isTrusted = isWorkspaceTrusted(settings).isTrusted;
   // Check settings OR check process.argv directly since this might be called
   // before arguments are fully parsed.
+  const args = process.argv.slice(2);
+  const doubleDashIndex = args.indexOf('--');
+  const relevantArgs =
+    doubleDashIndex === -1 ? args : args.slice(0, doubleDashIndex);
+
   const isSandboxed =
     !!settings.tools?.sandbox ||
-    process.argv.includes('-s') ||
-    process.argv.includes('--sandbox');
+    relevantArgs.includes('-s') ||
+    relevantArgs.includes('--sandbox');
 
   if (!isTrusted && !isSandboxed) {
     return;
@@ -445,7 +466,11 @@ export function loadEnvironment(settings: Settings): void {
 
   // Cloud Shell environment variable handling
   if (process.env['CLOUD_SHELL'] === 'true') {
-    setUpCloudShellEnvironment(envFilePath);
+    setUpCloudShellEnvironment(
+      envFilePath,
+      isTrusted ?? false,
+      isSandboxed ?? false,
+    );
   }
 
   if (envFilePath) {
@@ -461,13 +486,14 @@ export function loadEnvironment(settings: Settings): void {
 
       for (const key in parsedEnv) {
         if (Object.hasOwn(parsedEnv, key)) {
+          let value = parsedEnv[key];
           // If the workspace is untrusted but we are sandboxed, only allow whitelisted variables.
-          if (
-            !isTrusted &&
-            isSandboxed &&
-            !AUTH_ENV_VAR_WHITELIST.includes(key)
-          ) {
-            continue;
+          if (!isTrusted && isSandboxed) {
+            if (!AUTH_ENV_VAR_WHITELIST.includes(key)) {
+              continue;
+            }
+            // Sanitize the value for untrusted sources
+            value = sanitizeEnvVar(value);
           }
 
           // If it's a project .env file, skip loading excluded variables.
@@ -477,7 +503,7 @@ export function loadEnvironment(settings: Settings): void {
 
           // Load variable only if it's not already set in the environment.
           if (!Object.hasOwn(process.env, key)) {
-            process.env[key] = parsedEnv[key];
+            process.env[key] = value;
           }
         }
       }
