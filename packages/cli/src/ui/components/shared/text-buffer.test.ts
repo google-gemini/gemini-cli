@@ -1359,7 +1359,7 @@ describe('useTextBuffer', () => {
       expect(state.cursor).toEqual([0, 0]);
     });
 
-    it('move: up/down should treat multi-byte chars as single units for visual cursor', () => {
+    it('move: left/right should treat multi-byte chars as single units for visual cursor', () => {
       const { result } = renderHook(() =>
         useTextBuffer({
           initialText: '🐶🐱',
