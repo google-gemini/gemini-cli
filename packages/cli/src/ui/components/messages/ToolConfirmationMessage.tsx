@@ -41,6 +41,34 @@ import {
 import { AskUserDialog } from '../AskUserDialog.js';
 import { ExitPlanModeDialog } from '../ExitPlanModeDialog.js';
 
+type ExecOptionValue =
+  | ToolConfirmationOutcome
+  | `scope:${ApprovalScope}`
+  | 'more-options'
+  | 'back';
+
+/**
+ * Helper function to build radio select items for scope options.
+ * Adds "(recommended)" suffix to the recommended scope option.
+ */
+function buildScopeOptionItems(
+  scopeOptions: ScopeOption[],
+  recommendedScope: ApprovalScope,
+): Array<RadioSelectItem<ExecOptionValue>> {
+  return scopeOptions.map((scopeOpt) => {
+    const isRecommended = scopeOpt.id === recommendedScope;
+    const label = isRecommended
+      ? `${scopeOpt.label} (recommended)`
+      : scopeOpt.label;
+
+    return {
+      label,
+      value: `scope:${scopeOpt.id}` as ExecOptionValue,
+      key: `scope:${scopeOpt.id}`,
+    };
+  });
+}
+
 export interface ToolConfirmationMessageProps {
   callId: string;
   confirmationDetails:
@@ -316,18 +344,9 @@ export const ToolConfirmationMessage: React.FC<
             });
 
             // Show scope options for current command
-            for (const scopeOpt of scopeOptions) {
-              const isRecommended = scopeOpt.id === recommendedScope;
-              const label = isRecommended
-                ? `${scopeOpt.label} (recommended)`
-                : scopeOpt.label;
-
-              options.push({
-                label,
-                value: `scope:${scopeOpt.id}` as ExecOptionValue,
-                key: `scope:${scopeOpt.id}`,
-              });
-            }
+            options.push(
+              ...buildScopeOptionItems(scopeOptions, recommendedScope),
+            );
 
             // Show back option
             options.push({
@@ -379,18 +398,9 @@ export const ToolConfirmationMessage: React.FC<
           const scopeOptions = generateScopeOptions(fullCommand);
           const recommendedScope = getRecommendedScope(fullCommand);
 
-          for (const scopeOpt of scopeOptions) {
-            const isRecommended = scopeOpt.id === recommendedScope;
-            const label = isRecommended
-              ? `${scopeOpt.label} (recommended)`
-              : scopeOpt.label;
-
-            options.push({
-              label,
-              value: `scope:${scopeOpt.id}` as ExecOptionValue,
-              key: `scope:${scopeOpt.id}`,
-            });
-          }
+          options.push(
+            ...buildScopeOptionItems(scopeOptions, recommendedScope),
+          );
         }
       }
 
