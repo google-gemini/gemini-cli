@@ -1952,6 +1952,8 @@ export class PlanExecutionEvent implements BaseTelemetryEvent {
   approval_mode: ApprovalMode;
 
   constructor(approvalMode: ApprovalMode) {
+    this['event.name'] = this.eventName;
+    this['event.timestamp'] = new Date().toISOString();
     this.approval_mode = approvalMode;
   }
   'event.name': string;
@@ -1960,7 +1962,8 @@ export class PlanExecutionEvent implements BaseTelemetryEvent {
   toOpenTelemetryAttributes(config: Config): LogAttributes {
     return {
       ...getCommonAttributes(config),
-      event_name: this.eventName,
+      'event.name': this.eventName,
+      'event.timestamp': this['event.timestamp'],
       approval_mode: this.approval_mode,
     };
   }
