@@ -730,12 +730,16 @@ export type ApprovalScope =
  * Payload for scope-based shell command approval.
  */
 export interface ToolScopeConfirmationPayload {
-  /** The selected approval scope */
-  scope: ApprovalScope;
+  /** The selected approval scope (for single commands or uniform compound scope) */
+  scope?: ApprovalScope;
+  /** Per-command scopes for compound commands (command string -> scope) */
+  commandScopes?: Record<string, ApprovalScope>;
   /** Custom regex pattern (only used when scope is 'custom') */
   customPattern?: string;
   /** Whether to persist this approval (auto-decided based on command intent, can be overridden) */
   persist?: boolean;
+  /** For compound commands, list of all commands to apply scope to */
+  compoundCommands?: string[];
 }
 
 export type ToolConfirmationPayload =

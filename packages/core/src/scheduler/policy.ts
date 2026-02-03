@@ -28,27 +28,17 @@ import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { EDIT_TOOL_NAMES } from '../tools/tool-names.js';
 import type { ValidatingToolCall } from './types.js';
 import {
-  extractBinary,
+  parseCommand,
   shouldPersist as shouldPersistCommand,
 } from '../policy/scope-generator.js';
 
-export const PLAN_MODE_DENIAL_MESSAGE =
-  'You are in Plan Mode - adjust your prompt to only use read and search tools.';
-
 /**
- * Helper to determine the error message and type for a policy denial.
+ * Helper to format the policy denial error.
  */
 export function getPolicyDenialError(
   config: Config,
   rule?: PolicyRule,
 ): { errorMessage: string; errorType: ToolErrorType } {
-  if (config.getApprovalMode() === ApprovalMode.PLAN) {
-    return {
-      errorMessage: PLAN_MODE_DENIAL_MESSAGE,
-      errorType: ToolErrorType.STOP_EXECUTION,
-    };
-  }
-
   const denyMessage = rule?.denyMessage ? ` ${rule.denyMessage}` : '';
   return {
     errorMessage: `Tool execution denied by policy.${denyMessage}`,
@@ -107,13 +97,11 @@ export async function updatePolicy(
   deps: { config: Config; messageBus: MessageBus },
   payload?: ToolConfirmationPayload,
 ): Promise<void> {
-  // Mode Transitions (AUTO_EDIT)
   if (isAutoEditTransition(tool, outcome)) {
     deps.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
     return;
   }
 
-  // Specialized Tools (MCP)
   if (confirmationDetails?.type === 'mcp') {
     await handleMcpPolicyUpdate(
       tool,
@@ -124,7 +112,6 @@ export async function updatePolicy(
     return;
   }
 
-  // Generic Fallback (Shell, Info, etc.)
   await handleStandardPolicyUpdate(
     tool,
     outcome,
@@ -151,32 +138,14 @@ function isAutoEditTransition(
   );
 }
 
-/**
- * Type guard to check if payload contains scope information.
- */
 function isScopePayload(
   payload: ToolConfirmationPayload | undefined,
 ): payload is ToolScopeConfirmationPayload {
-  return payload !== undefined && 'scope' in payload;
+  return (
+    payload !== undefined && ('scope' in payload || 'commandScopes' in payload)
+  );
 }
 
-/**
- * Escapes special regex characters in a string.
- */
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/**
- * Handles policy updates for standard tools (Shell, Info, etc.), including
- * session-level and persistent approvals.
- *
- * Supports the new scope-based approval system:
- * - 'exact': Only the exact command (current behavior)
- * - 'command-flags': Command with same flags, any arguments
- * - 'command-only': Command with any flags/arguments
- * - 'custom': User-provided regex pattern
- */
 async function handleStandardPolicyUpdate(
   tool: AnyDeclarativeTool,
   outcome: ToolConfirmationOutcome,
@@ -191,59 +160,113 @@ async function handleStandardPolicyUpdate(
     const options: PolicyUpdateOptions = {};
 
     if (confirmationDetails?.type === 'exec') {
-      // Check if we have scope information from the new UI
       if (isScopePayload(payload)) {
-        const { scope, customPattern } = payload;
-        const command = confirmationDetails.rootCommand;
+        const { scope, customPattern, compoundCommands, commandScopes } =
+          payload;
 
-        switch (scope) {
-          case 'exact':
-            // Current behavior: use commandPrefix
-            options.commandPrefix = confirmationDetails.rootCommands;
-            break;
-
-          case 'command-flags':
-            // Same as exact for now (commandPrefix handles this)
-            options.commandPrefix = confirmationDetails.rootCommands;
-            break;
-
-          case 'command-only': {
-            // Allow the binary with any flags/arguments
-            const binary = extractBinary(command);
-            options.argsPattern = `^${escapeRegex(binary)}\\b`;
-            break;
-          }
-
-          case 'custom':
-            // User-provided pattern
-            if (customPattern) {
-              options.argsPattern = customPattern;
-            } else {
-              // Fallback to exact if no custom pattern
-              options.commandPrefix = confirmationDetails.rootCommands;
+        // Handle per-command scopes (from expanded mode)
+        if (commandScopes && Object.keys(commandScopes).length > 0) {
+          const prefixes: string[] = [];
+          for (const [cmd, cmdScope] of Object.entries(commandScopes)) {
+            const parts = parseCommand(cmd);
+            switch (cmdScope) {
+              case 'exact':
+                prefixes.push(cmd);
+                break;
+              case 'command-flags':
+                // 'command-flags' = binary + subcommand level
+                prefixes.push(
+                  parts.subcommand
+                    ? `${parts.binary} ${parts.subcommand}`
+                    : parts.binary,
+                );
+                break;
+              case 'command-only':
+                prefixes.push(parts.binary);
+                break;
+              default:
+                prefixes.push(cmd);
             }
-            break;
+          }
+          options.commandPrefix = [...new Set(prefixes)]; // Dedupe
+        } else if (compoundCommands && compoundCommands.length > 1 && scope) {
+          // Handle compound commands with uniform scope
+          const prefixes: string[] = [];
+          for (const cmd of compoundCommands) {
+            const parts = parseCommand(cmd);
+            switch (scope) {
+              case 'exact':
+                prefixes.push(cmd);
+                break;
+              case 'command-flags':
+                // 'command-flags' = binary + subcommand level
+                prefixes.push(
+                  parts.subcommand
+                    ? `${parts.binary} ${parts.subcommand}`
+                    : parts.binary,
+                );
+                break;
+              case 'command-only':
+                prefixes.push(parts.binary);
+                break;
+              default:
+                prefixes.push(cmd);
+            }
+          }
+          options.commandPrefix = [...new Set(prefixes)]; // Dedupe
+        } else if (scope) {
+          // Single command - original logic
+          const fullCommand = confirmationDetails.command;
 
-          default:
-            // Unknown scope, fallback to exact
-            options.commandPrefix = confirmationDetails.rootCommands;
+          switch (scope) {
+            case 'exact': {
+              options.commandPrefix = [fullCommand];
+              break;
+            }
+
+            case 'command-flags': {
+              // 'command-flags' scope means "binary + subcommand" level (e.g., "git add").
+              // The UI (generateScopeOptions) only offers this scope for commands with
+              // subcommands, so the fallback cases below are defensive measures:
+              // - If no subcommand but has flags: use binary only (rare edge case)
+              // - If neither: use binary only
+              const parts = parseCommand(fullCommand);
+              const cmdPrefix = parts.subcommand
+                ? `${parts.binary} ${parts.subcommand}`
+                : parts.binary;
+              options.commandPrefix = [cmdPrefix];
+              break;
+            }
+
+            case 'command-only': {
+              const parts = parseCommand(fullCommand);
+              options.commandPrefix = [parts.binary];
+              break;
+            }
+
+            case 'custom':
+              if (customPattern) {
+                options.argsPattern = customPattern;
+              } else {
+                options.commandPrefix = [fullCommand];
+              }
+              break;
+
+            default:
+              options.commandPrefix = [fullCommand];
+          }
         }
       } else {
-        // Legacy behavior: no scope payload, use commandPrefix
         options.commandPrefix = confirmationDetails.rootCommands;
       }
     }
 
-    // Determine persistence
     let persist = outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave;
 
-    // If using new scope system, auto-decide persistence based on command intent
     if (isScopePayload(payload) && confirmationDetails?.type === 'exec') {
-      // payload.persist can override auto-decision
       if (payload.persist !== undefined) {
         persist = payload.persist;
       } else if (outcome === ToolConfirmationOutcome.ProceedAlways) {
-        // Auto-decide based on command classification
         persist = shouldPersistCommand(confirmationDetails.rootCommand);
       }
     }
@@ -257,10 +280,6 @@ async function handleStandardPolicyUpdate(
   }
 }
 
-/**
- * Handles policy updates specifically for MCP tools, including session-level
- * and persistent approvals.
- */
 async function handleMcpPolicyUpdate(
   tool: AnyDeclarativeTool,
   outcome: ToolConfirmationOutcome,
@@ -283,7 +302,6 @@ async function handleMcpPolicyUpdate(
   let toolName = tool.name;
   const persist = outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave;
 
-  // If "Always allow all tools from this server", use the wildcard pattern
   if (outcome === ToolConfirmationOutcome.ProceedAlwaysServer) {
     toolName = `${confirmationDetails.serverName}__*`;
   }

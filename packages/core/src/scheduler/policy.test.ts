@@ -13,11 +13,7 @@ import {
   beforeEach,
   afterEach,
 } from 'vitest';
-import {
-  checkPolicy,
-  updatePolicy,
-  PLAN_MODE_DENIAL_MESSAGE,
-} from './policy.js';
+import { checkPolicy, updatePolicy, getPolicyDenialError } from './policy.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
@@ -442,7 +438,112 @@ describe('policy.ts', () => {
     });
 
     describe('scope-based approvals', () => {
-      it('should handle scope payload with exact scope', async () => {
+      it('should handle scope payload with exact scope (full command)', async () => {
+        const mockConfig = {
+          setApprovalMode: vi.fn(),
+        } as unknown as Mocked<Config>;
+        const mockMessageBus = {
+          publish: vi.fn(),
+        } as unknown as Mocked<MessageBus>;
+        const tool = { name: 'run_shell_command' } as AnyDeclarativeTool;
+        const details: ToolExecuteConfirmationDetails = {
+          type: 'exec',
+          command: 'ls -la',
+          rootCommand: 'ls',
+          rootCommands: ['ls'],
+          title: 'Shell',
+          onConfirm: vi.fn(),
+        };
+
+        await updatePolicy(
+          tool,
+          ToolConfirmationOutcome.ProceedAlways,
+          details,
+          { config: mockConfig, messageBus: mockMessageBus },
+          { scope: 'exact' },
+        );
+
+        // Exact scope uses the full command, not just the binary
+        expect(mockMessageBus.publish).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: MessageBusType.UPDATE_POLICY,
+            toolName: 'run_shell_command',
+            commandPrefix: ['ls -la'],
+          }),
+        );
+      });
+
+      it('should handle scope payload with command-only scope using commandPrefix', async () => {
+        const mockConfig = {
+          setApprovalMode: vi.fn(),
+        } as unknown as Mocked<Config>;
+        const mockMessageBus = {
+          publish: vi.fn(),
+        } as unknown as Mocked<MessageBus>;
+        const tool = { name: 'run_shell_command' } as AnyDeclarativeTool;
+        const details: ToolExecuteConfirmationDetails = {
+          type: 'exec',
+          command: 'ls -la /tmp',
+          rootCommand: 'ls',
+          rootCommands: ['ls'],
+          title: 'Shell',
+          onConfirm: vi.fn(),
+        };
+
+        await updatePolicy(
+          tool,
+          ToolConfirmationOutcome.ProceedAlways,
+          details,
+          { config: mockConfig, messageBus: mockMessageBus },
+          { scope: 'command-only' },
+        );
+
+        // Command-only scope uses just the binary via commandPrefix
+        expect(mockMessageBus.publish).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: MessageBusType.UPDATE_POLICY,
+            toolName: 'run_shell_command',
+            commandPrefix: ['ls'],
+          }),
+        );
+      });
+
+      it('should handle command-flags scope with subcommand', async () => {
+        const mockConfig = {
+          setApprovalMode: vi.fn(),
+        } as unknown as Mocked<Config>;
+        const mockMessageBus = {
+          publish: vi.fn(),
+        } as unknown as Mocked<MessageBus>;
+        const tool = { name: 'run_shell_command' } as AnyDeclarativeTool;
+        const details: ToolExecuteConfirmationDetails = {
+          type: 'exec',
+          command: 'git add .',
+          rootCommand: 'git',
+          rootCommands: ['git'],
+          title: 'Shell',
+          onConfirm: vi.fn(),
+        };
+
+        await updatePolicy(
+          tool,
+          ToolConfirmationOutcome.ProceedAlways,
+          details,
+          { config: mockConfig, messageBus: mockMessageBus },
+          { scope: 'command-flags' },
+        );
+
+        // Command-flags with subcommand uses binary + subcommand
+        expect(mockMessageBus.publish).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: MessageBusType.UPDATE_POLICY,
+            toolName: 'run_shell_command',
+            commandPrefix: ['git add'],
+          }),
+        );
+      });
+
+      it('should default to session-only for all commands', async () => {
         const mockConfig = {
           setApprovalMode: vi.fn(),
         } as unknown as Mocked<Config>;
@@ -469,80 +570,12 @@ describe('policy.ts', () => {
 
         expect(mockMessageBus.publish).toHaveBeenCalledWith(
           expect.objectContaining({
-            type: MessageBusType.UPDATE_POLICY,
-            toolName: 'run_shell_command',
-            commandPrefix: ['ls'],
+            persist: false, // All commands default to session-only
           }),
         );
       });
 
-      it('should handle scope payload with command-only scope using argsPattern', async () => {
-        const mockConfig = {
-          setApprovalMode: vi.fn(),
-        } as unknown as Mocked<Config>;
-        const mockMessageBus = {
-          publish: vi.fn(),
-        } as unknown as Mocked<MessageBus>;
-        const tool = { name: 'run_shell_command' } as AnyDeclarativeTool;
-        const details: ToolExecuteConfirmationDetails = {
-          type: 'exec',
-          command: 'ls -la /tmp',
-          rootCommand: 'ls',
-          rootCommands: ['ls'],
-          title: 'Shell',
-          onConfirm: vi.fn(),
-        };
-
-        await updatePolicy(
-          tool,
-          ToolConfirmationOutcome.ProceedAlways,
-          details,
-          { config: mockConfig, messageBus: mockMessageBus },
-          { scope: 'command-only' },
-        );
-
-        expect(mockMessageBus.publish).toHaveBeenCalledWith(
-          expect.objectContaining({
-            type: MessageBusType.UPDATE_POLICY,
-            toolName: 'run_shell_command',
-            argsPattern: '^ls\\b',
-          }),
-        );
-      });
-
-      it('should auto-persist read-only commands when scope payload present', async () => {
-        const mockConfig = {
-          setApprovalMode: vi.fn(),
-        } as unknown as Mocked<Config>;
-        const mockMessageBus = {
-          publish: vi.fn(),
-        } as unknown as Mocked<MessageBus>;
-        const tool = { name: 'run_shell_command' } as AnyDeclarativeTool;
-        const details: ToolExecuteConfirmationDetails = {
-          type: 'exec',
-          command: 'ls -la', // read-only command
-          rootCommand: 'ls',
-          rootCommands: ['ls'],
-          title: 'Shell',
-          onConfirm: vi.fn(),
-        };
-
-        await updatePolicy(
-          tool,
-          ToolConfirmationOutcome.ProceedAlways,
-          details,
-          { config: mockConfig, messageBus: mockMessageBus },
-          { scope: 'exact' }, // Using scope payload triggers auto-persist logic
-        );
-
-        expect(mockMessageBus.publish).toHaveBeenCalledWith(
-          expect.objectContaining({
-            persist: true, // Should auto-persist for read-only commands
-          }),
-        );
-      });
-
-      it('should not auto-persist write commands when scope payload present', async () => {
+      it('should not auto-persist dangerous commands when scope payload present', async () => {
         const mockConfig = {
           setApprovalMode: vi.fn(),
         } as unknown as Mocked<Config>;
@@ -574,7 +607,7 @@ describe('policy.ts', () => {
         );
       });
 
-      it('should respect explicit persist override in payload', async () => {
+      it('should respect explicit persist: true in payload', async () => {
         const mockConfig = {
           setApprovalMode: vi.fn(),
         } as unknown as Mocked<Config>;
@@ -584,7 +617,7 @@ describe('policy.ts', () => {
         const tool = { name: 'run_shell_command' } as AnyDeclarativeTool;
         const details: ToolExecuteConfirmationDetails = {
           type: 'exec',
-          command: 'ls -la', // read-only (would auto-persist)
+          command: 'ls -la',
           rootCommand: 'ls',
           rootCommands: ['ls'],
           title: 'Shell',
@@ -596,12 +629,12 @@ describe('policy.ts', () => {
           ToolConfirmationOutcome.ProceedAlways,
           details,
           { config: mockConfig, messageBus: mockMessageBus },
-          { scope: 'exact', persist: false }, // Explicit override
+          { scope: 'exact', persist: true }, // Explicit persist
         );
 
         expect(mockMessageBus.publish).toHaveBeenCalledWith(
           expect.objectContaining({
-            persist: false, // Should respect explicit override
+            persist: true, // Should respect explicit override
           }),
         );
       });
@@ -639,6 +672,331 @@ describe('policy.ts', () => {
           }),
         );
       });
+
+      describe('per-command scopes (compound commands)', () => {
+        it('should handle commandScopes with different scopes per command', async () => {
+          const mockConfig = {
+            setApprovalMode: vi.fn(),
+          } as unknown as Mocked<Config>;
+          const mockMessageBus = {
+            publish: vi.fn(),
+          } as unknown as Mocked<MessageBus>;
+          const tool = { name: 'run_shell_command' } as AnyDeclarativeTool;
+          const details: ToolExecuteConfirmationDetails = {
+            type: 'exec',
+            command: 'git status && ls -la',
+            rootCommand: 'git',
+            rootCommands: ['git', 'ls'],
+            commands: ['git status', 'ls -la'],
+            title: 'Shell',
+            onConfirm: vi.fn(),
+          };
+
+          await updatePolicy(
+            tool,
+            ToolConfirmationOutcome.ProceedAlways,
+            details,
+            { config: mockConfig, messageBus: mockMessageBus },
+            {
+              commandScopes: {
+                'git status': 'command-flags', // git status (subcommand)
+                'ls -la': 'command-only', // ls (binary only)
+              },
+              compoundCommands: ['git status', 'ls -la'],
+            },
+          );
+
+          expect(mockMessageBus.publish).toHaveBeenCalledWith(
+            expect.objectContaining({
+              type: MessageBusType.UPDATE_POLICY,
+              toolName: 'run_shell_command',
+              commandPrefix: expect.arrayContaining(['git status', 'ls']),
+            }),
+          );
+        });
+
+        it('should handle commandScopes with all exact scopes', async () => {
+          const mockConfig = {
+            setApprovalMode: vi.fn(),
+          } as unknown as Mocked<Config>;
+          const mockMessageBus = {
+            publish: vi.fn(),
+          } as unknown as Mocked<MessageBus>;
+          const tool = { name: 'run_shell_command' } as AnyDeclarativeTool;
+          const details: ToolExecuteConfirmationDetails = {
+            type: 'exec',
+            command: 'git add . && npm install',
+            rootCommand: 'git',
+            rootCommands: ['git', 'npm'],
+            commands: ['git add .', 'npm install'],
+            title: 'Shell',
+            onConfirm: vi.fn(),
+          };
+
+          await updatePolicy(
+            tool,
+            ToolConfirmationOutcome.ProceedAlways,
+            details,
+            { config: mockConfig, messageBus: mockMessageBus },
+            {
+              commandScopes: {
+                'git add .': 'exact',
+                'npm install': 'exact',
+              },
+              compoundCommands: ['git add .', 'npm install'],
+            },
+          );
+
+          expect(mockMessageBus.publish).toHaveBeenCalledWith(
+            expect.objectContaining({
+              type: MessageBusType.UPDATE_POLICY,
+              toolName: 'run_shell_command',
+              commandPrefix: expect.arrayContaining([
+                'git add .',
+                'npm install',
+              ]),
+            }),
+          );
+        });
+
+        it('should handle commandScopes with mixed command-only and command-flags', async () => {
+          const mockConfig = {
+            setApprovalMode: vi.fn(),
+          } as unknown as Mocked<Config>;
+          const mockMessageBus = {
+            publish: vi.fn(),
+          } as unknown as Mocked<MessageBus>;
+          const tool = { name: 'run_shell_command' } as AnyDeclarativeTool;
+          const details: ToolExecuteConfirmationDetails = {
+            type: 'exec',
+            command: 'cat file.txt && git commit -m "test"',
+            rootCommand: 'cat',
+            rootCommands: ['cat', 'git'],
+            commands: ['cat file.txt', 'git commit -m "test"'],
+            title: 'Shell',
+            onConfirm: vi.fn(),
+          };
+
+          await updatePolicy(
+            tool,
+            ToolConfirmationOutcome.ProceedAlways,
+            details,
+            { config: mockConfig, messageBus: mockMessageBus },
+            {
+              commandScopes: {
+                'cat file.txt': 'command-only', // cat (read-only, broad)
+                'git commit -m "test"': 'command-flags', // git commit (subcommand)
+              },
+              compoundCommands: ['cat file.txt', 'git commit -m "test"'],
+            },
+          );
+
+          expect(mockMessageBus.publish).toHaveBeenCalledWith(
+            expect.objectContaining({
+              type: MessageBusType.UPDATE_POLICY,
+              toolName: 'run_shell_command',
+              commandPrefix: expect.arrayContaining(['cat', 'git commit']),
+            }),
+          );
+        });
+
+        it('should dedupe identical prefixes from commandScopes', async () => {
+          const mockConfig = {
+            setApprovalMode: vi.fn(),
+          } as unknown as Mocked<Config>;
+          const mockMessageBus = {
+            publish: vi.fn(),
+          } as unknown as Mocked<MessageBus>;
+          const tool = { name: 'run_shell_command' } as AnyDeclarativeTool;
+          const details: ToolExecuteConfirmationDetails = {
+            type: 'exec',
+            command: 'ls -la && ls -l',
+            rootCommand: 'ls',
+            rootCommands: ['ls', 'ls'],
+            commands: ['ls -la', 'ls -l'],
+            title: 'Shell',
+            onConfirm: vi.fn(),
+          };
+
+          await updatePolicy(
+            tool,
+            ToolConfirmationOutcome.ProceedAlways,
+            details,
+            { config: mockConfig, messageBus: mockMessageBus },
+            {
+              commandScopes: {
+                'ls -la': 'command-only',
+                'ls -l': 'command-only',
+              },
+              compoundCommands: ['ls -la', 'ls -l'],
+            },
+          );
+
+          expect(mockMessageBus.publish).toHaveBeenCalledWith(
+            expect.objectContaining({
+              type: MessageBusType.UPDATE_POLICY,
+              toolName: 'run_shell_command',
+              commandPrefix: ['ls'], // Should be deduped
+            }),
+          );
+        });
+
+        it('should persist all-read-only compound commands with commandScopes', async () => {
+          const mockConfig = {
+            setApprovalMode: vi.fn(),
+          } as unknown as Mocked<Config>;
+          const mockMessageBus = {
+            publish: vi.fn(),
+          } as unknown as Mocked<MessageBus>;
+          const tool = { name: 'run_shell_command' } as AnyDeclarativeTool;
+          const details: ToolExecuteConfirmationDetails = {
+            type: 'exec',
+            command: 'ls -la && cat file.txt',
+            rootCommand: 'ls',
+            rootCommands: ['ls', 'cat'],
+            commands: ['ls -la', 'cat file.txt'],
+            title: 'Shell',
+            onConfirm: vi.fn(),
+          };
+
+          await updatePolicy(
+            tool,
+            ToolConfirmationOutcome.ProceedAlways,
+            details,
+            { config: mockConfig, messageBus: mockMessageBus },
+            {
+              commandScopes: {
+                'ls -la': 'command-only',
+                'cat file.txt': 'command-only',
+              },
+              compoundCommands: ['ls -la', 'cat file.txt'],
+              persist: true, // Explicit persist for all-read-only
+            },
+          );
+
+          expect(mockMessageBus.publish).toHaveBeenCalledWith(
+            expect.objectContaining({
+              type: MessageBusType.UPDATE_POLICY,
+              persist: true,
+            }),
+          );
+        });
+
+        it('should handle 3+ commands with per-command scopes', async () => {
+          const mockConfig = {
+            setApprovalMode: vi.fn(),
+          } as unknown as Mocked<Config>;
+          const mockMessageBus = {
+            publish: vi.fn(),
+          } as unknown as Mocked<MessageBus>;
+          const tool = { name: 'run_shell_command' } as AnyDeclarativeTool;
+          const details: ToolExecuteConfirmationDetails = {
+            type: 'exec',
+            command: 'ls && cat file.txt && git status',
+            rootCommand: 'ls',
+            rootCommands: ['ls', 'cat', 'git'],
+            commands: ['ls', 'cat file.txt', 'git status'],
+            title: 'Shell',
+            onConfirm: vi.fn(),
+          };
+
+          await updatePolicy(
+            tool,
+            ToolConfirmationOutcome.ProceedAlways,
+            details,
+            { config: mockConfig, messageBus: mockMessageBus },
+            {
+              commandScopes: {
+                ls: 'command-only',
+                'cat file.txt': 'exact',
+                'git status': 'command-flags',
+              },
+              compoundCommands: ['ls', 'cat file.txt', 'git status'],
+            },
+          );
+
+          expect(mockMessageBus.publish).toHaveBeenCalledWith(
+            expect.objectContaining({
+              type: MessageBusType.UPDATE_POLICY,
+              toolName: 'run_shell_command',
+              commandPrefix: expect.arrayContaining([
+                'ls',
+                'cat file.txt',
+                'git status',
+              ]),
+            }),
+          );
+        });
+
+        it('should fall back to uniform scope when commandScopes is empty', async () => {
+          const mockConfig = {
+            setApprovalMode: vi.fn(),
+          } as unknown as Mocked<Config>;
+          const mockMessageBus = {
+            publish: vi.fn(),
+          } as unknown as Mocked<MessageBus>;
+          const tool = { name: 'run_shell_command' } as AnyDeclarativeTool;
+          const details: ToolExecuteConfirmationDetails = {
+            type: 'exec',
+            command: 'ls && cat file.txt',
+            rootCommand: 'ls',
+            rootCommands: ['ls', 'cat'],
+            commands: ['ls', 'cat file.txt'],
+            title: 'Shell',
+            onConfirm: vi.fn(),
+          };
+
+          await updatePolicy(
+            tool,
+            ToolConfirmationOutcome.ProceedAlways,
+            details,
+            { config: mockConfig, messageBus: mockMessageBus },
+            {
+              scope: 'command-only', // Uniform scope
+              compoundCommands: ['ls', 'cat file.txt'],
+            },
+          );
+
+          expect(mockMessageBus.publish).toHaveBeenCalledWith(
+            expect.objectContaining({
+              type: MessageBusType.UPDATE_POLICY,
+              toolName: 'run_shell_command',
+              commandPrefix: expect.arrayContaining(['ls', 'cat']),
+            }),
+          );
+        });
+      });
+    });
+  });
+
+  describe('getPolicyDenialError', () => {
+    it('should return default denial message when no rule provided', () => {
+      const mockConfig = {
+        getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
+      } as unknown as Config;
+
+      const { errorMessage, errorType } = getPolicyDenialError(mockConfig);
+
+      expect(errorMessage).toBe('Tool execution denied by policy.');
+      expect(errorType).toBe(ToolErrorType.POLICY_VIOLATION);
+    });
+
+    it('should return custom deny message if provided', () => {
+      const mockConfig = {
+        getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
+      } as unknown as Config;
+      const rule = {
+        decision: PolicyDecision.DENY,
+        denyMessage: 'Custom Deny',
+      };
+
+      const { errorMessage, errorType } = getPolicyDenialError(
+        mockConfig,
+        rule,
+      );
+
+      expect(errorMessage).toBe('Tool execution denied by policy. Custom Deny');
+      expect(errorType).toBe(ToolErrorType.POLICY_VIOLATION);
     });
   });
 });
@@ -747,8 +1105,8 @@ describe('Plan Mode Denial Consistency', () => {
         }
       }
 
-      expect(resultMessage).toBe(PLAN_MODE_DENIAL_MESSAGE);
-      expect(resultErrorType).toBe(ToolErrorType.STOP_EXECUTION);
+      expect(resultMessage).toBe('Tool execution denied by policy.');
+      expect(resultErrorType).toBe(ToolErrorType.POLICY_VIOLATION);
     });
   });
 });

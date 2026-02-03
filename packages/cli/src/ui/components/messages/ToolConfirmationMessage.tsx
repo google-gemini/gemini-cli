@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import { Box, Text } from 'ink';
 import { DiffRenderer } from './DiffRenderer.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
@@ -15,6 +15,7 @@ import {
   type Config,
   type ToolConfirmationPayload,
   type ApprovalScope,
+  type ScopeOption,
   ToolConfirmationOutcome,
   hasRedirection,
   debugLogger,
@@ -38,6 +39,7 @@ import {
   REDIRECTION_WARNING_TIP_TEXT,
 } from '../../textConstants.js';
 import { AskUserDialog } from '../AskUserDialog.js';
+import { ExitPlanModeDialog } from '../ExitPlanModeDialog.js';
 
 export interface ToolConfirmationMessageProps {
   callId: string;
@@ -66,8 +68,17 @@ export const ToolConfirmationMessage: React.FC<
   const allowPermanentApproval =
     settings.merged.security.enablePermanentToolApproval;
 
-  const handlesOwnUI = confirmationDetails.type === 'ask_user';
+  const handlesOwnUI =
+    confirmationDetails.type === 'ask_user' ||
+    confirmationDetails.type === 'exit_plan_mode';
   const isTrustedFolder = config.isTrustedFolder();
+
+  // State for per-command scope selection (compound commands)
+  const [expandedMode, setExpandedMode] = useState(false);
+  const [currentCommandIndex, setCurrentCommandIndex] = useState(0);
+  const [selectedScopes, setSelectedScopes] = useState<
+    Record<string, ApprovalScope>
+  >({});
 
   const handleConfirm = useCallback(
     (outcome: ToolConfirmationOutcome, payload?: ToolConfirmationPayload) => {
@@ -98,33 +109,128 @@ export const ToolConfirmationMessage: React.FC<
     { isActive: isFocused },
   );
 
-  // For exec type, we use string values that encode scope information
-  // Format: "scope:<scope-id>" (e.g., "scope:command-only")
-  type ExecOptionValue = ToolConfirmationOutcome | `scope:${ApprovalScope}`;
+  type ExecOptionValue =
+    | ToolConfirmationOutcome
+    | `scope:${ApprovalScope}`
+    | 'more-options'
+    | 'back';
 
   const handleSelect = useCallback(
     (item: ToolConfirmationOutcome | string) => {
-      // Check if this is a scope-encoded option
+      // Handle "More options..." selection
+      if (item === 'more-options') {
+        setExpandedMode(true);
+        setCurrentCommandIndex(0);
+        setSelectedScopes({});
+        return;
+      }
+
+      // Handle "Back" selection
+      if (item === 'back') {
+        setExpandedMode(false);
+        setCurrentCommandIndex(0);
+        setSelectedScopes({});
+        return;
+      }
+
       if (typeof item === 'string' && item.startsWith('scope:')) {
         const scope = item.replace('scope:', '') as ApprovalScope;
 
-        // Determine persistence based on command intent
+        // In expanded mode, handle per-command scope selection
+        if (
+          expandedMode &&
+          confirmationDetails.type === 'exec' &&
+          confirmationDetails.rootCommands.length > 1
+        ) {
+          const commands = confirmationDetails.commands || [
+            confirmationDetails.command,
+          ];
+          const rootCommands = confirmationDetails.rootCommands;
+          const currentRootCmd = rootCommands[currentCommandIndex];
+
+          // Find the first full command that matches this root command
+          const currentCmd =
+            commands.find((cmd: string) =>
+              cmd.trim().toLowerCase().startsWith(currentRootCmd.toLowerCase()),
+            ) || commands[0];
+
+          const newSelectedScopes = {
+            ...selectedScopes,
+            [currentCmd]: scope,
+          };
+          setSelectedScopes(newSelectedScopes);
+
+          // Move to next command or finish
+          if (currentCommandIndex < rootCommands.length - 1) {
+            setCurrentCommandIndex(currentCommandIndex + 1);
+            return;
+          }
+
+          // All commands have been configured - submit with per-command scopes
+          const shouldPersistApproval = commands.every((cmd: string) =>
+            shouldPersist(cmd),
+          );
+
+          handleConfirm(ToolConfirmationOutcome.ProceedAlways, {
+            commandScopes: newSelectedScopes,
+            persist: shouldPersistApproval,
+            compoundCommands: commands,
+          });
+          return;
+        }
+
+        // Non-expanded mode (single command or uniform compound scope)
         const shouldPersistApproval =
           confirmationDetails.type === 'exec'
             ? shouldPersist(confirmationDetails.rootCommand)
             : false;
 
+        let customPattern: string | undefined;
+        let compoundCommands: string[] | undefined;
+
+        if (confirmationDetails.type === 'exec') {
+          const isCompound = confirmationDetails.rootCommands.length > 1;
+
+          if (isCompound) {
+            // For compound commands, pass all commands to apply scope to
+            compoundCommands = confirmationDetails.commands || [
+              confirmationDetails.command,
+            ];
+          } else {
+            // For single commands, check for custom pattern
+            const scopeOptions = generateScopeOptions(
+              confirmationDetails.command,
+            );
+            const selectedOption = scopeOptions.find(
+              (opt: ScopeOption) => opt.id === scope,
+            );
+            if (
+              selectedOption?.pattern &&
+              selectedOption.pattern.startsWith('^')
+            ) {
+              customPattern = selectedOption.pattern;
+            }
+          }
+        }
+
         handleConfirm(ToolConfirmationOutcome.ProceedAlways, {
-          scope,
+          scope: customPattern ? 'custom' : scope,
+          customPattern,
           persist: shouldPersistApproval,
+          compoundCommands,
         });
         return;
       }
 
-      // Regular outcome (Allow once, Cancel, etc.)
       handleConfirm(item as ToolConfirmationOutcome);
     },
-    [handleConfirm, confirmationDetails],
+    [
+      handleConfirm,
+      confirmationDetails,
+      expandedMode,
+      currentCommandIndex,
+      selectedScopes,
+    ],
   );
 
   const getOptions = useCallback(() => {
@@ -168,37 +274,123 @@ export const ToolConfirmationMessage: React.FC<
         });
       }
     } else if (confirmationDetails.type === 'exec') {
-      // Always offer "Allow once"
       options.push({
         label: 'Allow once',
         value: ToolConfirmationOutcome.ProceedOnce,
         key: 'Allow once',
       });
 
-      // In trusted folders, offer scope-based options
       if (isTrustedFolder) {
-        const command = confirmationDetails.rootCommand;
-        const scopeOptions = generateScopeOptions(
+        const commands = confirmationDetails.commands || [
           confirmationDetails.command,
-          command,
-        );
-        const recommendedScope = getRecommendedScope(command);
+        ];
+        const isCompoundCommand = commands.length > 1;
 
-        // Add scope-based options (skipping 'exact' which is like "Allow once")
-        for (const scopeOpt of scopeOptions) {
-          if (scopeOpt.id === 'exact') continue; // Skip exact, "Allow once" covers it
+        if (isCompoundCommand) {
+          const rootCommands = confirmationDetails.rootCommands;
 
-          const isRecommended = scopeOpt.id === recommendedScope;
-          const label = isRecommended
-            ? `${scopeOpt.label} (recommended)`
-            : scopeOpt.label;
+          if (expandedMode) {
+            // Expanded mode: show per-command scope selection
+            // Use deduplicated rootCommands for iteration
+            const currentRootCmd = rootCommands[currentCommandIndex];
 
-          // Use scope-encoded value: "scope:command-only"
-          options.push({
-            label,
-            value: `scope:${scopeOpt.id}` as ExecOptionValue,
-            key: `scope:${scopeOpt.id}`,
-          });
+            // Find first matching full command for this root command
+            const currentCmd =
+              commands.find((cmd: string) =>
+                cmd
+                  .trim()
+                  .toLowerCase()
+                  .startsWith(currentRootCmd.toLowerCase()),
+              ) || commands[0];
+
+            const scopeOptions = generateScopeOptions(currentCmd);
+            const recommendedScope = getRecommendedScope(currentCmd);
+
+            // Show header for current command
+            const stepLabel = `Step ${currentCommandIndex + 1}/${rootCommands.length}: ${currentRootCmd}`;
+            options.push({
+              label: `━━━ ${stepLabel} ━━━`,
+              value: 'back' as ExecOptionValue,
+              key: 'header',
+              disabled: true,
+            });
+
+            // Show scope options for current command
+            for (const scopeOpt of scopeOptions) {
+              const isRecommended = scopeOpt.id === recommendedScope;
+              const label = isRecommended
+                ? `${scopeOpt.label} (recommended)`
+                : scopeOpt.label;
+
+              options.push({
+                label,
+                value: `scope:${scopeOpt.id}` as ExecOptionValue,
+                key: `scope:${scopeOpt.id}`,
+              });
+            }
+
+            // Show back option
+            options.push({
+              label: '← Back to simple options',
+              value: 'back' as ExecOptionValue,
+              key: 'back',
+            });
+          } else {
+            // Non-expanded mode: show tiered scope options
+            // Check if any command is dangerous (exact-only)
+            const hasDangerousCmd = commands.some((cmd: string) => {
+              const scopeOpts = generateScopeOptions(cmd);
+              return scopeOpts.length === 1; // Only exact option = dangerous
+            });
+
+            // Always offer exact scope for all commands
+            const exactLabel = `Allow each exactly (${rootCommands.join(', ')})`;
+            options.push({
+              label: exactLabel,
+              value: 'scope:exact' as ExecOptionValue,
+              key: 'scope:exact',
+            });
+
+            if (!hasDangerousCmd) {
+              // Offer command-only (broadest) scope
+              const cmdOnlyLabel = `Allow by command (${rootCommands.join(', ')} *)`;
+              const isReadOnly = commands.every(
+                (cmd: string) => getRecommendedScope(cmd) === 'command-only',
+              );
+              options.push({
+                label: isReadOnly
+                  ? `${cmdOnlyLabel} (recommended)`
+                  : cmdOnlyLabel,
+                value: 'scope:command-only' as ExecOptionValue,
+                key: 'scope:command-only',
+              });
+
+              // Add "More options..." for per-command scope selection
+              options.push({
+                label: 'More options...',
+                value: 'more-options' as ExecOptionValue,
+                key: 'more-options',
+              });
+            }
+          }
+        } else {
+          // For single commands, offer scope selection
+          const fullCommand = confirmationDetails.command;
+          const scopeOptions = generateScopeOptions(fullCommand);
+          const recommendedScope = getRecommendedScope(fullCommand);
+
+          for (const scopeOpt of scopeOptions) {
+            const isRecommended = scopeOpt.id === recommendedScope;
+            const label = isRecommended
+              ? `${scopeOpt.label} (recommended)`
+              : scopeOpt.label;
+
+            options.push({
+              label,
+              value: `scope:${scopeOpt.id}` as ExecOptionValue,
+              key: `scope:${scopeOpt.id}`,
+            });
+          }
         }
       }
 
@@ -233,7 +425,6 @@ export const ToolConfirmationMessage: React.FC<
         key: 'No, suggest changes (esc)',
       });
     } else if (confirmationDetails.type === 'mcp') {
-      // mcp tool confirmation
       options.push({
         label: 'Allow once',
         value: ToolConfirmationOutcome.ProceedOnce,
@@ -271,6 +462,8 @@ export const ToolConfirmationMessage: React.FC<
     allowPermanentApproval,
     config,
     isDiffingEnabled,
+    expandedMode,
+    currentCommandIndex,
   ]);
 
   const availableBodyContentHeight = useCallback(() => {
@@ -320,6 +513,32 @@ export const ToolConfirmationMessage: React.FC<
       return { question: '', bodyContent, options: [] };
     }
 
+    if (confirmationDetails.type === 'exit_plan_mode') {
+      bodyContent = (
+        <ExitPlanModeDialog
+          planPath={confirmationDetails.planPath}
+          onApprove={(approvalMode) => {
+            handleConfirm(ToolConfirmationOutcome.ProceedOnce, {
+              approved: true,
+              approvalMode,
+            });
+          }}
+          onFeedback={(feedback) => {
+            handleConfirm(ToolConfirmationOutcome.ProceedOnce, {
+              approved: false,
+              feedback,
+            });
+          }}
+          onCancel={() => {
+            handleConfirm(ToolConfirmationOutcome.Cancel);
+          }}
+          width={terminalWidth}
+          availableHeight={availableBodyContentHeight()}
+        />
+      );
+      return { question: '', bodyContent, options: [] };
+    }
+
     if (confirmationDetails.type === 'edit') {
       if (!confirmationDetails.isModifying) {
         question = `Apply this change?`;
@@ -335,7 +554,6 @@ export const ToolConfirmationMessage: React.FC<
     } else if (confirmationDetails.type === 'info') {
       question = `Do you want to proceed?`;
     } else if (confirmationDetails.type === 'mcp') {
-      // mcp tool confirmation
       const mcpProps = confirmationDetails;
       question = `Allow execution of MCP tool "${mcpProps.toolName}" from server "${mcpProps.serverName}"?`;
     }
@@ -410,15 +628,27 @@ export const ToolConfirmationMessage: React.FC<
         );
       }
 
-      // Show persistence hint based on command classification
       const willPersist =
         isTrustedFolder && shouldPersist(executionProps.rootCommand);
+      const isCompoundCommand = executionProps.rootCommands.length > 1;
+
+      // Generate hint based on mode
+      let hintText: string;
+      if (expandedMode && isCompoundCommand) {
+        const configuredCount = Object.keys(selectedScopes).length;
+        hintText = `💡 Configuring scope for each command (${configuredCount}/${executionProps.rootCommands.length} done)`;
+      } else if (isCompoundCommand) {
+        hintText = '💡 Will approve all commands in this chain';
+      } else if (willPersist) {
+        hintText = '💡 Read-only command - will be saved for future sessions';
+      } else {
+        hintText = '💡 Will apply for this session only';
+      }
+
       const persistenceHint = isTrustedFolder ? (
         <Box marginTop={1}>
           <Text color={theme.border.default} dimColor>
-            {willPersist
-              ? '💡 Read-only command - will be saved for future sessions'
-              : '💡 Will apply for this session only'}
+            {hintText}
           </Text>
         </Box>
       ) : null;
@@ -430,11 +660,24 @@ export const ToolConfirmationMessage: React.FC<
             maxWidth={Math.max(terminalWidth, 1)}
           >
             <Box flexDirection="column">
-              {commandsToDisplay.map((cmd, idx) => (
-                <Text key={idx} color={theme.text.link}>
-                  {sanitizeForDisplay(cmd)}
-                </Text>
-              ))}
+              {commandsToDisplay.map((cmd, idx) => {
+                // In expanded mode, highlight the current command
+                const isCurrent = expandedMode && idx === currentCommandIndex;
+                const isConfigured =
+                  expandedMode && selectedScopes[cmd] !== undefined;
+                const prefix = isCurrent ? '► ' : isConfigured ? '✓ ' : '  ';
+                return (
+                  <Text
+                    key={idx}
+                    color={isCurrent ? theme.status.success : theme.text.link}
+                    bold={isCurrent}
+                  >
+                    {expandedMode ? prefix : ''}
+                    {sanitizeForDisplay(cmd)}
+                    {isConfigured ? ` [${selectedScopes[cmd]}]` : ''}
+                  </Text>
+                );
+              })}
             </Box>
           </MaxSizedBox>
           {warnings}
@@ -471,7 +714,6 @@ export const ToolConfirmationMessage: React.FC<
         </Box>
       );
     } else if (confirmationDetails.type === 'mcp') {
-      // mcp tool confirmation
       const mcpProps = confirmationDetails;
 
       bodyContent = (
@@ -490,6 +732,9 @@ export const ToolConfirmationMessage: React.FC<
     terminalWidth,
     handleConfirm,
     isTrustedFolder,
+    expandedMode,
+    currentCommandIndex,
+    selectedScopes,
   ]);
 
   if (confirmationDetails.type === 'edit') {

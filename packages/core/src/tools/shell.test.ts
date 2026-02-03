@@ -814,5 +814,104 @@ describe('ShellTool', () => {
         expect(details.rootCommand).toBe('ls, grep');
       }
     });
+
+    describe('rootCommands deduplication', () => {
+      it('should deduplicate rootCommands array when same command appears multiple times', async () => {
+        const shellTool = new ShellTool(mockConfig, createMockMessageBus());
+        const command = 'git fetch && git branch && ls -la';
+        const invocation = shellTool.build({ command });
+
+        // @ts-expect-error - getConfirmationDetails is protected
+        const details = await invocation.getConfirmationDetails(
+          new AbortController().signal,
+        );
+
+        expect(details).not.toBe(false);
+        if (details && details.type === 'exec') {
+          // rootCommands array should be deduplicated: ['git', 'ls'] not ['git', 'git', 'ls']
+          expect(details.rootCommands).toEqual(['git', 'ls']);
+          // rootCommand display string should also be deduplicated
+          expect(details.rootCommand).toBe('git, ls');
+        }
+      });
+
+      it('should deduplicate rootCommand display with multiple git subcommands', async () => {
+        const shellTool = new ShellTool(mockConfig, createMockMessageBus());
+        const command = 'git status && git diff && git log';
+        const invocation = shellTool.build({ command });
+
+        // @ts-expect-error - getConfirmationDetails is protected
+        const details = await invocation.getConfirmationDetails(
+          new AbortController().signal,
+        );
+
+        expect(details).not.toBe(false);
+        if (details && details.type === 'exec') {
+          // Should show 'git' only once, not 'git, git, git'
+          expect(details.rootCommands).toEqual(['git']);
+          expect(details.rootCommand).toBe('git');
+        }
+      });
+
+      it('should handle compound with duplicate binaries in non-adjacent positions', async () => {
+        const shellTool = new ShellTool(mockConfig, createMockMessageBus());
+        const command = 'git status && ls -la && git commit -m "test"';
+        const invocation = shellTool.build({ command });
+
+        // @ts-expect-error - getConfirmationDetails is protected
+        const details = await invocation.getConfirmationDetails(
+          new AbortController().signal,
+        );
+
+        expect(details).not.toBe(false);
+        if (details && details.type === 'exec') {
+          // rootCommands should be deduplicated regardless of position
+          expect(details.rootCommands).toEqual(['git', 'ls']);
+          expect(details.rootCommand).toBe('git, ls');
+        }
+      });
+
+      it('should populate commands array with split commands for compound', async () => {
+        const shellTool = new ShellTool(mockConfig, createMockMessageBus());
+        const command = 'git branch && npm install && ls -a';
+        const invocation = shellTool.build({ command });
+
+        // @ts-expect-error - getConfirmationDetails is protected
+        const details = await invocation.getConfirmationDetails(
+          new AbortController().signal,
+        );
+
+        expect(details).not.toBe(false);
+        if (details && details.type === 'exec') {
+          // commands array should be populated with individual commands
+          expect(details.commands).toEqual([
+            'git branch',
+            'npm install',
+            'ls -a',
+          ]);
+          // Should NOT include && connectors
+          expect(
+            details.commands?.every((cmd: string) => !cmd.includes('&&')),
+          ).toBe(true);
+        }
+      });
+
+      it('should not populate commands array for single command', async () => {
+        const shellTool = new ShellTool(mockConfig, createMockMessageBus());
+        const command = 'git status';
+        const invocation = shellTool.build({ command });
+
+        // @ts-expect-error - getConfirmationDetails is protected
+        const details = await invocation.getConfirmationDetails(
+          new AbortController().signal,
+        );
+
+        expect(details).not.toBe(false);
+        if (details && details.type === 'exec') {
+          // commands should be undefined for single commands
+          expect(details.commands).toBeUndefined();
+        }
+      });
+    });
   });
 });

@@ -40,6 +40,7 @@ import {
   stripShellWrapper,
   parseCommandDetails,
   hasRedirection,
+  splitCommands,
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -122,12 +123,18 @@ export class ShellToolInvocation extends BaseToolInvocation<
         rootCommandDisplay += ', redirection';
       }
     } else {
-      rootCommandDisplay = parsed.details
-        .map((detail) => detail.name)
-        .join(', ');
+      const uniqueNames = [
+        ...new Set(parsed.details.map((detail) => detail.name)),
+      ];
+      rootCommandDisplay = uniqueNames.join(', ');
     }
 
     const rootCommands = [...new Set(getCommandRoots(command))];
+
+    // Split compound commands for per-command scope selection
+    const splitCommandsList = splitCommands(command);
+    const commands =
+      splitCommandsList.length > 1 ? splitCommandsList : undefined;
 
     // Rely entirely on PolicyEngine for interactive confirmation.
     // If we are here, it means PolicyEngine returned ASK_USER (or no message bus),
@@ -138,6 +145,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       command: this.params.command,
       rootCommand: rootCommandDisplay,
       rootCommands,
+      commands,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         await this.publishPolicyUpdate(outcome);
       },
