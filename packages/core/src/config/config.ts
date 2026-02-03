@@ -158,7 +158,7 @@ export interface ExtensionSetting {
 export interface ResolvedExtensionSetting {
   name: string;
   envVar: string;
-  value: string;
+  value?: string;
   sensitive: boolean;
   scope?: 'user' | 'workspace';
   source?: string;
