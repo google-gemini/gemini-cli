@@ -106,16 +106,12 @@ gemini skills disable my-expertise --scope workspace
 5.  **Execution**: The model proceeds with the specialized expertise active. It
     is instructed to prioritize the skill's procedural guidance within reason.
 
-### Skill Activation and Deactivation
+### Skill Activation
 
 Once a skill is activated (typically by Gemini identifying a task that matches
 the skill's description and your approval), its specialized instructions and
-resources are loaded into the agent's context.
-
-A skill remains active and its guidance is prioritized for the duration of the
-specific task or sub-task it was activated to assist with. It implicitly
-deactivates when that particular task is completed and Gemini moves on to a new
-or unrelated top-level task.
+resources are loaded into the agent's context. A skill remains active and its
+guidance is prioritized for the duration of the session.
 
 ## Creating your own skills
 
