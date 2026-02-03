@@ -222,7 +222,7 @@ export function saveTrustedFolders(
 
 /** Is folder trust feature enabled per the current applied settings */
 export function isFolderTrustEnabled(settings: Settings): boolean {
-  const folderTrustSetting = settings.security?.folderTrust?.enabled ?? false;
+  const folderTrustSetting = settings.security?.folderTrust?.enabled ?? true;
   return folderTrustSetting;
 }
 
