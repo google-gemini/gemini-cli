@@ -233,7 +233,6 @@ describe('InputPrompt', () => {
       navigateDown: vi.fn(),
       resetCompletionState: vi.fn(),
       setActiveSuggestionIndex: vi.fn(),
-      setShowSuggestions: vi.fn(),
       handleAutocomplete: vi.fn(),
       promptCompletion: {
         text: '',

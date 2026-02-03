@@ -824,13 +824,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
               // Default behavior: auto-complete to prompt box
               completion.handleAutocomplete(targetIndex);
-              // Reset completion state to clear stale suggestions.
-              // We do not suppress completion here so that if the completion
-              // result still matches a valid completion pattern (e.g. a
-              // directory path), new suggestions can be fetched immediately.
-              completion.resetCompletionState();
-              reverseSearchCompletion.resetCompletionState();
-              commandSearchCompletion.resetCompletionState();
               setExpandedSuggestionIndex(-1); // Reset expansion after selection
             }
           }

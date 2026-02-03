@@ -36,7 +36,6 @@ export interface UseCommandCompletionReturn {
   isLoadingSuggestions: boolean;
   isPerfectMatch: boolean;
   setActiveSuggestionIndex: React.Dispatch<React.SetStateAction<number>>;
-  setShowSuggestions: React.Dispatch<React.SetStateAction<boolean>>;
   resetCompletionState: () => void;
   navigateUp: () => void;
   navigateDown: () => void;
@@ -83,12 +82,10 @@ export function useCommandCompletion({
     suggestions,
     activeSuggestionIndex,
     visibleStartIndex,
-    showSuggestions,
     isLoadingSuggestions,
     isPerfectMatch,
 
     setSuggestions,
-    setShowSuggestions,
     setActiveSuggestionIndex,
     setIsLoadingSuggestions,
     setIsPerfectMatch,
@@ -239,19 +236,14 @@ export function useCommandCompletion({
       reverseSearchActive
     ) {
       resetCompletionState();
-      return;
     }
-    // Show suggestions if we are loading OR if there are results to display.
-    setShowSuggestions(isLoadingSuggestions || suggestions.length > 0);
-  }, [
-    active,
-    completionMode,
-    suggestions.length,
-    isLoadingSuggestions,
-    reverseSearchActive,
-    resetCompletionState,
-    setShowSuggestions,
-  ]);
+  }, [active, completionMode, reverseSearchActive, resetCompletionState]);
+
+  const showSuggestions =
+    active &&
+    completionMode !== CompletionMode.IDLE &&
+    !reverseSearchActive &&
+    (isLoadingSuggestions || suggestions.length > 0);
 
   /**
    * Gets the completed text by replacing the completion range with the suggestion value.
@@ -368,7 +360,6 @@ export function useCommandCompletion({
     isLoadingSuggestions,
     isPerfectMatch,
     setActiveSuggestionIndex,
-    setShowSuggestions,
     resetCompletionState,
     navigateUp,
     navigateDown,
