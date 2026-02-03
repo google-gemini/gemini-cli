@@ -15,6 +15,11 @@ import { ApprovalMode } from '../policy/types.js';
 import * as fs from 'node:fs';
 import os from 'node:os';
 import { validatePlanPath } from '../utils/planUtils.js';
+import * as loggers from '../telemetry/loggers.js';
+
+vi.mock('../telemetry/loggers.js', () => ({
+  logPlanExecution: vi.fn(),
+}));
 
 describe('ExitPlanModeTool', () => {
   let tool: ExitPlanModeTool;
@@ -283,6 +288,30 @@ The plan is stored at: ${expectedPath}
 Ask the user for specific feedback on how to improve the plan.`,
         returnDisplay: 'Rejected (no feedback)',
       });
+    });
+
+    it('should log plan execution event when plan is approved', async () => {
+      const planRelativePath = createPlanFile('test.md', '# Content');
+      const invocation = tool.build({ plan_path: planRelativePath });
+
+      const confirmDetails = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+      if (confirmDetails === false) return;
+
+      await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce, {
+        approved: true,
+        approvalMode: ApprovalMode.AUTO_EDIT,
+      });
+
+      await invocation.execute(new AbortController().signal);
+
+      expect(loggers.logPlanExecution).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({
+          approval_mode: ApprovalMode.AUTO_EDIT,
+        }),
+      );
     });
 
     it('should return cancellation message when cancelled', async () => {

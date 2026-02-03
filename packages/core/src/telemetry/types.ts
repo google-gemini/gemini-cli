@@ -1577,7 +1577,8 @@ export type TelemetryEvent =
   | StartupStatsEvent
   | WebFetchFallbackAttemptEvent
   | EditStrategyEvent
-  | EditCorrectionEvent;
+  | EditCorrectionEvent
+  | PlanExecutionEvent;
 
 export const EVENT_EXTENSION_DISABLE = 'gemini_cli.extension_disable';
 export class ExtensionDisableEvent implements BaseTelemetryEvent {
@@ -1916,6 +1917,29 @@ export class ApprovalModeDurationEvent implements BaseTelemetryEvent {
 
   toLogBody(): string {
     return `Approval mode ${this.mode} was active for ${this.duration_ms}ms.`;
+  }
+}
+
+export class PlanExecutionEvent implements BaseTelemetryEvent {
+  eventName = 'plan_execution';
+  approval_mode: ApprovalMode;
+
+  constructor(approvalMode: ApprovalMode) {
+    this.approval_mode = approvalMode;
+  }
+  'event.name': string;
+  'event.timestamp': string;
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      event_name: this.eventName,
+      approval_mode: this.approval_mode,
+    };
+  }
+
+  toLogBody(): string {
+    return `Plan executed with approval mode: ${this.approval_mode}`;
   }
 }
 
