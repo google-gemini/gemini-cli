@@ -51,14 +51,15 @@ describe('Automated tool use', () => {
           ...tseslint.configs.recommended,
           {
             rules: {
-                "@typescript-eslint/no-unused-vars": "error"
+                "prefer-const": "error",
+                "@typescript-eslint/no-unused-vars": "off"
             }
           }
         ];
       `,
       'src/app.ts': `
-        function main() {
-            const count: number = "10"; // Error: Type 'string' is not assignable to type 'number'
+        export function main() {
+            let count = 10;
             console.log(count);
         }
       `,
@@ -82,7 +83,11 @@ describe('Automated tool use', () => {
           }
         }
         const cmd = (args as any)['command'];
-        return cmd && cmd.includes('eslint') && cmd.includes('--fix');
+        return (
+          cmd &&
+          (cmd.includes('eslint') || cmd.includes('npm run lint')) &&
+          cmd.includes('--fix')
+        );
       });
 
       expect(
