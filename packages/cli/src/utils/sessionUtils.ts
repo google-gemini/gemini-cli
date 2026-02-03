@@ -4,20 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  Config,
-  ConversationRecord,
-  MessageRecord,
-} from '@google/gemini-cli-core';
 import {
+  checkExhaustive,
   partListUnionToString,
   SESSION_FILE_PREFIX,
+  type Config,
+  type ConversationRecord,
+  type MessageRecord,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { stripUnsafeCharacters } from '../ui/utils/textUtils.js';
 import type { Part } from '@google/genai';
-import { checkExhaustive } from './checks.js';
 import {
   MessageType,
   ToolCallStatus,
