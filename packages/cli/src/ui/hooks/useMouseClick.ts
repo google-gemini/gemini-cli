@@ -31,7 +31,11 @@ export const useMouseClick = (
       const eventName =
         name ?? (button === 'left' ? 'left-press' : 'right-release');
       if (event.name === eventName && containerRef.current) {
-        const { x, y, width, height } = getBoundingBox(containerRef.current);
+        const boundingBox = getBoundingBox(containerRef.current);
+        if (!boundingBox) {
+          return;
+        }
+        const { x, y, width, height } = boundingBox;
         // Terminal mouse events are 1-based, Ink layout is 0-based.
         const mouseX = event.col - 1;
         const mouseY = event.row - 1;
