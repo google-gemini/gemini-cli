@@ -174,7 +174,6 @@ export function logFileOperation(
 
     recordFileOperationMetric(config, {
       operation: event.operation,
-      lines: event.lines,
       mimetype: event.mimetype,
       extension: event.extension,
       programming_language: event.programming_language,

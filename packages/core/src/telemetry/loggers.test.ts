@@ -1640,7 +1640,6 @@ describe('loggers', () => {
         mockConfig,
         {
           operation: 'read',
-          lines: 10,
           mimetype: 'text/plain',
           extension: '.txt',
           programming_language: 'typescript',

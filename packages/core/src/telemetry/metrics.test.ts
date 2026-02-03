@@ -367,7 +367,6 @@ describe('Telemetry Metrics', () => {
       initialized: boolean;
       attributes: {
         operation: FileOperation;
-        lines?: number;
         mimetype?: string;
         extension?: string;
       };
@@ -380,7 +379,6 @@ describe('Telemetry Metrics', () => {
         initialized: false,
         attributes: {
           operation: FileOperation.CREATE,
-          lines: 10,
           mimetype: 'text/plain',
           extension: 'txt',
         },
@@ -391,7 +389,6 @@ describe('Telemetry Metrics', () => {
         initialized: true,
         attributes: {
           operation: FileOperation.CREATE,
-          lines: 10,
           mimetype: 'text/plain',
           extension: 'txt',
         },

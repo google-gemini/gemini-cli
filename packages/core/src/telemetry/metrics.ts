@@ -114,7 +114,6 @@ const COUNTER_DEFINITIONS = {
     assign: (c: Counter) => (fileOperationCounter = c),
     attributes: {} as {
       operation: FileOperation;
-      lines?: number;
       mimetype?: string;
       extension?: string;
       programming_language?: string;
