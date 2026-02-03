@@ -257,53 +257,33 @@ describe('toolMapping', () => {
       expect(displayTool.resultDisplay).toBe('User cancelled');
     });
 
-    it('does not prune shell output for successful run_shell_command', () => {
-      const toolCall: SuccessfulToolCall = {
-        status: 'success',
-        request: { ...mockRequest, name: 'run_shell_command' },
-        tool: {
-          ...mockTool,
-          name: 'run_shell_command',
-        } as AnyDeclarativeTool,
+    it('propagates borderTop and borderBottom options correctly', () => {
+      const toolCall: ScheduledToolCall = {
+        status: 'scheduled',
+        request: mockRequest,
+        tool: mockTool,
         invocation: mockInvocation,
-        response: { ...mockResponse, resultDisplay: 'long output' },
       };
 
-      const result = mapToDisplay(toolCall);
-      const displayTool = result.tools[0];
-
-      expect(displayTool.resultDisplay).toBe('long output');
+      const result = mapToDisplay(toolCall, {
+        borderTop: true,
+        borderBottom: false,
+      });
+      expect(result.borderTop).toBe(true);
+      expect(result.borderBottom).toBe(false);
     });
 
-    it('does not prune shell output for error run_shell_command', () => {
-      const toolCall: ToolCall = {
-        status: 'error',
-        request: { ...mockRequest, name: 'run_shell_command' },
-        response: { ...mockResponse, resultDisplay: 'long error output' },
-      };
-
-      const result = mapToDisplay(toolCall);
-      const displayTool = result.tools[0];
-
-      expect(displayTool.resultDisplay).toBe('long error output');
-    });
-
-    it('does NOT prune output for other tools', () => {
-      const toolCall: SuccessfulToolCall = {
-        status: 'success',
-        request: { ...mockRequest, name: 'read_file' },
-        tool: {
-          ...mockTool,
-          name: 'read_file',
-        } as AnyDeclarativeTool,
+    it('sets resultDisplay to undefined for pre-execution statuses', () => {
+      const toolCall: ScheduledToolCall = {
+        status: 'scheduled',
+        request: mockRequest,
+        tool: mockTool,
         invocation: mockInvocation,
-        response: { ...mockResponse, resultDisplay: 'long file content' },
       };
 
       const result = mapToDisplay(toolCall);
-      const displayTool = result.tools[0];
-
-      expect(displayTool.resultDisplay).toBe('long file content');
+      expect(result.tools[0].resultDisplay).toBeUndefined();
+      expect(result.tools[0].status).toBe(ToolCallStatus.Pending);
     });
   });
 });
