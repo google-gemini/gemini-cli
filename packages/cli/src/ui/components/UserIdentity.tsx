@@ -5,6 +5,7 @@
  */
 
 import type React from 'react';
+import { useMemo } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import {
@@ -19,13 +20,21 @@ interface UserIdentityProps {
 
 export const UserIdentity: React.FC<UserIdentityProps> = ({ config }) => {
   const authType = config.getContentGeneratorConfig()?.authType;
+
+  const { email, tierName } = useMemo(() => {
+    if (!authType) {
+      return { email: undefined, tierName: undefined };
+    }
+    const userAccountManager = new UserAccountManager();
+    return {
+      email: userAccountManager.getCachedGoogleAccount(),
+      tierName: config.getUserTierName(),
+    };
+  }, [config, authType]);
+
   if (!authType) {
     return null;
   }
-
-  const userAccountManager = new UserAccountManager();
-  const email = userAccountManager.getCachedGoogleAccount();
-  const tierName = config.getUserTierName();
 
   return (
     <Box marginY={1} flexDirection="column">

@@ -1041,11 +1041,12 @@ export class Config {
   }
 
   getUserTier(): UserTierId | undefined {
-    return this.contentGenerator.userTier;
+    return this.contentGenerator?.userTier;
   }
 
   getUserTierName(): string | undefined {
-    return this.contentGenerator.userTierName;
+    // TODO(#1275): Re-enable user tier display when ready.
+    return undefined;
   }
 
   /**

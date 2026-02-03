@@ -55,7 +55,7 @@ describe('<UserIdentity />', () => {
       () =>
         ({
           getCachedGoogleAccount: () => undefined,
-        }) as unknown as ContentGeneratorConfig,
+        }) as unknown as UserAccountManager,
     );
 
     const mockConfig = makeFakeConfig();
