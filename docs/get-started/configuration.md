@@ -170,6 +170,15 @@ their corresponding top-level category object in your `settings.json` file.
     available options.
   - **Default:** `undefined`
 
+- **`ui.autoThemeSwitching`** (boolean):
+  - **Description:** Automatically switch between default light and dark themes
+    based on terminal background color.
+  - **Default:** `true`
+
+- **`ui.terminalBackgroundPollingInterval`** (number):
+  - **Description:** Interval in seconds to poll the terminal background color.
+  - **Default:** `60`
+
 - **`ui.customThemes`** (object):
   - **Description:** Custom theme definitions.
   - **Default:** `{}`
@@ -324,6 +333,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** The fraction of context usage at which to trigger context
     compression (e.g. 0.2, 0.3).
   - **Default:** `0.5`
+  - **Requires restart:** Yes
+
+- **`model.disableLoopDetection`** (boolean):
+  - **Description:** Disable automatic detection and prevention of infinite
+    loops.
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`model.skipNextSpeakerCheck`** (boolean):
