@@ -116,6 +116,22 @@ function showCitations(settings: LoadedSettings): boolean {
   return true;
 }
 
+function isCancelCommand(query: PartListUnion): boolean {
+  if (typeof query === 'string') {
+    return query.trim() === '/cancel';
+  }
+  if (Array.isArray(query) && query.length === 1) {
+    const first = query[0];
+    if (typeof first === 'string') {
+      return first.trim() === '/cancel';
+    }
+    if (typeof first === 'object' && first !== null && 'text' in first) {
+      return (first).text?.trim() === '/cancel';
+    }
+  }
+  return false;
+}
+
 /**
  * Calculates the current streaming state based on tool call status and responding flag.
  */
@@ -618,6 +634,12 @@ export const useGeminiStream = (
       if (turnCancelledRef.current) {
         return { queryToSend: null, shouldProceed: false };
       }
+
+      if (isCancelCommand(query)) {
+        cancelOngoingRequest();
+        return { queryToSend: null, shouldProceed: false };
+      }
+
       if (typeof query === 'string' && query.trim().length === 0) {
         return { queryToSend: null, shouldProceed: false };
       }
@@ -629,11 +651,6 @@ export const useGeminiStream = (
         await logger?.logMessage(MessageSenderType.USER, trimmedQuery);
 
         if (!shellModeActive) {
-          if (trimmedQuery === '/cancel') {
-            cancelOngoingRequest();
-            return { queryToSend: null, shouldProceed: false };
-          }
-
           // Handle UI-only commands first
           const slashCommandResult = isSlashCommand(trimmedQuery)
             ? await handleSlashCommand(trimmedQuery)
@@ -1183,26 +1200,6 @@ export const useGeminiStream = (
 
           const queryId = `${Date.now()}-${Math.random()}`;
           activeQueryIdRef.current = queryId;
-
-          const isCancelCommand = (q: PartListUnion) => {
-            if (typeof q === 'string') {
-              return q === '/cancel';
-            }
-            if (Array.isArray(q) && q.length === 1) {
-              const first = q[0];
-              if (typeof first === 'string') {
-                return first === '/cancel';
-              }
-              if (
-                typeof first === 'object' &&
-                first !== null &&
-                'text' in first
-              ) {
-                return (first).text === '/cancel';
-              }
-            }
-            return false;
-          };
 
           const cancelMatch = isCancelCommand(query);
           if (
