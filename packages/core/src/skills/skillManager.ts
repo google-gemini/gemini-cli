@@ -65,6 +65,12 @@ export class SkillManager {
     const userSkills = await loadSkillsFromDir(Storage.getUserSkillsDir());
     this.addSkillsWithPrecedence(userSkills);
 
+    // 3.1 User agent skills alias (.agents/skills)
+    const userAgentSkills = await loadSkillsFromDir(
+      Storage.getUserAgentSkillsDir(),
+    );
+    this.addSkillsWithPrecedence(userAgentSkills);
+
     // 4. Workspace skills (highest precedence)
     if (!isTrusted) {
       debugLogger.debug(
@@ -77,6 +83,12 @@ export class SkillManager {
       storage.getProjectSkillsDir(),
     );
     this.addSkillsWithPrecedence(projectSkills);
+
+    // 4.1 Workspace agent skills alias (.agents/skills)
+    const projectAgentSkills = await loadSkillsFromDir(
+      storage.getProjectAgentSkillsDir(),
+    );
+    this.addSkillsWithPrecedence(projectAgentSkills);
   }
 
   /**

@@ -46,7 +46,14 @@ import { ToolModificationHandler } from './tool-modifier.js';
 
 vi.mock('./state-manager.js');
 vi.mock('./confirmation.js');
-vi.mock('./policy.js');
+vi.mock('./policy.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./policy.js')>();
+  return {
+    ...actual,
+    checkPolicy: vi.fn(),
+    updatePolicy: vi.fn(),
+  };
+});
 vi.mock('./tool-executor.js');
 vi.mock('./tool-modifier.js');
 
@@ -55,7 +62,7 @@ import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { PolicyEngine } from '../policy/policy-engine.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
-import { PolicyDecision } from '../policy/types.js';
+import { PolicyDecision, ApprovalMode } from '../policy/types.js';
 import {
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
@@ -149,6 +156,7 @@ describe('Scheduler (Orchestrator)', () => {
       isInteractive: vi.fn().mockReturnValue(true),
       getEnableHooks: vi.fn().mockReturnValue(true),
       setApprovalMode: vi.fn(),
+      getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
     } as unknown as Mocked<Config>;
 
     mockMessageBus = {
@@ -730,6 +738,63 @@ describe('Scheduler (Orchestrator)', () => {
             expect.objectContaining({
               functionResponse: expect.objectContaining({
                 response: { error: 'Not interactive' },
+              }),
+            }),
+          ]),
+        }),
+      );
+    });
+
+    it('should return POLICY_VIOLATION error type when denied in Plan Mode', async () => {
+      vi.mocked(checkPolicy).mockResolvedValue({
+        decision: PolicyDecision.DENY,
+        rule: { decision: PolicyDecision.DENY },
+      });
+
+      mockConfig.getApprovalMode.mockReturnValue(ApprovalMode.PLAN);
+
+      await scheduler.schedule(req1, signal);
+
+      expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
+        'call-1',
+        'error',
+        expect.objectContaining({
+          errorType: ToolErrorType.POLICY_VIOLATION,
+          responseParts: expect.arrayContaining([
+            expect.objectContaining({
+              functionResponse: expect.objectContaining({
+                response: {
+                  error: 'Tool execution denied by policy.',
+                },
+              }),
+            }),
+          ]),
+        }),
+      );
+    });
+
+    it('should return POLICY_VIOLATION and custom deny message when denied in Plan Mode with rule message', async () => {
+      const customMessage = 'Custom Plan Mode Deny';
+      vi.mocked(checkPolicy).mockResolvedValue({
+        decision: PolicyDecision.DENY,
+        rule: { decision: PolicyDecision.DENY, denyMessage: customMessage },
+      });
+
+      mockConfig.getApprovalMode.mockReturnValue(ApprovalMode.PLAN);
+
+      await scheduler.schedule(req1, signal);
+
+      expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
+        'call-1',
+        'error',
+        expect.objectContaining({
+          errorType: ToolErrorType.POLICY_VIOLATION,
+          responseParts: expect.arrayContaining([
+            expect.objectContaining({
+              functionResponse: expect.objectContaining({
+                response: {
+                  error: `Tool execution denied by policy. ${customMessage}`,
+                },
               }),
             }),
           ]),

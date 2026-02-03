@@ -255,6 +255,7 @@ export function isFolderTrustEnabled(settings: Settings): boolean {
 }
 
 function getWorkspaceTrustFromLocalConfig(
+  workspaceDir: string,
   trustConfig?: Record<string, TrustLevel>,
 ): TrustResult {
   const folders = loadTrustedFolders();
@@ -269,7 +270,7 @@ function getWorkspaceTrustFromLocalConfig(
     );
   }
 
-  const isTrusted = folders.isPathTrusted(process.cwd(), configToUse);
+  const isTrusted = folders.isPathTrusted(workspaceDir, configToUse);
   return {
     isTrusted,
     source: isTrusted !== undefined ? 'file' : undefined,
@@ -278,6 +279,7 @@ function getWorkspaceTrustFromLocalConfig(
 
 export function isWorkspaceTrusted(
   settings: Settings,
+  workspaceDir: string = process.cwd(),
   trustConfig?: Record<string, TrustLevel>,
 ): TrustResult {
   if (!isFolderTrustEnabled(settings)) {
@@ -290,5 +292,5 @@ export function isWorkspaceTrusted(
   }
 
   // Fall back to the local user configuration
-  return getWorkspaceTrustFromLocalConfig(trustConfig);
+  return getWorkspaceTrustFromLocalConfig(workspaceDir, trustConfig);
 }

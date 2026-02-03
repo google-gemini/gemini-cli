@@ -351,6 +351,26 @@ const SETTINGS_SCHEMA = {
           'The color theme for the UI. See the CLI themes guide for available options.',
         showInDialog: false,
       },
+      autoThemeSwitching: {
+        type: 'boolean',
+        label: 'Auto Theme Switching',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Automatically switch between default light and dark themes based on terminal background color.',
+        showInDialog: true,
+      },
+      terminalBackgroundPollingInterval: {
+        type: 'number',
+        label: 'Terminal Background Polling Interval',
+        category: 'UI',
+        requiresRestart: false,
+        default: 60,
+        description:
+          'Interval in seconds to poll the terminal background color.',
+        showInDialog: true,
+      },
       customThemes: {
         type: 'object',
         label: 'Custom Themes',

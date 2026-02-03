@@ -21,15 +21,65 @@ import type { SelectionListItem } from '../hooks/useSelectionList.js';
 import { TabHeader, type Tab } from './shared/TabHeader.js';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
-import { checkExhaustive } from '../../utils/checks.js';
+import { checkExhaustive } from '@google/gemini-cli-core';
 import { TextInput } from './shared/TextInput.js';
 import { useTextBuffer } from './shared/text-buffer.js';
 import { getCachedStringWidth } from '../utils/textUtils.js';
 import { useTabbedNavigation } from '../hooks/useTabbedNavigation.js';
 import { DialogFooter } from './shared/DialogFooter.js';
+import { MarkdownDisplay } from '../utils/MarkdownDisplay.js';
+import { RenderInline } from '../utils/InlineMarkdownRenderer.js';
 import { MaxSizedBox } from './shared/MaxSizedBox.js';
 import { UIStateContext } from '../contexts/UIStateContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+
+/** Padding for dialog content to prevent text from touching edges. */
+const DIALOG_PADDING = 4;
+
+/**
+ * Checks if text is a single line without markdown identifiers.
+ */
+function isPlainSingleLine(text: string): boolean {
+  // Must be a single line (no newlines)
+  if (text.includes('\n') || text.includes('\r')) {
+    return false;
+  }
+
+  // Check for common markdown identifiers
+  const markdownPatterns = [
+    /^#{1,6}\s/, // Headers
+    /^[`~]{3,}/, // Code fences
+    /^[-*+]\s/, // Unordered lists
+    /^\d+\.\s/, // Ordered lists
+    /^[-*_]{3,}$/, // Horizontal rules
+    /\|/, // Tables
+    /\*\*|__/, // Bold
+    /(?<!\*)\*(?!\*)/, // Italic (single asterisk not part of bold)
+    /(?<!_)_(?!_)/, // Italic (single underscore not part of bold)
+    /`[^`]+`/, // Inline code
+    /\[.*?\]\(.*?\)/, // Links
+    /!\[/, // Images
+  ];
+
+  for (const pattern of markdownPatterns) {
+    if (pattern.test(text)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Auto-bolds plain single-line text by wrapping in **.
+ * Returns the text unchanged if it already contains markdown.
+ */
+function autoBoldIfPlain(text: string): string {
+  if (isPlainSingleLine(text)) {
+    return `**${text}**`;
+  }
+  return text;
+}
 
 interface AskUserDialogState {
   answers: { [key: string]: string };
@@ -303,9 +353,11 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
           maxWidth={availableWidth}
           overflowDirection="bottom"
         >
-          <Text bold color={theme.text.primary}>
-            {question.question}
-          </Text>
+          <MarkdownDisplay
+            text={autoBoldIfPlain(question.question)}
+            terminalWidth={availableWidth - DIALOG_PADDING}
+            isPending={false}
+          />
         </MaxSizedBox>
       </Box>
 
@@ -734,7 +786,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     : undefined;
   const questionHeight =
     listHeight && !isAlternateBuffer
-      ? Math.min(15, Math.max(1, listHeight - 4))
+      ? Math.min(15, Math.max(1, listHeight - DIALOG_PADDING))
       : undefined;
   const maxItemsToShow =
     listHeight && questionHeight
@@ -750,15 +802,18 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
           maxWidth={availableWidth}
           overflowDirection="bottom"
         >
-          <Text bold color={theme.text.primary}>
-            {question.question}
+          <Box flexDirection="column">
+            <MarkdownDisplay
+              text={autoBoldIfPlain(question.question)}
+              terminalWidth={availableWidth - DIALOG_PADDING}
+              isPending={false}
+            />
             {question.multiSelect && (
               <Text color={theme.text.secondary} italic>
-                {' '}
                 (Select all that apply)
               </Text>
             )}
-          </Text>
+          </Box>
         </MaxSizedBox>
       </Box>
 
@@ -833,7 +888,10 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
               {optionItem.description && (
                 <Text color={theme.text.secondary} wrap="wrap">
                   {' '}
-                  {optionItem.description}
+                  <RenderInline
+                    text={optionItem.description}
+                    defaultColor={theme.text.secondary}
+                  />
                 </Text>
               )}
             </Box>

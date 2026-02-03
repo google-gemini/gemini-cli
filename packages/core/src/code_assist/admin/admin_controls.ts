@@ -90,6 +90,40 @@ export async function fetchAdminControls(
 }
 
 /**
+ * Fetches the admin controls from the server a single time.
+ * This function does not start or stop any polling.
+ *
+ * @param server The CodeAssistServer instance.
+ * @param adminControlsEnabled Whether admin controls are enabled.
+ * @returns The fetched settings if enabled and successful, otherwise undefined.
+ */
+export async function fetchAdminControlsOnce(
+  server: CodeAssistServer | undefined,
+  adminControlsEnabled: boolean,
+): Promise<FetchAdminControlsResponse> {
+  if (!server || !server.projectId || !adminControlsEnabled) {
+    return {};
+  }
+
+  try {
+    const rawSettings = await server.fetchAdminControls({
+      project: server.projectId,
+    });
+    return sanitizeAdminSettings(rawSettings);
+  } catch (e) {
+    // Non-enterprise users don't have access to fetch settings.
+    if (isGaxiosError(e) && e.status === 403) {
+      return {};
+    }
+    debugLogger.error(
+      'Failed to fetch admin controls: ',
+      e instanceof Error ? e.message : e,
+    );
+    return {};
+  }
+}
+
+/**
  * Starts polling for admin controls.
  */
 function startAdminControlsPolling(

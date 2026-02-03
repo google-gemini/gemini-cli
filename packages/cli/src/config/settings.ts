@@ -50,7 +50,9 @@ import {
   formatValidationError,
 } from './settings-validation.js';
 
-function getMergeStrategyForPath(path: string[]): MergeStrategy | undefined {
+export function getMergeStrategyForPath(
+  path: string[],
+): MergeStrategy | undefined {
   let current: SettingDefinition | undefined = undefined;
   let currentSchema: SettingsSchema | undefined = getSettingsSchema();
   let parent: SettingDefinition | undefined = undefined;
@@ -469,10 +471,15 @@ export function setUpCloudShellEnvironment(envFilePath: string | null): void {
   }
 }
 
-export function loadEnvironment(settings: Settings): void {
-  const envFilePath = findEnvFile(process.cwd());
+export function loadEnvironment(
+  settings: Settings,
+  workspaceDir: string,
+  isWorkspaceTrustedFn = isWorkspaceTrusted,
+): void {
+  const envFilePath = findEnvFile(workspaceDir);
+  const trustResult = isWorkspaceTrustedFn(settings, workspaceDir);
 
-  if (!isWorkspaceTrusted(settings).isTrusted) {
+  if (trustResult.isTrusted !== true) {
     return;
   }
 
@@ -638,8 +645,8 @@ export function loadSettings(
     systemSettings,
   );
   const isTrusted =
-    isWorkspaceTrusted(initialTrustCheckSettings as Settings).isTrusted ??
-    false;
+    isWorkspaceTrusted(initialTrustCheckSettings as Settings, workspaceDir)
+      .isTrusted ?? false;
 
   // Create a temporary merged settings object to pass to loadEnvironment.
   const tempMergedSettings = mergeSettings(
@@ -652,7 +659,7 @@ export function loadSettings(
 
   // loadEnvironment depends on settings so we have to create a temp version of
   // the settings to avoid a cycle
-  loadEnvironment(tempMergedSettings);
+  loadEnvironment(tempMergedSettings, workspaceDir);
 
   // Check for any fatal errors before proceeding
   const fatalErrors = settingsErrors.filter((e) => e.severity === 'error');
