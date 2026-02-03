@@ -260,7 +260,14 @@ export async function validatePathWithinRoot(
     realPath = resolvedPath;
   }
 
-  if (!isWithinRoot(realPath, rootDirectory)) {
+  let realRoot: string;
+  try {
+    realRoot = await fsPromises.realpath(rootDirectory);
+  } catch {
+    realRoot = path.resolve(rootDirectory);
+  }
+
+  if (!isWithinRoot(realPath.toLowerCase(), realRoot.toLowerCase())) {
     return 'Access denied: path is outside of the designated directory.';
   }
 

@@ -82,7 +82,7 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
 
     // Since validateToolParamValues is synchronous, we use a basic synchronous check
     // for path traversal safety. High-level async validation is deferred to shouldConfirmExecute.
-    const plansDir = this.config.storage.getProjectTempPlansDir();
+    const plansDir = getRealPath(this.config.storage.getProjectTempPlansDir());
     const resolvedPath = path.resolve(
       this.config.getTargetDir(),
       params.plan_path,
@@ -90,7 +90,7 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
 
     const realPath = getRealPath(resolvedPath);
 
-    if (!isWithinRoot(realPath, plansDir)) {
+    if (!isWithinRoot(realPath.toLowerCase(), plansDir.toLowerCase())) {
       return `Access denied: plan path must be within the designated plans directory.`;
     }
 
