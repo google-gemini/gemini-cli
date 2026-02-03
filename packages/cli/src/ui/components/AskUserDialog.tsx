@@ -33,6 +33,51 @@ import { MaxSizedBox } from './shared/MaxSizedBox.js';
 import { UIStateContext } from '../contexts/UIStateContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 
+/**
+ * Checks if text is a single line without markdown identifiers.
+ */
+function isPlainSingleLine(text: string): boolean {
+  // Must be a single line (no newlines)
+  if (text.includes('\n') || text.includes('\r')) {
+    return false;
+  }
+
+  // Check for common markdown identifiers
+  const markdownPatterns = [
+    /^#{1,6}\s/, // Headers
+    /^[`~]{3,}/, // Code fences
+    /^[-*+]\s/, // Unordered lists
+    /^\d+\.\s/, // Ordered lists
+    /^[-*_]{3,}$/, // Horizontal rules
+    /\|/, // Tables
+    /\*\*|__/, // Bold
+    /(?<!\*)\*(?!\*)/, // Italic (single asterisk not part of bold)
+    /(?<!_)_(?!_)/, // Italic (single underscore not part of bold)
+    /`[^`]+`/, // Inline code
+    /\[.*?\]\(.*?\)/, // Links
+    /!\[/, // Images
+  ];
+
+  for (const pattern of markdownPatterns) {
+    if (pattern.test(text)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Auto-bolds plain single-line text by wrapping in **.
+ * Returns the text unchanged if it already contains markdown.
+ */
+function autoBoldIfPlain(text: string): string {
+  if (isPlainSingleLine(text)) {
+    return `**${text}**`;
+  }
+  return text;
+}
+
 interface AskUserDialogState {
   answers: { [key: string]: string };
   isEditingCustomOption: boolean;
@@ -306,7 +351,7 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
           overflowDirection="bottom"
         >
           <MarkdownDisplay
-            text={question.question}
+            text={autoBoldIfPlain(question.question)}
             terminalWidth={availableWidth - 4}
             isPending={false}
           />
@@ -756,7 +801,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
         >
           <Box flexDirection="column">
             <MarkdownDisplay
-              text={question.question}
+              text={autoBoldIfPlain(question.question)}
               terminalWidth={availableWidth - 4}
               isPending={false}
             />
