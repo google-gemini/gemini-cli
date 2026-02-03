@@ -8,7 +8,6 @@ import { describe, it, expect, vi } from 'vitest';
 import type { Mock } from 'vitest';
 import type { CallableTool } from '@google/genai';
 import { CoreToolScheduler } from './coreToolScheduler.js';
-import { PLAN_MODE_DENIAL_MESSAGE } from '../scheduler/policy.js';
 import type {
   ToolCall,
   WaitingToolCall,
@@ -2161,7 +2160,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
   });
 
   describe('Policy Decisions in Plan Mode', () => {
-    it('should return STOP_EXECUTION error type and informative message when denied in Plan Mode', async () => {
+    it('should return POLICY_VIOLATION error type and informative message when denied in Plan Mode', async () => {
       const mockTool = new MockTool({
         name: 'dangerous_tool',
         displayName: 'Dangerous Tool',
@@ -2205,8 +2204,10 @@ describe('CoreToolScheduler Sequential Execution', () => {
       const result = reportedTools[0];
 
       expect(result.status).toBe('error');
-      expect(result.response.errorType).toBe(ToolErrorType.STOP_EXECUTION);
-      expect(result.response.error.message).toBe(PLAN_MODE_DENIAL_MESSAGE);
+      expect(result.response.errorType).toBe(ToolErrorType.POLICY_VIOLATION);
+      expect(result.response.error.message).toBe(
+        'Tool execution denied by policy.',
+      );
     });
 
     it('should return custom deny message when denied in Plan Mode with a specific rule message', async () => {
@@ -2257,8 +2258,10 @@ describe('CoreToolScheduler Sequential Execution', () => {
       const result = reportedTools[0];
 
       expect(result.status).toBe('error');
-      expect(result.response.errorType).toBe(ToolErrorType.STOP_EXECUTION);
-      expect(result.response.error.message).toBe(customDenyMessage);
+      expect(result.response.errorType).toBe(ToolErrorType.POLICY_VIOLATION);
+      expect(result.response.error.message).toBe(
+        `Tool execution denied by policy. ${customDenyMessage}`,
+      );
     });
   });
 });

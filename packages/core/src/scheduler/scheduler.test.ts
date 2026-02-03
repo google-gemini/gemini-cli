@@ -745,7 +745,7 @@ describe('Scheduler (Orchestrator)', () => {
       );
     });
 
-    it('should return STOP_EXECUTION error type and informative message when denied in Plan Mode', async () => {
+    it('should return POLICY_VIOLATION error type when denied in Plan Mode', async () => {
       vi.mocked(checkPolicy).mockResolvedValue({
         decision: PolicyDecision.DENY,
         rule: { decision: PolicyDecision.DENY },
@@ -759,13 +759,12 @@ describe('Scheduler (Orchestrator)', () => {
         'call-1',
         'error',
         expect.objectContaining({
-          errorType: ToolErrorType.STOP_EXECUTION,
+          errorType: ToolErrorType.POLICY_VIOLATION,
           responseParts: expect.arrayContaining([
             expect.objectContaining({
               functionResponse: expect.objectContaining({
                 response: {
-                  error:
-                    'You are in Plan Mode - adjust your prompt to only use read and search tools.',
+                  error: 'Tool execution denied by policy.',
                 },
               }),
             }),
@@ -774,7 +773,7 @@ describe('Scheduler (Orchestrator)', () => {
       );
     });
 
-    it('should return STOP_EXECUTION and custom deny message when denied in Plan Mode with rule message', async () => {
+    it('should return POLICY_VIOLATION and custom deny message when denied in Plan Mode with rule message', async () => {
       const customMessage = 'Custom Plan Mode Deny';
       vi.mocked(checkPolicy).mockResolvedValue({
         decision: PolicyDecision.DENY,
@@ -789,12 +788,12 @@ describe('Scheduler (Orchestrator)', () => {
         'call-1',
         'error',
         expect.objectContaining({
-          errorType: ToolErrorType.STOP_EXECUTION,
+          errorType: ToolErrorType.POLICY_VIOLATION,
           responseParts: expect.arrayContaining([
             expect.objectContaining({
               functionResponse: expect.objectContaining({
                 response: {
-                  error: customMessage,
+                  error: `Tool execution denied by policy. ${customMessage}`,
                 },
               }),
             }),
