@@ -32,7 +32,6 @@ import {
   parseCommand,
   shouldPersist as shouldPersistCommand,
 } from '../policy/scope-generator.js';
-import { debugLogger } from '../utils/debugLogger.js';
 
 /**
  * Helper to format the policy denial error.
@@ -233,14 +232,6 @@ async function handleStandardPolicyUpdate(
         const { scope, customPattern, compoundCommands, commandScopes } =
           payload;
 
-        debugLogger.debug('[POLICY] Scope payload detected:', {
-          scope,
-          customPattern,
-          hasCommandScopes: !!commandScopes,
-          hasCompoundCommands: !!compoundCommands,
-          command: confirmationDetails.command,
-        });
-
         // Handle per-command scopes (from expanded mode)
         if (commandScopes && Object.keys(commandScopes).length > 0) {
           options.commandPrefix =
@@ -266,12 +257,11 @@ async function handleStandardPolicyUpdate(
           }
         }
       } else {
-        debugLogger.debug('[POLICY] No scope payload, using rootCommands:', {
-          rootCommands: confirmationDetails.rootCommands,
-          command: confirmationDetails.command,
-          payload,
-        });
-        options.commandPrefix = confirmationDetails.rootCommands;
+        // No scope payload provided. This happens when:
+        // 1. Folder is not trusted (so scope UI is hidden)
+        // 2. User clicked "Allow for this session" without selecting a scope
+        // Default to 'exact' scope (most restrictive) for safety.
+        options.commandPrefix = [confirmationDetails.command];
       }
     }
 
@@ -284,13 +274,6 @@ async function handleStandardPolicyUpdate(
         persist = shouldPersistCommand(confirmationDetails.rootCommand);
       }
     }
-
-    debugLogger.debug('[POLICY] Publishing policy update:', {
-      toolName: tool.name,
-      persist,
-      commandPrefix: options.commandPrefix,
-      argsPattern: options.argsPattern,
-    });
 
     await messageBus.publish({
       type: MessageBusType.UPDATE_POLICY,

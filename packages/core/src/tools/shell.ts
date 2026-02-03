@@ -16,11 +16,11 @@ import type {
   ToolResult,
   ToolCallConfirmationDetails,
   ToolExecuteConfirmationDetails,
-} from './tools.js';
+
+  ToolConfirmationOutcome} from './tools.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
-  ToolConfirmationOutcome,
   Kind,
   type PolicyUpdateOptions,
 } from './tools.js';
@@ -91,19 +91,11 @@ export class ShellToolInvocation extends BaseToolInvocation<
   }
 
   protected override getPolicyUpdateOptions(
-    outcome: ToolConfirmationOutcome,
+    _outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
-    if (
-      outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave ||
-      outcome === ToolConfirmationOutcome.ProceedAlways
-    ) {
-      const command = stripShellWrapper(this.params.command);
-      const rootCommands = [...new Set(getCommandRoots(command))];
-      if (rootCommands.length > 0) {
-        return { commandPrefix: rootCommands };
-      }
-      return { commandPrefix: this.params.command };
-    }
+    // Policy updates are now handled by the scheduler's policy layer
+    // which has access to the user's scope selection from the UI payload.
+    // Returning undefined here prevents double policy updates.
     return undefined;
   }
 

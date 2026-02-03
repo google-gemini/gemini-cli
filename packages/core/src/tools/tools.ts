@@ -149,12 +149,16 @@ export abstract class BaseToolInvocation<
     ) {
       if (this._toolName) {
         const options = this.getPolicyUpdateOptions(outcome);
-        void this.messageBus.publish({
-          type: MessageBusType.UPDATE_POLICY,
-          toolName: this._toolName,
-          persist: outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,
-          ...options,
-        });
+        // Only publish if getPolicyUpdateOptions returns options
+        // (returning undefined signals that policy updates are handled elsewhere)
+        if (options) {
+          void this.messageBus.publish({
+            type: MessageBusType.UPDATE_POLICY,
+            toolName: this._toolName,
+            persist: outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,
+            ...options,
+          });
+        }
       }
     }
   }

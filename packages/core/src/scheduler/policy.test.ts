@@ -240,11 +240,12 @@ describe('policy.ts', () => {
         messageBus: mockMessageBus,
       });
 
+      // When no scope is provided, default to exact scope (full command) for safety
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageBusType.UPDATE_POLICY,
           toolName: 'run_shell_command',
-          commandPrefix: ['ls'],
+          commandPrefix: ['ls -la'],
         }),
       );
     });
