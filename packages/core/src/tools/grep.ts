@@ -56,6 +56,11 @@ export interface GrepToolParams {
    * Optional: Maximum number of matches to return per file.
    */
   max_matches_per_file?: number;
+
+  /**
+   * Optional: Maximum number of total matches to return.
+   */
+  total_max_matches?: number;
 }
 
 /**
@@ -194,7 +199,8 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       // Collect matches from all search directories
       let allMatches: GrepMatch[] = [];
-      const totalMaxMatches = DEFAULT_TOTAL_MAX_MATCHES;
+      const totalMaxMatches =
+        this.params.total_max_matches ?? DEFAULT_TOTAL_MAX_MATCHES;
 
       // Create a timeout controller to prevent indefinitely hanging searches
       const timeoutController = new AbortController();
@@ -794,6 +800,12 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
           max_matches_per_file: {
             description:
               'Optional: Maximum number of matches to return per file. Use this to prevent being overwhelmed by repetitive matches in large files.',
+            type: 'integer',
+            minimum: 1,
+          },
+          total_max_matches: {
+            description:
+              'Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 100 if omitted.',
             type: 'integer',
             minimum: 1,
           },

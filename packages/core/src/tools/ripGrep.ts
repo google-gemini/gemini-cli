@@ -141,6 +141,11 @@ export interface RipGrepToolParams {
    * Optional: Maximum number of matches to return per file.
    */
   max_matches_per_file?: number;
+
+  /**
+   * Optional: Maximum number of total matches to return.
+   */
+  total_max_matches?: number;
 }
 
 /**
@@ -214,7 +219,8 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       const searchDirDisplay = pathParam;
 
-      const totalMaxMatches = DEFAULT_TOTAL_MAX_MATCHES;
+      const totalMaxMatches =
+        this.params.total_max_matches ?? DEFAULT_TOTAL_MAX_MATCHES;
       if (this.config.getDebugMode()) {
         debugLogger.log(`[GrepTool] Total result limit: ${totalMaxMatches}`);
       }
@@ -530,7 +536,7 @@ class GrepToolInvocation extends BaseToolInvocation<
   ): GrepMatch | null {
     try {
       const json = JSON.parse(line);
-      if (json.type === 'match') {
+      if (json.type === 'match' || json.type === 'context') {
         const match = json.data;
         // Defensive check: ensure text properties exist (skips binary/invalid encoding)
         if (match.path?.text && match.lines?.text) {
@@ -664,6 +670,12 @@ export class RipGrepTool extends BaseDeclarativeTool<
           max_matches_per_file: {
             description:
               'Optional: Maximum number of matches to return per file. Use this to prevent being overwhelmed by repetitive matches in large files. Defaults to 100 if omitted.',
+            type: 'integer',
+            minimum: 1,
+          },
+          total_max_matches: {
+            description:
+              'Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 2000 if omitted.',
             type: 'integer',
             minimum: 1,
           },

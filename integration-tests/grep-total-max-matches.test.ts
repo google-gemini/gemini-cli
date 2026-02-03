@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -8,7 +8,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
-import { RipGrepTool } from '../packages/core/src/tools/ripGrep.js';
+import { GrepTool } from '../packages/core/src/tools/grep.js';
 import { Config } from '../packages/core/src/config/config.js';
 import { WorkspaceContext } from '../packages/core/src/utils/workspaceContext.js';
 
@@ -28,10 +28,6 @@ class MockConfig {
     return true;
   }
 
-  getFileFilteringRespectGeminiIgnore() {
-    return true;
-  }
-
   getFileFilteringOptions() {
     return {
       respectGitIgnore: true,
@@ -40,69 +36,57 @@ class MockConfig {
     };
   }
 
+  getFileExclusions() {
+    return {
+      getGlobExcludes: () => [],
+    };
+  }
+
   validatePathAccess() {
     return null;
   }
 }
 
-describe('ripgrep-max-matches', () => {
+describe('grep-total-max-matches', () => {
   let tempDir: string;
-  let tool: RipGrepTool;
+  let tool: GrepTool;
 
   beforeAll(async () => {
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ripgrep-max-test-'));
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'grep-total-max-test-'));
 
     // Create a test file with multiple matches
     const content = `
       match 1
-      filler
       match 2
-      filler
       match 3
-      filler
       match 4
+      match 5
     `;
     await fs.writeFile(path.join(tempDir, 'many_matches.txt'), content);
 
     const config = new MockConfig(tempDir) as unknown as Config;
-    tool = new RipGrepTool(config);
+    tool = new GrepTool(config, null!);
   });
 
   afterAll(async () => {
     await fs.rm(tempDir, { recursive: true, force: true });
   });
 
-  it('should limit matches per file when max_matches_per_file is set', async () => {
+  it('should limit total matches when total_max_matches is set', async () => {
     const invocation = tool.build({
       pattern: 'match',
-      max_matches_per_file: 2,
+      total_max_matches: 3,
     });
     const result = await invocation.execute(new AbortController().signal);
 
-    expect(result.llmContent).toContain('Found 2 matches');
-    expect(result.llmContent).toContain('many_matches.txt');
-    expect(result.llmContent).toContain('match 1');
-    expect(result.llmContent).toContain('match 2');
-    expect(result.llmContent).not.toContain('match 3');
-    expect(result.llmContent).not.toContain('match 4');
-  });
-
-  it('should return all matches when max_matches_per_file is not set', async () => {
-    const invocation = tool.build({ pattern: 'match' });
-    const result = await invocation.execute(new AbortController().signal);
-
-    expect(result.llmContent).toContain('Found 4 matches');
+    expect(result.llmContent).toContain('Found 3 matches');
     expect(result.llmContent).toContain('match 1');
     expect(result.llmContent).toContain('match 2');
     expect(result.llmContent).toContain('match 3');
-    expect(result.llmContent).toContain('match 4');
-  });
-
-  it('should return context lines when requested', async () => {
-    const invocation = tool.build({ pattern: 'match 1', context: 1 });
-    const result = await invocation.execute(new AbortController().signal);
-
-    expect(result.llmContent).toContain('match 1');
-    expect(result.llmContent).toContain('filler'); // Context line
+    expect(result.llmContent).not.toContain('match 4');
+    expect(result.llmContent).not.toContain('match 5');
+    expect(result.llmContent).toContain(
+      '(results limited to 3 matches for performance)',
+    );
   });
 });
