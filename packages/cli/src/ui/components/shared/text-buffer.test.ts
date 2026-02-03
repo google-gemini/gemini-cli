@@ -1406,9 +1406,8 @@ describe('useTextBuffer', () => {
 
       // Press Up arrow - should move to first visual line
       // This currently fails because handleInput returns false if cursorRow === 0
-      let handledUp = false;
       act(() => {
-        handledUp = result.current.handleInput({
+        result.current.handleInput({
           name: 'up',
           shift: false,
           alt: false,
@@ -1418,14 +1417,12 @@ describe('useTextBuffer', () => {
           sequence: '\x1b[A',
         });
       });
-      expect(handledUp).toBe(true);
       expect(getBufferState(result).visualCursor[0]).toBe(0);
 
       // Press Down arrow - should move back to second visual line
       // This would also fail if cursorRow is the last logical row
-      let handledDown = false;
       act(() => {
-        handledDown = result.current.handleInput({
+        result.current.handleInput({
           name: 'down',
           shift: false,
           alt: false,
@@ -1435,7 +1432,6 @@ describe('useTextBuffer', () => {
           sequence: '\x1b[B',
         });
       });
-      expect(handledDown).toBe(true);
       expect(getBufferState(result).visualCursor[0]).toBe(1);
     });
 

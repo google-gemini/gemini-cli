@@ -2974,13 +2974,8 @@ export function useTextBuffer({
       cursorCol,
       lines,
       singleLine,
-<<<<<<< HEAD
-=======
-      setText,
-      text,
       visualCursor,
       visualLines,
->>>>>>> 8cae90f40 (Fix up/down arrow regression and add test. (#18108))
     ],
   );
 
