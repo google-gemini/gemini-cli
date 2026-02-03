@@ -112,6 +112,7 @@ Implement a comprehensive authentication system with multiple providers.
   let onCancel: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     vi.mocked(processSingleFileContent).mockResolvedValue({
       llmContent: samplePlanContent,
       returnDisplay: 'Read file',
@@ -124,6 +125,8 @@ Implement a comprehensive authentication system with multiple providers.
   });
 
   afterEach(() => {
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -160,6 +163,11 @@ Implement a comprehensive authentication system with multiple providers.
       it('renders correctly with plan content', async () => {
         const { lastFrame } = renderDialog({ useAlternateBuffer });
 
+        // Advance timers to pass the debounce period
+        await act(async () => {
+          vi.runAllTimers();
+        });
+
         await waitFor(() => {
           expect(lastFrame()).toContain('Add user authentication');
         });
@@ -178,6 +186,10 @@ Implement a comprehensive authentication system with multiple providers.
       it('calls onApprove with AUTO_EDIT when first option is selected', async () => {
         const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
 
+        await act(async () => {
+          vi.runAllTimers();
+        });
+
         await waitFor(() => {
           expect(lastFrame()).toContain('Add user authentication');
         });
@@ -191,6 +203,10 @@ Implement a comprehensive authentication system with multiple providers.
 
       it('calls onApprove with DEFAULT when second option is selected', async () => {
         const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
+
+        await act(async () => {
+          vi.runAllTimers();
+        });
 
         await waitFor(() => {
           expect(lastFrame()).toContain('Add user authentication');
@@ -206,6 +222,10 @@ Implement a comprehensive authentication system with multiple providers.
 
       it('calls onFeedback when feedback is typed and submitted', async () => {
         const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
+
+        await act(async () => {
+          vi.runAllTimers();
+        });
 
         await waitFor(() => {
           expect(lastFrame()).toContain('Add user authentication');
@@ -235,15 +255,21 @@ Implement a comprehensive authentication system with multiple providers.
       it('calls onCancel when Esc is pressed', async () => {
         const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
 
+        await act(async () => {
+          vi.runAllTimers();
+        });
+
         await waitFor(() => {
           expect(lastFrame()).toContain('Add user authentication');
         });
 
         writeKey(stdin, '\x1b'); // Escape
 
-        await waitFor(() => {
-          expect(onCancel).toHaveBeenCalled();
+        await act(async () => {
+          vi.runAllTimers();
         });
+
+        expect(onCancel).toHaveBeenCalled();
       });
 
       it('displays error state when file read fails', async () => {
@@ -254,6 +280,10 @@ Implement a comprehensive authentication system with multiple providers.
         });
 
         const { lastFrame } = renderDialog({ useAlternateBuffer });
+
+        await act(async () => {
+          vi.runAllTimers();
+        });
 
         await waitFor(() => {
           expect(lastFrame()).toContain('Error reading plan: File not found');
@@ -266,6 +296,10 @@ Implement a comprehensive authentication system with multiple providers.
         vi.mocked(validatePlanContent).mockResolvedValue('Plan file is empty.');
 
         const { lastFrame } = renderDialog({ useAlternateBuffer });
+
+        await act(async () => {
+          vi.runAllTimers();
+        });
 
         await waitFor(() => {
           expect(lastFrame()).toContain(
@@ -282,6 +316,10 @@ Implement a comprehensive authentication system with multiple providers.
 
         const { lastFrame } = renderDialog({ useAlternateBuffer });
 
+        await act(async () => {
+          vi.runAllTimers();
+        });
+
         await waitFor(() => {
           expect(lastFrame()).toContain(
             'Implement a comprehensive authentication system',
@@ -293,6 +331,10 @@ Implement a comprehensive authentication system with multiple providers.
 
       it('allows number key quick selection', async () => {
         const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
+
+        await act(async () => {
+          vi.runAllTimers();
+        });
 
         await waitFor(() => {
           expect(lastFrame()).toContain('Add user authentication');
@@ -308,6 +350,10 @@ Implement a comprehensive authentication system with multiple providers.
 
       it('clears feedback text when Ctrl+C is pressed while editing', async () => {
         const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
+
+        await act(async () => {
+          vi.runAllTimers();
+        });
 
         await waitFor(() => {
           expect(lastFrame()).toContain('Add user authentication');
@@ -387,6 +433,10 @@ Implement a comprehensive authentication system with multiple providers.
           },
         );
 
+        await act(async () => {
+          vi.runAllTimers();
+        });
+
         await waitFor(() => {
           expect(lastFrame()).toContain('Add user authentication');
         });
@@ -424,6 +474,10 @@ Implement a comprehensive authentication system with multiple providers.
       it('does not submit empty feedback when Enter is pressed', async () => {
         const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
 
+        await act(async () => {
+          vi.runAllTimers();
+        });
+
         await waitFor(() => {
           expect(lastFrame()).toContain('Add user authentication');
         });
@@ -437,7 +491,7 @@ Implement a comprehensive authentication system with multiple providers.
 
         // Wait a bit to ensure no callback was triggered
         await act(async () => {
-          await new Promise((resolve) => setTimeout(resolve, 50));
+          vi.advanceTimersByTime(50);
         });
 
         expect(onFeedback).not.toHaveBeenCalled();
@@ -446,6 +500,10 @@ Implement a comprehensive authentication system with multiple providers.
 
       it('allows arrow navigation while typing feedback to change selection', async () => {
         const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
+
+        await act(async () => {
+          vi.runAllTimers();
+        });
 
         await waitFor(() => {
           expect(lastFrame()).toContain('Add user authentication');

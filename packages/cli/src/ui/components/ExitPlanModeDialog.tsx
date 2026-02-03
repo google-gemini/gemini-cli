@@ -45,6 +45,13 @@ enum ApprovalOption {
   Manual = 'Yes, manually accept edits',
 }
 
+/**
+ * A tiny component for loading and error states with consistent styling.
+ */
+const StatusMessage: React.FC<{
+  children: React.ReactNode;
+}> = ({ children }) => <Box paddingX={1}>{children}</Box>;
+
 function usePlanContent(planPath: string, config: Config): PlanContentState {
   const [state, setState] = useState<PlanContentState>({
     status: PlanStatus.Loading,
@@ -128,33 +135,51 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
 }) => {
   const config = useConfig();
   const planState = usePlanContent(planPath, config);
+  const [showLoading, setShowLoading] = useState(false);
+
+  useEffect(() => {
+    if (planState.status !== PlanStatus.Loading) {
+      setShowLoading(false);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setShowLoading(true);
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [planState.status]);
 
   if (planState.status === PlanStatus.Loading) {
+    if (!showLoading) {
+      return null;
+    }
+
     return (
-      <Box paddingX={1}>
+      <StatusMessage>
         <Text color={theme.text.secondary} italic>
           Loading plan...
         </Text>
-      </Box>
+      </StatusMessage>
     );
   }
 
   if (planState.status === PlanStatus.Error) {
     return (
-      <Box paddingX={1}>
+      <StatusMessage>
         <Text color={theme.status.error}>
           Error reading plan: {planState.error}
         </Text>
-      </Box>
+      </StatusMessage>
     );
   }
 
   const planContent = planState.content?.trim();
   if (!planContent) {
     return (
-      <Box paddingX={1}>
+      <StatusMessage>
         <Text color={theme.status.error}>Error: Plan content is empty.</Text>
-      </Box>
+      </StatusMessage>
     );
   }
 
