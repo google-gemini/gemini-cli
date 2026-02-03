@@ -34,6 +34,7 @@ import { WebFetchTool } from '../tools/web-fetch.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { AskUserTool } from '../tools/ask-user.js';
+import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { HookDefinition, HookEventName } from '../hooks/types.js';
@@ -393,6 +394,7 @@ export interface ConfigParameters {
   includeDirectories?: string[];
   bugCommand?: BugCommandSettings;
   model: string;
+  disableLoopDetection?: boolean;
   maxSessionTurns?: number;
   experimentalZedIntegration?: boolean;
   listSessions?: boolean;
@@ -531,6 +533,7 @@ export class Config {
   private readonly cwd: string;
   private readonly bugCommand: BugCommandSettings | undefined;
   private model: string;
+  private readonly disableLoopDetection: boolean;
   private previewFeatures: boolean | undefined;
   private hasAccessToPreviewModel: boolean = false;
   private readonly noBrowser: boolean;
@@ -697,6 +700,7 @@ export class Config {
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
     this.model = params.model;
+    this.disableLoopDetection = params.disableLoopDetection ?? false;
     this._activeModel = params.model;
     this.enableAgents = params.enableAgents ?? false;
     this.agents = params.agents ?? {};
@@ -1116,6 +1120,10 @@ export class Config {
 
   getModel(): string {
     return this.model;
+  }
+
+  getDisableLoopDetection(): boolean {
+    return this.disableLoopDetection ?? false;
   }
 
   setModel(newModel: string, isTemporary: boolean = true): void {
@@ -2132,6 +2140,9 @@ export class Config {
     registerCoreTool(AskUserTool);
     if (this.getUseWriteTodos()) {
       registerCoreTool(WriteTodosTool);
+    }
+    if (this.isPlanEnabled()) {
+      registerCoreTool(ExitPlanModeTool, this);
     }
 
     // Register Subagents as Tools

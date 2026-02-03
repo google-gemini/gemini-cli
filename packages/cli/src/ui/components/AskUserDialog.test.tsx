@@ -11,6 +11,7 @@ import { waitFor } from '../../test-utils/async.js';
 import { AskUserDialog } from './AskUserDialog.js';
 import { QuestionType, type Question } from '@google/gemini-cli-core';
 import chalk from 'chalk';
+import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
 
 // Helper to write to stdin with proper act() wrapping
 const writeKey = (stdin: { write: (data: string) => void }, key: string) => {
@@ -43,7 +44,6 @@ describe('AskUserDialog', () => {
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
         width={120}
-        availableHeight={20}
       />,
       { width: 120 },
     );
@@ -109,7 +109,6 @@ describe('AskUserDialog', () => {
           onSubmit={onSubmit}
           onCancel={vi.fn()}
           width={120}
-          availableHeight={20}
         />,
         { width: 120 },
       );
@@ -130,7 +129,6 @@ describe('AskUserDialog', () => {
         onSubmit={onSubmit}
         onCancel={vi.fn()}
         width={120}
-        availableHeight={20}
       />,
       { width: 120 },
     );
@@ -160,33 +158,49 @@ describe('AskUserDialog', () => {
     });
   });
 
-  it('shows scroll arrows when options exceed available height', async () => {
-    const questions: Question[] = [
-      {
-        question: 'Choose an option',
-        header: 'Scroll Test',
-        options: Array.from({ length: 15 }, (_, i) => ({
-          label: `Option ${i + 1}`,
-          description: `Description ${i + 1}`,
-        })),
-        multiSelect: false,
-      },
-    ];
+  describe.each([
+    { useAlternateBuffer: true, expectedArrows: false },
+    { useAlternateBuffer: false, expectedArrows: true },
+  ])(
+    'Scroll Arrows (useAlternateBuffer: $useAlternateBuffer)',
+    ({ useAlternateBuffer, expectedArrows }) => {
+      it(`shows scroll arrows correctly when useAlternateBuffer is ${useAlternateBuffer}`, async () => {
+        const questions: Question[] = [
+          {
+            question: 'Choose an option',
+            header: 'Scroll Test',
+            options: Array.from({ length: 15 }, (_, i) => ({
+              label: `Option ${i + 1}`,
+              description: `Description ${i + 1}`,
+            })),
+            multiSelect: false,
+          },
+        ];
 
-    const { lastFrame } = renderWithProviders(
-      <AskUserDialog
-        questions={questions}
-        onSubmit={vi.fn()}
-        onCancel={vi.fn()}
-        width={80}
-        availableHeight={10} // Small height to force scrolling
-      />,
-    );
+        const { lastFrame } = renderWithProviders(
+          <AskUserDialog
+            questions={questions}
+            onSubmit={vi.fn()}
+            onCancel={vi.fn()}
+            width={80}
+            availableHeight={10} // Small height to force scrolling
+          />,
+          { useAlternateBuffer },
+        );
 
-    await waitFor(() => {
-      expect(lastFrame()).toMatchSnapshot();
-    });
-  });
+        await waitFor(() => {
+          if (expectedArrows) {
+            expect(lastFrame()).toContain('▲');
+            expect(lastFrame()).toContain('▼');
+          } else {
+            expect(lastFrame()).not.toContain('▲');
+            expect(lastFrame()).not.toContain('▼');
+          }
+          expect(lastFrame()).toMatchSnapshot();
+        });
+      });
+    },
+  );
 
   it('navigates to custom option when typing unbound characters (Type-to-Jump)', async () => {
     const { stdin, lastFrame } = renderWithProviders(
@@ -195,7 +209,6 @@ describe('AskUserDialog', () => {
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
         width={120}
-        availableHeight={20}
       />,
       { width: 120 },
     );
@@ -247,7 +260,6 @@ describe('AskUserDialog', () => {
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
         width={120}
-        availableHeight={20}
       />,
       { width: 120 },
     );
@@ -262,7 +274,6 @@ describe('AskUserDialog', () => {
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
         width={120}
-        availableHeight={20}
       />,
       { width: 120 },
     );
@@ -277,7 +288,6 @@ describe('AskUserDialog', () => {
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
         width={120}
-        availableHeight={20}
       />,
       { width: 120 },
     );
@@ -309,7 +319,6 @@ describe('AskUserDialog', () => {
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
         width={120}
-        availableHeight={20}
       />,
       { width: 120 },
     );
@@ -352,7 +361,6 @@ describe('AskUserDialog', () => {
         onSubmit={onSubmit}
         onCancel={vi.fn()}
         width={120}
-        availableHeight={20}
       />,
       { width: 120 },
     );
@@ -421,7 +429,6 @@ describe('AskUserDialog', () => {
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
         width={120}
-        availableHeight={20}
       />,
       { width: 120 },
     );
@@ -451,7 +458,6 @@ describe('AskUserDialog', () => {
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
         width={120}
-        availableHeight={20}
       />,
       { width: 120 },
     );
@@ -497,7 +503,6 @@ describe('AskUserDialog', () => {
         onSubmit={vi.fn()}
         onCancel={vi.fn()}
         width={120}
-        availableHeight={20}
       />,
       { width: 120 },
     );
@@ -534,7 +539,6 @@ describe('AskUserDialog', () => {
         onSubmit={onSubmit}
         onCancel={vi.fn()}
         width={120}
-        availableHeight={20}
       />,
       { width: 120 },
     );
@@ -568,7 +572,6 @@ describe('AskUserDialog', () => {
           onSubmit={vi.fn()}
           onCancel={vi.fn()}
           width={120}
-          availableHeight={20}
         />,
         { width: 120 },
       );
@@ -591,7 +594,6 @@ describe('AskUserDialog', () => {
           onSubmit={vi.fn()}
           onCancel={vi.fn()}
           width={120}
-          availableHeight={20}
         />,
         { width: 120 },
       );
@@ -614,7 +616,6 @@ describe('AskUserDialog', () => {
           onSubmit={vi.fn()}
           onCancel={vi.fn()}
           width={120}
-          availableHeight={20}
         />,
         { width: 120 },
       );
@@ -650,7 +651,6 @@ describe('AskUserDialog', () => {
           onSubmit={vi.fn()}
           onCancel={vi.fn()}
           width={120}
-          availableHeight={20}
         />,
         { width: 120 },
       );
@@ -682,7 +682,6 @@ describe('AskUserDialog', () => {
           onSubmit={vi.fn()}
           onCancel={vi.fn()}
           width={120}
-          availableHeight={20}
         />,
         { width: 120 },
       );
@@ -730,7 +729,6 @@ describe('AskUserDialog', () => {
           onSubmit={onSubmit}
           onCancel={vi.fn()}
           width={120}
-          availableHeight={20}
         />,
         { width: 120 },
       );
@@ -781,7 +779,6 @@ describe('AskUserDialog', () => {
           onSubmit={onSubmit}
           onCancel={vi.fn()}
           width={120}
-          availableHeight={20}
         />,
         { width: 120 },
       );
@@ -808,7 +805,6 @@ describe('AskUserDialog', () => {
           onSubmit={vi.fn()}
           onCancel={onCancel}
           width={120}
-          availableHeight={20}
         />,
         { width: 120 },
       );
@@ -855,7 +851,6 @@ describe('AskUserDialog', () => {
           onSubmit={vi.fn()}
           onCancel={vi.fn()}
           width={120}
-          availableHeight={20}
         />,
         { width: 120 },
       );
@@ -915,7 +910,6 @@ describe('AskUserDialog', () => {
           onSubmit={onSubmit}
           onCancel={vi.fn()}
           width={120}
-          availableHeight={20}
         />,
         { width: 120 },
       );
@@ -1004,6 +998,141 @@ describe('AskUserDialog', () => {
         // Backticks should be removed
         expect(frame).toContain('npm start');
         expect(frame).not.toContain('`npm start`');
+      });
+    });
+  });
+
+  it('uses availableTerminalHeight from UIStateContext if availableHeight prop is missing', () => {
+    const questions: Question[] = [
+      {
+        question: 'Choose an option',
+        header: 'Context Test',
+        options: Array.from({ length: 10 }, (_, i) => ({
+          label: `Option ${i + 1}`,
+          description: `Description ${i + 1}`,
+        })),
+        multiSelect: false,
+      },
+    ];
+
+    const mockUIState = {
+      availableTerminalHeight: 5, // Small height to force scroll arrows
+    } as UIState;
+
+    const { lastFrame } = renderWithProviders(
+      <UIStateContext.Provider value={mockUIState}>
+        <AskUserDialog
+          questions={questions}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+          width={80}
+        />
+      </UIStateContext.Provider>,
+      { useAlternateBuffer: false },
+    );
+
+    // With height 5 and alternate buffer disabled, it should show scroll arrows (▲)
+    expect(lastFrame()).toContain('▲');
+    expect(lastFrame()).toContain('▼');
+  });
+
+  it('does NOT truncate the question when in alternate buffer mode even with small height', () => {
+    const longQuestion =
+      'This is a very long question ' + 'with many words '.repeat(10);
+    const questions: Question[] = [
+      {
+        question: longQuestion,
+        header: 'Alternate Buffer Test',
+        options: [{ label: 'Option 1', description: 'Desc 1' }],
+        multiSelect: false,
+      },
+    ];
+
+    const mockUIState = {
+      availableTerminalHeight: 5,
+    } as UIState;
+
+    const { lastFrame } = renderWithProviders(
+      <UIStateContext.Provider value={mockUIState}>
+        <AskUserDialog
+          questions={questions}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+          width={40} // Small width to force wrapping
+        />
+      </UIStateContext.Provider>,
+      { useAlternateBuffer: true },
+    );
+
+    // Should NOT contain the truncation message
+    expect(lastFrame()).not.toContain('hidden ...');
+    // Should contain the full long question (or at least its parts)
+    expect(lastFrame()).toContain('This is a very long question');
+  });
+
+  describe('Choice question placeholder', () => {
+    it('uses placeholder for "Other" option when provided', async () => {
+      const questions: Question[] = [
+        {
+          question: 'Select your preferred language:',
+          header: 'Language',
+          options: [
+            { label: 'TypeScript', description: '' },
+            { label: 'JavaScript', description: '' },
+          ],
+          placeholder: 'Type another language...',
+          multiSelect: false,
+        },
+      ];
+
+      const { stdin, lastFrame } = renderWithProviders(
+        <AskUserDialog
+          questions={questions}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+          width={80}
+        />,
+        { width: 80 },
+      );
+
+      // Navigate to the "Other" option
+      writeKey(stdin, '\x1b[B'); // Down
+      writeKey(stdin, '\x1b[B'); // Down to Other
+
+      await waitFor(() => {
+        expect(lastFrame()).toMatchSnapshot();
+      });
+    });
+
+    it('uses default placeholder when not provided', async () => {
+      const questions: Question[] = [
+        {
+          question: 'Select your preferred language:',
+          header: 'Language',
+          options: [
+            { label: 'TypeScript', description: '' },
+            { label: 'JavaScript', description: '' },
+          ],
+          multiSelect: false,
+        },
+      ];
+
+      const { stdin, lastFrame } = renderWithProviders(
+        <AskUserDialog
+          questions={questions}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+          width={80}
+        />,
+        { width: 80 },
+      );
+
+      // Navigate to the "Other" option
+      writeKey(stdin, '\x1b[B'); // Down
+      writeKey(stdin, '\x1b[B'); // Down to Other
+
+      await waitFor(() => {
+        expect(lastFrame()).toMatchSnapshot();
       });
     });
   });
