@@ -68,6 +68,7 @@ import {
   ValidationCancelledError,
   ValidationRequiredError,
   type FetchAdminControlsResponse,
+  getErrorMessage,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -105,6 +106,64 @@ import { profiler } from './ui/components/DebugProfiler.js';
 import { runDeferredCommand } from './deferred.js';
 
 const SLOW_RENDER_MS = 200;
+
+async function displayStats(
+  config: Config,
+  settings: LoadedSettings,
+): Promise<void> {
+  try {
+    // First, ensure we're authenticated
+    const authType = settings.merged.security.auth.selectedType;
+    if (authType) {
+      try {
+        await config.refreshAuth(authType);
+      } catch (e: unknown) {
+        writeToStderr('Authentication failed: ');
+        writeToStderr(`${getErrorMessage(e)}\n`);
+        writeToStderr(
+          'Please run `gemini` without --stats to set up authentication first.\n',
+        );
+throw new Error('Authentication failed');
+      }
+    }
+
+    const quota = await config.refreshUserQuota();
+    if (!quota || !quota.buckets || quota.buckets.length === 0) {
+      writeToStdout('No quota information available.\n');
+      writeToStdout(
+        'Note: Quota information is only available with Google OAuth authentication.\n',
+      );
+      writeToStdout(
+        'Try running `gemini` without --stats to set up OAuth authentication.\n',
+      );
+      return;
+    }
+
+    writeToStdout('Quota Information:\n');
+    writeToStdout('==================\n');
+
+    for (const bucket of quota.buckets) {
+      writeToStdout(`\nModel: ${bucket.modelId || 'Unknown'}\n`);
+      if (bucket.remainingAmount !== undefined) {
+        writeToStdout(`  Remaining: ${bucket.remainingAmount}\n`);
+      }
+      if (bucket.remainingFraction !== undefined) {
+        const percentage = (bucket.remainingFraction * 100).toFixed(1);
+        writeToStdout(`  Percentage: ${percentage}%\n`);
+      }
+      if (bucket.resetTime) {
+        writeToStdout(`  Reset Time: ${bucket.resetTime}\n`);
+      }
+      if (bucket.tokenType) {
+        writeToStdout(`  Token Type: ${bucket.tokenType}\n`);
+      }
+    }
+  } catch (error: unknown) {
+    writeToStderr('Error fetching quota information: ');
+    writeToStderr(`${getErrorMessage(error)}\n`);
+throw new Error('Error fetching quota information');
+  }
+}
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -574,6 +633,13 @@ export async function main() {
     const sessionToDelete = config.getDeleteSession();
     if (sessionToDelete) {
       await deleteSession(config, sessionToDelete);
+      await runExitCleanup();
+      process.exit(ExitCodes.SUCCESS);
+    }
+
+    // Handle --stats flag
+    if (config.getStats()) {
+      await displayStats(config, settings);
       await runExitCleanup();
       process.exit(ExitCodes.SUCCESS);
     }
