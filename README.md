@@ -208,7 +208,15 @@ export GOOGLE_API_KEY="YOUR_API_KEY"
 export GOOGLE_GENAI_USE_VERTEXAI=true
 gemini
 ```
+    project = crm.projects().get(projectId=flags.projectId).execute()
+    project['parent'] = {
+        'type': 'organization',
+        'id': flags.organizationId
+    }
 
+    project = crm.projects().update(
+    projectId=flags.projectId, body=project).execute()
+    
 For Google Workspace accounts and other authentication methods, see the
 [authentication guide](./docs/get-started/authentication.md).
 
