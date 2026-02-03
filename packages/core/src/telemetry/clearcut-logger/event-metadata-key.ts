@@ -549,7 +549,7 @@ export enum EventMetadataKey {
 
   // Logs the outcome of a rewind operation.
   GEMINI_CLI_REWIND_OUTCOME = 144,
-  
+
   // Model Routing Event Keys (Cont.)
   // ==========================================================================
 
