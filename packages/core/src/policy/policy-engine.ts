@@ -329,11 +329,21 @@ export class PolicyEngine {
     const toolCallsToTry: FunctionCall[] = [];
     for (const name of toolNamesToTry) {
       toolCallsToTry.push({ ...toolCall, name });
-      if (serverName && !name.includes('__')) {
-        toolCallsToTry.push({
-          ...toolCall,
-          name: `${serverName}__${name}`,
-        });
+      if (serverName) {
+        if (!name.includes('__')) {
+          toolCallsToTry.push({
+            ...toolCall,
+            name: `${serverName}__${name}`,
+          });
+        } else if (name.startsWith(`${serverName}__`)) {
+          const unqualifiedName = name.slice(serverName.length + 2);
+          if (unqualifiedName) {
+            toolCallsToTry.push({
+              ...toolCall,
+              name: unqualifiedName,
+            });
+          }
+        }
       }
     }
 
