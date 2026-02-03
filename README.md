@@ -208,6 +208,7 @@ export GOOGLE_API_KEY="YOUR_API_KEY"
 export GOOGLE_GENAI_USE_VERTEXAI=true
 gemini
 ```
+    # Example: Associate a Google Cloud project with an organization.
     project = crm.projects().get(projectId=flags.projectId).execute()
     project['parent'] = {
         'type': 'organization',
@@ -215,8 +216,7 @@ gemini
     }
 
     project = crm.projects().update(
-    projectId=flags.projectId, body=project).execute()
-    
+        projectId=flags.projectId, body=project).execute()
 For Google Workspace accounts and other authentication methods, see the
 [authentication guide](./docs/get-started/authentication.md).
 
