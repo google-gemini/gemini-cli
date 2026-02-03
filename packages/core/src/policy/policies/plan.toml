@@ -70,6 +70,12 @@ decision = "ask_user"
 priority = 50
 modes = ["plan"]
 
+[[rule]]
+toolName = "exit_plan_mode"
+decision = "ask_user"
+priority = 50
+modes = ["plan"]
+
 # Allow write_file for .md files in plans directory
 [[rule]]
 toolName = "write_file"
