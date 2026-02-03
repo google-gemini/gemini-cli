@@ -5,12 +5,12 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { render } from '../../../test-utils/render.js';
+import { renderWithProviders } from '../../../test-utils/render.js';
 import { ThinkingMessage } from './ThinkingMessage.js';
 
 describe('ThinkingMessage', () => {
   it('renders thinking subject', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <ThinkingMessage
         thought={{ subject: 'Planning', description: 'test' }}
         terminalWidth={80}
@@ -21,7 +21,7 @@ describe('ThinkingMessage', () => {
   });
 
   it('renders with thought subject', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <ThinkingMessage
         thought={{ subject: 'Processing', description: 'test' }}
         terminalWidth={80}
@@ -32,7 +32,7 @@ describe('ThinkingMessage', () => {
   });
 
   it('renders thought content', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <ThinkingMessage
         thought={{
           subject: 'Planning',
@@ -47,7 +47,7 @@ describe('ThinkingMessage', () => {
   });
 
   it('renders empty state gracefully', () => {
-    const { lastFrame } = render(
+    const { lastFrame } = renderWithProviders(
       <ThinkingMessage
         thought={{ subject: '', description: '' }}
         terminalWidth={80}

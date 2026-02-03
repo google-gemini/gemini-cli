@@ -79,6 +79,9 @@ import {
 } from './useToolScheduler.js';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { useSessionStats } from '../contexts/SessionContext.js';
+import { useKeypress } from './useKeypress.js';
+import type { LoadedSettings } from '../../config/settings.js';
 
 const MAX_THOUGHT_SUMMARY_LENGTH = 140;
 
@@ -115,9 +118,6 @@ function summarizeThought(thought: ThoughtSummary): ThoughtSummary {
     .trimEnd();
   return { subject: `${trimmed}...`, description: '' };
 }
-import { useSessionStats } from '../contexts/SessionContext.js';
-import { useKeypress } from './useKeypress.js';
-import type { LoadedSettings } from '../../config/settings.js';
 
 type ToolResponseWithParts = ToolCallResponseInfo & {
   llmContent?: PartListUnion;
