@@ -8,7 +8,10 @@ import { ExtensionManager } from '../../config/extension-manager.js';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 import { loadSettings } from '../../config/settings.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
-import { debugLogger } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  type ResolvedExtensionSetting,
+} from '@google/gemini-cli-core';
 
 export async function getExtensionManager() {
   const workspaceDir = process.cwd();
@@ -34,4 +37,16 @@ export async function getExtensionAndManager(name: string) {
   }
 
   return { extension, extensionManager };
+}
+
+export function getFormattedSettingValue(
+  setting: ResolvedExtensionSetting,
+): string {
+  if (!setting.value) {
+    return '[not set]';
+  }
+  if (setting.sensitive) {
+    return '***';
+  }
+  return setting.value;
 }
