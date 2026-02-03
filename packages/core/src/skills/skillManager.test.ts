@@ -78,8 +78,14 @@ description: project-desc
     };
 
     vi.spyOn(Storage, 'getUserSkillsDir').mockReturnValue(userDir);
+    vi.spyOn(Storage, 'getUserAgentSkillsDir').mockReturnValue(
+      '/non-existent-user-agent',
+    );
     const storage = new Storage('/dummy');
     vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue(projectDir);
+    vi.spyOn(storage, 'getProjectAgentSkillsDir').mockReturnValue(
+      '/non-existent-project-agent',
+    );
 
     const service = new SkillManager();
     // @ts-expect-error accessing private method for testing
@@ -135,8 +141,14 @@ description: project-desc
     };
 
     vi.spyOn(Storage, 'getUserSkillsDir').mockReturnValue(userDir);
+    vi.spyOn(Storage, 'getUserAgentSkillsDir').mockReturnValue(
+      '/non-existent-user-agent',
+    );
     const storage = new Storage('/dummy');
     vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue(projectDir);
+    vi.spyOn(storage, 'getProjectAgentSkillsDir').mockReturnValue(
+      '/non-existent-project-agent',
+    );
 
     const service = new SkillManager();
     // @ts-expect-error accessing private method for testing
@@ -196,7 +208,13 @@ body1`,
 
     const storage = new Storage('/dummy');
     vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue(testRootDir);
+    vi.spyOn(storage, 'getProjectAgentSkillsDir').mockReturnValue(
+      '/non-existent-project-agent',
+    );
     vi.spyOn(Storage, 'getUserSkillsDir').mockReturnValue('/non-existent');
+    vi.spyOn(Storage, 'getUserAgentSkillsDir').mockReturnValue(
+      '/non-existent-user-agent',
+    );
 
     const service = new SkillManager();
     // @ts-expect-error accessing private method for testing
@@ -224,7 +242,13 @@ description: project-desc
 
     const storage = new Storage('/dummy');
     vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue(projectDir);
+    vi.spyOn(storage, 'getProjectAgentSkillsDir').mockReturnValue(
+      '/non-existent-project-agent',
+    );
     vi.spyOn(Storage, 'getUserSkillsDir').mockReturnValue('/non-existent');
+    vi.spyOn(Storage, 'getUserAgentSkillsDir').mockReturnValue(
+      '/non-existent-user-agent',
+    );
 
     const service = new SkillManager();
     // @ts-expect-error accessing private method for testing
@@ -331,8 +355,14 @@ description: project-desc
       });
 
       vi.spyOn(Storage, 'getUserSkillsDir').mockReturnValue(userDir);
+      vi.spyOn(Storage, 'getUserAgentSkillsDir').mockReturnValue(
+        '/non-existent-user-agent',
+      );
       const storage = new Storage('/dummy');
       vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue(projectDir);
+      vi.spyOn(storage, 'getProjectAgentSkillsDir').mockReturnValue(
+        '/non-existent-project-agent',
+      );
 
       const service = new SkillManager();
       // @ts-expect-error accessing private method for testing
@@ -384,8 +414,14 @@ description: project-desc
       });
 
       vi.spyOn(Storage, 'getUserSkillsDir').mockReturnValue(userDir);
+      vi.spyOn(Storage, 'getUserAgentSkillsDir').mockReturnValue(
+        '/non-existent-user-agent',
+      );
       const storage = new Storage('/dummy');
       vi.spyOn(storage, 'getProjectSkillsDir').mockReturnValue('/non-existent');
+      vi.spyOn(storage, 'getProjectAgentSkillsDir').mockReturnValue(
+        '/non-existent-project-agent',
+      );
 
       const service = new SkillManager();
 
