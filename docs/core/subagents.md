@@ -116,7 +116,7 @@ description: Specialized in finding security vulnerabilities in code.
 kind: local
 tools:
   - read_file
-  - search_file_content
+  - grep_search
 model: gemini-2.5-pro
 temperature: 0.2
 max_turns: 10
