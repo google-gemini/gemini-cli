@@ -170,6 +170,20 @@
           "markdownDescription": "The color theme for the UI. See the CLI themes guide for available options.\n\n- Category: `UI`\n- Requires restart: `no`",
           "type": "string"
         },
+        "autoThemeSwitching": {
+          "title": "Auto Theme Switching",
+          "description": "Automatically switch between default light and dark themes based on terminal background color.",
+          "markdownDescription": "Automatically switch between default light and dark themes based on terminal background color.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "terminalBackgroundPollingInterval": {
+          "title": "Terminal Background Polling Interval",
+          "description": "Interval in seconds to poll the terminal background color.",
+          "markdownDescription": "Interval in seconds to poll the terminal background color.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `60`",
+          "default": 60,
+          "type": "number"
+        },
         "customThemes": {
           "title": "Custom Themes",
           "description": "Custom theme definitions.",
@@ -456,6 +470,13 @@
           "markdownDescription": "The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `0.5`",
           "default": 0.5,
           "type": "number"
+        },
+        "disableLoopDetection": {
+          "title": "Disable Loop Detection",
+          "description": "Disable automatic detection and prevention of infinite loops.",
+          "markdownDescription": "Disable automatic detection and prevention of infinite loops.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
         },
         "skipNextSpeakerCheck": {
           "title": "Skip Next Speaker Check",
@@ -1111,13 +1132,6 @@
             }
           },
           "additionalProperties": false
-        },
-        "autoAccept": {
-          "title": "Auto Accept",
-          "description": "Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).",
-          "markdownDescription": "Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
-          "type": "boolean"
         },
         "approvalMode": {
           "title": "Approval Mode",
