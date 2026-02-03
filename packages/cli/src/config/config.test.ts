@@ -14,6 +14,7 @@ import {
   WRITE_FILE_TOOL_NAME,
   EDIT_TOOL_NAME,
   WEB_FETCH_TOOL_NAME,
+  ASK_USER_TOOL_NAME,
   type ExtensionLoader,
   debugLogger,
   ApprovalMode,
@@ -596,9 +597,9 @@ describe('parseArguments', () => {
 
   it('should set isCommand to true for hooks command', async () => {
     process.argv = ['node', 'script.js', 'hooks', 'migrate'];
-    // Hooks command enabled via tools settings
+    // Hooks command enabled via hooksConfig settings
     const settings = createTestMergedSettings({
-      tools: { enableHooks: true },
+      hooksConfig: { enabled: true },
     });
     const argv = await parseArguments(settings);
     expect(argv.isCommand).toBe(true);
@@ -1014,7 +1015,9 @@ describe('mergeExcludeTools', () => {
     process.argv = ['node', 'script.js', '-p', 'test'];
     const argv = await parseArguments(createTestMergedSettings());
     const config = await loadCliConfig(settings, 'test-session', argv);
-    expect(config.getExcludeTools()).toEqual(defaultExcludes);
+    expect(config.getExcludeTools()).toEqual(
+      new Set([...defaultExcludes, ASK_USER_TOOL_NAME]),
+    );
   });
 
   it('should handle settings with excludeTools but no extensions', async () => {
@@ -1098,6 +1101,7 @@ describe('Approval mode tool exclusion logic', () => {
     expect(excludedTools).toContain(SHELL_TOOL_NAME);
     expect(excludedTools).toContain(EDIT_TOOL_NAME);
     expect(excludedTools).toContain(WRITE_FILE_TOOL_NAME);
+    expect(excludedTools).toContain(ASK_USER_TOOL_NAME);
   });
 
   it('should exclude all interactive tools in non-interactive mode with explicit default approval mode', async () => {
@@ -1118,6 +1122,7 @@ describe('Approval mode tool exclusion logic', () => {
     expect(excludedTools).toContain(SHELL_TOOL_NAME);
     expect(excludedTools).toContain(EDIT_TOOL_NAME);
     expect(excludedTools).toContain(WRITE_FILE_TOOL_NAME);
+    expect(excludedTools).toContain(ASK_USER_TOOL_NAME);
   });
 
   it('should exclude only shell tools in non-interactive mode with auto_edit approval mode', async () => {
@@ -1138,9 +1143,10 @@ describe('Approval mode tool exclusion logic', () => {
     expect(excludedTools).toContain(SHELL_TOOL_NAME);
     expect(excludedTools).not.toContain(EDIT_TOOL_NAME);
     expect(excludedTools).not.toContain(WRITE_FILE_TOOL_NAME);
+    expect(excludedTools).toContain(ASK_USER_TOOL_NAME);
   });
 
-  it('should exclude no interactive tools in non-interactive mode with yolo approval mode', async () => {
+  it('should exclude only ask_user in non-interactive mode with yolo approval mode', async () => {
     process.argv = [
       'node',
       'script.js',
@@ -1158,6 +1164,7 @@ describe('Approval mode tool exclusion logic', () => {
     expect(excludedTools).not.toContain(SHELL_TOOL_NAME);
     expect(excludedTools).not.toContain(EDIT_TOOL_NAME);
     expect(excludedTools).not.toContain(WRITE_FILE_TOOL_NAME);
+    expect(excludedTools).toContain(ASK_USER_TOOL_NAME);
   });
 
   it('should exclude all interactive tools in non-interactive mode with plan approval mode', async () => {
@@ -1182,9 +1189,10 @@ describe('Approval mode tool exclusion logic', () => {
     expect(excludedTools).toContain(SHELL_TOOL_NAME);
     expect(excludedTools).toContain(EDIT_TOOL_NAME);
     expect(excludedTools).toContain(WRITE_FILE_TOOL_NAME);
+    expect(excludedTools).toContain(ASK_USER_TOOL_NAME);
   });
 
-  it('should exclude no interactive tools in non-interactive mode with legacy yolo flag', async () => {
+  it('should exclude only ask_user in non-interactive mode with legacy yolo flag', async () => {
     process.argv = ['node', 'script.js', '--yolo', '-p', 'test'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings();
@@ -1195,6 +1203,7 @@ describe('Approval mode tool exclusion logic', () => {
     expect(excludedTools).not.toContain(SHELL_TOOL_NAME);
     expect(excludedTools).not.toContain(EDIT_TOOL_NAME);
     expect(excludedTools).not.toContain(WRITE_FILE_TOOL_NAME);
+    expect(excludedTools).toContain(ASK_USER_TOOL_NAME);
   });
 
   it('should not exclude interactive tools in interactive mode regardless of approval mode', async () => {
@@ -1219,6 +1228,7 @@ describe('Approval mode tool exclusion logic', () => {
       expect(excludedTools).not.toContain(SHELL_TOOL_NAME);
       expect(excludedTools).not.toContain(EDIT_TOOL_NAME);
       expect(excludedTools).not.toContain(WRITE_FILE_TOOL_NAME);
+      expect(excludedTools).not.toContain(ASK_USER_TOOL_NAME);
     }
   });
 
@@ -1255,7 +1265,7 @@ describe('Approval mode tool exclusion logic', () => {
     });
 
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'Cannot start in YOLO mode since it is disabled by your admin',
+      'YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
     );
   });
 
@@ -1777,6 +1787,7 @@ describe('loadCliConfig tool exclusions', () => {
     expect(config.getExcludeTools()).not.toContain('run_shell_command');
     expect(config.getExcludeTools()).not.toContain('replace');
     expect(config.getExcludeTools()).not.toContain('write_file');
+    expect(config.getExcludeTools()).not.toContain('ask_user');
   });
 
   it('should not exclude interactive tools in interactive mode with YOLO', async () => {
@@ -1791,6 +1802,7 @@ describe('loadCliConfig tool exclusions', () => {
     expect(config.getExcludeTools()).not.toContain('run_shell_command');
     expect(config.getExcludeTools()).not.toContain('replace');
     expect(config.getExcludeTools()).not.toContain('write_file');
+    expect(config.getExcludeTools()).not.toContain('ask_user');
   });
 
   it('should exclude interactive tools in non-interactive mode without YOLO', async () => {
@@ -1805,9 +1817,10 @@ describe('loadCliConfig tool exclusions', () => {
     expect(config.getExcludeTools()).toContain('run_shell_command');
     expect(config.getExcludeTools()).toContain('replace');
     expect(config.getExcludeTools()).toContain('write_file');
+    expect(config.getExcludeTools()).toContain('ask_user');
   });
 
-  it('should not exclude interactive tools in non-interactive mode with YOLO', async () => {
+  it('should exclude only ask_user in non-interactive mode with YOLO', async () => {
     process.stdin.isTTY = false;
     process.argv = ['node', 'script.js', '-p', 'test', '--yolo'];
     const argv = await parseArguments(createTestMergedSettings());
@@ -1819,6 +1832,7 @@ describe('loadCliConfig tool exclusions', () => {
     expect(config.getExcludeTools()).not.toContain('run_shell_command');
     expect(config.getExcludeTools()).not.toContain('replace');
     expect(config.getExcludeTools()).not.toContain('write_file');
+    expect(config.getExcludeTools()).toContain('ask_user');
   });
 
   it('should not exclude shell tool in non-interactive mode when --allowed-tools="ShellTool" is set', async () => {
@@ -2928,7 +2942,7 @@ describe('loadCliConfig disableYoloMode', () => {
       security: { disableYoloMode: true },
     });
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'Cannot start in YOLO mode since it is disabled by your admin',
+      'YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
     );
   });
 });
@@ -2960,7 +2974,7 @@ describe('loadCliConfig secureModeEnabled', () => {
     });
 
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'Cannot start in YOLO mode since it is disabled by your admin',
+      'YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
     );
   });
 
@@ -2974,7 +2988,7 @@ describe('loadCliConfig secureModeEnabled', () => {
     });
 
     await expect(loadCliConfig(settings, 'test-session', argv)).rejects.toThrow(
-      'Cannot start in YOLO mode since it is disabled by your admin',
+      'YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
     );
   });
 
