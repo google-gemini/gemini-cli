@@ -2208,5 +2208,57 @@ describe('CoreToolScheduler Sequential Execution', () => {
       expect(result.response.errorType).toBe(ToolErrorType.STOP_EXECUTION);
       expect(result.response.error.message).toBe(PLAN_MODE_DENIAL_MESSAGE);
     });
+
+    it('should return custom deny message when denied in Plan Mode with a specific rule message', async () => {
+      const mockTool = new MockTool({
+        name: 'dangerous_tool',
+        displayName: 'Dangerous Tool',
+        description: 'Does risky stuff',
+      });
+      const mockToolRegistry = {
+        getTool: () => mockTool,
+        getAllToolNames: () => ['dangerous_tool'],
+      } as unknown as ToolRegistry;
+
+      const onAllToolCallsComplete = vi.fn();
+      const customDenyMessage = 'Custom denial message for testing';
+
+      const mockConfig = createMockConfig({
+        getToolRegistry: () => mockToolRegistry,
+        getApprovalMode: () => ApprovalMode.PLAN,
+        getPolicyEngine: () =>
+          ({
+            check: async () => ({
+              decision: PolicyDecision.DENY,
+              rule: { denyMessage: customDenyMessage },
+            }),
+          }) as unknown as PolicyEngine,
+      });
+      mockConfig.getHookSystem = vi.fn().mockReturnValue(undefined);
+
+      const scheduler = new CoreToolScheduler({
+        config: mockConfig,
+        onAllToolCallsComplete,
+        getPreferredEditor: () => 'vscode',
+      });
+
+      const request = {
+        callId: 'call-1',
+        name: 'dangerous_tool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-1',
+      };
+
+      await scheduler.schedule(request, new AbortController().signal);
+
+      expect(onAllToolCallsComplete).toHaveBeenCalledTimes(1);
+      const reportedTools = onAllToolCallsComplete.mock.calls[0][0];
+      const result = reportedTools[0];
+
+      expect(result.status).toBe('error');
+      expect(result.response.errorType).toBe(ToolErrorType.STOP_EXECUTION);
+      expect(result.response.error.message).toBe(customDenyMessage);
+    });
   });
 });

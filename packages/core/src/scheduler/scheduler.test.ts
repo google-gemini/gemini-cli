@@ -745,6 +745,64 @@ describe('Scheduler (Orchestrator)', () => {
       );
     });
 
+    it('should return STOP_EXECUTION error type and informative message when denied in Plan Mode', async () => {
+      vi.mocked(checkPolicy).mockResolvedValue({
+        decision: PolicyDecision.DENY,
+        rule: { decision: PolicyDecision.DENY },
+      });
+
+      mockConfig.getApprovalMode.mockReturnValue(ApprovalMode.PLAN);
+
+      await scheduler.schedule(req1, signal);
+
+      expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
+        'call-1',
+        'error',
+        expect.objectContaining({
+          errorType: ToolErrorType.STOP_EXECUTION,
+          responseParts: expect.arrayContaining([
+            expect.objectContaining({
+              functionResponse: expect.objectContaining({
+                response: {
+                  error:
+                    'You are in Plan Mode - adjust your prompt to only use read and search tools.',
+                },
+              }),
+            }),
+          ]),
+        }),
+      );
+    });
+
+    it('should return STOP_EXECUTION and custom deny message when denied in Plan Mode with rule message', async () => {
+      const customMessage = 'Custom Plan Mode Deny';
+      vi.mocked(checkPolicy).mockResolvedValue({
+        decision: PolicyDecision.DENY,
+        rule: { decision: PolicyDecision.DENY, denyMessage: customMessage },
+      });
+
+      mockConfig.getApprovalMode.mockReturnValue(ApprovalMode.PLAN);
+
+      await scheduler.schedule(req1, signal);
+
+      expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
+        'call-1',
+        'error',
+        expect.objectContaining({
+          errorType: ToolErrorType.STOP_EXECUTION,
+          responseParts: expect.arrayContaining([
+            expect.objectContaining({
+              functionResponse: expect.objectContaining({
+                response: {
+                  error: customMessage,
+                },
+              }),
+            }),
+          ]),
+        }),
+      );
+    });
+
     it('should bypass confirmation and ProceedOnce if Policy returns ALLOW (YOLO/AllowedTools)', async () => {
       vi.mocked(checkPolicy).mockResolvedValue({
         decision: PolicyDecision.ALLOW,

@@ -16,6 +16,7 @@ import {
 import {
   checkPolicy,
   updatePolicy,
+  getPolicyDenialError,
   PLAN_MODE_DENIAL_MESSAGE,
 } from './policy.js';
 import type { Config } from '../config/config.js';
@@ -439,6 +440,66 @@ describe('policy.ts', () => {
           persist: true,
         }),
       );
+    });
+  });
+
+  describe('getPolicyDenialError', () => {
+    it('should return default plan mode message in Plan Mode', () => {
+      const mockConfig = {
+        getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.PLAN),
+      } as unknown as Config;
+
+      const { errorMessage, errorType } = getPolicyDenialError(mockConfig);
+
+      expect(errorMessage).toBe(PLAN_MODE_DENIAL_MESSAGE);
+      expect(errorType).toBe(ToolErrorType.STOP_EXECUTION);
+    });
+
+    it('should return custom deny message in Plan Mode if provided', () => {
+      const mockConfig = {
+        getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.PLAN),
+      } as unknown as Config;
+      const rule = {
+        decision: PolicyDecision.DENY,
+        denyMessage: 'Custom Plan Deny',
+      };
+
+      const { errorMessage, errorType } = getPolicyDenialError(
+        mockConfig,
+        rule,
+      );
+
+      expect(errorMessage).toBe('Custom Plan Deny');
+      expect(errorType).toBe(ToolErrorType.STOP_EXECUTION);
+    });
+
+    it('should return default deny message in non-Plan Mode', () => {
+      const mockConfig = {
+        getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
+      } as unknown as Config;
+
+      const { errorMessage, errorType } = getPolicyDenialError(mockConfig);
+
+      expect(errorMessage).toBe('Tool execution denied by policy.');
+      expect(errorType).toBe(ToolErrorType.POLICY_VIOLATION);
+    });
+
+    it('should return custom deny message in non-Plan Mode if provided', () => {
+      const mockConfig = {
+        getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
+      } as unknown as Config;
+      const rule = {
+        decision: PolicyDecision.DENY,
+        denyMessage: 'Custom Deny',
+      };
+
+      const { errorMessage, errorType } = getPolicyDenialError(
+        mockConfig,
+        rule,
+      );
+
+      expect(errorMessage).toBe('Tool execution denied by policy. Custom Deny');
+      expect(errorType).toBe(ToolErrorType.POLICY_VIOLATION);
     });
   });
 });

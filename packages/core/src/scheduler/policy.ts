@@ -37,8 +37,9 @@ export function getPolicyDenialError(
   rule?: PolicyRule,
 ): { errorMessage: string; errorType: ToolErrorType } {
   if (config.getApprovalMode() === ApprovalMode.PLAN) {
+    const errorMessage = rule?.denyMessage ?? PLAN_MODE_DENIAL_MESSAGE;
     return {
-      errorMessage: PLAN_MODE_DENIAL_MESSAGE,
+      errorMessage,
       errorType: ToolErrorType.STOP_EXECUTION,
     };
   }
