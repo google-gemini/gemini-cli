@@ -172,7 +172,7 @@ export class ClassifierStrategy implements RoutingStrategy {
       return {
         model: selectedModel,
         metadata: {
-          source: 'Classifier',
+          source: 'ClassifierStrategy',
           latencyMs,
           reasoning,
         },

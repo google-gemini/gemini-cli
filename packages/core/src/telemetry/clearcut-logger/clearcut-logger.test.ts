@@ -941,6 +941,38 @@ describe('ClearcutLogger', () => {
         'Something went wrong',
       ]);
     });
+
+    it('logs a successful routing event with numerical routing fields', () => {
+      const { logger } = setup();
+      const event = new ModelRoutingEvent(
+        'gemini-pro',
+        'NumericalClassifierStrategy (Strict)',
+        123,
+        '[Score: 90 / Threshold: 80] reasoning',
+        false,
+        undefined,
+        true,
+        '80',
+      );
+
+      logger?.logModelRoutingEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.MODEL_ROUTING);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ROUTING_REASONING,
+        '[Score: 90 / Threshold: 80] reasoning',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ROUTING_NUMERICAL_ENABLED,
+        'true',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_ROUTING_CLASSIFIER_THRESHOLD,
+        '80',
+      ]);
+    });
   });
 
   describe('logAgentStartEvent', () => {

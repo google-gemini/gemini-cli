@@ -112,7 +112,7 @@ describe('ClassifierStrategy', () => {
     expect(decision).toEqual({
       model: DEFAULT_GEMINI_FLASH_MODEL,
       metadata: {
-        source: 'Classifier',
+        source: 'ClassifierStrategy',
         latencyMs: expect.any(Number),
         reasoning: mockApiResponse.reasoning,
       },
@@ -139,7 +139,7 @@ describe('ClassifierStrategy', () => {
     expect(decision).toEqual({
       model: DEFAULT_GEMINI_MODEL,
       metadata: {
-        source: 'Classifier',
+        source: 'ClassifierStrategy',
         latencyMs: expect.any(Number),
         reasoning: mockApiResponse.reasoning,
       },

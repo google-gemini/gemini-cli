@@ -1234,6 +1234,28 @@ export class ClearcutLogger {
       });
     }
 
+    if (event.reasoning) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_REASONING,
+        value: event.reasoning,
+      });
+    }
+
+    if (event.enable_numerical_routing !== undefined) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_NUMERICAL_ENABLED,
+        value: event.enable_numerical_routing.toString(),
+      });
+    }
+
+    if (event.classifier_threshold) {
+      data.push({
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_ROUTING_CLASSIFIER_THRESHOLD,
+        value: event.classifier_threshold,
+      });
+    }
+
     this.enqueueLogEvent(this.createLogEvent(EventNames.MODEL_ROUTING, data));
     this.flushIfNeeded();
   }
