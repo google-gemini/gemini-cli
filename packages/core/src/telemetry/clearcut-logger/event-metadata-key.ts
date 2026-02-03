@@ -544,6 +544,12 @@ export enum EventMetadataKey {
   GEMINI_CLI_APPROVAL_MODE_DURATION_MS = 143,
 
   // ==========================================================================
+  // Rewind Event Keys
+  // ==========================================================================
+
+  // Logs the outcome of a rewind operation.
+  GEMINI_CLI_REWIND_OUTCOME = 144,
+
   // Model Routing Event Keys (Cont.)
   // ==========================================================================
 
