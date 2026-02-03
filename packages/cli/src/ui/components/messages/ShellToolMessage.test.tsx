@@ -54,6 +54,12 @@ vi.mock('../../utils/MarkdownDisplay.js', () => ({
   },
 }));
 
+vi.mock('./ToolResultDisplay.js', () => ({
+  ToolResultDisplay: vi.fn(({ maxLines }) => (
+    <Text>MockToolResultDisplay:maxLines={String(maxLines)}</Text>
+  )),
+}));
+
 describe('<ShellToolMessage />', () => {
   const baseProps: ShellToolMessageProps = {
     callId: 'tool-123',
@@ -173,6 +179,54 @@ describe('<ShellToolMessage />', () => {
       // Should call setEmbeddedShellFocused(false) because isThisShellFocused became false
       await waitFor(() => {
         expect(mockSetEmbeddedShellFocused).toHaveBeenCalledWith(false);
+      });
+    });
+  });
+
+  describe('maxLines logic (constrained vs unconstrained)', () => {
+    it('passes maxLines as undefined when availableTerminalHeight is undefined', async () => {
+      const { ToolResultDisplay: MockToolResultDisplay } = await import(
+        './ToolResultDisplay.js'
+      );
+
+      const props: ShellToolMessageProps = {
+        ...baseProps,
+        availableTerminalHeight: undefined, // Unconstrained
+      };
+
+      renderWithProviders(<ShellToolMessage {...props} />, { uiActions });
+
+      await waitFor(() => {
+        // Verify the props of the last call
+        const lastCallProps = vi
+          .mocked(MockToolResultDisplay)
+          .mock.calls.at(-1)?.[0];
+        expect(lastCallProps).toMatchObject({
+          maxLines: undefined,
+        });
+      });
+    });
+
+    it('passes ACTIVE_SHELL_MAX_LINES when availableTerminalHeight is defined', async () => {
+      const { ToolResultDisplay: MockToolResultDisplay } = await import(
+        './ToolResultDisplay.js'
+      );
+      const { ACTIVE_SHELL_MAX_LINES } = await import('../../constants.js');
+
+      const props: ShellToolMessageProps = {
+        ...baseProps,
+        availableTerminalHeight: 20, // Constrained
+      };
+
+      renderWithProviders(<ShellToolMessage {...props} />, { uiActions });
+
+      await waitFor(() => {
+        const lastCallProps = vi
+          .mocked(MockToolResultDisplay)
+          .mock.calls.at(-1)?.[0];
+        expect(lastCallProps).toMatchObject({
+          maxLines: ACTIVE_SHELL_MAX_LINES,
+        });
       });
     });
   });

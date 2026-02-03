@@ -157,7 +157,8 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
           terminalWidth={terminalWidth}
           renderOutputAsMarkdown={renderOutputAsMarkdown}
           maxLines={
-            isAlternateBuffer && isThisShellFocused
+            (isAlternateBuffer && isThisShellFocused) ||
+            availableTerminalHeight === undefined
               ? undefined
               : ACTIVE_SHELL_MAX_LINES
           }

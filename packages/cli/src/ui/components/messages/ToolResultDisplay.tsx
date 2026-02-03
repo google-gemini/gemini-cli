@@ -151,7 +151,9 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
         }
         width={childWidth}
         maxLines={isAlternateBuffer ? undefined : maxLines}
-        disableTruncation={isAlternateBuffer}
+        disableTruncation={
+          isAlternateBuffer || availableTerminalHeight === undefined
+        }
       />
     );
   }

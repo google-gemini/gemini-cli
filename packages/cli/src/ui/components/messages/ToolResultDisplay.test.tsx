@@ -287,4 +287,32 @@ describe('ToolResultDisplay', () => {
     expect(output).toContain('Line 2');
     expect(output).toContain('Line 3');
   });
+
+  it('does not truncate ANSI output when availableTerminalHeight is undefined', () => {
+    const ansiResult: AnsiOutput = Array.from({ length: 50 }, (_, i) => [
+      {
+        text: `Line ${i + 1}`,
+        fg: '',
+        bg: '',
+        bold: false,
+        italic: false,
+        underline: false,
+        dim: false,
+        inverse: false,
+      },
+    ]);
+    const { lastFrame } = render(
+      <ToolResultDisplay
+        resultDisplay={ansiResult}
+        terminalWidth={80}
+        maxLines={25}
+        availableTerminalHeight={undefined}
+      />,
+    );
+    const output = lastFrame();
+
+    // In unconstrained mode, it should NOT truncate to 25 lines
+    expect(output).toContain('Line 1');
+    expect(output).toContain('Line 50');
+  });
 });
