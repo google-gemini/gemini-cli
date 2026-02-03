@@ -195,7 +195,7 @@ describe('ExtensionManager Settings Scope', () => {
       (s) => s.envVar === 'TEST_SETTING',
     );
     expect(setting).toBeDefined();
-    expect(setting?.value).toBe('[not set]');
+    expect(setting?.value).toBeUndefined();
     expect(setting?.scope).toBeUndefined();
 
     // Verify output string does not contain scope
