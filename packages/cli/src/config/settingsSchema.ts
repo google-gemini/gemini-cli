@@ -1390,7 +1390,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description: 'Automatically configure Node.js memory limits',
-        showInDialog: false,
+        showInDialog: true,
       },
       dnsResolutionOrder: {
         type: 'string',

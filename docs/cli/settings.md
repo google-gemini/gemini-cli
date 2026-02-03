@@ -115,6 +115,12 @@ they appear in the UI.
 | Folder Trust                          | `security.folderTrust.enabled`                  | Setting to track whether Folder trust is enabled.                                                                                                                       | `true`  |
 | Enable Environment Variable Redaction | `security.environmentVariableRedaction.enabled` | Enable redaction of environment variables that may contain secrets.                                                                                                     | `false` |
 
+### Advanced
+
+| UI Label                          | Setting                        | Description                                   | Default |
+| --------------------------------- | ------------------------------ | --------------------------------------------- | ------- |
+| Auto Configure Max Old Space Size | `advanced.autoConfigureMemory` | Automatically configure Node.js memory limits | `false` |
+
 ### Experimental
 
 | UI Label         | Setting                      | Description                                                                         | Default |
