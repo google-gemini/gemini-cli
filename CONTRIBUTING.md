@@ -45,7 +45,7 @@ The process for contributing code is as follows:
     `🔒Maintainers only`, this means it is reserved for project maintainers. We
     will not accept pull requests related to these issues. In the near future,
     we will explicitly mark issues looking for contributions using the
-    `help  wanted` label. If you believe an issue is a good candidate for
+    `help-wanted` label. If you believe an issue is a good candidate for
     community contribution, please leave a comment on the issue. A maintainer
     will review it and apply the `help-wanted` label if appropriate. Only
     maintainers should attempt to add the `help-wanted` label to an issue.
