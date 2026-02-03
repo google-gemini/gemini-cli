@@ -61,11 +61,50 @@ vi.mock('../../contexts/OverflowContext.js', () => ({
   }),
 }));
 
+// Mock Scrollable
+vi.mock('../shared/Scrollable.js', () => ({
+  Scrollable: ({ children }: { children: React.ReactNode }) => (
+    <Box flexDirection="column">
+      <Text>Scrollable Container</Text>
+      {children}
+    </Box>
+  ),
+}));
+
 describe('ToolResultDisplay', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseUIState.mockReturnValue({ renderMarkdown: true });
     mockUseAlternateBuffer.mockReturnValue(false);
+  });
+
+  it('uses Scrollable for ANSI output in alternate buffer mode', () => {
+    mockUseAlternateBuffer.mockReturnValue(true);
+    const ansiResult: AnsiOutput = [
+      [
+        {
+          text: 'ansi content',
+          fg: 'red',
+          bg: 'black',
+          bold: false,
+          italic: false,
+          underline: false,
+          dim: false,
+          inverse: false,
+        },
+      ],
+    ];
+    const { lastFrame } = render(
+      <ToolResultDisplay
+        resultDisplay={ansiResult}
+        terminalWidth={80}
+        maxLines={10}
+      />,
+    );
+    const output = lastFrame();
+
+    expect(output).toContain('Scrollable Container');
+    expect(output).toContain('ansi content');
   });
 
   it('renders string result as markdown by default', () => {

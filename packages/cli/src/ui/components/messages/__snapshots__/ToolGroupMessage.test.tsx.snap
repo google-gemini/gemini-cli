@@ -47,6 +47,30 @@ exports[`<ToolGroupMessage /> > Border Color Logic > uses yellow border for shel
 │ ✓  run_shell_command A tool for testing                                      │
 │                                                                              │
 │ Test result                                                                  │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯"
 `;
 
@@ -145,6 +169,30 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders mixed tool calls incl
 │                                                                              │
 │ Test result                                                                  │
 │                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
 │ o  write_file Write to file                                                  │
 │                                                                              │
 │ Test result                                                                  │
@@ -172,6 +220,30 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders shell command with ye
 │ ✓  run_shell_command Execute shell command                                   │
 │                                                                              │
 │ Test result                                                                  │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯"
 `;
 
@@ -230,9 +302,13 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders with limited terminal
 │                                                                              │
 │ This is a long result that might need height constraints                     │
 │                                                                              │
+│                                                                              │
+│                                                                              │
 │ ✓  another-tool Another tool                                                 │
 │                                                                              │
 │ More output here                                                             │
+│                                                                              │
+│                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯"
 `;
 
@@ -250,9 +326,13 @@ exports[`<ToolGroupMessage /> > Height Calculation > calculates available height
 │                                                                              │
 │ Result 1                                                                     │
 │                                                                              │
+│                                                                              │
+│                                                                              │
 │ ✓  test-tool A tool for testing                                              │
 │                                                                              │
 │ Result 2                                                                     │
+│                                                                              │
+│                                                                              │
 │                                                                              │
 │ ✓  test-tool A tool for testing                                              │
 │                                                                              │

@@ -22,8 +22,9 @@ import {
   FocusHint,
 } from './ToolShared.js';
 import type { ToolMessageProps } from './ToolMessage.js';
-import type { Config } from '@google/gemini-cli-core';
 import { ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
+import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
+import type { Config } from '@google/gemini-cli-core';
 
 export interface ShellToolMessageProps extends ToolMessageProps {
   activeShellPtyId?: number | null;
@@ -62,6 +63,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
 
   borderDimColor,
 }) => {
+  const isAlternateBuffer = useAlternateBuffer();
   const isThisShellFocused = checkIsShellFocused(
     name,
     status,
@@ -154,7 +156,11 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
           availableTerminalHeight={availableTerminalHeight}
           terminalWidth={terminalWidth}
           renderOutputAsMarkdown={renderOutputAsMarkdown}
-          maxLines={isThisShellFocused ? undefined : ACTIVE_SHELL_MAX_LINES}
+          maxLines={
+            isAlternateBuffer && isThisShellFocused
+              ? undefined
+              : ACTIVE_SHELL_MAX_LINES
+          }
         />
         {isThisShellFocused && config && (
           <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>

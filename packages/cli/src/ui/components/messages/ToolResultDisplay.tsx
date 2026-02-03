@@ -14,6 +14,8 @@ import { theme } from '../../semantic-colors.js';
 import type { AnsiOutput } from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { tryParseJSON } from '../../../utils/jsonoutput.js';
+import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
+import { Scrollable } from '../shared/Scrollable.js';
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 6; // for tool name, status, padding, and 'ShowMoreLines' hint
@@ -44,6 +46,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   maxLines,
 }) => {
   const { renderMarkdown } = useUIState();
+  const isAlternateBuffer = useAlternateBuffer();
 
   let availableHeight = availableTerminalHeight
     ? Math.max(
@@ -60,13 +63,27 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   const childWidth = terminalWidth - combinedPaddingAndBorderWidth;
 
   const truncatedResultDisplay = React.useMemo(() => {
-    if (typeof resultDisplay === 'string') {
-      if (resultDisplay.length > MAXIMUM_RESULT_DISPLAY_CHARACTERS) {
-        return '...' + resultDisplay.slice(-MAXIMUM_RESULT_DISPLAY_CHARACTERS);
+    // Only truncate string output if not in alternate buffer mode to ensure
+    // we can scroll through the full output.
+    if (typeof resultDisplay === 'string' && !isAlternateBuffer) {
+      let text = resultDisplay;
+      if (text.length > MAXIMUM_RESULT_DISPLAY_CHARACTERS) {
+        text = '...' + text.slice(-MAXIMUM_RESULT_DISPLAY_CHARACTERS);
       }
+      if (maxLines) {
+        const hasTrailingNewline = text.endsWith('\n');
+        const contentText = hasTrailingNewline ? text.slice(0, -1) : text;
+        const lines = contentText.split('\n');
+        if (lines.length > maxLines) {
+          text =
+            lines.slice(-maxLines).join('\n') +
+            (hasTrailingNewline ? '\n' : '');
+        }
+      }
+      return text;
     }
     return resultDisplay;
-  }, [resultDisplay]);
+  }, [resultDisplay, isAlternateBuffer, maxLines]);
 
   if (!truncatedResultDisplay) return null;
 
@@ -129,10 +146,26 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
     content = (
       <AnsiOutputText
         data={truncatedResultDisplay as AnsiOutput}
-        availableTerminalHeight={availableHeight}
+        availableTerminalHeight={
+          isAlternateBuffer ? undefined : availableHeight
+        }
         width={childWidth}
-        maxLines={maxLines}
+        maxLines={isAlternateBuffer ? undefined : maxLines}
+        disableTruncation={isAlternateBuffer}
       />
+    );
+  }
+
+  if (isAlternateBuffer) {
+    return (
+      <Scrollable
+        width={childWidth}
+        height={maxLines ?? availableHeight}
+        hasFocus={true} // Allow scrolling via keyboard (Shift+Up/Down)
+        scrollToBottom={true}
+      >
+        {content}
+      </Scrollable>
     );
   }
 

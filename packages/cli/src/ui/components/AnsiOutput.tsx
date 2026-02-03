@@ -15,6 +15,7 @@ interface AnsiOutputProps {
   availableTerminalHeight?: number;
   width: number;
   maxLines?: number;
+  disableTruncation?: boolean;
 }
 
 export const AnsiOutputText: React.FC<AnsiOutputProps> = ({
@@ -22,6 +23,7 @@ export const AnsiOutputText: React.FC<AnsiOutputProps> = ({
   availableTerminalHeight,
   width,
   maxLines,
+  disableTruncation,
 }) => {
   const effectiveHeight =
     availableTerminalHeight && availableTerminalHeight > 0
@@ -32,7 +34,7 @@ export const AnsiOutputText: React.FC<AnsiOutputProps> = ({
     ? Math.min(effectiveHeight, maxLines)
     : effectiveHeight;
 
-  const lastLines = data.slice(-limit);
+  const lastLines = disableTruncation ? data : data.slice(-limit);
   return (
     <Box flexDirection="column" width={width} flexShrink={0}>
       {lastLines.map((line: AnsiLine, lineIndex: number) => (
