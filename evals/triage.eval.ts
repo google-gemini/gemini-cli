@@ -6,36 +6,37 @@
 
 import { describe, expect } from 'vitest';
 import { evalTest } from './test-helper.js';
-import fs from 'node:fs';
+import fs from 'node:fs/promises';
 import path from 'node:path';
+import yaml from 'js-yaml';
 
 // Read the workflow file to extract the prompt
 const workflowPath = path.join(
   process.cwd(),
   '.github/workflows/gemini-automated-issue-triage.yml',
 );
-const workflowContent = fs.readFileSync(workflowPath, 'utf8');
+const workflowContent = await fs.readFile(workflowPath, 'utf8');
 
-// Extract the prompt block
-// Looking for "prompt: |-" followed by the content, until the next step definition
-const promptMatch = workflowContent.match(
-  /prompt: \|-\n([\s\S]+?)(?=\n\s+-\s+name:)/,
+// Use a YAML parser for robustness
+const workflowData = yaml.load(workflowContent) as {
+  jobs?: {
+    'triage-issue'?: {
+      steps?: { id?: string; with?: { prompt?: string } }[];
+    };
+  };
+};
+
+const triageStep = workflowData.jobs?.['triage-issue']?.steps?.find(
+  (step) => step.id === 'gemini_issue_analysis',
 );
 
-if (!promptMatch) {
+const TRIAGE_PROMPT_TEMPLATE = triageStep?.with?.prompt;
+
+if (!TRIAGE_PROMPT_TEMPLATE) {
   throw new Error(
-    'Could not extract prompt from workflow file. Check regex or file content.',
+    'Could not extract prompt from workflow file. Check for `jobs.triage-issue.steps[id=gemini_issue_analysis].with.prompt` in the YAML file.',
   );
 }
-
-const rawPrompt = promptMatch[1];
-// Remove the YAML indentation (12 spaces based on the file structure)
-// We detect the indentation from the first line
-const lines = rawPrompt.split('\n');
-const firstLineIndent = lines[0].match(/^\s*/)?.[0].length || 0;
-const TRIAGE_PROMPT_TEMPLATE = lines
-  .map((line) => line.slice(firstLineIndent))
-  .join('\n');
 
 const createPrompt = (title: string, body: string) => {
   // The placeholders in the YAML are ${{ env.ISSUE_TITLE }} etc.
@@ -48,6 +49,49 @@ const createPrompt = (title: string, body: string) => {
     );
 };
 
+const escapeHtml = (str: string) => {
+  return str.replace(/[<>&'"]/g, (c) => {
+    switch (c) {
+      case '<':
+        return '&lt;';
+      case '>':
+        return '&gt;';
+      case '&':
+        return '&amp;';
+      case "'":
+        return '&apos;';
+      case '"':
+        return '&quot;';
+    }
+    return ''; // Should not happen
+  });
+};
+
+const assertHasLabel = (expectedLabel: string) => {
+  return async (_rig: unknown, result: string) => {
+    const jsonMatch = result.match(/{[\s\S]*}/);
+    if (!jsonMatch || !jsonMatch[0]) {
+      throw new Error(
+        `Could not find a JSON object in the result: "${escapeHtml(result)}"`,
+      );
+    }
+
+    let data: { labels_to_set?: string[] };
+    try {
+      data = JSON.parse(jsonMatch[0]);
+    } catch (e) {
+      const err = e as Error;
+      throw new Error(
+        `Failed to parse JSON. Error: ${err.message}. Result: "${escapeHtml(result)}"`,
+      );
+    }
+
+    expect(data).toHaveProperty('labels_to_set');
+    expect(Array.isArray(data.labels_to_set)).toBe(true);
+    expect(data.labels_to_set).toContain(expectedLabel);
+  };
+};
+
 describe('triage_agent', () => {
   evalTest('USUALLY_PASSES', {
     name: 'should identify area/core for windows installation issues',
@@ -55,10 +99,7 @@ describe('triage_agent', () => {
       'CLI failed to install on Windows',
       'I tried running npm install but it failed with an error on Windows 11.',
     ),
-    assert: async (rig, result) => {
-      const json = JSON.parse(result.match(/{[\s\S]*}/)?.[0] || '{}');
-      expect(json.labels_to_set).toContain('area/core');
-    },
+    assert: assertHasLabel('area/core'),
   });
 
   evalTest('USUALLY_PASSES', {
@@ -67,10 +108,7 @@ describe('triage_agent', () => {
       'Tests are failing in the CI/CD pipeline',
       'The github action is failing with a 500 error.',
     ),
-    assert: async (rig, result) => {
-      const json = JSON.parse(result.match(/{[\s\S]*}/)?.[0] || '{}');
-      expect(json.labels_to_set).toContain('area/platform');
-    },
+    assert: assertHasLabel('area/platform'),
   });
 
   evalTest('USUALLY_PASSES', {
@@ -79,10 +117,7 @@ describe('triage_agent', () => {
       'Resource Exhausted 429',
       'I am getting a 429 error when running the CLI.',
     ),
-    assert: async (rig, result) => {
-      const json = JSON.parse(result.match(/{[\s\S]*}/)?.[0] || '{}');
-      expect(json.labels_to_set).toContain('area/platform');
-    },
+    assert: assertHasLabel('area/platform'),
   });
 
   evalTest('USUALLY_PASSES', {
@@ -91,10 +126,7 @@ describe('triage_agent', () => {
       'Local build failing',
       'I cannot build the project locally. npm run build fails.',
     ),
-    assert: async (rig, result) => {
-      const json = JSON.parse(result.match(/{[\s\S]*}/)?.[0] || '{}');
-      expect(json.labels_to_set).toContain('area/core');
-    },
+    assert: assertHasLabel('area/core'),
   });
 
   evalTest('USUALLY_PASSES', {
@@ -103,10 +135,7 @@ describe('triage_agent', () => {
       'Sandbox connection failed',
       'I cannot connect to the docker sandbox environment.',
     ),
-    assert: async (rig, result) => {
-      const json = JSON.parse(result.match(/{[\s\S]*}/)?.[0] || '{}');
-      expect(json.labels_to_set).toContain('area/platform');
-    },
+    assert: assertHasLabel('area/platform'),
   });
 
   evalTest('USUALLY_PASSES', {
@@ -115,10 +144,7 @@ describe('triage_agent', () => {
       'Local tests failing',
       'I am running npm test locally and it fails.',
     ),
-    assert: async (rig, result) => {
-      const json = JSON.parse(result.match(/{[\s\S]*}/)?.[0] || '{}');
-      expect(json.labels_to_set).toContain('area/core');
-    },
+    assert: assertHasLabel('area/core'),
   });
 
   evalTest('USUALLY_PASSES', {
@@ -127,10 +153,7 @@ describe('triage_agent', () => {
       'Bug with web search?',
       'I am trying to use web search but I do not know the syntax. Is it @web or /web?',
     ),
-    assert: async (rig, result) => {
-      const json = JSON.parse(result.match(/{[\s\S]*}/)?.[0] || '{}');
-      expect(json.labels_to_set).toContain('area/agent');
-    },
+    assert: assertHasLabel('area/agent'),
   });
 
   evalTest('USUALLY_PASSES', {
@@ -139,19 +162,13 @@ describe('triage_agent', () => {
       'Please add a python extension',
       'I want to write python scripts as an extension.',
     ),
-    assert: async (rig, result) => {
-      const json = JSON.parse(result.match(/{[\s\S]*}/)?.[0] || '{}');
-      expect(json.labels_to_set).toContain('area/extensions');
-    },
+    assert: assertHasLabel('area/extensions'),
   });
 
   evalTest('USUALLY_PASSES', {
     name: 'should identify area/unknown for off-topic spam',
     prompt: createPrompt('Buy cheap rolex', 'Click here for discount.'),
-    assert: async (rig, result) => {
-      const json = JSON.parse(result.match(/{[\s\S]*}/)?.[0] || '{}');
-      expect(json.labels_to_set).toContain('area/unknown');
-    },
+    assert: assertHasLabel('area/unknown'),
   });
 
   evalTest('USUALLY_PASSES', {
@@ -160,10 +177,7 @@ describe('triage_agent', () => {
       'Why does it segfault?',
       'Why does the CLI segfault immediately when I run it on Ubuntu?',
     ),
-    assert: async (rig, result) => {
-      const json = JSON.parse(result.match(/{[\s\S]*}/)?.[0] || '{}');
-      expect(json.labels_to_set).toContain('area/core');
-    },
+    assert: assertHasLabel('area/core'),
   });
 
   evalTest('USUALLY_PASSES', {
@@ -172,10 +186,7 @@ describe('triage_agent', () => {
       'Can we have a diff tool?',
       'Is it possible to add a built-in tool to show diffs before editing?',
     ),
-    assert: async (rig, result) => {
-      const json = JSON.parse(result.match(/{[\s\S]*}/)?.[0] || '{}');
-      expect(json.labels_to_set).toContain('area/agent');
-    },
+    assert: assertHasLabel('area/agent'),
   });
 
   evalTest('USUALLY_PASSES', {
@@ -184,10 +195,7 @@ describe('triage_agent', () => {
       'License key issue',
       'Where do I enter my enterprise license key? I cannot find the setting.',
     ),
-    assert: async (rig, result) => {
-      const json = JSON.parse(result.match(/{[\s\S]*}/)?.[0] || '{}');
-      expect(json.labels_to_set).toContain('area/enterprise');
-    },
+    assert: assertHasLabel('area/enterprise'),
   });
 
   evalTest('USUALLY_PASSES', {
@@ -196,9 +204,6 @@ describe('triage_agent', () => {
       'It does not work',
       'I tried to use it and it failed.',
     ),
-    assert: async (rig, result) => {
-      const json = JSON.parse(result.match(/{[\s\S]*}/)?.[0] || '{}');
-      expect(json.labels_to_set).toContain('area/unknown');
-    },
+    assert: assertHasLabel('area/unknown'),
   });
 });
