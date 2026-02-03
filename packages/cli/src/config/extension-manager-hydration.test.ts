@@ -227,7 +227,6 @@ System using model: \${MODEL_NAME}
       settings: createTestMergedSettings({
         telemetry: { enabled: false },
         experimental: { extensionConfig: true },
-        tools: { enableHooks: true },
         hooksConfig: { enabled: true },
       }),
       requestConsent: vi.fn().mockResolvedValue(true),

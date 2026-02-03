@@ -50,11 +50,13 @@ export * from './code_assist/server.js';
 export * from './code_assist/setup.js';
 export * from './code_assist/types.js';
 export * from './code_assist/telemetry.js';
+export * from './code_assist/admin/admin_controls.js';
 export * from './core/apiKeyCredentialStorage.js';
 
 // Export utilities
 export { homedir, tmpdir } from './utils/paths.js';
 export * from './utils/paths.js';
+export * from './utils/checks.js';
 export * from './utils/schemaValidator.js';
 export * from './utils/errors.js';
 export * from './utils/exitCodes.js';

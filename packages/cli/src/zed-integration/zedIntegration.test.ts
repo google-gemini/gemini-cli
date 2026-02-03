@@ -129,7 +129,7 @@ describe('GeminiAgent', () => {
 
     expect(response.protocolVersion).toBe(acp.PROTOCOL_VERSION);
     expect(response.authMethods).toHaveLength(3);
-    expect(response.agentCapabilities?.loadSession).toBe(false);
+    expect(response.agentCapabilities?.loadSession).toBe(true);
   });
 
   it('should authenticate correctly', async () => {
@@ -273,6 +273,7 @@ describe('Session', () => {
     mockChat = {
       sendMessageStream: vi.fn(),
       addHistory: vi.fn(),
+      recordCompletedToolCalls: vi.fn(),
     } as unknown as Mocked<GeminiChat>;
     mockTool = {
       kind: 'native',
@@ -293,6 +294,7 @@ describe('Session', () => {
     } as unknown as Mocked<MessageBus>;
     mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getActiveModel: vi.fn().mockReturnValue('gemini-pro'),
       getPreviewFeatures: vi.fn().mockReturnValue({}),
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
       getFileService: vi.fn().mockReturnValue({

@@ -170,6 +170,15 @@ their corresponding top-level category object in your `settings.json` file.
     available options.
   - **Default:** `undefined`
 
+- **`ui.autoThemeSwitching`** (boolean):
+  - **Description:** Automatically switch between default light and dark themes
+    based on terminal background color.
+  - **Default:** `true`
+
+- **`ui.terminalBackgroundPollingInterval`** (number):
+  - **Description:** Interval in seconds to poll the terminal background color.
+  - **Default:** `60`
+
 - **`ui.customThemes`** (object):
   - **Description:** Custom theme definitions.
   - **Default:** `{}`
@@ -324,6 +333,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** The fraction of context usage at which to trigger context
     compression (e.g. 0.2, 0.3).
   - **Default:** `0.5`
+  - **Requires restart:** Yes
+
+- **`model.disableLoopDetection`** (boolean):
+  - **Description:** Disable automatic detection and prevention of infinite
+    loops.
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`model.skipNextSpeakerCheck`** (boolean):
@@ -661,11 +676,6 @@ their corresponding top-level category object in your `settings.json` file.
     performance.
   - **Default:** `true`
 
-- **`tools.autoAccept`** (boolean):
-  - **Description:** Automatically accept and execute tool calls that are
-    considered safe (e.g., read-only operations).
-  - **Default:** `false`
-
 - **`tools.approvalMode`** (enum):
   - **Description:** The default approval mode for tool execution. 'default'
     prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is
@@ -733,12 +743,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
-- **`tools.enableHooks`** (boolean):
-  - **Description:** Enables the hooks system experiment. When disabled, the
-    hooks system is completely deactivated regardless of other settings.
-  - **Default:** `true`
-  - **Requires restart:** Yes
-
 #### `mcp`
 
 - **`mcp.serverCommand`** (string):
@@ -777,6 +781,13 @@ their corresponding top-level category object in your `settings.json` file.
 - **`security.blockGitExtensions`** (boolean):
   - **Description:** Blocks installing and loading extensions from Git.
   - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`security.allowedExtensions`** (array):
+  - **Description:** List of Regex patterns for allowed extensions. If nonempty,
+    only extensions that match the patterns in this list are allowed. Overrides
+    the blockGitExtensions setting.
+  - **Default:** `[]`
   - **Requires restart:** Yes
 
 - **`security.folderTrust.enabled`** (boolean):
