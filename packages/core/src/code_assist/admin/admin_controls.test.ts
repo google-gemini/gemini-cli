@@ -517,7 +517,17 @@ describe('Admin Controls', () => {
       (mockServer.fetchAdminControls as Mock).mockResolvedValue(serverResponse);
 
       const result = await fetchAdminControlsOnce(mockServer, true);
-      expect(result).toEqual({ strictModeDisabled: true });
+      expect(result).toEqual({
+        strictModeDisabled: true,
+        cliFeatureSetting: {
+          extensionsSetting: { extensionsEnabled: false },
+          unmanagedCapabilitiesEnabled: false,
+        },
+        mcpSetting: {
+          mcpEnabled: false,
+          mcpConfig: {},
+        },
+      });
       expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
     });
 
