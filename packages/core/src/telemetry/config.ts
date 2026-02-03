@@ -210,7 +210,11 @@ export function parseOtlpHeaders(
             continue;
           }
           const stringVal = String(val);
-          if (isValidHeaderName(key) && isValidHeaderValue(stringVal)) {
+          if (
+            stringVal &&
+            isValidHeaderName(key) &&
+            isValidHeaderValue(stringVal)
+          ) {
             result[key] = stringVal;
             if (Object.keys(result).length > MAX_HEADER_COUNT) {
               return undefined;
