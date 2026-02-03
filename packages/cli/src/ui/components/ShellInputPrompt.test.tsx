@@ -68,7 +68,7 @@ describe('ShellInputPrompt', () => {
   it.each([
     ['up', -1],
     ['down', 1],
-  ])('handles scroll %s (Ctrl+Shift+%s)', (key, direction) => {
+  ])('handles scroll %s (Command.SHELL_SCROLL_%s)', (key, direction) => {
     render(<ShellInputPrompt activeShellPtyId={1} focus={true} />);
 
     const handler = mockUseKeypress.mock.calls[0][0];
@@ -82,7 +82,7 @@ describe('ShellInputPrompt', () => {
     ['pageup', -25],
     ['pagedown', 25],
   ])(
-    'handles page scroll %s (Ctrl+Shift+%s) with default size',
+    'handles page scroll %s (Command.SHELL_SCROLL_%s) with default size',
     (key, expectedScroll) => {
       render(<ShellInputPrompt activeShellPtyId={1} focus={true} />);
 
@@ -160,7 +160,7 @@ describe('ShellInputPrompt', () => {
     expect(mockWriteToPty).not.toHaveBeenCalled();
   });
 
-  it('ignores Shift+Tab to allow focus navigation', () => {
+  it('ignores Command.SHELL_LEAVE_FOCUS (Shift+Tab) to allow focus navigation', () => {
     render(<ShellInputPrompt activeShellPtyId={1} focus={true} />);
 
     const handler = mockUseKeypress.mock.calls[0][0];

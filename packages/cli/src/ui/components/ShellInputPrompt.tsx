@@ -43,27 +43,25 @@ export const ShellInputPrompt: React.FC<ShellInputPromptProps> = ({
       }
 
       // Allow Shift+Tab to bubble up for focus navigation
-      if (key.name === 'tab' && key.shift) {
+      if (keyMatchers[Command.SHELL_LEAVE_FOCUS](key)) {
         return false;
       }
 
-      if (key.ctrl && key.shift) {
-        if (key.name === 'up') {
-          ShellExecutionService.scrollPty(activeShellPtyId, -1);
-          return true;
-        }
-        if (key.name === 'down') {
-          ShellExecutionService.scrollPty(activeShellPtyId, 1);
-          return true;
-        }
-        if (key.name === 'pageup') {
-          ShellExecutionService.scrollPty(activeShellPtyId, -scrollPageSize);
-          return true;
-        }
-        if (key.name === 'pagedown') {
-          ShellExecutionService.scrollPty(activeShellPtyId, scrollPageSize);
-          return true;
-        }
+      if (keyMatchers[Command.SHELL_SCROLL_UP](key)) {
+        ShellExecutionService.scrollPty(activeShellPtyId, -1);
+        return true;
+      }
+      if (keyMatchers[Command.SHELL_SCROLL_DOWN](key)) {
+        ShellExecutionService.scrollPty(activeShellPtyId, 1);
+        return true;
+      }
+      if (keyMatchers[Command.SHELL_SCROLL_PAGE_UP](key)) {
+        ShellExecutionService.scrollPty(activeShellPtyId, -scrollPageSize);
+        return true;
+      }
+      if (keyMatchers[Command.SHELL_SCROLL_PAGE_DOWN](key)) {
+        ShellExecutionService.scrollPty(activeShellPtyId, scrollPageSize);
+        return true;
       }
 
       const ansiSequence = keyToAnsi(key);
