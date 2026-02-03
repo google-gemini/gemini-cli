@@ -86,7 +86,10 @@ describe('save_memory', () => {
     },
     prompt: `I'm going to get a coffee.`,
     assert: async (rig, result) => {
-      const wasToolCalled = await rig.waitForToolCall('save_memory', 500);
+      await rig.waitForTelemetryReady();
+      const wasToolCalled = rig
+        .readToolLogs()
+        .some((log) => log.toolRequest.name === 'save_memory');
       expect(
         wasToolCalled,
         'save_memory should not be called for temporary information',
