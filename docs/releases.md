@@ -29,7 +29,7 @@ or if we have to deviate from it. Our weekly releases will be minor version
 increments and any bug or hotfixes between releases will go out as patch
 versions on the most recent release.
 
-Each Tuesday ~2000 UTC new Stable and Preview releases will be cut. The
+Each Tuesday ~20:00 UTC new Stable and Preview releases will be cut. The
 promotion flow is:
 
 - Code is committed to main and pushed each night to nightly
