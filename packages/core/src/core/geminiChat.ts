@@ -262,6 +262,11 @@ export class GeminiChat {
     this.systemInstruction = sysInstr;
   }
 
+  /** A promise that resolves when the current message processing is complete. */
+  get processing(): Promise<void> {
+    return this.sendPromise;
+  }
+
   /**
    * Sends a message to the model and returns the response in chunks.
    *
@@ -512,9 +517,21 @@ export class GeminiChat {
 
       lastModelToUse = modelToUse;
 
-      // Create a timeout signal to prevent long hanging requests.
-      const timeoutSignal = AbortSignal.timeout(TIMEOUT_MS);
-      const combinedSignal = AbortSignal.any([abortSignal, timeoutSignal]);
+      const timeoutController = new AbortController();
+      const timeoutIdRef: { id?: NodeJS.Timeout } = {};
+
+      const resetInactivityTimeout = () => {
+        if (timeoutIdRef.id) clearTimeout(timeoutIdRef.id);
+        timeoutIdRef.id = setTimeout(() => {
+          timeoutController.abort();
+        }, TIMEOUT_MS);
+      };
+
+      resetInactivityTimeout();
+      const combinedSignal = AbortSignal.any([
+        abortSignal,
+        timeoutController.signal,
+      ]);
 
       const config: GenerateContentConfig = {
         ...currentGenerateContentConfig,
@@ -604,12 +621,15 @@ export class GeminiChat {
           );
         return {
           stream,
-          timeoutSignal,
+          timeoutController,
+          timeoutIdRef,
+          resetInactivityTimeout,
         };
       } catch (error) {
-        if (timeoutSignal.aborted) {
+        if (timeoutIdRef.id) clearTimeout(timeoutIdRef.id);
+        if (timeoutController.signal.aborted) {
           const timeoutError = new Error(
-            `Request timed out after ${TIMEOUT_MS}ms`,
+            `Request timed out after ${TIMEOUT_MS}ms of inactivity`,
           );
           (timeoutError as unknown as { code: string }).code = 'ETIMEDOUT';
           throw timeoutError;
@@ -638,27 +658,29 @@ export class GeminiChat {
       );
     };
 
-    const { stream: streamResponse, timeoutSignal } = await retryWithBackoff(
-      apiCall,
-      {
-        onPersistent429: onPersistent429Callback,
-        onValidationRequired: onValidationRequiredCallback,
-        authType: this.config.getContentGeneratorConfig()?.authType,
-        retryFetchErrors: this.config.getRetryFetchErrors(),
-        signal: abortSignal,
-        maxAttempts: availabilityMaxAttempts,
-        getAvailabilityContext,
-        onRetry: (attempt, error, delayMs) => {
-          coreEvents.emitRetryAttempt({
-            attempt,
-            maxAttempts: availabilityMaxAttempts ?? 10,
-            delayMs,
-            error: error instanceof Error ? error.message : String(error),
-            model: lastModelToUse,
-          });
-        },
+    const {
+      stream: streamResponse,
+      timeoutController,
+      timeoutIdRef,
+      resetInactivityTimeout,
+    } = await retryWithBackoff(apiCall, {
+      onPersistent429: onPersistent429Callback,
+      onValidationRequired: onValidationRequiredCallback,
+      authType: this.config.getContentGeneratorConfig()?.authType,
+      retryFetchErrors: this.config.getRetryFetchErrors(),
+      signal: abortSignal,
+      maxAttempts: availabilityMaxAttempts,
+      getAvailabilityContext,
+      onRetry: (attempt, error, delayMs) => {
+        coreEvents.emitRetryAttempt({
+          attempt,
+          maxAttempts: availabilityMaxAttempts ?? 10,
+          delayMs,
+          error: error instanceof Error ? error.message : String(error),
+          model: lastModelToUse,
+        });
       },
-    );
+    });
 
     // Store the original request for AfterModel hooks
     const originalRequest: GenerateContentParameters = {
@@ -671,7 +693,9 @@ export class GeminiChat {
       lastModelToUse,
       streamResponse,
       originalRequest,
-      timeoutSignal,
+      timeoutController,
+      timeoutIdRef,
+      resetInactivityTimeout,
     );
   }
 
@@ -830,7 +854,9 @@ export class GeminiChat {
     model: string,
     streamResponse: AsyncGenerator<GenerateContentResponse>,
     originalRequest: GenerateContentParameters,
-    timeoutSignal: AbortSignal,
+    timeoutController: AbortController,
+    timeoutIdRef: { id?: NodeJS.Timeout },
+    resetInactivityTimeout: () => void,
   ): AsyncGenerator<GenerateContentResponse> {
     const modelResponseParts: Part[] = [];
 
@@ -839,6 +865,7 @@ export class GeminiChat {
 
     try {
       for await (const chunk of streamResponse) {
+        resetInactivityTimeout();
         const candidateWithReason = chunk?.candidates?.find(
           (candidate) => candidate.finishReason,
         );
@@ -897,14 +924,16 @@ export class GeminiChat {
         }
       }
     } catch (error) {
-      if (timeoutSignal.aborted) {
+      if (timeoutController.signal.aborted) {
         const timeoutError = new Error(
-          `Request timed out after ${TIMEOUT_MS}ms`,
+          `Request timed out after ${TIMEOUT_MS}ms of inactivity`,
         );
         (timeoutError as unknown as { code: string }).code = 'ETIMEDOUT';
         throw timeoutError;
       }
       throw error;
+    } finally {
+      if (timeoutIdRef.id) clearTimeout(timeoutIdRef.id);
     }
 
     // String thoughts and consolidate text parts.

@@ -138,7 +138,6 @@ describe('GeminiChat', () => {
       getModel: vi.fn().mockImplementation(() => currentModel),
       setModel: vi.fn().mockImplementation((m: string) => {
         currentModel = m;
-        // When model is explicitly set, active model usually resets or updates to it
         currentActiveModel = m;
       }),
       getQuotaErrorOccurred: vi.fn().mockReturnValue(false),
@@ -150,13 +149,16 @@ describe('GeminiChat', () => {
       },
       getToolRegistry: vi.fn().mockReturnValue({
         getTool: vi.fn(),
+        getAllTools: vi.fn().mockReturnValue([]),
       }),
-      getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
+      getContentGenerator: vi
+        .fn()
+        .mockImplementation(() => mockContentGenerator),
       getRetryFetchErrors: vi.fn().mockReturnValue(false),
       getUserTier: vi.fn().mockReturnValue(undefined),
       modelConfigService: {
-        getResolvedConfig: vi.fn().mockImplementation((modelConfigKey) => {
-          const model = modelConfigKey.model ?? mockConfig.getModel();
+        getResolvedConfig: vi.fn().mockImplementation((modelConfigKey = {}) => {
+          const model = modelConfigKey.model ?? currentModel ?? 'gemini-pro';
           const thinkingConfig = model.startsWith('gemini-3')
             ? {
                 thinkingLevel: ThinkingLevel.HIGH,
@@ -176,9 +178,9 @@ describe('GeminiChat', () => {
       isInteractive: vi.fn().mockReturnValue(false),
       getEnableHooks: vi.fn().mockReturnValue(false),
       getActiveModel: vi.fn().mockImplementation(() => currentActiveModel),
-      setActiveModel: vi
-        .fn()
-        .mockImplementation((m: string) => (currentActiveModel = m)),
+      setActiveModel: vi.fn().mockImplementation((m: string) => {
+        currentActiveModel = m;
+      }),
       getModelAvailabilityService: vi
         .fn()
         .mockReturnValue(createAvailabilityServiceMock()),
@@ -1013,64 +1015,149 @@ describe('GeminiChat', () => {
       );
     });
 
-    it('should throw ETIMEDOUT when request times out', async () => {
-      // 1. Mock AbortSignal.timeout to return a manually controllable signal
-      const manualTimeoutController = new AbortController();
-      const timeoutSpy = vi
-        .spyOn(AbortSignal, 'timeout')
-        .mockReturnValue(manualTimeoutController.signal);
+    it('should throw Error with ETIMEDOUT code when request stalls immediately (inactivity timeout)', async () => {
+      vi.useFakeTimers();
 
-      // 2. Mock generateContentStream to hang UNTIL aborted
       vi.mocked(mockContentGenerator.generateContentStream).mockImplementation(
-        async (request) => {
-          const signal = request.config?.abortSignal;
-          return {
-            async *[Symbol.asyncIterator]() {
-              if (signal) {
-                await new Promise((resolve, reject) => {
-                  if (signal.aborted) {
-                    reject(new Error('Aborted'));
-                    return;
-                  }
-                  signal.addEventListener('abort', () => {
-                    reject(new Error('Aborted'));
-                  });
-                });
-              } else {
-                await new Promise(() => {}); // Hang indefinitely
+        async (req) => {
+          const signal = req.config?.abortSignal;
+          return (async function* () {
+            yield {
+              candidates: [
+                {
+                  content: { role: 'model', parts: [{ text: 'Thinking...' }] },
+                },
+              ],
+            } as unknown as GenerateContentResponse;
+
+            // Stall for a long time, but respond to abort signal
+            await new Promise((resolve, reject) => {
+              const tid = setTimeout(resolve, 1000000);
+              const abortListener = () => {
+                clearTimeout(tid);
+                reject(new Error('Aborted'));
+              };
+              signal?.addEventListener('abort', abortListener);
+              if (signal?.aborted) {
+                clearTimeout(tid);
+                reject(new Error('Aborted'));
               }
-              yield {} as GenerateContentResponse; // Dummy yield to satisfy require-yield lint rule
-            },
-          } as AsyncGenerator<GenerateContentResponse>;
+            });
+          })();
         },
       );
 
-      // 3. Start the request
       const streamPromise = chat.sendMessageStream(
         { model: 'gemini-2.0-flash' },
-        'test timeout',
-        'prompt-id-timeout',
+        'test stall',
+        'prompt-id-stall',
         new AbortController().signal,
       );
 
-      // 4. Simulate timeout by aborting the signal
-      // We need to wait a tick to ensure the promise starts executing
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      manualTimeoutController.abort();
+      const stream = await streamPromise;
+      const events: StreamEvent[] = [];
+      let caughtError: (Error & { code?: string }) | null = null;
 
-      // 5. Assert it throws ETIMEDOUT
-      await expect(async () => {
-        for await (const _ of await streamPromise) {
-          // consume
+      const consumer = (async () => {
+        try {
+          for await (const event of stream) {
+            events.push(event);
+          }
+        } catch (e) {
+          caughtError = e as Error & { code?: string };
         }
-      }).rejects.toThrowError(
-        expect.objectContaining({
-          message: expect.stringContaining('Request timed out'),
-          code: 'ETIMEDOUT',
-        }),
+      })();
+
+      // Trigger Attempt 1 timeout
+      await vi.advanceTimersByTimeAsync(65000);
+      // Give it a microtick to process events
+      await Promise.resolve();
+
+      expect(events).toHaveLength(3);
+      expect(events[0].type).toBe(StreamEventType.CHUNK);
+      expect(events[1].type).toBe(StreamEventType.RETRY);
+      expect(events[2].type).toBe(StreamEventType.CHUNK);
+
+      // Trigger Attempt 2 timeout
+      await vi.advanceTimersByTimeAsync(65000);
+
+      await consumer;
+
+      expect(caughtError).not.toBeNull();
+      expect(caughtError!.code).toBe('ETIMEDOUT');
+      expect(caughtError!.message).toContain('inactivity');
+
+      // Wait for the internal sendPromise to resolve to avoid unhandled rejections
+      await chat.processing;
+
+      vi.useRealTimers();
+    }, 30000);
+
+    it('should NOT throw ETIMEDOUT when request is long-running but active', async () => {
+      vi.useFakeTimers();
+
+      // Mock generateContentStream to return a stream that takes 40 seconds total but yields every 20s
+      // (Both are less than the 60s inactivity timeout)
+      const longStream = (async function* () {
+        yield {
+          candidates: [
+            { content: { role: 'model', parts: [{ text: 'Chunk 1' }] } },
+          ],
+        } as unknown as GenerateContentResponse;
+
+        await new Promise((r) => setTimeout(r, 20000));
+
+        yield {
+          candidates: [
+            { content: { role: 'model', parts: [{ text: 'Chunk 2' }] } },
+          ],
+        } as unknown as GenerateContentResponse;
+
+        await new Promise((r) => setTimeout(r, 20000));
+
+        yield {
+          candidates: [
+            { content: { role: 'model', parts: [{ text: 'Final' }] } },
+            { finishReason: 'STOP' },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        longStream,
       );
 
-      timeoutSpy.mockRestore();
+      const streamPromise = chat.sendMessageStream(
+        { model: 'gemini-2.0-flash' },
+        'test long',
+        'prompt-id-long',
+        new AbortController().signal,
+      );
+
+      const stream = await streamPromise;
+      const chunks: string[] = [];
+
+      const consumer = (async () => {
+        for await (const event of stream) {
+          if (event.type === StreamEventType.CHUNK) {
+            const text = event.value.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) chunks.push(text);
+          }
+        }
+      })();
+
+      // Advance time in steps to allow generator to yield
+      await vi.advanceTimersByTimeAsync(20001);
+      await vi.advanceTimersByTimeAsync(20001);
+      await vi.advanceTimersByTimeAsync(20001);
+
+      await consumer;
+
+      expect(chunks).toContain('Chunk 1');
+      expect(chunks).toContain('Chunk 2');
+      expect(chunks).toContain('Final');
+
+      vi.useRealTimers();
     });
   });
 
