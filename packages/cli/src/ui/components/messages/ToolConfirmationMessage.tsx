@@ -63,6 +63,15 @@ export const ToolConfirmationMessage: React.FC<
   const allowPermanentApproval =
     settings.merged.security.enablePermanentToolApproval;
 
+  const containsRedirection = useMemo(() => {
+    if (confirmationDetails.type !== 'exec') return false;
+    const commandsToDisplay =
+      confirmationDetails.commands && confirmationDetails.commands.length > 1
+        ? confirmationDetails.commands
+        : [confirmationDetails.command];
+    return commandsToDisplay.some((cmd) => hasRedirection(cmd));
+  }, [confirmationDetails]);
+
   const handlesOwnUI =
     confirmationDetails.type === 'ask_user' ||
     confirmationDetails.type === 'exit_plan_mode';
@@ -149,6 +158,13 @@ export const ToolConfirmationMessage: React.FC<
         key: 'Allow once',
       });
       if (isTrustedFolder) {
+        if (containsRedirection) {
+          options.push({
+            label: 'Allow redirection for this session',
+            value: ToolConfirmationOutcome.ProceedAlwaysRedirection,
+            key: 'Allow redirection for this session',
+          });
+        }
         options.push({
           label: `Allow for this session`,
           value: ToolConfirmationOutcome.ProceedAlways,
@@ -231,6 +247,7 @@ export const ToolConfirmationMessage: React.FC<
     allowPermanentApproval,
     config,
     isDiffingEnabled,
+    containsRedirection,
   ]);
 
   const availableBodyContentHeight = useCallback(() => {
@@ -344,9 +361,6 @@ export const ToolConfirmationMessage: React.FC<
         executionProps.commands && executionProps.commands.length > 1
           ? executionProps.commands
           : [executionProps.command];
-      const containsRedirection = commandsToDisplay.some((cmd) =>
-        hasRedirection(cmd),
-      );
 
       let bodyContentHeight = availableBodyContentHeight();
       let warnings: React.ReactNode = null;
@@ -461,6 +475,7 @@ export const ToolConfirmationMessage: React.FC<
     availableBodyContentHeight,
     terminalWidth,
     handleConfirm,
+    containsRedirection,
   ]);
 
   if (confirmationDetails.type === 'edit') {

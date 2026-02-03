@@ -130,6 +130,17 @@ describe('createPolicyUpdater', () => {
     expect(parsed.rule).toHaveLength(1);
     expect(parsed.rule![0].commandPrefix).toEqual(['echo', 'ls']);
   });
+
+  it('should call setAllowSessionRedirection on ALLOW_SESSION_REDIRECTION message', async () => {
+    vi.spyOn(policyEngine, 'setAllowSessionRedirection');
+    createPolicyUpdater(policyEngine, messageBus);
+
+    await messageBus.publish({
+      type: MessageBusType.ALLOW_SESSION_REDIRECTION,
+    });
+
+    expect(policyEngine.setAllowSessionRedirection).toHaveBeenCalledWith(true);
+  });
 });
 
 describe('ShellToolInvocation Policy Update', () => {

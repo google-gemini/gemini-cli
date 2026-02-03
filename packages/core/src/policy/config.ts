@@ -329,6 +329,10 @@ export function createPolicyUpdater(
   policyEngine: PolicyEngine,
   messageBus: MessageBus,
 ) {
+  messageBus.subscribe(MessageBusType.ALLOW_SESSION_REDIRECTION, () => {
+    policyEngine.setAllowSessionRedirection(true);
+  });
+
   messageBus.subscribe(
     MessageBusType.UPDATE_POLICY,
     async (message: UpdatePolicy) => {

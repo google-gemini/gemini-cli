@@ -141,6 +141,13 @@ export abstract class BaseToolInvocation<
   protected async publishPolicyUpdate(
     outcome: ToolConfirmationOutcome,
   ): Promise<void> {
+    if (outcome === ToolConfirmationOutcome.ProceedAlwaysRedirection) {
+      void this.messageBus.publish({
+        type: MessageBusType.ALLOW_SESSION_REDIRECTION,
+      });
+      return;
+    }
+
     if (
       outcome === ToolConfirmationOutcome.ProceedAlways ||
       outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave
@@ -777,6 +784,7 @@ export enum ToolConfirmationOutcome {
   ProceedAlwaysAndSave = 'proceed_always_and_save',
   ProceedAlwaysServer = 'proceed_always_server',
   ProceedAlwaysTool = 'proceed_always_tool',
+  ProceedAlwaysRedirection = 'proceed_always_redirection',
   ModifyWithEditor = 'modify_with_editor',
   Cancel = 'cancel',
 }

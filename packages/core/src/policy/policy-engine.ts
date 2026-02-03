@@ -87,6 +87,7 @@ export class PolicyEngine {
   private readonly nonInteractive: boolean;
   private readonly checkerRunner?: CheckerRunner;
   private approvalMode: ApprovalMode;
+  private allowSessionRedirection = false;
 
   constructor(config: PolicyEngineConfig = {}, checkerRunner?: CheckerRunner) {
     this.rules = (config.rules ?? []).sort(
@@ -118,11 +119,19 @@ export class PolicyEngine {
     return this.approvalMode;
   }
 
+  /**
+   * Set whether redirection is allowed for the current session.
+   */
+  setAllowSessionRedirection(allowed: boolean): void {
+    this.allowSessionRedirection = allowed;
+  }
+
   private shouldDowngradeForRedirection(
     command: string,
     allowRedirection?: boolean,
   ): boolean {
     return (
+      !this.allowSessionRedirection &&
       !allowRedirection &&
       hasRedirection(command) &&
       this.approvalMode !== ApprovalMode.AUTO_EDIT &&
