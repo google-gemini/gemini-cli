@@ -16,7 +16,7 @@ import {
   Storage,
   coreEvents,
   homedir,
-  type FetchAdminControlsResponse,
+  type AdminControlsSettings,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
@@ -385,14 +385,10 @@ export class LoadedSettings {
     coreEvents.emitSettingsChanged();
   }
 
-  setRemoteAdminSettings(remoteSettings: FetchAdminControlsResponse): void {
+  setRemoteAdminSettings(remoteSettings: AdminControlsSettings): void {
     const admin: Settings['admin'] = {};
-    const {
-      secureModeEnabled,
-      strictModeDisabled,
-      mcpSetting,
-      cliFeatureSetting,
-    } = remoteSettings;
+    const { strictModeDisabled, mcpSetting, cliFeatureSetting } =
+      remoteSettings;
 
     if (Object.keys(remoteSettings).length === 0) {
       this._remoteAdminSettings = { admin };
@@ -400,19 +396,13 @@ export class LoadedSettings {
       return;
     }
 
-    if (strictModeDisabled !== undefined) {
-      admin.secureModeEnabled = !strictModeDisabled;
-    } else if (secureModeEnabled !== undefined) {
-      admin.secureModeEnabled = secureModeEnabled;
-    } else {
-      admin.secureModeEnabled = true;
-    }
-    admin.mcp = { enabled: mcpSetting?.mcpEnabled ?? false };
+    admin.secureModeEnabled = !strictModeDisabled;
+    admin.mcp = { enabled: mcpSetting?.mcpEnabled };
     admin.extensions = {
-      enabled: cliFeatureSetting?.extensionsSetting?.extensionsEnabled ?? false,
+      enabled: cliFeatureSetting?.extensionsSetting?.extensionsEnabled,
     };
     admin.skills = {
-      enabled: cliFeatureSetting?.unmanagedCapabilitiesEnabled ?? false,
+      enabled: cliFeatureSetting?.unmanagedCapabilitiesEnabled,
     };
 
     this._remoteAdminSettings = { admin };
