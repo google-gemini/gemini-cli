@@ -1948,7 +1948,7 @@ function getExtensionEnvironment(
   const env: Record<string, string> = {};
   if (extension?.resolvedSettings) {
     for (const setting of extension.resolvedSettings) {
-      if (setting.value !== undefined) {
+      if (setting.value) {
         env[setting.envVar] = setting.value;
       }
     }
