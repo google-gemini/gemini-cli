@@ -228,7 +228,7 @@ Slash commands provide meta-level control over the CLI itself.
     [settings](../get-started/configuration.md). See
     [Checkpointing documentation](../cli/checkpointing.md) for more details.
 
-- **`/rewind`**
+- [**`/rewind`**](./rewind.md)
   - **Description:** Navigates backward through the conversation history,
     allowing you to review past interactions and potentially revert to a
     previous state. This feature helps in managing complex or branched
