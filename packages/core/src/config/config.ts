@@ -376,8 +376,11 @@ export interface ConfigParameters {
   debugMode: boolean;
   question?: string;
 
+  /** @deprecated Use the Policy System instead. See https://geminicli.com/docs/core/policy-engine/ */
   coreTools?: string[];
+  /** @deprecated Use the Policy System instead. See https://geminicli.com/docs/core/policy-engine/ */
   allowedTools?: string[];
+  /** @deprecated Use the Policy System instead. See https://geminicli.com/docs/core/policy-engine/ */
   excludeTools?: string[];
   toolDiscoveryCommand?: string;
   toolCallCommand?: string;
