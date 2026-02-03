@@ -610,12 +610,14 @@ export const useGeminiStream = (
     (key) => {
       if (key.name === 'escape' && !isShellFocused) {
         cancelOngoingRequest();
+        return true;
       }
     },
     {
       isActive:
         streamingState === StreamingState.Responding ||
         streamingState === StreamingState.WaitingForConfirmation,
+      priority: true,
     },
   );
 
