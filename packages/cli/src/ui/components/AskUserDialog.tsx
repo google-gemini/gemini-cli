@@ -33,6 +33,9 @@ import { MaxSizedBox } from './shared/MaxSizedBox.js';
 import { UIStateContext } from '../contexts/UIStateContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 
+/** Padding for dialog content to prevent text from touching edges. */
+const DIALOG_PADDING = 4;
+
 /**
  * Checks if text is a single line without markdown identifiers.
  */
@@ -352,7 +355,7 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
         >
           <MarkdownDisplay
             text={autoBoldIfPlain(question.question)}
-            terminalWidth={availableWidth - 4}
+            terminalWidth={availableWidth - DIALOG_PADDING}
             isPending={false}
           />
         </MaxSizedBox>
@@ -783,7 +786,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     : undefined;
   const questionHeight =
     listHeight && !isAlternateBuffer
-      ? Math.min(15, Math.max(1, listHeight - 4))
+      ? Math.min(15, Math.max(1, listHeight - DIALOG_PADDING))
       : undefined;
   const maxItemsToShow =
     listHeight && questionHeight
@@ -802,7 +805,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
           <Box flexDirection="column">
             <MarkdownDisplay
               text={autoBoldIfPlain(question.question)}
-              terminalWidth={availableWidth - 4}
+              terminalWidth={availableWidth - DIALOG_PADDING}
               isPending={false}
             />
             {question.multiSelect && (
