@@ -509,6 +509,14 @@ describe('telemetry/config helpers', () => {
       });
     });
 
+    it('rejects JSON with empty string values', async () => {
+      const result = parseOtlpHeaders('{"Header":"","Valid":"value"}');
+      // Should only include the header with a non-empty value
+      expect(result).toEqual({
+        Valid: 'value',
+      });
+    });
+
     it('rejects JSON with control characters in values', async () => {
       const result = parseOtlpHeaders('{"Header":"value\\nwith\\nnewlines"}');
       expect(result).toBeUndefined();
