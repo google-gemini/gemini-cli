@@ -15,7 +15,6 @@ import { ToolErrorType } from '../tools/tool-error.js';
 import { BINARY_EXTENSIONS } from './ignorePatterns.js';
 import { createRequire as createModuleRequire } from 'node:module';
 import { debugLogger } from './debugLogger.js';
-import { isSubpath } from './paths.js';
 
 const requireModule = createModuleRequire(import.meta.url);
 
@@ -238,45 +237,6 @@ export function getRealPath(filePath: string): string {
   } catch {
     return path.resolve(filePath);
   }
-}
-
-/**
- * Validates that a path is safe (no traversal) and exists within a root.
- * @param pathToCheck The untrusted path to check.
- * @param rootDirectory The authorized root directory.
- * @param targetDir The current working directory.
- * @returns An error message if validation fails, or null if successful.
- */
-export async function validatePathWithinRoot(
-  pathToCheck: string,
-  rootDirectory: string,
-  targetDir: string,
-): Promise<string | null> {
-  const resolvedPath = path.resolve(targetDir, pathToCheck);
-
-  let realPath: string;
-  try {
-    realPath = await fsPromises.realpath(resolvedPath);
-  } catch {
-    realPath = resolvedPath;
-  }
-
-  let realRoot: string;
-  try {
-    realRoot = await fsPromises.realpath(rootDirectory);
-  } catch {
-    realRoot = path.resolve(rootDirectory);
-  }
-
-  if (!isSubpath(realRoot, realPath)) {
-    return 'Access denied: path is outside of the designated directory.';
-  }
-
-  if (!(await fileExists(resolvedPath))) {
-    return `File does not exist: ${pathToCheck}.`;
-  }
-
-  return null;
 }
 
 /**

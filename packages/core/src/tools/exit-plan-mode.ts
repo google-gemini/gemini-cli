@@ -21,8 +21,7 @@ import { EXIT_PLAN_MODE_TOOL_NAME } from './tool-names.js';
 import { validatePlanPath, validatePlanContent } from '../utils/planUtils.js';
 import { ApprovalMode } from '../policy/types.js';
 import { checkExhaustive } from '../utils/checks.js';
-import { getRealPath } from '../utils/fileUtils.js';
-import { isSubpath } from '../utils/paths.js';
+import { resolveToRealPath, isSubpath } from '../utils/paths.js';
 
 /**
  * Returns a human-readable description for an approval mode.
@@ -83,13 +82,15 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
 
     // Since validateToolParamValues is synchronous, we use a basic synchronous check
     // for path traversal safety. High-level async validation is deferred to shouldConfirmExecute.
-    const plansDir = getRealPath(this.config.storage.getProjectTempPlansDir());
+    const plansDir = resolveToRealPath(
+      this.config.storage.getProjectTempPlansDir(),
+    );
     const resolvedPath = path.resolve(
       this.config.getTargetDir(),
       params.plan_path,
     );
 
-    const realPath = getRealPath(resolvedPath);
+    const realPath = resolveToRealPath(resolvedPath);
 
     if (!isSubpath(plansDir, realPath)) {
       return `Access denied: plan path must be within the designated plans directory.`;

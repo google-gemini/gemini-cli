@@ -4,7 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { isEmpty, validatePathWithinRoot } from './fileUtils.js';
+import path from 'node:path';
+import { isEmpty, fileExists } from './fileUtils.js';
+import { isSubpath, resolveToRealPath } from './paths.js';
 
 /**
  * Standard error messages for the plan approval workflow.
@@ -32,16 +34,18 @@ export async function validatePlanPath(
   plansDir: string,
   targetDir: string,
 ): Promise<string | null> {
-  const error = await validatePathWithinRoot(planPath, plansDir, targetDir);
-  if (error) {
-    if (error.includes('Access denied')) {
-      return PlanErrorMessages.PATH_ACCESS_DENIED;
-    }
-    if (error.includes('File does not exist')) {
-      return PlanErrorMessages.FILE_NOT_FOUND(planPath);
-    }
-    return error;
+  const resolvedPath = path.resolve(targetDir, planPath);
+  const realPath = resolveToRealPath(resolvedPath);
+  const realPlansDir = resolveToRealPath(plansDir);
+
+  if (!isSubpath(realPlansDir, realPath)) {
+    return PlanErrorMessages.PATH_ACCESS_DENIED;
   }
+
+  if (!(await fileExists(resolvedPath))) {
+    return PlanErrorMessages.FILE_NOT_FOUND(planPath);
+  }
+
   return null;
 }
 
