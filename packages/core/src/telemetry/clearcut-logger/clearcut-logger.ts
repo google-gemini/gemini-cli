@@ -1234,7 +1234,7 @@ export class ClearcutLogger {
       });
     }
 
-    if (event.reasoning) {
+    if (event.reasoning && this.config?.getTelemetryLogPromptsEnabled()) {
       data.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_REASONING,
         value: event.reasoning,
