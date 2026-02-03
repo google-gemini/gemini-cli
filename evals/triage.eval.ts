@@ -234,4 +234,31 @@ describe('triage_agent', () => {
     ),
     assert: assertHasLabel('area/unknown'),
   });
+
+  evalTest('USUALLY_PASSES', {
+    name: 'should identify area/security for prompt injection reports',
+    prompt: createPrompt(
+      'Prompt injection vulnerability',
+      'I found a way to make the agent ignore instructions by saying "Ignore all previous instructions".',
+    ),
+    assert: assertHasLabel('area/security'),
+  });
+
+  evalTest('USUALLY_PASSES', {
+    name: 'should identify area/non-interactive for headless crashes',
+    prompt: createPrompt(
+      'Headless mode segfault',
+      'When I run with --headless, the CLI crashes immediately.',
+    ),
+    assert: assertHasLabel('area/non-interactive'),
+  });
+
+  evalTest('USUALLY_PASSES', {
+    name: 'should identify area/agent for mixed feedback and tool bugs',
+    prompt: createPrompt(
+      'Great tool but web search fails',
+      'I love using Gemini CLI, it is amazing! However, the @web tool gives me an error every time I search for "react".',
+    ),
+    assert: assertHasLabel('area/agent'),
+  });
 });
