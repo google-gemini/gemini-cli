@@ -207,6 +207,9 @@ export class GeminiAgent {
       config.setFileSystemService(acpFileSystemService);
     }
 
+    await config.initialize();
+    startupProfiler.flush(config);
+
     const geminiClient = config.getGeminiClient();
     const chat = await geminiClient.startChat();
     const session = new Session(sessionId, chat, config, this.connection);
