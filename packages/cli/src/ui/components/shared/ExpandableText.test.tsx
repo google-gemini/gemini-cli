@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import chalk from 'chalk';
 import { describe, it, expect } from 'vitest';
 import { render } from '../../../test-utils/render.js';
 import { ExpandableText, MAX_WIDTH } from './ExpandableText.js';
@@ -76,6 +77,7 @@ describe('ExpandableText', () => {
       100,
     );
     expect(lastFrame()).toMatchSnapshot();
+    expect(lastFrame()).toContain(chalk.inverse(userInput));
     unmount();
   });
 
