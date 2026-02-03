@@ -65,7 +65,12 @@ export interface ToolConfirmationResponse {
  * Data-only versions of ToolCallConfirmationDetails for bus transmission.
  */
 export type SerializableConfirmationDetails =
-  | { type: 'info'; title: string; prompt: string; urls?: string[] }
+  | {
+      type: 'info';
+      title: string;
+      prompt: string;
+      urls?: string[];
+    }
   | {
       type: 'edit';
       title: string;
@@ -90,6 +95,11 @@ export type SerializableConfirmationDetails =
       serverName: string;
       toolName: string;
       toolDisplayName: string;
+    }
+  | {
+      type: 'ask_user';
+      title: string;
+      questions: Question[];
     };
 
 export interface UpdatePolicy {
@@ -138,7 +148,7 @@ export interface Question {
   options?: QuestionOption[];
   /** Allow multiple selections. Only applies when type='choice'. */
   multiSelect?: boolean;
-  /** Placeholder hint text. Only applies when type='text'. */
+  /** Placeholder hint text. For type='text', shown in the input field. For type='choice', shown in the "Other" custom input. */
   placeholder?: string;
 }
 

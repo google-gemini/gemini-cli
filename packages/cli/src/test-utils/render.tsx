@@ -27,6 +27,7 @@ import {
 import { type HistoryItemToolGroup, StreamingState } from '../ui/types.js';
 import { ToolActionsProvider } from '../ui/contexts/ToolActionsContext.js';
 import { AskUserActionsProvider } from '../ui/contexts/AskUserActionsContext.js';
+import { TerminalProvider } from '../ui/contexts/TerminalContext.js';
 
 import { makeFakeConfig, type Config } from '@google/gemini-cli-core';
 import { FakePersistentState } from './persistentStateFake.js';
@@ -157,6 +158,9 @@ const baseMockUiState = {
   terminalHeight: 40,
   currentModel: 'gemini-pro',
   terminalBackgroundColor: undefined,
+  activePtyId: undefined,
+  backgroundShells: new Map(),
+  backgroundShellHeight: 0,
 };
 
 export const mockAppState: AppState = {
@@ -201,7 +205,11 @@ const mockUIActions: UIActions = {
   handleApiKeyCancel: vi.fn(),
   setBannerVisible: vi.fn(),
   setEmbeddedShellFocused: vi.fn(),
+  dismissBackgroundShell: vi.fn(),
+  setActiveBackgroundShellPid: vi.fn(),
+  setIsBackgroundShellListOpen: vi.fn(),
   setAuthContext: vi.fn(),
+  handleWarning: vi.fn(),
   handleRestart: vi.fn(),
   handleNewAgentsSelect: vi.fn(),
 };
@@ -310,16 +318,18 @@ export const renderWithProviders = (
                           <MouseProvider
                             mouseEventsEnabled={mouseEventsEnabled}
                           >
-                            <ScrollProvider>
-                              <Box
-                                width={terminalWidth}
-                                flexShrink={0}
-                                flexGrow={0}
-                                flexDirection="column"
-                              >
-                                {component}
-                              </Box>
-                            </ScrollProvider>
+                            <TerminalProvider>
+                              <ScrollProvider>
+                                <Box
+                                  width={terminalWidth}
+                                  flexShrink={0}
+                                  flexGrow={0}
+                                  flexDirection="column"
+                                >
+                                  {component}
+                                </Box>
+                              </ScrollProvider>
+                            </TerminalProvider>
                           </MouseProvider>
                         </KeypressProvider>
                       </AskUserActionsProvider>

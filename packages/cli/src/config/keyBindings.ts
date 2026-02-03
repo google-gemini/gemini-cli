@@ -72,6 +72,15 @@ export enum Command {
   OPEN_EXTERNAL_EDITOR = 'input.openExternalEditor',
   PASTE_CLIPBOARD = 'input.paste',
 
+  BACKGROUND_SHELL_ESCAPE = 'backgroundShellEscape',
+  BACKGROUND_SHELL_SELECT = 'backgroundShellSelect',
+  TOGGLE_BACKGROUND_SHELL = 'toggleBackgroundShell',
+  TOGGLE_BACKGROUND_SHELL_LIST = 'toggleBackgroundShellList',
+  KILL_BACKGROUND_SHELL = 'backgroundShell.kill',
+  UNFOCUS_BACKGROUND_SHELL = 'backgroundShell.unfocus',
+  UNFOCUS_BACKGROUND_SHELL_LIST = 'backgroundShell.listUnfocus',
+  SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING = 'backgroundShell.unfocusWarning',
+
   // App Controls
   SHOW_ERROR_DETAILS = 'app.showErrorDetails',
   SHOW_FULL_TODOS = 'app.showFullTodos',
@@ -85,6 +94,7 @@ export enum Command {
   UNFOCUS_SHELL_INPUT = 'app.unfocusShellInput',
   CLEAR_SCREEN = 'app.clearScreen',
   RESTART_APP = 'app.restart',
+  SUSPEND_APP = 'app.suspend',
 }
 
 /**
@@ -138,7 +148,6 @@ export const defaultKeyBindings: KeyBindingConfig = {
   ],
   [Command.MOVE_LEFT]: [
     { key: 'left', shift: false, alt: false, ctrl: false, cmd: false },
-    { key: 'b', ctrl: true },
   ],
   [Command.MOVE_RIGHT]: [
     { key: 'right', shift: false, alt: false, ctrl: false, cmd: false },
@@ -170,8 +179,15 @@ export const defaultKeyBindings: KeyBindingConfig = {
   ],
   [Command.DELETE_CHAR_LEFT]: [{ key: 'backspace' }, { key: 'h', ctrl: true }],
   [Command.DELETE_CHAR_RIGHT]: [{ key: 'delete' }, { key: 'd', ctrl: true }],
-  [Command.UNDO]: [{ key: 'z', shift: false, ctrl: true }],
-  [Command.REDO]: [{ key: 'z', shift: true, ctrl: true }],
+  [Command.UNDO]: [
+    { key: 'z', cmd: true, shift: false },
+    { key: 'z', alt: true, shift: false },
+  ],
+  [Command.REDO]: [
+    { key: 'z', ctrl: true, shift: true },
+    { key: 'z', cmd: true, shift: true },
+    { key: 'z', alt: true, shift: true },
+  ],
 
   // Scrolling
   [Command.SCROLL_UP]: [{ key: 'up', shift: true }],
@@ -257,6 +273,16 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.TOGGLE_COPY_MODE]: [{ key: 's', ctrl: true }],
   [Command.TOGGLE_YOLO]: [{ key: 'y', ctrl: true }],
   [Command.CYCLE_APPROVAL_MODE]: [{ key: 'tab', shift: true }],
+  [Command.TOGGLE_BACKGROUND_SHELL]: [{ key: 'b', ctrl: true }],
+  [Command.TOGGLE_BACKGROUND_SHELL_LIST]: [{ key: 'l', ctrl: true }],
+  [Command.KILL_BACKGROUND_SHELL]: [{ key: 'k', ctrl: true }],
+  [Command.UNFOCUS_BACKGROUND_SHELL]: [{ key: 'tab', shift: true }],
+  [Command.UNFOCUS_BACKGROUND_SHELL_LIST]: [{ key: 'tab', shift: false }],
+  [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING]: [
+    { key: 'tab', shift: false },
+  ],
+  [Command.BACKGROUND_SHELL_SELECT]: [{ key: 'return' }],
+  [Command.BACKGROUND_SHELL_ESCAPE]: [{ key: 'escape' }],
   [Command.SHOW_MORE_LINES]: [
     { key: 'o', ctrl: true },
     { key: 's', ctrl: true },
@@ -265,6 +291,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.UNFOCUS_SHELL_INPUT]: [{ key: 'tab' }],
   [Command.CLEAR_SCREEN]: [{ key: 'l', ctrl: true }],
   [Command.RESTART_APP]: [{ key: 'r' }],
+  [Command.SUSPEND_APP]: [{ key: 'z', ctrl: true }],
 };
 
 interface CommandCategory {
@@ -370,10 +397,19 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.TOGGLE_YOLO,
       Command.CYCLE_APPROVAL_MODE,
       Command.SHOW_MORE_LINES,
+      Command.TOGGLE_BACKGROUND_SHELL,
+      Command.TOGGLE_BACKGROUND_SHELL_LIST,
+      Command.KILL_BACKGROUND_SHELL,
+      Command.BACKGROUND_SHELL_SELECT,
+      Command.BACKGROUND_SHELL_ESCAPE,
+      Command.UNFOCUS_BACKGROUND_SHELL,
+      Command.UNFOCUS_BACKGROUND_SHELL_LIST,
+      Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING,
       Command.FOCUS_SHELL_INPUT,
       Command.UNFOCUS_SHELL_INPUT,
       Command.CLEAR_SCREEN,
       Command.RESTART_APP,
+      Command.SUSPEND_APP,
     ],
   },
 ];
@@ -460,8 +496,17 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
     'Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only).',
   [Command.SHOW_MORE_LINES]:
     'Expand a height-constrained response to show additional lines when not in alternate buffer mode.',
+  [Command.BACKGROUND_SHELL_SELECT]: 'Enter',
+  [Command.BACKGROUND_SHELL_ESCAPE]: 'Esc',
+  [Command.TOGGLE_BACKGROUND_SHELL]: 'Ctrl+B',
+  [Command.TOGGLE_BACKGROUND_SHELL_LIST]: 'Ctrl+L',
+  [Command.KILL_BACKGROUND_SHELL]: 'Ctrl+K',
+  [Command.UNFOCUS_BACKGROUND_SHELL]: 'Shift+Tab',
+  [Command.UNFOCUS_BACKGROUND_SHELL_LIST]: 'Tab',
+  [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING]: 'Tab',
   [Command.FOCUS_SHELL_INPUT]: 'Focus the shell input from the gemini input.',
   [Command.UNFOCUS_SHELL_INPUT]: 'Focus the Gemini input from the shell input.',
   [Command.CLEAR_SCREEN]: 'Clear the terminal screen and redraw the UI.',
   [Command.RESTART_APP]: 'Restart the application.',
+  [Command.SUSPEND_APP]: 'Suspend the application (not yet implemented).',
 };
