@@ -108,6 +108,7 @@ describe('ExtensionManager Settings Scope', () => {
       settings: createTestMergedSettings({
         telemetry: { enabled: false },
         experimental: { extensionConfig: true },
+        security: { folderTrust: { enabled: false } },
       }),
     });
 
@@ -146,6 +147,7 @@ describe('ExtensionManager Settings Scope', () => {
       settings: createTestMergedSettings({
         telemetry: { enabled: false },
         experimental: { extensionConfig: true },
+        security: { folderTrust: { enabled: false } },
       }),
     });
 
@@ -182,6 +184,7 @@ describe('ExtensionManager Settings Scope', () => {
       settings: createTestMergedSettings({
         telemetry: { enabled: false },
         experimental: { extensionConfig: true },
+        security: { folderTrust: { enabled: false } },
       }),
     });
 
