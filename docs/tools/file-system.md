@@ -117,14 +117,13 @@ directories) will be created.
   `Found 5 file(s) matching "*.ts" within src, sorted by modification time (newest first):\nsrc/file1.ts\nsrc/subdir/file2.ts...`
 - **Confirmation:** No.
 
-## 5. `search_file_content` (SearchText)
+## 5. `grep_search` (SearchText)
 
-`search_file_content` searches for a regular expression pattern within the
-content of files in a specified directory. Can filter files by a glob pattern.
-Returns the lines containing matches, along with their file paths and line
-numbers.
+`grep_search` searches for a regular expression pattern within the content of
+files in a specified directory. Can filter files by a glob pattern. Returns the
+lines containing matches, along with their file paths and line numbers.
 
-- **Tool name:** `search_file_content`
+- **Tool name:** `grep_search`
 - **Display name:** SearchText
 - **File:** `grep.ts`
 - **Parameters:**

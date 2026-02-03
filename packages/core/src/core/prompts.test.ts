@@ -27,7 +27,7 @@ import { ApprovalMode } from '../policy/types.js';
 vi.mock('../tools/ls', () => ({ LSTool: { Name: 'list_directory' } }));
 vi.mock('../tools/edit', () => ({ EditTool: { Name: 'replace' } }));
 vi.mock('../tools/glob', () => ({ GlobTool: { Name: 'glob' } }));
-vi.mock('../tools/grep', () => ({ GrepTool: { Name: 'search_file_content' } }));
+vi.mock('../tools/grep', () => ({ GrepTool: { Name: 'grep_search' } }));
 vi.mock('../tools/read-file', () => ({ ReadFileTool: { Name: 'read_file' } }));
 vi.mock('../tools/read-many-files', () => ({
   ReadManyFilesTool: { Name: 'read_many_files' },
@@ -241,14 +241,14 @@ describe('Core System Prompt (prompts.ts)', () => {
         );
         expect(prompt).toContain(`do not ignore the output of the agent`);
         expect(prompt).not.toContain(
-          "Use 'search_file_content' and 'glob' search tools extensively",
+          "Use 'grep_search' and 'glob' search tools extensively",
         );
       } else {
         expect(prompt).not.toContain(
           `your **first and primary action** must be to delegate to the '${CodebaseInvestigatorAgent.name}' agent`,
         );
         expect(prompt).toContain(
-          "Use 'search_file_content' and 'glob' search tools extensively",
+          "Use 'grep_search' and 'glob' search tools extensively",
         );
       }
       expect(prompt).toMatchSnapshot();
@@ -291,7 +291,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       // Should NOT include disabled tools
       expect(prompt).not.toContain('`google_web_search`');
       expect(prompt).not.toContain('`list_directory`');
-      expect(prompt).not.toContain('`search_file_content`');
+      expect(prompt).not.toContain('`grep_search`');
     });
   });
 
