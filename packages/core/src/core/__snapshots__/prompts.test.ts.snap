@@ -176,7 +176,8 @@ The following read-only tools are available in Plan Mode:
 - \`write_file\` - Save plans to the plans directory (see Plan Storage below)
 
 ## Plan Storage
-- Save your plans as Markdown (.md) files directly to: \`/tmp/project-temp/plans/\`
+- Save your plans as Markdown (.md) files ONLY within: \`/tmp/project-temp/plans/\`
+- You are restricted to writing files within this directory while in Plan Mode.
 - Use descriptive filenames: \`feature-name.md\` or \`bugfix-description.md\`
 
 ## Workflow Phases
