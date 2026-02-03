@@ -520,12 +520,10 @@ export async function main() {
 
     // Show deprecation warning only for allowedTools as that's the only one set by the user currently via command line args
     if (config.getAllowedTools() !== undefined) {
-      setTimeout(() => {
-        coreEvents.emitFeedback(
-          'warning',
-          `The allowed-tools cli argument is deprecated and will be removed in Gemini CLI 1.0: Please use the Policy Engine to manage tool permissions instead: https://geminicli.com/docs/core/policy-engine/`,
-        );
-      }, 0);
+      coreEvents.emitFeedback(
+        'warning',
+        `The allowed-tools cli argument is deprecated and will be removed in Gemini CLI 1.0: Please use the Policy Engine to manage tool permissions instead: https://geminicli.com/docs/core/policy-engine/`,
+      );
     }
 
     if (config.isInteractive() && config.storage && config.getDebugMode()) {
