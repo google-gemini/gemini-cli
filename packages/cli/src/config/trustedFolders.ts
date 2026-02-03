@@ -36,7 +36,9 @@ export enum TrustLevel {
   DO_NOT_TRUST = 'DO_NOT_TRUST',
 }
 
-export function isTrustLevel(value: unknown): value is TrustLevel {
+export function isTrustLevel(
+  value: string | number | boolean | object | null | undefined,
+): value is TrustLevel {
   return (
     typeof value === 'string' &&
     Object.values(TrustLevel).includes(value as TrustLevel)
@@ -185,11 +187,13 @@ export function loadTrustedFolders(): LoadedTrustedFolders {
   const userConfig: Record<string, TrustLevel> = {};
 
   const userPath = getTrustedFoldersPath();
-  // Load user trusted folders
   try {
     if (fs.existsSync(userPath)) {
       const content = fs.readFileSync(userPath, 'utf-8');
-      const parsed: unknown = JSON.parse(stripJsonComments(content));
+      const parsed = JSON.parse(stripJsonComments(content)) as Record<
+        string,
+        string
+      >;
 
       if (
         typeof parsed !== 'object' ||
@@ -214,7 +218,7 @@ export function loadTrustedFolders(): LoadedTrustedFolders {
         }
       }
     }
-  } catch (error: unknown) {
+  } catch (error) {
     errors.push({
       message: getErrorMessage(error),
       path: userPath,

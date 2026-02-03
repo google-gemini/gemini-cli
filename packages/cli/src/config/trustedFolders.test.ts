@@ -133,6 +133,42 @@ describe('Trusted Folders Loading', () => {
       expect(folders.isPathTrusted('/secret/mine/privatekey.pem')).toBe(false);
       expect(folders.isPathTrusted('/user/someotherfolder')).toBe(undefined);
     });
+
+    it('prioritizes the longest matching path (precedence)', () => {
+      const { folders } = setup({
+        config: {
+          '/a': TrustLevel.TRUST_FOLDER,
+          '/a/b': TrustLevel.DO_NOT_TRUST,
+          '/a/b/c': TrustLevel.TRUST_FOLDER,
+          '/parent/trustme': TrustLevel.TRUST_PARENT, // effective path is /parent
+          '/parent/trustme/butnotthis': TrustLevel.DO_NOT_TRUST,
+        },
+      });
+
+      // /a/b/c/d matches /a (len 2), /a/b (len 4), /a/b/c (len 6).
+      // /a/b/c wins (TRUST_FOLDER).
+      expect(folders.isPathTrusted('/a/b/c/d')).toBe(true);
+
+      // /a/b/x matches /a (len 2), /a/b (len 4).
+      // /a/b wins (DO_NOT_TRUST).
+      expect(folders.isPathTrusted('/a/b/x')).toBe(false);
+
+      // /a/x matches /a (len 2).
+      // /a wins (TRUST_FOLDER).
+      expect(folders.isPathTrusted('/a/x')).toBe(true);
+
+      // Overlap with TRUST_PARENT
+      // /parent/trustme/butnotthis/file matches:
+      // - /parent/trustme (len 15, TRUST_PARENT -> effective /parent)
+      // - /parent/trustme/butnotthis (len 26, DO_NOT_TRUST)
+      // /parent/trustme/butnotthis wins.
+      expect(folders.isPathTrusted('/parent/trustme/butnotthis/file')).toBe(
+        false,
+      );
+
+      // /parent/other matches /parent/trustme (len 15, effective /parent)
+      expect(folders.isPathTrusted('/parent/other')).toBe(true);
+    });
   });
 
   it('should load user rules if only user file exists', () => {
