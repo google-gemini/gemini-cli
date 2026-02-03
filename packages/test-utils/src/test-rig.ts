@@ -337,6 +337,9 @@ export class TestRig {
         auth: {
           selectedType: 'gemini-api-key',
         },
+        folderTrust: {
+          enabled: false,
+        },
       },
       ui: {
         useAlternateBuffer: true,
