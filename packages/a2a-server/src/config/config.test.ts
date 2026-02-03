@@ -123,7 +123,7 @@ describe('loadConfig', () => {
 
         await loadConfig(mockSettings, mockExtensionLoader, taskId);
 
-        expect(Config).toHaveBeenCalledWith(
+        expect(Config).toHaveBeenLastCalledWith(
           expect.objectContaining({
             disableYoloMode: !mockAdminSettings.strictModeDisabled,
             mcpEnabled: mockAdminSettings.mcpSetting?.mcpEnabled,
@@ -144,11 +144,11 @@ describe('loadConfig', () => {
 
         await loadConfig(mockSettings, mockExtensionLoader, taskId);
 
-        expect(Config).toHaveBeenCalledWith(
+        expect(Config).toHaveBeenLastCalledWith(
           expect.objectContaining({
             disableYoloMode: !false,
             mcpEnabled: mockAdminSettings.mcpSetting?.mcpEnabled,
-            extensionsEnabled: false,
+            extensionsEnabled: undefined,
           }),
         );
       });
@@ -159,7 +159,7 @@ describe('loadConfig', () => {
 
         await loadConfig(mockSettings, mockExtensionLoader, taskId);
 
-        expect(Config).toHaveBeenCalledWith(expect.objectContaining({}));
+        expect(Config).toHaveBeenLastCalledWith(expect.objectContaining({}));
       });
 
       it('should fetch admin controls using the code assist server when available', async () => {
@@ -182,11 +182,11 @@ describe('loadConfig', () => {
           mockCodeAssistServer,
           true,
         );
-        expect(Config).toHaveBeenCalledWith(
+        expect(Config).toHaveBeenLastCalledWith(
           expect.objectContaining({
             disableYoloMode: !mockAdminSettings.strictModeDisabled,
             mcpEnabled: mockAdminSettings.mcpSetting?.mcpEnabled,
-            extensionsEnabled: false,
+            extensionsEnabled: undefined,
           }),
         );
       });
