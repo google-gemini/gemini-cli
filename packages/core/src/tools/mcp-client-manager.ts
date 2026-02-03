@@ -85,6 +85,7 @@ export class McpClientManager {
           }
           return this.disconnectClient(name, true);
         }
+        return Promise.resolve();
       }),
     );
     await this.cliConfig.refreshMcpContext();
