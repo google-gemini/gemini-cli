@@ -310,6 +310,29 @@ describe('GrepTool', () => {
       expect(result.error?.type).toBe(ToolErrorType.GREP_EXECUTION_ERROR);
       vi.mocked(glob.globStream).mockReset();
     }, 30000);
+
+    it('should limit matches per file when max_matches_per_file is set', async () => {
+      // fileA.txt has 2 matches for "world"
+      // sub/fileC.txt has 1 match for "world"
+      const params: GrepToolParams = {
+        pattern: 'world',
+        max_matches_per_file: 1,
+      };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      // Should find 1 match in fileA.txt (instead of 2)
+      // And 1 match in sub/fileC.txt
+      // Total 2 matches (was 3)
+
+      expect(result.llmContent).toContain('Found 2 matches');
+      expect(result.llmContent).toContain('File: fileA.txt');
+
+      // Count occurrences of match lines in the output
+      // Matches lines start with L<number>:
+      const matches = result.llmContent.match(/^L\d+:.*world/gm);
+      expect(matches?.length).toBe(2);
+    }, 30000);
   });
 
   describe('multi-directory workspace', () => {

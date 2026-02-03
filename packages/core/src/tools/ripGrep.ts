@@ -131,6 +131,11 @@ export interface RipGrepToolParams {
    * If true, does not respect .gitignore or default ignores (like build/dist).
    */
   no_ignore?: boolean;
+
+  /**
+   * Optional: Maximum number of matches to return per file.
+   */
+  max_matches_per_file?: number;
 }
 
 /**
@@ -236,6 +241,7 @@ class GrepToolInvocation extends BaseToolInvocation<
           before: this.params.before,
           no_ignore: this.params.no_ignore,
           maxMatches: totalMaxMatches,
+          maxMatchesPerFile: this.params.max_matches_per_file,
           signal: timeoutController.signal,
         });
       } finally {
@@ -320,6 +326,7 @@ class GrepToolInvocation extends BaseToolInvocation<
     before?: number;
     no_ignore?: boolean;
     maxMatches: number;
+    maxMatchesPerFile?: number;
     signal: AbortSignal;
   }): Promise<GrepMatch[]> {
     const {
@@ -333,6 +340,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       before,
       no_ignore,
       maxMatches,
+      maxMatchesPerFile,
     } = options;
 
     const rgArgs = ['--json'];
@@ -359,6 +367,10 @@ class GrepToolInvocation extends BaseToolInvocation<
     }
     if (no_ignore) {
       rgArgs.push('--no-ignore');
+    }
+
+    if (maxMatchesPerFile) {
+      rgArgs.push('--max-count', maxMatchesPerFile.toString());
     }
 
     if (include) {
@@ -543,6 +555,12 @@ export class RipGrepTool extends BaseDeclarativeTool<
             description:
               'If true, searches all files including those usually ignored (like in .gitignore, build/, dist/, etc). Defaults to false if omitted.',
             type: 'boolean',
+          },
+          max_matches_per_file: {
+            description:
+              'Optional: Maximum number of matches to return per file. Use this to prevent being overwhelmed by repetitive matches in large files.',
+            type: 'integer',
+            minimum: 1,
           },
         },
         required: ['pattern'],

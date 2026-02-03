@@ -1655,6 +1655,36 @@ describe('RipGrepTool', () => {
       // Note: Ripgrep JSON output for context lines doesn't include line numbers for context lines directly
       // The current parsing only extracts the matched line, so we only assert on that.
     });
+
+    it('should handle max_matches_per_file parameter', async () => {
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileA.txt' },
+                line_number: 1,
+                lines: { text: 'match 1\n' },
+              },
+            }) + '\n',
+          exitCode: 0,
+        }),
+      );
+
+      const params: RipGrepToolParams = {
+        pattern: 'match',
+        max_matches_per_file: 5,
+      };
+      const invocation = grepTool.build(params);
+      await invocation.execute(abortSignal);
+
+      expect(mockSpawn).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.arrayContaining(['--max-count', '5']),
+        expect.anything(),
+      );
+    });
   });
 
   describe('getDescription', () => {
