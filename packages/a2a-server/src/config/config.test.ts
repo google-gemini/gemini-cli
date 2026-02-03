@@ -134,6 +134,34 @@ describe('loadConfig', () => {
         );
       });
 
+      it('should treat unset admin settings as false when admin settings are passed', async () => {
+        const mockAdminSettings: FetchAdminControlsResponse = {
+          mcpSetting: {
+            mcpEnabled: true,
+          },
+        };
+        vi.mocked(fetchAdminControlsOnce).mockResolvedValue(mockAdminSettings);
+
+        await loadConfig(mockSettings, mockExtensionLoader, taskId);
+
+        expect(Config).toHaveBeenCalledWith(
+          expect.objectContaining({
+            disableYoloMode: !false,
+            mcpEnabled: mockAdminSettings.mcpSetting?.mcpEnabled,
+            extensionsEnabled: false,
+          }),
+        );
+      });
+
+      it('should not pass default unset admin settings when no admin settings are present', async () => {
+        const mockAdminSettings: FetchAdminControlsResponse = {};
+        vi.mocked(fetchAdminControlsOnce).mockResolvedValue(mockAdminSettings);
+
+        await loadConfig(mockSettings, mockExtensionLoader, taskId);
+
+        expect(Config).toHaveBeenCalledWith(expect.objectContaining({}));
+      });
+
       it('should fetch admin controls using the code assist server when available', async () => {
         const mockAdminSettings: FetchAdminControlsResponse = {
           mcpSetting: {
@@ -158,6 +186,7 @@ describe('loadConfig', () => {
           expect.objectContaining({
             disableYoloMode: !mockAdminSettings.strictModeDisabled,
             mcpEnabled: mockAdminSettings.mcpSetting?.mcpEnabled,
+            extensionsEnabled: false,
           }),
         );
       });

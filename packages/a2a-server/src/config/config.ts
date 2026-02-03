@@ -150,19 +150,21 @@ export async function loadConfig(
       adminControlsEnabled,
     );
 
-    // Set config parameters according to what admin settings are available.
-    if (adminSettings.strictModeDisabled !== undefined) {
-      finalConfigParams.disableYoloMode = !adminSettings.strictModeDisabled;
-    }
-    if (adminSettings.mcpSetting?.mcpEnabled !== undefined) {
-      finalConfigParams.mcpEnabled = adminSettings.mcpSetting?.mcpEnabled;
-    }
-    if (
-      adminSettings.cliFeatureSetting?.extensionsSetting?.extensionsEnabled !==
-      undefined
-    ) {
+    // Admin settings are able to be undefined if unset, but if any are present,
+    // we should initialize them all.
+    // If any are present, undefined settings should be treated as if they were
+    // set to false.
+    // If NONE are present, disregard admin settings entirely, and pass the
+    // final config as is.
+    if (Object.keys(adminSettings).length !== 0) {
+      finalConfigParams.disableYoloMode = !(
+        adminSettings.strictModeDisabled ?? false
+      );
+      finalConfigParams.mcpEnabled =
+        adminSettings.mcpSetting?.mcpEnabled ?? false;
       finalConfigParams.extensionsEnabled =
-        adminSettings.cliFeatureSetting?.extensionsSetting?.extensionsEnabled;
+        adminSettings.cliFeatureSetting?.extensionsSetting?.extensionsEnabled ??
+        false;
     }
   }
 
