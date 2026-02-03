@@ -17,6 +17,8 @@ import {
   coreEvents,
   homedir,
   type FetchAdminControlsResponse,
+  debugLogger,
+  FileDiscoveryService,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
@@ -410,13 +412,13 @@ function findEnvFile(startDir: string): string | null {
   }
 }
 
-export function setUpCloudShellEnvironment(envFilePath: string | null): void {
+export function setUpCloudShellEnvironment(envFilePath: string): void {
   // Special handling for GOOGLE_CLOUD_PROJECT in Cloud Shell:
   // Because GOOGLE_CLOUD_PROJECT in Cloud Shell tracks the project
   // set by the user using "gcloud config set project" we do not want to
   // use its value. So, unless the user overrides GOOGLE_CLOUD_PROJECT in
   // one of the .env files, we set the Cloud Shell-specific default here.
-  if (envFilePath && fs.existsSync(envFilePath)) {
+  if (fs.existsSync(envFilePath)) {
     const envFileContent = fs.readFileSync(envFilePath);
     const parsedEnv = dotenv.parse(envFileContent);
     if (parsedEnv['GOOGLE_CLOUD_PROJECT']) {
@@ -435,6 +437,47 @@ export function setUpCloudShellEnvironment(envFilePath: string | null): void {
 export function loadEnvironment(settings: Settings): void {
   const envFilePath = findEnvFile(process.cwd());
 
+  if (envFilePath == null) {
+    return;
+  }
+
+  // This service normally exists within config
+  //  however, config is way created *after* environment is loaded and settings are created.
+  // Config also *depends* on settings created here,
+  //  so we cannot use `config.fileDiscoveryService` as it would be a cyclical dependency.
+  // Therefore, a temporary instance is created.
+  const fileDiscovery = new FileDiscoveryService(process.cwd());
+
+  const gitIgnored =
+    settings.context?.fileFiltering?.respectGitIgnore &&
+    fileDiscovery.shouldIgnoreFile(envFilePath, {
+      respectGitIgnore: true,
+      respectGeminiIgnore: false,
+    });
+  const geminiIgnored =
+    settings.context?.fileFiltering?.respectGeminiIgnore &&
+    fileDiscovery.shouldIgnoreFile(envFilePath, {
+      respectGitIgnore: false,
+      respectGeminiIgnore: true,
+    });
+
+  if (gitIgnored || geminiIgnored) {
+    const reason =
+      gitIgnored && geminiIgnored ? 'both' : gitIgnored ? 'git' : 'gemini';
+
+    const reasonText =
+      reason === 'both'
+        ? 'both .gitignore and .geminiignore'
+        : reason === 'git'
+          ? '.gitignore'
+          : '.geminiignore';
+
+    debugLogger.warn(
+      `Path "${envFilePath}" is ignored by ${reasonText}. It will not be loaded into process environment`,
+    );
+    return;
+  }
+
   if (!isWorkspaceTrusted(settings).isTrusted) {
     return;
   }
@@ -444,33 +487,31 @@ export function loadEnvironment(settings: Settings): void {
     setUpCloudShellEnvironment(envFilePath);
   }
 
-  if (envFilePath) {
-    // Manually parse and load environment variables to handle exclusions correctly.
-    // This avoids modifying environment variables that were already set from the shell.
-    try {
-      const envFileContent = fs.readFileSync(envFilePath, 'utf-8');
-      const parsedEnv = dotenv.parse(envFileContent);
+  // Manually parse and load environment variables to handle exclusions correctly.
+  // This avoids modifying environment variables that were already set from the shell.
+  try {
+    const envFileContent = fs.readFileSync(envFilePath, 'utf-8');
+    const parsedEnv = dotenv.parse(envFileContent);
 
-      const excludedVars =
-        settings?.advanced?.excludedEnvVars || DEFAULT_EXCLUDED_ENV_VARS;
-      const isProjectEnvFile = !envFilePath.includes(GEMINI_DIR);
+    const excludedVars =
+      settings?.advanced?.excludedEnvVars || DEFAULT_EXCLUDED_ENV_VARS;
+    const isProjectEnvFile = !envFilePath.includes(GEMINI_DIR);
 
-      for (const key in parsedEnv) {
-        if (Object.hasOwn(parsedEnv, key)) {
-          // If it's a project .env file, skip loading excluded variables.
-          if (isProjectEnvFile && excludedVars.includes(key)) {
-            continue;
-          }
+    for (const key in parsedEnv) {
+      if (Object.hasOwn(parsedEnv, key)) {
+        // If it's a project .env file, skip loading excluded variables.
+        if (isProjectEnvFile && excludedVars.includes(key)) {
+          continue;
+        }
 
-          // Load variable only if it's not already set in the environment.
-          if (!Object.hasOwn(process.env, key)) {
-            process.env[key] = parsedEnv[key];
-          }
+        // Load variable only if it's not already set in the environment.
+        if (!Object.hasOwn(process.env, key)) {
+          process.env[key] = parsedEnv[key];
         }
       }
-    } catch (_e) {
-      // Errors are ignored to match the behavior of `dotenv.config({ quiet: true })`.
     }
+  } catch (_e) {
+    // Errors are ignored to match the behavior of `dotenv.config({ quiet: true })`.
   }
 }
 
