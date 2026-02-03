@@ -101,6 +101,11 @@ export type SerializableConfirmationDetails =
       type: 'ask_user';
       title: string;
       questions: Question[];
+    }
+  | {
+      type: 'exit_plan_mode';
+      title: string;
+      planPath: string;
     };
 
 export interface UpdatePolicy {
@@ -149,7 +154,7 @@ export interface Question {
   options?: QuestionOption[];
   /** Allow multiple selections. Only applies when type='choice'. */
   multiSelect?: boolean;
-  /** Placeholder hint text. Only applies when type='text'. */
+  /** Placeholder hint text. For type='text', shown in the input field. For type='choice', shown in the "Other" custom input. */
   placeholder?: string;
 }
 

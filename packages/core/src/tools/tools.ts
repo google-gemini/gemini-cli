@@ -18,6 +18,7 @@ import {
   type ToolConfirmationResponse,
   type Question,
 } from '../confirmation-bus/types.js';
+import { type ApprovalMode } from '../policy/types.js';
 
 /**
  * Represents a validated and ready-to-execute tool call.
@@ -693,13 +694,27 @@ export interface ToolEditConfirmationDetails {
   ideConfirmation?: Promise<DiffUpdateResult>;
 }
 
-export interface ToolConfirmationPayload {
-  // used to override `modifiedProposedContent` for modifiable tools in the
-  // inline modify flow
-  newContent?: string;
-  // used for askuser tool to return user's answers
-  answers?: { [questionIndex: string]: string };
+export interface ToolEditConfirmationPayload {
+  newContent: string;
 }
+
+export interface ToolAskUserConfirmationPayload {
+  answers: { [questionIndex: string]: string };
+}
+
+export interface ToolExitPlanModeConfirmationPayload {
+  /** Whether the user approved the plan */
+  approved: boolean;
+  /** If approved, the approval mode to use for implementation */
+  approvalMode?: ApprovalMode;
+  /** If rejected, the user's feedback */
+  feedback?: string;
+}
+
+export type ToolConfirmationPayload =
+  | ToolEditConfirmationPayload
+  | ToolAskUserConfirmationPayload
+  | ToolExitPlanModeConfirmationPayload;
 
 export interface ToolExecuteConfirmationDetails {
   type: 'exec';
@@ -738,12 +753,23 @@ export interface ToolAskUserConfirmationDetails {
   ) => Promise<void>;
 }
 
+export interface ToolExitPlanModeConfirmationDetails {
+  type: 'exit_plan_mode';
+  title: string;
+  planPath: string;
+  onConfirm: (
+    outcome: ToolConfirmationOutcome,
+    payload?: ToolConfirmationPayload,
+  ) => Promise<void>;
+}
+
 export type ToolCallConfirmationDetails =
   | ToolEditConfirmationDetails
   | ToolExecuteConfirmationDetails
   | ToolMcpConfirmationDetails
   | ToolInfoConfirmationDetails
-  | ToolAskUserConfirmationDetails;
+  | ToolAskUserConfirmationDetails
+  | ToolExitPlanModeConfirmationDetails;
 
 export enum ToolConfirmationOutcome {
   ProceedOnce = 'proceed_once',
@@ -765,6 +791,7 @@ export enum Kind {
   Think = 'think',
   Fetch = 'fetch',
   Communicate = 'communicate',
+  Plan = 'plan',
   Other = 'other',
 }
 

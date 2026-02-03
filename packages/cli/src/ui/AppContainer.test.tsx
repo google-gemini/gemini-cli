@@ -158,6 +158,12 @@ vi.mock('./components/shared/text-buffer.js');
 vi.mock('./hooks/useLogger.js');
 vi.mock('./hooks/useInputHistoryStore.js');
 vi.mock('./hooks/useHookDisplayState.js');
+vi.mock('./hooks/useTerminalTheme.js', () => ({
+  useTerminalTheme: vi.fn(),
+}));
+
+import { useHookDisplayState } from './hooks/useHookDisplayState.js';
+import { useTerminalTheme } from './hooks/useTerminalTheme.js';
 
 // Mock external utilities
 vi.mock('../utils/events.js');
@@ -186,7 +192,6 @@ import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
-import { useHookDisplayState } from './hooks/useHookDisplayState.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { measureElement } from 'ink';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
@@ -261,6 +266,7 @@ describe('AppContainer State Management', () => {
   const mockedUseKeypress = useKeypress as Mock;
   const mockedUseInputHistoryStore = useInputHistoryStore as Mock;
   const mockedUseHookDisplayState = useHookDisplayState as Mock;
+  const mockedUseTerminalTheme = useTerminalTheme as Mock;
 
   const DEFAULT_GEMINI_STREAM_MOCK = {
     streamingState: 'idle',
@@ -372,7 +378,9 @@ describe('AppContainer State Management', () => {
     mockedUseTextBuffer.mockReturnValue({
       text: '',
       setText: vi.fn(),
-      // Add other properties if AppContainer uses them
+      lines: [''],
+      cursor: [0, 0],
+      handleInput: vi.fn().mockReturnValue(false),
     });
     mockedUseLogger.mockReturnValue({
       getPreviousUserMessages: vi.fn().mockResolvedValue([]),
@@ -387,6 +395,7 @@ describe('AppContainer State Management', () => {
       currentLoadingPhrase: '',
     });
     mockedUseHookDisplayState.mockReturnValue([]);
+    mockedUseTerminalTheme.mockReturnValue(undefined);
 
     // Mock Config
     mockConfig = makeFakeConfig();
@@ -1901,7 +1910,7 @@ describe('AppContainer State Management', () => {
   });
 
   describe('Keyboard Input Handling (CTRL+C / CTRL+D)', () => {
-    let handleGlobalKeypress: (key: Key) => void;
+    let handleGlobalKeypress: (key: Key) => boolean;
     let mockHandleSlashCommand: Mock;
     let mockCancelOngoingRequest: Mock;
     let rerender: () => void;
@@ -1936,9 +1945,11 @@ describe('AppContainer State Management', () => {
 
     beforeEach(() => {
       // Capture the keypress handler from the AppContainer
-      mockedUseKeypress.mockImplementation((callback: (key: Key) => void) => {
-        handleGlobalKeypress = callback;
-      });
+      mockedUseKeypress.mockImplementation(
+        (callback: (key: Key) => boolean) => {
+          handleGlobalKeypress = callback;
+        },
+      );
 
       // Mock slash command handler
       mockHandleSlashCommand = vi.fn();
@@ -1962,6 +1973,9 @@ describe('AppContainer State Management', () => {
       mockedUseTextBuffer.mockReturnValue({
         text: '',
         setText: vi.fn(),
+        lines: [''],
+        cursor: [0, 0],
+        handleInput: vi.fn().mockReturnValue(false),
       });
 
       vi.useFakeTimers();
@@ -2021,24 +2035,55 @@ describe('AppContainer State Management', () => {
     });
 
     describe('CTRL+D', () => {
-      it('should do nothing if text buffer is not empty', async () => {
-        mockedUseTextBuffer.mockReturnValue({
-          text: 'some text',
-          setText: vi.fn(),
-        });
-        await setupKeypressTest();
-
-        pressKey({ name: 'd', ctrl: true }, 2);
-
-        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
-        unmount();
-      });
-
       it('should quit on second press if buffer is empty', async () => {
         await setupKeypressTest();
 
         pressKey({ name: 'd', ctrl: true }, 2);
 
+        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
+          '/quit',
+          undefined,
+          undefined,
+          false,
+        );
+        unmount();
+      });
+
+      it('should NOT quit if buffer is not empty (bubbles from InputPrompt)', async () => {
+        mockedUseTextBuffer.mockReturnValue({
+          text: 'some text',
+          setText: vi.fn(),
+          lines: ['some text'],
+          cursor: [0, 9], // At the end
+          handleInput: vi.fn().mockReturnValue(false),
+        });
+        await setupKeypressTest();
+
+        // Capture return value
+        let result = true;
+        const originalPressKey = (key: Partial<Key>) => {
+          act(() => {
+            result = handleGlobalKeypress({
+              name: 'd',
+              shift: false,
+              alt: false,
+              ctrl: true,
+              cmd: false,
+              ...key,
+            } as Key);
+          });
+          rerender();
+        };
+
+        originalPressKey({ name: 'd', ctrl: true });
+
+        // AppContainer's handler should return true if it reaches it
+        expect(result).toBe(true);
+        // But it should only be called once, so count is 1, not quitting yet.
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+
+        originalPressKey({ name: 'd', ctrl: true });
+        // Now count is 2, it should quit.
         expect(mockHandleSlashCommand).toHaveBeenCalledWith(
           '/quit',
           undefined,
@@ -2067,7 +2112,7 @@ describe('AppContainer State Management', () => {
   });
 
   describe('Copy Mode (CTRL+S)', () => {
-    let handleGlobalKeypress: (key: Key) => void;
+    let handleGlobalKeypress: (key: Key) => boolean;
     let rerender: () => void;
     let unmount: () => void;
 
@@ -2097,9 +2142,11 @@ describe('AppContainer State Management', () => {
 
     beforeEach(() => {
       mocks.mockStdout.write.mockClear();
-      mockedUseKeypress.mockImplementation((callback: (key: Key) => void) => {
-        handleGlobalKeypress = callback;
-      });
+      mockedUseKeypress.mockImplementation(
+        (callback: (key: Key) => boolean) => {
+          handleGlobalKeypress = callback;
+        },
+      );
       vi.useFakeTimers();
     });
 
