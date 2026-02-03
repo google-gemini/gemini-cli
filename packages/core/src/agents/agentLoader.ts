@@ -8,8 +8,8 @@ import yaml from 'js-yaml';
 import * as fs from 'node:fs/promises';
 import { type Dirent } from 'node:fs';
 import * as path from 'node:path';
-import * as crypto from 'node:crypto';
 import { z } from 'zod';
+import { AcknowledgedAgentsService } from './acknowledgedAgents.js';
 import type { AgentDefinition } from './types.js';
 import { isValidToolName } from '../tools/tool-names.js';
 import { FRONTMATTER_REGEX } from '../skills/skillLoader.js';
@@ -347,7 +347,7 @@ export async function loadAgentsFromDirectory(
     const filePath = path.join(dir, entry.name);
     try {
       const content = await fs.readFile(filePath, 'utf-8');
-      const hash = crypto.createHash('sha256').update(content).digest('hex');
+      const hash = AcknowledgedAgentsService.computeHash(content);
       const agentDefs = await parseAgentMarkdown(filePath, content);
       for (const def of agentDefs) {
         const agent = markdownToAgentDefinition(def, { hash, filePath });

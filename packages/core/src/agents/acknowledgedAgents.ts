@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import * as crypto from 'node:crypto';
 import { Storage } from '../config/storage.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
@@ -20,6 +21,10 @@ export interface AcknowledgedAgentsMap {
 export class AcknowledgedAgentsService {
   private acknowledgedAgents: AcknowledgedAgentsMap = {};
   private loaded = false;
+
+  static computeHash(content: string): string {
+    return crypto.createHash('sha256').update(content).digest('hex');
+  }
 
   async load(): Promise<void> {
     if (this.loaded) return;

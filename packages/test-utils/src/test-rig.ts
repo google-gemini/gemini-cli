@@ -17,7 +17,6 @@ import {
   AcknowledgedAgentsService,
 } from '@google/gemini-cli-core';
 import fs from 'node:fs';
-import crypto from 'node:crypto';
 import * as pty from '@lydell/node-pty';
 import stripAnsi from 'strip-ansi';
 import * as os from 'node:os';
@@ -370,7 +369,7 @@ export class TestRig {
     try {
       const service = new AcknowledgedAgentsService();
       for (const [name, content] of Object.entries(agents)) {
-        const hash = crypto.createHash('sha256').update(content).digest('hex');
+        const hash = AcknowledgedAgentsService.computeHash(content);
         await service.acknowledge(projectRoot, name, hash);
       }
     } finally {

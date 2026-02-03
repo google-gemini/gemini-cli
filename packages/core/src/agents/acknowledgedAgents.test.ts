@@ -94,4 +94,13 @@ describe('AcknowledgedAgentsService', () => {
       false,
     );
   });
+
+  it('should compute consistent hashes', () => {
+    const content = 'some content';
+    const hash = AcknowledgedAgentsService.computeHash(content);
+    expect(hash).toBe(AcknowledgedAgentsService.computeHash(content));
+    expect(hash).not.toBe(
+      AcknowledgedAgentsService.computeHash('other content'),
+    );
+  });
 });
