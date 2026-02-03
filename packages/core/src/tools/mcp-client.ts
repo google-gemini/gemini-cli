@@ -1008,9 +1008,7 @@ export async function discoverTools(
         );
 
         // Extract readOnlyHint from annotations
-        const isReadOnly = (
-          toolDef.annotations as { readOnlyHint?: boolean } | undefined
-        )?.readOnlyHint;
+        const isReadOnly = toolDef.annotations?.readOnlyHint === true;
 
         const tool = new DiscoveredMCPTool(
           mcpCallableTool,
