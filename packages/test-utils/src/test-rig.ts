@@ -411,6 +411,7 @@ export class TestRig {
         key !== 'GOOGLE_API_KEY' &&
         key !== 'GEMINI_MODEL' &&
         key !== 'GEMINI_DEBUG' &&
+        key !== 'GEMINI_CLI_TEST_VAR' &&
         !key.startsWith('GEMINI_CLI_ACTIVITY_LOG')
       ) {
         delete cleanEnv[key];
