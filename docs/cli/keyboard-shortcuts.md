@@ -44,14 +44,18 @@ available combinations.
 
 #### Scrolling
 
-| Action                   | Keys                              |
-| ------------------------ | --------------------------------- |
-| Scroll content up.       | `Shift + Up Arrow`                |
-| Scroll content down.     | `Shift + Down Arrow`              |
-| Scroll to the top.       | `Ctrl + Home`<br />`Shift + Home` |
-| Scroll to the bottom.    | `Ctrl + End`<br />`Shift + End`   |
-| Scroll up by one page.   | `Page Up`                         |
-| Scroll down by one page. | `Page Down`                       |
+| Action                                      | Keys                              |
+| ------------------------------------------- | --------------------------------- |
+| Scroll content up.                          | `Shift + Up Arrow`                |
+| Scroll content down.                        | `Shift + Down Arrow`              |
+| Scroll to the top.                          | `Ctrl + Home`<br />`Shift + Home` |
+| Scroll to the bottom.                       | `Ctrl + End`<br />`Shift + End`   |
+| Scroll up by one page.                      | `Page Up`                         |
+| Scroll down by one page.                    | `Page Down`                       |
+| Scroll the embedded shell up.               | `Shift + Ctrl + Up Arrow`         |
+| Scroll the embedded shell down.             | `Shift + Ctrl + Down Arrow`       |
+| Scroll the embedded shell up by one page.   | `Shift + Ctrl + Page Up`          |
+| Scroll the embedded shell down by one page. | `Shift + Ctrl + Page Down`        |
 
 #### History & Search
 
@@ -74,6 +78,7 @@ available combinations.
 | Move down within dialog options.                   | `Down Arrow (no Shift)`<br />`J (no Shift)` |
 | Move to the next item or question in a dialog.     | `Tab (no Shift)`                            |
 | Move to the previous item or question in a dialog. | `Shift + Tab`                               |
+| Move focus out of the embedded shell.              | `Shift + Tab`                               |
 
 #### Suggestions & Completions
 
