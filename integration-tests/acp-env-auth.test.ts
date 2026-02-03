@@ -152,7 +152,9 @@ describe('ACP Environment and Auth', () => {
           mcpServers: [],
         }),
       ).rejects.toMatchObject({
-        message: expect.stringContaining('Authentication required'),
+        message: expect.stringContaining(
+          'Gemini API key is missing or not configured.',
+        ),
       });
 
       child.stdin!.end();
