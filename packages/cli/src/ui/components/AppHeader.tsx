@@ -7,6 +7,7 @@
 import { Box } from 'ink';
 import { Header } from './Header.js';
 import { Tips } from './Tips.js';
+import { UserIdentity } from './UserIdentity.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
@@ -39,6 +40,9 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
             />
           )}
         </>
+      )}
+      {settings.merged.ui.showUserIdentity !== false && (
+        <UserIdentity config={config} />
       )}
       {!(settings.merged.ui.hideTips || config.getScreenReader()) &&
         showTips && <Tips config={config} />}
