@@ -1484,9 +1484,10 @@ describe('Settings Loading and Merging', () => {
         return pStr;
       });
 
-      (mockFsExistsSync as Mock).mockImplementation((p: string) => 
-        // Only return true for workspace settings path to see if it gets loaded
-         p === mockWorkspaceSettingsPath
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: string) =>
+          // Only return true for workspace settings path to see if it gets loaded
+          p === mockWorkspaceSettingsPath,
       );
 
       const settings = loadSettings(mockSymlinkDir);

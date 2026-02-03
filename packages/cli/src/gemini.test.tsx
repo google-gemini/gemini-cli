@@ -25,7 +25,6 @@ import { loadCliConfig, parseArguments } from './config/config.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
 import { terminalCapabilityManager } from './ui/utils/terminalCapabilityManager.js';
 import { start_sandbox } from './utils/sandbox.js';
-import { readStdin } from './utils/readStdin.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import os from 'node:os';
 import v8 from 'node:v8';
@@ -201,9 +200,7 @@ vi.mock('./utils/events.js', async (importOriginal) => {
   };
 });
 
-vi.mock('./utils/readStdin.js', () => ({
-  readStdin: vi.fn().mockResolvedValue('stdin-data'),
-}));
+import * as readStdinModule from './utils/readStdin.js';
 
 vi.mock('./utils/sandbox.js', () => ({
   sandbox_command: vi.fn(() => ''), // Default to no sandbox command
@@ -243,6 +240,7 @@ vi.mock('./validateNonInterActiveAuth.js', () => ({
 describe('gemini.tsx main function', () => {
   let originalEnvGeminiSandbox: string | undefined;
   let originalEnvSandbox: string | undefined;
+  let originalIsTTY: boolean | undefined;
   let initialUnhandledRejectionListeners: NodeJS.UnhandledRejectionListener[] =
     [];
 
@@ -255,6 +253,10 @@ describe('gemini.tsx main function', () => {
 
     initialUnhandledRejectionListeners =
       process.listeners('unhandledRejection');
+
+    originalIsTTY = process.stdin.isTTY;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stdin as any).isTTY = true;
   });
 
   afterEach(() => {
@@ -277,10 +279,8 @@ describe('gemini.tsx main function', () => {
       }
     });
 
-    Object.defineProperty(process.stdin, 'isTTY', {
-      value: true,
-      configurable: true,
-    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stdin as any).isTTY = originalIsTTY;
 
     vi.restoreAllMocks();
   });
@@ -412,6 +412,8 @@ describe('getNodeMemoryArgs', () => {
 
 describe('gemini.tsx main function kitty protocol', () => {
   let originalEnvNoRelaunch: string | undefined;
+  let originalIsTTY: boolean | undefined;
+  let originalIsRaw: boolean | undefined;
   let setRawModeSpy: MockInstance<
     (mode: boolean) => NodeJS.ReadStream & { fd: 0 }
   >;
@@ -428,14 +430,12 @@ describe('gemini.tsx main function kitty protocol', () => {
     }
     setRawModeSpy = vi.spyOn(process.stdin, 'setRawMode');
 
-    Object.defineProperty(process.stdin, 'isTTY', {
-      value: true,
-      configurable: true,
-    });
-    Object.defineProperty(process.stdin, 'isRaw', {
-      value: false,
-      configurable: true,
-    });
+    originalIsTTY = process.stdin.isTTY;
+    originalIsRaw = process.stdin.isRaw;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stdin as any).isTTY = true;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stdin as any).isRaw = false;
   });
 
   afterEach(() => {
@@ -445,6 +445,10 @@ describe('gemini.tsx main function kitty protocol', () => {
     } else {
       delete process.env['GEMINI_CLI_NO_RELAUNCH'];
     }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stdin as any).isTTY = originalIsTTY;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stdin as any).isRaw = originalIsRaw;
     vi.restoreAllMocks();
   });
 
@@ -802,6 +806,10 @@ describe('gemini.tsx main function kitty protocol', () => {
         throw new MockProcessExitError(code);
       });
 
+    const readStdinSpy = vi
+      .spyOn(readStdinModule, 'readStdin')
+      .mockResolvedValue('stdin-data');
+
     vi.mocked(loadSettings).mockReturnValue(
       createMockSettings({
         merged: { advanced: {}, security: { auth: {} }, ui: {} },
@@ -823,10 +831,8 @@ describe('gemini.tsx main function kitty protocol', () => {
     );
 
     // Mock stdin to be non-TTY
-    Object.defineProperty(process.stdin, 'isTTY', {
-      value: false,
-      configurable: true,
-    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stdin as any).isTTY = false;
 
     process.env['GEMINI_API_KEY'] = 'test-key';
     try {
@@ -837,13 +843,13 @@ describe('gemini.tsx main function kitty protocol', () => {
       delete process.env['GEMINI_API_KEY'];
     }
 
-    expect(readStdin).toHaveBeenCalled();
+    expect(readStdinSpy).toHaveBeenCalled();
     // In this test setup, runNonInteractive might be called on the mocked module,
     // but we need to ensure we are checking the correct spy instance.
     // Since vi.mock is hoisted, runNonInteractiveSpy is defined early.
     expect(runNonInteractive).toHaveBeenCalled();
     const callArgs = vi.mocked(runNonInteractive).mock.calls[0][0];
-    expect(callArgs.input).toBe('test-question');
+    expect(callArgs.input).toBe('stdin-data\n\ntest-question');
     expect(processExitSpy).toHaveBeenCalledWith(0);
     processExitSpy.mockRestore();
   });
@@ -851,6 +857,7 @@ describe('gemini.tsx main function kitty protocol', () => {
 
 describe('gemini.tsx main function exit codes', () => {
   let originalEnvNoRelaunch: string | undefined;
+  let originalIsTTY: boolean | undefined;
 
   beforeEach(() => {
     originalEnvNoRelaunch = process.env['GEMINI_CLI_NO_RELAUNCH'];
@@ -860,6 +867,8 @@ describe('gemini.tsx main function exit codes', () => {
     });
     // Mock stderr to avoid cluttering output
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+
+    originalIsTTY = process.stdin.isTTY;
   });
 
   afterEach(() => {
@@ -868,6 +877,8 @@ describe('gemini.tsx main function exit codes', () => {
     } else {
       delete process.env['GEMINI_CLI_NO_RELAUNCH'];
     }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stdin as any).isTTY = originalIsTTY;
     vi.restoreAllMocks();
   });
 
@@ -881,10 +892,8 @@ describe('gemini.tsx main function exit codes', () => {
     vi.mocked(parseArguments).mockResolvedValue({
       promptInteractive: true,
     } as unknown as CliArgs);
-    Object.defineProperty(process.stdin, 'isTTY', {
-      value: false,
-      configurable: true,
-    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stdin as any).isTTY = false;
 
     try {
       await main();
@@ -892,11 +901,6 @@ describe('gemini.tsx main function exit codes', () => {
     } catch (e) {
       expect(e).toBeInstanceOf(MockProcessExitError);
       expect((e as MockProcessExitError).code).toBe(42);
-    } finally {
-      Object.defineProperty(process.stdin, 'isTTY', {
-        value: true,
-        configurable: true,
-      });
     }
   });
 
@@ -982,10 +986,8 @@ describe('gemini.tsx main function exit codes', () => {
       }),
     );
     vi.mocked(parseArguments).mockResolvedValue({} as unknown as CliArgs);
-    Object.defineProperty(process.stdin, 'isTTY', {
-      value: true, // Simulate TTY so it doesn't try to read stdin
-      configurable: true,
-    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (process.stdin as any).isTTY = true;
 
     process.env['GEMINI_API_KEY'] = 'test-key';
     try {

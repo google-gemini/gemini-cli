@@ -15,7 +15,6 @@ import {
 } from 'vitest';
 import yargs, { type Argv } from 'yargs';
 import { SettingScope, type LoadedSettings } from '../../config/settings.js';
-import * as trustedFolders from '../../config/trustedFolders.js';
 import { removeCommand } from './remove.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -42,6 +41,14 @@ vi.mock('../utils.js', () => ({
   exitCli: vi.fn(),
 }));
 
+vi.mock('../../config/trustedFolders.js', () => ({
+  isWorkspaceTrusted: vi.fn(() => ({
+    isTrusted: true,
+    source: undefined,
+  })),
+  isFolderTrustEnabled: vi.fn(() => false),
+}));
+
 describe('mcp remove command', () => {
   describe('unit tests with mocks', () => {
     let parser: Argv;
@@ -50,11 +57,6 @@ describe('mcp remove command', () => {
 
     beforeEach(async () => {
       vi.resetAllMocks();
-      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
-        isTrusted: true,
-        source: undefined,
-      });
-      vi.spyOn(trustedFolders, 'isFolderTrustEnabled').mockReturnValue(false);
 
       mockSetValue = vi.fn();
       mockSettings = {
@@ -113,12 +115,6 @@ describe('mcp remove command', () => {
     beforeEach(() => {
       vi.resetAllMocks();
       vi.restoreAllMocks();
-
-      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
-        isTrusted: true,
-        source: undefined,
-      });
-      vi.spyOn(trustedFolders, 'isFolderTrustEnabled').mockReturnValue(false);
 
       tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-remove-test-'));
       settingsDir = path.join(tempDir, GEMINI_DIR);
