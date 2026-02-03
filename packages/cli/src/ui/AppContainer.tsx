@@ -224,7 +224,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const activeHooks = useHookDisplayState();
   const [updateInfo, setUpdateInfo] = useState<UpdateObject | null>(null);
   const [isTrustedFolder, setIsTrustedFolder] = useState<boolean | undefined>(
-    isWorkspaceTrusted(settings.merged).isTrusted,
+    () => isWorkspaceTrusted(settings.merged).isTrusted,
   );
 
   const [queueErrorMessage, setQueueErrorMessage] = useState<string | null>(
