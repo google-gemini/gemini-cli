@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 interface UseInputHistoryProps {
   userMessages: readonly string[];
@@ -27,13 +27,17 @@ export function useInputHistory({
   currentQuery,
   onChange,
 }: UseInputHistoryProps): UseInputHistoryReturn {
-  const [historyIndex, setHistoryIndex] = useState<number>(-1);
-  const [originalQueryBeforeNav, setOriginalQueryBeforeNav] =
-    useState<string>('');
+  const currentQueryRef = useRef(currentQuery);
+  const historyIndexRef = useRef<number>(-1);
+  const originalQueryBeforeNavRef = useRef<string>('');
+
+  useEffect(() => {
+    currentQueryRef.current = currentQuery;
+  }, [currentQuery]);
 
   const resetHistoryNav = useCallback(() => {
-    setHistoryIndex(-1);
-    setOriginalQueryBeforeNav('');
+    historyIndexRef.current = -1;
+    originalQueryBeforeNavRef.current = '';
   }, []);
 
   const handleSubmit = useCallback(
@@ -51,57 +55,42 @@ export function useInputHistory({
     if (!isActive) return false;
     if (userMessages.length === 0) return false;
 
-    let nextIndex = historyIndex;
-    if (historyIndex === -1) {
+    let nextIndex = historyIndexRef.current;
+    if (historyIndexRef.current === -1) {
       // Store the current query from the parent before navigating
-      setOriginalQueryBeforeNav(currentQuery);
+      originalQueryBeforeNavRef.current = currentQueryRef.current;
       nextIndex = 0;
-    } else if (historyIndex < userMessages.length - 1) {
-      nextIndex = historyIndex + 1;
+    } else if (historyIndexRef.current < userMessages.length - 1) {
+      nextIndex = historyIndexRef.current + 1;
     } else {
       return false; // Already at the oldest message
     }
 
-    if (nextIndex !== historyIndex) {
-      setHistoryIndex(nextIndex);
+    if (nextIndex !== historyIndexRef.current) {
+      historyIndexRef.current = nextIndex;
       const newValue = userMessages[userMessages.length - 1 - nextIndex];
       onChange(newValue);
       return true;
     }
     return false;
-  }, [
-    historyIndex,
-    setHistoryIndex,
-    onChange,
-    userMessages,
-    isActive,
-    currentQuery, // Use currentQuery from props
-    setOriginalQueryBeforeNav,
-  ]);
+  }, [onChange, userMessages, isActive]);
 
   const navigateDown = useCallback(() => {
     if (!isActive) return false;
-    if (historyIndex === -1) return false; // Not currently navigating history
+    if (historyIndexRef.current === -1) return false; // Not currently navigating history
 
-    const nextIndex = historyIndex - 1;
-    setHistoryIndex(nextIndex);
+    const nextIndex = historyIndexRef.current - 1;
+    historyIndexRef.current = nextIndex;
 
     if (nextIndex === -1) {
       // Reached the end of history navigation, restore original query
-      onChange(originalQueryBeforeNav);
+      onChange(originalQueryBeforeNavRef.current);
     } else {
       const newValue = userMessages[userMessages.length - 1 - nextIndex];
       onChange(newValue);
     }
     return true;
-  }, [
-    historyIndex,
-    setHistoryIndex,
-    originalQueryBeforeNav,
-    onChange,
-    userMessages,
-    isActive,
-  ]);
+  }, [onChange, userMessages, isActive]);
 
   return {
     handleSubmit,
