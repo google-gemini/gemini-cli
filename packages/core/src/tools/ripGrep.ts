@@ -103,6 +103,11 @@ export interface RipGrepToolParams {
   include?: string;
 
   /**
+   * Optional: A string that must be present in the file for it to be included (logical AND).
+   */
+  filter?: string;
+
+  /**
    * If true, searches case-sensitively. Defaults to false.
    */
   case_sensitive?: boolean;
@@ -234,6 +239,7 @@ class GrepToolInvocation extends BaseToolInvocation<
           pattern: this.params.pattern,
           path: searchDirAbs,
           include: this.params.include,
+          filter: this.params.filter,
           case_sensitive: this.params.case_sensitive,
           fixed_strings: this.params.fixed_strings,
           context: this.params.context,
@@ -319,6 +325,7 @@ class GrepToolInvocation extends BaseToolInvocation<
     pattern: string;
     path: string;
     include?: string;
+    filter?: string;
     case_sensitive?: boolean;
     fixed_strings?: boolean;
     context?: number;
@@ -333,6 +340,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       pattern,
       path: absolutePath,
       include,
+      filter,
       case_sensitive,
       fixed_strings,
       context,
@@ -342,6 +350,88 @@ class GrepToolInvocation extends BaseToolInvocation<
       maxMatches,
       maxMatchesPerFile,
     } = options;
+
+    const rgPath = await ensureRgPath();
+
+    // If filter is provided, first find files matching the filter.
+    // This simulates "rg -l 'filter' | xargs rg 'pattern'".
+    let matchingFiles: string[] | undefined;
+
+    if (filter) {
+      const filterArgs = ['--files-with-matches', '--json'];
+      if (!case_sensitive) {
+        filterArgs.push('--ignore-case');
+      }
+      // Treat filter as literal string if fixed_strings is true, or maybe we should always treat filter as regex?
+      // The prompt says "must_contain" or "pattern_b".
+      // Let's assume filter follows same rules as pattern (regex unless fixed_strings).
+      if (fixed_strings) {
+        filterArgs.push('--fixed-strings');
+        filterArgs.push(filter);
+      } else {
+        filterArgs.push('--regexp', filter);
+      }
+
+      if (no_ignore) {
+        filterArgs.push('--no-ignore');
+      }
+      if (include) {
+        filterArgs.push('--glob', include);
+      }
+
+      if (!no_ignore) {
+        // Add ignore patterns
+        const fileExclusions = new FileExclusions(this.config);
+        const excludes = fileExclusions.getGlobExcludes([
+          ...COMMON_DIRECTORY_EXCLUDES,
+          '*.log',
+          '*.tmp',
+        ]);
+        excludes.forEach((exclude) => {
+          filterArgs.push('--glob', `!${exclude}`);
+        });
+
+        const geminiIgnorePaths =
+          this.fileDiscoveryService.getIgnoreFilePaths();
+        for (const ignorePath of geminiIgnorePaths) {
+          filterArgs.push('--ignore-file', ignorePath);
+        }
+      }
+
+      filterArgs.push('--threads', '4');
+      filterArgs.push(absolutePath);
+
+      try {
+        const generator = execStreaming(rgPath, filterArgs, {
+          signal: options.signal,
+          allowedExitCodes: [0, 1],
+        });
+
+        matchingFiles = [];
+        for await (const line of generator) {
+          try {
+            const json = JSON.parse(line);
+            if (json.type === 'match') {
+              const match = json.data;
+              if (match.path?.text) {
+                matchingFiles.push(match.path.text);
+              }
+            }
+          } catch (_e) {
+            // Ignore parse errors
+          }
+        }
+
+        if (matchingFiles.length === 0) {
+          return [];
+        }
+      } catch (error: unknown) {
+        debugLogger.debug(
+          `GrepLogic: ripgrep filter failed: ${getErrorMessage(error)}`,
+        );
+        throw error;
+      }
+    }
 
     const rgArgs = ['--json'];
 
@@ -373,35 +463,45 @@ class GrepToolInvocation extends BaseToolInvocation<
       rgArgs.push('--max-count', maxMatchesPerFile.toString());
     }
 
-    if (include) {
-      rgArgs.push('--glob', include);
-    }
-
-    if (!no_ignore) {
-      const fileExclusions = new FileExclusions(this.config);
-      const excludes = fileExclusions.getGlobExcludes([
-        ...COMMON_DIRECTORY_EXCLUDES,
-        '*.log',
-        '*.tmp',
-      ]);
-      excludes.forEach((exclude) => {
-        rgArgs.push('--glob', `!${exclude}`);
-      });
-
-      // Add .geminiignore and custom ignore files support (if provided/mandated)
-      // (ripgrep natively handles .gitignore)
-      const geminiIgnorePaths = this.fileDiscoveryService.getIgnoreFilePaths();
-      for (const ignorePath of geminiIgnorePaths) {
-        rgArgs.push('--ignore-file', ignorePath);
+    // If we have matchingFiles, we pass them as arguments.
+    // Otherwise we use include/exclude args and the path.
+    if (matchingFiles) {
+      // We don't need --glob include here as we are passing specific files that already matched the include in the filter step.
+      // We also don't need ignore files/patterns as we are passing explicit files.
+      // However, we should check command line length.
+      // If matchingFiles is very large, we might need to batch?
+      // For now, let's just spread them.
+      rgArgs.push(...matchingFiles);
+    } else {
+      if (include) {
+        rgArgs.push('--glob', include);
       }
+
+      if (!no_ignore) {
+        const fileExclusions = new FileExclusions(this.config);
+        const excludes = fileExclusions.getGlobExcludes([
+          ...COMMON_DIRECTORY_EXCLUDES,
+          '*.log',
+          '*.tmp',
+        ]);
+        excludes.forEach((exclude) => {
+          rgArgs.push('--glob', `!${exclude}`);
+        });
+
+        const geminiIgnorePaths =
+          this.fileDiscoveryService.getIgnoreFilePaths();
+        for (const ignorePath of geminiIgnorePaths) {
+          rgArgs.push('--ignore-file', ignorePath);
+        }
+      }
+      rgArgs.push(absolutePath);
     }
 
+    // Add threads
     rgArgs.push('--threads', '4');
-    rgArgs.push(absolutePath);
 
     const results: GrepMatch[] = [];
     try {
-      const rgPath = await ensureRgPath();
       const generator = execStreaming(rgPath, rgArgs, {
         signal: options.signal,
         allowedExitCodes: [0, 1],
@@ -524,6 +624,11 @@ export class RipGrepTool extends BaseDeclarativeTool<
           include: {
             description:
               "Glob pattern to filter files (e.g., '*.ts', 'src/**'). Recommended for large repositories to reduce noise. Defaults to all files if omitted.",
+            type: 'string',
+          },
+          filter: {
+            description:
+              'Optional: A string that must be present in the file for it to be included (logical AND). Use this to filter results to files containing both the `pattern` and this filter.',
             type: 'string',
           },
           case_sensitive: {
