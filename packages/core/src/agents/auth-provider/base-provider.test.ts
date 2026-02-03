@@ -88,6 +88,49 @@ describe('BaseA2AAuthProvider', () => {
 
       expect(result).toEqual({ Authorization: 'new-token' });
     });
+
+    it('should retry up to 2 times on 401/403', async () => {
+      const provider = new TestAuthProvider({ Authorization: 'Bearer token' });
+      const response401 = new Response(null, { status: 401 });
+
+      // First retry should succeed
+      const result1 = await provider.shouldRetryWithHeaders({}, response401);
+      expect(result1).toEqual({ Authorization: 'Bearer token' });
+
+      // Second retry should succeed
+      const result2 = await provider.shouldRetryWithHeaders({}, response401);
+      expect(result2).toEqual({ Authorization: 'Bearer token' });
+    });
+
+    it('should return undefined after max retries exceeded', async () => {
+      const provider = new TestAuthProvider({ Authorization: 'Bearer token' });
+      const response401 = new Response(null, { status: 401 });
+
+      // Exhaust retries
+      await provider.shouldRetryWithHeaders({}, response401); // retry 1
+      await provider.shouldRetryWithHeaders({}, response401); // retry 2
+
+      // Third attempt should return undefined
+      const result = await provider.shouldRetryWithHeaders({}, response401);
+      expect(result).toBeUndefined();
+    });
+
+    it('should reset retry count on successful response', async () => {
+      const provider = new TestAuthProvider({ Authorization: 'Bearer token' });
+      const response401 = new Response(null, { status: 401 });
+      const response200 = new Response(null, { status: 200 });
+
+      // Use up retries
+      await provider.shouldRetryWithHeaders({}, response401); // retry 1
+      await provider.shouldRetryWithHeaders({}, response401); // retry 2
+
+      // Success resets counter
+      await provider.shouldRetryWithHeaders({}, response200);
+
+      // Should be able to retry again
+      const result = await provider.shouldRetryWithHeaders({}, response401);
+      expect(result).toEqual({ Authorization: 'Bearer token' });
+    });
   });
 
   describe('initialize', () => {

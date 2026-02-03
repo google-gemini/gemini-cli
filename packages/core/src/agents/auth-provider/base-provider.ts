@@ -14,6 +14,9 @@ export abstract class BaseA2AAuthProvider implements A2AAuthProvider {
   abstract readonly type: A2AAuthProviderType;
   abstract headers(): Promise<HttpHeaders>;
 
+  private static readonly MAX_AUTH_RETRIES = 2;
+  private authRetryCount = 0;
+
   /**
    * Default: retry on 401/403 with fresh headers.
    * Subclasses with cached tokens must override to force-refresh to avoid infinite retries.
@@ -23,8 +26,14 @@ export abstract class BaseA2AAuthProvider implements A2AAuthProvider {
     res: Response,
   ): Promise<HttpHeaders | undefined> {
     if (res.status === 401 || res.status === 403) {
+      if (this.authRetryCount >= BaseA2AAuthProvider.MAX_AUTH_RETRIES) {
+        return undefined; // Max retries exceeded
+      }
+      this.authRetryCount++;
       return this.headers();
     }
+    // Reset on success
+    this.authRetryCount = 0;
     return undefined;
   }
 

@@ -125,6 +125,7 @@ export class A2AAuthProviderFactory {
     };
   }
 
+  // Security schemes have OR semantics per A2A spec - matching any single scheme is sufficient
   private static findMatchingScheme(
     authConfig: A2AAuthConfig,
     securitySchemes: Record<string, SecurityScheme>,
