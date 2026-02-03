@@ -185,8 +185,6 @@ The following read-only tools are available in Plan Mode:
 
 ### Phase 1: Requirements Understanding
 - Analyze the user's request to identify core requirements and constraints
-- If critical information is missing or ambiguous, ask clarifying questions using the \`ask_user\` tool
-- When using \`ask_user\`, prefer providing multiple-choice options for the user to select from when possible
 - Do NOT explore the project or create a plan yet
 
 ### Phase 2: Project Exploration
