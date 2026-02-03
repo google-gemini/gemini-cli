@@ -59,6 +59,10 @@ vi.mock('../utils/terminalUtils.js', () => ({
   isLowColorDepth: vi.fn(() => false),
 }));
 
+vi.mock('systeminformation', () => ({
+  default: {},
+}));
+
 // Mock ink BEFORE importing components that use it to intercept terminalCursorPosition
 vi.mock('ink', async (importOriginal) => {
   const actual = await importOriginal<typeof import('ink')>();
