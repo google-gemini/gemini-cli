@@ -7,6 +7,7 @@
 import type {
   ClientMetadata,
   GeminiUserTier,
+  IneligibleTier,
   LoadCodeAssistResponse,
   OnboardUserRequest,
 } from './types.js';
@@ -32,6 +33,16 @@ export class ProjectIdRequiredError extends Error {
 export class ValidationCancelledError extends Error {
   constructor() {
     super('User cancelled account validation');
+  }
+}
+
+export class IneligibleTierError extends Error {
+  readonly ineligibleTiers: IneligibleTier[];
+
+  constructor(ineligibleTiers: IneligibleTier[]) {
+    const reasons = ineligibleTiers.map((t) => t.reasonMessage).join(', ');
+    super(reasons);
+    this.ineligibleTiers = ineligibleTiers;
   }
 }
 
@@ -121,24 +132,18 @@ export async function setupUser(
       if (projectId) {
         return {
           projectId,
-          userTier: loadRes.currentTier.id,
-          userTierName: loadRes.currentTier.name,
+          userTier: loadRes.paidTier?.id ?? loadRes.currentTier.id,
+          userTierName: loadRes.paidTier?.name ?? loadRes.currentTier.name,
         };
       }
 
       // If user is not setup for standard tier, inform them about all other tiers they are ineligible for.
-      if (loadRes.ineligibleTiers && loadRes.ineligibleTiers.length > 0) {
-        const reasons = loadRes.ineligibleTiers
-          .map((t) => t.reasonMessage)
-          .join(', ');
-        throw new Error(reasons);
-      }
-      throw new ProjectIdRequiredError();
+      throwIneligibleOrProjectIdError(loadRes);
     }
     return {
       projectId: loadRes.cloudaicompanionProject,
-      userTier: loadRes.currentTier.id,
-      userTierName: loadRes.currentTier.name,
+      userTier: loadRes.paidTier?.id ?? loadRes.currentTier.id,
+      userTierName: loadRes.paidTier?.name ?? loadRes.currentTier.name,
     };
   }
 
@@ -180,7 +185,8 @@ export async function setupUser(
         userTierName: tier.name,
       };
     }
-    throw new ProjectIdRequiredError();
+
+    throwIneligibleOrProjectIdError(loadRes);
   }
 
   return {
@@ -188,6 +194,13 @@ export async function setupUser(
     userTier: tier.id,
     userTierName: tier.name,
   };
+}
+
+function throwIneligibleOrProjectIdError(res: LoadCodeAssistResponse): never {
+  if (res.ineligibleTiers && res.ineligibleTiers.length > 0) {
+    throw new IneligibleTierError(res.ineligibleTiers);
+  }
+  throw new ProjectIdRequiredError();
 }
 
 function getOnboardTier(res: LoadCodeAssistResponse): GeminiUserTier {

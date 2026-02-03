@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../../test-utils/render.js';
+import { render, renderWithProviders } from '../../../test-utils/render.js';
 import { waitFor } from '../../../test-utils/async.js';
 import { OverflowProvider } from '../../contexts/OverflowContext.js';
 import { MaxSizedBox } from './MaxSizedBox.js';
+import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { Box, Text } from 'ink';
 import { describe, it, expect } from 'vitest';
 
@@ -225,5 +226,32 @@ describe('<MaxSizedBox />', () => {
     );
     expect(lastFrame()).toMatchSnapshot();
     unmount();
+  });
+
+  it('does not leak content after hidden indicator with bottom overflow', async () => {
+    const markdownContent = Array.from(
+      { length: 20 },
+      (_, i) => `- Step ${i + 1}: Do something important`,
+    ).join('\n');
+    const { lastFrame } = renderWithProviders(
+      <MaxSizedBox maxWidth={80} maxHeight={5} overflowDirection="bottom">
+        <MarkdownDisplay
+          text={`## Plan\n\n${markdownContent}`}
+          isPending={false}
+          terminalWidth={76}
+        />
+      </MaxSizedBox>,
+      { width: 80 },
+    );
+
+    await waitFor(() => expect(lastFrame()).toContain('... last'));
+
+    const frame = lastFrame()!;
+    const lines = frame.split('\n');
+    const lastLine = lines[lines.length - 1];
+
+    // The last line should only contain the hidden indicator, no leaked content
+    expect(lastLine).toMatch(/^\.\.\. last \d+ lines? hidden \.\.\.$/);
+    expect(lastFrame()).toMatchSnapshot();
   });
 });

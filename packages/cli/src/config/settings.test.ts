@@ -29,10 +29,11 @@ vi.mock('./settings.js', async (importActual) => {
 });
 
 // Mock trustedFolders
+import * as trustedFolders from './trustedFolders.js';
 vi.mock('./trustedFolders.js', () => ({
-  isWorkspaceTrusted: vi
-    .fn()
-    .mockReturnValue({ isTrusted: true, source: 'file' }),
+  isWorkspaceTrusted: vi.fn(),
+  isFolderTrustEnabled: vi.fn(),
+  loadTrustedFolders: vi.fn(),
 }));
 
 vi.mock('./settingsSchema.js', async (importOriginal) => {
@@ -151,7 +152,7 @@ describe('Settings Loading and Merging', () => {
     (mockFsExistsSync as Mock).mockReturnValue(false);
     (fs.readFileSync as Mock).mockReturnValue('{}'); // Return valid empty JSON
     (mockFsMkdirSync as Mock).mockImplementation(() => undefined);
-    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+    vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
       isTrusted: true,
       source: 'file',
     });
@@ -1635,7 +1636,7 @@ describe('Settings Loading and Merging', () => {
     });
 
     it('should NOT merge workspace settings when workspace is not trusted', () => {
-      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
         isTrusted: false,
         source: 'file',
       });
@@ -1666,23 +1667,60 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.context?.fileName).toBe('USER.md'); // User setting
       expect(settings.merged.ui?.theme).toBe('dark'); // User setting
     });
+
+    it('should NOT merge workspace settings when workspace trust is undefined', () => {
+      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
+        isTrusted: undefined,
+        source: undefined,
+      });
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const userSettingsContent = {
+        ui: { theme: 'dark' },
+        tools: { sandbox: false },
+        context: { fileName: 'USER.md' },
+      };
+      const workspaceSettingsContent = {
+        tools: { sandbox: true },
+        context: { fileName: 'WORKSPACE.md' },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.tools?.sandbox).toBe(false); // User setting
+      expect(settings.merged.context?.fileName).toBe('USER.md'); // User setting
+    });
   });
 
   describe('loadEnvironment', () => {
     function setup({
       isFolderTrustEnabled = true,
-      isWorkspaceTrustedValue = true,
+      isWorkspaceTrustedValue = true as boolean | undefined,
     }) {
       delete process.env['TESTTEST']; // reset
-      const geminiEnvPath = path.resolve(path.join(GEMINI_DIR, '.env'));
+      const geminiEnvPath = path.resolve(
+        path.join(MOCK_WORKSPACE_DIR, GEMINI_DIR, '.env'),
+      );
 
-      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
         isTrusted: isWorkspaceTrustedValue,
         source: 'file',
       });
-      (mockFsExistsSync as Mock).mockImplementation((p: fs.PathLike) =>
-        [USER_SETTINGS_PATH, geminiEnvPath].includes(p.toString()),
-      );
+      (mockFsExistsSync as Mock).mockImplementation((p: fs.PathLike) => {
+        const normalizedP = path.resolve(p.toString());
+        return [path.resolve(USER_SETTINGS_PATH), geminiEnvPath].includes(
+          normalizedP,
+        );
+      });
       const userSettingsContent: Settings = {
         ui: {
           theme: 'dark',
@@ -1698,9 +1736,10 @@ describe('Settings Loading and Merging', () => {
       };
       (fs.readFileSync as Mock).mockImplementation(
         (p: fs.PathOrFileDescriptor) => {
-          if (p === USER_SETTINGS_PATH)
+          const normalizedP = path.resolve(p.toString());
+          if (normalizedP === path.resolve(USER_SETTINGS_PATH))
             return JSON.stringify(userSettingsContent);
-          if (p === geminiEnvPath) return 'TESTTEST=1234';
+          if (normalizedP === geminiEnvPath) return 'TESTTEST=1234';
           return '{}';
         },
       );
@@ -1708,14 +1747,34 @@ describe('Settings Loading and Merging', () => {
 
     it('sets environment variables from .env files', () => {
       setup({ isFolderTrustEnabled: false, isWorkspaceTrustedValue: true });
-      loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
+      const settings = {
+        security: { folderTrust: { enabled: false } },
+      } as Settings;
+      loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
 
       expect(process.env['TESTTEST']).toEqual('1234');
     });
 
     it('does not load env files from untrusted spaces', () => {
       setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: false });
-      loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
+      const settings = {
+        security: { folderTrust: { enabled: true } },
+      } as Settings;
+      loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
+
+      expect(process.env['TESTTEST']).not.toEqual('1234');
+    });
+
+    it('does not load env files when trust is undefined', () => {
+      delete process.env['TESTTEST'];
+      // isWorkspaceTrusted returns {isTrusted: undefined} for matched rules with no trust value, or no matching rules.
+      setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: undefined });
+      const settings = {
+        security: { folderTrust: { enabled: true } },
+      } as Settings;
+
+      const mockTrustFn = vi.fn().mockReturnValue({ isTrusted: undefined });
+      loadEnvironment(settings, MOCK_WORKSPACE_DIR, mockTrustFn);
 
       expect(process.env['TESTTEST']).not.toEqual('1234');
     });
@@ -1731,7 +1790,7 @@ describe('Settings Loading and Merging', () => {
       mockFsExistsSync.mockReturnValue(true);
       mockFsReadFileSync = vi.mocked(fs.readFileSync);
       mockFsReadFileSync.mockReturnValue('{}');
-      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
         isTrusted: true,
         source: undefined,
       });
@@ -2157,8 +2216,11 @@ describe('Settings Loading and Merging', () => {
       // 2. Now, set remote admin settings.
       loadedSettings.setRemoteAdminSettings({
         strictModeDisabled: false,
-        mcpSetting: { mcpEnabled: false },
-        cliFeatureSetting: { extensionsSetting: { extensionsEnabled: false } },
+        mcpSetting: { mcpEnabled: false, mcpConfig: {} },
+        cliFeatureSetting: {
+          extensionsSetting: { extensionsEnabled: false },
+          unmanagedCapabilitiesEnabled: false,
+        },
       });
 
       // 3. Verify that remote admin settings take precedence.
@@ -2198,8 +2260,11 @@ describe('Settings Loading and Merging', () => {
 
       const newRemoteSettings = {
         strictModeDisabled: false,
-        mcpSetting: { mcpEnabled: false },
-        cliFeatureSetting: { extensionsSetting: { extensionsEnabled: false } },
+        mcpSetting: { mcpEnabled: false, mcpConfig: {} },
+        cliFeatureSetting: {
+          extensionsSetting: { extensionsEnabled: false },
+          unmanagedCapabilitiesEnabled: false,
+        },
       };
 
       loadedSettings.setRemoteAdminSettings(newRemoteSettings);
@@ -2210,13 +2275,6 @@ describe('Settings Loading and Merging', () => {
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
       // Non-admin settings should remain untouched
       expect(loadedSettings.merged.ui?.theme).toBe('initial-theme');
-
-      // Verify that calling setRemoteAdminSettings with partial data overwrites previous remote settings
-      // and missing properties revert to schema defaults.
-      loadedSettings.setRemoteAdminSettings({ strictModeDisabled: true });
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false); // Defaulting to false if missing
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false); // Defaulting to false if missing
     });
 
     it('should correctly handle undefined remote admin settings', () => {
@@ -2248,84 +2306,6 @@ describe('Settings Loading and Merging', () => {
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
     });
 
-    it('should correctly handle missing properties in remote admin settings', () => {
-      (mockFsExistsSync as Mock).mockReturnValue(true);
-      const systemSettingsContent = {
-        admin: {
-          secureModeEnabled: true,
-        },
-      };
-
-      (fs.readFileSync as Mock).mockImplementation(
-        (p: fs.PathOrFileDescriptor) => {
-          if (p === getSystemSettingsPath()) {
-            return JSON.stringify(systemSettingsContent);
-          }
-          return '{}';
-        },
-      );
-
-      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
-      // Ensure initial state from defaults (as file-based admin settings are ignored)
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
-
-      // Set remote settings with only strictModeDisabled (false -> secureModeEnabled: true)
-      loadedSettings.setRemoteAdminSettings({
-        strictModeDisabled: false,
-      });
-
-      // Verify secureModeEnabled is updated, others default to false
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
-
-      // Set remote settings with only mcpSetting.mcpEnabled
-      loadedSettings.setRemoteAdminSettings({
-        mcpSetting: { mcpEnabled: false },
-      });
-
-      // Verify mcpEnabled is updated, others remain defaults (secureModeEnabled defaults to true if strictModeDisabled is missing)
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
-
-      // Set remote settings with only cliFeatureSetting.extensionsSetting.extensionsEnabled
-      loadedSettings.setRemoteAdminSettings({
-        cliFeatureSetting: { extensionsSetting: { extensionsEnabled: false } },
-      });
-
-      // Verify extensionsEnabled is updated, others remain defaults
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
-
-      // Verify that missing strictModeDisabled falls back to secureModeEnabled
-      loadedSettings.setRemoteAdminSettings({
-        secureModeEnabled: false,
-      });
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
-
-      loadedSettings.setRemoteAdminSettings({
-        secureModeEnabled: true,
-      });
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
-
-      // Verify strictModeDisabled takes precedence over secureModeEnabled
-      loadedSettings.setRemoteAdminSettings({
-        strictModeDisabled: false,
-        secureModeEnabled: false,
-      });
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
-
-      loadedSettings.setRemoteAdminSettings({
-        strictModeDisabled: true,
-        secureModeEnabled: true,
-      });
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
-    });
-
     it('should set skills based on unmanagedCapabilitiesEnabled', () => {
       const loadedSettings = loadSettings();
       loadedSettings.setRemoteAdminSettings({
@@ -2341,51 +2321,6 @@ describe('Settings Loading and Merging', () => {
         },
       });
       expect(loadedSettings.merged.admin.skills?.enabled).toBe(false);
-    });
-
-    it('should default mcp.enabled to false if mcpSetting is present but mcpEnabled is undefined', () => {
-      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
-      loadedSettings.setRemoteAdminSettings({
-        mcpSetting: {},
-      });
-      expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
-    });
-
-    it('should default extensions.enabled to false if extensionsSetting is present but extensionsEnabled is undefined', () => {
-      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
-      loadedSettings.setRemoteAdminSettings({
-        cliFeatureSetting: {
-          extensionsSetting: {},
-        },
-      });
-      expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
-    });
-
-    it('should force secureModeEnabled to true if undefined, overriding schema defaults', () => {
-      // Mock schema to have secureModeEnabled default to false to verify the override
-      const originalSchema = getSettingsSchema();
-      const modifiedSchema = JSON.parse(JSON.stringify(originalSchema));
-      if (modifiedSchema.admin?.properties?.secureModeEnabled) {
-        modifiedSchema.admin.properties.secureModeEnabled.default = false;
-      }
-      vi.mocked(getSettingsSchema).mockReturnValue(modifiedSchema);
-
-      try {
-        (mockFsExistsSync as Mock).mockReturnValue(true);
-        (fs.readFileSync as Mock).mockImplementation(() => '{}');
-
-        const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
-
-        // Pass a non-empty object that doesn't have strictModeDisabled
-        loadedSettings.setRemoteAdminSettings({
-          mcpSetting: {},
-        });
-
-        // It should be forced to true by the logic (default secure), overriding the mock default of false
-        expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
-      } finally {
-        vi.mocked(getSettingsSchema).mockReturnValue(originalSchema);
-      }
     });
 
     it('should handle completely empty remote admin settings response', () => {

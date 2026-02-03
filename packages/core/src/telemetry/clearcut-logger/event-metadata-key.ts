@@ -7,7 +7,7 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
-  // Next ID: 144
+  // Next ID: 148
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
@@ -542,4 +542,23 @@ export enum EventMetadataKey {
 
   // Logs the duration spent in an approval mode in milliseconds.
   GEMINI_CLI_APPROVAL_MODE_DURATION_MS = 143,
+
+  // ==========================================================================
+  // Rewind Event Keys
+  // ==========================================================================
+
+  // Logs the outcome of a rewind operation.
+  GEMINI_CLI_REWIND_OUTCOME = 144,
+
+  // Model Routing Event Keys (Cont.)
+  // ==========================================================================
+
+  // Logs the reasoning for the routing decision.
+  GEMINI_CLI_ROUTING_REASONING = 145,
+
+  // Logs whether numerical routing was enabled.
+  GEMINI_CLI_ROUTING_NUMERICAL_ENABLED = 146,
+
+  // Logs the classifier threshold used.
+  GEMINI_CLI_ROUTING_CLASSIFIER_THRESHOLD = 147,
 }

@@ -16,7 +16,7 @@ import {
   Storage,
   coreEvents,
   homedir,
-  type FetchAdminControlsResponse,
+  type AdminControlsSettings,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
@@ -50,7 +50,9 @@ import {
   formatValidationError,
 } from './settings-validation.js';
 
-function getMergeStrategyForPath(path: string[]): MergeStrategy | undefined {
+export function getMergeStrategyForPath(
+  path: string[],
+): MergeStrategy | undefined {
   let current: SettingDefinition | undefined = undefined;
   let currentSchema: SettingsSchema | undefined = getSettingsSchema();
   let parent: SettingDefinition | undefined = undefined;
@@ -346,14 +348,10 @@ export class LoadedSettings {
     coreEvents.emitSettingsChanged();
   }
 
-  setRemoteAdminSettings(remoteSettings: FetchAdminControlsResponse): void {
+  setRemoteAdminSettings(remoteSettings: AdminControlsSettings): void {
     const admin: Settings['admin'] = {};
-    const {
-      secureModeEnabled,
-      strictModeDisabled,
-      mcpSetting,
-      cliFeatureSetting,
-    } = remoteSettings;
+    const { strictModeDisabled, mcpSetting, cliFeatureSetting } =
+      remoteSettings;
 
     if (Object.keys(remoteSettings).length === 0) {
       this._remoteAdminSettings = { admin };
@@ -361,19 +359,13 @@ export class LoadedSettings {
       return;
     }
 
-    if (strictModeDisabled !== undefined) {
-      admin.secureModeEnabled = !strictModeDisabled;
-    } else if (secureModeEnabled !== undefined) {
-      admin.secureModeEnabled = secureModeEnabled;
-    } else {
-      admin.secureModeEnabled = true;
-    }
-    admin.mcp = { enabled: mcpSetting?.mcpEnabled ?? false };
+    admin.secureModeEnabled = !strictModeDisabled;
+    admin.mcp = { enabled: mcpSetting?.mcpEnabled };
     admin.extensions = {
-      enabled: cliFeatureSetting?.extensionsSetting?.extensionsEnabled ?? false,
+      enabled: cliFeatureSetting?.extensionsSetting?.extensionsEnabled,
     };
     admin.skills = {
-      enabled: cliFeatureSetting?.unmanagedCapabilitiesEnabled ?? false,
+      enabled: cliFeatureSetting?.unmanagedCapabilitiesEnabled,
     };
 
     this._remoteAdminSettings = { admin };
@@ -432,10 +424,15 @@ export function setUpCloudShellEnvironment(envFilePath: string | null): void {
   }
 }
 
-export function loadEnvironment(settings: Settings): void {
-  const envFilePath = findEnvFile(process.cwd());
+export function loadEnvironment(
+  settings: Settings,
+  workspaceDir: string,
+  isWorkspaceTrustedFn = isWorkspaceTrusted,
+): void {
+  const envFilePath = findEnvFile(workspaceDir);
+  const trustResult = isWorkspaceTrustedFn(settings, workspaceDir);
 
-  if (!isWorkspaceTrusted(settings).isTrusted) {
+  if (trustResult.isTrusted !== true) {
     return;
   }
 
@@ -600,7 +597,8 @@ export function loadSettings(
     userSettings,
   );
   const isTrusted =
-    isWorkspaceTrusted(initialTrustCheckSettings as Settings).isTrusted ?? true;
+    isWorkspaceTrusted(initialTrustCheckSettings as Settings, workspaceDir)
+      .isTrusted ?? false;
 
   // Create a temporary merged settings object to pass to loadEnvironment.
   const tempMergedSettings = mergeSettings(
@@ -613,7 +611,7 @@ export function loadSettings(
 
   // loadEnvironment depends on settings so we have to create a temp version of
   // the settings to avoid a cycle
-  loadEnvironment(tempMergedSettings);
+  loadEnvironment(tempMergedSettings, workspaceDir);
 
   // Check for any fatal errors before proceeding
   const fatalErrors = settingsErrors.filter((e) => e.severity === 'error');
