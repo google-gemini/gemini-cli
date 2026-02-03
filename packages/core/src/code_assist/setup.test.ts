@@ -312,6 +312,32 @@ describe('setupUser for new user', () => {
       userTierName: 'paid',
     });
   });
+
+  it('should throw ineligible tier error when onboarding fails and ineligible tiers exist', async () => {
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT', '');
+    mockLoad.mockResolvedValue({
+      allowedTiers: [mockPaidTier],
+      ineligibleTiers: [
+        {
+          reasonCode: 'UNSUPPORTED_LOCATION',
+          reasonMessage:
+            'Your current account is not eligible for Gemini Code Assist for individuals because it is not currently available in your location.',
+          tierId: 'free-tier',
+          tierName: 'Gemini Code Assist for individuals',
+        },
+      ],
+    });
+    mockOnboardUser.mockResolvedValue({
+      done: true,
+      response: {
+        cloudaicompanionProject: {},
+      },
+    });
+
+    await expect(setupUser({} as OAuth2Client)).rejects.toThrow(
+      'Your current account is not eligible for Gemini Code Assist for individuals because it is not currently available in your location.',
+    );
+  });
 });
 
 describe('setupUser validation', () => {
