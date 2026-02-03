@@ -174,7 +174,10 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       this.resolvedPath,
       this.config.getTargetDir(),
     );
-    return `Writing to ${shortenPath(relativePath)}`;
+    return `Writing to ${shortenPath(
+      relativePath,
+      this.config.getTruncatePathHintThreshold(),
+    )}`;
   }
 
   protected override async getConfirmationDetails(
@@ -220,7 +223,10 @@ class WriteFileToolInvocation extends BaseToolInvocation<
 
     const confirmationDetails: ToolEditConfirmationDetails = {
       type: 'edit',
-      title: `Confirm Write: ${shortenPath(relativePath)}`,
+      title: `Confirm Write: ${shortenPath(
+        relativePath,
+        this.config.getTruncatePathHintThreshold(),
+      )}`,
       fileName,
       filePath: this.resolvedPath,
       fileDiff,

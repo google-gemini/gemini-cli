@@ -695,7 +695,10 @@ class EditToolInvocation
 
     const confirmationDetails: ToolEditConfirmationDetails = {
       type: 'edit',
-      title: `Confirm Edit: ${shortenPath(makeRelative(this.params.file_path, this.config.getTargetDir()))}`,
+      title: `Confirm Edit: ${shortenPath(
+        makeRelative(this.params.file_path, this.config.getTargetDir()),
+        this.config.getTruncatePathHintThreshold(),
+      )}`,
       fileName,
       filePath: this.params.file_path,
       fileDiff,
@@ -731,7 +734,10 @@ class EditToolInvocation
       this.config.getTargetDir(),
     );
     if (this.params.old_string === '') {
-      return `Create ${shortenPath(relativePath)}`;
+      return `Create ${shortenPath(
+        relativePath,
+        this.config.getTruncatePathHintThreshold(),
+      )}`;
     }
 
     const oldStringSnippet =
@@ -742,9 +748,15 @@ class EditToolInvocation
       (this.params.new_string.length > 30 ? '...' : '');
 
     if (this.params.old_string === this.params.new_string) {
-      return `No file changes to ${shortenPath(relativePath)}`;
+      return `No file changes to ${shortenPath(
+        relativePath,
+        this.config.getTruncatePathHintThreshold(),
+      )}`;
     }
-    return `${shortenPath(relativePath)}: ${oldStringSnippet} => ${newStringSnippet}`;
+    return `${shortenPath(
+      relativePath,
+      this.config.getTruncatePathHintThreshold(),
+    )}: ${oldStringSnippet} => ${newStringSnippet}`;
   }
 
   /**
@@ -816,7 +828,10 @@ class EditToolInvocation
 
       let displayResult: ToolResultDisplay;
       if (editData.isNewFile) {
-        displayResult = `Created ${shortenPath(makeRelative(this.params.file_path, this.config.getTargetDir()))}`;
+        displayResult = `Created ${shortenPath(
+          makeRelative(this.params.file_path, this.config.getTargetDir()),
+          this.config.getTruncatePathHintThreshold(),
+        )}`;
       } else {
         // Generate diff for display, even though core logic doesn't technically need it
         // The CLI wrapper will use this part of the ToolResult

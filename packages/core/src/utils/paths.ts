@@ -56,9 +56,15 @@ export function tildeifyPath(path: string): string {
 
 /**
  * Shortens a path string if it exceeds maxLen, prioritizing the start and end segments.
+ * If maxLen is less than 0, no truncation is performed.
  * Example: /path/to/a/very/long/file.txt -> /path/.../long/file.txt
  */
 export function shortenPath(filePath: string, maxLen: number = 35): string {
+  // A negative value for maxLen indicates that truncation should be disabled.
+  if (maxLen < 0) {
+    return filePath;
+  }
+
   if (filePath.length <= maxLen) {
     return filePath;
   }

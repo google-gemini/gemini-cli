@@ -110,6 +110,7 @@ const mockConfigInternal = {
     }) as unknown as ToolRegistry,
   isInteractive: () => false,
   getDisableLLMCorrection: vi.fn(() => true),
+  getTruncatePathHintThreshold: vi.fn(() => 35),
   storage: {
     getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
   },

@@ -71,6 +71,7 @@ describe('Tool Confirmation Policy Updates', () => {
         isPathWithinWorkspace: () => true,
         getDirectories: () => [rootDir],
       }),
+      getTruncatePathHintThreshold: vi.fn(() => 35),
       storage: {
         getProjectTempDir: () => path.join(os.tmpdir(), 'gemini-cli-temp'),
       },
