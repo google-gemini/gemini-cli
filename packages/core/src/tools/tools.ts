@@ -129,11 +129,14 @@ export abstract class BaseToolInvocation<
    * Returns tool-specific options for policy updates.
    * Subclasses can override this to provide additional options like
    * commandPrefix (for shell) or mcpName (for MCP tools).
+   *
+   * Return undefined to skip publishing (policy handled by scheduler).
+   * Return {} to publish with default options.
    */
   protected getPolicyUpdateOptions(
     _outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
-    return undefined;
+    return {}; // Default: publish with no special options
   }
 
   /**
@@ -149,9 +152,9 @@ export abstract class BaseToolInvocation<
     ) {
       if (this._toolName) {
         const options = this.getPolicyUpdateOptions(outcome);
-        // Only publish if getPolicyUpdateOptions returns options
-        // (returning undefined signals that policy updates are handled elsewhere)
-        if (options) {
+        // Only publish if getPolicyUpdateOptions doesn't return undefined
+        // (undefined signals that policy updates are handled elsewhere, e.g., by scheduler)
+        if (options !== undefined) {
           void this.messageBus.publish({
             type: MessageBusType.UPDATE_POLICY,
             toolName: this._toolName,

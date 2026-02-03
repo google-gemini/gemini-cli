@@ -900,6 +900,7 @@ describe('Scheduler (Orchestrator)', () => {
           title: 'Title',
           prompt: 'Confirm?',
         },
+        payload: undefined,
       };
       vi.mocked(resolveConfirmation).mockResolvedValue(resolution);
 
@@ -928,6 +929,7 @@ describe('Scheduler (Orchestrator)', () => {
           config: mockConfig,
           messageBus: mockMessageBus,
         }),
+        resolution.payload,
       );
 
       expect(mockExecutor.execute).toHaveBeenCalled();

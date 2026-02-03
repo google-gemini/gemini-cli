@@ -146,9 +146,10 @@ describe('ShellToolInvocation Policy Update', () => {
     );
   });
 
-  it('should extract multiple root commands for chained commands', () => {
-    vi.mocked(shellUtils.getCommandRoots).mockReturnValue(['git', 'npm']);
-
+  it('should return undefined for policy updates (handled by scheduler)', () => {
+    // ShellToolInvocation no longer publishes its own policy updates.
+    // The scheduler's policy layer handles this instead to prevent double updates
+    // and properly support scope-based approvals from the UI.
     const invocation = new ShellToolInvocation(
       mockConfig,
       { command: 'git status && npm test' },
@@ -161,28 +162,6 @@ describe('ShellToolInvocation Policy Update', () => {
     const options = (
       invocation as unknown as TestableShellToolInvocation
     ).getPolicyUpdateOptions(ToolConfirmationOutcome.ProceedAlways);
-    expect(options!.commandPrefix).toEqual(['git', 'npm']);
-    expect(shellUtils.getCommandRoots).toHaveBeenCalledWith(
-      'git status && npm test',
-    );
-  });
-
-  it('should extract a single root command', () => {
-    vi.mocked(shellUtils.getCommandRoots).mockReturnValue(['ls']);
-
-    const invocation = new ShellToolInvocation(
-      mockConfig,
-      { command: 'ls -la /tmp' },
-      mockMessageBus,
-      'run_shell_command',
-      'Shell',
-    );
-
-    // Accessing protected method for testing
-    const options = (
-      invocation as unknown as TestableShellToolInvocation
-    ).getPolicyUpdateOptions(ToolConfirmationOutcome.ProceedAlways);
-    expect(options!.commandPrefix).toEqual(['ls']);
-    expect(shellUtils.getCommandRoots).toHaveBeenCalledWith('ls -la /tmp');
+    expect(options).toBeUndefined();
   });
 });
