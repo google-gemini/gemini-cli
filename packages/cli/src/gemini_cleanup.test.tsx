@@ -78,6 +78,7 @@ vi.mock('./config/config.js', () => ({
     getQuestion: vi.fn(() => ''),
     isInteractive: () => false,
     storage: { initialize: vi.fn().mockResolvedValue(undefined) },
+    getAllowedTools: vi.fn(),
   } as unknown as Config),
   parseArguments: vi.fn().mockResolvedValue({}),
   isDebugMode: vi.fn(() => false),
@@ -188,6 +189,7 @@ describe('gemini.tsx main function cleanup', () => {
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
     vi.mocked(loadCliConfig).mockResolvedValue({
       isInteractive: vi.fn(() => false),
+      getAllowedTools: vi.fn(),
       getQuestion: vi.fn(() => 'test'),
       getSandbox: vi.fn(() => false),
       getDebugMode: vi.fn(() => false),

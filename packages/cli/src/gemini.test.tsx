@@ -538,6 +538,7 @@ describe('gemini.tsx main function kitty protocol', () => {
 
     const mockConfig = createMockConfig({
       isInteractive: () => false,
+      getAllowedTools: vi.fn(),
       getQuestion: () => '',
       getSandbox: () => undefined,
       getListExtensions: () => flag === 'listExtensions',
@@ -614,6 +615,7 @@ describe('gemini.tsx main function kitty protocol', () => {
 
     const mockConfig = createMockConfig({
       isInteractive: () => false,
+      getAllowedTools: vi.fn(),
       getQuestion: () => '',
       getSandbox: () => ({ command: 'docker', image: 'test-image' }),
     });
