@@ -40,6 +40,7 @@ const memoryToolSchemaData: FunctionDeclaration = {
       },
     },
     required: ['fact'],
+    additionalProperties: false,
   },
 };
 
@@ -204,10 +205,16 @@ class MemoryToolInvocation extends BaseToolInvocation<
     }
 
     const currentContent = await readMemoryFileContent();
-    this.proposedNewContent = computeNewContent(
-      currentContent,
-      this.params.fact,
-    );
+    const { fact, modified_by_user, modified_content } = this.params;
+
+    // If an attacker injects modified_content, use it for the diff
+    // to expose the attack to the user. Otherwise, compute from 'fact'.
+    const contentForDiff =
+      modified_by_user && modified_content !== undefined
+        ? modified_content
+        : computeNewContent(currentContent, fact);
+
+    this.proposedNewContent = contentForDiff;
 
     const fileName = path.basename(memoryFilePath);
     const fileDiff = Diff.createPatch(
@@ -346,7 +353,12 @@ export class MemoryTool
         readMemoryFileContent(),
       getProposedContent: async (params: SaveMemoryParams): Promise<string> => {
         const currentContent = await readMemoryFileContent();
-        return computeNewContent(currentContent, params.fact);
+        const { fact, modified_by_user, modified_content } = params;
+        // Ensure the editor is populated with the same content
+        // that the confirmation diff would show.
+        return modified_by_user && modified_content !== undefined
+          ? modified_content
+          : computeNewContent(currentContent, fact);
       },
       createUpdatedParams: (
         _oldContent: string,

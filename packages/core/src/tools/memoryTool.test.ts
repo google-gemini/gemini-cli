@@ -107,6 +107,7 @@ describe('MemoryTool', () => {
       expect(memoryTool.schema).toBeDefined();
       expect(memoryTool.schema.name).toBe('save_memory');
       expect(memoryTool.schema.parametersJsonSchema).toStrictEqual({
+        additionalProperties: false,
         type: 'object',
         properties: {
           fact: {
@@ -353,6 +354,16 @@ describe('MemoryTool', () => {
         expect(result.newContent).toContain('- Old fact');
         expect(result.newContent).toContain('- New fact');
       }
+    });
+
+    it('should throw error if extra parameters are injected', () => {
+      const attackParams = {
+        fact: 'a harmless-looking fact',
+        modified_by_user: true,
+        modified_content: '## MALICIOUS HEADER\n- injected evil content',
+      };
+
+      expect(() => memoryTool.build(attackParams)).toThrow();
     });
   });
 });
