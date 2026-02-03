@@ -9,6 +9,7 @@ import { initReactI18next } from 'react-i18next';
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 // Get current directory in ES modules
@@ -20,57 +21,126 @@ async function loadTranslationFile(
   lang: string,
   namespace: string,
 ): Promise<Record<string, unknown>> {
+  const filePath = path.join(__dirname, 'locales', lang, `${namespace}.json`);
   try {
-    const filePath = path.join(__dirname, 'locales', lang, `${namespace}.json`);
     const content = await fs.readFile(filePath, 'utf8');
     return JSON.parse(content) as Record<string, unknown>;
-  } catch (_error) {
+  } catch (error) {
     // Silently fail if file doesn't exist - i18next handles missing keys
-    return {};
+    if (
+      error instanceof Error &&
+      'code' in error &&
+      (error as { code: string }).code === 'ENOENT'
+    ) {
+      return {};
+    }
+    // For other errors (like JSON parsing), fail loudly to aid debugging
+    throw new Error(`Failed to load or parse translation file: ${filePath}`, {
+      cause: error,
+    });
   }
 }
 
-const namespaces = ['common', 'help', 'dialogs'];
+const namespaces = [
+  'common',
+  'help',
+  'dialogs',
+  'loading',
+  'commands',
+  'ui',
+  'messages',
+  'privacy',
+  'auth',
+];
 const localesDir = path.join(__dirname, 'locales');
 
-// Language display names for settings UI
-const LANGUAGE_LABELS: Record<string, string> = {
-  en: 'English',
-  ja: '日本語',
-  // Add more language labels here as locales are added
-};
+interface LocaleManifest {
+  displayName: string;
+}
+
+/**
+ * Read a locale's manifest.json to get its self-reported display name.
+ * Returns null if the manifest is missing or unreadable.
+ */
+function readLocaleManifest(langDir: string): LocaleManifest | null {
+  try {
+    const manifestPath = path.join(langDir, 'manifest.json');
+    const content = fsSync.readFileSync(manifestPath, 'utf8');
+    return JSON.parse(content) as LocaleManifest;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Synchronously scan the locales directory to find available language packs.
+ * Each locale folder must contain a manifest.json with a displayName field.
  * This runs at module load time so the schema can access the options.
  */
-function detectAvailableLanguagesSync(): string[] {
+function detectAvailableLanguagesSync(): {
+  codes: string[];
+  labels: Map<string, string>;
+} {
+  const labels = new Map<string, string>();
   try {
     const entries = fsSync.readdirSync(localesDir, { withFileTypes: true });
-    const langs = entries
+    const dirs = entries
       .filter((entry) => entry.isDirectory())
       .map((entry) => entry.name)
       .filter((name) => !name.startsWith('.')); // Exclude hidden directories
 
-    // Ensure 'en' is always first (default/fallback language)
-    if (langs.includes('en')) {
-      return ['en', ...langs.filter((l) => l !== 'en')];
+    for (const dir of dirs) {
+      const manifest = readLocaleManifest(path.join(localesDir, dir));
+      if (manifest?.displayName) {
+        labels.set(dir, manifest.displayName);
+      } else {
+        // Locale folder without manifest — use the folder name as-is
+        labels.set(dir, dir.toUpperCase());
+      }
     }
-    return langs.length > 0 ? langs : ['en'];
-  } catch {
+
+    // Ensure 'en' is always first (default/fallback language)
+    const codes = [...labels.keys()];
+    if (codes.includes('en')) {
+      const sorted = ['en', ...codes.filter((l) => l !== 'en').sort()];
+      return { codes: sorted, labels };
+    }
+    return { codes: codes.length > 0 ? codes.sort() : ['en'], labels };
+  } catch (error) {
     // If we can't read the directory, fall back to English only
-    return ['en'];
+    // Log a warning in debug mode for easier debugging, but don't crash
+    if (process.env['DEBUG']) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `Could not detect available languages in ${localesDir}:`,
+        error,
+      );
+    }
+    labels.set('en', 'English');
+    return { codes: ['en'], labels };
   }
 }
 
 // Detect available languages synchronously at module load
-const availableLanguages: string[] = detectAvailableLanguagesSync();
+const { codes: availableLanguages, labels: languageLabels } =
+  detectAvailableLanguagesSync();
+
+// Cache language options at module load to prevent re-creation on each access
+// This prevents React flickering from new object references
+const cachedLanguageOptions: ReadonlyArray<{ value: string; label: string }> =
+  Object.freeze([
+    { value: 'auto', label: 'Auto' },
+    ...availableLanguages.map((lang) => ({
+      value: lang,
+      label: languageLabels.get(lang) ?? lang.toUpperCase(),
+    })),
+  ]);
 
 /**
  * Get the list of available languages (detected from locale folders).
  */
-export function getAvailableLanguages(): string[] {
-  return [...availableLanguages];
+export function getAvailableLanguages(): readonly string[] {
+  return availableLanguages;
 }
 
 /**
@@ -82,21 +152,39 @@ export function isLanguageAvailable(lang: string): boolean {
 
 /**
  * Get language options formatted for the settings schema.
- * Returns an array with 'auto' option followed by available languages.
+ * Returns a cached, frozen array to prevent React re-render flickering.
  */
-export function getLanguageOptions(): Array<{ value: string; label: string }> {
-  const options: Array<{ value: string; label: string }> = [
-    { value: 'auto', label: 'Auto' },
-  ];
+export function getLanguageOptions(): ReadonlyArray<{
+  value: string;
+  label: string;
+}> {
+  return cachedLanguageOptions;
+}
 
-  for (const lang of availableLanguages) {
-    options.push({
-      value: lang,
-      label: LANGUAGE_LABELS[lang] ?? lang.toUpperCase(),
-    });
+/**
+ * Read the saved language preference directly from ~/.gemini/settings.json.
+ * This avoids a circular dependency: the settings schema imports from this
+ * module (for getLanguageOptions()), so we cannot import the settings module
+ * here. Instead we read the raw JSON file at a known path.
+ */
+function getSavedLanguagePreference(): string | null {
+  try {
+    const homeDir =
+      process.env['HOME'] ?? process.env['USERPROFILE'] ?? os.homedir();
+    const settingsPath = path.join(homeDir, '.gemini', 'settings.json');
+    const content = fsSync.readFileSync(settingsPath, 'utf8');
+    const settings = JSON.parse(content) as Record<string, unknown>;
+    const experimental = settings['experimental'] as
+      | Record<string, unknown>
+      | undefined;
+    const lang = experimental?.['language'];
+    if (typeof lang === 'string' && lang !== 'auto') {
+      return lang;
+    }
+  } catch {
+    // Settings file may not exist or be unreadable — that's fine
   }
-
-  return options;
+  return null;
 }
 
 /**
@@ -115,11 +203,17 @@ function getSystemLanguage(): string {
   const fromGeminiLang = checkLang(process.env['GEMINI_LANG']);
   if (fromGeminiLang) return fromGeminiLang;
 
-  // 2. Check LANG environment variable (Unix-style locale)
+  // 2. Check saved language preference from ~/.gemini/settings.json
+  const fromSettings = getSavedLanguagePreference();
+  if (fromSettings && availableLanguages.includes(fromSettings)) {
+    return fromSettings;
+  }
+
+  // 3. Check LANG environment variable (Unix-style locale)
   const fromLangEnv = checkLang(process.env['LANG']);
   if (fromLangEnv) return fromLangEnv;
 
-  // 3. Check Intl API (browser/Node.js locale detection)
+  // 4. Check Intl API (browser/Node.js locale detection)
   try {
     const intlLocale = Intl.DateTimeFormat().resolvedOptions().locale;
     const fromIntl = checkLang(intlLocale);
@@ -128,7 +222,7 @@ function getSystemLanguage(): string {
     // Intl may not be available in some environments
   }
 
-  // 4. Fallback to English
+  // 5. Fallback to English
   return 'en';
 }
 
