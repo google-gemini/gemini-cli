@@ -21,7 +21,10 @@ const workflowContent = await fs.readFile(workflowPath, 'utf8');
 const workflowData = yaml.load(workflowContent) as {
   jobs?: {
     'triage-issue'?: {
-      steps?: { id?: string; with?: { prompt?: string } }[];
+      steps?: {
+        id?: string;
+        with?: { prompt?: string; script?: string };
+      }[];
     };
   };
 };
@@ -30,11 +33,37 @@ const triageStep = workflowData.jobs?.['triage-issue']?.steps?.find(
   (step) => step.id === 'gemini_issue_analysis',
 );
 
+const labelsStep = workflowData.jobs?.['triage-issue']?.steps?.find(
+  (step) => step.id === 'get_labels',
+);
+
 const TRIAGE_PROMPT_TEMPLATE = triageStep?.with?.prompt;
+const LABELS_SCRIPT = labelsStep?.with?.script;
 
 if (!TRIAGE_PROMPT_TEMPLATE) {
   throw new Error(
     'Could not extract prompt from workflow file. Check for `jobs.triage-issue.steps[id=gemini_issue_analysis].with.prompt` in the YAML file.',
+  );
+}
+
+// Extract available labels from the script
+let availableLabels = '';
+if (LABELS_SCRIPT) {
+  const match = LABELS_SCRIPT.match(/const allowedLabels = \[([\s\S]+?)\];/);
+  if (match && match[1]) {
+    // Clean up the extracted string: remove quotes, commas, and whitespace
+    availableLabels = match[1]
+      .replace(/['"\n\r]/g, '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
+      .join(', ');
+  }
+}
+
+if (!availableLabels) {
+  throw new Error(
+    'Could not extract available labels from workflow file. Check for `jobs.triage-issue.steps[id=get_labels].with.script` containing `const allowedLabels = [...]`.',
   );
 }
 
@@ -43,10 +72,7 @@ const createPrompt = (title: string, body: string) => {
   // We need to replace them with the actual values for the test.
   return TRIAGE_PROMPT_TEMPLATE.replace('${{ env.ISSUE_TITLE }}', title)
     .replace('${{ env.ISSUE_BODY }}', body)
-    .replace(
-      '${{ env.AVAILABLE_LABELS }}',
-      'area/agent, area/enterprise, area/non-interactive, area/core, area/security, area/platform, area/extensions, area/unknown',
-    );
+    .replace('${{ env.AVAILABLE_LABELS }}', availableLabels);
 };
 
 const escapeHtml = (str: string) => {
@@ -69,16 +95,18 @@ const escapeHtml = (str: string) => {
 
 const assertHasLabel = (expectedLabel: string) => {
   return async (_rig: unknown, result: string) => {
-    const jsonMatch = result.match(/{[\s\S]*}/);
-    if (!jsonMatch || !jsonMatch[0]) {
+    const firstBrace = result.indexOf('{');
+    const lastBrace = result.lastIndexOf('}');
+    if (firstBrace === -1 || lastBrace === -1 || lastBrace < firstBrace) {
       throw new Error(
         `Could not find a JSON object in the result: "${escapeHtml(result)}"`,
       );
     }
+    const jsonString = result.substring(firstBrace, lastBrace + 1);
 
     let data: { labels_to_set?: string[] };
     try {
-      data = JSON.parse(jsonMatch[0]);
+      data = JSON.parse(jsonString);
     } catch (e) {
       const err = e as Error;
       throw new Error(
