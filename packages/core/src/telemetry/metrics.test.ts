@@ -489,7 +489,7 @@ describe('Telemetry Metrics', () => {
       initializeMetricsModule(mockConfig);
       const event = new ModelRoutingEvent(
         'gemini-pro',
-        'classifier',
+        'Classifier',
         200,
         'test-reason',
         true,
@@ -502,7 +502,7 @@ describe('Telemetry Metrics', () => {
         'installation.id': 'test-installation-id',
         'user.email': 'test@example.com',
         'routing.decision_model': 'gemini-pro',
-        'routing.decision_source': 'classifier',
+        'routing.decision_source': 'Classifier',
         'routing.failed': true,
         'routing.reasoning': 'test-reason',
       });
@@ -513,7 +513,7 @@ describe('Telemetry Metrics', () => {
         'installation.id': 'test-installation-id',
         'user.email': 'test@example.com',
         'routing.decision_model': 'gemini-pro',
-        'routing.decision_source': 'classifier',
+        'routing.decision_source': 'Classifier',
         'routing.failed': true,
         'routing.reasoning': 'test-reason',
         'routing.error_message': 'test-error',
