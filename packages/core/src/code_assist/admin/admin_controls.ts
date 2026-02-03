@@ -10,21 +10,74 @@ import { isDeepStrictEqual } from 'node:util';
 import {
   type FetchAdminControlsResponse,
   FetchAdminControlsResponseSchema,
+  McpConfigDefinitionSchema,
+  type AdminControlsSettings,
 } from '../types.js';
 import { getCodeAssistServer } from '../codeAssist.js';
 import type { Config } from '../../config/config.js';
 
 let pollingInterval: NodeJS.Timeout | undefined;
-let currentSettings: FetchAdminControlsResponse | undefined;
+let currentSettings: AdminControlsSettings | undefined;
 
 export function sanitizeAdminSettings(
   settings: FetchAdminControlsResponse,
-): FetchAdminControlsResponse {
+): AdminControlsSettings {
   const result = FetchAdminControlsResponseSchema.safeParse(settings);
   if (!result.success) {
     return {};
   }
-  return result.data;
+  const sanitized = result.data;
+  let mcpConfig;
+
+  if (sanitized.mcpSetting?.mcpConfigJson) {
+    try {
+      const parsed = JSON.parse(sanitized.mcpSetting.mcpConfigJson);
+      const validationResult = McpConfigDefinitionSchema.safeParse(parsed);
+
+      if (validationResult.success) {
+        mcpConfig = validationResult.data;
+        // Sort include/exclude tools for stable comparison
+        if (mcpConfig.mcpServers) {
+          for (const server of Object.values(mcpConfig.mcpServers)) {
+            if (server.includeTools) {
+              server.includeTools.sort();
+            }
+            if (server.excludeTools) {
+              server.excludeTools.sort();
+            }
+          }
+        }
+      }
+    } catch (_e) {
+      // Ignore parsing errors
+    }
+  }
+
+  // Apply defaults (secureModeEnabled is supported for backward compatibility)
+  let strictModeDisabled = false;
+  if (sanitized.strictModeDisabled !== undefined) {
+    strictModeDisabled = sanitized.strictModeDisabled;
+  } else if (sanitized.secureModeEnabled !== undefined) {
+    strictModeDisabled = !sanitized.secureModeEnabled;
+  }
+
+  return {
+    strictModeDisabled,
+    cliFeatureSetting: {
+      ...sanitized.cliFeatureSetting,
+      extensionsSetting: {
+        extensionsEnabled:
+          sanitized.cliFeatureSetting?.extensionsSetting?.extensionsEnabled ??
+          false,
+      },
+      unmanagedCapabilitiesEnabled:
+        sanitized.cliFeatureSetting?.unmanagedCapabilitiesEnabled ?? false,
+    },
+    mcpSetting: {
+      mcpEnabled: sanitized.mcpSetting?.mcpEnabled ?? false,
+      mcpConfig: mcpConfig ?? {},
+    },
+  };
 }
 
 function isGaxiosError(error: unknown): error is { status: number } {
@@ -48,10 +101,10 @@ function isGaxiosError(error: unknown): error is { status: number } {
  */
 export async function fetchAdminControls(
   server: CodeAssistServer | undefined,
-  cachedSettings: FetchAdminControlsResponse | undefined,
+  cachedSettings: AdminControlsSettings | undefined,
   adminControlsEnabled: boolean,
-  onSettingsChanged: (settings: FetchAdminControlsResponse) => void,
-): Promise<FetchAdminControlsResponse> {
+  onSettingsChanged: (settings: AdminControlsSettings) => void,
+): Promise<AdminControlsSettings> {
   if (!server || !server.projectId || !adminControlsEnabled) {
     stopAdminControlsPolling();
     currentSettings = undefined;
@@ -129,7 +182,7 @@ export async function fetchAdminControlsOnce(
 function startAdminControlsPolling(
   server: CodeAssistServer,
   project: string,
-  onSettingsChanged: (settings: FetchAdminControlsResponse) => void,
+  onSettingsChanged: (settings: AdminControlsSettings) => void,
 ) {
   stopAdminControlsPolling();
 
