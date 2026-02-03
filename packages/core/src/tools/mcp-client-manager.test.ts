@@ -16,7 +16,7 @@ import {
 import { McpClientManager } from './mcp-client-manager.js';
 import { McpClient, MCPDiscoveryState } from './mcp-client.js';
 import type { ToolRegistry } from './tool-registry.js';
-import type { Config } from '../config/config.js';
+import type { Config, GeminiCLIExtension } from '../config/config.js';
 
 vi.mock('./mcp-client.js', async () => {
   const originalModule = await vi.importActual('./mcp-client.js');
@@ -318,6 +318,59 @@ describe('McpClientManager', () => {
       await manager.startConfiguredMcpServers();
 
       await expect(manager.restartServer('test-server')).resolves.not.toThrow();
+    });
+  });
+
+  describe('Extension handling', () => {
+    it('should remove mcp servers from allServerConfigs when stopExtension is called', async () => {
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+      const mcpServers = {
+        'test-server': { command: 'node', args: ['server.js'] },
+      };
+      const extension: GeminiCLIExtension = {
+        name: 'test-extension',
+        mcpServers,
+        isActive: true,
+        version: '1.0.0',
+        path: '/some-path',
+        contextFiles: [],
+        id: '123',
+      };
+
+      await manager.startExtension(extension);
+      expect(manager.getMcpServers()).toHaveProperty('test-server');
+
+      await manager.stopExtension(extension);
+      expect(manager.getMcpServers()).not.toHaveProperty('test-server');
+    });
+
+    it('should remove servers from blockedMcpServers when stopExtension is called', async () => {
+      mockConfig.getBlockedMcpServers.mockReturnValue(['blocked-server']);
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+      const mcpServers = {
+        'blocked-server': { command: 'node', args: ['server.js'] },
+      };
+      const extension: GeminiCLIExtension = {
+        name: 'test-extension',
+        mcpServers,
+        isActive: true,
+        version: '1.0.0',
+        path: '/some-path',
+        contextFiles: [],
+        id: '123',
+      };
+
+      await manager.startExtension(extension);
+      expect(manager.getBlockedMcpServers()).toContainEqual({
+        name: 'blocked-server',
+        extensionName: 'test-extension',
+      });
+
+      await manager.stopExtension(extension);
+      expect(manager.getBlockedMcpServers()).not.toContainEqual({
+        name: 'blocked-server',
+        extensionName: 'test-extension',
+      });
     });
   });
 });
