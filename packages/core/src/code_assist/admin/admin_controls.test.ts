@@ -405,6 +405,88 @@ describe('Admin Controls', () => {
       expect(mockOnSettingsChanged).not.toHaveBeenCalled();
       expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(2);
     });
+    it('should continue polling after a fetch error', async () => {
+      // Initial fetch is successful
+      (mockServer.fetchAdminControls as Mock).mockResolvedValue({
+        strictModeDisabled: true,
+      });
+      await fetchAdminControls(
+        mockServer,
+        undefined,
+        true,
+        mockOnSettingsChanged,
+      );
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
+
+      // Next poll fails
+      (mockServer.fetchAdminControls as Mock).mockRejectedValue(
+        new Error('Poll failed'),
+      );
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(2);
+      expect(mockOnSettingsChanged).not.toHaveBeenCalled(); // No changes on error
+
+      // Subsequent poll succeeds with new data
+      (mockServer.fetchAdminControls as Mock).mockResolvedValue({
+        strictModeDisabled: false,
+      });
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(3);
+      expect(mockOnSettingsChanged).toHaveBeenCalledWith({
+        strictModeDisabled: false,
+      });
+    });
+
+    it('should STOP polling if server returns 403', async () => {
+      // Initial fetch is successful
+      (mockServer.fetchAdminControls as Mock).mockResolvedValue({
+        strictModeDisabled: true,
+      });
+      await fetchAdminControls(
+        mockServer,
+        undefined,
+        true,
+        mockOnSettingsChanged,
+      );
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
+
+      // Next poll returns 403
+      const error403 = new Error('Forbidden');
+      Object.assign(error403, { status: 403 });
+      (mockServer.fetchAdminControls as Mock).mockRejectedValue(error403);
+
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(2);
+
+      // Advance time again - should NOT poll again
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('stopAdminControlsPolling', () => {
+    it('should stop polling after it has started', async () => {
+      (mockServer.fetchAdminControls as Mock).mockResolvedValue({});
+
+      // Start polling
+      await fetchAdminControls(
+        mockServer,
+        undefined,
+        true,
+        mockOnSettingsChanged,
+      );
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
+
+      // Stop polling
+      stopAdminControlsPolling();
+
+      // Advance timer well beyond the polling interval
+      await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
+
+      // The poll should not have fired again
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
+      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('getAdminErrorMessage', () => {
