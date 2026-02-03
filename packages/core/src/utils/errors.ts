@@ -16,40 +16,11 @@ export function isNodeError(error: unknown): error is NodeJS.ErrnoException {
 
 export function getErrorMessage(error: unknown): string {
   const friendlyError = toFriendlyError(error);
-  return extractMessage(friendlyError);
-}
-
-function extractMessage(input: unknown): string {
-  if (input instanceof Error) {
-    return extractMessage(input.message);
+  if (friendlyError instanceof Error) {
+    return friendlyError.message;
   }
-
-  if (typeof input === 'string') {
-    const trimmed = input.trim();
-    // Attempt to parse JSON error responses (common in Google API errors)
-    if (
-      (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
-      (trimmed.startsWith('[') && trimmed.endsWith(']'))
-    ) {
-      try {
-        const parsed = JSON.parse(trimmed);
-        const next =
-          parsed?.error?.message ||
-          parsed?.[0]?.error?.message ||
-          parsed?.message;
-
-        if (next && next !== input) {
-          return extractMessage(next);
-        }
-      } catch {
-        // Fall back to original string if parsing fails
-      }
-    }
-    return input;
-  }
-
   try {
-    return String(input);
+    return String(friendlyError);
   } catch {
     return 'Failed to get error details';
   }
