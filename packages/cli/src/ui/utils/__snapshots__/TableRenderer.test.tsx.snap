@@ -2,21 +2,21 @@
 
 exports[`TableRenderer > renders a 3x3 table correctly 1`] = `
 "
-┌──────────────┬──────────────┬──────────────┐
-│ Header 1     │ Header 2     │ Header 3     │
-├──────────────┼──────────────┼──────────────┤
-│ Row 1, Col 1 │ Row 1, Col 2 │ Row 1, Col 3 │
-│ Row 2, Col 1 │ Row 2, Col 2 │ Row 2, Col 3 │
-│ Row 3, Col 1 │ Row 3, Col 2 │ Row 3, Col 3 │
-└──────────────┴──────────────┴──────────────┘
+┌─────────────────────────┬─────────────────────────┬─────────────────────────┐
+│ Header 1                │ Header 2                │ Header 3                │
+├─────────────────────────┼─────────────────────────┼─────────────────────────┤
+│ Row 1, Col 1            │ Row 1, Col 2            │ Row 1, Col 3            │
+│ Row 2, Col 1            │ Row 2, Col 2            │ Row 2, Col 3            │
+│ Row 3, Col 1            │ Row 3, Col 2            │ Row 3, Col 3            │
+└─────────────────────────┴─────────────────────────┴─────────────────────────┘
 "
 `;
 
 exports[`TableRenderer > renders a table with long headers and 4 columns correctly 1`] = `
 "
 ┌──────────────────┬──────────────────┬───────────────────┬──────────────────┐
-│ Very Long Column Header One │ Very Long Column Header Two │ Very Long Column Header Three │ Very Long Column Header
-Four │
+│ Very Long Column │ Very Long Column │ Very Long Column  │ Very Long Column │
+│ Header One       │ Header Two       │ Header Three      │ Header Four      │
 ├──────────────────┼──────────────────┼───────────────────┼──────────────────┤
 │ Data 1.1         │ Data 1.2         │ Data 1.3          │ Data 1.4         │
 │ Data 2.1         │ Data 2.2         │ Data 2.3          │ Data 2.4         │
@@ -27,12 +27,12 @@ Four │
 
 exports[`TableRenderer > wraps long cell content correctly 1`] = `
 "
-┌────┬───────────────────────────────┐
-│ Col 1 │ Col 2                         │
-├────┼───────────────────────────────┤
-│ Sh │ This is a very long cell      │
-│ or │ content that should wrap to   │
-│ t  │ multiple lines                │
-└────┴───────────────────────────────┘
+┌───────┬─────────────────────────────┐
+│ Col 1 │ Col 2                       │
+├───────┼─────────────────────────────┤
+│ Short │ This is a very long cell    │
+│       │ content that should wrap to │
+│       │ multiple lines              │
+└───────┴─────────────────────────────┘
 "
 `;

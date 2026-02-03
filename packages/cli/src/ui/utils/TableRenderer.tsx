@@ -25,35 +25,76 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   rows,
   terminalWidth,
 }) => {
-  // Calculate column widths using actual display width after markdown processing
-  const columnWidths = headers.map((header, index) => {
+  // --- Step 1: Define Constraints per Column ---
+  const constraints = headers.map((header, colIndex) => {
     const headerWidth = getPlainTextLength(header);
-    const maxRowWidth = Math.max(
-      ...rows.map((row) => getPlainTextLength(row[index] || '')),
-    );
-    return Math.max(headerWidth, maxRowWidth) + 2; // Add padding
+
+    // Calculate max content width and max word width for this column
+    let maxContentWidth = headerWidth;
+    let maxWordWidth = 0;
+
+    rows.forEach((row) => {
+      const cell = row[colIndex] || '';
+      const cellWidth = getPlainTextLength(cell);
+      maxContentWidth = Math.max(maxContentWidth, cellWidth);
+
+      // Find longest word to ensure it fits without splitting
+      const words = cell.split(/\s+/);
+      for (const word of words) {
+        const wordWidth = getPlainTextLength(word);
+        maxWordWidth = Math.max(maxWordWidth, wordWidth);
+      }
+    });
+
+    // min: used to guarantee minimum column width and prevent wrapping mid-word
+    // Defaults to header width or max word width
+    const min = Math.max(headerWidth, maxWordWidth);
+
+    // max: used to determine how much the column can grow if space allows
+    // Ensure max is never smaller than min
+    const max = Math.max(min, maxContentWidth);
+
+    return { min, max };
   });
 
-  // Ensure table fits within terminal width
-  // We calculate scale based on content width vs available width (terminal - borders)
-  // First, extract content widths by removing the 2-char padding.
-  const contentWidths = columnWidths.map((width) => Math.max(0, width - 2));
-  const totalContentWidth = contentWidths.reduce(
-    (sum, width) => sum + width,
-    0,
-  );
-
-  // Fixed overhead includes padding (2 per column) and separators (1 per column + 1 final).
-  const fixedOverhead = headers.length * 2 + (headers.length + 1);
-
-  // Subtract 1 from available width to avoid edge-case wrapping on some terminals
+  // --- Step 2: Calculate Available Space ---
+  // Fixed overhead: borders (n+1) + padding (2n)
+  const fixedOverhead = headers.length + 1 + headers.length * 2;
   const availableWidth = Math.max(0, terminalWidth - fixedOverhead - 1);
 
-  const scaleFactor =
-    totalContentWidth > availableWidth ? availableWidth / totalContentWidth : 1;
-  const adjustedWidths = contentWidths.map(
-    (width) => Math.floor(width * scaleFactor) + 2,
-  );
+  // --- Step 3: Allocation Algorithm ---
+  const totalMinWidth = constraints.reduce((sum, c) => sum + c.min, 0);
+  let finalContentWidths: number[];
+
+  if (totalMinWidth > availableWidth) {
+    // Case A: Not enough space even for minimums.
+    // We must scale everything down proportionally.
+    const scale = availableWidth / totalMinWidth;
+    finalContentWidths = constraints.map((c) => Math.floor(c.min * scale));
+  } else {
+    // Case B: We have space! Distribute the surplus.
+    const surplus = availableWidth - totalMinWidth;
+    const totalGrowthNeed = constraints.reduce(
+      (sum, c) => sum + (c.max - c.min),
+      0,
+    );
+
+    if (totalGrowthNeed === 0) {
+      // If nobody wants to grow, simply give everyone their min.
+      finalContentWidths = constraints.map((c) => c.min);
+    } else {
+      finalContentWidths = constraints.map((c) => {
+        const growthNeed = c.max - c.min;
+        // Calculate share: (My Need / Total Need) * Surplus
+        const share = growthNeed / totalGrowthNeed;
+        const extra = Math.floor(surplus * share);
+        return c.min + extra;
+      });
+    }
+  }
+
+  // Add padding (+2) to get the visual widths expected by the renderers
+  const adjustedWidths = finalContentWidths.map((w) => w + 2);
 
   // Helper function to render a cell with proper width
   const renderCell = (
@@ -64,38 +105,6 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     const contentWidth = Math.max(0, width - 2);
     const displayWidth = getPlainTextLength(content);
 
-    let cellContent = content;
-    if (isHeader && displayWidth > contentWidth) {
-      if (contentWidth <= 3) {
-        // Just truncate by character count
-        cellContent = content.substring(
-          0,
-          Math.min(content.length, contentWidth),
-        );
-      } else {
-        // Truncate preserving markdown formatting using binary search
-        let left = 0;
-        let right = content.length;
-        let bestTruncated = content;
-
-        // Binary search to find the optimal truncation point
-        while (left <= right) {
-          const mid = Math.floor((left + right) / 2);
-          const candidate = content.substring(0, mid);
-          const candidateWidth = getPlainTextLength(candidate);
-
-          if (candidateWidth <= contentWidth - 1) {
-            bestTruncated = candidate;
-            left = mid + 1;
-          } else {
-            right = mid - 1;
-          }
-        }
-
-        cellContent = bestTruncated + '…';
-      }
-    }
-
     // Calculate exact padding needed
     const paddingNeeded = Math.max(0, contentWidth - displayWidth);
 
@@ -103,10 +112,10 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
       <Text>
         {isHeader ? (
           <Text bold color={theme.text.link}>
-            <RenderInline text={cellContent} />
+            <RenderInline text={content} />
           </Text>
         ) : (
-          <RenderInline text={cellContent} />
+          <RenderInline text={content} />
         )}
         {' '.repeat(paddingNeeded)}
       </Text>
@@ -165,9 +174,32 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
       const colWidth = adjustedWidths[colIndex];
       const contentWidth = Math.max(1, colWidth - 2); // Subtract padding
 
-      // Wrap to this specific width
-      const wrapped = wrapAnsi(cell, contentWidth, { hard: true, trim: true });
-      return wrapped.split('\n');
+      // 1. Try soft wrap first (respects word boundaries)
+      // wrap-ansi with hard:false will put long words on their own line but won't split them,
+      // potentially exceeding contentWidth.
+      const softWrapped = wrapAnsi(cell, contentWidth, {
+        hard: false,
+        trim: true,
+      });
+
+      // 2. Post-process to handle "Giant Words" that overflow
+      const rawLines = softWrapped.split('\n');
+      const finalLines: string[] = [];
+
+      for (const line of rawLines) {
+        if (getPlainTextLength(line) > contentWidth) {
+          // It's too long (a single giant word or URL). Force break it.
+          const forced = wrapAnsi(line, contentWidth, {
+            hard: true,
+            trim: true,
+          });
+          finalLines.push(...forced.split('\n'));
+        } else {
+          finalLines.push(line);
+        }
+      }
+
+      return finalLines;
     });
 
     const maxHeight = Math.max(...wrappedCells.map((lines) => lines.length), 1);
