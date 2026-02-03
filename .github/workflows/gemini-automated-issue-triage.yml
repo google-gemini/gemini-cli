@@ -209,7 +209,7 @@ jobs:
               "I am having trouble running the CLI in headless mode"
 
             area/core
-            - Description: Issues with the fundamental CLI app itself. This includes the user interface (UI/UX), installation, OS compatibility, and performance.
+            - Description: Issues with the fundamental CLI app itself. This includes the user interface (UI/UX), installation, OS compatibility, performance, and local development issues (e.g., local build or test failures).
             - Example Issues:
               "I am seeing my screen flicker when using the CLI."
               "The output in my terminal is malformed or unreadable."
@@ -221,6 +221,8 @@ jobs:
               "High CPU or memory usage by the CLI process."
               "Issues related to multi-modality (e.g., handling image inputs)."
               "Problems with the IDE integration connection or installation"
+              "I cannot build the project locally."
+              "My local tests are failing."
 
             area/security
             - Description: Issues related to user authentication, authorization, data security, and privacy.
@@ -234,7 +236,7 @@ jobs:
               "Preventing unauthorized data access."
 
             area/platform
-            - Description: Issues related to CI/CD, release management, testing, eval infrastructure, capacity, quota management, and sandbox environments.
+            - Description: Issues related to CI/CD pipelines, release management, automated testing infrastructure (evals), capacity, quota management, and sandbox environments. NOT for local test failures.
             - Example Issues:
               "I am getting a 429 'Resource Exhausted' or 500-level server error."
               "General slowness or high latency from the service."
