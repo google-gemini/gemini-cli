@@ -36,22 +36,49 @@ export function sanitizeAdminSettings(
 
       if (validationResult.success) {
         mcpConfig = validationResult.data;
+        // Sort include/exclude tools for stable comparison
+        if (mcpConfig.mcpServers) {
+          for (const server of Object.values(mcpConfig.mcpServers)) {
+            if (server.includeTools) {
+              server.includeTools.sort();
+            }
+            if (server.excludeTools) {
+              server.excludeTools.sort();
+            }
+          }
+        }
       }
     } catch (_e) {
       // Ignore parsing errors
     }
   }
 
+  // Apply defaults
+  // secureModeEnabled defaults to true (strictModeDisabled = false).
+  // logical precedence: strictModeDisabled > secureModeEnabled > default (true)
+  let strictModeDisabled = false;
+  if (sanitized.strictModeDisabled !== undefined) {
+    strictModeDisabled = sanitized.strictModeDisabled;
+  } else if (sanitized.secureModeEnabled !== undefined) {
+    strictModeDisabled = !sanitized.secureModeEnabled;
+  }
+
   return {
-    secureModeEnabled: sanitized.secureModeEnabled,
-    strictModeDisabled: sanitized.strictModeDisabled,
-    cliFeatureSetting: sanitized.cliFeatureSetting,
-    mcpSetting: sanitized.mcpSetting
-      ? {
-          mcpEnabled: sanitized.mcpSetting.mcpEnabled,
-          mcpConfig,
-        }
-      : undefined,
+    strictModeDisabled,
+    cliFeatureSetting: {
+      ...sanitized.cliFeatureSetting,
+      extensionsSetting: {
+        extensionsEnabled:
+          sanitized.cliFeatureSetting?.extensionsSetting?.extensionsEnabled ??
+          false,
+      },
+      unmanagedCapabilitiesEnabled:
+        sanitized.cliFeatureSetting?.unmanagedCapabilitiesEnabled ?? false,
+    },
+    mcpSetting: {
+      mcpEnabled: sanitized.mcpSetting?.mcpEnabled ?? false,
+      mcpConfig: mcpConfig ?? {},
+    },
   };
 }
 

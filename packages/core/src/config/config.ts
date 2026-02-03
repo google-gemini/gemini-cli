@@ -100,7 +100,6 @@ import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
 import type { UserTierId } from '../code_assist/types.js';
 import type { RetrieveUserQuotaResponse } from '../code_assist/types.js';
-import type { FetchAdminControlsResponse } from '../code_assist/types.js';
 import type { AdminControlsSettings } from '../code_assist/types.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
@@ -1026,7 +1025,7 @@ export class Config {
       codeAssistServer,
       this.getRemoteAdminSettings(),
       adminControlsEnabled,
-      (newSettings: FetchAdminControlsResponse) => {
+      (newSettings: AdminControlsSettings) => {
         this.setRemoteAdminSettings(newSettings);
         coreEvents.emitAdminSettingsChanged();
       },

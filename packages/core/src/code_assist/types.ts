@@ -332,8 +332,6 @@ const McpSettingSchema = z.object({
 
 // Schema for internal application use (parsed mcpConfig)
 export const AdminControlsSettingsSchema = z.object({
-  // TODO: deprecate once backend stops sending this field
-  secureModeEnabled: z.boolean().optional(),
   strictModeDisabled: z.boolean().optional(),
   mcpSetting: z
     .object({

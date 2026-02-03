@@ -2216,8 +2216,11 @@ describe('Settings Loading and Merging', () => {
       // 2. Now, set remote admin settings.
       loadedSettings.setRemoteAdminSettings({
         strictModeDisabled: false,
-        mcpSetting: { mcpEnabled: false },
-        cliFeatureSetting: { extensionsSetting: { extensionsEnabled: false } },
+        mcpSetting: { mcpEnabled: false, mcpConfig: {} },
+        cliFeatureSetting: {
+          extensionsSetting: { extensionsEnabled: false },
+          unmanagedCapabilitiesEnabled: false,
+        },
       });
 
       // 3. Verify that remote admin settings take precedence.
@@ -2257,8 +2260,11 @@ describe('Settings Loading and Merging', () => {
 
       const newRemoteSettings = {
         strictModeDisabled: false,
-        mcpSetting: { mcpEnabled: false },
-        cliFeatureSetting: { extensionsSetting: { extensionsEnabled: false } },
+        mcpSetting: { mcpEnabled: false, mcpConfig: {} },
+        cliFeatureSetting: {
+          extensionsSetting: { extensionsEnabled: false },
+          unmanagedCapabilitiesEnabled: false,
+        },
       };
 
       loadedSettings.setRemoteAdminSettings(newRemoteSettings);
@@ -2359,30 +2365,6 @@ describe('Settings Loading and Merging', () => {
       expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
       expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(false);
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(false);
-
-      // Verify that missing strictModeDisabled falls back to secureModeEnabled
-      loadedSettings.setRemoteAdminSettings({
-        secureModeEnabled: false,
-      });
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
-
-      loadedSettings.setRemoteAdminSettings({
-        secureModeEnabled: true,
-      });
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
-
-      // Verify strictModeDisabled takes precedence over secureModeEnabled
-      loadedSettings.setRemoteAdminSettings({
-        strictModeDisabled: false,
-        secureModeEnabled: false,
-      });
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(true);
-
-      loadedSettings.setRemoteAdminSettings({
-        strictModeDisabled: true,
-        secureModeEnabled: true,
-      });
-      expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
     });
 
     it('should set skills based on unmanagedCapabilitiesEnabled', () => {
