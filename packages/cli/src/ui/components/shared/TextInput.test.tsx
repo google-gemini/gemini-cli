@@ -49,6 +49,8 @@ vi.mock('./text-buffer.js', () => {
       mockTextBuffer.viewportVisualLines = [newText];
       if (typeof cursorPosition === 'number') {
         mockTextBuffer.visualCursor[1] = cursorPosition;
+      } else if (cursorPosition === 'start') {
+        mockTextBuffer.visualCursor[1] = 0;
       } else {
         mockTextBuffer.visualCursor[1] = newText.length;
       }
@@ -101,6 +103,8 @@ describe('TextInput', () => {
         buffer.viewportVisualLines = [newText];
         if (typeof cursorPosition === 'number') {
           buffer.visualCursor[1] = cursorPosition;
+        } else if (cursorPosition === 'start') {
+          buffer.visualCursor[1] = 0;
         } else {
           buffer.visualCursor[1] = newText.length;
         }

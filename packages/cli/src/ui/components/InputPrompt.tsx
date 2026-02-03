@@ -750,6 +750,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       // We prioritize execution unless the user is explicitly selecting a different suggestion.
       if (
         completion.isPerfectMatch &&
+        completion.completionMode !== CompletionMode.AT &&
         keyMatchers[Command.RETURN](key) &&
         (!completion.showSuggestions || completion.activeSuggestionIndex <= 0)
       ) {

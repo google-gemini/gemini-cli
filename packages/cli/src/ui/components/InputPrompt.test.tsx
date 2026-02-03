@@ -941,6 +941,33 @@ describe('InputPrompt', () => {
     unmount();
   });
 
+  it('should NOT submit on Enter when an @-path is a perfect match', async () => {
+    mockedUseCommandCompletion.mockReturnValue({
+      ...mockCommandCompletion,
+      showSuggestions: true,
+      suggestions: [{ label: 'file.txt', value: 'file.txt' }],
+      activeSuggestionIndex: 0,
+      isPerfectMatch: true,
+      completionMode: CompletionMode.AT,
+    });
+    props.buffer.text = '@file.txt';
+
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    await act(async () => {
+      stdin.write('\r');
+    });
+
+    await waitFor(() => {
+      // Should handle autocomplete but NOT submit
+      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
+      expect(props.onSubmit).not.toHaveBeenCalled();
+    });
+    unmount();
+  });
+
   it('should auto-execute commands with autoExecute: true on Enter', async () => {
     const aboutCommand: SlashCommand = {
       name: 'about',
@@ -3783,6 +3810,40 @@ describe('InputPrompt', () => {
           active: false,
         });
       });
+    });
+
+    it('should not render suggestions during history navigation', async () => {
+      // 1. Set up a dynamic mock implementation BEFORE rendering
+      mockedUseCommandCompletion.mockImplementation(({ active }) => ({
+        ...mockCommandCompletion,
+        showSuggestions: active,
+        suggestions: active
+          ? [{ value: 'suggestion', label: 'suggestion' }]
+          : [],
+      }));
+
+      const { stdout, stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        { uiActions },
+      );
+
+      // 2. Verify suggestions ARE showing initially because active is true by default
+      await waitFor(() => {
+        expect(stdout.lastFrame()).toContain('suggestion');
+      });
+
+      // 3. Trigger history navigation which should set suppressCompletion to true
+      await act(async () => {
+        stdin.write('\u001B[A');
+      });
+
+      // 4. Verify that suggestions are NOT in the output frame after navigation
+      await waitFor(() => {
+        expect(stdout.lastFrame()).not.toContain('suggestion');
+      });
+
+      expect(stdout.lastFrame()).toMatchSnapshot();
+      unmount();
     });
 
     it('should continue to suppress completion after manual cursor movement', async () => {
