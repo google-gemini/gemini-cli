@@ -12,6 +12,7 @@ import {
   EVENT_API_ERROR,
   EVENT_API_RESPONSE,
   EVENT_TOOL_CALL,
+  EVENT_REWIND,
 } from './types.js';
 import type {
   ApiErrorEvent,
@@ -27,6 +28,7 @@ import type {
   LoopDetectedEvent,
   LoopDetectionDisabledEvent,
   SlashCommandEvent,
+  RewindEvent,
   ConversationFinishedEvent,
   ChatCompressionEvent,
   MalformedJsonResponseEvent,
@@ -343,6 +345,24 @@ export function logSlashCommand(
   event: SlashCommandEvent,
 ): void {
   ClearcutLogger.getInstance(config)?.logSlashCommandEvent(event);
+  bufferTelemetryEvent(() => {
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    };
+    logger.emit(logRecord);
+  });
+}
+
+export function logRewind(config: Config, event: RewindEvent): void {
+  const uiEvent = {
+    ...event,
+    'event.name': EVENT_REWIND,
+    'event.timestamp': new Date().toISOString(),
+  } as UiEvent;
+  uiTelemetryService.addEvent(uiEvent);
+  ClearcutLogger.getInstance(config)?.logRewindEvent(event);
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
     const logRecord: LogRecord = {

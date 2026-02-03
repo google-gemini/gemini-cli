@@ -26,23 +26,13 @@ import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { EDIT_TOOL_NAMES } from '../tools/tool-names.js';
 import type { ValidatingToolCall } from './types.js';
 
-export const PLAN_MODE_DENIAL_MESSAGE =
-  'You are in Plan Mode - adjust your prompt to only use read and search tools.';
-
 /**
- * Helper to determine the error message and type for a policy denial.
+ * Helper to format the policy denial error.
  */
 export function getPolicyDenialError(
   config: Config,
   rule?: PolicyRule,
 ): { errorMessage: string; errorType: ToolErrorType } {
-  if (config.getApprovalMode() === ApprovalMode.PLAN) {
-    return {
-      errorMessage: PLAN_MODE_DENIAL_MESSAGE,
-      errorType: ToolErrorType.STOP_EXECUTION,
-    };
-  }
-
   const denyMessage = rule?.denyMessage ? ` ${rule.denyMessage}` : '';
   return {
     errorMessage: `Tool execution denied by policy.${denyMessage}`,

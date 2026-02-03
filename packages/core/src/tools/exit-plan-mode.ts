@@ -55,6 +55,7 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
     private config: Config,
     messageBus: MessageBus,
   ) {
+    const plansDir = config.storage.getProjectTempPlansDir();
     super(
       EXIT_PLAN_MODE_TOOL_NAME,
       'Exit Plan Mode',
@@ -66,8 +67,7 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
         properties: {
           plan_path: {
             type: 'string',
-            description:
-              'The file path to the finalized plan (e.g., "plans/feature-x.md").',
+            description: `The file path to the finalized plan (e.g., "${plansDir}/feature-x.md"). This path MUST be within the designated plans directory: ${plansDir}/`,
           },
         },
       },
