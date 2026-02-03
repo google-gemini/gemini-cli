@@ -112,6 +112,10 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
         execSync('git commit --allow-empty -m "Initial commit"', execOptions);
       }
 
+      if (evalCase.acknowledgedAgents) {
+        await rig.acknowledgeAgents(evalCase.acknowledgedAgents);
+      }
+
       const result = await rig.run({
         args: evalCase.prompt,
         approvalMode: evalCase.approvalMode ?? 'yolo',
@@ -172,5 +176,6 @@ export interface EvalCase {
   timeout?: number;
   files?: Record<string, string>;
   approvalMode?: 'default' | 'auto_edit' | 'yolo' | 'plan';
+  acknowledgedAgents?: Record<string, string>;
   assert: (rig: TestRig, result: string) => Promise<void>;
 }

@@ -135,6 +135,7 @@ export * from './prompts/mcp-prompts.js';
 export * from './agents/types.js';
 export * from './agents/agentLoader.js';
 export * from './agents/local-executor.js';
+export * from './agents/acknowledgedAgents.js';
 
 // Export specific tool logic
 export * from './tools/read-file.js';

@@ -11,8 +11,13 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { env } from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { DEFAULT_GEMINI_MODEL, GEMINI_DIR } from '@google/gemini-cli-core';
+import {
+  DEFAULT_GEMINI_MODEL,
+  GEMINI_DIR,
+  AcknowledgedAgentsService,
+} from '@google/gemini-cli-core';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import * as pty from '@lydell/node-pty';
 import stripAnsi from 'strip-ansi';
 import * as os from 'node:os';
@@ -354,6 +359,27 @@ export class TestRig {
       join(projectGeminiDir, 'settings.json'),
       JSON.stringify(settings, null, 2),
     );
+  }
+
+  async acknowledgeAgents(agents: Record<string, string>) {
+    // Use realpath to ensure the path matches what the CLI sees (e.g. /var vs /private/var on macOS)
+    const projectRoot = fs.realpathSync(this.testDir!);
+    const originalHome = process.env['GEMINI_CLI_HOME'];
+    process.env['GEMINI_CLI_HOME'] = this.homeDir!;
+
+    try {
+      const service = new AcknowledgedAgentsService();
+      for (const [name, content] of Object.entries(agents)) {
+        const hash = crypto.createHash('sha256').update(content).digest('hex');
+        await service.acknowledge(projectRoot, name, hash);
+      }
+    } finally {
+      if (originalHome) {
+        process.env['GEMINI_CLI_HOME'] = originalHome;
+      } else {
+        delete process.env['GEMINI_CLI_HOME'];
+      }
+    }
   }
 
   createFile(fileName: string, content: string) {
