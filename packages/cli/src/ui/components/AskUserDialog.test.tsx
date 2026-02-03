@@ -10,6 +10,7 @@ import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { AskUserDialog } from './AskUserDialog.js';
 import { QuestionType, type Question } from '@google/gemini-cli-core';
+import chalk from 'chalk';
 import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
 
 // Helper to write to stdin with proper act() wrapping
@@ -937,6 +938,125 @@ describe('AskUserDialog', () => {
           '0': 'A1',
           '1': 'A2',
         });
+      });
+    });
+  });
+
+  describe('Markdown rendering', () => {
+    it('auto-bolds plain single-line questions', async () => {
+      const questions: Question[] = [
+        {
+          question: 'Which option do you prefer?',
+          header: 'Test',
+          options: [{ label: 'Yes', description: '' }],
+          multiSelect: false,
+        },
+      ];
+
+      const { lastFrame } = renderWithProviders(
+        <AskUserDialog
+          questions={questions}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+          width={120}
+          availableHeight={40}
+        />,
+        { width: 120 },
+      );
+
+      await waitFor(() => {
+        const frame = lastFrame();
+        // Plain text should be rendered as bold
+        expect(frame).toContain(chalk.bold('Which option do you prefer?'));
+      });
+    });
+
+    it('does not auto-bold questions that already have markdown', async () => {
+      const questions: Question[] = [
+        {
+          question: 'Is **this** working?',
+          header: 'Test',
+          options: [{ label: 'Yes', description: '' }],
+          multiSelect: false,
+        },
+      ];
+
+      const { lastFrame } = renderWithProviders(
+        <AskUserDialog
+          questions={questions}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+          width={120}
+          availableHeight={40}
+        />,
+        { width: 120 },
+      );
+
+      await waitFor(() => {
+        const frame = lastFrame();
+        // Should NOT have double-bold (the whole question bolded AND "this" bolded)
+        // "Is " should not be bold, only "this" should be bold
+        expect(frame).toContain('Is ');
+        expect(frame).toContain(chalk.bold('this'));
+        expect(frame).not.toContain('**this**');
+      });
+    });
+
+    it('renders bold markdown in question', async () => {
+      const questions: Question[] = [
+        {
+          question: 'Is **this** working?',
+          header: 'Test',
+          options: [{ label: 'Yes', description: '' }],
+          multiSelect: false,
+        },
+      ];
+
+      const { lastFrame } = renderWithProviders(
+        <AskUserDialog
+          questions={questions}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+          width={120}
+          availableHeight={40}
+        />,
+        { width: 120 },
+      );
+
+      await waitFor(() => {
+        const frame = lastFrame();
+        // Check for chalk.bold('this') - asterisks should be gone, text should be bold
+        expect(frame).toContain(chalk.bold('this'));
+        expect(frame).not.toContain('**this**');
+      });
+    });
+
+    it('renders inline code markdown in question', async () => {
+      const questions: Question[] = [
+        {
+          question: 'Run `npm start`?',
+          header: 'Test',
+          options: [{ label: 'Yes', description: '' }],
+          multiSelect: false,
+        },
+      ];
+
+      const { lastFrame } = renderWithProviders(
+        <AskUserDialog
+          questions={questions}
+          onSubmit={vi.fn()}
+          onCancel={vi.fn()}
+          width={120}
+          availableHeight={40}
+        />,
+        { width: 120 },
+      );
+
+      await waitFor(() => {
+        const frame = lastFrame();
+        // Backticks should be removed
+        expect(frame).toContain('npm start');
+        expect(frame).not.toContain('`npm start`');
       });
     });
   });
