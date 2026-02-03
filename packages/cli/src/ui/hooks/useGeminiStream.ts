@@ -811,9 +811,10 @@ export const useGeminiStream = (
 
       contentBufferRef.current = newGeminiMessageBuffer;
 
-      // Throttle UI updates to 100ms to reduce rendering overhead in Termux
+      // Throttle UI updates to 33ms (approx 30fps, a multiple of 60Hz/120Hz VSync)
+      // to align with screen refresh and reduce Termux rendering overhead.
       const now = Date.now();
-      if (now - lastContentUpdateTimeRef.current > 100) {
+      if (now - lastContentUpdateTimeRef.current > 33) {
         flushContentBuffer(userMessageTimestamp);
         newGeminiMessageBuffer = contentBufferRef.current;
       }

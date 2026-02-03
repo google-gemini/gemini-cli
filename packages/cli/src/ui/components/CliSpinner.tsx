@@ -28,8 +28,8 @@ export const CliSpinner = (props: SpinnerProps) => {
 
   const optimizedProps = useMemo(() => {
     if (isAndroid()) {
-      // Dots usually has an interval of 80ms. Increase it to 160ms on Android to save CPU.
-      const interval = (props).interval || 160;
+      // Align with 60Hz refresh rate multiples (16.67ms * 8 = ~133ms)
+      const interval = (props).interval || 133;
       return {
         ...props,
         type: props.type || 'dots',
