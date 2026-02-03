@@ -15,7 +15,7 @@ export const WEB_SEARCH_TOOL_NAME = 'google_web_search';
 export const WEB_FETCH_TOOL_NAME = 'web_fetch';
 export const EDIT_TOOL_NAME = 'replace';
 export const SHELL_TOOL_NAME = 'run_shell_command';
-export const GREP_TOOL_NAME = 'search_file_content';
+export const GREP_TOOL_NAME = 'grep_search';
 export const READ_MANY_FILES_TOOL_NAME = 'read_many_files';
 export const READ_FILE_TOOL_NAME = 'read_file';
 export const LS_TOOL_NAME = 'list_directory';
@@ -25,6 +25,7 @@ export const ACTIVATE_SKILL_TOOL_NAME = 'activate_skill';
 export const EDIT_TOOL_NAMES = new Set([EDIT_TOOL_NAME, WRITE_FILE_TOOL_NAME]);
 export const ASK_USER_TOOL_NAME = 'ask_user';
 export const ASK_USER_DISPLAY_NAME = 'Ask User';
+export const EXIT_PLAN_MODE_TOOL_NAME = 'exit_plan_mode';
 
 /**
  * Mapping of legacy tool names to their current names.
@@ -32,7 +33,7 @@ export const ASK_USER_DISPLAY_NAME = 'Ask User';
  */
 export const TOOL_LEGACY_ALIASES: Record<string, string> = {
   // Add future renames here, e.g.:
-  // 'search_file_content': GREP_TOOL_NAME,
+  search_file_content: GREP_TOOL_NAME,
 };
 
 /**
@@ -92,6 +93,7 @@ export const PLAN_MODE_TOOLS = [
   LS_TOOL_NAME,
   WEB_SEARCH_TOOL_NAME,
   ASK_USER_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
 ] as const;
 
 /**
