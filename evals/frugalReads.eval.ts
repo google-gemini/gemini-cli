@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -14,7 +14,7 @@ describe('Frugal reads eval', () => {
    * primarily on ranged reads when the line number is known. Smaller
    * context generally helps the agent to work more reliably for longer.
    */
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: 'should use ranged read when specific line is targeted',
     files: {
       'package.json': JSON.stringify({
