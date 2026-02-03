@@ -4,11 +4,15 @@ exports[`ToolConfirmationMessage > should display multiple commands for exec typ
 "echo "hello"
 ls -la
 whoami
+
+💡 Will apply for this session only
 Allow execution of 3 commands?
 
 ● 1. Allow once
-  2. Allow for this session
-  3. No, suggest changes (esc)
+  2. Allow each exactly (echo)
+  3. Allow by command (echo *)
+  4. More options...
+  5. No, suggest changes (esc)
 "
 `;
 
@@ -75,11 +79,14 @@ Allow execution of: 'echo'?
 
 exports[`ToolConfirmationMessage > with folder trust > 'for exec confirmations' > should show "allow always" when folder is trusted 1`] = `
 "echo "hello"
+
+💡 Will apply for this session only
 Allow execution of: 'echo'?
 
 ● 1. Allow once
-  2. Allow for this session
-  3. No, suggest changes (esc)
+  2. Allow 'echo "hello"' exactly
+  3. Allow 'echo' (any arguments)
+  4. No, suggest changes (esc)
 "
 `;
 

@@ -5,10 +5,15 @@ exports[`ToolConfirmationMessage Redirection > should display redirection warnin
 
 Note: Command contains redirection which can be undesirable.
 Tip:  Toggle auto-edit (Shift+Tab) to allow redirection in the future.
+
+💡 Will apply for this session only
 Allow execution of: 'echo, redirection (>)'?
 
 ● 1. Allow once
-  2. Allow for this session
-  3. No, suggest changes (esc)
+  2. Allow 'echo "hello" > test.txt' exactly
+  3. Allow 'echo "hello" >' (any arguments) (recommended)
+  4. Allow 'echo "hello"' (any arguments)
+  5. Allow 'echo' (any arguments)
+  6. No, suggest changes (esc)
 "
 `;

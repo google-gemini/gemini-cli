@@ -82,11 +82,14 @@ exports[`ToolConfirmationQueue > renders the confirming tool with progress indic
 │ ?  ls list files                                                             │
 │                                                                              │
 │ ls                                                                           │
+│                                                                              │
+│ 💡 Will apply for this session only                                          │
 │ Allow execution of: 'ls'?                                                    │
 │                                                                              │
 │ ● 1. Allow once                                                              │
-│   2. Allow for this session                                                  │
-│   3. No, suggest changes (esc)                                               │
+│   2. Allow 'ls' exactly                                                      │
+│   3. Allow 'ls' (any arguments) (recommended)                                │
+│   4. No, suggest changes (esc)                                               │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 "
