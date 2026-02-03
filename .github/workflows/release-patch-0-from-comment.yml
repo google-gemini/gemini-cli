@@ -28,22 +28,59 @@ jobs:
           permission: 'write'
           issue-type: 'pull-request'
 
-      - name: 'Get PR Status'
-        id: 'pr_status'
+      - name: 'Get Commits'
+        id: 'get_commits'
         if: "startsWith(github.event.comment.body, '/patch')"
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          COMMENT_BODY: '${{ github.event.comment.body }}'
+          CURRENT_PR: '${{ github.event.issue.number }}'
         run: |
-          gh pr view "${{ github.event.issue.number }}" --json mergeCommit,state > pr_status.json
-          echo "MERGE_COMMIT_SHA=$(jq -r .mergeCommit.oid pr_status.json)" >> "$GITHUB_OUTPUT"
-          echo "STATE=$(jq -r .state pr_status.json)" >> "$GITHUB_OUTPUT"
+          # Find all PR numbers in the comment body (e.g., #123, owner/repo#456)
+          # The regex handles both formats and extracts just the number
+          comment_prs=$(echo "$COMMENT_BODY" | grep -oP '(?:\S+/)?\S+#\K\d+')
+          
+          # Combine with the current PR number, ensuring no duplicates
+          all_prs=$(echo -e "${CURRENT_PR}\n${comment_prs}" | sort -u)
+
+          echo "Found PRs to patch: ${all_prs}"
+
+          commit_shas=()
+          unmerged_prs=()
+          merged_prs=()
+
+          for pr in $all_prs; do
+            echo "Checking status of PR #${pr}..."
+            # Get PR status (state and merge commit)
+            pr_status=$(gh pr view "$pr" --json mergeCommit,state)
+            state=$(echo "$pr_status" | jq -r .state)
+
+            if [[ "$state" != "MERGED" ]]; then
+              unmerged_prs+=("$pr")
+            else
+              commit_sha=$(echo "$pr_status" | jq -r .mergeCommit.oid)
+              commit_shas+=("$commit_sha")
+              merged_prs+=("$pr")
+            fi
+          done
+
+          if [[ ${#unmerged_prs[@]} -gt 0 ]]; then
+            echo "ALL_MERGED=false" >> "$GITHUB_OUTPUT"
+            echo "UNMERGED_PRS=$(IFS=,; echo "${unmerged_prs[*]}")" >> "$GITHUB_OUTPUT"
+          else
+            echo "ALL_MERGED=true" >> "$GITHUB_OUTPUT"
+            echo "COMMITS=$(IFS=,; echo "${commit_shas[*]}")" >> "$GITHUB_OUTPUT"
+            echo "PR_NUMBERS=$(IFS=,; echo "${merged_prs[*]}")" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: 'Dispatch if Merged'
-        if: "steps.pr_status.outputs.STATE == 'MERGED'"
+        if: "steps.get_commits.outputs.ALL_MERGED == 'true'"
         id: 'dispatch_patch'
         uses: 'actions/github-script@00f12e3e20659f42342b1c0226afda7f7c042325'
         env:
           COMMENT_BODY: '${{ github.event.comment.body }}'
+          COMMITS: '${{ steps.get_commits.outputs.COMMITS }}'
+          PR_NUMBERS: '${{ steps.get_commits.outputs.PR_NUMBERS }}'
         with:
           github-token: '${{ secrets.GITHUB_TOKEN }}'
           script: |
@@ -60,17 +97,10 @@ jobs:
             // /patch preview
             if (commentBody.trim() === '/patch' || commentBody.trim() === '/patch both') {
               channels = ['stable', 'preview'];
-            } else if (commentBody.trim() === '/patch stable') {
+            } else if (commentBody.includes('stable')) {
               channels = ['stable'];
-            } else if (commentBody.trim() === '/patch preview') {
+            } else if (commentBody.includes('preview')) {
               channels = ['preview'];
-            } else {
-              // Fallback parsing for legacy formats
-              if (commentBody.includes('channel=preview')) {
-                channels = ['preview'];
-              } else if (commentBody.includes('--channel preview')) {
-                channels = ['preview'];
-              }
             }
 
             console.log('Detected channels:', channels);
@@ -87,9 +117,9 @@ jobs:
                 workflow_id: 'release-patch-1-create-pr.yml',
                 ref: 'main',
                 inputs: {
-                  commit: '${{ steps.pr_status.outputs.MERGE_COMMIT_SHA }}',
+                  commits: process.env.COMMITS,
                   channel: channel,
-                  original_pr: '${{ github.event.issue.number }}',
+                  original_prs: process.env.PR_NUMBERS,
                   environment: 'prod'
                 }
               });
@@ -123,13 +153,13 @@ jobs:
             }
 
       - name: 'Comment on Failure'
-        if: "startsWith(github.event.comment.body, '/patch') && steps.pr_status.outputs.STATE != 'MERGED'"
+        if: "startsWith(github.event.comment.body, '/patch') && steps.get_commits.outputs.ALL_MERGED == 'false'"
         uses: 'peter-evans/create-or-update-comment@67dcc547d311b736a8e6c5c236542148a47adc3d'
         with:
           token: '${{ secrets.GITHUB_TOKEN }}'
           issue-number: '${{ github.event.issue.number }}'
           body: |
-            :x: The `/patch` command failed. This pull request must be merged before a patch can be created.
+            :x: The `/patch` command failed. The following pull request(s) must be merged before a patch can be created: #${{ steps.get_commits.outputs.UNMERGED_PRS }}
 
       - name: 'Final Status Comment - Success'
         if: "always() && startsWith(github.event.comment.body, '/patch') && steps.dispatch_patch.outcome == 'success' && steps.dispatch_patch.outputs.dispatched_run_urls"
@@ -142,7 +172,8 @@ jobs:
 
             **📋 Details:**
             - **Channels**: `${{ steps.dispatch_patch.outputs.dispatched_channels }}`
-            - **Commit**: `${{ steps.pr_status.outputs.MERGE_COMMIT_SHA }}`
+            - **PRs**: `${{ steps.get_commits.outputs.PR_NUMBERS }}`
+            - **Commits**: `${{ steps.get_commits.outputs.COMMITS }}`
             - **Workflows Created**: ${{ steps.dispatch_patch.outputs.dispatched_run_count }}
 
             **🔗 Track Progress:**
@@ -160,7 +191,8 @@ jobs:
 
             **📋 Details:**
             - **Channels**: `${{ steps.dispatch_patch.outputs.dispatched_channels }}`
-            - **Commit**: `${{ steps.pr_status.outputs.MERGE_COMMIT_SHA }}`
+            - **PRs**: `${{ steps.get_commits.outputs.PR_NUMBERS }}`
+            - **Commits**: `${{ steps.get_commits.outputs.COMMITS }}`
             - **Workflows Created**: ${{ steps.dispatch_patch.outputs.dispatched_run_count }}
 
             **🔗 Track Progress:**

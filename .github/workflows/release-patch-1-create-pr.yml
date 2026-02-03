@@ -1,13 +1,13 @@
 name: 'Release: Patch (1) Create PR'
 
 run-name: >-
-  Release Patch (1) Create PR | S:${{ inputs.channel }} | C:${{ inputs.commit }} ${{ inputs.original_pr && format('| PR:#{0}', inputs.original_pr) || '' }}
+  Release Patch (1) Create PR | S:${{ inputs.channel }} | C:${{ inputs.commits }} ${{ inputs.original_prs && format('| PRs:#{0}', inputs.original_prs) || '' }}
 
 on:
   workflow_dispatch:
     inputs:
-      commit:
-        description: 'The commit SHA to cherry-pick for the patch.'
+      commits:
+        description: 'The commit SHAs to cherry-pick for the patch (comma-separated).'
         required: true
         type: 'string'
       channel:
@@ -27,8 +27,8 @@ on:
         required: false
         type: 'string'
         default: 'main'
-      original_pr:
-        description: 'The original PR number to comment back on.'
+      original_prs:
+        description: 'The original PR numbers to comment back on (comma-separated).'
         required: false
         type: 'string'
       environment:
@@ -85,9 +85,9 @@ jobs:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           GH_TOKEN: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
           CLI_PACKAGE_NAME: '${{ vars.CLI_PACKAGE_NAME }}'
-          PATCH_COMMIT: '${{ github.event.inputs.commit }}'
+          PATCH_COMMITS: '${{ github.event.inputs.commits }}'
           PATCH_CHANNEL: '${{ github.event.inputs.channel }}'
-          ORIGINAL_PR: '${{ github.event.inputs.original_pr }}'
+          ORIGINAL_PRS: '${{ github.event.inputs.original_prs }}'
           DRY_RUN: '${{ github.event.inputs.dry_run }}'
         continue-on-error: true
         run: |
@@ -95,9 +95,9 @@ jobs:
           {
             node scripts/releasing/create-patch-pr.js \
               --cli-package-name="${CLI_PACKAGE_NAME}" \
-              --commit="${PATCH_COMMIT}" \
+              --commits="${PATCH_COMMITS}" \
               --channel="${PATCH_CHANNEL}" \
-              --pullRequestNumber="${ORIGINAL_PR}" \
+              --pullRequestNumbers="${ORIGINAL_PRS}" \
               --dry-run="${DRY_RUN}"
           } 2>&1 | tee >(
             echo "LOG_CONTENT<<EOF" >> "$GITHUB_ENV"
@@ -107,12 +107,12 @@ jobs:
           echo "EXIT_CODE=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
 
       - name: 'Comment on Original PR'
-        if: 'always() && inputs.original_pr'
+        if: 'always() && inputs.original_prs'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-          ORIGINAL_PR: '${{ github.event.inputs.original_pr }}'
+          ORIGINAL_PRS: '${{ github.event.inputs.original_prs }}'
           EXIT_CODE: '${{ steps.create_patch.outputs.EXIT_CODE }}'
-          COMMIT: '${{ github.event.inputs.commit }}'
+          COMMITS: '${{ github.event.inputs.commits }}'
           CHANNEL: '${{ github.event.inputs.channel }}'
           REPOSITORY: '${{ github.repository }}'
           GITHUB_RUN_ID: '${{ github.run_id }}'

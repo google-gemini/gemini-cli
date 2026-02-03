@@ -1,7 +1,7 @@
 name: 'Release: Patch (3) Release'
 
 run-name: >-
-  Release Patch (3) Release | T:${{ inputs.type }} | R:${{ inputs.release_ref }} ${{ inputs.original_pr && format('| PR:#{0}', inputs.original_pr) || '' }}
+  Release Patch (3) Release | T:${{ inputs.type }} | R:${{ inputs.release_ref }} ${{ inputs.original_prs && format('| PRs:#{0}', inputs.original_prs) || '' }}
 
 on:
   workflow_dispatch:
@@ -27,8 +27,8 @@ on:
         description: 'The branch, tag, or SHA to release from.'
         required: true
         type: 'string'
-      original_pr:
-        description: 'The original PR number to comment back on.'
+      original_prs:
+        description: 'The original PR numbers to comment back on.'
         required: false
         type: 'string'
       environment:
@@ -208,10 +208,10 @@ jobs:
             --label 'release-failure,priority/p0'
 
       - name: 'Comment Success on Original PR'
-        if: '${{ success() && github.event.inputs.original_pr }}'
+        if: '${{ success() && github.event.inputs.original_prs }}'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-          ORIGINAL_PR: '${{ github.event.inputs.original_pr }}'
+          ORIGINAL_PRS: '${{ github.event.inputs.original_prs }}'
           SUCCESS: 'true'
           RELEASE_VERSION: '${{ steps.patch_version.outputs.RELEASE_VERSION }}'
           RELEASE_TAG: '${{ steps.patch_version.outputs.RELEASE_TAG }}'
@@ -225,10 +225,10 @@ jobs:
           node scripts/releasing/patch-comment.js
 
       - name: 'Comment Failure on Original PR'
-        if: '${{ failure() && github.event.inputs.original_pr }}'
+        if: '${{ failure() && github.event.inputs.original_prs }}'
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
-          ORIGINAL_PR: '${{ github.event.inputs.original_pr }}'
+          ORIGINAL_PRS: '${{ github.event.inputs.original_prs }}'
           SUCCESS: 'false'
           RELEASE_VERSION: '${{ steps.patch_version.outputs.RELEASE_VERSION }}'
           RELEASE_TAG: '${{ steps.patch_version.outputs.RELEASE_TAG }}'
