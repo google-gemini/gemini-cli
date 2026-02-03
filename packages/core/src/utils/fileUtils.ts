@@ -15,6 +15,7 @@ import { ToolErrorType } from '../tools/tool-error.js';
 import { BINARY_EXTENSIONS } from './ignorePatterns.js';
 import { createRequire as createModuleRequire } from 'node:module';
 import { debugLogger } from './debugLogger.js';
+import { isSubpath } from './paths.js';
 
 const requireModule = createModuleRequire(import.meta.url);
 
@@ -267,7 +268,7 @@ export async function validatePathWithinRoot(
     realRoot = path.resolve(rootDirectory);
   }
 
-  if (!isWithinRoot(realPath.toLowerCase(), realRoot.toLowerCase())) {
+  if (!isSubpath(realRoot, realPath)) {
     return 'Access denied: path is outside of the designated directory.';
   }
 
