@@ -182,7 +182,7 @@ export class ReadFileTool extends BaseDeclarativeTool<
           },
           limit: {
             description:
-              "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. Minimize unnecessarily large reads. Set the offset and limit large enough to read the continguous block needed for your task, plus 50-100 lines of margin.",
+              "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. Minimize unnecessarily large reads. Set the offset and limit large enough to read the continguous block needed for your task, plus 100 lines of margin, when possible.",
             type: 'number',
           },
         },
