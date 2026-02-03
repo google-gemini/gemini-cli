@@ -330,7 +330,7 @@ describe('GrepTool', () => {
 
       // Count occurrences of match lines in the output
       // Matches lines start with L<number>:
-      const matches = result.llmContent.match(/^L\d+:.*world/gm);
+      const matches = (result.llmContent as string).match(/^L\d+:.*world/gm);
       expect(matches?.length).toBe(2);
     }, 30000);
   });
