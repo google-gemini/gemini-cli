@@ -121,8 +121,8 @@ export async function setupUser(
       if (projectId) {
         return {
           projectId,
-          userTier: loadRes.currentTier.id,
-          userTierName: loadRes.currentTier.name,
+          userTier: loadRes.paidTier?.id ?? loadRes.currentTier.id,
+          userTierName: loadRes.paidTier?.name ?? loadRes.currentTier.name,
         };
       }
 
@@ -137,8 +137,8 @@ export async function setupUser(
     }
     return {
       projectId: loadRes.cloudaicompanionProject,
-      userTier: loadRes.currentTier.id,
-      userTierName: loadRes.currentTier.name,
+      userTier: loadRes.paidTier?.id ?? loadRes.currentTier.id,
+      userTierName: loadRes.paidTier?.name ?? loadRes.currentTier.name,
     };
   }
 
