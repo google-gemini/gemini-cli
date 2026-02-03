@@ -6,7 +6,6 @@
 
 import {
   ACTIVATE_SKILL_TOOL_NAME,
-  ASK_USER_TOOL_NAME,
   EDIT_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
@@ -313,8 +312,6 @@ ${options.planModeToolsList}
 
 ### Phase 1: Requirements Understanding
 - Analyze the user's request to identify core requirements and constraints
-- If critical information is missing or ambiguous, ask clarifying questions using the \`${ASK_USER_TOOL_NAME}\` tool
-- When using \`${ASK_USER_TOOL_NAME}\`, prefer providing multiple-choice options for the user to select from when possible
 - Do NOT explore the project or create a plan yet
 
 ### Phase 2: Project Exploration

@@ -46,7 +46,6 @@ export const ALL_BUILTIN_TOOL_NAMES = [
   LS_TOOL_NAME,
   MEMORY_TOOL_NAME,
   ACTIVATE_SKILL_TOOL_NAME,
-  ASK_USER_TOOL_NAME,
 ] as const;
 
 /**
@@ -60,7 +59,6 @@ export const PLAN_MODE_TOOLS = [
   READ_FILE_TOOL_NAME,
   LS_TOOL_NAME,
   WEB_SEARCH_TOOL_NAME,
-  ASK_USER_TOOL_NAME,
 ] as const;
 
 /**
