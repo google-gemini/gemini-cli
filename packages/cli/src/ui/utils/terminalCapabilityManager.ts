@@ -14,6 +14,7 @@ import {
   enableBracketedPasteMode,
   disableBracketedPasteMode,
 } from '@google/gemini-cli-core';
+import { parseColor } from '../themes/color-utils.js';
 
 export type TerminalBackgroundColor = string | undefined;
 
@@ -36,7 +37,7 @@ export class TerminalCapabilityManager {
   // eslint-disable-next-line no-control-regex
   private static readonly DEVICE_ATTRIBUTES_REGEX = /\x1b\[\?(\d+)(;\d+)*c/;
   // OSC 11 response: OSC 11 ; rgb:rrrr/gggg/bbbb ST (or BEL)
-  private static readonly OSC_11_REGEX =
+  static readonly OSC_11_REGEX =
     // eslint-disable-next-line no-control-regex
     /\x1b\]11;rgb:([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})(\x1b\\|\x07)?/;
   // modifyOtherKeys response: CSI > 4 ; level m
@@ -129,7 +130,7 @@ export class TerminalCapabilityManager {
           const match = buffer.match(TerminalCapabilityManager.OSC_11_REGEX);
           if (match) {
             bgReceived = true;
-            this.terminalBackgroundColor = this.parseColor(
+            this.terminalBackgroundColor = parseColor(
               match[1],
               match[2],
               match[3],
@@ -233,24 +234,6 @@ export class TerminalCapabilityManager {
 
   isKittyProtocolEnabled(): boolean {
     return this.kittyEnabled;
-  }
-
-  private parseColor(rHex: string, gHex: string, bHex: string): string {
-    const parseComponent = (hex: string) => {
-      const val = parseInt(hex, 16);
-      if (hex.length === 1) return (val / 15) * 255;
-      if (hex.length === 2) return val;
-      if (hex.length === 3) return (val / 4095) * 255;
-      if (hex.length === 4) return (val / 65535) * 255;
-      return val;
-    };
-
-    const r = parseComponent(rHex);
-    const g = parseComponent(gHex);
-    const b = parseComponent(bHex);
-
-    const toHex = (c: number) => Math.round(c).toString(16).padStart(2, '0');
-    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
   }
 }
 

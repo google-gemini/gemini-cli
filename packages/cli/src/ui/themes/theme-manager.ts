@@ -63,6 +63,14 @@ class ThemeManager {
     this.activeTheme = DEFAULT_THEME;
   }
 
+  isDefaultTheme(themeName: string | undefined): boolean {
+    return (
+      themeName === undefined ||
+      themeName === DEFAULT_THEME.name ||
+      themeName === DefaultLight.name
+    );
+  }
+
   /**
    * Loads custom themes from settings.
    * @param customThemesSettings Custom themes from settings.

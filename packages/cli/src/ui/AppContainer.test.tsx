@@ -157,6 +157,12 @@ vi.mock('./components/shared/text-buffer.js');
 vi.mock('./hooks/useLogger.js');
 vi.mock('./hooks/useInputHistoryStore.js');
 vi.mock('./hooks/useHookDisplayState.js');
+vi.mock('./hooks/useTerminalTheme.js', () => ({
+  useTerminalTheme: vi.fn(),
+}));
+
+import { useHookDisplayState } from './hooks/useHookDisplayState.js';
+import { useTerminalTheme } from './hooks/useTerminalTheme.js';
 
 // Mock external utilities
 vi.mock('../utils/events.js');
@@ -185,7 +191,6 @@ import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
-import { useHookDisplayState } from './hooks/useHookDisplayState.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { measureElement } from 'ink';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
@@ -260,6 +265,7 @@ describe('AppContainer State Management', () => {
   const mockedUseKeypress = useKeypress as Mock;
   const mockedUseInputHistoryStore = useInputHistoryStore as Mock;
   const mockedUseHookDisplayState = useHookDisplayState as Mock;
+  const mockedUseTerminalTheme = useTerminalTheme as Mock;
 
   const DEFAULT_GEMINI_STREAM_MOCK = {
     streamingState: 'idle',
@@ -388,6 +394,7 @@ describe('AppContainer State Management', () => {
       currentLoadingPhrase: '',
     });
     mockedUseHookDisplayState.mockReturnValue([]);
+    mockedUseTerminalTheme.mockReturnValue(undefined);
 
     // Mock Config
     mockConfig = makeFakeConfig();
