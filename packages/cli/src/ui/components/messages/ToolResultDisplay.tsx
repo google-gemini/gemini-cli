@@ -8,14 +8,16 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { DiffRenderer } from './DiffRenderer.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
-import { AnsiOutputText } from '../AnsiOutput.js';
+import { AnsiOutputText, AnsiLineText } from '../AnsiOutput.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { theme } from '../../semantic-colors.js';
-import type { AnsiOutput } from '@google/gemini-cli-core';
+import type { AnsiOutput, AnsiLine } from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { tryParseJSON } from '../../../utils/jsonoutput.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 import { Scrollable } from '../shared/Scrollable.js';
+import { ScrollableList } from '../shared/ScrollableList.js';
+import { SCROLL_TO_ITEM_END } from '../shared/VirtualizedList.js';
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 6; // for tool name, status, padding, and 'ShowMoreLines' hint
@@ -159,6 +161,27 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   }
 
   if (isAlternateBuffer) {
+    if (Array.isArray(truncatedResultDisplay)) {
+      return (
+        <Box
+          width={childWidth}
+          flexDirection="column"
+          height={maxLines ?? availableHeight}
+        >
+          <ScrollableList
+            width={childWidth}
+            data={truncatedResultDisplay as AnsiOutput}
+            renderItem={({ item }: { item: AnsiLine }) => (
+              <AnsiLineText line={item} />
+            )}
+            estimatedItemHeight={() => 1}
+            keyExtractor={(_: AnsiLine, index: number) => index.toString()}
+            initialScrollIndex={SCROLL_TO_ITEM_END}
+            hasFocus={true}
+          />
+        </Box>
+      );
+    }
     return (
       <Scrollable
         width={childWidth}

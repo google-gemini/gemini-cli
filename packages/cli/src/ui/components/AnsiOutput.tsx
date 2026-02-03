@@ -38,25 +38,29 @@ export const AnsiOutputText: React.FC<AnsiOutputProps> = ({
   return (
     <Box flexDirection="column" width={width} flexShrink={0}>
       {lastLines.map((line: AnsiLine, lineIndex: number) => (
-        <Text key={lineIndex} wrap="truncate">
-          {line.length > 0
-            ? line.map((token: AnsiToken, tokenIndex: number) => (
-                <Text
-                  key={tokenIndex}
-                  color={token.fg}
-                  backgroundColor={token.bg}
-                  inverse={token.inverse}
-                  dimColor={token.dim}
-                  bold={token.bold}
-                  italic={token.italic}
-                  underline={token.underline}
-                >
-                  {token.text}
-                </Text>
-              ))
-            : null}
-        </Text>
+        <AnsiLineText key={lineIndex} line={line} />
       ))}
     </Box>
   );
 };
+
+export const AnsiLineText: React.FC<{ line: AnsiLine }> = ({ line }) => (
+  <Text wrap="truncate">
+    {line.length > 0
+      ? line.map((token: AnsiToken, tokenIndex: number) => (
+          <Text
+            key={tokenIndex}
+            color={token.fg}
+            backgroundColor={token.bg}
+            inverse={token.inverse}
+            dimColor={token.dim}
+            bold={token.bold}
+            italic={token.italic}
+            underline={token.underline}
+          >
+            {token.text}
+          </Text>
+        ))
+      : null}
+  </Text>
+);

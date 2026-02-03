@@ -37,6 +37,14 @@ vi.mock('../AnsiOutput.js', () => ({
       .join('\n');
     return <Text>MockAnsiOutput:{serialized}</Text>;
   },
+  AnsiLineText: function MockAnsiLineText({
+    line,
+  }: {
+    line: AnsiOutput[number];
+  }) {
+    const serialized = line.map((token) => token.text || '').join('');
+    return <Text>MockAnsiLine:{serialized}</Text>;
+  },
 }));
 
 // Mock child components or utilities if they are complex or have side effects

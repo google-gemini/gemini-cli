@@ -70,7 +70,7 @@ exports[`<ToolMessage /> > renders AnsiOutputText for AnsiOutput results 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ✓  test-tool A tool for testing                                              │
 │                                                                              │
-│ MockAnsiOutput:hello                                                         │"
+│ MockAnsiLine:hello                                                           │"
 `;
 
 exports[`<ToolMessage /> > renders DiffRenderer for diff results 1`] = `

@@ -71,6 +71,24 @@ vi.mock('../shared/Scrollable.js', () => ({
   ),
 }));
 
+// Mock ScrollableList
+vi.mock('../shared/ScrollableList.js', () => ({
+  ScrollableList: ({
+    data,
+    renderItem,
+  }: {
+    data: unknown[];
+    renderItem: (info: { item: unknown; index: number }) => React.ReactNode;
+  }) => (
+    <Box flexDirection="column">
+      <Text>ScrollableList Container</Text>
+      {data.map((item, index) => (
+        <Box key={index}>{renderItem({ item, index })}</Box>
+      ))}
+    </Box>
+  ),
+}));
+
 describe('ToolResultDisplay', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -78,7 +96,7 @@ describe('ToolResultDisplay', () => {
     mockUseAlternateBuffer.mockReturnValue(false);
   });
 
-  it('uses Scrollable for ANSI output in alternate buffer mode', () => {
+  it('uses ScrollableList for ANSI output in alternate buffer mode', () => {
     mockUseAlternateBuffer.mockReturnValue(true);
     const ansiResult: AnsiOutput = [
       [
@@ -103,8 +121,23 @@ describe('ToolResultDisplay', () => {
     );
     const output = lastFrame();
 
-    expect(output).toContain('Scrollable Container');
+    expect(output).toContain('ScrollableList Container');
     expect(output).toContain('ansi content');
+  });
+
+  it('uses Scrollable for non-ANSI output in alternate buffer mode', () => {
+    mockUseAlternateBuffer.mockReturnValue(true);
+    const { lastFrame } = render(
+      <ToolResultDisplay
+        resultDisplay="**Markdown content**"
+        terminalWidth={80}
+        maxLines={10}
+      />,
+    );
+    const output = lastFrame();
+
+    expect(output).toContain('Scrollable Container');
+    expect(output).toContain('Markdown content');
   });
 
   it('renders string result as markdown by default', () => {
