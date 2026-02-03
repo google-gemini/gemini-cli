@@ -11,7 +11,6 @@ import { act } from 'react';
 import { renderHookWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { useGeminiStream } from './useGeminiStream.js';
-import { useKeypress } from './useKeypress.js';
 import * as atCommandProcessor from './atCommandProcessor.js';
 import type {
   TrackedToolCall,
@@ -1071,23 +1070,11 @@ describe('useGeminiStream', () => {
   });
 
   describe('User Cancellation', () => {
-    let keypressCallback: (key: any) => void;
-    const mockUseKeypress = useKeypress as Mock;
-
-    beforeEach(() => {
-      // Capture the callback passed to useKeypress
-      mockUseKeypress.mockImplementation((callback, options) => {
-        if (options.isActive) {
-          keypressCallback = callback;
-        } else {
-          keypressCallback = () => {};
-        }
-      });
-    });
-
-    const simulateEscapeKeyPress = () => {
-      act(() => {
-        keypressCallback({ name: 'escape' });
+    const simulateEscapeKeyPress = async (hookResult: {
+      current: { submitQuery: (query: PartListUnion) => Promise<void> };
+    }) => {
+      await act(async () => {
+        await hookResult.current.submitQuery('/cancel');
       });
     };
 
@@ -1113,7 +1100,7 @@ describe('useGeminiStream', () => {
       });
 
       // Simulate escape key press
-      simulateEscapeKeyPress();
+      await simulateEscapeKeyPress(result);
 
       // Verify cancellation message is added
       await waitFor(() => {
@@ -1164,7 +1151,7 @@ describe('useGeminiStream', () => {
         result.current.submitQuery('test query');
       });
 
-      simulateEscapeKeyPress();
+      await simulateEscapeKeyPress(result);
 
       expect(cancelSubmitSpy).toHaveBeenCalledWith(false);
     });
@@ -1205,18 +1192,18 @@ describe('useGeminiStream', () => {
         result.current.submitQuery('test query');
       });
 
-      simulateEscapeKeyPress();
+      await simulateEscapeKeyPress(result);
 
       expect(setShellInputFocusedSpy).toHaveBeenCalledWith(false);
     });
 
-    it('should not do anything if escape is pressed when not responding', () => {
+    it('should not do anything if escape is pressed when not responding', async () => {
       const { result } = renderTestHook();
 
       expect(result.current.streamingState).toBe(StreamingState.Idle);
 
       // Simulate escape key press
-      simulateEscapeKeyPress();
+      await simulateEscapeKeyPress(result);
 
       // No change should happen, no cancellation message
       expect(mockAddItem).not.toHaveBeenCalledWith(
@@ -1251,7 +1238,7 @@ describe('useGeminiStream', () => {
       });
 
       // Cancel the request
-      simulateEscapeKeyPress();
+      await simulateEscapeKeyPress(result);
 
       // Allow the stream to continue
       await act(async () => {
@@ -1297,7 +1284,7 @@ describe('useGeminiStream', () => {
       expect(result.current.streamingState).toBe(StreamingState.Responding);
 
       // Try to cancel
-      simulateEscapeKeyPress();
+      await simulateEscapeKeyPress(result);
 
       // The cancel function should be called
       expect(mockCancelAllToolCalls).toHaveBeenCalled();
@@ -1347,7 +1334,7 @@ describe('useGeminiStream', () => {
       );
 
       // Try to cancel
-      simulateEscapeKeyPress();
+      await simulateEscapeKeyPress(result);
 
       // The imperative cancel function should be called on the scheduler
       expect(mockCancelAllToolCalls).toHaveBeenCalled();

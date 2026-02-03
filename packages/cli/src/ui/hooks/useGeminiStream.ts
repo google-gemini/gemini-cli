@@ -78,7 +78,6 @@ import {
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { useSessionStats } from '../contexts/SessionContext.js';
-import { useKeypress } from './useKeypress.js';
 import type { LoadedSettings } from '../../config/settings.js';
 
 type ToolResponseWithParts = ToolCallResponseInfo & {
@@ -183,7 +182,7 @@ export const useGeminiStream = (
   setShellInputFocused: (value: boolean) => void,
   terminalWidth: number,
   terminalHeight: number,
-  isShellFocused?: boolean,
+  _isShellFocused?: boolean,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const [retryStatus, setRetryStatus] = useState<RetryAttemptPayload | null>(
@@ -606,21 +605,6 @@ export const useGeminiStream = (
     activeShellPtyId,
   ]);
 
-  useKeypress(
-    (key) => {
-      if (key.name === 'escape' && !isShellFocused) {
-        cancelOngoingRequest();
-        return true;
-      }
-    },
-    {
-      isActive:
-        streamingState === StreamingState.Responding ||
-        streamingState === StreamingState.WaitingForConfirmation,
-      priority: true,
-    },
-  );
-
   const prepareQueryForGemini = useCallback(
     async (
       query: PartListUnion,
@@ -645,6 +629,11 @@ export const useGeminiStream = (
         await logger?.logMessage(MessageSenderType.USER, trimmedQuery);
 
         if (!shellModeActive) {
+          if (trimmedQuery === '/cancel') {
+            cancelOngoingRequest();
+            return { queryToSend: null, shouldProceed: false };
+          }
+
           // Handle UI-only commands first
           const slashCommandResult = isSlashCommand(trimmedQuery)
             ? await handleSlashCommand(trimmedQuery)
@@ -741,6 +730,7 @@ export const useGeminiStream = (
       logger,
       shellModeActive,
       scheduleToolCalls,
+      cancelOngoingRequest,
     ],
   );
 
@@ -1193,12 +1183,36 @@ export const useGeminiStream = (
 
           const queryId = `${Date.now()}-${Math.random()}`;
           activeQueryIdRef.current = queryId;
+
+          const isCancelCommand = (q: PartListUnion) => {
+            if (typeof q === 'string') {
+              return q === '/cancel';
+            }
+            if (Array.isArray(q) && q.length === 1) {
+              const first = q[0];
+              if (typeof first === 'string') {
+                return first === '/cancel';
+              }
+              if (
+                typeof first === 'object' &&
+                first !== null &&
+                'text' in first
+              ) {
+                return (first).text === '/cancel';
+              }
+            }
+            return false;
+          };
+
+          const cancelMatch = isCancelCommand(query);
           if (
             (streamingState === StreamingState.Responding ||
               streamingState === StreamingState.WaitingForConfirmation) &&
-            !options?.isContinuation
-          )
+            !options?.isContinuation &&
+            !cancelMatch
+          ) {
             return;
+          }
 
           const userMessageTimestamp = Date.now();
 

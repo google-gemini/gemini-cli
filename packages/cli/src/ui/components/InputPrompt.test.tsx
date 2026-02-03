@@ -2336,6 +2336,25 @@ describe('InputPrompt', () => {
       unmount();
     });
 
+    it('should call onSubmit("/cancel") when ESC is pressed during streaming', async () => {
+      props.streamingState = StreamingState.Responding;
+      props.onSubmit = vi.fn();
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+
+      await act(async () => {
+        stdin.write('\x1B');
+        vi.advanceTimersByTime(100);
+      });
+
+      await waitFor(() => {
+        expect(props.onSubmit).toHaveBeenCalledWith('/cancel');
+      });
+      unmount();
+    });
+
     it('should not call onEscapePromptChange when not provided', async () => {
       props.onEscapePromptChange = undefined;
       props.buffer.setText('some text');
