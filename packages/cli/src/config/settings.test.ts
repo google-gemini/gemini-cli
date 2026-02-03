@@ -106,7 +106,7 @@ vi.mock('fs', async (importOriginal) => {
     readFileSync: vi.fn(),
     writeFileSync: vi.fn(),
     mkdirSync: vi.fn(),
-    realpathSync: (p: string) => p,
+    realpathSync: vi.fn((p: string) => p),
   };
 });
 
@@ -120,9 +120,11 @@ const mockCoreEvents = vi.hoisted(() => ({
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
+  const os = await import('node:os');
   return {
     ...actual,
     coreEvents: mockCoreEvents,
+    homedir: vi.fn(() => os.homedir()),
   };
 });
 
@@ -1461,6 +1463,44 @@ describe('Settings Loading and Merging', () => {
         });
       });
     });
+
+    it('should correctly skip workspace-level loading if workspaceDir is a symlink to home', () => {
+      const mockHomeDir = '/mock/home/user';
+      const mockSymlinkDir = '/mock/symlink/to/home';
+      const mockWorkspaceSettingsPath = path.join(
+        mockSymlinkDir,
+        GEMINI_DIR,
+        'settings.json',
+      );
+
+      vi.mocked(osActual.homedir).mockReturnValue(mockHomeDir);
+      vi.mocked(fs.realpathSync).mockImplementation((p: fs.PathLike) => {
+        const pStr = p.toString();
+        const resolved = path.resolve(pStr);
+        if (
+          resolved === path.resolve(mockSymlinkDir) ||
+          resolved === path.resolve(mockHomeDir)
+        ) {
+          return mockHomeDir;
+        }
+        return pStr;
+      });
+
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: string) =>
+          // Only return true for workspace settings path to see if it gets loaded
+          p === mockWorkspaceSettingsPath,
+      );
+
+      const settings = loadSettings(mockSymlinkDir);
+
+      // Verify that even though the file exists, it was NOT loaded because realpath matched home
+      expect(fs.readFileSync).not.toHaveBeenCalledWith(
+        mockWorkspaceSettingsPath,
+        'utf-8',
+      );
+      expect(settings.workspace.settings).toEqual({});
+    });
   });
 
   describe('excludedProjectEnvVars integration', () => {
@@ -2644,6 +2684,122 @@ MALICIOUS_VAR=allowed-because-trusted
           'attacker-projectinject',
         );
       });
+    });
+  });
+});
+
+describe('LoadedSettings Isolation and Serializability', () => {
+  let loadedSettings: LoadedSettings;
+
+  interface TestData {
+    a: {
+      b: number;
+    };
+  }
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+
+    // Create a minimal LoadedSettings instance
+    const emptyScope = {
+      path: '/mock/settings.json',
+      settings: {},
+      originalSettings: {},
+    } as unknown as SettingsFile;
+
+    loadedSettings = new LoadedSettings(
+      emptyScope, // system
+      emptyScope, // systemDefaults
+      { ...emptyScope }, // user
+      emptyScope, // workspace
+      true, // isTrusted
+    );
+  });
+
+  describe('setValue Isolation', () => {
+    it('should isolate state between settings and originalSettings', () => {
+      const complexValue: TestData = { a: { b: 1 } };
+      loadedSettings.setValue(SettingScope.User, 'test', complexValue);
+
+      const userSettings = loadedSettings.forScope(SettingScope.User);
+      const settingsValue = (userSettings.settings as Record<string, unknown>)[
+        'test'
+      ] as TestData;
+      const originalValue = (
+        userSettings.originalSettings as Record<string, unknown>
+      )['test'] as TestData;
+
+      // Verify they are equal but different references
+      expect(settingsValue).toEqual(complexValue);
+      expect(originalValue).toEqual(complexValue);
+      expect(settingsValue).not.toBe(complexValue);
+      expect(originalValue).not.toBe(complexValue);
+      expect(settingsValue).not.toBe(originalValue);
+
+      // Modify the in-memory setting object
+      settingsValue.a.b = 2;
+
+      // originalSettings should NOT be affected
+      expect(originalValue.a.b).toBe(1);
+    });
+
+    it('should not share references between settings and originalSettings (original servers test)', () => {
+      const mcpServers = {
+        'test-server': { command: 'echo' },
+      };
+
+      loadedSettings.setValue(SettingScope.User, 'mcpServers', mcpServers);
+
+      // Modify the original object
+      delete (mcpServers as Record<string, unknown>)['test-server'];
+
+      // The settings in LoadedSettings should still have the server
+      const userSettings = loadedSettings.forScope(SettingScope.User);
+      expect(
+        (userSettings.settings.mcpServers as Record<string, unknown>)[
+          'test-server'
+        ],
+      ).toBeDefined();
+      expect(
+        (userSettings.originalSettings.mcpServers as Record<string, unknown>)[
+          'test-server'
+        ],
+      ).toBeDefined();
+
+      // They should also be different objects from each other
+      expect(userSettings.settings.mcpServers).not.toBe(
+        userSettings.originalSettings.mcpServers,
+      );
+    });
+  });
+
+  describe('setValue Serializability', () => {
+    it('should preserve Map/Set types (via structuredClone)', () => {
+      const mapValue = { myMap: new Map([['key', 'value']]) };
+      loadedSettings.setValue(SettingScope.User, 'test', mapValue);
+
+      const userSettings = loadedSettings.forScope(SettingScope.User);
+      const settingsValue = (userSettings.settings as Record<string, unknown>)[
+        'test'
+      ] as { myMap: Map<string, string> };
+
+      // Map is preserved by structuredClone
+      expect(settingsValue.myMap).toBeInstanceOf(Map);
+      expect(settingsValue.myMap.get('key')).toBe('value');
+
+      // But it should be a different reference
+      expect(settingsValue.myMap).not.toBe(mapValue.myMap);
+    });
+
+    it('should handle circular references (structuredClone supports them, but deepMerge may not)', () => {
+      const circular: Record<string, unknown> = { a: 1 };
+      circular['self'] = circular;
+
+      // structuredClone(circular) works, but LoadedSettings.setValue calls
+      // computeMergedSettings() -> customDeepMerge() which blows up on circularity.
+      expect(() => {
+        loadedSettings.setValue(SettingScope.User, 'test', circular);
+      }).toThrow(/Maximum call stack size exceeded/);
     });
   });
 });
