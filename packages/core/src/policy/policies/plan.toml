@@ -31,6 +31,7 @@
 decision = "deny"
 priority = 20
 modes = ["plan"]
+deny_message = "You are in Plan Mode - adjust your prompt to only use read and search tools."
 
 # Explicitly Allow Read-Only Tools in Plan mode.
 

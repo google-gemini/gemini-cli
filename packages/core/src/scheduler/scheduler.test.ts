@@ -745,6 +745,63 @@ describe('Scheduler (Orchestrator)', () => {
       );
     });
 
+    it('should return POLICY_VIOLATION error type when denied in Plan Mode', async () => {
+      vi.mocked(checkPolicy).mockResolvedValue({
+        decision: PolicyDecision.DENY,
+        rule: { decision: PolicyDecision.DENY },
+      });
+
+      mockConfig.getApprovalMode.mockReturnValue(ApprovalMode.PLAN);
+
+      await scheduler.schedule(req1, signal);
+
+      expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
+        'call-1',
+        'error',
+        expect.objectContaining({
+          errorType: ToolErrorType.POLICY_VIOLATION,
+          responseParts: expect.arrayContaining([
+            expect.objectContaining({
+              functionResponse: expect.objectContaining({
+                response: {
+                  error: 'Tool execution denied by policy.',
+                },
+              }),
+            }),
+          ]),
+        }),
+      );
+    });
+
+    it('should return POLICY_VIOLATION and custom deny message when denied in Plan Mode with rule message', async () => {
+      const customMessage = 'Custom Plan Mode Deny';
+      vi.mocked(checkPolicy).mockResolvedValue({
+        decision: PolicyDecision.DENY,
+        rule: { decision: PolicyDecision.DENY, denyMessage: customMessage },
+      });
+
+      mockConfig.getApprovalMode.mockReturnValue(ApprovalMode.PLAN);
+
+      await scheduler.schedule(req1, signal);
+
+      expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
+        'call-1',
+        'error',
+        expect.objectContaining({
+          errorType: ToolErrorType.POLICY_VIOLATION,
+          responseParts: expect.arrayContaining([
+            expect.objectContaining({
+              functionResponse: expect.objectContaining({
+                response: {
+                  error: `Tool execution denied by policy. ${customMessage}`,
+                },
+              }),
+            }),
+          ]),
+        }),
+      );
+    });
+
     it('should bypass confirmation and ProceedOnce if Policy returns ALLOW (YOLO/AllowedTools)', async () => {
       vi.mocked(checkPolicy).mockResolvedValue({
         decision: PolicyDecision.ALLOW,
