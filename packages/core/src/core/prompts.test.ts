@@ -22,6 +22,9 @@ import {
   DEFAULT_GEMINI_MODEL,
 } from '../config/models.js';
 import { ApprovalMode } from '../policy/types.js';
+import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
+import type { CallableTool } from '@google/genai';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 // Mock tool names if they are dynamically generated or complex
 vi.mock('../tools/ls', () => ({ LSTool: { Name: 'list_directory' } }));
@@ -62,6 +65,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     mockConfig = {
       getToolRegistry: vi.fn().mockReturnValue({
         getAllToolNames: vi.fn().mockReturnValue([]),
+        getAllTools: vi.fn().mockReturnValue([]),
       }),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       storage: {
@@ -270,6 +274,32 @@ describe('Core System Prompt (prompts.ts)', () => {
       const prompt = getCoreSystemPrompt(mockConfig);
       expect(prompt).not.toContain('# Active Approval Mode: Plan');
       expect(prompt).toMatchSnapshot();
+    });
+
+    it('should include read-only MCP tools in PLAN mode', () => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
+
+      const mcpTool = new DiscoveredMCPTool(
+        {} as CallableTool,
+        'readonly-server',
+        'read_static_value',
+        'A read-only tool',
+        {},
+        {} as MessageBus,
+        false,
+        true, // isReadOnly
+      );
+
+      vi.mocked(mockConfig.getToolRegistry().getAllTools).mockReturnValue([
+        mcpTool,
+      ]);
+      vi.mocked(mockConfig.getToolRegistry().getAllToolNames).mockReturnValue([
+        mcpTool.name,
+      ]);
+
+      const prompt = getCoreSystemPrompt(mockConfig);
+
+      expect(prompt).toContain('`read_static_value` (readonly-server)');
     });
 
     it('should only list available tools in PLAN mode', () => {

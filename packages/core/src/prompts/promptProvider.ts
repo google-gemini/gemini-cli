@@ -25,6 +25,7 @@ import {
   READ_FILE_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { resolveModel, isPreviewModel } from '../config/models.js';
+import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 
 /**
  * Orchestrates prompt generation by gathering context and building options.
@@ -55,13 +56,30 @@ export class PromptProvider {
     const isGemini3 = isPreviewModel(desiredModel);
 
     // --- Context Gathering ---
+    let planModeToolsList = PLAN_MODE_TOOLS.filter((t) =>
+      new Set(toolNames).has(t),
+    )
+      .map((t) => `- \`${t}\``)
+      .join('\n');
+
+    // Add read-only MCP tools to the list
+    if (isPlanMode) {
+      const allTools = config.getToolRegistry().getAllTools();
+      const readOnlyMcpTools = allTools.filter(
+        (t): t is DiscoveredMCPTool =>
+          t instanceof DiscoveredMCPTool && !!t.isReadOnly,
+      );
+      if (readOnlyMcpTools.length > 0) {
+        const mcpToolsList = readOnlyMcpTools
+          .map((t) => `- \`${t.name}\` (${t.serverName})`)
+          .join('\n');
+        planModeToolsList += `\n${mcpToolsList}`;
+      }
+    }
+
     const planOptions: snippets.ApprovalModePlanOptions | undefined = isPlanMode
       ? {
-          planModeToolsList: PLAN_MODE_TOOLS.filter((t) =>
-            new Set(toolNames).has(t),
-          )
-            .map((t) => `- \`${t}\``)
-            .join('\n'),
+          planModeToolsList,
           plansDir: config.storage.getProjectTempPlansDir(),
         }
       : undefined;
