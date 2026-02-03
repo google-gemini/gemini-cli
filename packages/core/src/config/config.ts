@@ -101,6 +101,7 @@ import { HookSystem } from '../hooks/index.js';
 import type { UserTierId } from '../code_assist/types.js';
 import type { RetrieveUserQuotaResponse } from '../code_assist/types.js';
 import type { FetchAdminControlsResponse } from '../code_assist/types.js';
+import type { AdminControlsSettings } from '../code_assist/types.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
@@ -623,7 +624,7 @@ export class Config {
   private readonly planEnabled: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
-  private remoteAdminSettings: FetchAdminControlsResponse | undefined;
+  private remoteAdminSettings: AdminControlsSettings | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
   private lastModeSwitchTime: number = Date.now();
 
@@ -1094,11 +1095,11 @@ export class Config {
     this.latestApiRequest = req;
   }
 
-  getRemoteAdminSettings(): FetchAdminControlsResponse | undefined {
+  getRemoteAdminSettings(): AdminControlsSettings | undefined {
     return this.remoteAdminSettings;
   }
 
-  setRemoteAdminSettings(settings: FetchAdminControlsResponse): void {
+  setRemoteAdminSettings(settings: AdminControlsSettings): void {
     this.remoteAdminSettings = settings;
   }
 

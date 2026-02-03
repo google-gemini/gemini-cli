@@ -10,21 +10,49 @@ import { isDeepStrictEqual } from 'node:util';
 import {
   type FetchAdminControlsResponse,
   FetchAdminControlsResponseSchema,
+  McpConfigDefinitionSchema,
+  type AdminControlsSettings,
 } from '../types.js';
 import { getCodeAssistServer } from '../codeAssist.js';
 import type { Config } from '../../config/config.js';
 
 let pollingInterval: NodeJS.Timeout | undefined;
-let currentSettings: FetchAdminControlsResponse | undefined;
+let currentSettings: AdminControlsSettings | undefined;
 
 export function sanitizeAdminSettings(
   settings: FetchAdminControlsResponse,
-): FetchAdminControlsResponse {
+): AdminControlsSettings {
   const result = FetchAdminControlsResponseSchema.safeParse(settings);
   if (!result.success) {
     return {};
   }
-  return result.data;
+  const sanitized = result.data;
+  let mcpConfig;
+
+  if (sanitized.mcpSetting?.mcpConfigJson) {
+    try {
+      const parsed = JSON.parse(sanitized.mcpSetting.mcpConfigJson);
+      const validationResult = McpConfigDefinitionSchema.safeParse(parsed);
+
+      if (validationResult.success) {
+        mcpConfig = validationResult.data;
+      }
+    } catch (_e) {
+      // Ignore parsing errors
+    }
+  }
+
+  return {
+    secureModeEnabled: sanitized.secureModeEnabled,
+    strictModeDisabled: sanitized.strictModeDisabled,
+    cliFeatureSetting: sanitized.cliFeatureSetting,
+    mcpSetting: sanitized.mcpSetting
+      ? {
+          mcpEnabled: sanitized.mcpSetting.mcpEnabled,
+          mcpConfig,
+        }
+      : undefined,
+  };
 }
 
 function isGaxiosError(error: unknown): error is { status: number } {
@@ -48,10 +76,10 @@ function isGaxiosError(error: unknown): error is { status: number } {
  */
 export async function fetchAdminControls(
   server: CodeAssistServer | undefined,
-  cachedSettings: FetchAdminControlsResponse | undefined,
+  cachedSettings: AdminControlsSettings | undefined,
   adminControlsEnabled: boolean,
-  onSettingsChanged: (settings: FetchAdminControlsResponse) => void,
-): Promise<FetchAdminControlsResponse> {
+  onSettingsChanged: (settings: AdminControlsSettings) => void,
+): Promise<AdminControlsSettings> {
   if (!server || !server.projectId || !adminControlsEnabled) {
     stopAdminControlsPolling();
     currentSettings = undefined;
@@ -95,7 +123,7 @@ export async function fetchAdminControls(
 function startAdminControlsPolling(
   server: CodeAssistServer,
   project: string,
-  onSettingsChanged: (settings: FetchAdminControlsResponse) => void,
+  onSettingsChanged: (settings: AdminControlsSettings) => void,
 ) {
   stopAdminControlsPolling();
 

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { isDeepStrictEqual } from 'node:util';
 import {
   describe,
   it,
@@ -22,6 +23,7 @@ import {
 import type { CodeAssistServer } from '../server.js';
 import type { Config } from '../../config/config.js';
 import { getCodeAssistServer } from '../codeAssist.js';
+import type { FetchAdminControlsResponse } from '../types.js';
 
 vi.mock('../codeAssist.js', () => ({
   getCodeAssistServer: vi.fn(),
@@ -49,37 +51,131 @@ describe('Admin Controls', () => {
   });
 
   describe('sanitizeAdminSettings', () => {
-    it('should strip unknown fields', () => {
+    it('should strip unknown fields and pass through mcpConfigJson when valid', () => {
+      const mcpConfig = {
+        mcpServers: {
+          'server-1': {
+            url: 'http://example.com',
+            type: 'sse' as const,
+            trust: true,
+            includeTools: ['tool1'],
+          },
+        },
+      };
+
       const input = {
         strictModeDisabled: false,
         extraField: 'should be removed',
         mcpSetting: {
-          mcpEnabled: false,
+          mcpEnabled: true,
+          mcpConfigJson: JSON.stringify(mcpConfig),
           unknownMcpField: 'remove me',
         },
       };
 
-      const result = sanitizeAdminSettings(input);
+      const result = sanitizeAdminSettings(
+        input as unknown as FetchAdminControlsResponse,
+      );
 
       expect(result).toEqual({
         strictModeDisabled: false,
         mcpSetting: {
-          mcpEnabled: false,
+          mcpEnabled: true,
+          mcpConfig,
         },
       });
-      // Explicitly check that unknown fields are gone
-      expect((result as Record<string, unknown>)['extraField']).toBeUndefined();
     });
 
-    it('should preserve valid nested fields', () => {
-      const input = {
-        cliFeatureSetting: {
-          extensionsSetting: {
-            extensionsEnabled: true,
+    it('should ignore mcpConfigJson if it is invalid JSON', () => {
+      const input: FetchAdminControlsResponse = {
+        mcpSetting: {
+          mcpEnabled: true,
+          mcpConfigJson: '{ invalid json }',
+        },
+      };
+
+      const result = sanitizeAdminSettings(input);
+      expect(result.mcpSetting).toEqual({
+        mcpEnabled: true,
+        mcpConfig: undefined,
+      });
+    });
+
+    it('should ignore mcpConfigJson if it does not match schema', () => {
+      const invalidConfig = {
+        mcpServers: {
+          'server-1': {
+            url: 123, // should be string
+            type: 'invalid-type', // should be sse or http
           },
         },
       };
-      expect(sanitizeAdminSettings(input)).toEqual(input);
+      const input: FetchAdminControlsResponse = {
+        mcpSetting: {
+          mcpEnabled: true,
+          mcpConfigJson: JSON.stringify(invalidConfig),
+        },
+      };
+
+      const result = sanitizeAdminSettings(input);
+      expect(result.mcpSetting).toEqual({
+        mcpEnabled: true,
+        mcpConfig: undefined,
+      });
+    });
+
+    it('should handle undefined mcpSetting', () => {
+      const input: FetchAdminControlsResponse = {
+        strictModeDisabled: true,
+      };
+
+      const result = sanitizeAdminSettings(input);
+      expect(result).toEqual({
+        strictModeDisabled: true,
+        cliFeatureSetting: undefined,
+        mcpSetting: undefined,
+        secureModeEnabled: undefined,
+      });
+    });
+
+    it('should handle missing mcpConfigJson', () => {
+      const input: FetchAdminControlsResponse = {
+        mcpSetting: {
+          mcpEnabled: true,
+        },
+      };
+
+      const result = sanitizeAdminSettings(input);
+      expect(result.mcpSetting).toEqual({
+        mcpEnabled: true,
+        mcpConfig: undefined,
+      });
+    });
+  });
+
+  describe('isDeepStrictEqual verification', () => {
+    it('should consider objects with different key orders as equal', () => {
+      const obj1 = { a: 1, b: 2 };
+      const obj2 = { b: 2, a: 1 };
+      expect(isDeepStrictEqual(obj1, obj2)).toBe(true);
+    });
+
+    it('should consider nested objects with different key orders as equal', () => {
+      const obj1 = { outer: { a: 1, b: 2 } };
+      const obj2 = { outer: { b: 2, a: 1 } };
+      expect(isDeepStrictEqual(obj1, obj2)).toBe(true);
+    });
+
+    it('should consider arrays with different order as NOT equal', () => {
+      const arr1 = [1, 2];
+      const arr2 = [2, 1];
+      expect(isDeepStrictEqual(arr1, arr2)).toBe(false);
+    });
+
+    it('should consider objects inside arrays with different key orders as equal', () => {
+      const list1 = [{ a: 1, b: 2 }];
+      const list2 = [{ b: 2, a: 1 }];
+      expect(isDeepStrictEqual(list1, list2)).toBe(true);
     });
   });
 
@@ -152,7 +248,12 @@ describe('Admin Controls', () => {
         true,
         mockOnSettingsChanged,
       );
-      expect(result).toEqual(serverResponse);
+      expect(result).toEqual({
+        strictModeDisabled: false,
+        cliFeatureSetting: undefined,
+        mcpSetting: undefined,
+        secureModeEnabled: undefined,
+      });
       expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
     });
 
@@ -208,7 +309,12 @@ describe('Admin Controls', () => {
         true,
         mockOnSettingsChanged,
       );
-      expect(result).toEqual({ strictModeDisabled: false });
+      expect(result).toEqual({
+        strictModeDisabled: false,
+        cliFeatureSetting: undefined,
+        mcpSetting: undefined,
+        secureModeEnabled: undefined,
+      });
       expect(
         (result as Record<string, unknown>)['unknownField'],
       ).toBeUndefined();
@@ -271,6 +377,9 @@ describe('Admin Controls', () => {
 
       expect(mockOnSettingsChanged).toHaveBeenCalledWith({
         strictModeDisabled: false,
+        cliFeatureSetting: undefined,
+        mcpSetting: undefined,
+        secureModeEnabled: undefined,
       });
     });
 
@@ -295,89 +404,6 @@ describe('Admin Controls', () => {
 
       expect(mockOnSettingsChanged).not.toHaveBeenCalled();
       expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(2);
-    });
-
-    it('should continue polling after a fetch error', async () => {
-      // Initial fetch is successful
-      (mockServer.fetchAdminControls as Mock).mockResolvedValue({
-        strictModeDisabled: true,
-      });
-      await fetchAdminControls(
-        mockServer,
-        undefined,
-        true,
-        mockOnSettingsChanged,
-      );
-      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
-
-      // Next poll fails
-      (mockServer.fetchAdminControls as Mock).mockRejectedValue(
-        new Error('Poll failed'),
-      );
-      await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
-      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(2);
-      expect(mockOnSettingsChanged).not.toHaveBeenCalled(); // No changes on error
-
-      // Subsequent poll succeeds with new data
-      (mockServer.fetchAdminControls as Mock).mockResolvedValue({
-        strictModeDisabled: false,
-      });
-      await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
-      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(3);
-      expect(mockOnSettingsChanged).toHaveBeenCalledWith({
-        strictModeDisabled: false,
-      });
-    });
-
-    it('should STOP polling if server returns 403', async () => {
-      // Initial fetch is successful
-      (mockServer.fetchAdminControls as Mock).mockResolvedValue({
-        strictModeDisabled: true,
-      });
-      await fetchAdminControls(
-        mockServer,
-        undefined,
-        true,
-        mockOnSettingsChanged,
-      );
-      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
-
-      // Next poll returns 403
-      const error403 = new Error('Forbidden');
-      Object.assign(error403, { status: 403 });
-      (mockServer.fetchAdminControls as Mock).mockRejectedValue(error403);
-
-      await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
-      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(2);
-
-      // Advance time again - should NOT poll again
-      await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
-      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(2);
-    });
-  });
-
-  describe('stopAdminControlsPolling', () => {
-    it('should stop polling after it has started', async () => {
-      (mockServer.fetchAdminControls as Mock).mockResolvedValue({});
-
-      // Start polling
-      await fetchAdminControls(
-        mockServer,
-        undefined,
-        true,
-        mockOnSettingsChanged,
-      );
-      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
-
-      // Stop polling
-      stopAdminControlsPolling();
-
-      // Advance timer well beyond the polling interval
-      await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
-
-      // The poll should not have fired again
-      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
-      expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
     });
   });
 

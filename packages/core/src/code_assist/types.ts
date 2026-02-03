@@ -311,10 +311,40 @@ const CliFeatureSettingSchema = z.object({
   unmanagedCapabilitiesEnabled: z.boolean().optional(),
 });
 
+const McpServerConfigSchema = z.object({
+  url: z.string().optional(),
+  type: z.enum(['sse', 'http']).optional(),
+  trust: z.boolean().optional(),
+  includeTools: z.array(z.string()).optional(),
+  excludeTools: z.array(z.string()).optional(),
+});
+
+export const McpConfigDefinitionSchema = z.object({
+  mcpServers: z.record(McpServerConfigSchema).optional(),
+});
+
+export type McpConfigDefinition = z.infer<typeof McpConfigDefinitionSchema>;
+
 const McpSettingSchema = z.object({
   mcpEnabled: z.boolean().optional(),
-  overrideMcpConfigJson: z.string().optional(),
+  mcpConfigJson: z.string().optional(),
 });
+
+// Schema for internal application use (parsed mcpConfig)
+export const AdminControlsSettingsSchema = z.object({
+  // TODO: deprecate once backend stops sending this field
+  secureModeEnabled: z.boolean().optional(),
+  strictModeDisabled: z.boolean().optional(),
+  mcpSetting: z
+    .object({
+      mcpEnabled: z.boolean().optional(),
+      mcpConfig: McpConfigDefinitionSchema.optional(),
+    })
+    .optional(),
+  cliFeatureSetting: CliFeatureSettingSchema.optional(),
+});
+
+export type AdminControlsSettings = z.infer<typeof AdminControlsSettingsSchema>;
 
 export const FetchAdminControlsResponseSchema = z.object({
   // TODO: deprecate once backend stops sending this field

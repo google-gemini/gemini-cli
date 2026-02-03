@@ -16,7 +16,7 @@ import {
   Storage,
   coreEvents,
   homedir,
-  type FetchAdminControlsResponse,
+  type AdminControlsSettings,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
@@ -348,7 +348,7 @@ export class LoadedSettings {
     coreEvents.emitSettingsChanged();
   }
 
-  setRemoteAdminSettings(remoteSettings: FetchAdminControlsResponse): void {
+  setRemoteAdminSettings(remoteSettings: AdminControlsSettings): void {
     const admin: Settings['admin'] = {};
     const {
       secureModeEnabled,
