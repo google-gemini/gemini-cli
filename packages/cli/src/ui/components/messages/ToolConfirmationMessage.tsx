@@ -69,6 +69,213 @@ function buildScopeOptionItems(
   });
 }
 
+/**
+ * Finds the full command that matches the given root command.
+ * Used to map root commands (like "git") to full commands (like "git status").
+ */
+function findMatchingCommand(commands: string[], rootCommand: string): string {
+  return (
+    commands.find((cmd: string) =>
+      cmd.trim().toLowerCase().startsWith(rootCommand.toLowerCase()),
+    ) || commands[0]
+  );
+}
+
+/**
+ * Checks if confirmation details represent compound commands (multiple commands chained).
+ */
+function isCompoundCommand(
+  confirmationDetails:
+    | ToolCallConfirmationDetails
+    | SerializableConfirmationDetails,
+): boolean {
+  return (
+    confirmationDetails.type === 'exec' &&
+    confirmationDetails.rootCommands.length > 1
+  );
+}
+
+/**
+ * Checks if any command in the list is dangerous (restricted to exact-only scope).
+ * Dangerous commands only have one scope option (exact), indicating high risk.
+ */
+function hasAnyDangerousCommand(commands: string[]): boolean {
+  return commands.some((cmd: string) => {
+    const scopeOptions = generateScopeOptions(cmd);
+    // Dangerous commands only allow exact scope (length === 1)
+    return scopeOptions.length === 1;
+  });
+}
+
+/**
+ * Handles scope selection in expanded mode for per-command configuration.
+ * @returns True if the selection was handled, false to continue processing
+ */
+function handleExpandedModeSelection(
+  scope: ApprovalScope,
+  confirmationDetails: Extract<
+    SerializableConfirmationDetails,
+    { type: 'exec' }
+  >,
+  expandedMode: boolean,
+  currentCommandIndex: number,
+  selectedScopes: Record<string, ApprovalScope>,
+  setSelectedScopes: (scopes: Record<string, ApprovalScope>) => void,
+  setCurrentCommandIndex: (index: number) => void,
+  handleConfirm: (
+    outcome: ToolConfirmationOutcome,
+    payload?: ToolConfirmationPayload,
+  ) => void,
+): boolean {
+  if (!expandedMode || confirmationDetails.rootCommands.length <= 1) {
+    return false;
+  }
+
+  const commands = confirmationDetails.commands || [
+    confirmationDetails.command,
+  ];
+  const rootCommands = confirmationDetails.rootCommands;
+  const currentRootCmd = rootCommands[currentCommandIndex];
+  const currentCmd = findMatchingCommand(commands, currentRootCmd);
+
+  const newSelectedScopes = {
+    ...selectedScopes,
+    [currentCmd]: scope,
+  };
+  setSelectedScopes(newSelectedScopes);
+
+  // Move to next command or finish
+  if (currentCommandIndex < rootCommands.length - 1) {
+    setCurrentCommandIndex(currentCommandIndex + 1);
+    return true;
+  }
+
+  // All commands configured - submit with per-command scopes.
+  // Only persist if ALL commands are safe to persist (prevents auto-persisting dangerous commands).
+  const shouldPersistApproval = commands.every((cmd: string) =>
+    shouldPersist(cmd),
+  );
+
+  handleConfirm(ToolConfirmationOutcome.ProceedAlways, {
+    commandScopes: newSelectedScopes,
+    persist: shouldPersistApproval,
+    compoundCommands: commands,
+  });
+  return true;
+}
+
+/**
+ * Builds the payload for single or uniform compound command scope selection.
+ */
+function buildScopePayload(
+  confirmationDetails: Extract<
+    SerializableConfirmationDetails,
+    { type: 'exec' }
+  >,
+  scope: ApprovalScope,
+): ToolConfirmationPayload {
+  const isCompound = confirmationDetails.rootCommands.length > 1;
+  const shouldPersistApproval = shouldPersist(confirmationDetails.rootCommand);
+
+  if (isCompound) {
+    // For compound commands, apply uniform scope to all commands
+    return {
+      scope,
+      persist: shouldPersistApproval,
+      compoundCommands: confirmationDetails.commands || [
+        confirmationDetails.command,
+      ],
+    };
+  }
+
+  // For single commands, check for custom pattern
+  const scopeOptions = generateScopeOptions(confirmationDetails.command);
+  const selectedOption = scopeOptions.find(
+    (opt: ScopeOption) => opt.id === scope,
+  );
+  const customPattern = selectedOption?.pattern?.startsWith('^')
+    ? selectedOption.pattern
+    : undefined;
+
+  return {
+    scope: customPattern ? 'custom' : scope,
+    customPattern,
+    persist: shouldPersistApproval,
+  };
+}
+
+/**
+ * Builds radio select options for compound commands based on current mode.
+ */
+function buildCompoundCommandOptions(
+  commands: string[],
+  rootCommands: string[],
+  expandedMode: boolean,
+  currentCommandIndex: number,
+): Array<RadioSelectItem<ExecOptionValue>> {
+  const options: Array<RadioSelectItem<ExecOptionValue>> = [];
+
+  if (expandedMode) {
+    // Expanded mode: per-command scope selection
+    const currentRootCmd = rootCommands[currentCommandIndex];
+    const currentCmd = findMatchingCommand(commands, currentRootCmd);
+    const scopeOptions = generateScopeOptions(currentCmd);
+    const recommendedScope = getRecommendedScope(currentCmd);
+
+    // Header
+    const stepLabel = `Step ${currentCommandIndex + 1}/${rootCommands.length}: ${currentRootCmd}`;
+    options.push({
+      label: `━━━ ${stepLabel} ━━━`,
+      value: 'back' as ExecOptionValue,
+      key: 'header',
+      disabled: true,
+    });
+
+    // Scope options
+    options.push(...buildScopeOptionItems(scopeOptions, recommendedScope));
+
+    // Back option
+    options.push({
+      label: '← Back to simple options',
+      value: 'back' as ExecOptionValue,
+      key: 'back',
+    });
+  } else {
+    // Non-expanded mode: tiered uniform scope options
+    const hasDangerousCmd = hasAnyDangerousCommand(commands);
+
+    // Always offer exact scope
+    options.push({
+      label: `Allow each exactly (${rootCommands.join(', ')})`,
+      value: 'scope:exact' as ExecOptionValue,
+      key: 'scope:exact',
+    });
+
+    if (!hasDangerousCmd) {
+      // Offer broadest scope
+      const isReadOnly = commands.every(
+        (cmd: string) => getRecommendedScope(cmd) === 'command-only',
+      );
+      const cmdOnlyLabel = `Allow by command (${rootCommands.join(', ')} *)`;
+
+      options.push({
+        label: isReadOnly ? `${cmdOnlyLabel} (recommended)` : cmdOnlyLabel,
+        value: 'scope:command-only' as ExecOptionValue,
+        key: 'scope:command-only',
+      });
+
+      // More options
+      options.push({
+        label: 'More options...',
+        value: 'more-options' as ExecOptionValue,
+        key: 'more-options',
+      });
+    }
+  }
+
+  return options;
+}
+
 export interface ToolConfirmationMessageProps {
   callId: string;
   confirmationDetails:
@@ -145,7 +352,7 @@ export const ToolConfirmationMessage: React.FC<
 
   const handleSelect = useCallback(
     (item: ToolConfirmationOutcome | string) => {
-      // Handle "More options..." selection
+      // Handle mode transitions
       if (item === 'more-options') {
         setExpandedMode(true);
         setCurrentCommandIndex(0);
@@ -153,7 +360,6 @@ export const ToolConfirmationMessage: React.FC<
         return;
       }
 
-      // Handle "Back" selection
       if (item === 'back') {
         setExpandedMode(false);
         setCurrentCommandIndex(0);
@@ -161,95 +367,33 @@ export const ToolConfirmationMessage: React.FC<
         return;
       }
 
+      // Handle scope selections
       if (typeof item === 'string' && item.startsWith('scope:')) {
         const scope = item.replace('scope:', '') as ApprovalScope;
 
-        // In expanded mode, handle per-command scope selection
-        if (
-          expandedMode &&
-          confirmationDetails.type === 'exec' &&
-          confirmationDetails.rootCommands.length > 1
-        ) {
-          const commands = confirmationDetails.commands || [
-            confirmationDetails.command,
-          ];
-          const rootCommands = confirmationDetails.rootCommands;
-          const currentRootCmd = rootCommands[currentCommandIndex];
-
-          // Find the first full command that matches this root command
-          const currentCmd =
-            commands.find((cmd: string) =>
-              cmd.trim().toLowerCase().startsWith(currentRootCmd.toLowerCase()),
-            ) || commands[0];
-
-          const newSelectedScopes = {
-            ...selectedScopes,
-            [currentCmd]: scope,
-          };
-          setSelectedScopes(newSelectedScopes);
-
-          // Move to next command or finish
-          if (currentCommandIndex < rootCommands.length - 1) {
-            setCurrentCommandIndex(currentCommandIndex + 1);
-            return;
-          }
-
-          // All commands have been configured - submit with per-command scopes
-          const shouldPersistApproval = commands.every((cmd: string) =>
-            shouldPersist(cmd),
+        if (confirmationDetails.type === 'exec') {
+          // Delegate to expanded mode handler
+          const handled = handleExpandedModeSelection(
+            scope,
+            confirmationDetails,
+            expandedMode,
+            currentCommandIndex,
+            selectedScopes,
+            setSelectedScopes,
+            setCurrentCommandIndex,
+            handleConfirm,
           );
 
-          handleConfirm(ToolConfirmationOutcome.ProceedAlways, {
-            commandScopes: newSelectedScopes,
-            persist: shouldPersistApproval,
-            compoundCommands: commands,
-          });
+          if (handled) return;
+
+          // Non-expanded mode: single or uniform compound scope
+          const payload = buildScopePayload(confirmationDetails, scope);
+          handleConfirm(ToolConfirmationOutcome.ProceedAlways, payload);
           return;
         }
-
-        // Non-expanded mode (single command or uniform compound scope)
-        const shouldPersistApproval =
-          confirmationDetails.type === 'exec'
-            ? shouldPersist(confirmationDetails.rootCommand)
-            : false;
-
-        let customPattern: string | undefined;
-        let compoundCommands: string[] | undefined;
-
-        if (confirmationDetails.type === 'exec') {
-          const isCompound = confirmationDetails.rootCommands.length > 1;
-
-          if (isCompound) {
-            // For compound commands, pass all commands to apply scope to
-            compoundCommands = confirmationDetails.commands || [
-              confirmationDetails.command,
-            ];
-          } else {
-            // For single commands, check for custom pattern
-            const scopeOptions = generateScopeOptions(
-              confirmationDetails.command,
-            );
-            const selectedOption = scopeOptions.find(
-              (opt: ScopeOption) => opt.id === scope,
-            );
-            if (
-              selectedOption?.pattern &&
-              selectedOption.pattern.startsWith('^')
-            ) {
-              customPattern = selectedOption.pattern;
-            }
-          }
-        }
-
-        handleConfirm(ToolConfirmationOutcome.ProceedAlways, {
-          scope: customPattern ? 'custom' : scope,
-          customPattern,
-          persist: shouldPersistApproval,
-          compoundCommands,
-        });
-        return;
       }
 
+      // Handle standard outcomes
       handleConfirm(item as ToolConfirmationOutcome);
     },
     [
@@ -312,88 +456,19 @@ export const ToolConfirmationMessage: React.FC<
         const commands = confirmationDetails.commands || [
           confirmationDetails.command,
         ];
-        const isCompoundCommand = commands.length > 1;
 
-        if (isCompoundCommand) {
-          const rootCommands = confirmationDetails.rootCommands;
-
-          if (expandedMode) {
-            // Expanded mode: show per-command scope selection
-            // Use deduplicated rootCommands for iteration
-            const currentRootCmd = rootCommands[currentCommandIndex];
-
-            // Find first matching full command for this root command
-            const currentCmd =
-              commands.find((cmd: string) =>
-                cmd
-                  .trim()
-                  .toLowerCase()
-                  .startsWith(currentRootCmd.toLowerCase()),
-              ) || commands[0];
-
-            const scopeOptions = generateScopeOptions(currentCmd);
-            const recommendedScope = getRecommendedScope(currentCmd);
-
-            // Show header for current command
-            const stepLabel = `Step ${currentCommandIndex + 1}/${rootCommands.length}: ${currentRootCmd}`;
-            options.push({
-              label: `━━━ ${stepLabel} ━━━`,
-              value: 'back' as ExecOptionValue,
-              key: 'header',
-              disabled: true,
-            });
-
-            // Show scope options for current command
-            options.push(
-              ...buildScopeOptionItems(scopeOptions, recommendedScope),
-            );
-
-            // Show back option
-            options.push({
-              label: '← Back to simple options',
-              value: 'back' as ExecOptionValue,
-              key: 'back',
-            });
-          } else {
-            // Non-expanded mode: show tiered scope options
-            // Check if any command is dangerous (exact-only)
-            const hasDangerousCmd = commands.some((cmd: string) => {
-              const scopeOpts = generateScopeOptions(cmd);
-              return scopeOpts.length === 1; // Only exact option = dangerous
-            });
-
-            // Always offer exact scope for all commands
-            const exactLabel = `Allow each exactly (${rootCommands.join(', ')})`;
-            options.push({
-              label: exactLabel,
-              value: 'scope:exact' as ExecOptionValue,
-              key: 'scope:exact',
-            });
-
-            if (!hasDangerousCmd) {
-              // Offer command-only (broadest) scope
-              const cmdOnlyLabel = `Allow by command (${rootCommands.join(', ')} *)`;
-              const isReadOnly = commands.every(
-                (cmd: string) => getRecommendedScope(cmd) === 'command-only',
-              );
-              options.push({
-                label: isReadOnly
-                  ? `${cmdOnlyLabel} (recommended)`
-                  : cmdOnlyLabel,
-                value: 'scope:command-only' as ExecOptionValue,
-                key: 'scope:command-only',
-              });
-
-              // Add "More options..." for per-command scope selection
-              options.push({
-                label: 'More options...',
-                value: 'more-options' as ExecOptionValue,
-                key: 'more-options',
-              });
-            }
-          }
+        if (isCompoundCommand(confirmationDetails)) {
+          // Compound commands: use extracted helper
+          options.push(
+            ...buildCompoundCommandOptions(
+              commands,
+              confirmationDetails.rootCommands,
+              expandedMode,
+              currentCommandIndex,
+            ),
+          );
         } else {
-          // For single commands, offer scope selection
+          // Single commands: offer scope selection
           const fullCommand = confirmationDetails.command;
           const scopeOptions = generateScopeOptions(fullCommand);
           const recommendedScope = getRecommendedScope(fullCommand);

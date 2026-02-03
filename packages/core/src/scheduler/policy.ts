@@ -151,8 +151,57 @@ function isScopePayload(
 }
 
 /**
+ * Determines if payload contains per-command scope configuration (expanded mode).
+ */
+function hasPerCommandScopes(
+  payload?: ToolConfirmationPayload,
+): payload is ToolScopeConfirmationPayload & {
+  commandScopes: Record<string, ApprovalScope>;
+} {
+  // commandScopes can be an empty object {}, which should be treated as no scopes
+  return (
+    isScopePayload(payload) &&
+    !!payload.commandScopes &&
+    Object.keys(payload.commandScopes).length > 0
+  );
+}
+
+/**
+ * Determines if payload contains uniform compound command scope.
+ */
+function hasUniformCompoundScope(
+  payload?: ToolConfirmationPayload,
+): payload is ToolScopeConfirmationPayload & {
+  compoundCommands: string[];
+  scope: ApprovalScope;
+} {
+  return (
+    isScopePayload(payload) &&
+    !!payload.compoundCommands &&
+    payload.compoundCommands.length > 1 &&
+    !!payload.scope
+  );
+}
+
+/**
+ * Determines if payload contains single command scope.
+ */
+function hasSingleCommandScope(
+  payload?: ToolConfirmationPayload,
+): payload is ToolScopeConfirmationPayload & { scope: ApprovalScope } {
+  return isScopePayload(payload) && !!payload.scope;
+}
+
+/**
  * Converts an approval scope and command to a command prefix string.
  * Used for building policy rules from scope selections.
+ *
+ * Scope levels (from most to least restrictive):
+ * - 'exact': Full command including all arguments
+ * - 'command-flags': Binary + subcommand (e.g., "git commit")
+ * - 'command-only': Binary only (e.g., "git")
+ *
+ * This allows users to choose the right balance between security and convenience.
  */
 function scopeToCommandPrefix(
   scope: ApprovalScope,
@@ -176,17 +225,26 @@ function scopeToCommandPrefix(
 }
 
 /**
+ * Builds command prefixes from a scope mapping, with deduplication.
+ * Shared helper for both per-command and uniform scope builders.
+ */
+function buildPrefixesFromScopeMap(
+  scopeMap: Record<string, ApprovalScope>,
+): string[] {
+  const prefixes = Object.entries(scopeMap).map(([cmd, scope]) =>
+    scopeToCommandPrefix(scope, cmd),
+  );
+  return [...new Set(prefixes)]; // Dedupe
+}
+
+/**
  * Builds command prefixes for per-command scope selections (expanded mode).
  * Each command can have its own scope (exact, command-flags, command-only).
  */
 function buildCommandPrefixesForPerCommandScopes(
   commandScopes: Record<string, ApprovalScope>,
 ): string[] {
-  const prefixes: string[] = [];
-  for (const [cmd, cmdScope] of Object.entries(commandScopes)) {
-    prefixes.push(scopeToCommandPrefix(cmdScope, cmd));
-  }
-  return [...new Set(prefixes)]; // Dedupe
+  return buildPrefixesFromScopeMap(commandScopes);
 }
 
 /**
@@ -197,11 +255,8 @@ function buildCommandPrefixesForUniformScope(
   commands: string[],
   scope: ApprovalScope,
 ): string[] {
-  const prefixes: string[] = [];
-  for (const cmd of commands) {
-    prefixes.push(scopeToCommandPrefix(scope, cmd));
-  }
-  return [...new Set(prefixes)]; // Dedupe
+  const scopeMap = Object.fromEntries(commands.map((cmd) => [cmd, scope]));
+  return buildPrefixesFromScopeMap(scopeMap);
 }
 
 /**
@@ -228,33 +283,36 @@ async function handleStandardPolicyUpdate(
     const options: PolicyUpdateOptions = {};
 
     if (confirmationDetails?.type === 'exec') {
-      if (isScopePayload(payload)) {
-        const { scope, customPattern, compoundCommands, commandScopes } =
-          payload;
+      // Handle per-command scopes (from expanded mode)
+      if (hasPerCommandScopes(payload)) {
+        options.commandPrefix = buildCommandPrefixesForPerCommandScopes(
+          payload.commandScopes,
+        );
+      }
+      // Handle compound commands with uniform scope
+      else if (hasUniformCompoundScope(payload)) {
+        options.commandPrefix = buildCommandPrefixesForUniformScope(
+          payload.compoundCommands,
+          payload.scope,
+        );
+      }
+      // Handle single command with scope
+      else if (hasSingleCommandScope(payload)) {
+        const fullCommand = confirmationDetails.command;
 
-        // Handle per-command scopes (from expanded mode)
-        if (commandScopes && Object.keys(commandScopes).length > 0) {
-          options.commandPrefix =
-            buildCommandPrefixesForPerCommandScopes(commandScopes);
-        } else if (compoundCommands && compoundCommands.length > 1 && scope) {
-          // Handle compound commands with uniform scope
-          options.commandPrefix = buildCommandPrefixesForUniformScope(
-            compoundCommands,
-            scope,
-          );
-        } else if (scope) {
-          // Single command with scope
-          const fullCommand = confirmationDetails.command;
-
-          if (scope === 'custom') {
-            if (customPattern) {
-              options.argsPattern = customPattern;
-            } else {
-              options.commandPrefix = [fullCommand];
-            }
+        if (payload.scope === 'custom') {
+          // Custom regex pattern
+          if (payload.customPattern) {
+            options.argsPattern = payload.customPattern;
           } else {
-            options.commandPrefix = [scopeToCommandPrefix(scope, fullCommand)];
+            // No custom pattern provided - fall back to exact command match
+            options.commandPrefix = [fullCommand];
           }
+        } else {
+          // Standard scope (exact, command-flags, command-only)
+          options.commandPrefix = [
+            scopeToCommandPrefix(payload.scope, fullCommand),
+          ];
         }
       } else {
         // No scope payload provided. This happens when:
@@ -265,12 +323,18 @@ async function handleStandardPolicyUpdate(
       }
     }
 
+    // Determine persistence based on (in order of priority):
+    // 1. Explicit payload.persist value (user's choice from UI)
+    // 2. Outcome type (ProceedAlwaysAndSave)
+    // 3. Command safety check (shouldPersistCommand for read-only commands)
     let persist = outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave;
 
     if (isScopePayload(payload) && confirmationDetails?.type === 'exec') {
       if (payload.persist !== undefined) {
+        // Explicit persist value takes precedence
         persist = payload.persist;
       } else if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+        // Auto-determine based on command safety (read-only commands can be persisted)
         persist = shouldPersistCommand(confirmationDetails.rootCommand);
       }
     }
