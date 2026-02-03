@@ -159,4 +159,21 @@ describe('ShellInputPrompt', () => {
 
     expect(mockWriteToPty).not.toHaveBeenCalled();
   });
+
+  it('ignores Shift+Tab to allow focus navigation', () => {
+    render(<ShellInputPrompt activeShellPtyId={1} focus={true} />);
+
+    const handler = mockUseKeypress.mock.calls[0][0];
+
+    const result = handler({
+      name: 'tab',
+      shift: true,
+      alt: false,
+      ctrl: false,
+      cmd: false,
+    });
+
+    expect(result).toBe(false);
+    expect(mockWriteToPty).not.toHaveBeenCalled();
+  });
 });

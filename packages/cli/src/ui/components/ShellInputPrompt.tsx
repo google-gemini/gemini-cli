@@ -42,6 +42,11 @@ export const ShellInputPrompt: React.FC<ShellInputPromptProps> = ({
         return false;
       }
 
+      // Allow Shift+Tab to bubble up for focus navigation
+      if (key.name === 'tab' && key.shift) {
+        return false;
+      }
+
       if (key.ctrl && key.shift) {
         if (key.name === 'up') {
           ShellExecutionService.scrollPty(activeShellPtyId, -1);
