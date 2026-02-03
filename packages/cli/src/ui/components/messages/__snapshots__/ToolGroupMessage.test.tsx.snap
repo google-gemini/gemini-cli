@@ -230,13 +230,9 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders with limited terminal
 │                                                                              │
 │ This is a long result that might need height constraints                     │
 │                                                                              │
-│                                                                              │
-│                                                                              │
 │ ✓  another-tool Another tool                                                 │
 │                                                                              │
 │ More output here                                                             │
-│                                                                              │
-│                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯"
 `;
 
@@ -254,13 +250,9 @@ exports[`<ToolGroupMessage /> > Height Calculation > calculates available height
 │                                                                              │
 │ Result 1                                                                     │
 │                                                                              │
-│                                                                              │
-│                                                                              │
 │ ✓  test-tool A tool for testing                                              │
 │                                                                              │
 │ Result 2                                                                     │
-│                                                                              │
-│                                                                              │
 │                                                                              │
 │ ✓  test-tool A tool for testing                                              │
 │                                                                              │
