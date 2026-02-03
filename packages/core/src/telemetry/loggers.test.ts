@@ -1737,7 +1737,7 @@ describe('loggers', () => {
     it('should log the event with numerical routing fields', () => {
       const event = new ModelRoutingEvent(
         'gemini-pro',
-        'NumericalClassifierStrategy (Strict)',
+        'NumericalClassifier (Strict)',
         150,
         '[Score: 90 / Threshold: 80] reasoning',
         false,
@@ -1753,7 +1753,7 @@ describe('loggers', () => {
       ).toHaveBeenCalledWith(event);
 
       expect(mockLogger.emit).toHaveBeenCalledWith({
-        body: 'Model routing decision. Model: gemini-pro, Source: NumericalClassifierStrategy (Strict)',
+        body: 'Model routing decision. Model: gemini-pro, Source: NumericalClassifier (Strict)',
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',

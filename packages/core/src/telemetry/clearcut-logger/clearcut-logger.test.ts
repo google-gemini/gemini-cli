@@ -946,7 +946,7 @@ describe('ClearcutLogger', () => {
       const { logger } = setup();
       const event = new ModelRoutingEvent(
         'gemini-pro',
-        'NumericalClassifierStrategy (Strict)',
+        'NumericalClassifier (Strict)',
         123,
         '[Score: 90 / Threshold: 80] reasoning',
         false,

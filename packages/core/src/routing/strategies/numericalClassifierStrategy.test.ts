@@ -122,7 +122,7 @@ describe('NumericalClassifierStrategy', () => {
       expect(decision).toEqual({
         model: DEFAULT_GEMINI_FLASH_MODEL,
         metadata: {
-          source: 'NumericalClassifierStrategy (Control)',
+          source: 'NumericalClassifier (Control)',
           latencyMs: expect.any(Number),
           reasoning: expect.stringContaining('Score: 40 / Threshold: 50'),
         },
@@ -148,7 +148,7 @@ describe('NumericalClassifierStrategy', () => {
       expect(decision).toEqual({
         model: DEFAULT_GEMINI_MODEL,
         metadata: {
-          source: 'NumericalClassifierStrategy (Control)',
+          source: 'NumericalClassifier (Control)',
           latencyMs: expect.any(Number),
           reasoning: expect.stringContaining('Score: 60 / Threshold: 50'),
         },
@@ -174,7 +174,7 @@ describe('NumericalClassifierStrategy', () => {
       expect(decision).toEqual({
         model: DEFAULT_GEMINI_FLASH_MODEL, // Routed to Flash because 60 < 80
         metadata: {
-          source: 'NumericalClassifierStrategy (Strict)',
+          source: 'NumericalClassifier (Strict)',
           latencyMs: expect.any(Number),
           reasoning: expect.stringContaining('Score: 60 / Threshold: 80'),
         },
@@ -200,7 +200,7 @@ describe('NumericalClassifierStrategy', () => {
       expect(decision).toEqual({
         model: DEFAULT_GEMINI_MODEL,
         metadata: {
-          source: 'NumericalClassifierStrategy (Strict)',
+          source: 'NumericalClassifier (Strict)',
           latencyMs: expect.any(Number),
           reasoning: expect.stringContaining('Score: 90 / Threshold: 80'),
         },
@@ -228,7 +228,7 @@ describe('NumericalClassifierStrategy', () => {
       expect(decision).toEqual({
         model: DEFAULT_GEMINI_FLASH_MODEL, // Score 60 < Threshold 70
         metadata: {
-          source: 'NumericalClassifierStrategy (Remote)',
+          source: 'NumericalClassifier (Remote)',
           latencyMs: expect.any(Number),
           reasoning: expect.stringContaining('Score: 60 / Threshold: 70'),
         },
@@ -254,7 +254,7 @@ describe('NumericalClassifierStrategy', () => {
       expect(decision).toEqual({
         model: DEFAULT_GEMINI_FLASH_MODEL, // Score 40 < Threshold 45.5
         metadata: {
-          source: 'NumericalClassifierStrategy (Remote)',
+          source: 'NumericalClassifier (Remote)',
           latencyMs: expect.any(Number),
           reasoning: expect.stringContaining('Score: 40 / Threshold: 45.5'),
         },
@@ -280,7 +280,7 @@ describe('NumericalClassifierStrategy', () => {
       expect(decision).toEqual({
         model: DEFAULT_GEMINI_MODEL, // Score 35 >= Threshold 30
         metadata: {
-          source: 'NumericalClassifierStrategy (Remote)',
+          source: 'NumericalClassifier (Remote)',
           latencyMs: expect.any(Number),
           reasoning: expect.stringContaining('Score: 35 / Threshold: 30'),
         },
@@ -308,7 +308,7 @@ describe('NumericalClassifierStrategy', () => {
       expect(decision).toEqual({
         model: DEFAULT_GEMINI_FLASH_MODEL, // Score 40 < Default A/B Threshold 50
         metadata: {
-          source: 'NumericalClassifierStrategy (Control)',
+          source: 'NumericalClassifier (Control)',
           latencyMs: expect.any(Number),
           reasoning: expect.stringContaining('Score: 40 / Threshold: 50'),
         },
@@ -335,7 +335,7 @@ describe('NumericalClassifierStrategy', () => {
       expect(decision).toEqual({
         model: DEFAULT_GEMINI_FLASH_MODEL,
         metadata: {
-          source: 'NumericalClassifierStrategy (Control)',
+          source: 'NumericalClassifier (Control)',
           latencyMs: expect.any(Number),
           reasoning: expect.stringContaining('Score: 40 / Threshold: 50'),
         },
@@ -362,7 +362,7 @@ describe('NumericalClassifierStrategy', () => {
       expect(decision).toEqual({
         model: DEFAULT_GEMINI_MODEL,
         metadata: {
-          source: 'NumericalClassifierStrategy (Control)',
+          source: 'NumericalClassifier (Control)',
           latencyMs: expect.any(Number),
           reasoning: expect.stringContaining('Score: 60 / Threshold: 50'),
         },

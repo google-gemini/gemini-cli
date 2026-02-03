@@ -187,7 +187,7 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
       return {
         model: selectedModel,
         metadata: {
-          source: `NumericalClassifierStrategy (${groupLabel})`,
+          source: `NumericalClassifier (${groupLabel})`,
           latencyMs,
           reasoning: `[Score: ${score} / Threshold: ${threshold}] ${routerResponse.complexity_reasoning}`,
         },
