@@ -53,6 +53,7 @@ export interface LoadCodeAssistResponse {
   allowedTiers?: GeminiUserTier[] | null;
   ineligibleTiers?: IneligibleTier[] | null;
   cloudaicompanionProject?: string | null;
+  paidTier?: GeminiUserTier | null;
 }
 
 /**
@@ -109,13 +110,17 @@ export enum IneligibleTierReasonCode {
 /**
  * UserTierId represents IDs returned from the Cloud Code Private API representing a user's tier
  *
- * //depot/google3/cloud/developer_experience/cloudcode/pa/service/usertier.go;l=16
+ * http://google3/cloud/developer_experience/codeassist/shared/usertier/tiers.go
+ * This is a subset of all available tiers. Since the source list is frequently updated,
+ * only add a tierId here if specific client-side handling is required.
  */
-export enum UserTierId {
-  FREE = 'free-tier',
-  LEGACY = 'legacy-tier',
-  STANDARD = 'standard-tier',
-}
+export const UserTierId = {
+  FREE: 'free-tier',
+  LEGACY: 'legacy-tier',
+  STANDARD: 'standard-tier',
+} as const;
+
+export type UserTierId = (typeof UserTierId)[keyof typeof UserTierId] | string;
 
 /**
  * PrivacyNotice reflects the structure received from the CodeAssist in regards to a tier
