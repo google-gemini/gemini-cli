@@ -56,7 +56,6 @@ gha-creds-*.json
 # Log files
 patch_output.log
 gemini-debug.log
-debug.log
 
 .genkit
 .gemini-clipboard/
