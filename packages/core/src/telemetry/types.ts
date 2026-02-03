@@ -1603,7 +1603,7 @@ export type TelemetryEvent =
   | StartupStatsEvent
   | WebFetchFallbackAttemptEvent
   | EditStrategyEvent
-  | PlanExecutionEvent;
+  | PlanExecutionEvent
   | RewindEvent
   | EditCorrectionEvent;
 
