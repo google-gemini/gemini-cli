@@ -107,6 +107,10 @@ describe('GeminiAgent', () => {
       initialize: vi.fn(),
       getFileSystemService: vi.fn(),
       setFileSystemService: vi.fn(),
+      getContentGeneratorConfig: vi.fn(),
+      getActiveModel: vi.fn().mockReturnValue('gemini-pro'),
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getPreviewFeatures: vi.fn().mockReturnValue({}),
       getGeminiClient: vi.fn().mockReturnValue({
         startChat: vi.fn().mockResolvedValue({}),
       }),
@@ -199,7 +203,7 @@ describe('GeminiAgent', () => {
         mcpServers: [],
       }),
     ).rejects.toMatchObject({
-      message: 'Authentication required',
+      message: 'Gemini API key is missing or not configured.',
     });
   });
 
@@ -238,14 +242,14 @@ describe('GeminiAgent', () => {
     mockConfig.refreshAuth.mockRejectedValue(new Error('Auth failed'));
     const debugSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    // Should throw RequestError.authRequired()
+    // Should throw RequestError with custom message
     await expect(
       agent.newSession({
         cwd: '/tmp',
         mcpServers: [],
       }),
     ).rejects.toMatchObject({
-      message: 'Authentication required',
+      message: 'Auth failed',
     });
 
     debugSpy.mockRestore();

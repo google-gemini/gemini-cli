@@ -133,7 +133,11 @@ export class GeminiAgent {
     // Refresh auth with the requested method
     // This will reuse existing credentials if they're valid,
     // or perform new authentication if needed
-    await this.config.refreshAuth(method);
+    try {
+      await this.config.refreshAuth(method);
+    } catch (e) {
+      throw new acp.RequestError(getErrorStatus(e) || 401, getErrorMessage(e));
+    }
     this.settings.setValue(
       SettingScope.User,
       'security.auth.selectedType',
@@ -158,6 +162,7 @@ export class GeminiAgent {
       loadedSettings.merged.security.auth.selectedType || AuthType.USE_GEMINI;
 
     let isAuthenticated = false;
+    let authErrorMessage = '';
     try {
       await config.refreshAuth(authType);
       isAuthenticated = true;
@@ -169,15 +174,21 @@ export class GeminiAgent {
         (!contentGeneratorConfig || !contentGeneratorConfig.apiKey)
       ) {
         isAuthenticated = false;
+        authErrorMessage = 'Gemini API key is missing or not configured.';
       }
     } catch (e) {
+      isAuthenticated = false;
+      authErrorMessage = getErrorMessage(e);
       debugLogger.error(
         `Authentication failed: ${e instanceof Error ? e.stack : e}`,
       );
     }
 
     if (!isAuthenticated) {
-      throw acp.RequestError.authRequired();
+      throw new acp.RequestError(
+        401,
+        authErrorMessage || 'Authentication required.',
+      );
     }
 
     if (this.clientCapabilities?.fs) {
@@ -377,7 +388,10 @@ export class Session {
           return { stopReason: 'cancelled' };
         }
 
-        throw error;
+        throw new acp.RequestError(
+          getErrorStatus(error) || 500,
+          getErrorMessage(error),
+        );
       }
 
       if (functionCalls.length > 0) {
