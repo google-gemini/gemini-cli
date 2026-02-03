@@ -330,8 +330,33 @@ describe('GrepTool', () => {
 
       // Count occurrences of match lines in the output
       // Matches lines start with L<number>:
-      const matches = result.llmContent.match(/^L\d+:.*world/gm);
+      const content =
+        typeof result.llmContent === 'string' ? result.llmContent : '';
+      const matches = content.match(/^L\d+:.*world/gm);
       expect(matches?.length).toBe(2);
+    }, 30000);
+
+    it('should filter files based on the filter parameter', async () => {
+      // fileA.txt contains "hello" and "world"
+      // fileB.js contains "hello" but NOT "world"
+      // sub/fileC.txt contains "world" but NOT "hello"
+
+      const params: GrepToolParams = {
+        pattern: 'hello',
+        filter: 'world',
+      };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      // Should find matches in fileA.txt because it has both
+      // Should NOT find matches in fileB.js (has hello, missing world)
+      // Should NOT find matches in sub/fileC.txt (missing hello, has world)
+
+      const content =
+        typeof result.llmContent === 'string' ? result.llmContent : '';
+      expect(content).toContain('File: fileA.txt');
+      expect(content).not.toContain('File: fileB.js');
+      expect(content).not.toContain('File: fileC.txt');
     }, 30000);
   });
 
