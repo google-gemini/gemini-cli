@@ -297,462 +297,479 @@ export async function startInteractiveUI(
 export async function main() {
   const cliStartupHandle = startupProfiler.start('cli_startup');
 
-  // Listen for admin controls from parent process (IPC) in non-sandbox mode. In
-  // sandbox mode, we re-fetch the admin controls from the server once we enter
-  // the sandbox.
-  // TODO: Cache settings in sandbox mode as well.
-  const adminControlsListner = setupAdminControlsListener();
-  registerCleanup(adminControlsListner.cleanup);
+  try {
+    // Listen for admin controls from parent process (IPC) in non-sandbox mode. In
+    // sandbox mode, we re-fetch the admin controls from the server once we enter
+    // the sandbox.
+    // TODO: Cache settings in sandbox mode as well.
+    const adminControlsListner = setupAdminControlsListener();
+    registerCleanup(adminControlsListner.cleanup);
 
-  const cleanupStdio = patchStdio();
-  registerSyncCleanup(() => {
-    // This is needed to ensure we don't lose any buffered output.
-    initializeOutputListenersAndFlush();
-    cleanupStdio();
-  });
-
-  setupUnhandledRejectionHandler();
-  const loadSettingsHandle = startupProfiler.start('load_settings');
-  const settings = loadSettings();
-  loadSettingsHandle?.end();
-
-  // Report settings errors once during startup
-  settings.errors.forEach((error) => {
-    coreEvents.emitFeedback('warning', error.message);
-  });
-
-  const trustedFolders = loadTrustedFolders();
-  trustedFolders.errors.forEach((error: TrustedFoldersError) => {
-    coreEvents.emitFeedback(
-      'warning',
-      `Error in ${error.path}: ${error.message}`,
-    );
-  });
-
-  await Promise.all([
-    cleanupCheckpoints(),
-    cleanupToolOutputFiles(settings.merged),
-  ]);
-
-  const parseArgsHandle = startupProfiler.start('parse_arguments');
-  const argv = await parseArguments(settings.merged);
-  parseArgsHandle?.end();
-
-  if (argv.startupMessages) {
-    argv.startupMessages.forEach((msg) => {
-      coreEvents.emitFeedback('info', msg);
-    });
-  }
-
-  // Check for invalid input combinations early to prevent crashes
-  if (argv.promptInteractive && !process.stdin.isTTY) {
-    writeToStderr(
-      'Error: The --prompt-interactive flag cannot be used when input is piped from stdin.\n',
-    );
-    await runExitCleanup();
-    process.exit(ExitCodes.FATAL_INPUT_ERROR);
-  }
-
-  const isDebugMode = cliConfig.isDebugMode(argv);
-  const consolePatcher = new ConsolePatcher({
-    stderr: true,
-    debugMode: isDebugMode,
-    onNewMessage: (msg) => {
-      coreEvents.emitConsoleLog(msg.type, msg.content);
-    },
-  });
-  consolePatcher.patch();
-  registerCleanup(consolePatcher.cleanup);
-
-  dns.setDefaultResultOrder(
-    validateDnsResolutionOrder(settings.merged.advanced.dnsResolutionOrder),
-  );
-
-  // Set a default auth type if one isn't set or is set to a legacy type
-  if (
-    !settings.merged.security.auth.selectedType ||
-    settings.merged.security.auth.selectedType === AuthType.LEGACY_CLOUD_SHELL
-  ) {
-    if (
-      process.env['CLOUD_SHELL'] === 'true' ||
-      process.env['GEMINI_CLI_USE_COMPUTE_ADC'] === 'true'
-    ) {
-      settings.setValue(
-        SettingScope.User,
-        'security.auth.selectedType',
-        AuthType.COMPUTE_ADC,
-      );
-    }
-  }
-
-  const partialConfig = await loadCliConfig(settings.merged, sessionId, argv, {
-    projectHooks: settings.workspace.settings.hooks,
-  });
-  adminControlsListner.setConfig(partialConfig);
-
-  // Refresh auth to fetch remote admin settings from CCPA and before entering
-  // the sandbox because the sandbox will interfere with the Oauth2 web
-  // redirect.
-  let initialAuthFailed = false;
-  if (!settings.merged.security.auth.useExternal) {
-    try {
-      if (
-        partialConfig.isInteractive() &&
-        settings.merged.security.auth.selectedType
-      ) {
-        const err = validateAuthMethod(
-          settings.merged.security.auth.selectedType,
-        );
-        if (err) {
-          throw new Error(err);
-        }
-
-        await partialConfig.refreshAuth(
-          settings.merged.security.auth.selectedType,
-        );
-      } else if (!partialConfig.isInteractive()) {
-        const authType = await validateNonInteractiveAuth(
-          settings.merged.security.auth.selectedType,
-          settings.merged.security.auth.useExternal,
-          partialConfig,
-          settings,
-        );
-        await partialConfig.refreshAuth(authType);
-      }
-    } catch (err) {
-      if (err instanceof ValidationCancelledError) {
-        // User cancelled verification, exit immediately.
-        await runExitCleanup();
-        process.exit(ExitCodes.SUCCESS);
-      }
-
-      // If validation is required, we don't treat it as a fatal failure.
-      // We allow the app to start, and the React-based ValidationDialog
-      // will handle it.
-      if (!(err instanceof ValidationRequiredError)) {
-        debugLogger.error('Error authenticating:', err);
-        initialAuthFailed = true;
-      }
-    }
-  }
-
-  const remoteAdminSettings = partialConfig.getRemoteAdminSettings();
-  // Set remote admin settings if returned from CCPA.
-  if (remoteAdminSettings) {
-    settings.setRemoteAdminSettings(remoteAdminSettings);
-  }
-
-  // Run deferred command now that we have admin settings.
-  await runDeferredCommand(settings.merged);
-
-  // hop into sandbox if we are outside and sandboxing is enabled
-  if (!process.env['SANDBOX']) {
-    const memoryArgs = settings.merged.advanced.autoConfigureMemory
-      ? getNodeMemoryArgs(isDebugMode)
-      : [];
-    const sandboxConfig = await loadSandboxConfig(settings.merged, argv);
-    // We intentionally omit the list of extensions here because extensions
-    // should not impact auth or setting up the sandbox.
-    // TODO(jacobr): refactor loadCliConfig so there is a minimal version
-    // that only initializes enough config to enable refreshAuth or find
-    // another way to decouple refreshAuth from requiring a config.
-
-    if (sandboxConfig) {
-      if (initialAuthFailed) {
-        await runExitCleanup();
-        process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
-      }
-      let stdinData = '';
-      if (!process.stdin.isTTY) {
-        stdinData = await readStdin();
-      }
-
-      // This function is a copy of the one from sandbox.ts
-      // It is moved here to decouple sandbox.ts from the CLI's argument structure.
-      const injectStdinIntoArgs = (
-        args: string[],
-        stdinData?: string,
-      ): string[] => {
-        const finalArgs = [...args];
-        if (stdinData) {
-          const promptIndex = finalArgs.findIndex(
-            (arg) => arg === '--prompt' || arg === '-p',
-          );
-          if (promptIndex > -1 && finalArgs.length > promptIndex + 1) {
-            // If there's a prompt argument, prepend stdin to it
-            finalArgs[promptIndex + 1] =
-              `${stdinData}\n\n${finalArgs[promptIndex + 1]}`;
-          } else {
-            // If there's no prompt argument, add stdin as the prompt
-            finalArgs.push('--prompt', stdinData);
-          }
-        }
-        return finalArgs;
-      };
-
-      const sandboxArgs = injectStdinIntoArgs(process.argv, stdinData);
-
-      await relaunchOnExitCode(() =>
-        start_sandbox(sandboxConfig, memoryArgs, partialConfig, sandboxArgs),
-      );
-      await runExitCleanup();
-      process.exit(ExitCodes.SUCCESS);
-    } else {
-      // Relaunch app so we always have a child process that can be internally
-      // restarted if needed.
-      await relaunchAppInChildProcess(memoryArgs, [], remoteAdminSettings);
-    }
-  }
-
-  // We are now past the logic handling potentially launching a child process
-  // to run Gemini CLI. It is now safe to perform expensive initialization that
-  // may have side effects.
-  {
-    const loadConfigHandle = startupProfiler.start('load_cli_config');
-    const config = await loadCliConfig(settings.merged, sessionId, argv, {
-      projectHooks: settings.workspace.settings.hooks,
-    });
-    loadConfigHandle?.end();
-    adminControlsListner.setConfig(config);
-
-    if (config.isInteractive() && config.storage && config.getDebugMode()) {
-      const { registerActivityLogger } = await import(
-        './utils/activityLogger.js'
-      );
-      registerActivityLogger(config);
-    }
-
-    // Register config for telemetry shutdown
-    // This ensures telemetry (including SessionEnd hooks) is properly flushed on exit
-    registerTelemetryConfig(config);
-
-    const policyEngine = config.getPolicyEngine();
-    const messageBus = config.getMessageBus();
-    createPolicyUpdater(policyEngine, messageBus);
-
-    // Register SessionEnd hook to fire on graceful exit
-    // This runs before telemetry shutdown in runExitCleanup()
-    registerCleanup(async () => {
-      await config.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
+    const cleanupStdio = patchStdio();
+    registerSyncCleanup(() => {
+      // This is needed to ensure we don't lose any buffered output.
+      initializeOutputListenersAndFlush();
+      cleanupStdio();
     });
 
-    // Cleanup sessions after config initialization
-    try {
-      await cleanupExpiredSessions(config, settings.merged);
-    } catch (e) {
-      debugLogger.error('Failed to cleanup expired sessions:', e);
-    }
+    setupUnhandledRejectionHandler();
+    const loadSettingsHandle = startupProfiler.start('load_settings');
+    const settings = loadSettings();
+    loadSettingsHandle?.end();
 
-    if (config.getListExtensions()) {
-      debugLogger.log('Installed extensions:');
-      for (const extension of config.getExtensions()) {
-        debugLogger.log(`- ${extension.name}`);
-      }
-      await runExitCleanup();
-      process.exit(ExitCodes.SUCCESS);
-    }
+    // Report settings errors once during startup
+    settings.errors.forEach((error) => {
+      coreEvents.emitFeedback('warning', error.message);
+    });
 
-    // Handle --list-sessions flag
-    if (config.getListSessions()) {
-      // Attempt auth for summary generation (gracefully skips if not configured)
-      const authType = settings.merged.security.auth.selectedType;
-      if (authType) {
-        try {
-          await config.refreshAuth(authType);
-        } catch (e) {
-          // Auth failed - continue without summary generation capability
-          debugLogger.debug(
-            'Auth failed for --list-sessions, summaries may not be generated:',
-            e,
-          );
-        }
-      }
+    const trustedFolders = loadTrustedFolders();
+    trustedFolders.errors.forEach((error: TrustedFoldersError) => {
+      coreEvents.emitFeedback(
+        'warning',
+        `Error in ${error.path}: ${error.message}`,
+      );
+    });
 
-      await listSessions(config);
-      await runExitCleanup();
-      process.exit(ExitCodes.SUCCESS);
-    }
+    await Promise.all([
+      cleanupCheckpoints(),
+      cleanupToolOutputFiles(settings.merged),
+    ]);
 
-    // Handle --delete-session flag
-    const sessionToDelete = config.getDeleteSession();
-    if (sessionToDelete) {
-      await deleteSession(config, sessionToDelete);
-      await runExitCleanup();
-      process.exit(ExitCodes.SUCCESS);
-    }
+    const parseArgsHandle = startupProfiler.start('parse_arguments');
+    const argv = await parseArguments(settings.merged);
+    parseArgsHandle?.end();
 
-    const wasRaw = process.stdin.isRaw;
-    if (config.isInteractive() && !wasRaw && process.stdin.isTTY) {
-      // Set this as early as possible to avoid spurious characters from
-      // input showing up in the output.
-      process.stdin.setRawMode(true);
-
-      if (
-        shouldEnterAlternateScreen(
-          isAlternateBufferEnabled(settings),
-          config.getScreenReader(),
-        )
-      ) {
-        enterAlternateScreen();
-        disableLineWrapping();
-
-        // Ink will cleanup so there is no need for us to manually cleanup.
-      }
-
-      // This cleanup isn't strictly needed but may help in certain situations.
-      process.on('SIGTERM', () => {
-        process.stdin.setRawMode(wasRaw);
-      });
-      process.on('SIGINT', () => {
-        process.stdin.setRawMode(wasRaw);
+    if (argv.startupMessages) {
+      argv.startupMessages.forEach((msg) => {
+        coreEvents.emitFeedback('info', msg);
       });
     }
 
-    await setupTerminalAndTheme(config, settings);
-
-    const initAppHandle = startupProfiler.start('initialize_app');
-    const initializationResult = await initializeApp(config, settings);
-    initAppHandle?.end();
-
-    if (
-      settings.merged.security.auth.selectedType ===
-        AuthType.LOGIN_WITH_GOOGLE &&
-      config.isBrowserLaunchSuppressed()
-    ) {
-      // Do oauth before app renders to make copying the link possible.
-      await getOauthClient(settings.merged.security.auth.selectedType, config);
-    }
-
-    if (config.getExperimentalZedIntegration()) {
-      return runZedIntegration(config, settings, argv);
-    }
-
-    let input = config.getQuestion();
-    const startupWarnings = [
-      ...(await getStartupWarnings()),
-      ...(await getUserStartupWarnings(settings.merged)),
-    ];
-
-    // Handle --resume flag
-    let resumedSessionData: ResumedSessionData | undefined = undefined;
-    if (argv.resume) {
-      const sessionSelector = new SessionSelector(config);
-      try {
-        const result = await sessionSelector.resolveSession(argv.resume);
-        resumedSessionData = {
-          conversation: result.sessionData,
-          filePath: result.sessionPath,
-        };
-        // Use the existing session ID to continue recording to the same session
-        config.setSessionId(resumedSessionData.conversation.sessionId);
-      } catch (error) {
-        coreEvents.emitFeedback(
-          'error',
-          `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        );
-        await runExitCleanup();
-        process.exit(ExitCodes.FATAL_INPUT_ERROR);
-      }
-    }
-
-    cliStartupHandle?.end();
-    // Render UI, passing necessary config values. Check that there is no command line question.
-    if (config.isInteractive()) {
-      await startInteractiveUI(
-        config,
-        settings,
-        startupWarnings,
-        process.cwd(),
-        resumedSessionData,
-        initializationResult,
-      );
-      return;
-    }
-
-    await config.initialize();
-    startupProfiler.flush(config);
-
-    // If not a TTY, read from stdin
-    // This is for cases where the user pipes input directly into the command
-    let stdinData: string | undefined = undefined;
-    if (!process.stdin.isTTY) {
-      stdinData = await readStdin();
-      if (stdinData) {
-        input = input ? `${stdinData}\n\n${input}` : stdinData;
-      }
-    }
-
-    // Fire SessionStart hook through MessageBus (only if hooks are enabled)
-    // Must be called AFTER config.initialize() to ensure HookRegistry is loaded
-    const sessionStartSource = resumedSessionData
-      ? SessionStartSource.Resume
-      : SessionStartSource.Startup;
-
-    const hookSystem = config?.getHookSystem();
-    if (hookSystem) {
-      const result = await hookSystem.fireSessionStartEvent(sessionStartSource);
-
-      if (result) {
-        if (result.systemMessage) {
-          writeToStderr(result.systemMessage + '\n');
-        }
-        const additionalContext = result.getAdditionalContext();
-        if (additionalContext) {
-          // Prepend context to input (System Context -> Stdin -> Question)
-          const wrappedContext = `<hook_context>${additionalContext}</hook_context>`;
-          input = input ? `${wrappedContext}\n\n${input}` : wrappedContext;
-        }
-      }
-    }
-
-    // Register SessionEnd hook for graceful exit
-    registerCleanup(async () => {
-      await config.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
-    });
-
-    if (!input) {
-      debugLogger.error(
-        `No input provided via stdin. Input can be provided by piping data into gemini or using the --prompt option.`,
+    // Check for invalid input combinations early to prevent crashes
+    if (argv.promptInteractive && !process.stdin.isTTY) {
+      writeToStderr(
+        'Error: The --prompt-interactive flag cannot be used when input is piped from stdin.\n',
       );
       await runExitCleanup();
       process.exit(ExitCodes.FATAL_INPUT_ERROR);
     }
 
-    const prompt_id = Math.random().toString(16).slice(2);
-    logUserPrompt(
-      config,
-      new UserPromptEvent(
-        input.length,
-        prompt_id,
-        config.getContentGeneratorConfig()?.authType,
-        input,
-      ),
+    const isDebugMode = cliConfig.isDebugMode(argv);
+    const consolePatcher = new ConsolePatcher({
+      stderr: true,
+      debugMode: isDebugMode,
+      onNewMessage: (msg) => {
+        coreEvents.emitConsoleLog(msg.type, msg.content);
+      },
+    });
+    consolePatcher.patch();
+    registerCleanup(consolePatcher.cleanup);
+
+    dns.setDefaultResultOrder(
+      validateDnsResolutionOrder(settings.merged.advanced.dnsResolutionOrder),
     );
 
-    const authType = await validateNonInteractiveAuth(
-      settings.merged.security.auth.selectedType,
-      settings.merged.security.auth.useExternal,
-      config,
-      settings,
-    );
-    await config.refreshAuth(authType);
-
-    if (config.getDebugMode()) {
-      debugLogger.log('Session ID: %s', sessionId);
+    // Set a default auth type if one isn't set or is set to a legacy type
+    if (
+      !settings.merged.security.auth.selectedType ||
+      settings.merged.security.auth.selectedType === AuthType.LEGACY_CLOUD_SHELL
+    ) {
+      if (
+        process.env['CLOUD_SHELL'] === 'true' ||
+        process.env['GEMINI_CLI_USE_COMPUTE_ADC'] === 'true'
+      ) {
+        settings.setValue(
+          SettingScope.User,
+          'security.auth.selectedType',
+          AuthType.COMPUTE_ADC,
+        );
+      }
     }
 
-    initializeOutputListenersAndFlush();
+    const partialConfig = await loadCliConfig(
+      settings.merged,
+      sessionId,
+      argv,
+      {
+        projectHooks: settings.workspace.settings.hooks,
+      },
+    );
+    adminControlsListner.setConfig(partialConfig);
 
-    await runNonInteractive({
-      config,
-      settings,
-      input,
-      prompt_id,
-      resumedSessionData,
-    });
-    // Call cleanup before process.exit, which causes cleanup to not run
-    await runExitCleanup();
-    process.exit(ExitCodes.SUCCESS);
+    // Refresh auth to fetch remote admin settings from CCPA and before entering
+    // the sandbox because the sandbox will interfere with the Oauth2 web
+    // redirect.
+    let initialAuthFailed = false;
+    if (!settings.merged.security.auth.useExternal) {
+      try {
+        if (
+          partialConfig.isInteractive() &&
+          settings.merged.security.auth.selectedType
+        ) {
+          const err = validateAuthMethod(
+            settings.merged.security.auth.selectedType,
+          );
+          if (err) {
+            throw new Error(err);
+          }
+
+          await partialConfig.refreshAuth(
+            settings.merged.security.auth.selectedType,
+          );
+        } else if (!partialConfig.isInteractive()) {
+          const authType = await validateNonInteractiveAuth(
+            settings.merged.security.auth.selectedType,
+            settings.merged.security.auth.useExternal,
+            partialConfig,
+            settings,
+          );
+          await partialConfig.refreshAuth(authType);
+        }
+      } catch (err) {
+        if (err instanceof ValidationCancelledError) {
+          // User cancelled verification, exit immediately.
+          await runExitCleanup();
+          process.exit(ExitCodes.SUCCESS);
+        }
+
+        // If validation is required, we don't treat it as a fatal failure.
+        // We allow the app to start, and the React-based ValidationDialog
+        // will handle it.
+        if (!(err instanceof ValidationRequiredError)) {
+          debugLogger.error('Error authenticating:', err);
+          initialAuthFailed = true;
+        }
+      }
+    }
+
+    const remoteAdminSettings = partialConfig.getRemoteAdminSettings();
+    // Set remote admin settings if returned from CCPA.
+    if (remoteAdminSettings) {
+      settings.setRemoteAdminSettings(remoteAdminSettings);
+    }
+
+    // Run deferred command now that we have admin settings.
+    await runDeferredCommand(settings.merged);
+
+    // hop into sandbox if we are outside and sandboxing is enabled
+    if (!process.env['SANDBOX']) {
+      const memoryArgs = settings.merged.advanced.autoConfigureMemory
+        ? getNodeMemoryArgs(isDebugMode)
+        : [];
+      const sandboxConfig = await loadSandboxConfig(settings.merged, argv);
+      // We intentionally omit the list of extensions here because extensions
+      // should not impact auth or setting up the sandbox.
+      // TODO(jacobr): refactor loadCliConfig so there is a minimal version
+      // that only initializes enough config to enable refreshAuth or find
+      // another way to decouple refreshAuth from requiring a config.
+
+      if (sandboxConfig) {
+        if (initialAuthFailed) {
+          await runExitCleanup();
+          process.exit(ExitCodes.FATAL_AUTHENTICATION_ERROR);
+        }
+        let stdinData = '';
+        if (!process.stdin.isTTY) {
+          stdinData = await readStdin();
+        }
+
+        // This function is a copy of the one from sandbox.ts
+        // It is moved here to decouple sandbox.ts from the CLI's argument structure.
+        const injectStdinIntoArgs = (
+          args: string[],
+          stdinData?: string,
+        ): string[] => {
+          const finalArgs = [...args];
+          if (stdinData) {
+            const promptIndex = finalArgs.findIndex(
+              (arg) => arg === '--prompt' || arg === '-p',
+            );
+            if (promptIndex > -1 && finalArgs.length > promptIndex + 1) {
+              // If there's a prompt argument, prepend stdin to it
+              finalArgs[promptIndex + 1] =
+                `${stdinData}\n\n${finalArgs[promptIndex + 1]}`;
+            } else {
+              // If there's no prompt argument, add stdin as the prompt
+              finalArgs.push('--prompt', stdinData);
+            }
+          }
+          return finalArgs;
+        };
+
+        const sandboxArgs = injectStdinIntoArgs(process.argv, stdinData);
+
+        await relaunchOnExitCode(() =>
+          start_sandbox(sandboxConfig, memoryArgs, partialConfig, sandboxArgs),
+        );
+        await runExitCleanup();
+        process.exit(ExitCodes.SUCCESS);
+      } else {
+        // Relaunch app so we always have a child process that can be internally
+        // restarted if needed.
+        await relaunchAppInChildProcess(memoryArgs, [], remoteAdminSettings);
+      }
+    }
+
+    // We are now past the logic handling potentially launching a child process
+    // to run Gemini CLI. It is now safe to perform expensive initialization that
+    // may have side effects.
+    {
+      const loadConfigHandle = startupProfiler.start('load_cli_config');
+      const config = await loadCliConfig(settings.merged, sessionId, argv, {
+        projectHooks: settings.workspace.settings.hooks,
+      });
+      loadConfigHandle?.end();
+      adminControlsListner.setConfig(config);
+
+      if (config.isInteractive() && config.storage && config.getDebugMode()) {
+        const { registerActivityLogger } = await import(
+          './utils/activityLogger.js'
+        );
+        registerActivityLogger(config);
+      }
+
+      // Register config for telemetry shutdown
+      // This ensures telemetry (including SessionEnd hooks) is properly flushed on exit
+      registerTelemetryConfig(config);
+
+      const policyEngine = config.getPolicyEngine();
+      const messageBus = config.getMessageBus();
+      createPolicyUpdater(policyEngine, messageBus);
+
+      // Register SessionEnd hook to fire on graceful exit
+      // This runs before telemetry shutdown in runExitCleanup()
+      registerCleanup(async () => {
+        await config
+          .getHookSystem()
+          ?.fireSessionEndEvent(SessionEndReason.Exit);
+      });
+
+      // Cleanup sessions after config initialization
+      try {
+        await cleanupExpiredSessions(config, settings.merged);
+      } catch (e) {
+        debugLogger.error('Failed to cleanup expired sessions:', e);
+      }
+
+      if (config.getListExtensions()) {
+        debugLogger.log('Installed extensions:');
+        for (const extension of config.getExtensions()) {
+          debugLogger.log(`- ${extension.name}`);
+        }
+        await runExitCleanup();
+        process.exit(ExitCodes.SUCCESS);
+      }
+
+      // Handle --list-sessions flag
+      if (config.getListSessions()) {
+        // Attempt auth for summary generation (gracefully skips if not configured)
+        const authType = settings.merged.security.auth.selectedType;
+        if (authType) {
+          try {
+            await config.refreshAuth(authType);
+          } catch (e) {
+            // Auth failed - continue without summary generation capability
+            debugLogger.debug(
+              'Auth failed for --list-sessions, summaries may not be generated:',
+              e,
+            );
+          }
+        }
+
+        await listSessions(config);
+        await runExitCleanup();
+        process.exit(ExitCodes.SUCCESS);
+      }
+
+      // Handle --delete-session flag
+      const sessionToDelete = config.getDeleteSession();
+      if (sessionToDelete) {
+        await deleteSession(config, sessionToDelete);
+        await runExitCleanup();
+        process.exit(ExitCodes.SUCCESS);
+      }
+
+      const wasRaw = process.stdin.isRaw;
+      if (config.isInteractive() && !wasRaw && process.stdin.isTTY) {
+        // Set this as early as possible to avoid spurious characters from
+        // input showing up in the output.
+        process.stdin.setRawMode(true);
+
+        if (
+          shouldEnterAlternateScreen(
+            isAlternateBufferEnabled(settings),
+            config.getScreenReader(),
+          )
+        ) {
+          enterAlternateScreen();
+          disableLineWrapping();
+
+          // Ink will cleanup so there is no need for us to manually cleanup.
+        }
+
+        // This cleanup isn't strictly needed but may help in certain situations.
+        process.on('SIGTERM', () => {
+          process.stdin.setRawMode(wasRaw);
+        });
+        process.on('SIGINT', () => {
+          process.stdin.setRawMode(wasRaw);
+        });
+      }
+
+      await setupTerminalAndTheme(config, settings);
+
+      const initAppHandle = startupProfiler.start('initialize_app');
+      const initializationResult = await initializeApp(config, settings);
+      initAppHandle?.end();
+
+      if (
+        settings.merged.security.auth.selectedType ===
+          AuthType.LOGIN_WITH_GOOGLE &&
+        config.isBrowserLaunchSuppressed()
+      ) {
+        // Do oauth before app renders to make copying the link possible.
+        await getOauthClient(
+          settings.merged.security.auth.selectedType,
+          config,
+        );
+      }
+
+      if (config.getExperimentalZedIntegration()) {
+        return await runZedIntegration(config, settings, argv);
+      }
+
+      let input = config.getQuestion();
+      const startupWarnings = [
+        ...(await getStartupWarnings()),
+        ...(await getUserStartupWarnings(settings.merged)),
+      ];
+
+      // Handle --resume flag
+      let resumedSessionData: ResumedSessionData | undefined = undefined;
+      if (argv.resume) {
+        const sessionSelector = new SessionSelector(config);
+        try {
+          const result = await sessionSelector.resolveSession(argv.resume);
+          resumedSessionData = {
+            conversation: result.sessionData,
+            filePath: result.sessionPath,
+          };
+          // Use the existing session ID to continue recording to the same session
+          config.setSessionId(resumedSessionData.conversation.sessionId);
+        } catch (error) {
+          coreEvents.emitFeedback(
+            'error',
+            `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          );
+          await runExitCleanup();
+          process.exit(ExitCodes.FATAL_INPUT_ERROR);
+        }
+      }
+
+      cliStartupHandle?.end();
+      // Render UI, passing necessary config values. Check that there is no command line question.
+      if (config.isInteractive()) {
+        await startInteractiveUI(
+          config,
+          settings,
+          startupWarnings,
+          process.cwd(),
+          resumedSessionData,
+          initializationResult,
+        );
+        return;
+      }
+
+      await config.initialize();
+      startupProfiler.flush(config);
+
+      // If not a TTY, read from stdin
+      // This is for cases where the user pipes input directly into the command
+      let stdinData: string | undefined = undefined;
+      if (!process.stdin.isTTY) {
+        stdinData = await readStdin();
+        if (stdinData) {
+          input = input ? `${stdinData}\n\n${input}` : stdinData;
+        }
+      }
+
+      // Fire SessionStart hook through MessageBus (only if hooks are enabled)
+      // Must be called AFTER config.initialize() to ensure HookRegistry is loaded
+      const sessionStartSource = resumedSessionData
+        ? SessionStartSource.Resume
+        : SessionStartSource.Startup;
+
+      const hookSystem = config?.getHookSystem();
+      if (hookSystem) {
+        const result =
+          await hookSystem.fireSessionStartEvent(sessionStartSource);
+
+        if (result) {
+          if (result.systemMessage) {
+            writeToStderr(result.systemMessage + '\n');
+          }
+          const additionalContext = result.getAdditionalContext();
+          if (additionalContext) {
+            // Prepend context to input (System Context -> Stdin -> Question)
+            const wrappedContext = `<hook_context>${additionalContext}</hook_context>`;
+            input = input ? `${wrappedContext}\n\n${input}` : wrappedContext;
+          }
+        }
+      }
+
+      // Register SessionEnd hook for graceful exit
+      registerCleanup(async () => {
+        await config
+          .getHookSystem()
+          ?.fireSessionEndEvent(SessionEndReason.Exit);
+      });
+
+      if (!input) {
+        debugLogger.error(
+          `No input provided via stdin. Input can be provided by piping data into gemini or using the --prompt option.`,
+        );
+        await runExitCleanup();
+        process.exit(ExitCodes.FATAL_INPUT_ERROR);
+      }
+
+      const prompt_id = Math.random().toString(16).slice(2);
+      logUserPrompt(
+        config,
+        new UserPromptEvent(
+          input.length,
+          prompt_id,
+          config.getContentGeneratorConfig()?.authType,
+          input,
+        ),
+      );
+
+      const authType = await validateNonInteractiveAuth(
+        settings.merged.security.auth.selectedType,
+        settings.merged.security.auth.useExternal,
+        config,
+        settings,
+      );
+      await config.refreshAuth(authType);
+
+      if (config.getDebugMode()) {
+        debugLogger.log('Session ID: %s', sessionId);
+      }
+
+      initializeOutputListenersAndFlush();
+
+      await runNonInteractive({
+        config,
+        settings,
+        input,
+        prompt_id,
+        resumedSessionData,
+      });
+      // Call cleanup before process.exit, which causes cleanup to not run
+      await runExitCleanup();
+      process.exit(ExitCodes.SUCCESS);
+    }
+  } finally {
+    cliStartupHandle?.end();
   }
 }
 

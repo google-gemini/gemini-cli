@@ -7,13 +7,16 @@
 import { describe, it, expect, vi } from 'vitest';
 import { main as generateDocs } from '../generate-settings-doc.ts';
 
-vi.mock('fs', () => ({
-  readFileSync: vi.fn().mockReturnValue(''),
-  createWriteStream: vi.fn(() => ({
-    write: vi.fn(),
-    on: vi.fn(),
-  })),
-}));
+vi.mock('fs', async () => {
+  const actual = await vi.importActual<typeof import('fs')>('fs');
+  return {
+    ...actual,
+    createWriteStream: vi.fn(() => ({
+      write: vi.fn(),
+      on: vi.fn(),
+    })),
+  };
+});
 
 describe('generate-settings-doc', () => {
   it('keeps documentation in sync in check mode', async () => {

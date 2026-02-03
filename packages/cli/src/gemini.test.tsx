@@ -94,6 +94,13 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     enterAlternateScreen: vi.fn(),
     disableLineWrapping: vi.fn(),
     getVersion: vi.fn(() => Promise.resolve('1.0.0')),
+    Storage: {
+      getGlobalGeminiDir: vi.fn(() => '/fake/gemini/dir'),
+      getGlobalSettingsPath: vi.fn(() => '/fake/gemini/dir/settings.json'),
+      getGlobalTempDir: vi.fn(() => '/fake/gemini/temp'),
+      getInstallationIdPath: vi.fn(() => '/fake/gemini/dir/id'),
+      getGoogleAccountsPath: vi.fn(() => '/fake/gemini/dir/accounts.json'),
+    },
   };
 });
 

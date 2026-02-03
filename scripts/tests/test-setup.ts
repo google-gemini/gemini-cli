@@ -6,6 +6,8 @@
 
 import { vi } from 'vitest';
 
+process.env['GEMINI_SKIP_USER_LOCALES'] = '1';
+
 vi.mock('fs', () => ({
   ...vi.importActual('fs'),
   appendFileSync: vi.fn(),
