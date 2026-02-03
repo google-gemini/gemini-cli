@@ -53,9 +53,7 @@ export function sanitizeAdminSettings(
     }
   }
 
-  // Apply defaults
-  // secureModeEnabled defaults to true (strictModeDisabled = false).
-  // logical precedence: strictModeDisabled > secureModeEnabled > default (true)
+  // Apply defaults (secureModeEnabled is supported for backward compatibility)
   let strictModeDisabled = false;
   if (sanitized.strictModeDisabled !== undefined) {
     strictModeDisabled = sanitized.strictModeDisabled;
