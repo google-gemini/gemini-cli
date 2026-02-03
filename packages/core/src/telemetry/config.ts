@@ -341,24 +341,25 @@ export async function resolveTelemetrySettings(options: {
   // Merge OTLP headers from settings, env, and argv (in that order, later overwrites earlier)
   const otlpHeaders: Record<string, string> = {};
 
+  const mergeHeaders = (source: Record<string, string> | undefined) => {
+    if (!source) return;
+    for (const [key, value] of Object.entries(source)) {
+      otlpHeaders[key.toLowerCase()] = value;
+    }
+  };
+
   // Start with settings
-  if (settings.otlpHeaders) {
-    Object.assign(otlpHeaders, settings.otlpHeaders);
-  }
+  mergeHeaders(settings.otlpHeaders);
 
   // Merge environment variable headers
   const envHeaders = parseOtlpHeaders(env['GEMINI_TELEMETRY_OTLP_HEADERS']);
-  if (envHeaders) {
-    Object.assign(otlpHeaders, envHeaders);
-  }
+  mergeHeaders(envHeaders);
 
   // Merge CLI argument headers (highest precedence)
   if (argv.telemetryOtlpHeader && Array.isArray(argv.telemetryOtlpHeader)) {
     for (const headerArg of argv.telemetryOtlpHeader) {
       const parsed = parseOtlpHeaders(headerArg);
-      if (parsed) {
-        Object.assign(otlpHeaders, parsed);
-      }
+      mergeHeaders(parsed);
     }
   }
 

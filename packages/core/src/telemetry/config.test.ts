@@ -571,7 +571,7 @@ describe('telemetry/config helpers', () => {
       };
       const resolved = await resolveTelemetrySettings({ settings });
       expect(resolved.otlpHeaders).toEqual({
-        Authorization: 'Bearer token',
+        authorization: 'Bearer token',
       });
     });
 
@@ -591,7 +591,7 @@ describe('telemetry/config helpers', () => {
       } as Record<string, string>;
       const resolved = await resolveTelemetrySettings({ env });
       expect(resolved.otlpHeaders).toEqual({
-        Authorization: 'Bearer XYZ',
+        authorization: 'Bearer XYZ',
         'x-api-key': 'abc',
       });
     });
@@ -602,7 +602,28 @@ describe('telemetry/config helpers', () => {
       };
       const resolved = await resolveTelemetrySettings({ argv });
       expect(resolved.otlpHeaders).toEqual({
-        Authorization: 'Bearer token',
+        authorization: 'Bearer token',
+      });
+    });
+
+    it('normalizes header keys to lowercase for case-insensitive merging', async () => {
+      const settings = {
+        otlpHeaders: {
+          'X-API-Key': 'from-settings',
+          Authorization: 'Bearer settings-token',
+        },
+      };
+      const env = {
+        GEMINI_TELEMETRY_OTLP_HEADERS: '{"x-api-key":"from-env"}',
+      } as Record<string, string>;
+      const argv = {
+        telemetryOtlpHeader: ['AUTHORIZATION=Bearer argv-token'],
+      };
+
+      const resolved = await resolveTelemetrySettings({ argv, env, settings });
+      expect(resolved.otlpHeaders).toEqual({
+        'x-api-key': 'from-env', // env overrides settings (case-insensitive)
+        authorization: 'Bearer argv-token', // argv overrides settings (case-insensitive)
       });
     });
   });

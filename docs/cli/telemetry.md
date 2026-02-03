@@ -110,6 +110,11 @@ key:
 This allows you to set base headers in settings while overriding specific values
 via environment variables or CLI flags when needed.
 
+**Case-insensitive merging:** HTTP header names are case-insensitive per
+RFC 7230. All header keys are normalized to lowercase during merging to ensure
+correct override behavior. For example, `Authorization`, `authorization`, and
+`AUTHORIZATION` are treated as the same header.
+
 **Format options:**
 
 - **JSON format:** `{"Authorization": "Bearer token", "x-api-key": "abc123"}`
