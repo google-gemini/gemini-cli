@@ -918,6 +918,7 @@ export class Config {
         await this.getSkillManager().discoverSkills(
           this.storage,
           this.getExtensions(),
+          this.isTrustedFolder(),
         );
         this.getSkillManager().setDisabledSkills(this.disabledSkills);
 
@@ -1924,6 +1925,7 @@ export class Config {
       await this.getSkillManager().discoverSkills(
         this.storage,
         this.getExtensions(),
+        this.isTrustedFolder(),
       );
       this.getSkillManager().setDisabledSkills(this.disabledSkills);
 
