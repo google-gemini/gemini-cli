@@ -14,14 +14,13 @@ import type { AnsiOutput, Config, GeminiClient } from '@google/gemini-cli-core';
 import { isBinary, ShellExecutionService } from '@google/gemini-cli-core';
 import { type PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
-import { SHELL_COMMAND_NAME, SHELL_HISTORY_MAX_LINES } from '../constants.js';
+import { SHELL_COMMAND_NAME } from '../constants.js';
 import { formatBytes } from '../utils/formatters.js';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import os from 'node:os';
 import fs from 'node:fs';
 import { themeManager } from '../../ui/themes/theme-manager.js';
-import { pruneShellOutput } from '../utils/textUtils.js';
 import {
   shellReducer,
   initialState,
@@ -478,10 +477,7 @@ export const useShellCommandProcessor = (
           const finalToolDisplay: IndividualToolCallDisplay = {
             ...initialToolDisplay,
             status: finalStatus,
-            resultDisplay: pruneShellOutput(
-              finalOutput,
-              SHELL_HISTORY_MAX_LINES,
-            ),
+            resultDisplay: finalOutput,
           };
 
           if (finalStatus !== ToolCallStatus.Canceled) {

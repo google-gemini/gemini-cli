@@ -10,47 +10,6 @@ import { stripVTControlCharacters } from 'node:util';
 import stringWidth from 'string-width';
 import { LRUCache } from 'mnemonist';
 import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../constants.js';
-import type { AnsiOutput, ToolResultDisplay } from '@google/gemini-cli-core';
-
-/**
- * Prunes shell output to the last N lines.
- * Handles both string output and AnsiOutput object.
- */
-export function pruneShellOutput(
-  output: ToolResultDisplay | undefined,
-  maxLines: number,
-): ToolResultDisplay | undefined {
-  if (output === undefined) return undefined;
-
-  if (typeof output === 'string') {
-    if (maxLines <= 0) return '';
-
-    let searchEnd = output.length;
-    if (output.endsWith('\n')) {
-      searchEnd--;
-    }
-
-    let newlineCount = 0;
-    for (let i = searchEnd - 1; i >= 0; i--) {
-      if (output[i] === '\n') {
-        newlineCount++;
-        if (newlineCount === maxLines) {
-          return output.substring(i + 1);
-        }
-      }
-    }
-
-    return output;
-  }
-
-  if (Array.isArray(output)) {
-    // Assume it's AnsiOutput (AnsiLine[])
-    if (output.length <= maxLines) return output;
-    return output.slice(-maxLines) as AnsiOutput;
-  }
-
-  return output;
-}
 
 /**
  * Calculates the maximum width of a multi-line ASCII art string.

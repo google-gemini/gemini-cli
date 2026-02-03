@@ -8,82 +8,15 @@ import { describe, it, expect } from 'vitest';
 import type {
   ToolCallConfirmationDetails,
   ToolEditConfirmationDetails,
-  AnsiOutput,
 } from '@google/gemini-cli-core';
 import {
   escapeAnsiCtrlCodes,
   stripUnsafeCharacters,
   getCachedStringWidth,
   sanitizeForDisplay,
-  pruneShellOutput,
 } from './textUtils.js';
 
-const createMockAnsiOutput = (lines: string[]): AnsiOutput =>
-  lines.map((line) => [
-    {
-      text: line,
-      bold: false,
-      italic: false,
-      underline: false,
-      dim: false,
-      inverse: false,
-      fg: '',
-      bg: '',
-    },
-  ]);
-
 describe('textUtils', () => {
-  describe('pruneShellOutput', () => {
-    it('should return undefined if input is undefined', () => {
-      expect(pruneShellOutput(undefined, 5)).toBeUndefined();
-    });
-
-    it('should return original string if shorter than limit', () => {
-      const output = 'line1\nline2';
-      expect(pruneShellOutput(output, 5)).toBe(output);
-    });
-
-    it('should truncate string if longer than limit', () => {
-      const output = 'line1\nline2\nline3\nline4\nline5\nline6';
-      const expected = 'line2\nline3\nline4\nline5\nline6';
-      expect(pruneShellOutput(output, 5)).toBe(expected);
-    });
-
-    it('should return original AnsiOutput if shorter than limit', () => {
-      const output: AnsiOutput = createMockAnsiOutput(['line1', 'line2']);
-      expect(pruneShellOutput(output, 5)).toBe(output);
-    });
-
-    it('should truncate AnsiOutput if longer than limit', () => {
-      const output: AnsiOutput = createMockAnsiOutput([
-        'line1',
-        'line2',
-        'line3',
-        'line4',
-        'line5',
-        'line6',
-      ]);
-      const expected: AnsiOutput = createMockAnsiOutput([
-        'line2',
-        'line3',
-        'line4',
-        'line5',
-        'line6',
-      ]);
-      expect(pruneShellOutput(output, 5)).toEqual(expected);
-    });
-
-    it('should return original input if not string or array', () => {
-      const output = 123 as unknown as string;
-      expect(pruneShellOutput(output, 5)).toBe(output);
-    });
-
-    it('should correctly handle trailing newlines', () => {
-      const output = 'a\nb\n';
-      expect(pruneShellOutput(output, 1)).toBe('b\n');
-    });
-  });
-
   describe('sanitizeForListDisplay', () => {
     it('should strip ANSI codes and replace newlines/tabs with spaces', () => {
       const input = '\u001b[31mLine 1\nLine 2\tTabbed\r\nEnd\u001b[0m';

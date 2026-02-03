@@ -32,10 +32,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
-vi.mock('../utils/textUtils.js', () => ({
-  pruneShellOutput: vi.fn((output) => `pruned: ${output}`),
-}));
-
 describe('toolMapping', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -261,7 +257,7 @@ describe('toolMapping', () => {
       expect(displayTool.resultDisplay).toBe('User cancelled');
     });
 
-    it('prunes shell output for successful run_shell_command', () => {
+    it('does not prune shell output for successful run_shell_command', () => {
       const toolCall: SuccessfulToolCall = {
         status: 'success',
         request: { ...mockRequest, name: 'run_shell_command' },
@@ -276,10 +272,10 @@ describe('toolMapping', () => {
       const result = mapToDisplay(toolCall);
       const displayTool = result.tools[0];
 
-      expect(displayTool.resultDisplay).toBe('pruned: long output');
+      expect(displayTool.resultDisplay).toBe('long output');
     });
 
-    it('prunes shell output for error run_shell_command', () => {
+    it('does not prune shell output for error run_shell_command', () => {
       const toolCall: ToolCall = {
         status: 'error',
         request: { ...mockRequest, name: 'run_shell_command' },
@@ -289,7 +285,7 @@ describe('toolMapping', () => {
       const result = mapToDisplay(toolCall);
       const displayTool = result.tools[0];
 
-      expect(displayTool.resultDisplay).toBe('pruned: long error output');
+      expect(displayTool.resultDisplay).toBe('long error output');
     });
 
     it('does NOT prune output for other tools', () => {
