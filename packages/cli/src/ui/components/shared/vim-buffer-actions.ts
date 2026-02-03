@@ -19,7 +19,7 @@ import {
   findWordEndInLine,
 } from './text-buffer.js';
 import { cpLen, toCodePoints } from '../../utils/textUtils.js';
-import { assumeExhaustive } from '../../../utils/checks.js';
+import { assumeExhaustive } from '@google/gemini-cli-core';
 
 // Check if we're at the end of a base word (on the last base character)
 // Returns true if current position has a base character followed only by combining marks until non-word

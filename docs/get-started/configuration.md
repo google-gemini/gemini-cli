@@ -326,6 +326,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `0.5`
   - **Requires restart:** Yes
 
+- **`model.disableLoopDetection`** (boolean):
+  - **Description:** Disable automatic detection and prevention of infinite
+    loops.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`model.skipNextSpeakerCheck`** (boolean):
   - **Description:** Skip the next speaker check.
   - **Default:** `true`
@@ -660,11 +666,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable shell output efficiency optimizations for better
     performance.
   - **Default:** `true`
-
-- **`tools.autoAccept`** (boolean):
-  - **Description:** Automatically accept and execute tool calls that are
-    considered safe (e.g., read-only operations).
-  - **Default:** `false`
 
 - **`tools.approvalMode`** (enum):
   - **Description:** The default approval mode for tool execution. 'default'
