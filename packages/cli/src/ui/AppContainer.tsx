@@ -189,10 +189,6 @@ export const AppContainer = (props: AppContainerProps) => {
   const historyManager = useHistory({
     chatRecordingService: config.getGeminiClient()?.getChatRecordingService(),
   });
-<<<<<<< HEAD
-=======
-
->>>>>>> d63c34b6e (feat(ui): move user identity display to header (#18216))
   useMemoryMonitor(historyManager);
   const settings = useSettings();
   const isAlternateBuffer = useAlternateBuffer();
