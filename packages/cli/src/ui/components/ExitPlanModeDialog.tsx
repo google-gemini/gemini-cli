@@ -19,6 +19,7 @@ import {
   ApprovalMode,
   validatePlanPath,
   validatePlanContent,
+  checkExhaustive,
 } from '@google/gemini-cli-core';
 import { theme } from '../semantic-colors.js';
 import { MarkdownDisplay } from '../utils/MarkdownDisplay.js';
@@ -29,7 +30,6 @@ import { useTextBuffer } from './shared/text-buffer.js';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import { DialogFooter } from './shared/DialogFooter.js';
-import { checkExhaustive } from '../../utils/checks.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { MaxSizedBox } from './shared/MaxSizedBox.js';
 import { UIStateContext } from '../contexts/UIStateContext.js';

@@ -55,7 +55,7 @@ Implementation Steps
  8. Add multi-factor authentication in src/auth/MFAService.ts
  9. Implement session timeout handling in src/auth/SessionManager.ts
  10. Add audit logging for auth events in src/auth/AuditLogger.ts
-... last 20 lines hidden ...agement in src/auth/UserProfile.ts
+... last 20 lines hidden ...
 
 Ready to start implementation?
 
