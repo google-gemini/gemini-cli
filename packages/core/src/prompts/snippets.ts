@@ -8,6 +8,7 @@ import {
   ACTIVATE_SKILL_TOOL_NAME,
   ASK_USER_TOOL_NAME,
   EDIT_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
   MEMORY_TOOL_NAME,
@@ -304,7 +305,8 @@ ${options.planModeToolsList}
 - \`${WRITE_FILE_TOOL_NAME}\` - Save plans to the plans directory (see Plan Storage below)
 
 ## Plan Storage
-- Save your plans as Markdown (.md) files directly to: \`${options.plansDir}/\`
+- Save your plans as Markdown (.md) files ONLY within: \`${options.plansDir}/\`
+- You are restricted to writing files within this directory while in Plan Mode.
 - Use descriptive filenames: \`feature-name.md\` or \`bugfix-description.md\`
 
 ## Workflow Phases
@@ -326,12 +328,12 @@ ${options.planModeToolsList}
 - Only begin this phase after exploration is complete
 - Create a detailed implementation plan with clear steps
 - Include file paths, function signatures, and code snippets where helpful
-- After saving the plan, present the full content of the markdown file to the user for review
+- Save the implementation plan to the designated plans directory
 
 ### Phase 4: Review & Approval
-- Ask the user if they approve the plan, want revisions, or want to reject it
-- Address feedback and iterate as needed
-- **When the user approves the plan**, prompt them to switch out of Plan Mode to begin implementation by pressing Shift+Tab to cycle to a different approval mode
+- Present the plan and request approval for the finalized plan using the \`${EXIT_PLAN_MODE_TOOL_NAME}\` tool
+- If plan is approved, you can begin implementation
+- If plan is rejected, address the feedback and iterate on the plan
 
 ## Constraints
 - You may ONLY use the read-only tools listed above
