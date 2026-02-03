@@ -590,6 +590,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           return true;
         }
 
+        // If we are currently responding or awaiting confirmation, ESC should act as a cancel first.
+        if (
+          streamingState === StreamingState.Responding ||
+          streamingState === StreamingState.WaitingForConfirmation
+        ) {
+          onSubmit('/cancel');
+          return true;
+        }
+
         // Handle double ESC
         if (escPressCount.current === 0) {
           escPressCount.current = 1;
