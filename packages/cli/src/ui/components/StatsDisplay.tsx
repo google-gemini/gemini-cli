@@ -8,7 +8,7 @@ import type React from 'react';
 import { Box, Text } from 'ink';
 import { ThemedGradient } from './ThemedGradient.js';
 import { theme } from '../semantic-colors.js';
-import { formatDuration } from '../utils/formatters.js';
+import { formatDuration, formatResetTime } from '../utils/formatters.js';
 import type { ModelMetrics } from '../contexts/SessionContext.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import {
@@ -19,11 +19,15 @@ import {
   USER_AGREEMENT_RATE_MEDIUM,
   CACHE_EFFICIENCY_HIGH,
   CACHE_EFFICIENCY_MEDIUM,
+  QUOTA_THRESHOLD_HIGH,
+  QUOTA_THRESHOLD_MEDIUM,
 } from '../utils/displayUtils.js';
 import { computeSessionStats } from '../utils/computeStats.js';
 import {
   type RetrieveUserQuotaResponse,
   VALID_GEMINI_MODELS,
+  getDisplayString,
+  isAutoModel,
 } from '@google/gemini-cli-core';
 import { useSettings } from '../contexts/SettingsContext.js';
 
@@ -122,36 +126,25 @@ const buildModelRows = (
   return [...activeRows, ...quotaRows];
 };
 
-const formatResetTime = (resetTime: string): string => {
-  const diff = new Date(resetTime).getTime() - Date.now();
-  if (diff <= 0) return '';
-
-  const totalMinutes = Math.ceil(diff / (1000 * 60));
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-
-  const fmt = (val: number, unit: 'hour' | 'minute') =>
-    new Intl.NumberFormat('en', {
-      style: 'unit',
-      unit,
-      unitDisplay: 'narrow',
-    }).format(val);
-
-  if (hours > 0 && minutes > 0) {
-    return `(Resets in ${fmt(hours, 'hour')} ${fmt(minutes, 'minute')})`;
-  } else if (hours > 0) {
-    return `(Resets in ${fmt(hours, 'hour')})`;
-  }
-
-  return `(Resets in ${fmt(minutes, 'minute')})`;
-};
-
 const ModelUsageTable: React.FC<{
   models: Record<string, ModelMetrics>;
   quotas?: RetrieveUserQuotaResponse;
   cacheEfficiency: number;
   totalCachedTokens: number;
-}> = ({ models, quotas, cacheEfficiency, totalCachedTokens }) => {
+  currentModel?: string;
+  pooledRemaining?: number;
+  pooledLimit?: number;
+  pooledResetTime?: string;
+}> = ({
+  models,
+  quotas,
+  cacheEfficiency,
+  totalCachedTokens,
+  currentModel,
+  pooledRemaining,
+  pooledLimit,
+  pooledResetTime,
+}) => {
   const rows = buildModelRows(models, quotas);
 
   if (rows.length === 0) {
@@ -179,13 +172,64 @@ const ModelUsageTable: React.FC<{
       ? usageLimitWidth
       : uncachedWidth + cachedWidth + outputTokensWidth);
 
+  const isAuto = currentModel && isAutoModel(currentModel);
+  const modelUsageTitle = isAuto
+    ? `${getDisplayString(currentModel)} Usage`
+    : `Model Usage`;
+
   return (
     <Box flexDirection="column" marginTop={1}>
       {/* Header */}
       <Box alignItems="flex-end">
         <Box width={nameWidth}>
           <Text bold color={theme.text.primary} wrap="truncate-end">
-            Model Usage
+            {modelUsageTitle}
+          </Text>
+        </Box>
+      </Box>
+
+      {isAuto &&
+        showQuotaColumn &&
+        pooledRemaining !== undefined &&
+        pooledLimit !== undefined &&
+        pooledLimit > 0 && (
+          <Box flexDirection="column" marginTop={0} marginBottom={1}>
+            <Text
+              color={getStatusColor((pooledRemaining / pooledLimit) * 100, {
+                green: QUOTA_THRESHOLD_HIGH,
+                yellow: QUOTA_THRESHOLD_MEDIUM,
+              })}
+            >
+              {pooledRemaining === 0
+                ? `Limit reached`
+                : `${((pooledRemaining / pooledLimit) * 100).toFixed(0)}% usage remaining`}
+              {pooledResetTime && `, ${formatResetTime(pooledResetTime)}`}
+            </Text>
+            <Text color={theme.text.primary}>
+              Usage limit: {pooledLimit.toLocaleString()}
+            </Text>
+            <Text color={theme.text.primary}>
+              Usage limits span all sessions and reset daily.
+            </Text>
+            {pooledRemaining === 0 ? (
+              <Text color={theme.text.primary}>
+                Please /auth to upgrade or switch to an API key to continue.
+              </Text>
+            ) : (
+              <Text color={theme.text.primary}>
+                /auth to upgrade or switch to API key.
+              </Text>
+            )}
+            <Text color={theme.text.primary}>
+              For a full token breakdown, run `/stats model`.
+            </Text>
+          </Box>
+        )}
+
+      <Box alignItems="flex-end">
+        <Box width={nameWidth}>
+          <Text bold color={theme.text.primary}>
+            Model
           </Text>
         </Box>
         <Box
@@ -198,6 +242,7 @@ const ModelUsageTable: React.FC<{
             Reqs
           </Text>
         </Box>
+
         {!showQuotaColumn && (
           <>
             <Box
@@ -239,7 +284,7 @@ const ModelUsageTable: React.FC<{
             alignItems="flex-end"
           >
             <Text bold color={theme.text.primary}>
-              Usage left
+              Usage remaining
             </Text>
           </Box>
         )}
@@ -259,7 +304,10 @@ const ModelUsageTable: React.FC<{
       {rows.map((row) => (
         <Box key={row.key}>
           <Box width={nameWidth}>
-            <Text color={theme.text.primary} wrap="truncate-end">
+            <Text
+              color={row.isActive ? theme.text.primary : theme.text.secondary}
+              wrap="truncate-end"
+            >
               {row.modelName}
             </Text>
           </Box>
@@ -344,19 +392,6 @@ const ModelUsageTable: React.FC<{
           </Text>
         </Box>
       )}
-
-      {showQuotaColumn && (
-        <>
-          <Box marginTop={1} marginBottom={2}>
-            <Text color={theme.text.primary}>
-              {`Usage limits span all sessions and reset daily.\n/auth to upgrade or switch to API key.`}
-            </Text>
-          </Box>
-          <Text color={theme.text.secondary}>
-            » Tip: For a full token breakdown, run `/stats model`.
-          </Text>
-        </>
-      )}
     </Box>
   );
 };
@@ -368,6 +403,10 @@ interface StatsDisplayProps {
   selectedAuthType?: string;
   userEmail?: string;
   tier?: string;
+  currentModel?: string;
+  pooledRemaining?: number;
+  pooledLimit?: number;
+  pooledResetTime?: string;
 }
 
 export const StatsDisplay: React.FC<StatsDisplayProps> = ({
@@ -377,6 +416,10 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
   selectedAuthType,
   userEmail,
   tier,
+  currentModel,
+  pooledRemaining,
+  pooledLimit,
+  pooledResetTime,
 }) => {
   const { stats } = useSessionStats();
   const { metrics } = stats;
@@ -508,6 +551,10 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
         quotas={quotas}
         cacheEfficiency={computed.cacheEfficiency}
         totalCachedTokens={computed.totalCachedTokens}
+        currentModel={currentModel}
+        pooledRemaining={pooledRemaining}
+        pooledLimit={pooledLimit}
+        pooledResetTime={pooledResetTime}
       />
     </Box>
   );

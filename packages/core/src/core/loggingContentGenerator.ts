@@ -34,6 +34,7 @@ import { CodeAssistServer } from '../code_assist/server.js';
 import { toContents } from '../code_assist/converter.js';
 import { isStructuredError } from '../utils/quotaErrorDetection.js';
 import { runInDevTraceSpan, type SpanMetadata } from '../telemetry/trace.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 interface StructuredError {
   status: number;
@@ -233,6 +234,9 @@ export class LoggingContentGenerator implements ContentGenerator {
             req.config,
             serverDetails,
           );
+          this.config
+            .refreshUserQuotaIfStale()
+            .catch((e) => debugLogger.debug('quota refresh failed', e));
           return response;
         } catch (error) {
           const durationMs = Date.now() - startTime;
@@ -354,6 +358,9 @@ export class LoggingContentGenerator implements ContentGenerator {
         req.config,
         serverDetails,
       );
+      this.config
+        .refreshUserQuotaIfStale()
+        .catch((e) => debugLogger.debug('quota refresh failed', e));
       spanMetadata.output = {
         streamChunks: responses.map((r) => ({
           content: r.candidates?.[0]?.content ?? null,

@@ -53,9 +53,14 @@ import { tokenLimit } from '../core/tokenLimits.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
+  isAutoModel,
   isPreviewModel,
+  PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL_AUTO,
+  resolveModel,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
@@ -563,6 +568,12 @@ export class Config {
   fallbackModelHandler?: FallbackModelHandler;
   validationHandler?: ValidationHandler;
   private quotaErrorOccurred: boolean = false;
+  private modelQuotas: Map<
+    string,
+    { remaining: number; limit: number; resetTime?: string }
+  > = new Map();
+  private lastRetrievedQuota?: RetrieveUserQuotaResponse;
+  private lastQuotaFetchTime = 0;
   private readonly summarizeToolOutput:
     | Record<string, SummarizeToolOutputSettings>
     | undefined;
@@ -1205,6 +1216,104 @@ export class Config {
     return this.quotaErrorOccurred;
   }
 
+  setQuota(
+    remaining: number | undefined,
+    limit: number | undefined,
+    modelId?: string,
+  ): void {
+    const activeModel = modelId ?? this.getActiveModel();
+    if (remaining !== undefined && limit !== undefined) {
+      const current = this.modelQuotas.get(activeModel);
+      if (
+        !current ||
+        current.remaining !== remaining ||
+        current.limit !== limit
+      ) {
+        this.modelQuotas.set(activeModel, { remaining, limit });
+        const pooled = this.getPooledQuota();
+        coreEvents.emitQuotaChanged(
+          pooled.remaining,
+          pooled.limit,
+          pooled.resetTime,
+        );
+      }
+    }
+  }
+
+  private getPooledQuota(): {
+    remaining?: number;
+    limit?: number;
+    resetTime?: string;
+  } {
+    const model = this.getModel();
+    if (!isAutoModel(model)) {
+      return {};
+    }
+
+    const isPreview =
+      model === PREVIEW_GEMINI_MODEL_AUTO ||
+      isPreviewModel(this.getActiveModel());
+    const proModel = isPreview ? PREVIEW_GEMINI_MODEL : DEFAULT_GEMINI_MODEL;
+    const flashModel = isPreview
+      ? PREVIEW_GEMINI_FLASH_MODEL
+      : DEFAULT_GEMINI_FLASH_MODEL;
+
+    const proQuota = this.modelQuotas.get(proModel);
+    const flashQuota = this.modelQuotas.get(flashModel);
+
+    if (proQuota || flashQuota) {
+      // For reset time, take the one that is furthest in the future (most conservative)
+      const resetTime = [proQuota?.resetTime, flashQuota?.resetTime]
+        .filter((t): t is string => !!t)
+        .sort()
+        .reverse()[0];
+
+      return {
+        remaining: (proQuota?.remaining ?? 0) + (flashQuota?.remaining ?? 0),
+        limit: (proQuota?.limit ?? 0) + (flashQuota?.limit ?? 0),
+        resetTime,
+      };
+    }
+
+    return {};
+  }
+
+  getQuotaRemaining(): number | undefined {
+    const pooled = this.getPooledQuota();
+    if (pooled.remaining !== undefined) {
+      return pooled.remaining;
+    }
+    const primaryModel = resolveModel(
+      this.getModel(),
+      this.getPreviewFeatures(),
+    );
+    return this.modelQuotas.get(primaryModel)?.remaining;
+  }
+
+  getQuotaLimit(): number | undefined {
+    const pooled = this.getPooledQuota();
+    if (pooled.limit !== undefined) {
+      return pooled.limit;
+    }
+    const primaryModel = resolveModel(
+      this.getModel(),
+      this.getPreviewFeatures(),
+    );
+    return this.modelQuotas.get(primaryModel)?.limit;
+  }
+
+  getQuotaResetTime(): string | undefined {
+    const pooled = this.getPooledQuota();
+    if (pooled.resetTime !== undefined) {
+      return pooled.resetTime;
+    }
+    const primaryModel = resolveModel(
+      this.getModel(),
+      this.getPreviewFeatures(),
+    );
+    return this.modelQuotas.get(primaryModel)?.resetTime;
+  }
+
   getEmbeddingModel(): string {
     return this.embeddingModel;
   }
@@ -1284,6 +1393,40 @@ export class Config {
       const quota = await codeAssistServer.retrieveUserQuota({
         project: codeAssistServer.projectId,
       });
+
+      if (quota.buckets) {
+        this.lastRetrievedQuota = quota;
+        this.lastQuotaFetchTime = Date.now();
+
+        for (const bucket of quota.buckets) {
+          if (
+            bucket.modelId &&
+            bucket.remainingAmount &&
+            bucket.remainingFraction != null
+          ) {
+            const remaining = parseInt(bucket.remainingAmount, 10);
+            const limit =
+              bucket.remainingFraction > 0
+                ? Math.round(remaining / bucket.remainingFraction)
+                : (this.modelQuotas.get(bucket.modelId)?.limit ?? 0);
+
+            if (!isNaN(remaining) && Number.isFinite(limit) && limit > 0) {
+              this.modelQuotas.set(bucket.modelId, {
+                remaining,
+                limit,
+                resetTime: bucket.resetTime,
+              });
+            }
+          }
+        }
+        const pooled = this.getPooledQuota();
+        coreEvents.emitQuotaChanged(
+          pooled.remaining,
+          pooled.limit,
+          pooled.resetTime,
+        );
+      }
+
       const hasAccess =
         quota.buckets?.some((b) => b.modelId === PREVIEW_GEMINI_MODEL) ?? false;
       this.setHasAccessToPreviewModel(hasAccess);
@@ -1292,6 +1435,41 @@ export class Config {
       debugLogger.debug('Failed to retrieve user quota', e);
       return undefined;
     }
+  }
+
+  async refreshUserQuotaIfStale(
+    staleMs = 30_000,
+  ): Promise<RetrieveUserQuotaResponse | undefined> {
+    const now = Date.now();
+    if (now - this.lastQuotaFetchTime > staleMs) {
+      return this.refreshUserQuota();
+    }
+    return this.lastRetrievedQuota;
+  }
+
+  getLastRetrievedQuota(): RetrieveUserQuotaResponse | undefined {
+    return this.lastRetrievedQuota;
+  }
+
+  getRemainingQuotaForModel(modelId: string):
+    | {
+        remainingAmount?: number;
+        remainingFraction?: number;
+        resetTime?: string;
+      }
+    | undefined {
+    const bucket = this.lastRetrievedQuota?.buckets?.find(
+      (b) => b.modelId === modelId,
+    );
+    if (!bucket) return undefined;
+
+    return {
+      remainingAmount: bucket.remainingAmount
+        ? parseInt(bucket.remainingAmount, 10)
+        : undefined,
+      remainingFraction: bucket.remainingFraction,
+      resetTime: bucket.resetTime,
+    };
   }
 
   getCoreTools(): string[] | undefined {

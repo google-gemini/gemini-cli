@@ -16,6 +16,9 @@ export const USER_AGREEMENT_RATE_MEDIUM = 45;
 export const CACHE_EFFICIENCY_HIGH = 40;
 export const CACHE_EFFICIENCY_MEDIUM = 15;
 
+export const QUOTA_THRESHOLD_HIGH = 20;
+export const QUOTA_THRESHOLD_MEDIUM = 5;
+
 // --- Color Logic ---
 export const getStatusColor = (
   value: number,

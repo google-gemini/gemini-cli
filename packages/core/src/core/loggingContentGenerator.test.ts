@@ -51,6 +51,7 @@ describe('LoggingContentGenerator', () => {
       getContentGeneratorConfig: vi.fn().mockReturnValue({
         authType: 'API_KEY',
       }),
+      refreshUserQuotaIfStale: vi.fn().mockResolvedValue(undefined),
     } as unknown as Config;
     loggingContentGenerator = new LoggingContentGenerator(wrapped, config);
     vi.useFakeTimers();

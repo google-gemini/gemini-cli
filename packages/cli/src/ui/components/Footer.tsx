@@ -17,6 +17,7 @@ import process from 'node:process';
 import { ThemedGradient } from './ThemedGradient.js';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
+import { QuotaDisplay } from './QuotaDisplay.js';
 import { DebugProfiler } from './DebugProfiler.js';
 import { isDevelopment } from '../../utils/installationInfo.js';
 import { useUIState } from '../contexts/UIStateContext.js';
@@ -43,6 +44,9 @@ export const Footer: React.FC = () => {
     nightly,
     isTrustedFolder,
     terminalWidth,
+    quotaRemaining,
+    quotaLimit,
+    quotaResetTime,
   } = {
     model: uiState.currentModel,
     targetDir: config.getTargetDir(),
@@ -56,6 +60,9 @@ export const Footer: React.FC = () => {
     nightly: uiState.nightly,
     isTrustedFolder: uiState.isTrustedFolder,
     terminalWidth: uiState.terminalWidth,
+    quotaRemaining: uiState.quotaRemaining,
+    quotaLimit: uiState.quotaLimit,
+    quotaResetTime: uiState.quotaResetTime,
   };
 
   const showMemoryUsage =
@@ -156,6 +163,16 @@ export const Footer: React.FC = () => {
                     promptTokenCount={promptTokenCount}
                     model={model}
                     terminalWidth={terminalWidth}
+                  />
+                </>
+              )}
+              {quotaRemaining !== undefined && quotaLimit !== undefined && (
+                <>
+                  {' '}
+                  <QuotaDisplay
+                    remaining={quotaRemaining}
+                    limit={quotaLimit}
+                    resetTime={quotaResetTime}
                   />
                 </>
               )}

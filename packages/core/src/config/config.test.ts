@@ -169,6 +169,7 @@ const mockCoreEvents = vi.hoisted(() => ({
   emitFeedback: vi.fn(),
   emitModelChanged: vi.fn(),
   emitConsoleLog: vi.fn(),
+  emitQuotaChanged: vi.fn(),
   on: vi.fn(),
 }));
 
@@ -1959,7 +1960,13 @@ describe('Config Quota & Preview Model Access', () => {
   describe('refreshUserQuota', () => {
     it('should update hasAccessToPreviewModel to true if quota includes preview model', async () => {
       mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
-        buckets: [{ modelId: PREVIEW_GEMINI_MODEL }],
+        buckets: [
+          {
+            modelId: 'gemini-3-pro-preview',
+            remainingAmount: '100',
+            remainingFraction: 1.0,
+          },
+        ],
       });
 
       await config.refreshUserQuota();
@@ -1968,11 +1975,64 @@ describe('Config Quota & Preview Model Access', () => {
 
     it('should update hasAccessToPreviewModel to false if quota does not include preview model', async () => {
       mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
-        buckets: [{ modelId: 'some-other-model' }],
+        buckets: [
+          {
+            modelId: 'some-other-model',
+            remainingAmount: '10',
+            remainingFraction: 0.1,
+          },
+        ],
       });
 
       await config.refreshUserQuota();
       expect(config.getHasAccessToPreviewModel()).toBe(false);
+    });
+
+    it('should calculate pooled quota correctly for auto models', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
+        buckets: [
+          {
+            modelId: 'gemini-2.5-pro',
+            remainingAmount: '10',
+            remainingFraction: 0.2,
+          },
+          {
+            modelId: 'gemini-2.5-flash',
+            remainingAmount: '80',
+            remainingFraction: 0.8,
+          },
+        ],
+      });
+
+      config.setModel('auto-gemini-2.5');
+      await config.refreshUserQuota();
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const pooled = (config as any).getPooledQuota();
+      // Pro: 10 / 0.2 = 50 total.
+      // Flash: 80 / 0.8 = 100 total.
+      // Pooled: (10 + 80) / (50 + 100) = 90 / 150 = 0.6
+      expect(pooled?.remaining).toBe(90);
+      expect(pooled?.limit).toBe(150);
+      expect((pooled?.remaining ?? 0) / (pooled?.limit ?? 1)).toBeCloseTo(0.6);
+    });
+
+    it('should return undefined pooled quota for non-auto models', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
+        buckets: [
+          {
+            modelId: 'gemini-2.5-pro',
+            remainingAmount: '10',
+            remainingFraction: 0.2,
+          },
+        ],
+      });
+
+      config.setModel('gemini-2.5-pro');
+      await config.refreshUserQuota();
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect((config as any).getPooledQuota()).toEqual({});
     });
 
     it('should update hasAccessToPreviewModel to false if buckets are undefined', async () => {
