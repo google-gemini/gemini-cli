@@ -74,7 +74,7 @@ export class McpClientManager {
     await Promise.all(
       Object.keys(extension.mcpServers ?? {}).map((name) => {
         const config = this.allServerConfigs.get(name);
-        if (config?.extension === extension) {
+        if (config?.extension?.id === extension.id) {
           this.allServerConfigs.delete(name);
           // Also remove from blocked servers if present
           const index = this.blockedMcpServers.findIndex(
