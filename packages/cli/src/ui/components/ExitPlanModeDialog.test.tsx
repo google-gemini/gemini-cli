@@ -9,7 +9,14 @@ import { act } from 'react';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { ExitPlanModeDialog } from './ExitPlanModeDialog.js';
-import { ApprovalMode, validatePlanContent } from '@google/gemini-cli-core';
+import { useKeypress } from '../hooks/useKeypress.js';
+import { keyMatchers, Command } from '../keyMatchers.js';
+import {
+  ApprovalMode,
+  validatePlanContent,
+  processSingleFileContent,
+  type FileSystemService,
+} from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -19,6 +26,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     ...actual,
     validatePlanPath: vi.fn(async () => null),
     validatePlanContent: vi.fn(async () => null),
+    processSingleFileContent: vi.fn(),
   };
 });
 
@@ -104,7 +112,10 @@ Implement a comprehensive authentication system with multiple providers.
   let onCancel: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    vi.mocked(fs.promises.readFile).mockResolvedValue(samplePlanContent);
+    vi.mocked(processSingleFileContent).mockResolvedValue({
+      llmContent: samplePlanContent,
+      returnDisplay: 'Read file',
+    });
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.realpathSync).mockImplementation((p) => p as string);
     onApprove = vi.fn();
@@ -135,6 +146,10 @@ Implement a comprehensive authentication system with multiple providers.
           storage: {
             getProjectTempPlansDir: () => mockPlansDir,
           },
+          getFileSystemService: (): FileSystemService => ({
+            readTextFile: vi.fn(),
+            writeTextFile: vi.fn(),
+          }),
         } as unknown as import('@google/gemini-cli-core').Config,
       },
     );
@@ -150,9 +165,10 @@ Implement a comprehensive authentication system with multiple providers.
         });
 
         await waitFor(() => {
-          expect(fs.promises.readFile).toHaveBeenCalledWith(
+          expect(processSingleFileContent).toHaveBeenCalledWith(
             mockPlanFullPath,
-            'utf8',
+            mockPlansDir,
+            expect.anything(),
           );
         });
 
@@ -231,9 +247,11 @@ Implement a comprehensive authentication system with multiple providers.
       });
 
       it('displays error state when file read fails', async () => {
-        vi.mocked(fs.promises.readFile).mockRejectedValue(
-          new Error('File not found'),
-        );
+        vi.mocked(processSingleFileContent).mockResolvedValue({
+          llmContent: '',
+          returnDisplay: '',
+          error: 'File not found',
+        });
 
         const { lastFrame } = renderDialog({ useAlternateBuffer });
 
@@ -257,7 +275,10 @@ Implement a comprehensive authentication system with multiple providers.
       });
 
       it('handles long plan content appropriately', async () => {
-        vi.mocked(fs.promises.readFile).mockResolvedValue(longPlanContent);
+        vi.mocked(processSingleFileContent).mockResolvedValue({
+          llmContent: longPlanContent,
+          returnDisplay: 'Read file',
+        });
 
         const { lastFrame } = renderDialog({ useAlternateBuffer });
 
@@ -318,34 +339,86 @@ Implement a comprehensive authentication system with multiple providers.
         expect(onCancel).not.toHaveBeenCalled();
       });
 
-      it('exits the dialog when Ctrl+C is pressed twice in feedback mode', async () => {
-        const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
+      it('bubbles up Ctrl+C when feedback is empty while editing', async () => {
+        const onBubbledQuit = vi.fn();
+
+        const BubbleListener = ({
+          children,
+        }: {
+          children: React.ReactNode;
+        }) => {
+          useKeypress(
+            (key) => {
+              if (keyMatchers[Command.QUIT](key)) {
+                onBubbledQuit();
+              }
+              return false;
+            },
+            { isActive: true },
+          );
+          return <>{children}</>;
+        };
+
+        const { stdin, lastFrame } = renderWithProviders(
+          <BubbleListener>
+            <ExitPlanModeDialog
+              planPath={mockPlanFullPath}
+              onApprove={onApprove}
+              onFeedback={onFeedback}
+              onCancel={onCancel}
+              width={80}
+              availableHeight={24}
+            />
+          </BubbleListener>,
+          {
+            useAlternateBuffer,
+            config: {
+              getTargetDir: () => mockTargetDir,
+              getIdeMode: () => false,
+              isTrustedFolder: () => true,
+              storage: {
+                getProjectTempPlansDir: () => mockPlansDir,
+              },
+              getFileSystemService: (): FileSystemService => ({
+                readTextFile: vi.fn(),
+                writeTextFile: vi.fn(),
+              }),
+            } as unknown as import('@google/gemini-cli-core').Config,
+          },
+        );
 
         await waitFor(() => {
           expect(lastFrame()).toContain('Add user authentication');
         });
 
-        // Navigate to feedback option and start typing
+        // Navigate to feedback option
         writeKey(stdin, '\x1b[B'); // Down arrow
         writeKey(stdin, '\x1b[B'); // Down arrow
-        writeKey(stdin, '\r'); // Select to focus input
 
         // Type some feedback
         for (const char of 'test') {
           writeKey(stdin, char);
         }
 
-        // First Ctrl+C to clear
-        writeKey(stdin, '\x03'); // Ctrl+C
+        await waitFor(() => {
+          expect(lastFrame()).toContain('test');
+        });
 
-        expect(onCancel).not.toHaveBeenCalled();
-
-        // Second Ctrl+C to exit
+        // First Ctrl+C to clear text
         writeKey(stdin, '\x03'); // Ctrl+C
 
         await waitFor(() => {
-          expect(onCancel).toHaveBeenCalled();
+          expect(lastFrame()).toMatchSnapshot();
         });
+        expect(onBubbledQuit).not.toHaveBeenCalled();
+
+        // Second Ctrl+C to exit (should bubble)
+        writeKey(stdin, '\x03'); // Ctrl+C
+
+        await waitFor(() => {
+          expect(onBubbledQuit).toHaveBeenCalled();
+        });
+        expect(onCancel).not.toHaveBeenCalled();
       });
 
       it('does not submit empty feedback when Enter is pressed', async () => {

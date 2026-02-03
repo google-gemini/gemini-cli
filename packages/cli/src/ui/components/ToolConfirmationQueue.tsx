@@ -25,7 +25,7 @@ function getConfirmationHeader(
     Record<SerializableConfirmationDetails['type'], string>
   > = {
     ask_user: 'Answer Questions',
-    exit_plan_mode: 'Plan Approval',
+    exit_plan_mode: 'Ready to start implementation?',
   };
   if (!details?.type) {
     return 'Action Required';
