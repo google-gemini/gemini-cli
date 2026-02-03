@@ -482,6 +482,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return false;
       }
 
+      if (
+        key.name === 'escape' &&
+        (streamingState === StreamingState.Responding ||
+          streamingState === StreamingState.WaitingForConfirmation)
+      ) {
+        return false;
+      }
+
       if (key.name === 'paste') {
         // Record paste time to prevent accidental auto-submission
         if (!isTerminalPasteTrusted(kittyProtocol.enabled)) {
@@ -984,6 +992,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       backgroundShells.size,
       backgroundShellHeight,
       history,
+      streamingState,
     ],
   );
 

@@ -77,6 +77,7 @@ they appear in the UI.
 | ----------------------- | ---------------------------- | -------------------------------------------------------------------------------------- | ------- |
 | Max Session Turns       | `model.maxSessionTurns`      | Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.      | `-1`    |
 | Compression Threshold   | `model.compressionThreshold` | The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3). | `0.5`   |
+| Disable Loop Detection  | `model.disableLoopDetection` | Disable automatic detection and prevention of infinite loops.                          | `false` |
 | Skip Next Speaker Check | `model.skipNextSpeakerCheck` | Skip the next speaker check.                                                           | `true`  |
 
 ### Context
@@ -97,7 +98,6 @@ they appear in the UI.
 | -------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- |
 | Enable Interactive Shell         | `tools.shell.enableInteractiveShell` | Use node-pty for an interactive shell experience. Fallback to child_process still applies.                                                                                     | `true`      |
 | Show Color                       | `tools.shell.showColor`              | Show color in shell output.                                                                                                                                                    | `false`     |
-| Auto Accept                      | `tools.autoAccept`                   | Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).                                                                             | `false`     |
 | Approval Mode                    | `tools.approvalMode`                 | The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet. | `"default"` |
 | Use Ripgrep                      | `tools.useRipgrep`                   | Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.                                                                | `true`      |
 | Enable Tool Output Truncation    | `tools.enableToolOutputTruncation`   | Enable truncation of large tool outputs.                                                                                                                                       | `true`      |
