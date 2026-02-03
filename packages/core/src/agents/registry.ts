@@ -4,11 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as fs from 'node:fs/promises';
 import { Storage } from '../config/storage.js';
 import { CoreEvent, coreEvents } from '../utils/events.js';
 import type { AgentOverride, Config } from '../config/config.js';
 import type { AgentDefinition, LocalAgentDefinition } from './types.js';
 import { loadAgentsFromDirectory } from './agentLoader.js';
+import { AcknowledgedAgentsService } from './acknowledgedAgents.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { CliHelpAgent } from './cli-help-agent.js';
 import { GeneralistAgent } from './generalist-agent.js';
@@ -81,11 +83,19 @@ export class AgentRegistry {
     const ackService = this.config.getAcknowledgedAgentsService();
     const projectRoot = this.config.getProjectRoot();
     if (agent.metadata?.hash) {
-      await ackService.acknowledge(
-        projectRoot,
-        agent.name,
-        agent.metadata.hash,
-      );
+      let content: string;
+      if (agent.kind === 'remote') {
+        content = agent.agentCardUrl;
+      } else {
+        if (!agent.metadata.filePath) {
+          throw new Error(
+            `Cannot acknowledge local agent ${agent.name}: missing file path`,
+          );
+        }
+        content = await fs.readFile(agent.metadata.filePath, 'utf-8');
+      }
+
+      await ackService.acknowledge(projectRoot, agent.name, content);
       await this.registerAgent(agent);
       coreEvents.emitAgentsRefreshed();
     }
@@ -146,7 +156,9 @@ export class AgentRegistry {
           if (!agent.metadata) {
             agent.metadata = {};
           }
-          agent.metadata.hash = agent.agentCardUrl;
+          agent.metadata.hash = AcknowledgedAgentsService.computeHash(
+            agent.agentCardUrl,
+          );
         }
 
         if (!agent.metadata?.hash) {

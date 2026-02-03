@@ -369,8 +369,7 @@ export class TestRig {
     try {
       const service = new AcknowledgedAgentsService();
       for (const [name, content] of Object.entries(agents)) {
-        const hash = AcknowledgedAgentsService.computeHash(content);
-        await service.acknowledge(projectRoot, name, hash);
+        await service.acknowledge(projectRoot, name, content);
       }
     } finally {
       if (originalHome) {

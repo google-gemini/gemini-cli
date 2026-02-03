@@ -40,25 +40,27 @@ describe('AcknowledgedAgentsService', () => {
     const service = new AcknowledgedAgentsService();
     const ackPath = Storage.getAcknowledgedAgentsPath();
 
-    await service.acknowledge('/project', 'AgentA', 'hash1');
+    await service.acknowledge('/project', 'AgentA', 'content1');
 
     // Verify file exists and content
     const content = await fs.readFile(ackPath, 'utf-8');
-    expect(content).toContain('"AgentA": "hash1"');
+    const hash1 = AcknowledgedAgentsService.computeHash('content1');
+    expect(content).toContain(`"AgentA": "${hash1}"`);
   });
 
   it('should return true for acknowledged agent', async () => {
     const service = new AcknowledgedAgentsService();
 
-    await service.acknowledge('/project', 'AgentA', 'hash1');
+    await service.acknowledge('/project', 'AgentA', 'content1');
 
-    expect(await service.isAcknowledged('/project', 'AgentA', 'hash1')).toBe(
+    const hash1 = AcknowledgedAgentsService.computeHash('content1');
+    expect(await service.isAcknowledged('/project', 'AgentA', hash1)).toBe(
       true,
     );
     expect(await service.isAcknowledged('/project', 'AgentA', 'hash2')).toBe(
       false,
     );
-    expect(await service.isAcknowledged('/project', 'AgentB', 'hash1')).toBe(
+    expect(await service.isAcknowledged('/project', 'AgentB', hash1)).toBe(
       false,
     );
   });

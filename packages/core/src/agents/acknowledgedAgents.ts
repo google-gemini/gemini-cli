@@ -78,8 +78,9 @@ export class AcknowledgedAgentsService {
   async acknowledge(
     projectPath: string,
     agentName: string,
-    hash: string,
+    content: string,
   ): Promise<void> {
+    const hash = AcknowledgedAgentsService.computeHash(content);
     await this.load();
     if (!this.acknowledgedAgents[projectPath]) {
       this.acknowledgedAgents[projectPath] = {};
