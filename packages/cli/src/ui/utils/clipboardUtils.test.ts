@@ -305,6 +305,9 @@ describe('clipboardUtils', () => {
     });
 
     it('should return null if tool is not yet detected', async () => {
+      // Unset session type to ensure no tool is detected automatically
+      delete process.env['XDG_SESSION_TYPE'];
+
       // Don't prime the tool
       const result = await clipboardUtils.saveClipboardImage(mockTargetDir);
       expect(result).toBe(null);
