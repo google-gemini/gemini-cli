@@ -74,7 +74,6 @@ export const useThemeCommand = (
   const handleThemeSelect = useCallback(
     (themeName: string, scope: LoadableSettingScope) => {
       try {
-        // Merge user and workspace custom themes (workspace takes precedence)
         const mergedCustomThemes = {
           ...(loadedSettings.user.settings.ui?.customThemes || {}),
           ...(loadedSettings.workspace.settings.ui?.customThemes || {}),

@@ -40,6 +40,7 @@ describe('ContextManager', () => {
       getMcpClientManager: vi.fn().mockReturnValue({
         getMcpInstructions: vi.fn().mockReturnValue('MCP Instructions'),
       }),
+      isTrustedFolder: vi.fn().mockReturnValue(true),
     } as unknown as Config;
 
     contextManager = new ContextManager(mockConfig);
@@ -112,6 +113,24 @@ describe('ContextManager', () => {
         fileCount: 2,
       });
     });
+
+    it('should not load environment memory if folder is not trusted', async () => {
+      vi.mocked(mockConfig.isTrustedFolder).mockReturnValue(false);
+      const mockGlobalResult = {
+        files: [
+          { path: '/home/user/.gemini/GEMINI.md', content: 'Global Content' },
+        ],
+      };
+      vi.mocked(memoryDiscovery.loadGlobalMemory).mockResolvedValue(
+        mockGlobalResult,
+      );
+
+      await contextManager.refresh();
+
+      expect(memoryDiscovery.loadEnvironmentMemory).not.toHaveBeenCalled();
+      expect(contextManager.getEnvironmentMemory()).toBe('');
+      expect(contextManager.getGlobalMemory()).toContain('Global Content');
+    });
   });
 
   describe('discoverContext', () => {
@@ -148,6 +167,17 @@ describe('ContextManager', () => {
         '/app',
       ]);
 
+      expect(result).toBe('');
+    });
+
+    it('should return empty string if folder is not trusted', async () => {
+      vi.mocked(mockConfig.isTrustedFolder).mockReturnValue(false);
+
+      const result = await contextManager.discoverContext('/app/src/file.ts', [
+        '/app',
+      ]);
+
+      expect(memoryDiscovery.loadJitSubdirectoryMemory).not.toHaveBeenCalled();
       expect(result).toBe('');
     });
   });

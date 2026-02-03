@@ -30,6 +30,18 @@ export const getAsciiArtWidth = (asciiArt: string): number => {
  *  code units so that surrogate‑pair emoji count as one "column".)
  * ---------------------------------------------------------------------- */
 
+/**
+ * Checks if a string contains only ASCII characters (0-127).
+ */
+export function isAscii(str: string): boolean {
+  for (let i = 0; i < str.length; i++) {
+    if (str.charCodeAt(i) > 127) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // Cache for code points
 const MAX_STRING_LENGTH_TO_CACHE = 1000;
 const codePointsCache = new LRUCache<string, string[]>(
@@ -37,15 +49,8 @@ const codePointsCache = new LRUCache<string, string[]>(
 );
 
 export function toCodePoints(str: string): string[] {
-  // ASCII fast path - check if all chars are ASCII (0-127)
-  let isAscii = true;
-  for (let i = 0; i < str.length; i++) {
-    if (str.charCodeAt(i) > 127) {
-      isAscii = false;
-      break;
-    }
-  }
-  if (isAscii) {
+  // ASCII fast path
+  if (isAscii(str)) {
     return str.split('');
   }
 
@@ -68,6 +73,9 @@ export function toCodePoints(str: string): string[] {
 }
 
 export function cpLen(str: string): number {
+  if (isAscii(str)) {
+    return str.length;
+  }
   return toCodePoints(str).length;
 }
 
@@ -79,6 +87,9 @@ export function cpIndexToOffset(str: string, cpIndex: number): number {
 }
 
 export function cpSlice(str: string, start: number, end?: number): string {
+  if (isAscii(str)) {
+    return str.slice(start, end);
+  }
   // Slice by code‑point indices and re‑join.
   const arr = toCodePoints(str).slice(start, end);
   return arr.join('');
