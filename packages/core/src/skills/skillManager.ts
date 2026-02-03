@@ -66,16 +66,17 @@ export class SkillManager {
     this.addSkillsWithPrecedence(userSkills);
 
     // 4. Workspace skills (highest precedence)
-    if (isTrusted) {
-      const projectSkills = await loadSkillsFromDir(
-        storage.getProjectSkillsDir(),
-      );
-      this.addSkillsWithPrecedence(projectSkills);
-    } else {
+    if (!isTrusted) {
       debugLogger.debug(
         'Workspace skills disabled because folder is not trusted.',
       );
+      return;
     }
+
+    const projectSkills = await loadSkillsFromDir(
+      storage.getProjectSkillsDir(),
+    );
+    this.addSkillsWithPrecedence(projectSkills);
   }
 
   /**

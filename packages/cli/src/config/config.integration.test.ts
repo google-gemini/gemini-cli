@@ -174,7 +174,7 @@ describe('Configuration Integration Tests', () => {
       // Import the argument parsing function for integration testing
       const { parseArguments: parseArgs } = await import('./config.js');
       parseArguments = parseArgs;
-    }, 30000);
+    });
 
     it.each([
       {
