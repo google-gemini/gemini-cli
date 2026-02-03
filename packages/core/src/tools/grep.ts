@@ -774,7 +774,7 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
     super(
       GrepTool.Name,
       'SearchText',
-      'Searches for a regular expression pattern within file contents. Max 100 matches.',
+      'Searches for a regular expression pattern within file contents.',
       Kind.Search,
       {
         properties: {
