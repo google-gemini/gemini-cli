@@ -72,9 +72,21 @@ export class McpClientManager {
   async stopExtension(extension: GeminiCLIExtension) {
     debugLogger.log(`Unloading extension: ${extension.name}`);
     await Promise.all(
-      Object.keys(extension.mcpServers ?? {}).map((name) =>
-        this.disconnectClient(name, true),
-      ),
+      Object.keys(extension.mcpServers ?? {}).map((name) => {
+        const config = this.allServerConfigs.get(name);
+        if (config?.extension === extension) {
+          this.allServerConfigs.delete(name);
+          // Also remove from blocked servers if present
+          const index = this.blockedMcpServers.findIndex(
+            (s) => s.name === name && s.extensionName === extension.name,
+          );
+          if (index !== -1) {
+            this.blockedMcpServers.splice(index, 1);
+          }
+          return this.disconnectClient(name, true);
+        }
+        return Promise.resolve();
+      }),
     );
     await this.cliConfig.refreshMcpContext();
   }

@@ -98,6 +98,7 @@ import { deleteSession, listSessions } from './utils/sessions.js';
 import { createPolicyUpdater } from './config/policy.js';
 import { ScrollProvider } from './ui/contexts/ScrollProvider.js';
 import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
+import { TerminalProvider } from './ui/contexts/TerminalContext.js';
 
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { profiler } from './ui/components/DebugProfiler.js';
@@ -228,19 +229,21 @@ export async function startInteractiveUI(
               settings.merged.general.debugKeystrokeLogging
             }
           >
-            <ScrollProvider>
-              <SessionStatsProvider>
-                <VimModeProvider settings={settings}>
-                  <AppContainer
-                    config={config}
-                    startupWarnings={startupWarnings}
-                    version={version}
-                    resumedSessionData={resumedSessionData}
-                    initializationResult={initializationResult}
-                  />
-                </VimModeProvider>
-              </SessionStatsProvider>
-            </ScrollProvider>
+            <TerminalProvider>
+              <ScrollProvider>
+                <SessionStatsProvider>
+                  <VimModeProvider settings={settings}>
+                    <AppContainer
+                      config={config}
+                      startupWarnings={startupWarnings}
+                      version={version}
+                      resumedSessionData={resumedSessionData}
+                      initializationResult={initializationResult}
+                    />
+                  </VimModeProvider>
+                </SessionStatsProvider>
+              </ScrollProvider>
+            </TerminalProvider>
           </MouseProvider>
         </KeypressProvider>
       </SettingsContext.Provider>
