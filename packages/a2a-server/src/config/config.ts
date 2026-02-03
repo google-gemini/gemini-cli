@@ -157,14 +157,10 @@ export async function loadConfig(
     // If NONE are present, disregard admin settings entirely, and pass the
     // final config as is.
     if (Object.keys(adminSettings).length !== 0) {
-      finalConfigParams.disableYoloMode = !(
-        adminSettings.strictModeDisabled ?? false
-      );
-      finalConfigParams.mcpEnabled =
-        adminSettings.mcpSetting?.mcpEnabled ?? false;
+      finalConfigParams.disableYoloMode = !adminSettings.strictModeDisabled;
+      finalConfigParams.mcpEnabled = adminSettings.mcpSetting?.mcpEnabled;
       finalConfigParams.extensionsEnabled =
-        adminSettings.cliFeatureSetting?.extensionsSetting?.extensionsEnabled ??
-        false;
+        adminSettings.cliFeatureSetting?.extensionsSetting?.extensionsEnabled;
     }
   }
 

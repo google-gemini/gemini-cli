@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { isDeepStrictEqual } from 'node:util';
 import {
   describe,
   it,
@@ -23,6 +24,10 @@ import {
 import type { CodeAssistServer } from '../server.js';
 import type { Config } from '../../config/config.js';
 import { getCodeAssistServer } from '../codeAssist.js';
+import type {
+  FetchAdminControlsResponse,
+  AdminControlsSettings,
+} from '../types.js';
 
 vi.mock('../codeAssist.js', () => ({
   getCodeAssistServer: vi.fn(),
@@ -50,37 +55,243 @@ describe('Admin Controls', () => {
   });
 
   describe('sanitizeAdminSettings', () => {
-    it('should strip unknown fields', () => {
+    it('should strip unknown fields and pass through mcpConfigJson when valid', () => {
+      const mcpConfig = {
+        mcpServers: {
+          'server-1': {
+            url: 'http://example.com',
+            type: 'sse' as const,
+            trust: true,
+            includeTools: ['tool1'],
+          },
+        },
+      };
+
       const input = {
         strictModeDisabled: false,
         extraField: 'should be removed',
         mcpSetting: {
-          mcpEnabled: false,
+          mcpEnabled: true,
+          mcpConfigJson: JSON.stringify(mcpConfig),
           unknownMcpField: 'remove me',
+        },
+      };
+
+      const result = sanitizeAdminSettings(
+        input as unknown as FetchAdminControlsResponse,
+      );
+
+      expect(result).toEqual({
+        strictModeDisabled: false,
+        cliFeatureSetting: {
+          extensionsSetting: { extensionsEnabled: false },
+          unmanagedCapabilitiesEnabled: false,
+        },
+        mcpSetting: {
+          mcpEnabled: true,
+          mcpConfig,
+        },
+      });
+    });
+
+    it('should ignore mcpConfigJson if it is invalid JSON', () => {
+      const input: FetchAdminControlsResponse = {
+        mcpSetting: {
+          mcpEnabled: true,
+          mcpConfigJson: '{ invalid json }',
+        },
+      };
+
+      const result = sanitizeAdminSettings(input);
+      expect(result.mcpSetting).toEqual({
+        mcpEnabled: true,
+        mcpConfig: {},
+      });
+    });
+
+    it('should ignore mcpConfigJson if it does not match schema', () => {
+      const invalidConfig = {
+        mcpServers: {
+          'server-1': {
+            url: 123, // should be string
+            type: 'invalid-type', // should be sse or http
+          },
+        },
+      };
+      const input: FetchAdminControlsResponse = {
+        mcpSetting: {
+          mcpEnabled: true,
+          mcpConfigJson: JSON.stringify(invalidConfig),
+        },
+      };
+
+      const result = sanitizeAdminSettings(input);
+      expect(result.mcpSetting).toEqual({
+        mcpEnabled: true,
+        mcpConfig: {},
+      });
+    });
+
+    it('should apply default values when fields are missing', () => {
+      const input = {};
+      const result = sanitizeAdminSettings(input as FetchAdminControlsResponse);
+
+      expect(result).toEqual({
+        strictModeDisabled: false,
+        cliFeatureSetting: {
+          extensionsSetting: { extensionsEnabled: false },
+          unmanagedCapabilitiesEnabled: false,
+        },
+        mcpSetting: {
+          mcpEnabled: false,
+          mcpConfig: {},
+        },
+      });
+    });
+
+    it('should default mcpEnabled to false if mcpSetting is present but mcpEnabled is undefined', () => {
+      const input = { mcpSetting: {} };
+      const result = sanitizeAdminSettings(input as FetchAdminControlsResponse);
+      expect(result.mcpSetting?.mcpEnabled).toBe(false);
+      expect(result.mcpSetting?.mcpConfig).toEqual({});
+    });
+
+    it('should default extensionsEnabled to false if extensionsSetting is present but extensionsEnabled is undefined', () => {
+      const input = {
+        cliFeatureSetting: {
+          extensionsSetting: {},
+        },
+      };
+      const result = sanitizeAdminSettings(input as FetchAdminControlsResponse);
+      expect(
+        result.cliFeatureSetting?.extensionsSetting?.extensionsEnabled,
+      ).toBe(false);
+    });
+
+    it('should default unmanagedCapabilitiesEnabled to false if cliFeatureSetting is present but unmanagedCapabilitiesEnabled is undefined', () => {
+      const input = {
+        cliFeatureSetting: {},
+      };
+      const result = sanitizeAdminSettings(input as FetchAdminControlsResponse);
+      expect(result.cliFeatureSetting?.unmanagedCapabilitiesEnabled).toBe(
+        false,
+      );
+    });
+
+    it('should reflect explicit values', () => {
+      const input: FetchAdminControlsResponse = {
+        strictModeDisabled: true,
+        cliFeatureSetting: {
+          extensionsSetting: { extensionsEnabled: true },
+          unmanagedCapabilitiesEnabled: true,
+        },
+        mcpSetting: {
+          mcpEnabled: true,
         },
       };
 
       const result = sanitizeAdminSettings(input);
 
       expect(result).toEqual({
-        strictModeDisabled: false,
+        strictModeDisabled: true,
+        cliFeatureSetting: {
+          extensionsSetting: { extensionsEnabled: true },
+          unmanagedCapabilitiesEnabled: true,
+        },
         mcpSetting: {
-          mcpEnabled: false,
+          mcpEnabled: true,
+          mcpConfig: {},
         },
       });
-      // Explicitly check that unknown fields are gone
-      expect((result as Record<string, unknown>)['extraField']).toBeUndefined();
     });
 
-    it('should preserve valid nested fields', () => {
-      const input = {
-        cliFeatureSetting: {
-          extensionsSetting: {
-            extensionsEnabled: true,
+    it('should prioritize strictModeDisabled over secureModeEnabled', () => {
+      const input: FetchAdminControlsResponse = {
+        strictModeDisabled: true,
+        secureModeEnabled: true, // Should be ignored because strictModeDisabled takes precedence for backwards compatibility if both exist (though usually they shouldn't)
+      };
+
+      const result = sanitizeAdminSettings(input);
+      expect(result.strictModeDisabled).toBe(true);
+    });
+
+    it('should use secureModeEnabled if strictModeDisabled is undefined', () => {
+      const input: FetchAdminControlsResponse = {
+        secureModeEnabled: false,
+      };
+
+      const result = sanitizeAdminSettings(input);
+      expect(result.strictModeDisabled).toBe(true);
+    });
+  });
+
+  describe('isDeepStrictEqual verification', () => {
+    it('should consider AdminControlsSettings with different key orders as equal', () => {
+      const settings1: AdminControlsSettings = {
+        strictModeDisabled: false,
+        mcpSetting: { mcpEnabled: true },
+        cliFeatureSetting: { unmanagedCapabilitiesEnabled: true },
+      };
+      const settings2: AdminControlsSettings = {
+        cliFeatureSetting: { unmanagedCapabilitiesEnabled: true },
+        mcpSetting: { mcpEnabled: true },
+        strictModeDisabled: false,
+      };
+      expect(isDeepStrictEqual(settings1, settings2)).toBe(true);
+    });
+
+    it('should consider nested settings objects with different key orders as equal', () => {
+      const settings1: AdminControlsSettings = {
+        mcpSetting: {
+          mcpEnabled: true,
+          mcpConfig: {
+            mcpServers: {
+              server1: { url: 'url', type: 'sse' },
+            },
           },
         },
       };
-      expect(sanitizeAdminSettings(input)).toEqual(input);
+
+      // Order swapped in mcpConfig and mcpServers items
+      const settings2: AdminControlsSettings = {
+        mcpSetting: {
+          mcpConfig: {
+            mcpServers: {
+              server1: { type: 'sse', url: 'url' },
+            },
+          },
+          mcpEnabled: true,
+        },
+      };
+      expect(isDeepStrictEqual(settings1, settings2)).toBe(true);
+    });
+
+    it('should consider arrays in options as order-independent and equal if shuffled after sanitization', () => {
+      const mcpConfig1 = {
+        mcpServers: {
+          server1: { includeTools: ['a', 'b'] },
+        },
+      };
+      const mcpConfig2 = {
+        mcpServers: {
+          server1: { includeTools: ['b', 'a'] },
+        },
+      };
+
+      const settings1 = sanitizeAdminSettings({
+        mcpSetting: {
+          mcpEnabled: true,
+          mcpConfigJson: JSON.stringify(mcpConfig1),
+        },
+      });
+      const settings2 = sanitizeAdminSettings({
+        mcpSetting: {
+          mcpEnabled: true,
+          mcpConfigJson: JSON.stringify(mcpConfig2),
+        },
+      });
+
+      expect(isDeepStrictEqual(settings1, settings2)).toBe(true);
     });
   });
 
@@ -112,7 +323,14 @@ describe('Admin Controls', () => {
     });
 
     it('should use cachedSettings and start polling if provided', async () => {
-      const cachedSettings = { strictModeDisabled: false };
+      const cachedSettings = {
+        strictModeDisabled: false,
+        mcpSetting: { mcpEnabled: false, mcpConfig: {} },
+        cliFeatureSetting: {
+          extensionsSetting: { extensionsEnabled: false },
+          unmanagedCapabilitiesEnabled: false,
+        },
+      };
       const result = await fetchAdminControls(
         mockServer,
         cachedSettings,
@@ -153,7 +371,17 @@ describe('Admin Controls', () => {
         true,
         mockOnSettingsChanged,
       );
-      expect(result).toEqual(serverResponse);
+      expect(result).toEqual({
+        strictModeDisabled: false,
+        cliFeatureSetting: {
+          extensionsSetting: { extensionsEnabled: false },
+          unmanagedCapabilitiesEnabled: false,
+        },
+        mcpSetting: {
+          mcpEnabled: false,
+          mcpConfig: {},
+        },
+      });
       expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
     });
 
@@ -209,7 +437,17 @@ describe('Admin Controls', () => {
         true,
         mockOnSettingsChanged,
       );
-      expect(result).toEqual({ strictModeDisabled: false });
+      expect(result).toEqual({
+        strictModeDisabled: false,
+        cliFeatureSetting: {
+          extensionsSetting: { extensionsEnabled: false },
+          unmanagedCapabilitiesEnabled: false,
+        },
+        mcpSetting: {
+          mcpEnabled: false,
+          mcpConfig: {},
+        },
+      });
       expect(
         (result as Record<string, unknown>)['unknownField'],
       ).toBeUndefined();
@@ -279,7 +517,17 @@ describe('Admin Controls', () => {
       (mockServer.fetchAdminControls as Mock).mockResolvedValue(serverResponse);
 
       const result = await fetchAdminControlsOnce(mockServer, true);
-      expect(result).toEqual({ strictModeDisabled: true });
+      expect(result).toEqual({
+        strictModeDisabled: true,
+        cliFeatureSetting: {
+          extensionsSetting: { extensionsEnabled: false },
+          unmanagedCapabilitiesEnabled: false,
+        },
+        mcpSetting: {
+          mcpEnabled: false,
+          mcpConfig: {},
+        },
+      });
       expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
     });
 
@@ -337,6 +585,14 @@ describe('Admin Controls', () => {
 
       expect(mockOnSettingsChanged).toHaveBeenCalledWith({
         strictModeDisabled: false,
+        cliFeatureSetting: {
+          extensionsSetting: { extensionsEnabled: false },
+          unmanagedCapabilitiesEnabled: false,
+        },
+        mcpSetting: {
+          mcpEnabled: false,
+          mcpConfig: {},
+        },
       });
     });
 
@@ -362,7 +618,6 @@ describe('Admin Controls', () => {
       expect(mockOnSettingsChanged).not.toHaveBeenCalled();
       expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(2);
     });
-
     it('should continue polling after a fetch error', async () => {
       // Initial fetch is successful
       (mockServer.fetchAdminControls as Mock).mockResolvedValue({
@@ -392,6 +647,14 @@ describe('Admin Controls', () => {
       expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(3);
       expect(mockOnSettingsChanged).toHaveBeenCalledWith({
         strictModeDisabled: false,
+        cliFeatureSetting: {
+          extensionsSetting: { extensionsEnabled: false },
+          unmanagedCapabilitiesEnabled: false,
+        },
+        mcpSetting: {
+          mcpEnabled: false,
+          mcpConfig: {},
+        },
       });
     });
 
