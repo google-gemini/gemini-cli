@@ -67,6 +67,7 @@ import {
   getSystemSettingsPath,
   getSystemDefaultsPath,
   type Settings,
+  type SettingsFile,
   saveSettings,
   getDefaultsFromSchema,
   loadEnvironment,
