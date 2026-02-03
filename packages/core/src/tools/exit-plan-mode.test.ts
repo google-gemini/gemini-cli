@@ -31,8 +31,9 @@ describe('ExitPlanModeTool', () => {
     tempRootDir = fs.realpathSync(
       fs.mkdtempSync(path.join(os.tmpdir(), 'exit-plan-test-')),
     );
-    mockPlansDir = path.join(tempRootDir, 'plans');
-    fs.mkdirSync(mockPlansDir, { recursive: true });
+    const plansDirRaw = path.join(tempRootDir, 'plans');
+    fs.mkdirSync(plansDirRaw, { recursive: true });
+    mockPlansDir = fs.realpathSync(plansDirRaw);
 
     mockConfig = {
       getTargetDir: vi.fn().mockReturnValue(tempRootDir),
@@ -100,7 +101,7 @@ describe('ExitPlanModeTool', () => {
     });
 
     it('should return false when plan file cannot be read', async () => {
-      const planRelativePath = 'plans/non-existent.md';
+      const planRelativePath = path.join('plans', 'non-existent.md');
       const invocation = tool.build({ plan_path: planRelativePath });
 
       const result = await invocation.shouldConfirmExecute(

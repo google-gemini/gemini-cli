@@ -18,8 +18,9 @@ describe('planUtils', () => {
     tempRootDir = fs.realpathSync(
       fs.mkdtempSync(path.join(os.tmpdir(), 'planUtils-test-')),
     );
-    plansDir = path.join(tempRootDir, 'plans');
-    fs.mkdirSync(plansDir, { recursive: true });
+    const plansDirRaw = path.join(tempRootDir, 'plans');
+    fs.mkdirSync(plansDirRaw, { recursive: true });
+    plansDir = fs.realpathSync(plansDirRaw);
   });
 
   afterEach(() => {
@@ -30,7 +31,7 @@ describe('planUtils', () => {
 
   describe('validatePlanPath', () => {
     it('should return null for a valid path within plans directory', async () => {
-      const planPath = 'plans/test.md';
+      const planPath = path.join('plans', 'test.md');
       const fullPath = path.join(tempRootDir, planPath);
       fs.writeFileSync(fullPath, '# My Plan');
 
@@ -39,19 +40,19 @@ describe('planUtils', () => {
     });
 
     it('should return error for path traversal', async () => {
-      const planPath = '../secret.txt';
+      const planPath = path.join('..', 'secret.txt');
       const result = await validatePlanPath(planPath, plansDir, tempRootDir);
       expect(result).toContain('Access denied');
     });
 
     it('should return error for non-existent file', async () => {
-      const planPath = 'plans/ghost.md';
+      const planPath = path.join('plans', 'ghost.md');
       const result = await validatePlanPath(planPath, plansDir, tempRootDir);
       expect(result).toContain('Plan file does not exist');
     });
 
     it('should detect path traversal via symbolic links', async () => {
-      const maliciousPath = 'plans/malicious.md';
+      const maliciousPath = path.join('plans', 'malicious.md');
       const fullMaliciousPath = path.join(tempRootDir, maliciousPath);
       const outsideFile = path.join(tempRootDir, 'outside.txt');
       fs.writeFileSync(outsideFile, 'secret content');
