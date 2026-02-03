@@ -53,6 +53,7 @@ describe('planCommand', () => {
         config: {
           isPlanEnabled: vi.fn(),
           setApprovalMode: vi.fn(),
+          getActivePlanPath: vi.fn(),
           storage: {
             getProjectTempPlansDir: vi.fn().mockReturnValue('/mock/plans/dir'),
           },
@@ -94,7 +95,9 @@ describe('planCommand', () => {
 
   it('should switch to plan mode if enabled', async () => {
     vi.mocked(mockContext.services.config!.isPlanEnabled).mockReturnValue(true);
-    vi.mocked(fs.promises.access).mockRejectedValue(new Error('No entry')); // No plans found case
+    vi.mocked(mockContext.services.config!.getActivePlanPath).mockReturnValue(
+      undefined,
+    );
 
     if (!planCommand.action) throw new Error('Action missing');
     await planCommand.action(mockContext, '');
@@ -108,91 +111,57 @@ describe('planCommand', () => {
     );
   });
 
-  it('should show "No plans found" if directory does not exist', async () => {
+  it('should show "No active plan found" if no active plan path in config', async () => {
     vi.mocked(mockContext.services.config!.isPlanEnabled).mockReturnValue(true);
-    vi.mocked(fs.promises.access).mockRejectedValue(new Error('No entry'));
-
-    if (!planCommand.action) throw new Error('Action missing');
-    await planCommand.action(mockContext, '');
-
-    expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
-      'info',
-      'No plans found.',
+    vi.mocked(mockContext.services.config!.getActivePlanPath).mockReturnValue(
+      undefined,
     );
-  });
-
-  it('should show "No plans found" if directory is empty of .md files', async () => {
-    vi.mocked(mockContext.services.config!.isPlanEnabled).mockReturnValue(true);
-    vi.mocked(fs.promises.access).mockResolvedValue(undefined);
-    vi.mocked(
-      fs.promises.readdir as unknown as (
-        path: fs.PathLike,
-      ) => Promise<string[]>,
-    ).mockResolvedValue(['not-a-plan.txt']);
-
-    if (!planCommand.action) throw new Error('Action missing');
-    await planCommand.action(mockContext, '');
-
-    expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
-      'info',
-      'No plans found.',
-    );
-  });
-
-  it('should find and display the latest plan', async () => {
-    vi.mocked(mockContext.services.config!.isPlanEnabled).mockReturnValue(true);
-    vi.mocked(fs.promises.access).mockResolvedValue(undefined);
-    vi.mocked(
-      fs.promises.readdir as unknown as (
-        path: fs.PathLike,
-      ) => Promise<string[]>,
-    ).mockResolvedValue(['old-plan.md', 'new-plan.md']);
-
-    vi.mocked(fs.promises.stat).mockImplementation(async (filePath) => {
-      const pathStr = filePath as string;
-      if (pathStr.includes('old-plan.md')) {
-        return { mtimeMs: 1000 } as fs.Stats;
-      }
-      if (pathStr.includes('new-plan.md')) {
-        return { mtimeMs: 2000 } as fs.Stats;
-      }
-      return {} as fs.Stats;
-    });
-
-    vi.mocked(fs.promises.readFile).mockResolvedValue('# New Plan Content');
-
-    if (!planCommand.action) throw new Error('Action missing');
-    await planCommand.action(mockContext, '');
-
-    expect(fs.promises.readFile).toHaveBeenCalledWith(
-      '/mock/plans/dir/new-plan.md',
-      'utf-8',
-    );
-    expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
-      'info',
-      'Latest Plan: new-plan.md',
-    );
-    expect(mockContext.ui.addItem).toHaveBeenCalledWith({
-      type: MessageType.GEMINI,
-      text: '# New Plan Content',
-    });
-  });
-
-  it('should handle errors when reading plans', async () => {
-    vi.mocked(mockContext.services.config!.isPlanEnabled).mockReturnValue(true);
-    vi.mocked(fs.promises.access).mockResolvedValue(undefined);
-    vi.mocked(
-      fs.promises.readdir as unknown as (
-        path: fs.PathLike,
-      ) => Promise<string[]>,
-    ).mockRejectedValue(new Error('Read error'));
 
     if (!planCommand.action) throw new Error('Action missing');
     await planCommand.action(mockContext, '');
 
     expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
       'error',
-      expect.stringContaining('Failed to read plans: Error: Read error'),
+      'No active plan found. Please create and approve a plan first.',
+    );
+  });
+
+  it('should display the active plan from config', async () => {
+    const mockPlanPath = '/mock/plans/dir/active-plan.md';
+    vi.mocked(mockContext.services.config!.isPlanEnabled).mockReturnValue(true);
+    vi.mocked(mockContext.services.config!.getActivePlanPath).mockReturnValue(
+      mockPlanPath,
+    );
+    vi.mocked(fs.promises.readFile).mockResolvedValue('# Active Plan Content');
+
+    if (!planCommand.action) throw new Error('Action missing');
+    await planCommand.action(mockContext, '');
+
+    expect(fs.promises.readFile).toHaveBeenCalledWith(mockPlanPath, 'utf-8');
+    expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+      'info',
+      'Active Plan: active-plan.md',
+    );
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+      type: MessageType.GEMINI,
+      text: '# Active Plan Content',
+    });
+  });
+
+  it('should handle errors when reading the active plan', async () => {
+    const mockPlanPath = '/mock/plans/dir/active-plan.md';
+    vi.mocked(mockContext.services.config!.isPlanEnabled).mockReturnValue(true);
+    vi.mocked(mockContext.services.config!.getActivePlanPath).mockReturnValue(
+      mockPlanPath,
+    );
+    vi.mocked(fs.promises.readFile).mockRejectedValue(new Error('Read error'));
+
+    if (!planCommand.action) throw new Error('Action missing');
+    await planCommand.action(mockContext, '');
+
+    expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+      'error',
+      expect.stringContaining(`Failed to read active plan at ${mockPlanPath}`),
       expect.any(Error),
     );
   });

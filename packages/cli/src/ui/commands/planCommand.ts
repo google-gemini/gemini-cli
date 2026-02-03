@@ -36,46 +36,32 @@ export const planCommand: SlashCommand = {
     coreEvents.emitFeedback('info', 'Switched to Plan Mode.');
 
     // Find and display the latest plan
-    const plansDir = config.storage.getProjectTempPlansDir();
+    const activePlanPath = config.getActivePlanPath();
+
+    if (!activePlanPath) {
+      coreEvents.emitFeedback(
+        'error',
+        'No active plan found. Please create and approve a plan first.',
+      );
+      return;
+    }
 
     try {
-      try {
-        await fs.promises.access(plansDir, fs.constants.F_OK);
-      } catch {
-        coreEvents.emitFeedback('info', 'No plans found.');
-        return;
-      }
+      const content = await fs.promises.readFile(activePlanPath, 'utf-8');
+      const fileName = path.basename(activePlanPath);
 
-      const files = await fs.promises.readdir(plansDir);
-      const planFiles = files.filter((f) => f.endsWith('.md'));
-
-      if (planFiles.length === 0) {
-        coreEvents.emitFeedback('info', 'No plans found.');
-        return;
-      }
-
-      // Sort by modification time, newest first
-      const sortedPlans = await Promise.all(
-        planFiles.map(async (file) => {
-          const filePath = path.join(plansDir, file);
-          const stats = await fs.promises.stat(filePath);
-          return { file, mtime: stats.mtimeMs, filePath };
-        }),
-      );
-
-      sortedPlans.sort((a, b) => b.mtime - a.mtime);
-
-      const latestPlan = sortedPlans[0];
-      const content = await fs.promises.readFile(latestPlan.filePath, 'utf-8');
-
-      coreEvents.emitFeedback('info', `Latest Plan: ${latestPlan.file}`);
+      coreEvents.emitFeedback('info', `Active Plan: ${fileName}`);
 
       context.ui.addItem({
         type: MessageType.GEMINI,
         text: content,
       });
     } catch (error) {
-      coreEvents.emitFeedback('error', `Failed to read plans: ${error}`, error);
+      coreEvents.emitFeedback(
+        'error',
+        `Failed to read active plan at ${activePlanPath}: ${error}`,
+        error,
+      );
     }
   },
 };
