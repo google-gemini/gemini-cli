@@ -39,6 +39,13 @@ export function isITerm2(): boolean {
 }
 
 /**
+ * Returns true if the current platform is Android.
+ */
+export function isAndroid(): boolean {
+  return process.platform === 'android';
+}
+
+/**
  * Resets the cached iTerm2 detection value.
  * Primarily used for testing.
  */

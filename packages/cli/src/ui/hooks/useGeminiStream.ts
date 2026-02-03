@@ -126,7 +126,7 @@ function isCancelCommand(query: PartListUnion): boolean {
       return first.trim() === '/cancel';
     }
     if (typeof first === 'object' && first !== null && 'text' in first) {
-      return (first).text?.trim() === '/cancel';
+      return first.text?.trim() === '/cancel';
     }
   }
   return false;
@@ -450,12 +450,45 @@ export const useGeminiStream = (
   const lastQueryRef = useRef<PartListUnion | null>(null);
   const lastPromptIdRef = useRef<string | null>(null);
   const loopDetectedRef = useRef(false);
+  const contentBufferRef = useRef<string>('');
+  const lastContentUpdateTimeRef = useRef<number>(0);
   const [
     loopDetectionConfirmationRequest,
     setLoopDetectionConfirmationRequest,
   ] = useState<{
     onComplete: (result: { userSelection: 'disable' | 'keep' }) => void;
   } | null>(null);
+
+  const flushContentBuffer = useCallback(
+    (userMessageTimestamp: number) => {
+      const content = contentBufferRef.current;
+      if (!content) return;
+
+      const splitPoint = findLastSafeSplitPoint(content);
+      if (splitPoint === content.length) {
+        setPendingHistoryItem((item) => ({
+          type: item?.type as 'gemini' | 'gemini_content',
+          text: content,
+        }));
+      } else {
+        const beforeText = content.substring(0, splitPoint);
+        const afterText = content.substring(splitPoint);
+        addItem(
+          {
+            type: pendingHistoryItemRef.current?.type as
+              | 'gemini'
+              | 'gemini_content',
+            text: beforeText,
+          },
+          userMessageTimestamp,
+        );
+        setPendingHistoryItem({ type: 'gemini_content', text: afterText });
+        contentBufferRef.current = afterText;
+      }
+      lastContentUpdateTimeRef.current = Date.now();
+    },
+    [addItem, pendingHistoryItemRef, setPendingHistoryItem],
+  );
 
   const onExec = useCallback(async (done: Promise<void>) => {
     setIsResponding(true);
@@ -775,41 +808,19 @@ export const useGeminiStream = (
         setPendingHistoryItem({ type: 'gemini', text: '' });
         newGeminiMessageBuffer = eventValue;
       }
-      // Split large messages for better rendering performance. Ideally,
-      // we should maximize the amount of output sent to <Static />.
-      const splitPoint = findLastSafeSplitPoint(newGeminiMessageBuffer);
-      if (splitPoint === newGeminiMessageBuffer.length) {
-        // Update the existing message with accumulated content
-        setPendingHistoryItem((item) => ({
-          type: item?.type as 'gemini' | 'gemini_content',
-          text: newGeminiMessageBuffer,
-        }));
-      } else {
-        // This indicates that we need to split up this Gemini Message.
-        // Splitting a message is primarily a performance consideration. There is a
-        // <Static> component at the root of App.tsx which takes care of rendering
-        // content statically or dynamically. Everything but the last message is
-        // treated as static in order to prevent re-rendering an entire message history
-        // multiple times per-second (as streaming occurs). Prior to this change you'd
-        // see heavy flickering of the terminal. This ensures that larger messages get
-        // broken up so that there are more "statically" rendered.
-        const beforeText = newGeminiMessageBuffer.substring(0, splitPoint);
-        const afterText = newGeminiMessageBuffer.substring(splitPoint);
-        addItem(
-          {
-            type: pendingHistoryItemRef.current?.type as
-              | 'gemini'
-              | 'gemini_content',
-            text: beforeText,
-          },
-          userMessageTimestamp,
-        );
-        setPendingHistoryItem({ type: 'gemini_content', text: afterText });
-        newGeminiMessageBuffer = afterText;
+
+      contentBufferRef.current = newGeminiMessageBuffer;
+
+      // Throttle UI updates to 100ms to reduce rendering overhead in Termux
+      const now = Date.now();
+      if (now - lastContentUpdateTimeRef.current > 100) {
+        flushContentBuffer(userMessageTimestamp);
+        newGeminiMessageBuffer = contentBufferRef.current;
       }
+
       return newGeminiMessageBuffer;
     },
-    [addItem, pendingHistoryItemRef, setPendingHistoryItem],
+    [addItem, pendingHistoryItemRef, setPendingHistoryItem, flushContentBuffer],
   );
 
   const handleUserCancelledEvent = useCallback(
@@ -1160,6 +1171,10 @@ export const useGeminiStream = (
           }
         }
       }
+
+      // Final flush of any pending content
+      flushContentBuffer(userMessageTimestamp);
+
       if (toolCallRequests.length > 0) {
         if (pendingHistoryItemRef.current) {
           addItem(pendingHistoryItemRef.current, userMessageTimestamp);
@@ -1185,6 +1200,7 @@ export const useGeminiStream = (
       addItem,
       pendingHistoryItemRef,
       setPendingHistoryItem,
+      flushContentBuffer,
     ],
   );
   const submitQuery = useCallback(
