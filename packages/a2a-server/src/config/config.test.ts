@@ -11,6 +11,11 @@ import type { Settings } from './settings.js';
 import {
   type ExtensionLoader,
   FileDiscoveryService,
+  getCodeAssistServer,
+  Config,
+  ExperimentFlags,
+  fetchAdminControlsOnce,
+  type FetchAdminControlsResponse,
 } from '@google/gemini-cli-core';
 
 // Mock dependencies
@@ -19,11 +24,23 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
-    Config: vi.fn().mockImplementation((params) => ({
-      initialize: vi.fn(),
-      refreshAuth: vi.fn(),
-      ...params, // Expose params for assertion
-    })),
+    Config: vi.fn().mockImplementation((params) => {
+      const mockConfig = {
+        ...params,
+        initialize: vi.fn(),
+        refreshAuth: vi.fn(),
+        getExperiments: vi.fn().mockReturnValue({
+          flags: {
+            [actual.ExperimentFlags.ENABLE_ADMIN_CONTROLS]: {
+              boolValue: false,
+            },
+          },
+        }),
+        getRemoteAdminSettings: vi.fn(),
+        setRemoteAdminSettings: vi.fn(),
+      };
+      return mockConfig;
+    }),
     loadServerHierarchicalMemory: vi
       .fn()
       .mockResolvedValue({ memoryContent: '', fileCount: 0, filePaths: [] }),
@@ -31,6 +48,11 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       flush: vi.fn(),
     },
     FileDiscoveryService: vi.fn(),
+    getCodeAssistServer: vi.fn(),
+    fetchAdminControlsOnce: vi.fn(),
+    coreEvents: {
+      emitAdminSettingsChanged: vi.fn(),
+    },
   };
 });
 
@@ -54,6 +76,121 @@ describe('loadConfig', () => {
   afterEach(() => {
     delete process.env['CUSTOM_IGNORE_FILE_PATHS'];
     delete process.env['GEMINI_API_KEY'];
+  });
+
+  describe('admin settings overrides', () => {
+    it('should not fetch admin controls if experiment is disabled', async () => {
+      await loadConfig(mockSettings, mockExtensionLoader, taskId);
+      expect(fetchAdminControlsOnce).not.toHaveBeenCalled();
+    });
+
+    describe('when admin controls experiment is enabled', () => {
+      beforeEach(() => {
+        // We need to cast to any here to modify the mock implementation
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (Config as any).mockImplementation((params: unknown) => {
+          const mockConfig = {
+            ...(params as object),
+            initialize: vi.fn(),
+            refreshAuth: vi.fn(),
+            getExperiments: vi.fn().mockReturnValue({
+              flags: {
+                [ExperimentFlags.ENABLE_ADMIN_CONTROLS]: {
+                  boolValue: true,
+                },
+              },
+            }),
+            getRemoteAdminSettings: vi.fn().mockReturnValue({}),
+            setRemoteAdminSettings: vi.fn(),
+          };
+          return mockConfig;
+        });
+      });
+
+      it('should fetch admin controls and apply them', async () => {
+        const mockAdminSettings: FetchAdminControlsResponse = {
+          mcpSetting: {
+            mcpEnabled: false,
+          },
+          cliFeatureSetting: {
+            extensionsSetting: {
+              extensionsEnabled: false,
+            },
+          },
+          strictModeDisabled: false,
+        };
+        vi.mocked(fetchAdminControlsOnce).mockResolvedValue(mockAdminSettings);
+
+        await loadConfig(mockSettings, mockExtensionLoader, taskId);
+
+        expect(Config).toHaveBeenCalledWith(
+          expect.objectContaining({
+            disableYoloMode: !mockAdminSettings.strictModeDisabled,
+            mcpEnabled: mockAdminSettings.mcpSetting?.mcpEnabled,
+            extensionsEnabled:
+              mockAdminSettings.cliFeatureSetting?.extensionsSetting
+                ?.extensionsEnabled,
+          }),
+        );
+      });
+
+      it('should treat unset admin settings as false when admin settings are passed', async () => {
+        const mockAdminSettings: FetchAdminControlsResponse = {
+          mcpSetting: {
+            mcpEnabled: true,
+          },
+        };
+        vi.mocked(fetchAdminControlsOnce).mockResolvedValue(mockAdminSettings);
+
+        await loadConfig(mockSettings, mockExtensionLoader, taskId);
+
+        expect(Config).toHaveBeenCalledWith(
+          expect.objectContaining({
+            disableYoloMode: !false,
+            mcpEnabled: mockAdminSettings.mcpSetting?.mcpEnabled,
+            extensionsEnabled: false,
+          }),
+        );
+      });
+
+      it('should not pass default unset admin settings when no admin settings are present', async () => {
+        const mockAdminSettings: FetchAdminControlsResponse = {};
+        vi.mocked(fetchAdminControlsOnce).mockResolvedValue(mockAdminSettings);
+
+        await loadConfig(mockSettings, mockExtensionLoader, taskId);
+
+        expect(Config).toHaveBeenCalledWith(expect.objectContaining({}));
+      });
+
+      it('should fetch admin controls using the code assist server when available', async () => {
+        const mockAdminSettings: FetchAdminControlsResponse = {
+          mcpSetting: {
+            mcpEnabled: true,
+          },
+          strictModeDisabled: true,
+        };
+        const mockCodeAssistServer = { projectId: 'test-project' };
+        vi.mocked(getCodeAssistServer).mockReturnValue(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          mockCodeAssistServer as any,
+        );
+        vi.mocked(fetchAdminControlsOnce).mockResolvedValue(mockAdminSettings);
+
+        await loadConfig(mockSettings, mockExtensionLoader, taskId);
+
+        expect(fetchAdminControlsOnce).toHaveBeenCalledWith(
+          mockCodeAssistServer,
+          true,
+        );
+        expect(Config).toHaveBeenCalledWith(
+          expect.objectContaining({
+            disableYoloMode: !mockAdminSettings.strictModeDisabled,
+            mcpEnabled: mockAdminSettings.mcpSetting?.mcpEnabled,
+            extensionsEnabled: false,
+          }),
+        );
+      });
+    });
   });
 
   it('should set customIgnoreFilePaths when CUSTOM_IGNORE_FILE_PATHS env var is present', async () => {
