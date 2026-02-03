@@ -1,5 +1,25 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`AskUserDialog > Choice question placeholder > uses default placeholder when not provided 1`] = `
+"Select your preferred language:
+
+  1.  TypeScript
+  2.  JavaScript
+● 3.  Enter a custom value
+
+Enter to submit · Esc to cancel"
+`;
+
+exports[`AskUserDialog > Choice question placeholder > uses placeholder for "Other" option when provided 1`] = `
+"Select your preferred language:
+
+  1.  TypeScript
+  2.  JavaScript
+● 3.  Type another language...
+
+Enter to submit · Esc to cancel"
+`;
+
 exports[`AskUserDialog > Scroll Arrows (useAlternateBuffer: false) > shows scroll arrows correctly when useAlternateBuffer is false 1`] = `
 "Choose an option
 
