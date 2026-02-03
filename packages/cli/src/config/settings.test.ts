@@ -29,10 +29,11 @@ vi.mock('./settings.js', async (importActual) => {
 });
 
 // Mock trustedFolders
+import * as trustedFolders from './trustedFolders.js';
 vi.mock('./trustedFolders.js', () => ({
-  isWorkspaceTrusted: vi
-    .fn()
-    .mockReturnValue({ isTrusted: true, source: 'file' }),
+  isWorkspaceTrusted: vi.fn(),
+  isFolderTrustEnabled: vi.fn(),
+  loadTrustedFolders: vi.fn(),
 }));
 
 vi.mock('./settingsSchema.js', async (importOriginal) => {
@@ -152,7 +153,7 @@ describe('Settings Loading and Merging', () => {
     (mockFsExistsSync as Mock).mockReturnValue(false);
     (fs.readFileSync as Mock).mockReturnValue('{}'); // Return valid empty JSON
     (mockFsMkdirSync as Mock).mockImplementation(() => undefined);
-    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+    vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
       isTrusted: true,
       source: 'file',
     });
@@ -1636,7 +1637,7 @@ describe('Settings Loading and Merging', () => {
     });
 
     it('should NOT merge workspace settings when workspace is not trusted', () => {
-      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
         isTrusted: false,
         source: 'file',
       });
@@ -1667,24 +1668,61 @@ describe('Settings Loading and Merging', () => {
       expect(settings.merged.context?.fileName).toBe('USER.md'); // User setting
       expect(settings.merged.ui?.theme).toBe('dark'); // User setting
     });
+
+    it('should NOT merge workspace settings when workspace trust is undefined', () => {
+      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
+        isTrusted: undefined,
+        source: undefined,
+      });
+      (mockFsExistsSync as Mock).mockReturnValue(true);
+      const userSettingsContent = {
+        ui: { theme: 'dark' },
+        tools: { sandbox: false },
+        context: { fileName: 'USER.md' },
+      };
+      const workspaceSettingsContent = {
+        tools: { sandbox: true },
+        context: { fileName: 'WORKSPACE.md' },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          if (p === MOCK_WORKSPACE_SETTINGS_PATH)
+            return JSON.stringify(workspaceSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      expect(settings.merged.tools?.sandbox).toBe(false); // User setting
+      expect(settings.merged.context?.fileName).toBe('USER.md'); // User setting
+    });
   });
 
   describe('loadEnvironment', () => {
     function setup({
       isFolderTrustEnabled = true,
-      isWorkspaceTrustedValue = true,
+      isWorkspaceTrustedValue = true as boolean | undefined,
     }) {
-      delete process.env['TESTTEST']; // reset
       delete process.env['GEMINI_API_KEY']; // reset
-      const geminiEnvPath = path.resolve(path.join(GEMINI_DIR, '.env'));
+      delete process.env['TESTTEST']; // reset
+      const geminiEnvPath = path.resolve(
+        path.join(MOCK_WORKSPACE_DIR, GEMINI_DIR, '.env'),
+      );
 
-      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
         isTrusted: isWorkspaceTrustedValue,
         source: 'file',
       });
-      (mockFsExistsSync as Mock).mockImplementation((p: fs.PathLike) =>
-        [USER_SETTINGS_PATH, geminiEnvPath].includes(p.toString()),
-      );
+      (mockFsExistsSync as Mock).mockImplementation((p: fs.PathLike) => {
+        const normalizedP = path.resolve(p.toString());
+        return [path.resolve(USER_SETTINGS_PATH), geminiEnvPath].includes(
+          normalizedP,
+        );
+      });
       const userSettingsContent: Settings = {
         ui: {
           theme: 'dark',
@@ -1700,9 +1738,10 @@ describe('Settings Loading and Merging', () => {
       };
       (fs.readFileSync as Mock).mockImplementation(
         (p: fs.PathOrFileDescriptor) => {
-          if (p === USER_SETTINGS_PATH)
+          const normalizedP = path.resolve(p.toString());
+          if (normalizedP === path.resolve(USER_SETTINGS_PATH))
             return JSON.stringify(userSettingsContent);
-          if (p === geminiEnvPath)
+          if (normalizedP === geminiEnvPath)
             return 'TESTTEST=1234\nGEMINI_API_KEY=test-key';
           return '{}';
         },
@@ -1711,7 +1750,10 @@ describe('Settings Loading and Merging', () => {
 
     it('sets environment variables from .env files', () => {
       setup({ isFolderTrustEnabled: false, isWorkspaceTrustedValue: true });
-      loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
+      const settings = {
+        security: { folderTrust: { enabled: false } },
+      } as Settings;
+      loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
 
       expect(process.env['TESTTEST']).toEqual('1234');
       expect(process.env['GEMINI_API_KEY']).toEqual('test-key');
@@ -1719,7 +1761,24 @@ describe('Settings Loading and Merging', () => {
 
     it('does not load env files from untrusted spaces', () => {
       setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: false });
-      loadEnvironment(loadSettings(MOCK_WORKSPACE_DIR).merged);
+      const settings = {
+        security: { folderTrust: { enabled: true } },
+      } as Settings;
+      loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
+
+      expect(process.env['TESTTEST']).not.toEqual('1234');
+    });
+
+    it('does not load env files when trust is undefined', () => {
+      delete process.env['TESTTEST'];
+      // isWorkspaceTrusted returns {isTrusted: undefined} for matched rules with no trust value, or no matching rules.
+      setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: undefined });
+      const settings = {
+        security: { folderTrust: { enabled: true } },
+      } as Settings;
+
+      const mockTrustFn = vi.fn().mockReturnValue({ isTrusted: undefined });
+      loadEnvironment(settings, MOCK_WORKSPACE_DIR, mockTrustFn);
 
       expect(process.env['TESTTEST']).not.toEqual('1234');
       expect(process.env['GEMINI_API_KEY']).not.toEqual('test-key');
@@ -1729,7 +1788,7 @@ describe('Settings Loading and Merging', () => {
       setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: false });
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
       settings.merged.tools.sandbox = true;
-      loadEnvironment(settings.merged);
+      loadEnvironment(settings.merged, MOCK_WORKSPACE_DIR);
 
       // GEMINI_API_KEY is in the whitelist, so it should be loaded.
       expect(process.env['GEMINI_API_KEY']).toEqual('test-key');
@@ -1745,7 +1804,7 @@ describe('Settings Loading and Merging', () => {
         const settings = loadSettings(MOCK_WORKSPACE_DIR);
         // Ensure sandbox is NOT in settings to test argv sniffing
         settings.merged.tools.sandbox = undefined;
-        loadEnvironment(settings.merged);
+        loadEnvironment(settings.merged, MOCK_WORKSPACE_DIR);
 
         expect(process.env['GEMINI_API_KEY']).toEqual('test-key');
         expect(process.env['TESTTEST']).not.toEqual('1234');
@@ -1765,7 +1824,7 @@ describe('Settings Loading and Merging', () => {
       mockFsExistsSync.mockReturnValue(true);
       mockFsReadFileSync = vi.mocked(fs.readFileSync);
       mockFsReadFileSync.mockReturnValue('{}');
-      vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
         isTrusted: true,
         source: undefined,
       });
@@ -2479,6 +2538,7 @@ describe('Settings Loading and Merging', () => {
 
         loadEnvironment(
           createMockSettings({ tools: { sandbox: false } }).merged,
+          MOCK_WORKSPACE_DIR,
         );
 
         // If sandboxed and untrusted, FOO should NOT be loaded, but GEMINI_API_KEY should be.
@@ -2497,6 +2557,7 @@ describe('Settings Loading and Merging', () => {
 
         loadEnvironment(
           createMockSettings({ tools: { sandbox: false } }).merged,
+          MOCK_WORKSPACE_DIR,
         );
 
         expect(process.env['GEMINI_API_KEY']).toBe('secret');
@@ -2515,6 +2576,7 @@ describe('Settings Loading and Merging', () => {
 
         loadEnvironment(
           createMockSettings({ tools: { sandbox: false } }).merged,
+          MOCK_WORKSPACE_DIR,
         );
 
         expect(process.env['GEMINI_API_KEY']).toBeUndefined();
@@ -2533,6 +2595,7 @@ describe('Settings Loading and Merging', () => {
 
         loadEnvironment(
           createMockSettings({ tools: { sandbox: false } }).merged,
+          MOCK_WORKSPACE_DIR,
         );
 
         expect(process.env['GEMINI_API_KEY']).toBeUndefined();
@@ -2557,6 +2620,7 @@ GOOGLE_API_KEY=another-secret
 
         loadEnvironment(
           createMockSettings({ tools: { sandbox: false } }).merged,
+          MOCK_WORKSPACE_DIR,
         );
 
         expect(process.env['GEMINI_API_KEY']).toBe('secret-key');
@@ -2581,6 +2645,7 @@ GOOGLE_API_KEY=another-secret
 
         loadEnvironment(
           createMockSettings({ tools: { sandbox: false } }).merged,
+          MOCK_WORKSPACE_DIR,
         );
 
         // sanitizeEnvVar: value.replace(/[^a-zA-Z0-9\-_./]/g, '')
@@ -2604,6 +2669,7 @@ GOOGLE_API_KEY=another-secret
 
         loadEnvironment(
           createMockSettings({ tools: { sandbox: false } }).merged,
+          MOCK_WORKSPACE_DIR,
         );
 
         expect(process.env['GEMINI_API_KEY']).toBe(
@@ -2623,6 +2689,7 @@ GOOGLE_API_KEY=another-secret
 
         loadEnvironment(
           createMockSettings({ tools: { sandbox: false } }).merged,
+          MOCK_WORKSPACE_DIR,
         );
 
         // Trusted source, no sanitization
@@ -2645,6 +2712,7 @@ MALICIOUS_VAR=allowed-because-trusted
 
         loadEnvironment(
           createMockSettings({ tools: { sandbox: false } }).merged,
+          MOCK_WORKSPACE_DIR,
         );
 
         expect(process.env['GEMINI_API_KEY']).toBe('un-sanitized;key!');
@@ -2673,6 +2741,7 @@ MALICIOUS_VAR=allowed-because-trusted
 
         loadEnvironment(
           createMockSettings({ tools: { sandbox: false } }).merged,
+          MOCK_WORKSPACE_DIR,
         );
 
         expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe('cloudshell-gca');
@@ -2692,6 +2761,7 @@ MALICIOUS_VAR=allowed-because-trusted
 
         loadEnvironment(
           createMockSettings({ tools: { sandbox: false } }).merged,
+          MOCK_WORKSPACE_DIR,
         );
 
         expect(process.env['GOOGLE_CLOUD_PROJECT']).toBe(

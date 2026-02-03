@@ -334,6 +334,19 @@ describe('isWorkspaceTrusted', () => {
     });
   });
 
+  it('should use workspaceDir instead of process.cwd() when provided', () => {
+    mockCwd = '/home/user/untrusted';
+    const workspaceDir = '/home/user/projectA';
+    mockRules['/home/user/projectA'] = TrustLevel.TRUST_FOLDER;
+    mockRules['/home/user/untrusted'] = TrustLevel.DO_NOT_TRUST;
+
+    // process.cwd() is untrusted, but workspaceDir is trusted
+    expect(isWorkspaceTrusted(mockSettings, workspaceDir)).toEqual({
+      isTrusted: true,
+      source: 'file',
+    });
+  });
+
   it('should handle path normalization', () => {
     mockCwd = '/home/user/projectA';
     mockRules[`/home/user/../user/${path.basename('/home/user/projectA')}`] =
@@ -528,7 +541,7 @@ describe('Verification: Auth and Trust Interaction', () => {
     const settings = createMockSettings({
       security: { folderTrust: { enabled: true } },
     });
-    loadEnvironment(settings.merged);
+    loadEnvironment(settings.merged, mockCwd);
 
     // 3. Verify env var NOT loaded
     expect(process.env['GEMINI_API_KEY']).toBe('');
