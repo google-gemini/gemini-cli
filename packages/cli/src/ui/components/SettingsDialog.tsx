@@ -232,7 +232,12 @@ export function SettingsDialog({
 
     return settingKeys.map((key) => {
       const definition = getSettingDefinition(key);
-      const type = definition?.type ?? 'string';
+      const schemaType = definition?.type ?? 'string';
+      // String settings with options behave like enums in the UI
+      // (cycle on Enter, show labels) but are stored as plain strings
+      // so the globalPendingChanges useEffect handles them correctly.
+      const type =
+        schemaType === 'string' && definition?.options ? 'enum' : schemaType;
 
       // Get the display value (with * indicator if modified)
       const displayValue = getDisplayValue(
@@ -278,7 +283,7 @@ export function SettingsDialog({
   const handleItemToggle = useCallback(
     (key: string, _item: SettingsDialogItem) => {
       const definition = getSettingDefinition(key);
-      if (!TOGGLE_TYPES.has(definition?.type)) {
+      if (!TOGGLE_TYPES.has(definition?.type) && !definition?.options) {
         return;
       }
       const currentValue = getEffectiveValue(key, pendingSettings, {});
@@ -288,7 +293,7 @@ export function SettingsDialog({
         setPendingSettings((prev) =>
           setPendingSettingValue(key, newValue as boolean, prev),
         );
-      } else if (definition?.type === 'enum' && definition.options) {
+      } else if (definition?.options) {
         const options = definition.options;
         const currentIndex = options?.findIndex(
           (opt) => opt.value === currentValue,
