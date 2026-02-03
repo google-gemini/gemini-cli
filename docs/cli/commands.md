@@ -204,6 +204,11 @@ Slash commands provide meta-level control over the CLI itself.
 - [**`/model`**](./model.md)
   - **Description:** Opens a dialog to choose your Gemini model.
 
+- **`/plan`**
+  - **Description:** Switch to Plan Mode (read-only) and view the current plan
+    if one has been generated.
+  - **Note:** This feature requires the `experimental.plan` setting to be
+    enabled in your configuration.
 - **`/policies`**
   - **Description:** Manage policies.
   - **Sub-commands:**
@@ -313,20 +318,6 @@ Slash commands provide meta-level control over the CLI itself.
         tool's name with its full description as provided to the model.
     - **`nodesc`** or **`nodescriptions`**:
       - **Description:** Hide tool descriptions, showing only the tool names.
-
-- **`/plan`**
-  - **Description:** Switch to Plan Mode (read-only) and view the current plan
-    if one has been generated.
-  - **Note:** This feature requires the `experimental.plan` setting to be
-    enabled in your configuration.
-
-- **`/privacy`**
-  - **Description:** Display the Privacy Notice and allow users to select
-    whether they consent to the collection of their data for service improvement
-    purposes.
-
-- **`/quit`** (or **`/exit`**)
-  - **Description:** Exit Gemini CLI.
 
 - **`/vim`**
   - **Description:** Toggle vim mode on or off. When vim mode is enabled, the
