@@ -254,6 +254,7 @@ describe('RewindViewer', () => {
       {
         description: 'removes reference markers',
         prompt: `some command @file\n--- Content from referenced files ---\nContent from file:\nblah blah\n--- End of content ---`,
+        expected: 'some command @file',
       },
       {
         description: 'strips expanded MCP resource content',
@@ -263,10 +264,23 @@ describe('RewindViewer', () => {
           '\nContent from @server3:mcp://demo-resource:\n' +
           'This is the content of the demo resource.\n' +
           `--- End of content ---`,
+        expected: 'read @server3:mcp://demo-resource hello',
       },
-    ])('$description', async ({ prompt }) => {
+      {
+        description: 'uses displayContent if present and does not strip',
+        prompt: `raw content with markers\n--- Content from referenced files ---\nblah\n--- End of content ---`,
+        displayContent: 'clean display content',
+        expected: 'clean display content',
+      },
+    ])('$description', async ({ prompt, displayContent, expected }) => {
       const conversation = createConversation([
-        { type: 'user', content: prompt, id: '1', timestamp: '1' },
+        {
+          type: 'user',
+          content: prompt,
+          displayContent,
+          id: '1',
+          timestamp: '1',
+        },
       ]);
       const onRewind = vi.fn();
       const { lastFrame, stdin } = renderWithProviders(
@@ -288,6 +302,15 @@ describe('RewindViewer', () => {
       // Wait for confirmation dialog
       await waitFor(() => {
         expect(lastFrame()).toContain('Confirm Rewind');
+      });
+
+      // Confirm
+      act(() => {
+        stdin.write('\r');
+      });
+
+      await waitFor(() => {
+        expect(onRewind).toHaveBeenCalledWith('1', expected, expect.anything());
       });
     });
   });

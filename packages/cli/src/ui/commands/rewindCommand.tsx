@@ -14,14 +14,14 @@ import { type HistoryItem } from '../types.js';
 import { convertSessionToHistoryFormats } from '../hooks/useSessionBrowser.js';
 import { revertFileChanges } from '../utils/rewindFileOps.js';
 import { RewindOutcome } from '../components/RewindConfirmation.js';
-import { checkExhaustive } from '../../utils/checks.js';
-
 import type { Content } from '@google/genai';
-import type {
-  ChatRecordingService,
-  GeminiClient,
+import {
+  checkExhaustive,
+  coreEvents,
+  debugLogger,
+  type ChatRecordingService,
+  type GeminiClient,
 } from '@google/gemini-cli-core';
-import { coreEvents, debugLogger } from '@google/gemini-cli-core';
 
 /**
  * Helper function to handle the core logic of rewinding a conversation.

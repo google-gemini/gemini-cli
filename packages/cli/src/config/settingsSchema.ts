@@ -351,6 +351,26 @@ const SETTINGS_SCHEMA = {
           'The color theme for the UI. See the CLI themes guide for available options.',
         showInDialog: false,
       },
+      autoThemeSwitching: {
+        type: 'boolean',
+        label: 'Auto Theme Switching',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Automatically switch between default light and dark themes based on terminal background color.',
+        showInDialog: true,
+      },
+      terminalBackgroundPollingInterval: {
+        type: 'number',
+        label: 'Terminal Background Polling Interval',
+        category: 'UI',
+        requiresRestart: false,
+        default: 60,
+        description:
+          'Interval in seconds to poll the terminal background color.',
+        showInDialog: true,
+      },
       customThemes: {
         type: 'object',
         label: 'Custom Themes',
@@ -739,6 +759,16 @@ const SETTINGS_SCHEMA = {
           'The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).',
         showInDialog: true,
       },
+      disableLoopDetection: {
+        type: 'boolean',
+        label: 'Disable Loop Detection',
+        category: 'Model',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Disable automatic detection and prevention of infinite loops.',
+        showInDialog: true,
+      },
       skipNextSpeakerCheck: {
         type: 'boolean',
         label: 'Skip Next Speaker Check',
@@ -1041,17 +1071,6 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
-      autoAccept: {
-        type: 'boolean',
-        label: 'Auto Accept',
-        category: 'Tools',
-        requiresRestart: false,
-        default: false,
-        description: oneLine`
-          Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).
-        `,
-        showInDialog: true,
-      },
       approvalMode: {
         type: 'enum',
         label: 'Approval Mode',
@@ -1179,16 +1198,6 @@ const SETTINGS_SCHEMA = {
         `,
         showInDialog: true,
       },
-      enableHooks: {
-        type: 'boolean',
-        label: 'Enable Hooks System (Experimental)',
-        category: 'Advanced',
-        requiresRestart: true,
-        default: true,
-        description:
-          'Enables the hooks system experiment. When disabled, the hooks system is completely deactivated regardless of other settings.',
-        showInDialog: false,
-      },
     },
   },
 
@@ -1277,6 +1286,17 @@ const SETTINGS_SCHEMA = {
         default: false,
         description: 'Blocks installing and loading extensions from Git.',
         showInDialog: true,
+      },
+      allowedExtensions: {
+        type: 'array',
+        label: 'Extension Source Regex Allowlist',
+        category: 'Security',
+        requiresRestart: true,
+        default: [] as string[],
+        description:
+          'List of Regex patterns for allowed extensions. If nonempty, only extensions that match the patterns in this list are allowed. Overrides the blockGitExtensions setting.',
+        showInDialog: true,
+        items: { type: 'string' },
       },
       folderTrust: {
         type: 'object',
