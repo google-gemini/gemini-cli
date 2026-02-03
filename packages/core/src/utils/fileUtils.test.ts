@@ -34,6 +34,8 @@ import {
   readWasmBinaryFromDisk,
   saveTruncatedToolOutput,
   formatTruncatedToolOutput,
+  getRealPath,
+  isEmpty,
 } from './fileUtils.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 
@@ -170,6 +172,47 @@ describe('fileUtils', () => {
         expect(isWithinRoot(testPath, root || defaultRoot)).toBe(expected);
       },
     );
+  });
+
+  describe('getRealPath', () => {
+    it('should resolve a real path for an existing file', () => {
+      const testFile = path.join(tempRootDir, 'real.txt');
+      actualNodeFs.writeFileSync(testFile, 'content');
+      expect(getRealPath(testFile)).toBe(actualNodeFs.realpathSync(testFile));
+    });
+
+    it('should return absolute resolved path for a non-existent file', () => {
+      const ghostFile = path.join(tempRootDir, 'ghost.txt');
+      expect(getRealPath(ghostFile)).toBe(path.resolve(ghostFile));
+    });
+
+    it('should resolve symbolic links', () => {
+      const targetFile = path.join(tempRootDir, 'target.txt');
+      const linkFile = path.join(tempRootDir, 'link.txt');
+      actualNodeFs.writeFileSync(targetFile, 'content');
+      actualNodeFs.symlinkSync(targetFile, linkFile);
+
+      expect(getRealPath(linkFile)).toBe(actualNodeFs.realpathSync(targetFile));
+    });
+  });
+
+  describe('isEmpty', () => {
+    it('should return false for a non-empty file', async () => {
+      const testFile = path.join(tempRootDir, 'full.txt');
+      actualNodeFs.writeFileSync(testFile, 'some content');
+      expect(await isEmpty(testFile)).toBe(false);
+    });
+
+    it('should return true for an empty file', async () => {
+      const testFile = path.join(tempRootDir, 'empty.txt');
+      actualNodeFs.writeFileSync(testFile, '   ');
+      expect(await isEmpty(testFile)).toBe(true);
+    });
+
+    it('should return true for a non-existent file (defensive)', async () => {
+      const testFile = path.join(tempRootDir, 'ghost.txt');
+      expect(await isEmpty(testFile)).toBe(true);
+    });
   });
 
   describe('fileExists', () => {
