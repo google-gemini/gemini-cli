@@ -14,9 +14,13 @@ import {
   type ToolCallConfirmationDetails,
   type Config,
   type ToolConfirmationPayload,
+  type ApprovalScope,
   ToolConfirmationOutcome,
   hasRedirection,
   debugLogger,
+  generateScopeOptions,
+  getRecommendedScope,
+  shouldPersist,
 } from '@google/gemini-cli-core';
 import type { RadioSelectItem } from '../shared/RadioButtonSelect.js';
 import { useToolActions } from '../../contexts/ToolActionsContext.js';
@@ -94,13 +98,37 @@ export const ToolConfirmationMessage: React.FC<
     { isActive: isFocused },
   );
 
+  // For exec type, we use string values that encode scope information
+  // Format: "scope:<scope-id>" (e.g., "scope:command-only")
+  type ExecOptionValue = ToolConfirmationOutcome | `scope:${ApprovalScope}`;
+
   const handleSelect = useCallback(
-    (item: ToolConfirmationOutcome) => handleConfirm(item),
-    [handleConfirm],
+    (item: ToolConfirmationOutcome | string) => {
+      // Check if this is a scope-encoded option
+      if (typeof item === 'string' && item.startsWith('scope:')) {
+        const scope = item.replace('scope:', '') as ApprovalScope;
+
+        // Determine persistence based on command intent
+        const shouldPersistApproval =
+          confirmationDetails.type === 'exec'
+            ? shouldPersist(confirmationDetails.rootCommand)
+            : false;
+
+        handleConfirm(ToolConfirmationOutcome.ProceedAlways, {
+          scope,
+          persist: shouldPersistApproval,
+        });
+        return;
+      }
+
+      // Regular outcome (Allow once, Cancel, etc.)
+      handleConfirm(item as ToolConfirmationOutcome);
+    },
+    [handleConfirm, confirmationDetails],
   );
 
   const getOptions = useCallback(() => {
-    const options: Array<RadioSelectItem<ToolConfirmationOutcome>> = [];
+    const options: Array<RadioSelectItem<ExecOptionValue>> = [];
 
     if (confirmationDetails.type === 'edit') {
       if (!confirmationDetails.isModifying) {
@@ -140,25 +168,40 @@ export const ToolConfirmationMessage: React.FC<
         });
       }
     } else if (confirmationDetails.type === 'exec') {
+      // Always offer "Allow once"
       options.push({
         label: 'Allow once',
         value: ToolConfirmationOutcome.ProceedOnce,
         key: 'Allow once',
       });
+
+      // In trusted folders, offer scope-based options
       if (isTrustedFolder) {
-        options.push({
-          label: `Allow for this session`,
-          value: ToolConfirmationOutcome.ProceedAlways,
-          key: `Allow for this session`,
-        });
-        if (allowPermanentApproval) {
+        const command = confirmationDetails.rootCommand;
+        const scopeOptions = generateScopeOptions(
+          confirmationDetails.command,
+          command,
+        );
+        const recommendedScope = getRecommendedScope(command);
+
+        // Add scope-based options (skipping 'exact' which is like "Allow once")
+        for (const scopeOpt of scopeOptions) {
+          if (scopeOpt.id === 'exact') continue; // Skip exact, "Allow once" covers it
+
+          const isRecommended = scopeOpt.id === recommendedScope;
+          const label = isRecommended
+            ? `${scopeOpt.label} (recommended)`
+            : scopeOpt.label;
+
+          // Use scope-encoded value: "scope:command-only"
           options.push({
-            label: `Allow for all future sessions`,
-            value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
-            key: `Allow for all future sessions`,
+            label,
+            value: `scope:${scopeOpt.id}` as ExecOptionValue,
+            key: `scope:${scopeOpt.id}`,
           });
         }
       }
+
       options.push({
         label: 'No, suggest changes (esc)',
         value: ToolConfirmationOutcome.Cancel,
@@ -367,6 +410,19 @@ export const ToolConfirmationMessage: React.FC<
         );
       }
 
+      // Show persistence hint based on command classification
+      const willPersist =
+        isTrustedFolder && shouldPersist(executionProps.rootCommand);
+      const persistenceHint = isTrustedFolder ? (
+        <Box marginTop={1}>
+          <Text color={theme.border.default} dimColor>
+            {willPersist
+              ? '💡 Read-only command - will be saved for future sessions'
+              : '💡 Will apply for this session only'}
+          </Text>
+        </Box>
+      ) : null;
+
       bodyContent = (
         <Box flexDirection="column">
           <MaxSizedBox
@@ -382,6 +438,7 @@ export const ToolConfirmationMessage: React.FC<
             </Box>
           </MaxSizedBox>
           {warnings}
+          {persistenceHint}
         </Box>
       );
     } else if (confirmationDetails.type === 'info') {
@@ -432,6 +489,7 @@ export const ToolConfirmationMessage: React.FC<
     availableBodyContentHeight,
     terminalWidth,
     handleConfirm,
+    isTrustedFolder,
   ]);
 
   if (confirmationDetails.type === 'edit') {

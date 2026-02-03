@@ -75,6 +75,8 @@ export interface ToolInvocation<
 export interface PolicyUpdateOptions {
   commandPrefix?: string | string[];
   mcpName?: string;
+  /** Regex pattern to match against command arguments (for broader scope approval) */
+  argsPattern?: string;
 }
 
 /**
@@ -711,10 +713,36 @@ export interface ToolExitPlanModeConfirmationPayload {
   feedback?: string;
 }
 
+/**
+ * Scope options for shell command approval.
+ * - 'exact': Only this exact command (current behavior)
+ * - 'command-flags': Command with these flags, any arguments (e.g., "ls -la *")
+ * - 'command-only': Command with any flags/arguments (e.g., "ls *")
+ * - 'custom': User-provided regex pattern
+ */
+export type ApprovalScope =
+  | 'exact'
+  | 'command-flags'
+  | 'command-only'
+  | 'custom';
+
+/**
+ * Payload for scope-based shell command approval.
+ */
+export interface ToolScopeConfirmationPayload {
+  /** The selected approval scope */
+  scope: ApprovalScope;
+  /** Custom regex pattern (only used when scope is 'custom') */
+  customPattern?: string;
+  /** Whether to persist this approval (auto-decided based on command intent, can be overridden) */
+  persist?: boolean;
+}
+
 export type ToolConfirmationPayload =
   | ToolEditConfirmationPayload
   | ToolAskUserConfirmationPayload
-  | ToolExitPlanModeConfirmationPayload;
+  | ToolExitPlanModeConfirmationPayload
+  | ToolScopeConfirmationPayload;
 
 export interface ToolExecuteConfirmationDetails {
   type: 'exec';

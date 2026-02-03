@@ -21,10 +21,16 @@ import {
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
   type PolicyUpdateOptions,
+  type ToolConfirmationPayload,
+  type ToolScopeConfirmationPayload,
 } from '../tools/tools.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { EDIT_TOOL_NAMES } from '../tools/tool-names.js';
 import type { ValidatingToolCall } from './types.js';
+import {
+  extractBinary,
+  shouldPersist as shouldPersistCommand,
+} from '../policy/scope-generator.js';
 
 export const PLAN_MODE_DENIAL_MESSAGE =
   'You are in Plan Mode - adjust your prompt to only use read and search tools.';
@@ -99,6 +105,7 @@ export async function updatePolicy(
   outcome: ToolConfirmationOutcome,
   confirmationDetails: SerializableConfirmationDetails | undefined,
   deps: { config: Config; messageBus: MessageBus },
+  payload?: ToolConfirmationPayload,
 ): Promise<void> {
   // Mode Transitions (AUTO_EDIT)
   if (isAutoEditTransition(tool, outcome)) {
@@ -123,6 +130,7 @@ export async function updatePolicy(
     outcome,
     confirmationDetails,
     deps.messageBus,
+    payload,
   );
 }
 
@@ -144,14 +152,37 @@ function isAutoEditTransition(
 }
 
 /**
+ * Type guard to check if payload contains scope information.
+ */
+function isScopePayload(
+  payload: ToolConfirmationPayload | undefined,
+): payload is ToolScopeConfirmationPayload {
+  return payload !== undefined && 'scope' in payload;
+}
+
+/**
+ * Escapes special regex characters in a string.
+ */
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * Handles policy updates for standard tools (Shell, Info, etc.), including
  * session-level and persistent approvals.
+ *
+ * Supports the new scope-based approval system:
+ * - 'exact': Only the exact command (current behavior)
+ * - 'command-flags': Command with same flags, any arguments
+ * - 'command-only': Command with any flags/arguments
+ * - 'custom': User-provided regex pattern
  */
 async function handleStandardPolicyUpdate(
   tool: AnyDeclarativeTool,
   outcome: ToolConfirmationOutcome,
   confirmationDetails: SerializableConfirmationDetails | undefined,
   messageBus: MessageBus,
+  payload?: ToolConfirmationPayload,
 ): Promise<void> {
   if (
     outcome === ToolConfirmationOutcome.ProceedAlways ||
@@ -160,13 +191,67 @@ async function handleStandardPolicyUpdate(
     const options: PolicyUpdateOptions = {};
 
     if (confirmationDetails?.type === 'exec') {
-      options.commandPrefix = confirmationDetails.rootCommands;
+      // Check if we have scope information from the new UI
+      if (isScopePayload(payload)) {
+        const { scope, customPattern } = payload;
+        const command = confirmationDetails.rootCommand;
+
+        switch (scope) {
+          case 'exact':
+            // Current behavior: use commandPrefix
+            options.commandPrefix = confirmationDetails.rootCommands;
+            break;
+
+          case 'command-flags':
+            // Same as exact for now (commandPrefix handles this)
+            options.commandPrefix = confirmationDetails.rootCommands;
+            break;
+
+          case 'command-only': {
+            // Allow the binary with any flags/arguments
+            const binary = extractBinary(command);
+            options.argsPattern = `^${escapeRegex(binary)}\\b`;
+            break;
+          }
+
+          case 'custom':
+            // User-provided pattern
+            if (customPattern) {
+              options.argsPattern = customPattern;
+            } else {
+              // Fallback to exact if no custom pattern
+              options.commandPrefix = confirmationDetails.rootCommands;
+            }
+            break;
+
+          default:
+            // Unknown scope, fallback to exact
+            options.commandPrefix = confirmationDetails.rootCommands;
+        }
+      } else {
+        // Legacy behavior: no scope payload, use commandPrefix
+        options.commandPrefix = confirmationDetails.rootCommands;
+      }
+    }
+
+    // Determine persistence
+    let persist = outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave;
+
+    // If using new scope system, auto-decide persistence based on command intent
+    if (isScopePayload(payload) && confirmationDetails?.type === 'exec') {
+      // payload.persist can override auto-decision
+      if (payload.persist !== undefined) {
+        persist = payload.persist;
+      } else if (outcome === ToolConfirmationOutcome.ProceedAlways) {
+        // Auto-decide based on command classification
+        persist = shouldPersistCommand(confirmationDetails.rootCommand);
+      }
     }
 
     await messageBus.publish({
       type: MessageBusType.UPDATE_POLICY,
       toolName: tool.name,
-      persist: outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,
+      persist,
       ...options,
     });
   }
