@@ -82,6 +82,10 @@ describe('Admin Controls', () => {
 
       expect(result).toEqual({
         strictModeDisabled: false,
+        cliFeatureSetting: {
+          extensionsSetting: { extensionsEnabled: false },
+          unmanagedCapabilitiesEnabled: false,
+        },
         mcpSetting: {
           mcpEnabled: true,
           mcpConfig,
@@ -100,7 +104,7 @@ describe('Admin Controls', () => {
       const result = sanitizeAdminSettings(input);
       expect(result.mcpSetting).toEqual({
         mcpEnabled: true,
-        mcpConfig: undefined,
+        mcpConfig: {},
       });
     });
 
@@ -123,7 +127,7 @@ describe('Admin Controls', () => {
       const result = sanitizeAdminSettings(input);
       expect(result.mcpSetting).toEqual({
         mcpEnabled: true,
-        mcpConfig: undefined,
+        mcpConfig: {},
       });
     });
 
@@ -368,9 +372,14 @@ describe('Admin Controls', () => {
       );
       expect(result).toEqual({
         strictModeDisabled: false,
-        cliFeatureSetting: undefined,
-        mcpSetting: undefined,
-        secureModeEnabled: undefined,
+        cliFeatureSetting: {
+          extensionsSetting: { extensionsEnabled: false },
+          unmanagedCapabilitiesEnabled: false,
+        },
+        mcpSetting: {
+          mcpEnabled: false,
+          mcpConfig: {},
+        },
       });
       expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(1);
     });
@@ -429,9 +438,14 @@ describe('Admin Controls', () => {
       );
       expect(result).toEqual({
         strictModeDisabled: false,
-        cliFeatureSetting: undefined,
-        mcpSetting: undefined,
-        secureModeEnabled: undefined,
+        cliFeatureSetting: {
+          extensionsSetting: { extensionsEnabled: false },
+          unmanagedCapabilitiesEnabled: false,
+        },
+        mcpSetting: {
+          mcpEnabled: false,
+          mcpConfig: {},
+        },
       });
       expect(
         (result as Record<string, unknown>)['unknownField'],
@@ -495,9 +509,14 @@ describe('Admin Controls', () => {
 
       expect(mockOnSettingsChanged).toHaveBeenCalledWith({
         strictModeDisabled: false,
-        cliFeatureSetting: undefined,
-        mcpSetting: undefined,
-        secureModeEnabled: undefined,
+        cliFeatureSetting: {
+          extensionsSetting: { extensionsEnabled: false },
+          unmanagedCapabilitiesEnabled: false,
+        },
+        mcpSetting: {
+          mcpEnabled: false,
+          mcpConfig: {},
+        },
       });
     });
 
@@ -552,6 +571,14 @@ describe('Admin Controls', () => {
       expect(mockServer.fetchAdminControls).toHaveBeenCalledTimes(3);
       expect(mockOnSettingsChanged).toHaveBeenCalledWith({
         strictModeDisabled: false,
+        cliFeatureSetting: {
+          extensionsSetting: { extensionsEnabled: false },
+          unmanagedCapabilitiesEnabled: false,
+        },
+        mcpSetting: {
+          mcpEnabled: false,
+          mcpConfig: {},
+        },
       });
     });
 
