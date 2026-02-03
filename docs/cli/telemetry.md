@@ -93,6 +93,38 @@ Environment variables can be used to override the settings in the file.
 `logPrompts`, `useCollector`), setting the corresponding environment variable to
 `true` or `1` will enable the feature. Any other value will disable it.
 
+### OTLP Headers
+
+The `otlpHeaders` setting allows you to send custom headers with OTLP telemetry
+requests. This is useful for authenticating with secured OTLP collectors that
+require API keys, bearer tokens, or other credentials.
+
+**Configuration precedence:** Headers are merged from multiple sources in the
+following order, with later sources overriding earlier ones for the same header
+key:
+
+1. `settings.json` (lowest precedence)
+2. `GEMINI_TELEMETRY_OTLP_HEADERS` environment variable
+3. `--telemetry-otlp-header` CLI flags (highest precedence)
+
+This allows you to set base headers in settings while overriding specific values
+via environment variables or CLI flags when needed.
+
+**Format options:**
+
+- **JSON format:** `{"Authorization": "Bearer token", "x-api-key": "abc123"}`
+- **Key=value pairs:** `Authorization=Bearer token,x-api-key=abc123`
+- **Environment variable reference:** Values can reference environment variables
+  using `$VAR_NAME` or `${VAR_NAME}` syntax.
+
+**Token expiry considerations:** OTLP headers are read once when the CLI starts.
+If your authentication tokens expire during a long-running session, you will
+need to restart the CLI to refresh them. For long-running sessions, consider:
+
+- Using non-expiring API keys when possible
+- Using service account credentials instead of short-lived tokens
+- Restarting the CLI periodically to refresh credentials
+
 For detailed information about all configuration options, see the
 [Configuration guide](../get-started/configuration.md).
 
