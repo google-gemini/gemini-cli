@@ -85,4 +85,71 @@ describe('TableRenderer', () => {
     expect(output).toContain('long cell');
     expect(output).toMatchSnapshot();
   });
+
+  it('wraps all long columns correctly', () => {
+    const headers = ['Col 1', 'Col 2'];
+    const rows = [
+      [
+        'This is a very long text that needs wrapping in column 1',
+        'This is also a very long text that needs wrapping in column 2',
+      ],
+    ];
+    const terminalWidth = 50;
+
+    const { lastFrame } = renderWithProviders(
+      <TableRenderer
+        headers={headers}
+        rows={rows}
+        terminalWidth={terminalWidth}
+      />,
+    );
+
+    const output = lastFrame();
+    expect(output).toContain('wrapping in');
+    expect(output).toMatchSnapshot();
+  });
+
+  it('wraps mixed long and short columns correctly', () => {
+    const headers = ['Short', 'Long'];
+    const rows = [
+      [
+        'Tiny',
+        'This is a very long text that definitely needs to wrap to the next line',
+      ],
+    ];
+    const terminalWidth = 40;
+
+    const { lastFrame } = renderWithProviders(
+      <TableRenderer
+        headers={headers}
+        rows={rows}
+        terminalWidth={terminalWidth}
+      />,
+    );
+
+    const output = lastFrame();
+    expect(output).toContain('Tiny');
+    expect(output).toContain('definitely needs');
+    expect(output).toMatchSnapshot();
+  });
+
+  it('wraps columns with punctuation correctly', () => {
+    const headers = ['Punctuation'];
+    const rows = [
+      ['Start. Stop. Comma, separated. Exclamation! Question? hyphen-ated'],
+    ];
+    const terminalWidth = 30;
+
+    const { lastFrame } = renderWithProviders(
+      <TableRenderer
+        headers={headers}
+        rows={rows}
+        terminalWidth={terminalWidth}
+      />,
+    );
+
+    const output = lastFrame();
+    expect(output).toContain('Start. Stop.');
+    expect(output).toMatchSnapshot();
+  });
 });
