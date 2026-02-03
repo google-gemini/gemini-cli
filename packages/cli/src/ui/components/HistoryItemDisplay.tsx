@@ -125,6 +125,10 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           selectedAuthType={itemForDisplay.selectedAuthType}
           userEmail={itemForDisplay.userEmail}
           tier={itemForDisplay.tier}
+          currentModel={itemForDisplay.currentModel}
+          pooledRemaining={itemForDisplay.pooledRemaining}
+          pooledLimit={itemForDisplay.pooledLimit}
+          pooledResetTime={itemForDisplay.pooledResetTime}
         />
       )}
       {itemForDisplay.type === 'model_stats' && (
@@ -132,6 +136,10 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           selectedAuthType={itemForDisplay.selectedAuthType}
           userEmail={itemForDisplay.userEmail}
           tier={itemForDisplay.tier}
+          currentModel={itemForDisplay.currentModel}
+          pooledRemaining={itemForDisplay.pooledRemaining}
+          pooledLimit={itemForDisplay.pooledLimit}
+          pooledResetTime={itemForDisplay.pooledResetTime}
         />
       )}
       {itemForDisplay.type === 'tool_stats' && <ToolStatsDisplay />}

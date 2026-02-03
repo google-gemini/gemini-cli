@@ -157,7 +157,7 @@ describe('useQuotaAndFallback', () => {
         const message = request!.message;
         expect(message).toContain('Usage limit reached for gemini-pro.');
         expect(message).toContain('Access resets at'); // From getResetTimeMessage
-        expect(message).toContain('/stats for usage details');
+        expect(message).toContain('/stats model for usage details');
         expect(message).toContain('/auth to switch to API key.');
 
         expect(mockHistoryManager.addItem).not.toHaveBeenCalled();

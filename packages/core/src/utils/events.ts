@@ -127,6 +127,15 @@ export interface AgentsDiscoveredPayload {
   agents: AgentDefinition[];
 }
 
+/**
+ * Payload for the 'quota-changed' event.
+ */
+export interface QuotaChangedPayload {
+  remaining: number | undefined;
+  limit: number | undefined;
+  resetTime?: string;
+}
+
 export enum CoreEvent {
   UserFeedback = 'user-feedback',
   ModelChanged = 'model-changed',
@@ -146,6 +155,7 @@ export enum CoreEvent {
   AgentsDiscovered = 'agents-discovered',
   RequestEditorSelection = 'request-editor-selection',
   EditorSelected = 'editor-selected',
+  QuotaChanged = 'quota-changed',
 }
 
 /**
@@ -161,6 +171,7 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.ConsoleLog]: [ConsoleLogPayload];
   [CoreEvent.Output]: [OutputPayload];
   [CoreEvent.MemoryChanged]: [MemoryChangedPayload];
+  [CoreEvent.QuotaChanged]: [QuotaChangedPayload];
   [CoreEvent.ExternalEditorClosed]: never[];
   [CoreEvent.McpClientUpdate]: Array<Map<string, McpClient> | never>;
   [CoreEvent.OauthDisplayMessage]: string[];
@@ -309,6 +320,18 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   emitAgentsDiscovered(agents: AgentDefinition[]): void {
     const payload: AgentsDiscoveredPayload = { agents };
     this._emitOrQueue(CoreEvent.AgentsDiscovered, payload);
+  }
+
+  /**
+   * Notifies subscribers that the quota has changed.
+   */
+  emitQuotaChanged(
+    remaining: number | undefined,
+    limit: number | undefined,
+    resetTime?: string,
+  ): void {
+    const payload: QuotaChangedPayload = { remaining, limit, resetTime };
+    this.emit(CoreEvent.QuotaChanged, payload);
   }
 
   /**

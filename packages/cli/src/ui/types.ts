@@ -153,20 +153,24 @@ export type HistoryItemHelp = HistoryItemBase & {
   timestamp: Date;
 };
 
-export type HistoryItemStats = HistoryItemBase & {
+export interface HistoryItemQuotaBase extends HistoryItemBase {
+  selectedAuthType?: string;
+  userEmail?: string;
+  tier?: string;
+  currentModel?: string;
+  pooledRemaining?: number;
+  pooledLimit?: number;
+  pooledResetTime?: string;
+}
+
+export type HistoryItemStats = HistoryItemQuotaBase & {
   type: 'stats';
   duration: string;
   quotas?: RetrieveUserQuotaResponse;
-  selectedAuthType?: string;
-  userEmail?: string;
-  tier?: string;
 };
 
-export type HistoryItemModelStats = HistoryItemBase & {
+export type HistoryItemModelStats = HistoryItemQuotaBase & {
   type: 'model_stats';
-  selectedAuthType?: string;
-  userEmail?: string;
-  tier?: string;
 };
 
 export type HistoryItemToolStats = HistoryItemBase & {

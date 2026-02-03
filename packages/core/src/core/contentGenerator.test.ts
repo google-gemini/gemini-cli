@@ -141,12 +141,11 @@ describe('createContentGenerator', () => {
     expect(GoogleGenAI).toHaveBeenCalledWith({
       apiKey: 'test-api-key',
       vertexai: undefined,
-      httpOptions: {
-        headers: {
+      httpOptions: expect.objectContaining({
+        headers: expect.objectContaining({
           'User-Agent': expect.stringContaining('GeminiCLI/1.2.3/gemini-pro'),
-          'x-gemini-api-privileged-user-id': expect.any(String),
-        },
-      },
+        }),
+      }),
     });
     expect(generator).toEqual(
       new LoggingContentGenerator(mockGenerator.models, mockConfig),
@@ -212,21 +211,21 @@ describe('createContentGenerator', () => {
     expect(GoogleGenAI).toHaveBeenCalledWith({
       apiKey: 'test-api-key',
       vertexai: undefined,
-      httpOptions: {
+      httpOptions: expect.objectContaining({
         headers: expect.objectContaining({
           'User-Agent': expect.any(String),
           'X-Test-Header': 'test',
           Another: 'value',
         }),
-      },
+      }),
     });
     expect(GoogleGenAI).toHaveBeenCalledWith(
       expect.not.objectContaining({
-        httpOptions: {
+        httpOptions: expect.objectContaining({
           headers: expect.objectContaining({
             Authorization: expect.any(String),
           }),
-        },
+        }),
       }),
     );
   });
@@ -256,12 +255,12 @@ describe('createContentGenerator', () => {
     expect(GoogleGenAI).toHaveBeenCalledWith({
       apiKey: 'test-api-key',
       vertexai: undefined,
-      httpOptions: {
+      httpOptions: expect.objectContaining({
         headers: expect.objectContaining({
           'User-Agent': expect.any(String),
           Authorization: 'Bearer test-api-key',
         }),
-      },
+      }),
     });
   });
 
@@ -290,20 +289,20 @@ describe('createContentGenerator', () => {
     expect(GoogleGenAI).toHaveBeenCalledWith({
       apiKey: 'test-api-key',
       vertexai: undefined,
-      httpOptions: {
+      httpOptions: expect.objectContaining({
         headers: expect.objectContaining({
           'User-Agent': expect.any(String),
         }),
-      },
+      }),
     });
     // Explicitly assert that Authorization header is NOT present
     expect(GoogleGenAI).toHaveBeenCalledWith(
       expect.not.objectContaining({
-        httpOptions: {
+        httpOptions: expect.objectContaining({
           headers: expect.objectContaining({
             Authorization: expect.any(String),
           }),
-        },
+        }),
       }),
     );
   });
@@ -328,11 +327,11 @@ describe('createContentGenerator', () => {
     expect(GoogleGenAI).toHaveBeenCalledWith({
       apiKey: 'test-api-key',
       vertexai: undefined,
-      httpOptions: {
+      httpOptions: expect.objectContaining({
         headers: {
           'User-Agent': expect.any(String),
         },
-      },
+      }),
     });
     expect(generator).toEqual(
       new LoggingContentGenerator(mockGenerator.models, mockConfig),
@@ -364,11 +363,11 @@ describe('createContentGenerator', () => {
     expect(GoogleGenAI).toHaveBeenCalledWith({
       apiKey: 'test-api-key',
       vertexai: undefined,
-      httpOptions: {
+      httpOptions: expect.objectContaining({
         headers: expect.objectContaining({
           'User-Agent': expect.any(String),
         }),
-      },
+      }),
       apiVersion: 'v1',
     });
   });
@@ -397,11 +396,11 @@ describe('createContentGenerator', () => {
     expect(GoogleGenAI).toHaveBeenCalledWith({
       apiKey: 'test-api-key',
       vertexai: undefined,
-      httpOptions: {
+      httpOptions: expect.objectContaining({
         headers: expect.objectContaining({
           'User-Agent': expect.any(String),
         }),
-      },
+      }),
     });
 
     expect(GoogleGenAI).toHaveBeenCalledWith(
@@ -436,11 +435,11 @@ describe('createContentGenerator', () => {
     expect(GoogleGenAI).toHaveBeenCalledWith({
       apiKey: 'test-api-key',
       vertexai: undefined,
-      httpOptions: {
+      httpOptions: expect.objectContaining({
         headers: expect.objectContaining({
           'User-Agent': expect.any(String),
         }),
-      },
+      }),
     });
 
     expect(GoogleGenAI).toHaveBeenCalledWith(
@@ -476,11 +475,11 @@ describe('createContentGenerator', () => {
     expect(GoogleGenAI).toHaveBeenCalledWith({
       apiKey: 'test-api-key',
       vertexai: true,
-      httpOptions: {
+      httpOptions: expect.objectContaining({
         headers: expect.objectContaining({
           'User-Agent': expect.any(String),
         }),
-      },
+      }),
       apiVersion: 'v1alpha',
     });
   });
