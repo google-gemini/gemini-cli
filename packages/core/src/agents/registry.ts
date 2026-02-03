@@ -503,26 +503,25 @@ export class AgentRegistry {
       return 'No sub-agents are currently available.';
     }
 
-    let context = '## Available Sub-Agents\n';
-    context += `Sub-agents are specialized expert agents that you can use to assist you in
-      the completion of all or part of a task.
+    let context = '# Sub-Agent Directory\n\n';
+    context += `Sub-agents are specialized expert models designed to handle specific domains of knowledge with greater precision and reliability than a generalist. 
 
-      Each sub-agent is available as a tool of the same name.
+Each sub-agent is available as a tool of the same name.
 
-      You MUST always delegate tasks to the sub-agent with the
-      relevant expertise, if one is available.
+To ensure the highest quality results, you should prioritize delegating tasks to the specialized expert sub-agent whenever a task falls within their domain of expertise.
 
-      The following tools can be used to start sub-agents:\n\n`;
+The following sub-agents are available as tools:\n\n`;
 
-    for (const [name] of this.agents) {
-      context += `- ${name}\n`;
+    for (const [name, definition] of this.agents) {
+      context += `- \`${name}\`: ${definition.description}\n`;
     }
 
-    context += `Remember that the closest relevant sub-agent should still be used even if its expertise is broader than the given task.
+    context += `\nRemember that sub-agents are intended to be used for a wide range of tasks within their broader domain. 
 
-    For example:
-    - A license-agent -> Should be used for a range of tasks, including reading, validating, and updating licenses and headers.
-    - A test-fixing-agent -> Should be used both for fixing tests as well as investigating test failures.`;
+    Examples of effective delegation:
+    - A \`license-agent\` should be used for tasks related to reading, validating, and updating licenses and headers.
+    - A \`test-fixing-agent\` should be used for both investigating test failures and implementing the actual fixes.
+    - A \`security-agent\` should be used for security audits, vulnerability scanning, and hardening.`;
 
     return context;
   }
