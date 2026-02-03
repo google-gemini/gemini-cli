@@ -144,6 +144,35 @@ describe('Admin Controls', () => {
       });
     });
 
+    it('should default mcpEnabled to false if mcpSetting is present but mcpEnabled is undefined', () => {
+      const input = { mcpSetting: {} };
+      const result = sanitizeAdminSettings(input as FetchAdminControlsResponse);
+      expect(result.mcpSetting?.mcpEnabled).toBe(false);
+      expect(result.mcpSetting?.mcpConfig).toEqual({});
+    });
+
+    it('should default extensionsEnabled to false if extensionsSetting is present but extensionsEnabled is undefined', () => {
+      const input = {
+        cliFeatureSetting: {
+          extensionsSetting: {},
+        },
+      };
+      const result = sanitizeAdminSettings(input as FetchAdminControlsResponse);
+      expect(
+        result.cliFeatureSetting?.extensionsSetting?.extensionsEnabled,
+      ).toBe(false);
+    });
+
+    it('should default unmanagedCapabilitiesEnabled to false if cliFeatureSetting is present but unmanagedCapabilitiesEnabled is undefined', () => {
+      const input = {
+        cliFeatureSetting: {},
+      };
+      const result = sanitizeAdminSettings(input as FetchAdminControlsResponse);
+      expect(result.cliFeatureSetting?.unmanagedCapabilitiesEnabled).toBe(
+        false,
+      );
+    });
+
     it('should reflect explicit values', () => {
       const input: FetchAdminControlsResponse = {
         strictModeDisabled: true,
