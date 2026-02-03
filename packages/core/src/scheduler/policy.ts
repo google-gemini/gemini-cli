@@ -97,11 +97,13 @@ export async function updatePolicy(
   deps: { config: Config; messageBus: MessageBus },
   payload?: ToolConfirmationPayload,
 ): Promise<void> {
+  // Mode Transitions (AUTO_EDIT)
   if (isAutoEditTransition(tool, outcome)) {
     deps.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
     return;
   }
 
+  // Specialized Tools (MCP)
   if (confirmationDetails?.type === 'mcp') {
     await handleMcpPolicyUpdate(
       tool,
@@ -112,6 +114,7 @@ export async function updatePolicy(
     return;
   }
 
+  // Generic Fallback (Shell, Info, etc.)
   await handleStandardPolicyUpdate(
     tool,
     outcome,
@@ -146,6 +149,70 @@ function isScopePayload(
   );
 }
 
+/**
+ * Converts an approval scope and command to a command prefix string.
+ * Used for building policy rules from scope selections.
+ */
+function scopeToCommandPrefix(
+  scope: ApprovalScope,
+  fullCommand: string,
+): string {
+  const parts = parseCommand(fullCommand);
+
+  switch (scope) {
+    case 'exact':
+      return fullCommand;
+    case 'command-flags':
+      // 'command-flags' = binary + subcommand level
+      return parts.subcommand
+        ? `${parts.binary} ${parts.subcommand}`
+        : parts.binary;
+    case 'command-only':
+      return parts.binary;
+    default:
+      return fullCommand;
+  }
+}
+
+/**
+ * Builds command prefixes for per-command scope selections (expanded mode).
+ * Each command can have its own scope (exact, command-flags, command-only).
+ */
+function buildCommandPrefixesForPerCommandScopes(
+  commandScopes: Record<string, ApprovalScope>,
+): string[] {
+  const prefixes: string[] = [];
+  for (const [cmd, cmdScope] of Object.entries(commandScopes)) {
+    prefixes.push(scopeToCommandPrefix(cmdScope, cmd));
+  }
+  return [...new Set(prefixes)]; // Dedupe
+}
+
+/**
+ * Builds command prefixes for compound commands with a uniform scope.
+ * All commands get the same scope applied.
+ */
+function buildCommandPrefixesForUniformScope(
+  commands: string[],
+  scope: ApprovalScope,
+): string[] {
+  const prefixes: string[] = [];
+  for (const cmd of commands) {
+    prefixes.push(scopeToCommandPrefix(scope, cmd));
+  }
+  return [...new Set(prefixes)]; // Dedupe
+}
+
+/**
+ * Handles policy updates for standard tools (Shell, Info, etc.), including
+ * session-level and persistent approvals.
+ *
+ * Supports the scope-based approval system:
+ * - 'exact': Only the exact command
+ * - 'command-flags': Command with same flags, any arguments
+ * - 'command-only': Command with any flags/arguments
+ * - 'custom': User-provided regex pattern
+ */
 async function handleStandardPolicyUpdate(
   tool: AnyDeclarativeTool,
   outcome: ToolConfirmationOutcome,
@@ -166,94 +233,26 @@ async function handleStandardPolicyUpdate(
 
         // Handle per-command scopes (from expanded mode)
         if (commandScopes && Object.keys(commandScopes).length > 0) {
-          const prefixes: string[] = [];
-          for (const [cmd, cmdScope] of Object.entries(commandScopes)) {
-            const parts = parseCommand(cmd);
-            switch (cmdScope) {
-              case 'exact':
-                prefixes.push(cmd);
-                break;
-              case 'command-flags':
-                // 'command-flags' = binary + subcommand level
-                prefixes.push(
-                  parts.subcommand
-                    ? `${parts.binary} ${parts.subcommand}`
-                    : parts.binary,
-                );
-                break;
-              case 'command-only':
-                prefixes.push(parts.binary);
-                break;
-              default:
-                prefixes.push(cmd);
-            }
-          }
-          options.commandPrefix = [...new Set(prefixes)]; // Dedupe
+          options.commandPrefix =
+            buildCommandPrefixesForPerCommandScopes(commandScopes);
         } else if (compoundCommands && compoundCommands.length > 1 && scope) {
           // Handle compound commands with uniform scope
-          const prefixes: string[] = [];
-          for (const cmd of compoundCommands) {
-            const parts = parseCommand(cmd);
-            switch (scope) {
-              case 'exact':
-                prefixes.push(cmd);
-                break;
-              case 'command-flags':
-                // 'command-flags' = binary + subcommand level
-                prefixes.push(
-                  parts.subcommand
-                    ? `${parts.binary} ${parts.subcommand}`
-                    : parts.binary,
-                );
-                break;
-              case 'command-only':
-                prefixes.push(parts.binary);
-                break;
-              default:
-                prefixes.push(cmd);
-            }
-          }
-          options.commandPrefix = [...new Set(prefixes)]; // Dedupe
+          options.commandPrefix = buildCommandPrefixesForUniformScope(
+            compoundCommands,
+            scope,
+          );
         } else if (scope) {
-          // Single command - original logic
+          // Single command with scope
           const fullCommand = confirmationDetails.command;
 
-          switch (scope) {
-            case 'exact': {
+          if (scope === 'custom') {
+            if (customPattern) {
+              options.argsPattern = customPattern;
+            } else {
               options.commandPrefix = [fullCommand];
-              break;
             }
-
-            case 'command-flags': {
-              // 'command-flags' scope means "binary + subcommand" level (e.g., "git add").
-              // The UI (generateScopeOptions) only offers this scope for commands with
-              // subcommands, so the fallback cases below are defensive measures:
-              // - If no subcommand but has flags: use binary only (rare edge case)
-              // - If neither: use binary only
-              const parts = parseCommand(fullCommand);
-              const cmdPrefix = parts.subcommand
-                ? `${parts.binary} ${parts.subcommand}`
-                : parts.binary;
-              options.commandPrefix = [cmdPrefix];
-              break;
-            }
-
-            case 'command-only': {
-              const parts = parseCommand(fullCommand);
-              options.commandPrefix = [parts.binary];
-              break;
-            }
-
-            case 'custom':
-              if (customPattern) {
-                options.argsPattern = customPattern;
-              } else {
-                options.commandPrefix = [fullCommand];
-              }
-              break;
-
-            default:
-              options.commandPrefix = [fullCommand];
+          } else {
+            options.commandPrefix = [scopeToCommandPrefix(scope, fullCommand)];
           }
         }
       } else {
@@ -280,6 +279,10 @@ async function handleStandardPolicyUpdate(
   }
 }
 
+/**
+ * Handles policy updates specifically for MCP tools, including session-level
+ * and persistent approvals.
+ */
 async function handleMcpPolicyUpdate(
   tool: AnyDeclarativeTool,
   outcome: ToolConfirmationOutcome,
@@ -302,6 +305,7 @@ async function handleMcpPolicyUpdate(
   let toolName = tool.name;
   const persist = outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave;
 
+  // If "Always allow all tools from this server", use the wildcard pattern
   if (outcome === ToolConfirmationOutcome.ProceedAlwaysServer) {
     toolName = `${confirmationDetails.serverName}__*`;
   }
