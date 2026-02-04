@@ -13,9 +13,10 @@ import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 
 vi.mock('node:child_process', async () => {
-  const actual = await vi.importActual<typeof import('node:child_process')>(
-    'node:child_process',
-  );
+  const actual =
+    await vi.importActual<typeof import('node:child_process')>(
+      'node:child_process',
+    );
   return {
     ...actual,
     spawn: vi.fn(),
@@ -35,6 +36,17 @@ vi.mock('node:fs/promises', async () => ({
   access: vi.fn().mockResolvedValue(undefined),
 }));
 
+interface MockProcess extends EventEmitter {
+  kill: ReturnType<typeof vi.fn>;
+  pid: number;
+}
+
+type ExecCallback = (
+  error: Error | null,
+  stdout?: { stdout: string } | string,
+  stderr?: string,
+) => void;
+
 describe('useVoiceInput', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -51,14 +63,12 @@ describe('useVoiceInput', () => {
   });
 
   it('should start recording using sox if available', async () => {
-    const mockProcess = new EventEmitter() as unknown as ReturnType<
-      typeof spawn
-    >;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (mockProcess as any).kill = vi.fn();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (mockProcess as any).pid = 123;
-    vi.mocked(spawn).mockReturnValue(mockProcess);
+    const mockProcess = new EventEmitter() as MockProcess;
+    mockProcess.kill = vi.fn();
+    mockProcess.pid = 123;
+    vi.mocked(spawn).mockReturnValue(
+      mockProcess as unknown as ReturnType<typeof spawn>,
+    );
 
     const { result } = renderHook(() => useVoiceInput());
 
@@ -71,17 +81,15 @@ describe('useVoiceInput', () => {
   });
 
   it('should stop recording and transcribe', async () => {
-    const mockProcess = new EventEmitter() as unknown as ReturnType<
-      typeof spawn
-    >;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (mockProcess as any).kill = vi.fn(() => {
+    const mockProcess = new EventEmitter() as MockProcess;
+    mockProcess.kill = vi.fn(() => {
       // Simulate process exit
       setTimeout(() => mockProcess.emit('exit', 0), 10);
     });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (mockProcess as any).pid = 123;
-    vi.mocked(spawn).mockReturnValue(mockProcess);
+    mockProcess.pid = 123;
+    vi.mocked(spawn).mockReturnValue(
+      mockProcess as unknown as ReturnType<typeof spawn>,
+    );
 
     const { result } = renderHook(() => useVoiceInput());
 
@@ -103,15 +111,16 @@ describe('useVoiceInput', () => {
     vi.mocked(spawn).mockReturnValue(
       new EventEmitter() as unknown as ReturnType<typeof spawn>,
     );
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(child_process.exec).mockImplementation(((cmd: string, cb: any) => {
+    vi.mocked(child_process.exec).mockImplementation(((
+      cmd: string,
+      cb: ExecCallback,
+    ) => {
       if (cmd === 'which sox') {
         cb(new Error('not found'));
       } else {
         cb(null, { stdout: '/usr/bin/arecord' });
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    }) as any);
+    }) as unknown as typeof child_process.exec);
 
     const { result } = renderHook(() => useVoiceInput());
 
@@ -123,11 +132,12 @@ describe('useVoiceInput', () => {
   });
 
   it('should handle errors when neither sox nor arecord is available', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(child_process.exec).mockImplementation(((cmd: string, cb: any) => {
+    vi.mocked(child_process.exec).mockImplementation(((
+      cmd: string,
+      cb: ExecCallback,
+    ) => {
       cb(new Error('not found'));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    }) as any);
+    }) as unknown as typeof child_process.exec);
 
     const { result } = renderHook(() => useVoiceInput());
 
@@ -135,7 +145,9 @@ describe('useVoiceInput', () => {
       await result.current.startRecording();
     });
 
-    expect(result.current.state.error).toContain('Neither sox nor arecord found');
+    expect(result.current.state.error).toContain(
+      'Neither sox nor arecord found',
+    );
     expect(result.current.state.isRecording).toBe(false);
   });
 });

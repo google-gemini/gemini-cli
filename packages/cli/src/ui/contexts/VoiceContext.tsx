@@ -12,7 +12,9 @@ export const VoiceContext = createContext<VoiceInputReturn | null>(null);
 export const useVoiceContext = () => {
   const context = useContext(VoiceContext);
   if (!context) {
-    throw new Error('useVoiceContext must be used within a VoiceContext.Provider');
+    throw new Error(
+      'useVoiceContext must be used within a VoiceContext.Provider',
+    );
   }
   return context;
 };

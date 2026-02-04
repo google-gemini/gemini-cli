@@ -104,6 +104,43 @@ exports[`RewindViewer > Navigation > handles 'down' navigation > after-down 1`] 
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
+exports[`RewindViewer > Navigation > handles 'down' navigation > after-down 2`] = `
+"
+  ERROR  Text string "                " must be rendered inside <Text> component
+
+ file:///home/fayerman/gemini-cli/node_modules/ink/src/reconciler.ts:230:10
+
+ - createTextInstance (file:///home/fayerman/gemini-cli/node_modules/ink/src/reconciler.ts:230:10)
+ -completeWor
+             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
+             ent.js:9082:42)
+ -runWithFiberIn
+  EV            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:1738:13)
+ -completeUnitOfW
+  rk             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                 lopment.js:12962:19)
+ -performUnitOfW
+  rk            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:12843:11)
+ -workLoopSyn
+             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
+             ent.js:12644:41)
+ -renderRootSy
+  c           (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.develop
+              ment.js:12624:11)
+ -performWorkOnR
+  ot            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:12135:44)
+ -performSyncWorkOn
+  oot              (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.de
+                   velopment.js:2446:7)
+ -flushSyncWorkAcrossRoo
+  s_impl                (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconcil
+                        er.development.js:2294:21)
+"
+`;
+
 exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                                      │
@@ -125,6 +162,43 @@ exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 1`] = `
 │ (Use Enter to select a message, Esc to close, Right/Left to expand/collapse)                                         │
 │                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`RewindViewer > Navigation > handles 'up' navigation > after-up 2`] = `
+"
+  ERROR  Text string "                " must be rendered inside <Text> component
+
+ file:///home/fayerman/gemini-cli/node_modules/ink/src/reconciler.ts:230:10
+
+ - createTextInstance (file:///home/fayerman/gemini-cli/node_modules/ink/src/reconciler.ts:230:10)
+ -completeWor
+             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
+             ent.js:9082:42)
+ -runWithFiberIn
+  EV            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:1738:13)
+ -completeUnitOfW
+  rk             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                 lopment.js:12962:19)
+ -performUnitOfW
+  rk            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:12843:11)
+ -workLoopSyn
+             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
+             ent.js:12644:41)
+ -renderRootSy
+  c           (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.develop
+              ment.js:12624:11)
+ -performWorkOnR
+  ot            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:12135:44)
+ -performSyncWorkOn
+  oot              (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.de
+                   velopment.js:2446:7)
+ -flushSyncWorkAcrossRoo
+  s_impl                (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconcil
+                        er.development.js:2294:21)
+"
 `;
 
 exports[`RewindViewer > Navigation > handles cyclic navigation > cyclic-down 1`] = `
@@ -150,6 +224,43 @@ exports[`RewindViewer > Navigation > handles cyclic navigation > cyclic-down 1`]
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;
 
+exports[`RewindViewer > Navigation > handles cyclic navigation > cyclic-down 2`] = `
+"
+  ERROR  Text string "                " must be rendered inside <Text> component
+
+ file:///home/fayerman/gemini-cli/node_modules/ink/src/reconciler.ts:230:10
+
+ - createTextInstance (file:///home/fayerman/gemini-cli/node_modules/ink/src/reconciler.ts:230:10)
+ -completeWor
+             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
+             ent.js:9082:42)
+ -runWithFiberIn
+  EV            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:1738:13)
+ -completeUnitOfW
+  rk             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                 lopment.js:12962:19)
+ -performUnitOfW
+  rk            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:12843:11)
+ -workLoopSyn
+             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
+             ent.js:12644:41)
+ -renderRootSy
+  c           (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.develop
+              ment.js:12624:11)
+ -performWorkOnR
+  ot            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:12135:44)
+ -performSyncWorkOn
+  oot              (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.de
+                   velopment.js:2446:7)
+ -flushSyncWorkAcrossRoo
+  s_impl                (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconcil
+                        er.development.js:2294:21)
+"
+`;
+
 exports[`RewindViewer > Navigation > handles cyclic navigation > cyclic-up 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │                                                                                                                      │
@@ -171,6 +282,43 @@ exports[`RewindViewer > Navigation > handles cyclic navigation > cyclic-up 1`] =
 │ (Use Enter to select a message, Esc to close, Right/Left to expand/collapse)                                         │
 │                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`RewindViewer > Navigation > handles cyclic navigation > cyclic-up 2`] = `
+"
+  ERROR  Text string "                " must be rendered inside <Text> component
+
+ file:///home/fayerman/gemini-cli/node_modules/ink/src/reconciler.ts:230:10
+
+ - createTextInstance (file:///home/fayerman/gemini-cli/node_modules/ink/src/reconciler.ts:230:10)
+ -completeWor
+             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
+             ent.js:9082:42)
+ -runWithFiberIn
+  EV            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:1738:13)
+ -completeUnitOfW
+  rk             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                 lopment.js:12962:19)
+ -performUnitOfW
+  rk            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:12843:11)
+ -workLoopSyn
+             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
+             ent.js:12644:41)
+ -renderRootSy
+  c           (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.develop
+              ment.js:12624:11)
+ -performWorkOnR
+  ot            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:12135:44)
+ -performSyncWorkOn
+  oot              (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.de
+                   velopment.js:2446:7)
+ -flushSyncWorkAcrossRoo
+  s_impl                (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconcil
+                        er.development.js:2294:21)
+"
 `;
 
 exports[`RewindViewer > Rendering > renders 'a single interaction' 1`] = `

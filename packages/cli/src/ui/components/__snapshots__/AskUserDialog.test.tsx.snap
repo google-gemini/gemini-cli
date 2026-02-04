@@ -51,6 +51,43 @@ exports[`AskUserDialog > Scroll Arrows (useAlternateBuffer: true) > shows scroll
 Enter to select · ↑/↓ to navigate · Esc to cancel"
 `;
 
+exports[`AskUserDialog > Scroll Arrows (useAlternateBuffer: true) > shows scroll arrows correctly when useAlternateBuffer is true 2`] = `
+"
+  ERROR  Text string "                " must be rendered inside <Text> component
+
+ file:///home/fayerman/gemini-cli/node_modules/ink/src/reconciler.ts:230:10
+
+ - createTextInstance (file:///home/fayerman/gemini-cli/node_modules/ink/src/reconciler.ts:230:10)
+ -completeWor
+             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
+             ent.js:9082:42)
+ -runWithFiberIn
+  EV            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:1738:13)
+ -completeUnitOfW
+  rk             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                 lopment.js:12962:19)
+ -performUnitOfW
+  rk            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:12843:11)
+ -workLoopSyn
+             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
+             ent.js:12644:41)
+ -renderRootSy
+  c           (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.develop
+              ment.js:12624:11)
+ -performWorkOnR
+  ot            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:12135:44)
+ -performSyncWorkOn
+  oot              (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.de
+                   velopment.js:2446:7)
+ -flushSyncWorkAcrossRoo
+  s_impl                (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconcil
+                        er.development.js:2294:21)
+"
+`;
+
 exports[`AskUserDialog > Text type questions > renders text input for type: "text" 1`] = `
 "What should we name this component?
 
@@ -166,4 +203,41 @@ License → (not answered)
 README → (not answered)
 
 Enter to submit · Tab/Shift+Tab to edit answers · Esc to cancel"
+`;
+
+exports[`AskUserDialog > shows warning for unanswered questions on Review tab 2`] = `
+"
+  ERROR  Text string "                " must be rendered inside <Text> component
+
+ file:///home/fayerman/gemini-cli/node_modules/ink/src/reconciler.ts:230:10
+
+ - createTextInstance (file:///home/fayerman/gemini-cli/node_modules/ink/src/reconciler.ts:230:10)
+ -completeWor
+             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
+             ent.js:9082:42)
+ -runWithFiberIn
+  EV            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:1738:13)
+ -completeUnitOfW
+  rk             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                 lopment.js:12962:19)
+ -performUnitOfW
+  rk            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:12843:11)
+ -workLoopSyn
+             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
+             ent.js:12644:41)
+ -renderRootSy
+  c           (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.develop
+              ment.js:12624:11)
+ -performWorkOnR
+  ot            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:12135:44)
+ -performSyncWorkOn
+  oot              (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.de
+                   velopment.js:2446:7)
+ -flushSyncWorkAcrossRoo
+  s_impl                (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconcil
+                        er.development.js:2294:21)
+"
 `;
