@@ -221,6 +221,7 @@ jobs:
             - Do NOT include any introductory or concluding remarks, explanations, or additional text.
             - Do NOT include any thoughts or reasoning outside the JSON block.
             - Ensure the output is a single JSON array of objects.
+            - Return the JSON as your final text response. Do NOT use `run_shell_command` or `echo` to print it.
 
       - name: 'Apply Labels to Issues'
         if: |-
