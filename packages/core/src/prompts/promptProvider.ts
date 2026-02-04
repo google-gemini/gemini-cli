@@ -119,6 +119,7 @@ export class PromptProvider {
               .map((t) => `- \`${t}\``)
               .join('\n'),
             plansDir: config.storage.getProjectTempPlansDir(),
+            approvedPlanPath: config.getApprovedPlanPath(),
           }),
           isPlanMode,
         ),

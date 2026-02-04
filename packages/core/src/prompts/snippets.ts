@@ -69,6 +69,7 @@ export interface FinalReminderOptions {
 export interface PlanningWorkflowOptions {
   planModeToolsList: string;
   plansDir: string;
+  approvedPlanPath?: string;
 }
 
 export interface AgentSkillOptions {
@@ -337,6 +338,18 @@ ${options.planModeToolsList}
 - Present the plan and request approval for the finalized plan using the \`${EXIT_PLAN_MODE_TOOL_NAME}\` tool
 - If plan is approved, you can begin implementation
 - If plan is rejected, address the feedback and iterate on the plan
+
+${
+  options.approvedPlanPath
+    ? `## Approved Plan
+An approved plan exists at: \`${options.approvedPlanPath}\`.
+Treat this file as the source of truth for the plan.
+- **Iterate:** You should default to reading this file using \`${READ_FILE_TOOL_NAME}\` and updating it with new refinements.
+- **New Plan:** Only create a new plan file if the user explicitly asks for a "new plan" or if the current request is for a completely different feature/bug.
+
+`
+    : ''
+}
 
 ## Constraints
 - You may ONLY use the read-only tools listed above
