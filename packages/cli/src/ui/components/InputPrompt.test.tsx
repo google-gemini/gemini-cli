@@ -2775,6 +2775,23 @@ describe('InputPrompt', () => {
       });
       unmount();
     });
+
+    it('ensures Ctrl+R search results are prioritized newest-to-oldest by reversing userMessages', async () => {
+      props.shellModeActive = false;
+      props.userMessages = ['oldest', 'middle', 'newest'];
+
+      renderWithProviders(<InputPrompt {...props} />);
+
+      const calls = vi.mocked(useReverseSearchCompletion).mock.calls;
+      const commandSearchCall = calls.find(
+        (call) =>
+          call[1] === props.userMessages ||
+          (Array.isArray(call[1]) && call[1][0] === 'newest'),
+      );
+
+      expect(commandSearchCall).toBeDefined();
+      expect(commandSearchCall![1]).toEqual(['newest', 'middle', 'oldest']);
+    });
   });
 
   describe('Tab focus toggle', () => {
