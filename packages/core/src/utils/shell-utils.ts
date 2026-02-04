@@ -543,6 +543,27 @@ export function parseCommandDetails(
  */
 export function getShellConfiguration(): ShellConfiguration {
   if (isWindows()) {
+    // Prefer Git Bash on Windows for better compatibility with AI-generated commands
+    const gitBashPaths = [
+      'C:\\Program Files\\Git\\bin\\bash.exe',
+      'C:\\Program Files (x86)\\Git\\bin\\bash.exe',
+      `${process.env['PROGRAMFILES']}\\Git\\bin\\bash.exe`,
+    ];
+    for (const bashPath of gitBashPaths) {
+      try {
+        if (fs.existsSync(bashPath)) {
+          return {
+            executable: bashPath,
+            argsPrefix: ['-c'],
+            shell: 'bash',
+          };
+        }
+      } catch {
+        // continue to next path
+      }
+    }
+
+    // Fallback to PowerShell if Git Bash not found
     const comSpec = process.env['ComSpec'];
     if (comSpec) {
       const executable = comSpec.toLowerCase();
