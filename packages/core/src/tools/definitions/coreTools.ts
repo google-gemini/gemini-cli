@@ -32,22 +32,8 @@ export const READ_FILE_DEFINITION: ToolDefinition = {
       required: ['file_path'],
     },
   },
-  variants: {
-    flash: {
-      description:
-        'Reads a file from the local filesystem. Fast and efficient for checking file content.',
-    },
-    pro: {
-      description:
-        'Reads and returns the content of a specified file. Use this for comprehensive analysis of source code, configuration, or documentation.',
-    },
-  },
 };
 
-/**
- * Note: Shell tool has platform-specific and dynamic parts.
- * The base here contains the core schema.
- */
 export const SHELL_DEFINITION: ToolDefinition = {
   base: {
     name: SHELL_TOOL_NAME,
@@ -76,16 +62,6 @@ export const SHELL_DEFINITION: ToolDefinition = {
         },
       },
       required: ['command'],
-    },
-  },
-  variants: {
-    flash: {
-      description:
-        'Executes a single shell command. Use for simple operations like listing files or moving data.',
-    },
-    pro: {
-      description:
-        'Executes a shell command. Can be used for complex workflows, multi-step installations, or deep system investigations.',
     },
   },
 };
