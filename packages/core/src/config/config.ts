@@ -35,6 +35,7 @@ import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { AskUserTool } from '../tools/ask-user.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
+import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { HookDefinition, HookEventName } from '../hooks/types.js';
@@ -2144,6 +2145,7 @@ export class Config {
     }
     if (this.isPlanEnabled()) {
       registerCoreTool(ExitPlanModeTool, this);
+      registerCoreTool(EnterPlanModeTool, this);
     }
 
     // Register Subagents as Tools
