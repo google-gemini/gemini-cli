@@ -140,9 +140,12 @@ export function isLargePaste(text: string): boolean {
 
 /**
  * Attempt to toggle expansion of a paste placeholder in the buffer.
- * Returns true if a toggle action was performed, false otherwise.
+ * Returns true if a toggle action was performed or hint was shown, false otherwise.
  */
-export function tryTogglePasteExpansion(buffer: TextBuffer): boolean {
+export function tryTogglePasteExpansion(
+  buffer: TextBuffer,
+  onHintMessage?: (msg: string) => void,
+): boolean {
   if (!buffer.pastedContent || Object.keys(buffer.pastedContent).length === 0) {
     return false;
   }
@@ -167,19 +170,9 @@ export function tryTogglePasteExpansion(buffer: TextBuffer): boolean {
     return true;
   }
 
-  // 3. Nothing expanded, cursor not on a placeholder — expand the first one
-  for (let r = 0; r < buffer.transformationsByLine.length; r++) {
-    const transforms = buffer.transformationsByLine[r];
-    if (!transforms) continue;
-    for (const t of transforms) {
-      if (t.type === 'paste' && t.id) {
-        buffer.togglePasteExpansion(t.id, r, t.logStart);
-        return true;
-      }
-    }
-  }
-
-  return false;
+  // 3. Placeholders exist but cursor isn't on one — show hint
+  onHintMessage?.('Move cursor within placeholder to expand');
+  return true;
 }
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
@@ -609,7 +602,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       // Ctrl+O to expand/collapse paste placeholders
       if (keyMatchers[Command.EXPAND_PASTE](key)) {
-        const handled = tryTogglePasteExpansion(buffer);
+        const handled = tryTogglePasteExpansion(buffer, (msg) =>
+          showTransientMessage(msg, TransientMessageType.Hint),
+        );
         if (handled) return true;
       }
 

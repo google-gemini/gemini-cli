@@ -3893,7 +3893,7 @@ describe('InputPrompt', () => {
       expect(buffer.togglePasteExpansion).toHaveBeenCalledWith(id, 1, 0);
     });
 
-    it('expands first placeholder when nothing is expanded and cursor is elsewhere', () => {
+    it('shows hint when cursor is not on placeholder but placeholders exist', () => {
       const id = '[Pasted Text: 6 lines]';
       const buffer = {
         cursor: [0, 0],
@@ -3916,8 +3916,12 @@ describe('InputPrompt', () => {
         togglePasteExpansion: vi.fn(),
       } as unknown as TextBuffer;
 
-      expect(tryTogglePasteExpansion(buffer)).toBe(true);
-      expect(buffer.togglePasteExpansion).toHaveBeenCalledWith(id, 1, 0);
+      const onHintMessage = vi.fn();
+      expect(tryTogglePasteExpansion(buffer, onHintMessage)).toBe(true);
+      expect(buffer.togglePasteExpansion).not.toHaveBeenCalled();
+      expect(onHintMessage).toHaveBeenCalledWith(
+        'Move cursor within placeholder to expand',
+      );
     });
   });
 });
