@@ -305,6 +305,32 @@ describe('GeminiAgent', () => {
     expect(session.prompt).toHaveBeenCalled();
     expect(result).toEqual({ stopReason: 'end_turn' });
   });
+
+  it('should delegate setModel to session', async () => {
+    await agent.newSession({ cwd: '/tmp', mcpServers: [] });
+    const session = (
+      agent as unknown as { sessions: Map<string, Session> }
+    ).sessions.get('test-session-id');
+    if (!session) throw new Error('Session not found');
+    session.setModel = vi.fn().mockReturnValue({});
+
+    const result = await agent.unstable_setSessionModel({
+      sessionId: 'test-session-id',
+      modelId: 'gemini-2.5-flash',
+    });
+
+    expect(session.setModel).toHaveBeenCalledWith('gemini-2.5-flash');
+    expect(result).toEqual({});
+  });
+
+  it('should throw error when setting model on non-existent session', async () => {
+    await expect(
+      agent.unstable_setSessionModel({
+        sessionId: 'unknown',
+        modelId: 'gemini-2.5-flash',
+      }),
+    ).rejects.toThrow('Session not found: unknown');
+  });
 });
 
 describe('Session', () => {
@@ -351,6 +377,7 @@ describe('Session', () => {
       getEnableRecursiveFileSearch: vi.fn().mockReturnValue(false),
       getDebugMode: vi.fn().mockReturnValue(false),
       getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
+      setModel: vi.fn().mockReturnValue({}),
     } as unknown as Mocked<Config>;
     mockConnection = {
       sessionUpdate: vi.fn(),
@@ -819,5 +846,10 @@ describe('Session', () => {
         MockReadManyFilesTool.mock.results.length - 1
       ].value;
     expect(mockInstance.build).toHaveBeenCalled();
+  });
+
+  it('should set model on config', () => {
+    session.setModel('gemini-2.5-flash');
+    expect(mockConfig.setModel).toHaveBeenCalledWith('gemini-2.5-flash');
   });
 });
