@@ -105,34 +105,34 @@ describe('agentsCommand', () => {
     );
   });
 
-  it('should reload the agent registry when refresh subcommand is called', async () => {
+  it('should reload the agent registry when reload subcommand is called', async () => {
     const reloadSpy = vi.fn().mockResolvedValue(undefined);
     mockConfig.getAgentRegistry = vi.fn().mockReturnValue({
       reload: reloadSpy,
     });
 
-    const refreshCommand = agentsCommand.subCommands?.find(
-      (cmd) => cmd.name === 'refresh',
+    const reloadCommand = agentsCommand.subCommands?.find(
+      (cmd) => cmd.name === 'reload',
     );
-    expect(refreshCommand).toBeDefined();
+    expect(reloadCommand).toBeDefined();
 
-    const result = await refreshCommand!.action!(mockContext, '');
+    const result = await reloadCommand!.action!(mockContext, '');
 
     expect(reloadSpy).toHaveBeenCalled();
     expect(result).toEqual({
       type: 'message',
       messageType: 'info',
-      content: 'Agents refreshed successfully.',
+      content: 'Agents reloaded successfully.',
     });
   });
 
-  it('should show an error if agent registry is not available during refresh', async () => {
+  it('should show an error if agent registry is not available during reload', async () => {
     mockConfig.getAgentRegistry = vi.fn().mockReturnValue(undefined);
 
-    const refreshCommand = agentsCommand.subCommands?.find(
-      (cmd) => cmd.name === 'refresh',
+    const reloadCommand = agentsCommand.subCommands?.find(
+      (cmd) => cmd.name === 'reload',
     );
-    const result = await refreshCommand!.action!(mockContext, '');
+    const result = await reloadCommand!.action!(mockContext, '');
 
     expect(result).toEqual({
       type: 'message',

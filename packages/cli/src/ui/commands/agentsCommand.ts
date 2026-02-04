@@ -322,8 +322,9 @@ const configCommand: SlashCommand = {
   completion: completeAllAgents,
 };
 
-const agentsRefreshCommand: SlashCommand = {
-  name: 'refresh',
+const agentsReloadCommand: SlashCommand = {
+  name: 'reload',
+  altNames: ['refresh'],
   description: 'Reload the agent registry',
   kind: CommandKind.BUILT_IN,
   action: async (context: CommandContext) => {
@@ -339,7 +340,7 @@ const agentsRefreshCommand: SlashCommand = {
 
     context.ui.addItem({
       type: MessageType.INFO,
-      text: 'Refreshing agent registry...',
+      text: 'Reloading agent registry...',
     });
 
     await agentRegistry.reload();
@@ -347,7 +348,7 @@ const agentsRefreshCommand: SlashCommand = {
     return {
       type: 'message',
       messageType: 'info',
-      content: 'Agents refreshed successfully.',
+      content: 'Agents reloaded successfully.',
     };
   },
 };
@@ -358,7 +359,7 @@ export const agentsCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   subCommands: [
     agentsListCommand,
-    agentsRefreshCommand,
+    agentsReloadCommand,
     enableCommand,
     disableCommand,
     configCommand,
