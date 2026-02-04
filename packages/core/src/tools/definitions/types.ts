@@ -7,19 +7,9 @@
 import { type FunctionDeclaration } from '@google/genai';
 
 /**
- * Defines a tool's identity with potential model-specific flavor variants.
+ * Defines a tool's identity using a structured declaration.
  */
 export interface ToolDefinition {
-  /** The base declaration used by default. */
+  /** The base declaration for the tool. */
   base: FunctionDeclaration;
-
-  /**
-   * Model-specific overrides for the tool declaration.
-   * Can override description, parameters, or any other field.
-   */
-  variants?: {
-    flash?: Partial<FunctionDeclaration>;
-    pro?: Partial<FunctionDeclaration>;
-    [modelKey: string]: Partial<FunctionDeclaration> | undefined;
-  };
 }
