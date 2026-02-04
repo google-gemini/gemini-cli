@@ -84,6 +84,16 @@ export class ModelConfigService {
     this.runtimeOverrides.push(override);
   }
 
+  getAliases(): string[] {
+    const { aliases = {}, customAliases = {} } = this.config || {};
+    const allAliases = {
+      ...aliases,
+      ...customAliases,
+      ...this.runtimeAliases,
+    };
+    return Object.keys(allAliases);
+  }
+
   /**
    * Resolves a model configuration by merging settings from aliases and applying overrides.
    *
