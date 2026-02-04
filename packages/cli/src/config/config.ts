@@ -39,7 +39,7 @@ import type {
   type OutputFormat,
   coreEvents,
   GEMINI_MODEL_ALIAS_AUTO,
-  getAdminErrorMessage
+  getAdminErrorMessage,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
