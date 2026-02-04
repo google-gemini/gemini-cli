@@ -16,6 +16,7 @@ import {
   MessageType,
 } from '../types.js';
 import { disableSkill, enableSkill } from '../../utils/skillSettings.js';
+import { getErrorMessage } from '../../utils/errors.js';
 
 import { getAdminErrorMessage } from '@google/gemini-cli-core';
 import {
