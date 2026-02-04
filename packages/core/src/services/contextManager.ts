@@ -6,6 +6,7 @@
 
 import {
   loadGlobalMemory,
+  loadExtensionMemory,
   loadEnvironmentMemory,
   loadJitSubdirectoryMemory,
   concatenateInstructions,
@@ -17,19 +18,21 @@ export class ContextManager {
   private readonly loadedPaths: Set<string> = new Set();
   private readonly config: Config;
   private globalMemory: string = '';
-  private environmentMemory: string = '';
+  private extensionMemory: string = '';
+  private projectMemory: string = '';
 
   constructor(config: Config) {
     this.config = config;
   }
 
   /**
-   * Refreshes the memory by reloading global and environment memory.
+   * Refreshes the memory by reloading global, extension, and project memory.
    */
   async refresh(): Promise<void> {
     this.loadedPaths.clear();
     await this.loadGlobalMemory();
-    await this.loadEnvironmentMemory();
+    await this.loadExtensionMemory();
+    await this.loadProjectMemory();
     this.emitMemoryChanged();
   }
 
@@ -42,24 +45,36 @@ export class ContextManager {
     );
   }
 
-  private async loadEnvironmentMemory(): Promise<void> {
-    if (!this.config.isTrustedFolder()) {
-      this.environmentMemory = '';
-      return;
-    }
-    const result = await loadEnvironmentMemory(
-      [...this.config.getWorkspaceContext().getDirectories()],
+  private async loadExtensionMemory(): Promise<void> {
+    const result = await loadExtensionMemory(
       this.config.getExtensionLoader(),
       this.config.getDebugMode(),
     );
     this.markAsLoaded(result.files.map((f) => f.path));
-    const envMemory = concatenateInstructions(
+    this.extensionMemory = concatenateInstructions(
+      result.files.map((f) => ({ filePath: f.path, content: f.content })),
+      this.config.getWorkingDir(),
+    );
+  }
+
+  private async loadProjectMemory(): Promise<void> {
+    if (!this.config.isTrustedFolder()) {
+      this.projectMemory = '';
+      return;
+    }
+    const result = await loadEnvironmentMemory(
+      [...this.config.getWorkspaceContext().getDirectories()],
+      this.config.getDebugMode(),
+    );
+
+    this.markAsLoaded(result.files.map((f) => f.path));
+    const projectMemory = concatenateInstructions(
       result.files.map((f) => ({ filePath: f.path, content: f.content })),
       this.config.getWorkingDir(),
     );
     const mcpInstructions =
       this.config.getMcpClientManager()?.getMcpInstructions() || '';
-    this.environmentMemory = [envMemory, mcpInstructions.trimStart()]
+    this.projectMemory = [projectMemory, mcpInstructions.trimStart()]
       .filter(Boolean)
       .join('\n\n');
   }
@@ -103,8 +118,12 @@ export class ContextManager {
     return this.globalMemory;
   }
 
+  getExtensionMemory(): string {
+    return this.extensionMemory;
+  }
+
   getEnvironmentMemory(): string {
-    return this.environmentMemory;
+    return this.projectMemory;
   }
 
   private markAsLoaded(paths: string[]): void {

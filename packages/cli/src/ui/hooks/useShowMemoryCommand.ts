@@ -6,7 +6,11 @@
 
 import type { Message } from '../types.js';
 import { MessageType } from '../types.js';
-import { debugLogger, type Config } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  type Config,
+  flattenMemory,
+} from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';
 
 export function createShowMemoryAction(
@@ -31,6 +35,7 @@ export function createShowMemoryAction(
     }
 
     const currentMemory = config.getUserMemory();
+    const flattenedMemory = flattenMemory(currentMemory);
     const fileCount = config.getGeminiMdFileCount();
     const contextFileName = settings.merged.context.fileName;
     const contextFileNames = Array.isArray(contextFileName)
@@ -39,7 +44,7 @@ export function createShowMemoryAction(
 
     if (debugMode) {
       debugLogger.log(
-        `[DEBUG] Showing memory. Content from config.getUserMemory() (first 200 chars): ${currentMemory.substring(0, 200)}...`,
+        `[DEBUG] Showing memory. Content from config.getUserMemory() (first 200 chars): ${flattenedMemory.substring(0, 200)}...`,
       );
       debugLogger.log(`[DEBUG] Number of context files loaded: ${fileCount}`);
     }
@@ -56,10 +61,10 @@ export function createShowMemoryAction(
       });
     }
 
-    if (currentMemory && currentMemory.trim().length > 0) {
+    if (flattenedMemory && flattenedMemory.trim().length > 0) {
       addMessage({
         type: MessageType.INFO,
-        content: `Current combined memory content:\n\`\`\`markdown\n${currentMemory}\n\`\`\``,
+        content: `Current combined memory content:\n\`\`\`markdown\n${flattenedMemory}\n\`\`\``,
         timestamp: new Date(),
       });
     } else {

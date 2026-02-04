@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import type { Config } from '../config/config.js';
+import type { HierarchicalMemory } from '../config/memory.js';
 import { GEMINI_DIR } from '../utils/paths.js';
 import { ApprovalMode } from '../policy/types.js';
 import * as snippets from './snippets.js';
@@ -37,7 +38,7 @@ export class PromptProvider {
    */
   getCoreSystemPrompt(
     config: Config,
-    userMemory?: string,
+    userMemory?: string | HierarchicalMemory,
     interactiveOverride?: boolean,
   ): string {
     const systemMdResolution = resolvePathFromEnv(

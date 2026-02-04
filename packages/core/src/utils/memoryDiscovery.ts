@@ -17,6 +17,7 @@ import { GEMINI_DIR, homedir } from './paths.js';
 import type { ExtensionLoader } from './extensionLoader.js';
 import { debugLogger } from './debugLogger.js';
 import type { Config } from '../config/config.js';
+import type { HierarchicalMemory } from '../config/memory.js';
 import { CoreEvent, coreEvents } from './events.js';
 
 // Simple console logger, similar to the one previously in CLI's config.ts
@@ -420,9 +421,30 @@ async function findUpwardGeminiFiles(
   return upwardPaths;
 }
 
+export async function loadExtensionMemory(
+  extensionLoader: ExtensionLoader,
+  debugMode: boolean = false,
+): Promise<MemoryLoadResult> {
+  const extensionPaths = extensionLoader
+    .getExtensions()
+    .filter((ext) => ext.isActive)
+    .flatMap((ext) => ext.contextFiles);
+
+  const sortedPaths = Array.from(new Set(extensionPaths)).sort();
+  const contents = await readGeminiMdFiles(sortedPaths, debugMode, 'tree');
+
+  return {
+    files: contents
+      .filter((item) => item.content !== null)
+      .map((item) => ({
+        path: item.filePath,
+        content: item.content as string,
+      })),
+  };
+}
+
 export async function loadEnvironmentMemory(
   trustedRoots: string[],
-  extensionLoader: ExtensionLoader,
   debugMode: boolean = false,
 ): Promise<MemoryLoadResult> {
   const allPaths = new Set<string>();
@@ -441,13 +463,6 @@ export async function loadEnvironmentMemory(
   const pathArrays = await Promise.all(traversalPromises);
   pathArrays.flat().forEach((p) => allPaths.add(p));
 
-  // Extensions
-  const extensionPaths = extensionLoader
-    .getExtensions()
-    .filter((ext) => ext.isActive)
-    .flatMap((ext) => ext.contextFiles);
-  extensionPaths.forEach((p) => allPaths.add(p));
-
   const sortedPaths = Array.from(allPaths).sort();
   const contents = await readGeminiMdFiles(sortedPaths, debugMode, 'tree');
 
@@ -462,7 +477,7 @@ export async function loadEnvironmentMemory(
 }
 
 export interface LoadServerHierarchicalMemoryResponse {
-  memoryContent: string;
+  memoryContent: HierarchicalMemory;
   fileCount: number;
   filePaths: string[];
 }
@@ -499,6 +514,10 @@ export async function loadServerHierarchicalMemory(
   // For the server, homedir() refers to the server process's home.
   // This is consistent with how MemoryTool already finds the global path.
   const userHomePath = homedir();
+  const globalGeminiDir = path.join(userHomePath, GEMINI_DIR);
+  const globalPaths: string[] = [];
+  const projectPaths: string[] = [];
+
   const filePaths = await getGeminiMdFilePathsInternal(
     currentWorkingDirectory,
     includeDirectoriesToReadGemini,
@@ -510,41 +529,67 @@ export async function loadServerHierarchicalMemory(
     maxDirs,
   );
 
-  // Add extension file paths separately since they may be conditionally enabled.
-  filePaths.push(
-    ...extensionLoader
-      .getExtensions()
-      .filter((ext) => ext.isActive)
-      .flatMap((ext) => ext.contextFiles),
-  );
+  for (const fPath of filePaths) {
+    if (fPath.startsWith(globalGeminiDir)) {
+      globalPaths.push(fPath);
+    } else {
+      projectPaths.push(fPath);
+    }
+  }
 
-  if (filePaths.length === 0) {
+  // Extensions
+  const extensionMemoryResult = await loadExtensionMemory(
+    extensionLoader,
+    debugMode,
+  );
+  const extensionPaths = extensionMemoryResult.files.map((f) => f.path);
+
+  const allFilePaths = [
+    ...globalPaths,
+    ...projectPaths,
+    ...extensionPaths,
+  ].filter((p, i, self) => self.indexOf(p) === i);
+
+  if (allFilePaths.length === 0) {
     if (debugMode)
       logger.debug('No GEMINI.md files found in hierarchy of the workspace.');
-    return { memoryContent: '', fileCount: 0, filePaths: [] };
+    return {
+      memoryContent: { global: '', extension: '', project: '' },
+      fileCount: 0,
+      filePaths: [],
+    };
   }
-  const contentsWithPaths = await readGeminiMdFiles(
-    filePaths,
+
+  const globalContents = await readGeminiMdFiles(
+    globalPaths,
     debugMode,
     importFormat,
   );
-  // Pass CWD for relative path display in concatenated content
-  const combinedInstructions = concatenateInstructions(
-    contentsWithPaths,
-    currentWorkingDirectory,
+  const projectContents = await readGeminiMdFiles(
+    projectPaths,
+    debugMode,
+    importFormat,
   );
-  if (debugMode)
-    logger.debug(
-      `Combined instructions length: ${combinedInstructions.length}`,
-    );
-  if (debugMode && combinedInstructions.length > 0)
-    logger.debug(
-      `Combined instructions (snippet): ${combinedInstructions.substring(0, 500)}...`,
-    );
+
+  const hierarchicalMemory: HierarchicalMemory = {
+    global: concatenateInstructions(globalContents, currentWorkingDirectory),
+    project: concatenateInstructions(projectContents, currentWorkingDirectory),
+    extension: concatenateInstructions(
+      extensionMemoryResult.files.map((f) => ({
+        filePath: f.path,
+        content: f.content,
+      })),
+      currentWorkingDirectory,
+    ),
+  };
+
   return {
-    memoryContent: combinedInstructions,
-    fileCount: contentsWithPaths.length,
-    filePaths,
+    memoryContent: hierarchicalMemory,
+    fileCount:
+      globalContents.length +
+      projectContents.length +
+      extensionMemoryResult.files.length,
+    filePaths: allFilePaths,
   };
 }
 
@@ -570,9 +615,12 @@ export async function refreshServerHierarchicalMemory(config: Config) {
   );
   const mcpInstructions =
     config.getMcpClientManager()?.getMcpInstructions() || '';
-  const finalMemory = [result.memoryContent, mcpInstructions.trimStart()]
-    .filter(Boolean)
-    .join('\n\n');
+  const finalMemory: HierarchicalMemory = {
+    ...result.memoryContent,
+    project: [result.memoryContent.project, mcpInstructions.trimStart()]
+      .filter(Boolean)
+      .join('\n\n'),
+  };
   config.setUserMemory(finalMemory);
   config.setGeminiMdFileCount(result.fileCount);
   config.setGeminiMdFilePaths(result.filePaths);

@@ -121,7 +121,7 @@ describe('memory commands', () => {
   describe('refreshMemory', () => {
     it('should refresh memory and show success message', async () => {
       mockRefresh.mockResolvedValue({
-        memoryContent: 'refreshed content',
+        memoryContent: { project: 'refreshed content' },
         fileCount: 2,
         filePaths: [],
       });
@@ -143,7 +143,7 @@ describe('memory commands', () => {
 
     it('should show a message if no memory content is found after refresh', async () => {
       mockRefresh.mockResolvedValue({
-        memoryContent: '',
+        memoryContent: { project: '' },
         fileCount: 0,
         filePaths: [],
       });

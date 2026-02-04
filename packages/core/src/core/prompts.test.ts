@@ -194,6 +194,36 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).toMatchSnapshot(); // Snapshot the combined prompt
   });
 
+  it('should render hierarchical memory with XML tags', () => {
+    vi.stubEnv('SANDBOX', undefined);
+    const memory = {
+      global: 'global context',
+      extension: 'extension context',
+      project: 'project context',
+    };
+    const prompt = getCoreSystemPrompt(mockConfig, memory);
+
+    expect(prompt).toContain(
+      '<global_context>\nglobal context\n</global_context>',
+    );
+    expect(prompt).toContain(
+      '<extension_context>\nextension context\n</extension_context>',
+    );
+    expect(prompt).toContain(
+      '<project_context>\nproject context\n</project_context>',
+    );
+    expect(prompt).toMatchSnapshot();
+  });
+
+  it('should include conflict resolution rules in core mandates', () => {
+    const prompt = getCoreSystemPrompt(mockConfig);
+    expect(prompt).toContain('# Core Mandates');
+    expect(prompt).toContain('Conflict Resolution:');
+    expect(prompt).toContain('<project_context>');
+    expect(prompt).toContain('<extension_context>');
+    expect(prompt).toContain('<global_context>');
+  });
+
   it('should match snapshot on Windows', () => {
     mockPlatform('win32');
     vi.stubEnv('SANDBOX', undefined);

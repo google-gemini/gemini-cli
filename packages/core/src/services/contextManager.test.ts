@@ -17,6 +17,7 @@ vi.mock('../utils/memoryDiscovery.js', async (importOriginal) => {
   return {
     ...actual,
     loadGlobalMemory: vi.fn(),
+    loadExtensionMemory: vi.fn(),
     loadEnvironmentMemory: vi.fn(),
     loadJitSubdirectoryMemory: vi.fn(),
     concatenateInstructions: vi
@@ -36,7 +37,9 @@ describe('ContextManager', () => {
       getWorkspaceContext: vi.fn().mockReturnValue({
         getDirectories: vi.fn().mockReturnValue(['/app']),
       }),
-      getExtensionLoader: vi.fn().mockReturnValue({}),
+      getExtensionLoader: vi.fn().mockReturnValue({
+        getExtensions: vi.fn().mockReturnValue([]),
+      }),
       getMcpClientManager: vi.fn().mockReturnValue({
         getMcpInstructions: vi.fn().mockReturnValue('MCP Instructions'),
       }),
@@ -46,6 +49,9 @@ describe('ContextManager', () => {
     contextManager = new ContextManager(mockConfig);
     vi.clearAllMocks();
     vi.spyOn(coreEvents, 'emit');
+    vi.mocked(memoryDiscovery.loadExtensionMemory).mockResolvedValue({
+      files: [],
+    });
   });
 
   describe('refresh', () => {
@@ -76,7 +82,6 @@ describe('ContextManager', () => {
 
       expect(memoryDiscovery.loadEnvironmentMemory).toHaveBeenCalledWith(
         ['/app'],
-        expect.anything(),
         false,
       );
       expect(contextManager.getEnvironmentMemory()).toContain(
