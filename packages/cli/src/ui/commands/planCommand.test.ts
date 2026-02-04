@@ -54,6 +54,7 @@ describe('planCommand', () => {
           isPlanEnabled: vi.fn(),
           setApprovalMode: vi.fn(),
           getApprovedPlanPath: vi.fn(),
+          getApprovalMode: vi.fn(),
           storage: {
             getProjectTempPlansDir: vi.fn().mockReturnValue('/mock/plans/dir'),
           },
