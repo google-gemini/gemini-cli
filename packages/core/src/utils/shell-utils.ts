@@ -544,12 +544,43 @@ export function parseCommandDetails(
 export function getShellConfiguration(): ShellConfiguration {
   if (isWindows()) {
     // Prefer Git Bash on Windows for better compatibility with AI-generated commands
-    const gitBashPaths = [
+    // Try multiple detection methods for robustness
+
+    // Method 1: Search for bash.exe in PATH
+    const pathEnv = process.env['PATH'] || '';
+    const pathDirs = pathEnv.split(path.delimiter);
+    for (const dir of pathDirs) {
+      const bashPath = path.join(dir, 'bash.exe');
+      try {
+        if (fs.existsSync(bashPath)) {
+          // Verify it's actually Git Bash by checking parent directories
+          const normalizedPath = bashPath.toLowerCase();
+          if (normalizedPath.includes('git')) {
+            return {
+              executable: bashPath,
+              argsPrefix: ['-c'],
+              shell: 'bash',
+            };
+          }
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    // Method 2: Check common Git for Windows installation paths
+    const commonPaths = [
       'C:\\Program Files\\Git\\bin\\bash.exe',
       'C:\\Program Files (x86)\\Git\\bin\\bash.exe',
-      `${process.env['PROGRAMFILES']}\\Git\\bin\\bash.exe`,
-    ];
-    for (const bashPath of gitBashPaths) {
+      process.env['PROGRAMFILES']
+        ? `${process.env['PROGRAMFILES']}\\Git\\bin\\bash.exe`
+        : null,
+      process.env['PROGRAMFILES(X86)']
+        ? `${process.env['PROGRAMFILES(X86)']}\\Git\\bin\\bash.exe`
+        : null,
+    ].filter((p): p is string => p !== null);
+
+    for (const bashPath of commonPaths) {
       try {
         if (fs.existsSync(bashPath)) {
           return {
@@ -559,7 +590,7 @@ export function getShellConfiguration(): ShellConfiguration {
           };
         }
       } catch {
-        // continue to next path
+        continue;
       }
     }
 
