@@ -90,7 +90,7 @@ describe('HookRegistry', () => {
       await hookRegistry.initialize();
 
       expect(hookRegistry.getAllHooks()).toHaveLength(0);
-      expect(mockDebugLogger.log).toHaveBeenCalledWith(
+      expect(mockDebugLogger.debug).toHaveBeenCalledWith(
         'Hook registry initialized with 0 hook entries',
       );
     });
