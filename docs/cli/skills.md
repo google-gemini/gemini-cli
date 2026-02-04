@@ -69,7 +69,7 @@ The `gemini skills` command provides management utilities:
 gemini skills list
 
 # Link agent skills from a local directory via symlink
-# Recursively discovers skills (**/SKILL.md) and creates symlinks in ~/.gemini/skills (user)
+# Discovers skills (SKILL.md or */SKILL.md) and creates symlinks in ~/.gemini/skills (user)
 gemini skills link /path/to/my-skills-repo
 
 # Link to the workspace scope (.gemini/skills)

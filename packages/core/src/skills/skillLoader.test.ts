@@ -255,62 +255,6 @@ description:no-space-desc
     expect(skills[0].description).toBe('no-space-desc');
   });
 
-  it('should recursively discover skills in nested subdirectories', async () => {
-    const nestedDir = path.join(testRootDir, 'group/subgroup/my-skill');
-    await fs.mkdir(nestedDir, { recursive: true });
-    const skillFile = path.join(nestedDir, 'SKILL.md');
-    await fs.writeFile(
-      skillFile,
-      `---
-name: nested-skill
-description: A nested skill
----
-`,
-    );
-
-    const skills = await loadSkillsFromDir(testRootDir, true);
-
-    expect(skills).toHaveLength(1);
-    expect(skills[0].name).toBe('nested-skill');
-    expect(skills[0].location).toBe(skillFile);
-  });
-
-  it('should NOT recursively discover skills by default', async () => {
-    const nestedDir = path.join(testRootDir, 'group/subgroup/my-skill');
-    await fs.mkdir(nestedDir, { recursive: true });
-    const skillFile = path.join(nestedDir, 'SKILL.md');
-    await fs.writeFile(
-      skillFile,
-      `---
-name: nested-skill
-description: A nested skill
----
-`,
-    );
-
-    const skills = await loadSkillsFromDir(testRootDir);
-
-    expect(skills).toHaveLength(0);
-  });
-
-  it('should follow symlinks to directories when recursive', async () => {
-    const skillSourceDir = path.join(testRootDir, 'source-skill');
-    await fs.mkdir(skillSourceDir, { recursive: true });
-    await fs.writeFile(
-      path.join(skillSourceDir, 'SKILL.md'),
-      '---\nname: symlinked-skill\ndescription: A symlinked skill\n---\n',
-    );
-
-    const linkDir = path.join(testRootDir, 'links');
-    await fs.mkdir(linkDir, { recursive: true });
-    await fs.symlink(skillSourceDir, path.join(linkDir, 'skill-link'), 'dir');
-
-    const skills = await loadSkillsFromDir(linkDir, true);
-
-    expect(skills).toHaveLength(1);
-    expect(skills[0].name).toBe('symlinked-skill');
-  });
-
   it('should sanitize skill names containing invalid filename characters', async () => {
     const skillFile = path.join(testRootDir, 'SKILL.md');
     await fs.writeFile(

@@ -93,8 +93,8 @@ describe('skillUtils', () => {
 
     it('should throw error if multiple skills with same name are discovered', async () => {
       const mockSkillSourceDir = path.join(tempDir, 'mock-skill-source');
-      const skillDir1 = path.join(mockSkillSourceDir, 'cat1/skill');
-      const skillDir2 = path.join(mockSkillSourceDir, 'cat2/skill');
+      const skillDir1 = path.join(mockSkillSourceDir, 'skill1');
+      const skillDir2 = path.join(mockSkillSourceDir, 'skill2');
       await fs.mkdir(skillDir1, { recursive: true });
       await fs.mkdir(skillDir2, { recursive: true });
       await fs.writeFile(

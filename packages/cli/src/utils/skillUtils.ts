@@ -201,7 +201,7 @@ export async function linkSkill(
   const sourcePath = path.resolve(source);
 
   onLog(`Searching for skills in ${sourcePath}...`);
-  const skills = await loadSkillsFromDir(sourcePath, true);
+  const skills = await loadSkillsFromDir(sourcePath);
 
   if (skills.length === 0) {
     throw new Error(

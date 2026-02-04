@@ -111,7 +111,6 @@ function parseSimpleFrontmatter(
  */
 export async function loadSkillsFromDir(
   dir: string,
-  recursive = false,
 ): Promise<SkillDefinition[]> {
   const discoveredSkills: SkillDefinition[] = [];
 
@@ -122,12 +121,11 @@ export async function loadSkillsFromDir(
       return [];
     }
 
-    const pattern = recursive ? '**/SKILL.md' : ['SKILL.md', '*/SKILL.md'];
+    const pattern = ['SKILL.md', '*/SKILL.md'];
     const skillFiles = await glob(pattern, {
       cwd: absoluteSearchPath,
       absolute: true,
       nodir: true,
-      follow: recursive,
       ignore: ['**/node_modules/**', '**/.git/**'],
     });
 
