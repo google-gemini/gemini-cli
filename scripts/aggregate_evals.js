@@ -38,6 +38,9 @@ function getModelFromPath(reportPath) {
   const artifactDir = parts.find((p) => p.startsWith('eval-logs-'));
   if (!artifactDir) return 'unknown';
 
+  const matchWorkflow = artifactDir.match(/^eval-logs-workflows-(.+)$/);
+  if (matchWorkflow) return `${matchWorkflow[1]} (Workflow)`;
+
   const matchNew = artifactDir.match(/^eval-logs-(.+)-(\d+)$/);
   if (matchNew) return matchNew[1];
 
