@@ -470,12 +470,13 @@ export class ToolRegistry {
    * Retrieves the list of tool schemas (FunctionDeclaration array).
    * Extracts the declarations from the ToolListUnion structure.
    * Includes discovered (vs registered) tools if configured.
+   * @param modelId Optional model identifier to get model-specific schemas.
    * @returns An array of FunctionDeclarations.
    */
-  getFunctionDeclarations(): FunctionDeclaration[] {
+  getFunctionDeclarations(modelId?: string): FunctionDeclaration[] {
     const declarations: FunctionDeclaration[] = [];
     this.getActiveTools().forEach((tool) => {
-      declarations.push(tool.schema);
+      declarations.push(tool.getSchema(modelId));
     });
     return declarations;
   }
@@ -483,14 +484,18 @@ export class ToolRegistry {
   /**
    * Retrieves a filtered list of tool schemas based on a list of tool names.
    * @param toolNames - An array of tool names to include.
+   * @param modelId Optional model identifier to get model-specific schemas.
    * @returns An array of FunctionDeclarations for the specified tools.
    */
-  getFunctionDeclarationsFiltered(toolNames: string[]): FunctionDeclaration[] {
+  getFunctionDeclarationsFiltered(
+    toolNames: string[],
+    modelId?: string,
+  ): FunctionDeclaration[] {
     const declarations: FunctionDeclaration[] = [];
     for (const name of toolNames) {
       const tool = this.getTool(name);
       if (tool) {
-        declarations.push(tool.schema);
+        declarations.push(tool.getSchema(modelId));
       }
     }
     return declarations;

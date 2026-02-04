@@ -312,8 +312,9 @@ export interface ToolBuilder<
 
   /**
    * Function declaration schema from @google/genai.
+   * @param modelId Optional model identifier to get a model-specific schema.
    */
-  schema: FunctionDeclaration;
+  getSchema(modelId?: string): FunctionDeclaration;
 
   /**
    * Whether the tool's output should be rendered as markdown.
@@ -355,7 +356,7 @@ export abstract class DeclarativeTool<
     readonly extensionId?: string,
   ) {}
 
-  get schema(): FunctionDeclaration {
+  getSchema(_modelId?: string): FunctionDeclaration {
     return {
       name: this.name,
       description: this.description,
@@ -486,7 +487,7 @@ export abstract class BaseDeclarativeTool<
 
   override validateToolParams(params: TParams): string | null {
     const errors = SchemaValidator.validate(
-      this.schema.parametersJsonSchema,
+      this.getSchema().parametersJsonSchema,
       params,
     );
 

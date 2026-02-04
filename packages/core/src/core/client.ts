@@ -253,9 +253,9 @@ export class GeminiClient {
     this.forceFullIdeContext = true;
   }
 
-  async setTools(): Promise<void> {
+  async setTools(modelId?: string): Promise<void> {
     const toolRegistry = this.config.getToolRegistry();
-    const toolDeclarations = toolRegistry.getFunctionDeclarations();
+    const toolDeclarations = toolRegistry.getFunctionDeclarations(modelId);
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
     this.getChat().setTools(tools);
   }
@@ -648,6 +648,10 @@ export class GeminiClient {
       yield { type: GeminiEventType.ModelInfo, value: modelToUse };
     }
     this.currentSequenceModel = modelToUse;
+
+    // Update tools with the final modelId to ensure model-dependent descriptions are used.
+    await this.setTools(modelToUse);
+
     const resultStream = turn.run(
       modelConfigKey,
       request,

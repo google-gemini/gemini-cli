@@ -43,6 +43,8 @@ import {
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { SHELL_DEFINITION } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
@@ -563,5 +565,20 @@ export class ShellTool extends BaseDeclarativeTool<
       _toolName,
       _toolDisplayName,
     );
+  }
+
+  override getSchema(modelId?: string) {
+    const declaration = modelId
+      ? resolveToolDeclaration(SHELL_DEFINITION, modelId)
+      : super.getSchema();
+
+    // Append platform-specific info which is currently not in the static definition
+    const platformInfo = getShellToolDescription(
+      this.config.getEnableInteractiveShell(),
+    );
+    return {
+      ...declaration,
+      description: `${declaration.description}\n\n${platformInfo}`,
+    };
   }
 }
