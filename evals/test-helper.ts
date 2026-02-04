@@ -7,9 +7,13 @@
 import { it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { execSync } from 'node:child_process';
 import { TestRig } from '@google/gemini-cli-test-utils';
-import { createUnauthorizedToolError } from '@google/gemini-cli-core';
+import {
+  createUnauthorizedToolError,
+  parseAgentMarkdown,
+} from '@google/gemini-cli-core';
 
 export * from '@google/gemini-cli-test-utils';
 
@@ -42,10 +46,55 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
       rig.setup(evalCase.name, evalCase.params);
 
       if (evalCase.files) {
+        const acknowledgedAgents: Record<string, Record<string, string>> = {};
+        const projectRoot = fs.realpathSync(rig.testDir!);
+
         for (const [filePath, content] of Object.entries(evalCase.files)) {
           const fullPath = path.join(rig.testDir!, filePath);
           fs.mkdirSync(path.dirname(fullPath), { recursive: true });
           fs.writeFileSync(fullPath, content);
+
+          // If it's an agent file, calculate hash for acknowledgement
+          if (
+            filePath.startsWith('.gemini/agents/') &&
+            filePath.endsWith('.md')
+          ) {
+            const hash = crypto
+              .createHash('sha256')
+              .update(content)
+              .digest('hex');
+
+            try {
+              const agentDefs = await parseAgentMarkdown(fullPath, content);
+              if (agentDefs.length > 0) {
+                const agentName = agentDefs[0].name;
+                if (!acknowledgedAgents[projectRoot]) {
+                  acknowledgedAgents[projectRoot] = {};
+                }
+                acknowledgedAgents[projectRoot][agentName] = hash;
+              }
+            } catch (error) {
+              console.warn(
+                `Failed to parse agent for test acknowledgement: ${filePath}`,
+                error,
+              );
+            }
+          }
+        }
+
+        // Write acknowledged_agents.json to the home directory
+        if (Object.keys(acknowledgedAgents).length > 0) {
+          const ackPath = path.join(
+            rig.homeDir!,
+            '.gemini',
+            'acknowledgments',
+            'agents.json',
+          );
+          fs.mkdirSync(path.dirname(ackPath), { recursive: true });
+          fs.writeFileSync(
+            ackPath,
+            JSON.stringify(acknowledgedAgents, null, 2),
+          );
         }
 
         const execOptions = { cwd: rig.testDir!, stdio: 'inherit' as const };
@@ -66,6 +115,7 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
       const result = await rig.run({
         args: evalCase.prompt,
         approvalMode: evalCase.approvalMode ?? 'yolo',
+        timeout: evalCase.timeout,
         env: {
           GEMINI_CLI_ACTIVITY_LOG_FILE: activityLogFile,
         },
@@ -86,6 +136,11 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
         await fs.promises.unlink(activityLogFile).catch((err) => {
           if (err.code !== 'ENOENT') throw err;
         });
+      }
+
+      if (rig._lastRunStderr) {
+        const stderrFile = path.join(logDir, `${sanitizedName}.stderr.log`);
+        await fs.promises.writeFile(stderrFile, rig._lastRunStderr);
       }
 
       await fs.promises.writeFile(
@@ -114,6 +169,7 @@ export interface EvalCase {
   name: string;
   params?: Record<string, any>;
   prompt: string;
+  timeout?: number;
   files?: Record<string, string>;
   approvalMode?: 'default' | 'auto_edit' | 'yolo' | 'plan';
   assert: (rig: TestRig, result: string) => Promise<void>;

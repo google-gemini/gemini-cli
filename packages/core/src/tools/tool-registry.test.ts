@@ -81,6 +81,18 @@ vi.mock('@google/genai', async () => {
   };
 });
 
+// Mock tool-names to provide a consistent alias for testing
+vi.mock('./tool-names.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./tool-names.js')>();
+  return {
+    ...actual,
+    TOOL_LEGACY_ALIASES: {
+      ...actual.TOOL_LEGACY_ALIASES,
+      legacy_test_tool: 'current_test_tool',
+    },
+  };
+});
+
 // Helper to create a mock CallableTool for specific test needs
 const createMockCallableTool = (
   toolDeclarations: FunctionDeclaration[],
@@ -583,6 +595,23 @@ describe('ToolRegistry', () => {
 
       expect(declarations).toHaveLength(1);
       expect(declarations[0].name).toBe(toolName);
+    });
+
+    it('should retrieve a tool using its legacy alias', async () => {
+      const legacyName = 'legacy_test_tool';
+      const currentName = 'current_test_tool';
+
+      const mockTool = new MockTool({
+        name: currentName,
+        description: 'Test Tool',
+        messageBus: mockMessageBus,
+      });
+
+      toolRegistry.registerTool(mockTool);
+
+      const retrievedTool = toolRegistry.getTool(legacyName);
+      expect(retrievedTool).toBeDefined();
+      expect(retrievedTool?.name).toBe(currentName);
     });
   });
 

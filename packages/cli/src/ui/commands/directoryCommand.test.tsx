@@ -86,6 +86,11 @@ describe('directoryCommand', () => {
         settings: {
           merged: {
             memoryDiscoveryMaxDirs: 1000,
+            security: {
+              folderTrust: {
+                enabled: false,
+              },
+            },
           },
         },
       },
