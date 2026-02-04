@@ -52,6 +52,7 @@ locations override lower ones: **Workspace > User > Extension**.
 Use the `/skills` slash command to view and manage available expertise:
 
 - `/skills list` (default): Shows all discovered skills and their status.
+- `/skills link <path>`: Links agent skills from a local directory via symlink.
 - `/skills disable <name>`: Prevents a specific skill from being used.
 - `/skills enable <name>`: Re-enables a disabled skill.
 - `/skills reload`: Refreshes the list of discovered skills from all tiers.
@@ -66,6 +67,13 @@ The `gemini skills` command provides management utilities:
 ```bash
 # List all discovered skills
 gemini skills list
+
+# Link agent skills from a local directory via symlink
+# Discovers skills (SKILL.md or */SKILL.md) and creates symlinks in ~/.gemini/skills (user)
+gemini skills link /path/to/my-skills-repo
+
+# Link to the workspace scope (.gemini/skills)
+gemini skills link /path/to/my-skills-repo --scope workspace
 
 # Install a skill from a Git repository, local directory, or zipped skill file (.skill)
 # Uses the user scope by default (~/.gemini/skills)
