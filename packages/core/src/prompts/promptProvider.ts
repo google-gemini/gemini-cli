@@ -48,6 +48,7 @@ export class PromptProvider {
     const isPlanMode = approvalMode === ApprovalMode.PLAN;
     const skills = config.getSkillManager().getSkills();
     const toolNames = config.getToolRegistry().getAllToolNames();
+    const enabledToolNames = new Set(toolNames);
 
     const desiredModel = resolveModel(
       config.getActiveModel(),
@@ -57,7 +58,7 @@ export class PromptProvider {
 
     // --- Context Gathering ---
     let planModeToolsList = PLAN_MODE_TOOLS.filter((t) =>
-      new Set(toolNames).has(t),
+      enabledToolNames.has(t),
     )
       .map((t) => `- \`${t}\``)
       .join('\n');
@@ -126,10 +127,10 @@ export class PromptProvider {
           'primaryWorkflows',
           () => ({
             interactive: interactiveMode,
-            enableCodebaseInvestigator: toolNames.includes(
+            enableCodebaseInvestigator: enabledToolNames.has(
               CodebaseInvestigatorAgent.name,
             ),
-            enableWriteTodosTool: toolNames.includes(WRITE_TODOS_TOOL_NAME),
+            enableWriteTodosTool: enabledToolNames.has(WRITE_TODOS_TOOL_NAME),
           }),
           !isPlanMode,
         ),
