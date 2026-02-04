@@ -12,12 +12,7 @@ import {
   type ToolConfirmationPayload,
   ToolConfirmationOutcome,
 } from '../tools/tools.js';
-import {
-  resolveEditorAsync,
-  type EditorType,
-  NO_EDITOR_AVAILABLE_ERROR,
-} from '../utils/editor.js';
-import { coreEvents } from '../utils/events.js';
+import type { EditorType } from '../utils/editor.js';
 import type { Config } from '../config/config.js';
 import { PolicyDecision } from '../policy/types.js';
 import { logToolCall } from '../telemetry/loggers.js';
@@ -756,16 +751,8 @@ export class CoreToolScheduler {
     } else if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
       const waitingToolCall = toolCall as WaitingToolCall;
 
-      const preferredEditor = this.getPreferredEditor();
-      const editor = await resolveEditorAsync(preferredEditor, signal);
-
-      if (!editor) {
-        // No editor available - emit error feedback and return to previous confirmation screen
-        coreEvents.emitFeedback('error', NO_EDITOR_AVAILABLE_ERROR);
-        this.setStatusInternal(callId, 'awaiting_approval', signal, {
-          ...waitingToolCall.confirmationDetails,
-          isModifying: false,
-        } as ToolCallConfirmationDetails);
+      const editorType = this.getPreferredEditor();
+      if (!editorType) {
         return;
       }
 
@@ -776,7 +763,7 @@ export class CoreToolScheduler {
 
       const result = await this.toolModifier.handleModifyWithEditor(
         waitingToolCall,
-        editor,
+        editorType,
         signal,
       );
 
