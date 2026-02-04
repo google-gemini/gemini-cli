@@ -136,10 +136,9 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
 # Core Mandates
 
 - **Context Efficiency:**
-  - Avoid wasting context window by scoping your searches to just the information needed to definitively answer the question. You can always search iteratively or search again with a larger scope if needed.
-  - You can use max_matches_per_file when searching broadly to limit the impact of each matching file.
-  - If you know you need a small number of results to complete your task, you can use total_max_matches to limit the response size.
-  - If you know that you need to find a match and need some surrounding context, you can request it with context, before, or after parameters. Take care to limit the total response size via one of the other parameters.
+  - Avoid wasting context window by scoping your searches to just the information needed to definitively answer the question. You can always search folders, file types, etc. iteratively or search again with a broader scope if needed.
+  - Use max_matches_per_file when searching broadly to limit the impact of each matching file. e.g.: "which files use NodeJS worker threads" only requires one match per file to answer.
+  - Use total_max_matches to limit the response size when you know that you only need a limited number. e.g.: "find me an example usage of path.resolve()" can use limit=5 to get 5 lines with locations to look instead of spending hundreds of tokens of context.
 
 - **Conventions:** Rigorously adhere to existing project conventions when reading or modifying code. Analyze surrounding code, tests, and configuration first.
 - **Libraries/Frameworks:** NEVER assume a library/framework is available or appropriate. Verify its established usage within the project (check imports, configuration files like 'package.json', 'Cargo.toml', 'requirements.txt', 'build.gradle', etc., or observe neighboring files) before employing it.
