@@ -394,8 +394,17 @@ export class GeminiChat {
               return; // Stop the generator
             }
 
+            // For connection phase errors, check if they are retryable
+            // (e.g., transient SSL errors like ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC)
             if (isConnectionPhase) {
-              throw error;
+              const isRetryable = isRetryableError(
+                error,
+                this.config.getRetryFetchErrors(),
+              );
+              if (!isRetryable || signal.aborted) {
+                throw error;
+              }
+              // Fall through to retry logic for retryable connection errors
             }
             lastError = error;
             const isContentError = error instanceof InvalidStreamError;
