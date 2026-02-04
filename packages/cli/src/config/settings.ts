@@ -16,7 +16,7 @@ import {
   Storage,
   coreEvents,
   homedir,
-  type FetchAdminControlsResponse,
+  type AdminControlsSettings,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/default-light.js';
@@ -76,6 +76,21 @@ export function getMergeStrategyForPath(
 export const USER_SETTINGS_PATH = Storage.getGlobalSettingsPath();
 export const USER_SETTINGS_DIR = path.dirname(USER_SETTINGS_PATH);
 export const DEFAULT_EXCLUDED_ENV_VARS = ['DEBUG', 'DEBUG_MODE'];
+
+const AUTH_ENV_VAR_WHITELIST = [
+  'GEMINI_API_KEY',
+  'GOOGLE_API_KEY',
+  'GOOGLE_CLOUD_PROJECT',
+  'GOOGLE_CLOUD_LOCATION',
+];
+
+/**
+ * Sanitizes an environment variable value to prevent shell injection.
+ * Restricts values to a safe character set: alphanumeric, -, _, ., /
+ */
+export function sanitizeEnvVar(value: string): string {
+  return value.replace(/[^a-zA-Z0-9\-_./]/g, '');
+}
 
 export function getSystemSettingsPath(): string {
   if (process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH']) {
@@ -277,8 +292,11 @@ export class LoadedSettings {
     this.system = system;
     this.systemDefaults = systemDefaults;
     this.user = user;
-    this.workspace = workspace;
+    this._workspaceFile = workspace;
     this.isTrusted = isTrusted;
+    this.workspace = isTrusted
+      ? workspace
+      : this.createEmptyWorkspace(workspace);
     this.errors = errors;
     this._merged = this.computeMergedSettings();
   }
@@ -286,15 +304,36 @@ export class LoadedSettings {
   readonly system: SettingsFile;
   readonly systemDefaults: SettingsFile;
   readonly user: SettingsFile;
-  readonly workspace: SettingsFile;
-  readonly isTrusted: boolean;
+  workspace: SettingsFile;
+  isTrusted: boolean;
   readonly errors: SettingsError[];
 
+  private _workspaceFile: SettingsFile;
   private _merged: MergedSettings;
   private _remoteAdminSettings: Partial<Settings> | undefined;
 
   get merged(): MergedSettings {
     return this._merged;
+  }
+
+  setTrusted(isTrusted: boolean): void {
+    if (this.isTrusted === isTrusted) {
+      return;
+    }
+    this.isTrusted = isTrusted;
+    this.workspace = isTrusted
+      ? this._workspaceFile
+      : this.createEmptyWorkspace(this._workspaceFile);
+    this._merged = this.computeMergedSettings();
+    coreEvents.emitSettingsChanged();
+  }
+
+  private createEmptyWorkspace(workspace: SettingsFile): SettingsFile {
+    return {
+      ...workspace,
+      settings: {},
+      originalSettings: {},
+    };
   }
 
   private computeMergedSettings(): MergedSettings {
@@ -341,21 +380,30 @@ export class LoadedSettings {
 
   setValue(scope: LoadableSettingScope, key: string, value: unknown): void {
     const settingsFile = this.forScope(scope);
-    setNestedProperty(settingsFile.settings, key, value);
-    setNestedProperty(settingsFile.originalSettings, key, value);
+
+    // Clone value to prevent reference sharing between settings and originalSettings
+    const valueToSet =
+      typeof value === 'object' && value !== null
+        ? structuredClone(value)
+        : value;
+
+    setNestedProperty(settingsFile.settings, key, valueToSet);
+    // Use a fresh clone for originalSettings to ensure total independence
+    setNestedProperty(
+      settingsFile.originalSettings,
+      key,
+      structuredClone(valueToSet),
+    );
+
     this._merged = this.computeMergedSettings();
     saveSettings(settingsFile);
     coreEvents.emitSettingsChanged();
   }
 
-  setRemoteAdminSettings(remoteSettings: FetchAdminControlsResponse): void {
+  setRemoteAdminSettings(remoteSettings: AdminControlsSettings): void {
     const admin: Settings['admin'] = {};
-    const {
-      secureModeEnabled,
-      strictModeDisabled,
-      mcpSetting,
-      cliFeatureSetting,
-    } = remoteSettings;
+    const { strictModeDisabled, mcpSetting, cliFeatureSetting } =
+      remoteSettings;
 
     if (Object.keys(remoteSettings).length === 0) {
       this._remoteAdminSettings = { admin };
@@ -363,19 +411,13 @@ export class LoadedSettings {
       return;
     }
 
-    if (strictModeDisabled !== undefined) {
-      admin.secureModeEnabled = !strictModeDisabled;
-    } else if (secureModeEnabled !== undefined) {
-      admin.secureModeEnabled = secureModeEnabled;
-    } else {
-      admin.secureModeEnabled = true;
-    }
-    admin.mcp = { enabled: mcpSetting?.mcpEnabled ?? false };
+    admin.secureModeEnabled = !strictModeDisabled;
+    admin.mcp = { enabled: mcpSetting?.mcpEnabled };
     admin.extensions = {
-      enabled: cliFeatureSetting?.extensionsSetting?.extensionsEnabled ?? false,
+      enabled: cliFeatureSetting?.extensionsSetting?.extensionsEnabled,
     };
     admin.skills = {
-      enabled: cliFeatureSetting?.unmanagedCapabilitiesEnabled ?? false,
+      enabled: cliFeatureSetting?.unmanagedCapabilitiesEnabled,
     };
 
     this._remoteAdminSettings = { admin };
@@ -412,26 +454,30 @@ function findEnvFile(startDir: string): string | null {
   }
 }
 
-export function setUpCloudShellEnvironment(envFilePath: string | null): void {
+export function setUpCloudShellEnvironment(
+  envFilePath: string | null,
+  isTrusted: boolean,
+  isSandboxed: boolean,
+): void {
   // Special handling for GOOGLE_CLOUD_PROJECT in Cloud Shell:
   // Because GOOGLE_CLOUD_PROJECT in Cloud Shell tracks the project
   // set by the user using "gcloud config set project" we do not want to
   // use its value. So, unless the user overrides GOOGLE_CLOUD_PROJECT in
   // one of the .env files, we set the Cloud Shell-specific default here.
+  let value = 'cloudshell-gca';
+
   if (envFilePath && fs.existsSync(envFilePath)) {
     const envFileContent = fs.readFileSync(envFilePath);
     const parsedEnv = dotenv.parse(envFileContent);
     if (parsedEnv['GOOGLE_CLOUD_PROJECT']) {
       // .env file takes precedence in Cloud Shell
-      process.env['GOOGLE_CLOUD_PROJECT'] = parsedEnv['GOOGLE_CLOUD_PROJECT'];
-    } else {
-      // If not in .env, set to default and override global
-      process.env['GOOGLE_CLOUD_PROJECT'] = 'cloudshell-gca';
+      value = parsedEnv['GOOGLE_CLOUD_PROJECT'];
+      if (!isTrusted && isSandboxed) {
+        value = sanitizeEnvVar(value);
+      }
     }
-  } else {
-    // If no .env file, set to default and override global
-    process.env['GOOGLE_CLOUD_PROJECT'] = 'cloudshell-gca';
   }
+  process.env['GOOGLE_CLOUD_PROJECT'] = value;
 }
 
 export function loadEnvironment(
@@ -442,13 +488,29 @@ export function loadEnvironment(
   const envFilePath = findEnvFile(workspaceDir);
   const trustResult = isWorkspaceTrustedFn(settings, workspaceDir);
 
-  if (trustResult.isTrusted !== true) {
+  const isTrusted = trustResult.isTrusted ?? false;
+  // Check settings OR check process.argv directly since this might be called
+  // before arguments are fully parsed. This is a best-effort sniffing approach
+  // that happens early in the CLI lifecycle. It is designed to detect the
+  // sandbox flag before the full command-line parser is initialized to ensure
+  // security constraints are applied when loading environment variables.
+  const args = process.argv.slice(2);
+  const doubleDashIndex = args.indexOf('--');
+  const relevantArgs =
+    doubleDashIndex === -1 ? args : args.slice(0, doubleDashIndex);
+
+  const isSandboxed =
+    !!settings.tools?.sandbox ||
+    relevantArgs.includes('-s') ||
+    relevantArgs.includes('--sandbox');
+
+  if (trustResult.isTrusted !== true && !isSandboxed) {
     return;
   }
 
   // Cloud Shell environment variable handling
   if (process.env['CLOUD_SHELL'] === 'true') {
-    setUpCloudShellEnvironment(envFilePath);
+    setUpCloudShellEnvironment(envFilePath, isTrusted, isSandboxed);
   }
 
   if (envFilePath) {
@@ -464,6 +526,16 @@ export function loadEnvironment(
 
       for (const key in parsedEnv) {
         if (Object.hasOwn(parsedEnv, key)) {
+          let value = parsedEnv[key];
+          // If the workspace is untrusted but we are sandboxed, only allow whitelisted variables.
+          if (!isTrusted && isSandboxed) {
+            if (!AUTH_ENV_VAR_WHITELIST.includes(key)) {
+              continue;
+            }
+            // Sanitize the value for untrusted sources
+            value = sanitizeEnvVar(value);
+          }
+
           // If it's a project .env file, skip loading excluded variables.
           if (isProjectEnvFile && excludedVars.includes(key)) {
             continue;
@@ -471,7 +543,7 @@ export function loadEnvironment(
 
           // Load variable only if it's not already set in the environment.
           if (!Object.hasOwn(process.env, key)) {
-            process.env[key] = parsedEnv[key];
+            process.env[key] = value;
           }
         }
       }
@@ -602,9 +674,10 @@ export function loadSettings(
   // For the initial trust check, we can only use user and system settings.
   const initialTrustCheckSettings = customDeepMerge(
     getMergeStrategyForPath,
-    {},
-    systemSettings,
+    getDefaultsFromSchema(),
+    systemDefaultSettings,
     userSettings,
+    systemSettings,
   );
   const isTrusted =
     isWorkspaceTrusted(initialTrustCheckSettings as Settings, workspaceDir)
@@ -682,57 +755,55 @@ export function migrateDeprecatedSettings(
   removeDeprecated = false,
 ): boolean {
   let anyModified = false;
+
+  const migrateBoolean = (
+    settings: Record<string, unknown>,
+    oldKey: string,
+    newKey: string,
+  ): boolean => {
+    let modified = false;
+    const oldValue = settings[oldKey];
+    const newValue = settings[newKey];
+
+    if (typeof oldValue === 'boolean') {
+      if (typeof newValue === 'boolean') {
+        // Both exist, trust the new one
+        if (removeDeprecated) {
+          delete settings[oldKey];
+          modified = true;
+        }
+      } else {
+        // Only old exists, migrate to new (inverted)
+        settings[newKey] = !oldValue;
+        if (removeDeprecated) {
+          delete settings[oldKey];
+        }
+        modified = true;
+      }
+    }
+    return modified;
+  };
+
   const processScope = (scope: LoadableSettingScope) => {
     const settings = loadedSettings.forScope(scope).settings;
 
-    // Migrate inverted boolean settings (disableX -> enableX)
-    // These settings were renamed and their boolean logic inverted
+    // Migrate general settings
     const generalSettings = settings.general as
       | Record<string, unknown>
       | undefined;
-    const uiSettings = settings.ui as Record<string, unknown> | undefined;
-    const contextSettings = settings.context as
-      | Record<string, unknown>
-      | undefined;
-
-    // Migrate general settings (disableAutoUpdate, disableUpdateNag)
     if (generalSettings) {
-      const newGeneral: Record<string, unknown> = { ...generalSettings };
+      const newGeneral = { ...generalSettings };
       let modified = false;
 
-      if (typeof newGeneral['disableAutoUpdate'] === 'boolean') {
-        if (typeof newGeneral['enableAutoUpdate'] === 'boolean') {
-          // Both exist, trust the new one
-          if (removeDeprecated) {
-            delete newGeneral['disableAutoUpdate'];
-            modified = true;
-          }
-        } else {
-          const oldValue = newGeneral['disableAutoUpdate'];
-          newGeneral['enableAutoUpdate'] = !oldValue;
-          if (removeDeprecated) {
-            delete newGeneral['disableAutoUpdate'];
-          }
-          modified = true;
-        }
-      }
-
-      if (typeof newGeneral['disableUpdateNag'] === 'boolean') {
-        if (typeof newGeneral['enableAutoUpdateNotification'] === 'boolean') {
-          // Both exist, trust the new one
-          if (removeDeprecated) {
-            delete newGeneral['disableUpdateNag'];
-            modified = true;
-          }
-        } else {
-          const oldValue = newGeneral['disableUpdateNag'];
-          newGeneral['enableAutoUpdateNotification'] = !oldValue;
-          if (removeDeprecated) {
-            delete newGeneral['disableUpdateNag'];
-          }
-          modified = true;
-        }
-      }
+      modified =
+        migrateBoolean(newGeneral, 'disableAutoUpdate', 'enableAutoUpdate') ||
+        modified;
+      modified =
+        migrateBoolean(
+          newGeneral,
+          'disableUpdateNag',
+          'enableAutoUpdateNotification',
+        ) || modified;
 
       if (modified) {
         loadedSettings.setValue(scope, 'general', newGeneral);
@@ -741,94 +812,63 @@ export function migrateDeprecatedSettings(
     }
 
     // Migrate ui settings
+    const uiSettings = settings.ui as Record<string, unknown> | undefined;
     if (uiSettings) {
-      const newUi: Record<string, unknown> = { ...uiSettings };
-      let modified = false;
-
-      // Migrate ui.accessibility.disableLoadingPhrases -> ui.accessibility.enableLoadingPhrases
+      const newUi = { ...uiSettings };
       const accessibilitySettings = newUi['accessibility'] as
         | Record<string, unknown>
         | undefined;
-      if (
-        accessibilitySettings &&
-        typeof accessibilitySettings['disableLoadingPhrases'] === 'boolean'
-      ) {
-        const newAccessibility: Record<string, unknown> = {
-          ...accessibilitySettings,
-        };
-        if (
-          typeof accessibilitySettings['enableLoadingPhrases'] === 'boolean'
-        ) {
-          // Both exist, trust the new one
-          if (removeDeprecated) {
-            delete newAccessibility['disableLoadingPhrases'];
-            newUi['accessibility'] = newAccessibility;
-            modified = true;
-          }
-        } else {
-          const oldValue = accessibilitySettings['disableLoadingPhrases'];
-          newAccessibility['enableLoadingPhrases'] = !oldValue;
-          if (removeDeprecated) {
-            delete newAccessibility['disableLoadingPhrases'];
-          }
-          newUi['accessibility'] = newAccessibility;
-          modified = true;
-        }
-      }
 
-      if (modified) {
-        loadedSettings.setValue(scope, 'ui', newUi);
-        anyModified = true;
+      if (accessibilitySettings) {
+        const newAccessibility = { ...accessibilitySettings };
+        if (
+          migrateBoolean(
+            newAccessibility,
+            'disableLoadingPhrases',
+            'enableLoadingPhrases',
+          )
+        ) {
+          newUi['accessibility'] = newAccessibility;
+          loadedSettings.setValue(scope, 'ui', newUi);
+          anyModified = true;
+        }
       }
     }
 
     // Migrate context settings
+    const contextSettings = settings.context as
+      | Record<string, unknown>
+      | undefined;
     if (contextSettings) {
-      const newContext: Record<string, unknown> = { ...contextSettings };
-      let modified = false;
-
-      // Migrate context.fileFiltering.disableFuzzySearch -> context.fileFiltering.enableFuzzySearch
+      const newContext = { ...contextSettings };
       const fileFilteringSettings = newContext['fileFiltering'] as
         | Record<string, unknown>
         | undefined;
-      if (
-        fileFilteringSettings &&
-        typeof fileFilteringSettings['disableFuzzySearch'] === 'boolean'
-      ) {
-        const newFileFiltering: Record<string, unknown> = {
-          ...fileFilteringSettings,
-        };
-        if (typeof fileFilteringSettings['enableFuzzySearch'] === 'boolean') {
-          // Both exist, trust the new one
-          if (removeDeprecated) {
-            delete newFileFiltering['disableFuzzySearch'];
-            newContext['fileFiltering'] = newFileFiltering;
-            modified = true;
-          }
-        } else {
-          const oldValue = fileFilteringSettings['disableFuzzySearch'];
-          newFileFiltering['enableFuzzySearch'] = !oldValue;
-          if (removeDeprecated) {
-            delete newFileFiltering['disableFuzzySearch'];
-          }
-          newContext['fileFiltering'] = newFileFiltering;
-          modified = true;
-        }
-      }
 
-      if (modified) {
-        loadedSettings.setValue(scope, 'context', newContext);
-        anyModified = true;
+      if (fileFilteringSettings) {
+        const newFileFiltering = { ...fileFilteringSettings };
+        if (
+          migrateBoolean(
+            newFileFiltering,
+            'disableFuzzySearch',
+            'enableFuzzySearch',
+          )
+        ) {
+          newContext['fileFiltering'] = newFileFiltering;
+          loadedSettings.setValue(scope, 'context', newContext);
+          anyModified = true;
+        }
       }
     }
 
     // Migrate experimental agent settings
-    anyModified ||= migrateExperimentalSettings(
-      settings,
-      loadedSettings,
-      scope,
-      removeDeprecated,
-    );
+    anyModified =
+      migrateExperimentalSettings(
+        settings,
+        loadedSettings,
+        scope,
+        removeDeprecated,
+      ) || anyModified;
   };
 
   processScope(SettingScope.User);
