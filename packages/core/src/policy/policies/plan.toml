@@ -60,12 +60,6 @@ priority = 50
 modes = ["plan"]
 
 [[rule]]
-toolName = "google_web_search"
-decision = "allow"
-priority = 50
-modes = ["plan"]
-
-[[rule]]
 toolName = "ask_user"
 decision = "ask_user"
 priority = 50
