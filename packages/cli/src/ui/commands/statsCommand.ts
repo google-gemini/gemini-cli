@@ -4,33 +4,53 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { HistoryItemStats } from '../types.js';
+import type {
+  HistoryItemStats,
+  HistoryItemModelStats,
+  HistoryItemToolStats,
+} from '../types.js';
 import { MessageType } from '../types.js';
 import { formatDuration } from '../utils/formatters.js';
+import { UserAccountManager } from '@google/gemini-cli-core';
 import {
   type CommandContext,
   type SlashCommand,
   CommandKind,
 } from './types.js';
 
+function getUserIdentity(context: CommandContext) {
+  const selectedAuthType =
+    context.services.settings.merged.security.auth.selectedType || '';
+
+  const userAccountManager = new UserAccountManager();
+  const cachedAccount = userAccountManager.getCachedGoogleAccount();
+  const userEmail = cachedAccount ?? undefined;
+
+  const tier = context.services.config?.getUserTierName();
+
+  return { selectedAuthType, userEmail, tier };
+}
+
 async function defaultSessionView(context: CommandContext) {
   const now = new Date();
   const { sessionStartTime } = context.session.stats;
   if (!sessionStartTime) {
-    context.ui.addItem(
-      {
-        type: MessageType.ERROR,
-        text: 'Session start time is unavailable, cannot calculate stats.',
-      },
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: 'Session start time is unavailable, cannot calculate stats.',
+    });
     return;
   }
   const wallDuration = now.getTime() - sessionStartTime.getTime();
 
+  const { selectedAuthType, userEmail, tier } = getUserIdentity(context);
+
   const statsItem: HistoryItemStats = {
     type: MessageType.STATS,
     duration: formatDuration(wallDuration),
+    selectedAuthType,
+    userEmail,
+    tier,
   };
 
   if (context.services.config) {
@@ -40,7 +60,7 @@ async function defaultSessionView(context: CommandContext) {
     }
   }
 
-  context.ui.addItem(statsItem, Date.now());
+  context.ui.addItem(statsItem);
 }
 
 export const statsCommand: SlashCommand = {
@@ -68,12 +88,13 @@ export const statsCommand: SlashCommand = {
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
       action: (context: CommandContext) => {
-        context.ui.addItem(
-          {
-            type: MessageType.MODEL_STATS,
-          },
-          Date.now(),
-        );
+        const { selectedAuthType, userEmail, tier } = getUserIdentity(context);
+        context.ui.addItem({
+          type: MessageType.MODEL_STATS,
+          selectedAuthType,
+          userEmail,
+          tier,
+        } as HistoryItemModelStats);
       },
     },
     {
@@ -82,12 +103,9 @@ export const statsCommand: SlashCommand = {
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
       action: (context: CommandContext) => {
-        context.ui.addItem(
-          {
-            type: MessageType.TOOL_STATS,
-          },
-          Date.now(),
-        );
+        context.ui.addItem({
+          type: MessageType.TOOL_STATS,
+        } as HistoryItemToolStats);
       },
     },
   ],

@@ -12,6 +12,7 @@ import {
   EVENT_API_ERROR,
   EVENT_API_RESPONSE,
   EVENT_TOOL_CALL,
+  EVENT_REWIND,
 } from './types.js';
 import type {
   ApiErrorEvent,
@@ -27,6 +28,7 @@ import type {
   LoopDetectedEvent,
   LoopDetectionDisabledEvent,
   SlashCommandEvent,
+  RewindEvent,
   ConversationFinishedEvent,
   ChatCompressionEvent,
   MalformedJsonResponseEvent,
@@ -41,16 +43,18 @@ import type {
   ExtensionUninstallEvent,
   ExtensionInstallEvent,
   ModelSlashCommandEvent,
-  SmartEditStrategyEvent,
-  SmartEditCorrectionEvent,
+  EditStrategyEvent,
+  EditCorrectionEvent,
   AgentStartEvent,
   AgentFinishEvent,
   RecoveryAttemptEvent,
   WebFetchFallbackAttemptEvent,
   ExtensionUpdateEvent,
-  LlmLoopCheckEvent,
+  ApprovalModeSwitchEvent,
+  ApprovalModeDurationEvent,
   HookCallEvent,
   StartupStatsEvent,
+  LlmLoopCheckEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -79,7 +83,7 @@ export function logCliConfiguration(
   config: Config,
   event: StartSessionEvent,
 ): void {
-  ClearcutLogger.getInstance(config)?.logStartSessionEvent(event);
+  void ClearcutLogger.getInstance(config)?.logStartSessionEvent(event);
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
     const logRecord: LogRecord = {
@@ -349,6 +353,24 @@ export function logSlashCommand(
   });
 }
 
+export function logRewind(config: Config, event: RewindEvent): void {
+  const uiEvent = {
+    ...event,
+    'event.name': EVENT_REWIND,
+    'event.timestamp': new Date().toISOString(),
+  } as UiEvent;
+  uiTelemetryService.addEvent(uiEvent);
+  ClearcutLogger.getInstance(config)?.logRewindEvent(event);
+  bufferTelemetryEvent(() => {
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    };
+    logger.emit(logRecord);
+  });
+}
+
 export function logIdeConnection(
   config: Config,
   event: IdeConnectionEvent,
@@ -568,11 +590,11 @@ export async function logExtensionDisable(
   });
 }
 
-export function logSmartEditStrategy(
+export function logEditStrategy(
   config: Config,
-  event: SmartEditStrategyEvent,
+  event: EditStrategyEvent,
 ): void {
-  ClearcutLogger.getInstance(config)?.logSmartEditStrategyEvent(event);
+  ClearcutLogger.getInstance(config)?.logEditStrategyEvent(event);
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
     const logRecord: LogRecord = {
@@ -583,11 +605,11 @@ export function logSmartEditStrategy(
   });
 }
 
-export function logSmartEditCorrectionEvent(
+export function logEditCorrectionEvent(
   config: Config,
-  event: SmartEditCorrectionEvent,
+  event: EditCorrectionEvent,
 ): void {
-  ClearcutLogger.getInstance(config)?.logSmartEditCorrectionEvent(event);
+  ClearcutLogger.getInstance(config)?.logEditCorrectionEvent(event);
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
     const logRecord: LogRecord = {
@@ -668,6 +690,32 @@ export function logLlmLoopCheck(
       attributes: event.toOpenTelemetryAttributes(config),
     };
     logger.emit(logRecord);
+  });
+}
+
+export function logApprovalModeSwitch(
+  config: Config,
+  event: ApprovalModeSwitchEvent,
+) {
+  ClearcutLogger.getInstance(config)?.logApprovalModeSwitchEvent(event);
+  bufferTelemetryEvent(() => {
+    logs.getLogger(SERVICE_NAME).emit({
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    });
+  });
+}
+
+export function logApprovalModeDuration(
+  config: Config,
+  event: ApprovalModeDurationEvent,
+) {
+  ClearcutLogger.getInstance(config)?.logApprovalModeDurationEvent(event);
+  bufferTelemetryEvent(() => {
+    logs.getLogger(SERVICE_NAME).emit({
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    });
   });
 }
 

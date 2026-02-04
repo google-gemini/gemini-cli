@@ -12,7 +12,6 @@ import {
 } from '../tools/tools.js';
 import type { Config } from '../config/config.js';
 import type { AgentDefinition, AgentInputs } from './types.js';
-import { convertInputConfigToJsonSchema } from './schema-utils.js';
 import { LocalSubagentInvocation } from './local-invocation.js';
 import { RemoteAgentInvocation } from './remote-invocation.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -38,21 +37,17 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
   constructor(
     private readonly definition: AgentDefinition,
     private readonly config: Config,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ) {
-    const parameterSchema = convertInputConfigToJsonSchema(
-      definition.inputConfig,
-    );
-
     super(
       definition.name,
       definition.displayName ?? definition.name,
       definition.description,
       Kind.Think,
-      parameterSchema,
+      definition.inputConfig.inputSchema,
+      messageBus,
       /* isOutputMarkdown */ true,
       /* canUpdateOutput */ true,
-      messageBus,
     );
   }
 
@@ -67,17 +62,30 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
    */
   protected createInvocation(
     params: AgentInputs,
+    messageBus: MessageBus,
+    _toolName?: string,
+    _toolDisplayName?: string,
   ): ToolInvocation<AgentInputs, ToolResult> {
     const definition = this.definition;
+    const effectiveMessageBus = messageBus;
+
     if (definition.kind === 'remote') {
-      return new RemoteAgentInvocation(definition, params, this.messageBus);
+      return new RemoteAgentInvocation(
+        definition,
+        params,
+        effectiveMessageBus,
+        _toolName,
+        _toolDisplayName,
+      );
     }
 
     return new LocalSubagentInvocation(
       definition,
       this.config,
       params,
-      this.messageBus,
+      effectiveMessageBus,
+      _toolName,
+      _toolDisplayName,
     );
   }
 }

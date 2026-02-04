@@ -33,6 +33,9 @@ vi.mock('../utils/events.js', () => ({
     emitConsoleLog: vi.fn(),
   },
 }));
+vi.mock('../utils/authConsent.js', () => ({
+  getConsentForOauth: vi.fn(() => Promise.resolve(true)),
+}));
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as http from 'node:http';
@@ -43,6 +46,7 @@ import type {
   OAuthClientRegistrationResponse,
 } from './oauth-provider.js';
 import { MCPOAuthProvider } from './oauth-provider.js';
+import { getConsentForOauth } from '../utils/authConsent.js';
 import type { OAuthToken } from './token-storage/types.js';
 import { MCPOAuthTokenStorage } from './oauth-token-storage.js';
 import {
@@ -51,6 +55,7 @@ import {
   type OAuthProtectedResourceMetadata,
 } from './oauth-utils.js';
 import { coreEvents } from '../utils/events.js';
+import { FatalCancellationError } from '../utils/errors.js';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -1006,6 +1011,254 @@ describe('MCPOAuthProvider', () => {
 
       global.setTimeout = originalSetTimeout;
     });
+
+    it('should use port from redirectUri if provided', async () => {
+      const configWithPort: MCPOAuthConfig = {
+        ...mockConfig,
+        redirectUri: 'http://localhost:12345/oauth/callback',
+      };
+
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          };
+          const mockRes = {
+            writeHead: vi.fn(),
+            end: vi.fn(),
+          };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+      mockHttpServer.address.mockReturnValue({
+        port: 12345,
+        address: '127.0.0.1',
+        family: 'IPv4',
+      });
+
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockTokenResponse),
+          json: mockTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      await authProvider.authenticate('test-server', configWithPort);
+
+      expect(mockHttpServer.listen).toHaveBeenCalledWith(
+        12345,
+        expect.any(Function),
+      );
+    });
+
+    it('should ignore invalid ports in redirectUri', async () => {
+      const configWithInvalidPort: MCPOAuthConfig = {
+        ...mockConfig,
+        redirectUri: 'http://localhost:invalid/oauth/callback',
+      };
+
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          };
+          const mockRes = {
+            writeHead: vi.fn(),
+            end: vi.fn(),
+          };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockTokenResponse),
+          json: mockTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      await authProvider.authenticate('test-server', configWithInvalidPort);
+
+      // Should be called with 0 (OS assigned) because the port was invalid
+      expect(mockHttpServer.listen).toHaveBeenCalledWith(
+        0,
+        expect.any(Function),
+      );
+    });
+
+    it('should not default to privileged ports when redirectUri has no port', async () => {
+      const configNoPort: MCPOAuthConfig = {
+        ...mockConfig,
+        redirectUri: 'http://localhost/oauth/callback',
+      };
+
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          };
+          const mockRes = {
+            writeHead: vi.fn(),
+            end: vi.fn(),
+          };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockTokenResponse),
+          json: mockTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      await authProvider.authenticate('test-server', configNoPort);
+
+      // Should be called with 0 (OS assigned), not 80
+      expect(mockHttpServer.listen).toHaveBeenCalledWith(
+        0,
+        expect.any(Function),
+      );
+    });
+    it('should include server name in the authentication message', async () => {
+      // Mock HTTP server callback
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        // Simulate OAuth callback
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          };
+          const mockRes = {
+            writeHead: vi.fn(),
+            end: vi.fn(),
+          };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+
+      // Mock token exchange
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockTokenResponse),
+          json: mockTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+
+      await authProvider.authenticate(
+        'production-server',
+        mockConfig,
+        undefined,
+      );
+
+      expect(getConsentForOauth).toHaveBeenCalledWith(
+        expect.stringContaining('production-server'),
+      );
+    });
+
+    it('should call openBrowserSecurely when consent is granted', async () => {
+      vi.mocked(getConsentForOauth).mockResolvedValue(true);
+
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        setTimeout(() => {
+          const req = {
+            url: '/oauth/callback?code=code&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          } as http.IncomingMessage;
+          const res = {
+            writeHead: vi.fn(),
+            end: vi.fn(),
+          } as unknown as http.ServerResponse;
+          (handler as http.RequestListener)(req, res);
+        }, 0);
+        return mockHttpServer as unknown as http.Server;
+      });
+      mockHttpServer.listen.mockImplementation((_port, callback) =>
+        callback?.(),
+      );
+      mockFetch.mockResolvedValue(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockTokenResponse),
+          json: mockTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      await authProvider.authenticate('test-server', mockConfig);
+
+      expect(mockOpenBrowserSecurely).toHaveBeenCalled();
+    });
+
+    it('should throw FatalCancellationError when consent is denied', async () => {
+      vi.mocked(getConsentForOauth).mockResolvedValue(false);
+      mockHttpServer.listen.mockImplementation((_port, callback) =>
+        callback?.(),
+      );
+
+      // Use fake timers to avoid hanging from the 5-minute timeout in startCallbackServer
+      vi.useFakeTimers();
+
+      const authProvider = new MCPOAuthProvider();
+      await expect(
+        authProvider.authenticate('test-server', mockConfig),
+      ).rejects.toThrow(FatalCancellationError);
+
+      expect(mockOpenBrowserSecurely).not.toHaveBeenCalled();
+      vi.useRealTimers();
+    });
   });
 
   describe('refreshAccessToken', () => {
@@ -1286,7 +1539,7 @@ describe('MCPOAuthProvider', () => {
       const authProvider = new MCPOAuthProvider();
       await authProvider.authenticate('test-server', mockConfig);
 
-      expect(crypto.randomBytes).toHaveBeenCalledWith(32); // code verifier
+      expect(crypto.randomBytes).toHaveBeenCalledWith(64); // code verifier
       expect(crypto.randomBytes).toHaveBeenCalledWith(16); // state
       expect(crypto.createHash).toHaveBeenCalledWith('sha256');
     });

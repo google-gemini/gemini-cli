@@ -4,19 +4,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { MemoryCommand } from './memory.js';
 import { debugLogger } from '@google/gemini-cli-core';
 import { ExtensionsCommand } from './extensions.js';
 import { InitCommand } from './init.js';
 import { RestoreCommand } from './restore.js';
 import type { Command } from './types.js';
 
-class CommandRegistry {
+export class CommandRegistry {
   private readonly commands = new Map<string, Command>();
 
   constructor() {
+    this.initialize();
+  }
+
+  initialize() {
+    this.commands.clear();
     this.register(new ExtensionsCommand());
     this.register(new RestoreCommand());
     this.register(new InitCommand());
+    this.register(new MemoryCommand());
   }
 
   register(command: Command) {

@@ -7,6 +7,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TerminalCapabilityManager } from './terminalCapabilityManager.js';
 import { EventEmitter } from 'node:events';
+import {
+  enableKittyKeyboardProtocol,
+  enableModifyOtherKeys,
+} from '@google/gemini-cli-core';
 
 // Mock fs
 vi.mock('node:fs', () => ({
@@ -23,6 +27,8 @@ vi.mock('@google/gemini-cli-core', () => ({
   disableKittyKeyboardProtocol: vi.fn(),
   enableModifyOtherKeys: vi.fn(),
   disableModifyOtherKeys: vi.fn(),
+  enableBracketedPasteMode: vi.fn(),
+  disableBracketedPasteMode: vi.fn(),
 }));
 
 describe('TerminalCapabilityManager', () => {
@@ -188,7 +194,8 @@ describe('TerminalCapabilityManager', () => {
       stdin.emit('data', Buffer.from('\x1b[?62c'));
 
       await promise;
-      expect(manager.isModifyOtherKeysEnabled()).toBe(true);
+
+      expect(enableModifyOtherKeys).toHaveBeenCalled();
     });
 
     it('should not enable modifyOtherKeys for level 0', async () => {
@@ -201,7 +208,8 @@ describe('TerminalCapabilityManager', () => {
       stdin.emit('data', Buffer.from('\x1b[?62c'));
 
       await promise;
-      expect(manager.isModifyOtherKeysEnabled()).toBe(false);
+
+      expect(enableModifyOtherKeys).not.toHaveBeenCalled();
     });
 
     it('should prefer Kitty over modifyOtherKeys', async () => {
@@ -216,7 +224,9 @@ describe('TerminalCapabilityManager', () => {
 
       await promise;
       expect(manager.isKittyProtocolEnabled()).toBe(true);
-      expect(manager.isModifyOtherKeysEnabled()).toBe(false);
+
+      expect(enableKittyKeyboardProtocol).toHaveBeenCalled();
+      expect(enableModifyOtherKeys).not.toHaveBeenCalled();
     });
 
     it('should enable modifyOtherKeys when Kitty not supported', async () => {
@@ -229,8 +239,9 @@ describe('TerminalCapabilityManager', () => {
       stdin.emit('data', Buffer.from('\x1b[?62c'));
 
       await promise;
-      expect(manager.isModifyOtherKeysEnabled()).toBe(true);
+
       expect(manager.isKittyProtocolEnabled()).toBe(false);
+      expect(enableModifyOtherKeys).toHaveBeenCalled();
     });
 
     it('should handle split modifyOtherKeys response chunks', async () => {
@@ -244,7 +255,8 @@ describe('TerminalCapabilityManager', () => {
       stdin.emit('data', Buffer.from('\x1b[?62c'));
 
       await promise;
-      expect(manager.isModifyOtherKeysEnabled()).toBe(true);
+
+      expect(enableModifyOtherKeys).toHaveBeenCalled();
     });
 
     it('should detect modifyOtherKeys with other capabilities', async () => {
@@ -261,7 +273,21 @@ describe('TerminalCapabilityManager', () => {
 
       expect(manager.getTerminalBackgroundColor()).toBe('#1a1a1a');
       expect(manager.getTerminalName()).toBe('tmux');
-      expect(manager.isModifyOtherKeysEnabled()).toBe(true);
+
+      expect(enableModifyOtherKeys).toHaveBeenCalled();
+    });
+
+    it('should not enable modifyOtherKeys without explicit response', async () => {
+      const manager = TerminalCapabilityManager.getInstance();
+      const promise = manager.detectCapabilities();
+
+      // Simulate only DA1 response (no specific MOK or Kitty response)
+      stdin.emit('data', Buffer.from('\x1b[?62c'));
+
+      await promise;
+
+      expect(manager.isKittyProtocolEnabled()).toBe(false);
+      expect(enableModifyOtherKeys).not.toHaveBeenCalled();
     });
   });
 });

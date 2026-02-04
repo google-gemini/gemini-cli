@@ -24,8 +24,13 @@ import {
   ReadManyFilesTool,
   type GeminiChat,
   type Config,
+  type MessageBus,
 } from '@google/gemini-cli-core';
-import { SettingScope, type LoadedSettings } from '../config/settings.js';
+import {
+  SettingScope,
+  type LoadedSettings,
+  loadSettings,
+} from '../config/settings.js';
 import { loadCliConfig, type CliArgs } from '../config/config.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -33,6 +38,14 @@ import * as path from 'node:path';
 vi.mock('../config/config.js', () => ({
   loadCliConfig: vi.fn(),
 }));
+
+vi.mock('../config/settings.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../config/settings.js')>();
+  return {
+    ...actual,
+    loadSettings: vi.fn(),
+  };
+});
 
 vi.mock('node:crypto', () => ({
   randomUUID: () => 'test-session-id',
@@ -94,8 +107,17 @@ describe('GeminiAgent', () => {
       initialize: vi.fn(),
       getFileSystemService: vi.fn(),
       setFileSystemService: vi.fn(),
+      getContentGeneratorConfig: vi.fn(),
+      getActiveModel: vi.fn().mockReturnValue('gemini-pro'),
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getPreviewFeatures: vi.fn().mockReturnValue({}),
       getGeminiClient: vi.fn().mockReturnValue({
         startChat: vi.fn().mockResolvedValue({}),
+      }),
+      getMessageBus: vi.fn().mockReturnValue({
+        publish: vi.fn(),
+        subscribe: vi.fn(),
+        unsubscribe: vi.fn(),
       }),
     } as unknown as Mocked<Awaited<ReturnType<typeof loadCliConfig>>>;
     mockSettings = {
@@ -111,6 +133,13 @@ describe('GeminiAgent', () => {
     } as unknown as Mocked<acp.AgentSideConnection>;
 
     (loadCliConfig as unknown as Mock).mockResolvedValue(mockConfig);
+    (loadSettings as unknown as Mock).mockImplementation(() => ({
+      merged: {
+        security: { auth: { selectedType: AuthType.LOGIN_WITH_GOOGLE } },
+        mcpServers: {},
+      },
+      setValue: vi.fn(),
+    }));
 
     agent = new GeminiAgent(mockConfig, mockSettings, mockArgv, mockConnection);
   });
@@ -123,7 +152,7 @@ describe('GeminiAgent', () => {
 
     expect(response.protocolVersion).toBe(acp.PROTOCOL_VERSION);
     expect(response.authMethods).toHaveLength(3);
-    expect(response.agentCapabilities?.loadSession).toBe(false);
+    expect(response.agentCapabilities?.loadSession).toBe(true);
   });
 
   it('should authenticate correctly', async () => {
@@ -142,6 +171,9 @@ describe('GeminiAgent', () => {
   });
 
   it('should create a new session', async () => {
+    mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
+      apiKey: 'test-key',
+    });
     const response = await agent.newSession({
       cwd: '/tmp',
       mcpServers: [],
@@ -151,6 +183,28 @@ describe('GeminiAgent', () => {
     expect(loadCliConfig).toHaveBeenCalled();
     expect(mockConfig.initialize).toHaveBeenCalled();
     expect(mockConfig.getGeminiClient).toHaveBeenCalled();
+  });
+
+  it('should fail session creation if Gemini API key is missing', async () => {
+    (loadSettings as unknown as Mock).mockImplementation(() => ({
+      merged: {
+        security: { auth: { selectedType: AuthType.USE_GEMINI } },
+        mcpServers: {},
+      },
+      setValue: vi.fn(),
+    }));
+    mockConfig.getContentGeneratorConfig = vi.fn().mockReturnValue({
+      apiKey: undefined,
+    });
+
+    await expect(
+      agent.newSession({
+        cwd: '/tmp',
+        mcpServers: [],
+      }),
+    ).rejects.toMatchObject({
+      message: 'Gemini API key is missing or not configured.',
+    });
   });
 
   it('should create a new session with mcp servers', async () => {
@@ -188,14 +242,14 @@ describe('GeminiAgent', () => {
     mockConfig.refreshAuth.mockRejectedValue(new Error('Auth failed'));
     const debugSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    // Should throw RequestError.authRequired()
+    // Should throw RequestError with custom message
     await expect(
       agent.newSession({
         cwd: '/tmp',
         mcpServers: [],
       }),
     ).rejects.toMatchObject({
-      message: 'Authentication required',
+      message: 'Auth failed',
     });
 
     debugSpy.mockRestore();
@@ -261,11 +315,13 @@ describe('Session', () => {
   let session: Session;
   let mockToolRegistry: { getTool: Mock };
   let mockTool: { kind: string; build: Mock };
+  let mockMessageBus: Mocked<MessageBus>;
 
   beforeEach(() => {
     mockChat = {
       sendMessageStream: vi.fn(),
       addHistory: vi.fn(),
+      recordCompletedToolCalls: vi.fn(),
     } as unknown as Mocked<GeminiChat>;
     mockTool = {
       kind: 'native',
@@ -279,8 +335,14 @@ describe('Session', () => {
     mockToolRegistry = {
       getTool: vi.fn().mockReturnValue(mockTool),
     };
+    mockMessageBus = {
+      publish: vi.fn(),
+      subscribe: vi.fn(),
+      unsubscribe: vi.fn(),
+    } as unknown as Mocked<MessageBus>;
     mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getActiveModel: vi.fn().mockReturnValue('gemini-pro'),
       getPreviewFeatures: vi.fn().mockReturnValue({}),
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
       getFileService: vi.fn().mockReturnValue({
@@ -290,6 +352,7 @@ describe('Session', () => {
       getTargetDir: vi.fn().mockReturnValue('/tmp'),
       getEnableRecursiveFileSearch: vi.fn().mockReturnValue(false),
       getDebugMode: vi.fn().mockReturnValue(false),
+      getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
     } as unknown as Mocked<Config>;
     mockConnection = {
       sessionUpdate: vi.fn(),

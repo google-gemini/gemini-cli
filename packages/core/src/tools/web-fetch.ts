@@ -114,7 +114,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
   constructor(
     private readonly config: Config,
     params: WebFetchToolParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
@@ -218,7 +218,8 @@ ${textContent}
   protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    // Legacy confirmation flow (no message bus OR policy decision was ASK_USER)
+    // Check for AUTO_EDIT approval mode. This tool has a specific behavior
+    // where ProceedAlways switches the entire session to AUTO_EDIT.
     if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
       return false;
     }
@@ -406,7 +407,7 @@ export class WebFetchTool extends BaseDeclarativeTool<
 
   constructor(
     private readonly config: Config,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
   ) {
     super(
       WebFetchTool.Name,
@@ -424,9 +425,9 @@ export class WebFetchTool extends BaseDeclarativeTool<
         required: ['prompt'],
         type: 'object',
       },
+      messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
-      messageBus,
     );
   }
 
@@ -452,7 +453,7 @@ export class WebFetchTool extends BaseDeclarativeTool<
 
   protected createInvocation(
     params: WebFetchToolParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ): ToolInvocation<WebFetchToolParams, ToolResult> {

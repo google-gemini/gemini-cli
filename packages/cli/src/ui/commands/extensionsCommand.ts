@@ -4,7 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { debugLogger, listExtensions } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  listExtensions,
+  type ExtensionInstallMetadata,
+} from '@google/gemini-cli-core';
 import type { ExtensionUpdateInfo } from '../../config/extension.js';
 import { getErrorMessage } from '../../utils/errors.js';
 import {
@@ -25,20 +29,19 @@ import {
   inferInstallMetadata,
 } from '../../config/extension-manager.js';
 import { SettingScope } from '../../config/settings.js';
+import { McpServerEnablementManager } from '../../config/mcp/mcpServerEnablement.js';
 import { theme } from '../semantic-colors.js';
+import { stat } from 'node:fs/promises';
 
 function showMessageIfNoExtensions(
   context: CommandContext,
   extensions: unknown[],
 ): boolean {
   if (extensions.length === 0) {
-    context.ui.addItem(
-      {
-        type: MessageType.INFO,
-        text: 'No extensions installed. Run `/extensions explore` to check out the gallery.',
-      },
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: MessageType.INFO,
+      text: 'No extensions installed. Run `/extensions explore` to check out the gallery.',
+    });
     return true;
   }
   return false;
@@ -58,7 +61,7 @@ async function listAction(context: CommandContext) {
     extensions,
   };
 
-  context.ui.addItem(historyItem, Date.now());
+  context.ui.addItem(historyItem);
 }
 
 function updateAction(context: CommandContext, args: string): Promise<void> {
@@ -67,13 +70,10 @@ function updateAction(context: CommandContext, args: string): Promise<void> {
   const names = all ? null : updateArgs;
 
   if (!all && names?.length === 0) {
-    context.ui.addItem(
-      {
-        type: MessageType.ERROR,
-        text: 'Usage: /extensions update <extension-names>|--all',
-      },
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: 'Usage: /extensions update <extension-names>|--all',
+    });
     return Promise.resolve();
   }
 
@@ -98,16 +98,13 @@ function updateAction(context: CommandContext, args: string): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-floating-promises
   updateComplete.then((updateInfos) => {
     if (updateInfos.length === 0) {
-      context.ui.addItem(
-        {
-          type: MessageType.INFO,
-          text: 'No extensions to update.',
-        },
-        Date.now(),
-      );
+      context.ui.addItem({
+        type: MessageType.INFO,
+        text: 'No extensions to update.',
+      });
     }
 
-    context.ui.addItem(historyItem, Date.now());
+    context.ui.addItem(historyItem);
     context.ui.setPendingItem(null);
   });
 
@@ -131,26 +128,20 @@ function updateAction(context: CommandContext, args: string): Promise<void> {
           (extension) => extension.name === name,
         );
         if (!extension) {
-          context.ui.addItem(
-            {
-              type: MessageType.ERROR,
-              text: `Extension ${name} not found.`,
-            },
-            Date.now(),
-          );
+          context.ui.addItem({
+            type: MessageType.ERROR,
+            text: `Extension ${name} not found.`,
+          });
           continue;
         }
       }
     }
   } catch (error) {
     resolveUpdateComplete!([]);
-    context.ui.addItem(
-      {
-        type: MessageType.ERROR,
-        text: getErrorMessage(error),
-      },
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: getErrorMessage(error),
+    });
   }
   return updateComplete.then((_) => {});
 }
@@ -161,13 +152,10 @@ async function restartAction(
 ): Promise<void> {
   const extensionLoader = context.services.config?.getExtensionLoader();
   if (!extensionLoader) {
-    context.ui.addItem(
-      {
-        type: MessageType.ERROR,
-        text: "Extensions are not yet loaded, can't restart yet",
-      },
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: "Extensions are not yet loaded, can't restart yet",
+    });
     return;
   }
 
@@ -180,13 +168,10 @@ async function restartAction(
   const all = restartArgs.length === 1 && restartArgs[0] === '--all';
   const names = all ? null : restartArgs;
   if (!all && names?.length === 0) {
-    context.ui.addItem(
-      {
-        type: MessageType.ERROR,
-        text: 'Usage: /extensions restart <extension-names>|--all',
-      },
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: 'Usage: /extensions restart <extension-names>|--all',
+    });
     return Promise.resolve();
   }
 
@@ -203,15 +188,10 @@ async function restartAction(
           !extensionsToRestart.some((extension) => extension.name === name),
       );
       if (notFound.length > 0) {
-        context.ui.addItem(
-          {
-            type: MessageType.WARNING,
-            text: `Extension(s) not found or not active: ${notFound.join(
-              ', ',
-            )}`,
-          },
-          Date.now(),
-        );
+        context.ui.addItem({
+          type: MessageType.WARNING,
+          text: `Extension(s) not found or not active: ${notFound.join(', ')}`,
+        });
       }
     }
   }
@@ -227,7 +207,7 @@ async function restartAction(
     text: `Restarting ${extensionsToRestart.length} extension${s}...`,
     color: theme.text.primary,
   };
-  context.ui.addItem(restartingMessage, Date.now());
+  context.ui.addItem(restartingMessage);
 
   const results = await Promise.allSettled(
     extensionsToRestart.map(async (extension) => {
@@ -254,13 +234,10 @@ async function restartAction(
         return `${extensionName}: ${getErrorMessage(failure.reason)}`;
       })
       .join('\n  ');
-    context.ui.addItem(
-      {
-        type: MessageType.ERROR,
-        text: `Failed to restart some extensions:\n  ${errorMessages}`,
-      },
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: `Failed to restart some extensions:\n  ${errorMessages}`,
+    });
   } else {
     const infoItem: HistoryItemInfo = {
       type: MessageType.INFO,
@@ -268,7 +245,7 @@ async function restartAction(
       icon: emptyIcon,
       color: theme.text.primary,
     };
-    context.ui.addItem(infoItem, Date.now());
+    context.ui.addItem(infoItem);
   }
 }
 
@@ -277,42 +254,30 @@ async function exploreAction(context: CommandContext) {
 
   // Only check for NODE_ENV for explicit test mode, not for unit test framework
   if (process.env['NODE_ENV'] === 'test') {
-    context.ui.addItem(
-      {
-        type: MessageType.INFO,
-        text: `Would open extensions page in your browser: ${extensionsUrl} (skipped in test environment)`,
-      },
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: MessageType.INFO,
+      text: `Would open extensions page in your browser: ${extensionsUrl} (skipped in test environment)`,
+    });
   } else if (
     process.env['SANDBOX'] &&
     process.env['SANDBOX'] !== 'sandbox-exec'
   ) {
-    context.ui.addItem(
-      {
-        type: MessageType.INFO,
-        text: `View available extensions at ${extensionsUrl}`,
-      },
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: MessageType.INFO,
+      text: `View available extensions at ${extensionsUrl}`,
+    });
   } else {
-    context.ui.addItem(
-      {
-        type: MessageType.INFO,
-        text: `Opening extensions page in your browser: ${extensionsUrl}`,
-      },
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: MessageType.INFO,
+      text: `Opening extensions page in your browser: ${extensionsUrl}`,
+    });
     try {
       await open(extensionsUrl);
     } catch (_error) {
-      context.ui.addItem(
-        {
-          type: MessageType.ERROR,
-          text: `Failed to open browser. Check out the extensions gallery at ${extensionsUrl}`,
-        },
-        Date.now(),
-      );
+      context.ui.addItem({
+        type: MessageType.ERROR,
+        text: `Failed to open browser. Check out the extensions gallery at ${extensionsUrl}`,
+      });
     }
   }
 }
@@ -341,13 +306,10 @@ function getEnableDisableContext(
       (parts.length === 3 && parts[1] === '--scope') // --scope <scope>
     )
   ) {
-    context.ui.addItem(
-      {
-        type: MessageType.ERROR,
-        text: `Usage: /extensions ${context.invocation?.name} <extension> [--scope=<user|workspace|session>]`,
-      },
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: `Usage: /extensions ${context.invocation?.name} <extension> [--scope=<user|workspace|session>]`,
+    });
     return null;
   }
   let scope: SettingScope;
@@ -367,13 +329,10 @@ function getEnableDisableContext(
       scope = SettingScope.Session;
       break;
     default:
-      context.ui.addItem(
-        {
-          type: MessageType.ERROR,
-          text: `Unsupported scope ${parts[2]}, should be one of "user", "workspace", or "session"`,
-        },
-        Date.now(),
-      );
+      context.ui.addItem({
+        type: MessageType.ERROR,
+        text: `Unsupported scope ${parts[2]}, should be one of "user", "workspace", or "session"`,
+      });
       debugLogger.error();
       return null;
   }
@@ -405,13 +364,10 @@ async function disableAction(context: CommandContext, args: string) {
   const { names, scope, extensionManager } = enableContext;
   for (const name of names) {
     await extensionManager.disableExtension(name, scope);
-    context.ui.addItem(
-      {
-        type: MessageType.INFO,
-        text: `Extension "${name}" disabled for the scope "${scope}"`,
-      },
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: MessageType.INFO,
+      text: `Extension "${name}" disabled for the scope "${scope}"`,
+    });
   }
 }
 
@@ -422,13 +378,42 @@ async function enableAction(context: CommandContext, args: string) {
   const { names, scope, extensionManager } = enableContext;
   for (const name of names) {
     await extensionManager.enableExtension(name, scope);
-    context.ui.addItem(
-      {
-        type: MessageType.INFO,
-        text: `Extension "${name}" enabled for the scope "${scope}"`,
-      },
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: MessageType.INFO,
+      text: `Extension "${name}" enabled for the scope "${scope}"`,
+    });
+
+    // Auto-enable any disabled MCP servers for this extension
+    const extension = extensionManager
+      .getExtensions()
+      .find((e) => e.name === name);
+
+    if (extension?.mcpServers) {
+      const mcpEnablementManager = McpServerEnablementManager.getInstance();
+      const mcpClientManager = context.services.config?.getMcpClientManager();
+      const enabledServers = await mcpEnablementManager.autoEnableServers(
+        Object.keys(extension.mcpServers ?? {}),
+      );
+
+      if (mcpClientManager && enabledServers.length > 0) {
+        const restartPromises = enabledServers.map((serverName) =>
+          mcpClientManager.restartServer(serverName).catch((error) => {
+            context.ui.addItem({
+              type: MessageType.WARNING,
+              text: `Failed to restart MCP server '${serverName}': ${getErrorMessage(error)}`,
+            });
+          }),
+        );
+        await Promise.all(restartPromises);
+      }
+
+      if (enabledServers.length > 0) {
+        context.ui.addItem({
+          type: MessageType.INFO,
+          text: `Re-enabled MCP servers: ${enabledServers.join(', ')}`,
+        });
+      }
+    }
   }
 }
 
@@ -443,13 +428,10 @@ async function installAction(context: CommandContext, args: string) {
 
   const source = args.trim();
   if (!source) {
-    context.ui.addItem(
-      {
-        type: MessageType.ERROR,
-        text: `Usage: /extensions install <source>`,
-      },
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: `Usage: /extensions install <source>`,
+    });
     return;
   }
 
@@ -468,45 +450,97 @@ async function installAction(context: CommandContext, args: string) {
   }
 
   if (!isValid) {
-    context.ui.addItem(
-      {
-        type: MessageType.ERROR,
-        text: `Invalid source: ${source}`,
-      },
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: `Invalid source: ${source}`,
+    });
     return;
   }
 
-  context.ui.addItem(
-    {
-      type: MessageType.INFO,
-      text: `Installing extension from "${source}"...`,
-    },
-    Date.now(),
-  );
+  context.ui.addItem({
+    type: MessageType.INFO,
+    text: `Installing extension from "${source}"...`,
+  });
 
   try {
     const installMetadata = await inferInstallMetadata(source);
     const extension =
       await extensionLoader.installOrUpdateExtension(installMetadata);
-    context.ui.addItem(
-      {
-        type: MessageType.INFO,
-        text: `Extension "${extension.name}" installed successfully.`,
-      },
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: MessageType.INFO,
+      text: `Extension "${extension.name}" installed successfully.`,
+    });
   } catch (error) {
-    context.ui.addItem(
-      {
-        type: MessageType.ERROR,
-        text: `Failed to install extension from "${source}": ${getErrorMessage(
-          error,
-        )}`,
-      },
-      Date.now(),
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: `Failed to install extension from "${source}": ${getErrorMessage(
+        error,
+      )}`,
+    });
+  }
+}
+
+async function linkAction(context: CommandContext, args: string) {
+  const extensionLoader = context.services.config?.getExtensionLoader();
+  if (!(extensionLoader instanceof ExtensionManager)) {
+    debugLogger.error(
+      `Cannot ${context.invocation?.name} extensions in this environment`,
     );
+    return;
+  }
+
+  const sourceFilepath = args.trim();
+  if (!sourceFilepath) {
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: `Usage: /extensions link <source>`,
+    });
+    return;
+  }
+  if (/[;&|`'"]/.test(sourceFilepath)) {
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: `Source file path contains disallowed characters: ${sourceFilepath}`,
+    });
+    return;
+  }
+
+  try {
+    await stat(sourceFilepath);
+  } catch (error) {
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: `Invalid source: ${sourceFilepath}`,
+    });
+    debugLogger.error(
+      `Failed to stat path "${sourceFilepath}": ${getErrorMessage(error)}`,
+    );
+    return;
+  }
+
+  context.ui.addItem({
+    type: MessageType.INFO,
+    text: `Linking extension from "${sourceFilepath}"...`,
+  });
+
+  try {
+    const installMetadata: ExtensionInstallMetadata = {
+      source: sourceFilepath,
+      type: 'link',
+    };
+    const extension =
+      await extensionLoader.installOrUpdateExtension(installMetadata);
+    context.ui.addItem({
+      type: MessageType.INFO,
+      text: `Extension "${extension.name}" linked successfully.`,
+    });
+  } catch (error) {
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: `Failed to link extension from "${sourceFilepath}": ${getErrorMessage(
+        error,
+      )}`,
+    });
   }
 }
 
@@ -521,43 +555,31 @@ async function uninstallAction(context: CommandContext, args: string) {
 
   const name = args.trim();
   if (!name) {
-    context.ui.addItem(
-      {
-        type: MessageType.ERROR,
-        text: `Usage: /extensions uninstall <extension-name>`,
-      },
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: `Usage: /extensions uninstall <extension-name>`,
+    });
     return;
   }
 
-  context.ui.addItem(
-    {
-      type: MessageType.INFO,
-      text: `Uninstalling extension "${name}"...`,
-    },
-    Date.now(),
-  );
+  context.ui.addItem({
+    type: MessageType.INFO,
+    text: `Uninstalling extension "${name}"...`,
+  });
 
   try {
     await extensionLoader.uninstallExtension(name, false);
-    context.ui.addItem(
-      {
-        type: MessageType.INFO,
-        text: `Extension "${name}" uninstalled successfully.`,
-      },
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: MessageType.INFO,
+      text: `Extension "${name}" uninstalled successfully.`,
+    });
   } catch (error) {
-    context.ui.addItem(
-      {
-        type: MessageType.ERROR,
-        text: `Failed to uninstall extension "${name}": ${getErrorMessage(
-          error,
-        )}`,
-      },
-      Date.now(),
-    );
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: `Failed to uninstall extension "${name}": ${getErrorMessage(
+        error,
+      )}`,
+    });
   }
 }
 
@@ -645,6 +667,14 @@ const installCommand: SlashCommand = {
   action: installAction,
 };
 
+const linkCommand: SlashCommand = {
+  name: 'link',
+  description: 'Link an extension from a local path',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: false,
+  action: linkAction,
+};
+
 const uninstallCommand: SlashCommand = {
   name: 'uninstall',
   description: 'Uninstall an extension',
@@ -675,7 +705,13 @@ export function extensionsCommand(
   enableExtensionReloading?: boolean,
 ): SlashCommand {
   const conditionalCommands = enableExtensionReloading
-    ? [disableCommand, enableCommand, installCommand, uninstallCommand]
+    ? [
+        disableCommand,
+        enableCommand,
+        installCommand,
+        uninstallCommand,
+        linkCommand,
+      ]
     : [];
   return {
     name: 'extensions',

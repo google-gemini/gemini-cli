@@ -5,13 +5,13 @@
  */
 
 import { render } from '../../test-utils/render.js';
-import { act } from 'react-dom/test-utils';
+import { act } from 'react';
 import {
   MultiFolderTrustDialog,
   MultiFolderTrustChoice,
   type MultiFolderTrustDialogProps,
 } from './MultiFolderTrustDialog.js';
-import { vi } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import {
   TrustLevel,
   type LoadedTrustedFolders,
@@ -22,6 +22,7 @@ import type { Config } from '@google/gemini-cli-core';
 import { MessageType } from '../types.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
+import * as path from 'node:path';
 
 // Mocks
 vi.mock('../hooks/useKeypress.js');
@@ -64,7 +65,7 @@ describe('MultiFolderTrustDialog', () => {
     vi.mocked(trustedFolders.loadTrustedFolders).mockReturnValue(
       mockTrustedFolders,
     );
-    vi.mocked(directoryUtils.expandHomeDir).mockImplementation((path) => path);
+    vi.mocked(directoryUtils.expandHomeDir).mockImplementation((p) => p);
     mockedRadioButtonSelect.mockImplementation((props) => (
       <div data-testid="RadioButtonSelect" {...props} />
     ));
@@ -91,10 +92,10 @@ describe('MultiFolderTrustDialog', () => {
     await act(async () => {
       keypressCallback({
         name: 'escape',
-        ctrl: false,
-        meta: false,
         shift: false,
-        paste: false,
+        alt: false,
+        ctrl: false,
+        cmd: false,
         sequence: '',
         insertable: false,
       });
@@ -148,8 +149,12 @@ describe('MultiFolderTrustDialog', () => {
       onSelect(MultiFolderTrustChoice.YES);
     });
 
-    expect(mockAddDirectory).toHaveBeenCalledWith('/path/to/folder1');
-    expect(mockAddDirectory).toHaveBeenCalledWith('/path/to/folder2');
+    expect(mockAddDirectory).toHaveBeenCalledWith(
+      path.resolve('/path/to/folder1'),
+    );
+    expect(mockAddDirectory).toHaveBeenCalledWith(
+      path.resolve('/path/to/folder2'),
+    );
     expect(mockSetValue).not.toHaveBeenCalled();
     expect(mockFinishAddingDirectories).toHaveBeenCalledWith(
       mockConfig,
@@ -169,9 +174,11 @@ describe('MultiFolderTrustDialog', () => {
       onSelect(MultiFolderTrustChoice.YES_AND_REMEMBER);
     });
 
-    expect(mockAddDirectory).toHaveBeenCalledWith('/path/to/folder1');
+    expect(mockAddDirectory).toHaveBeenCalledWith(
+      path.resolve('/path/to/folder1'),
+    );
     expect(mockSetValue).toHaveBeenCalledWith(
-      '/path/to/folder1',
+      path.resolve('/path/to/folder1'),
       TrustLevel.TRUST_FOLDER,
     );
     expect(mockFinishAddingDirectories).toHaveBeenCalledWith(
@@ -213,13 +220,10 @@ describe('MultiFolderTrustDialog', () => {
       onSelect(MultiFolderTrustChoice.YES);
     });
 
-    expect(mockAddItem).toHaveBeenCalledWith(
-      {
-        type: MessageType.ERROR,
-        text: 'Configuration is not available.',
-      },
-      expect.any(Number),
-    );
+    expect(mockAddItem).toHaveBeenCalledWith({
+      type: MessageType.ERROR,
+      text: 'Configuration is not available.',
+    });
     expect(mockOnComplete).toHaveBeenCalled();
     expect(mockFinishAddingDirectories).not.toHaveBeenCalled();
   });
@@ -246,8 +250,12 @@ describe('MultiFolderTrustDialog', () => {
       onSelect(MultiFolderTrustChoice.YES);
     });
 
-    expect(mockAddDirectory).toHaveBeenCalledWith('/path/to/good');
-    expect(mockAddDirectory).not.toHaveBeenCalledWith('/path/to/error');
+    expect(mockAddDirectory).toHaveBeenCalledWith(
+      path.resolve('/path/to/good'),
+    );
+    expect(mockAddDirectory).not.toHaveBeenCalledWith(
+      path.resolve('/path/to/error'),
+    );
     expect(mockFinishAddingDirectories).toHaveBeenCalledWith(
       mockConfig,
       mockAddItem,

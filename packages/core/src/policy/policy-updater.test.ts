@@ -72,14 +72,14 @@ describe('createPolicyUpdater', () => {
       1,
       expect.objectContaining({
         toolName: 'run_shell_command',
-        argsPattern: new RegExp('"command":"echo(?:[\\s"]|$)'),
+        argsPattern: new RegExp('"command":"echo(?:[\\s"]|\\\\")'),
       }),
     );
     expect(policyEngine.addRule).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
         toolName: 'run_shell_command',
-        argsPattern: new RegExp('"command":"ls(?:[\\s"]|$)'),
+        argsPattern: new RegExp('"command":"ls(?:[\\s"]|\\\\")'),
       }),
     );
   });
@@ -98,7 +98,7 @@ describe('createPolicyUpdater', () => {
     expect(policyEngine.addRule).toHaveBeenCalledWith(
       expect.objectContaining({
         toolName: 'run_shell_command',
-        argsPattern: new RegExp('"command":"git(?:[\\s"]|$)'),
+        argsPattern: new RegExp('"command":"git(?:[\\s"]|\\\\")'),
       }),
     );
   });
@@ -152,7 +152,6 @@ describe('ShellToolInvocation Policy Update', () => {
     const invocation = new ShellToolInvocation(
       mockConfig,
       { command: 'git status && npm test' },
-      new Set(),
       mockMessageBus,
       'run_shell_command',
       'Shell',
@@ -174,7 +173,6 @@ describe('ShellToolInvocation Policy Update', () => {
     const invocation = new ShellToolInvocation(
       mockConfig,
       { command: 'ls -la /tmp' },
-      new Set(),
       mockMessageBus,
       'run_shell_command',
       'Shell',

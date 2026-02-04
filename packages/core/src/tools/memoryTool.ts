@@ -179,7 +179,7 @@ class MemoryToolInvocation extends BaseToolInvocation<
 
   constructor(
     params: SaveMemoryParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     toolName?: string,
     displayName?: string,
   ) {
@@ -298,16 +298,16 @@ export class MemoryTool
 {
   static readonly Name = MEMORY_TOOL_NAME;
 
-  constructor(messageBus?: MessageBus) {
+  constructor(messageBus: MessageBus) {
     super(
       MemoryTool.Name,
       'SaveMemory',
       memoryToolDescription,
       Kind.Think,
       memoryToolSchemaData.parametersJsonSchema as Record<string, unknown>,
+      messageBus,
       true,
       false,
-      messageBus,
     );
   }
 
@@ -323,13 +323,13 @@ export class MemoryTool
 
   protected createInvocation(
     params: SaveMemoryParams,
-    messageBus?: MessageBus,
+    messageBus: MessageBus,
     toolName?: string,
     displayName?: string,
   ) {
     return new MemoryToolInvocation(
       params,
-      messageBus ?? this.messageBus,
+      messageBus,
       toolName ?? this.name,
       displayName ?? this.displayName,
     );

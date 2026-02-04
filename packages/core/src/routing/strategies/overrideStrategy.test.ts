@@ -56,4 +56,25 @@ describe('OverrideStrategy', () => {
     expect(decision).not.toBeNull();
     expect(decision?.model).toBe(overrideModel);
   });
+
+  it('should respect requestedModel from context', async () => {
+    const requestedModel = 'requested-model';
+    const configModel = 'config-model';
+    const mockConfig = {
+      getModel: () => configModel,
+      getPreviewFeatures: () => false,
+    } as Config;
+    const contextWithRequestedModel = {
+      requestedModel,
+    } as RoutingContext;
+
+    const decision = await strategy.route(
+      contextWithRequestedModel,
+      mockConfig,
+      mockClient,
+    );
+
+    expect(decision).not.toBeNull();
+    expect(decision?.model).toBe(requestedModel);
+  });
 });

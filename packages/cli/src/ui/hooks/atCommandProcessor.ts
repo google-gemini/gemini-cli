@@ -18,11 +18,16 @@ import {
   isNodeError,
   unescapePath,
   ReadManyFilesTool,
+  REFERENCE_CONTENT_START,
+  REFERENCE_CONTENT_END,
 } from '@google/gemini-cli-core';
 import { Buffer } from 'node:buffer';
 import type { HistoryItem, IndividualToolCallDisplay } from '../types.js';
 import { ToolCallStatus } from '../types.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
+
+const REF_CONTENT_HEADER = `\n${REFERENCE_CONTENT_START}`;
+const REF_CONTENT_FOOTER = `\n${REFERENCE_CONTENT_END}`;
 
 interface HandleAtCommandParams {
   query: string;
@@ -155,6 +160,7 @@ export async function handleAtCommand({
   const pathSpecsToRead: string[] = [];
   const resourceAttachments: DiscoveredMCPResource[] = [];
   const atPathToResolvedSpecMap = new Map<string, string>();
+  const agentsFound: string[] = [];
   const fileLabelsForDisplay: string[] = [];
   const absoluteToRelativePathMap = new Map<string, string>();
   const ignoredByReason: Record<string, string[]> = {
@@ -164,7 +170,10 @@ export async function handleAtCommand({
   };
 
   const toolRegistry = config.getToolRegistry();
-  const readManyFilesTool = new ReadManyFilesTool(config);
+  const readManyFilesTool = new ReadManyFilesTool(
+    config,
+    config.getMessageBus(),
+  );
   const globTool = toolRegistry.getTool('glob');
 
   if (!readManyFilesTool) {
@@ -205,6 +214,14 @@ export async function handleAtCommand({
       return { processedQuery: null, error: errMsg };
     }
 
+    // Check if this is an Agent reference
+    const agentRegistry = config.getAgentRegistry?.();
+    if (agentRegistry?.getDefinition(pathName)) {
+      agentsFound.push(pathName);
+      atPathToResolvedSpecMap.set(originalAtPath, pathName);
+      continue;
+    }
+
     // Check if this is an MCP resource reference (serverName:uri format)
     const resourceMatch = resourceRegistry.findResourceByUri(pathName);
     if (resourceMatch) {
@@ -213,8 +230,11 @@ export async function handleAtCommand({
       continue;
     }
 
-    const workspaceContext = config.getWorkspaceContext();
-    if (!workspaceContext.isPathWithinWorkspace(pathName)) {
+    const resolvedPathName = path.isAbsolute(pathName)
+      ? pathName
+      : path.resolve(config.getTargetDir(), pathName);
+
+    if (!config.isPathAllowed(resolvedPathName)) {
       onDebugMessage(
         `Path ${pathName} is not in the workspace and will be skipped.`,
       );
@@ -417,7 +437,11 @@ export async function handleAtCommand({
   }
 
   // Fallback for lone "@" or completely invalid @-commands resulting in empty initialQueryText
-  if (pathSpecsToRead.length === 0 && resourceAttachments.length === 0) {
+  if (
+    pathSpecsToRead.length === 0 &&
+    resourceAttachments.length === 0 &&
+    agentsFound.length === 0
+  ) {
     onDebugMessage('No valid file paths found in @ commands to read.');
     if (initialQueryText === '@' && query.trim() === '@') {
       // If the only thing was a lone @, pass original query (which might have spaces)
@@ -431,6 +455,14 @@ export async function handleAtCommand({
   }
 
   const processedQueryParts: PartListUnion = [{ text: initialQueryText }];
+
+  if (agentsFound.length > 0) {
+    const toolsList = agentsFound.map((agent) => `'${agent}'`).join(', ');
+    const agentNudge = `\n<system_note>\nThe user has explicitly selected the following agent(s): ${agentsFound.join(
+      ', ',
+    )}. Please use the following tool(s) to delegate the task: ${toolsList}.\n</system_note>\n`;
+    processedQueryParts.push({ text: agentNudge });
+  }
 
   const resourcePromises = resourceAttachments.map(async (resource) => {
     const uri = resource.uri;
@@ -476,10 +508,17 @@ export async function handleAtCommand({
   const resourceResults = await Promise.all(resourcePromises);
   const resourceReadDisplays: IndividualToolCallDisplay[] = [];
   let resourceErrorOccurred = false;
+  let hasAddedReferenceHeader = false;
 
   for (const result of resourceResults) {
     resourceReadDisplays.push(result.display);
     if (result.success) {
+      if (!hasAddedReferenceHeader) {
+        processedQueryParts.push({
+          text: REF_CONTENT_HEADER,
+        });
+        hasAddedReferenceHeader = true;
+      }
       processedQueryParts.push({ text: `\nContent from @${result.uri}:\n` });
       processedQueryParts.push(...result.parts);
     } else {
@@ -517,6 +556,9 @@ export async function handleAtCommand({
         userMessageTimestamp,
       );
     }
+    if (hasAddedReferenceHeader) {
+      processedQueryParts.push({ text: REF_CONTENT_FOOTER });
+    }
     return { processedQuery: processedQueryParts };
   }
 
@@ -547,9 +589,12 @@ export async function handleAtCommand({
 
     if (Array.isArray(result.llmContent)) {
       const fileContentRegex = /^--- (.*?) ---\n\n([\s\S]*?)\n\n$/;
-      processedQueryParts.push({
-        text: '\n--- Content from referenced files ---',
-      });
+      if (!hasAddedReferenceHeader) {
+        processedQueryParts.push({
+          text: REF_CONTENT_HEADER,
+        });
+        hasAddedReferenceHeader = true;
+      }
       for (const part of result.llmContent) {
         if (typeof part === 'string') {
           const match = fileContentRegex.exec(part);

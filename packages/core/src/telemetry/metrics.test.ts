@@ -478,6 +478,8 @@ describe('Telemetry Metrics', () => {
         'user.email': 'test@example.com',
         'routing.decision_model': 'gemini-pro',
         'routing.decision_source': 'default',
+        'routing.failed': false,
+        'routing.reasoning': 'test-reason',
       });
       // The session counter is called once on init
       expect(mockCounterAddFn).toHaveBeenCalledTimes(1);
@@ -487,7 +489,7 @@ describe('Telemetry Metrics', () => {
       initializeMetricsModule(mockConfig);
       const event = new ModelRoutingEvent(
         'gemini-pro',
-        'classifier',
+        'Classifier',
         200,
         'test-reason',
         true,
@@ -500,7 +502,9 @@ describe('Telemetry Metrics', () => {
         'installation.id': 'test-installation-id',
         'user.email': 'test@example.com',
         'routing.decision_model': 'gemini-pro',
-        'routing.decision_source': 'classifier',
+        'routing.decision_source': 'Classifier',
+        'routing.failed': true,
+        'routing.reasoning': 'test-reason',
       });
 
       expect(mockCounterAddFn).toHaveBeenCalledTimes(2);
@@ -508,7 +512,10 @@ describe('Telemetry Metrics', () => {
         'session.id': 'test-session-id',
         'installation.id': 'test-installation-id',
         'user.email': 'test@example.com',
-        'routing.decision_source': 'classifier',
+        'routing.decision_model': 'gemini-pro',
+        'routing.decision_source': 'Classifier',
+        'routing.failed': true,
+        'routing.reasoning': 'test-reason',
         'routing.error_message': 'test-error',
       });
     });

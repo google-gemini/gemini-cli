@@ -25,6 +25,16 @@ export function registerSyncCleanup(fn: () => void) {
   syncCleanupFunctions.push(fn);
 }
 
+/**
+ * Resets the internal cleanup state for testing purposes.
+ * This allows tests to run in isolation without vi.resetModules().
+ */
+export function resetCleanupForTesting() {
+  cleanupFunctions.length = 0;
+  syncCleanupFunctions.length = 0;
+  configForTelemetry = null;
+}
+
 export function runSyncCleanup() {
   for (const fn of syncCleanupFunctions) {
     try {
@@ -45,6 +55,10 @@ export function registerTelemetryConfig(config: Config) {
 }
 
 export async function runExitCleanup() {
+  // drain stdin to prevent printing garbage on exit
+  // https://github.com/google-gemini/gemini-cli/issues/1680
+  await drainStdin();
+
   runSyncCleanup();
   for (const fn of cleanupFunctions) {
     try {
@@ -55,6 +69,14 @@ export async function runExitCleanup() {
   }
   cleanupFunctions.length = 0; // Clear the array
 
+  if (configForTelemetry) {
+    try {
+      await configForTelemetry.dispose();
+    } catch (_) {
+      // Ignore errors during disposal
+    }
+  }
+
   // IMPORTANT: Shutdown telemetry AFTER all other cleanup functions have run
   // This ensures SessionEnd hooks and other telemetry are properly flushed
   if (configForTelemetry && isTelemetrySdkInitialized()) {
@@ -64,6 +86,18 @@ export async function runExitCleanup() {
       // Ignore errors during telemetry shutdown
     }
   }
+}
+
+async function drainStdin() {
+  if (!process.stdin?.isTTY) return;
+  // Resume stdin and attach a no-op listener to drain the buffer.
+  // We use removeAllListeners to ensure we don't trigger other handlers.
+  process.stdin
+    .resume()
+    .removeAllListeners('data')
+    .on('data', () => {});
+  // Give it a moment to flush the OS buffer.
+  await new Promise((resolve) => setTimeout(resolve, 50));
 }
 
 export async function cleanupCheckpoints() {

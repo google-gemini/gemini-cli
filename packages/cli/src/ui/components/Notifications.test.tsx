@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../test-utils/render.js';
+import { render, persistentStateMock } from '../../test-utils/render.js';
 import { Notifications } from './Notifications.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useAppContext, type AppState } from '../contexts/AppContext.js';
@@ -30,13 +30,20 @@ vi.mock('node:fs/promises', async () => {
     access: vi.fn(),
     writeFile: vi.fn(),
     mkdir: vi.fn().mockResolvedValue(undefined),
+    unlink: vi.fn().mockResolvedValue(undefined),
   };
 });
-vi.mock('node:os', () => ({
-  default: {
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  return {
+    ...actual,
+    default: {
+      ...actual,
+      homedir: () => '/mock/home',
+    },
     homedir: () => '/mock/home',
-  },
-}));
+  };
+});
 
 vi.mock('node:path', async () => {
   const actual = await vi.importActual<typeof import('node:path')>('node:path');
@@ -46,12 +53,19 @@ vi.mock('node:path', async () => {
   };
 });
 
-vi.mock('@google/gemini-cli-core', () => ({
-  GEMINI_DIR: '.gemini',
-  Storage: {
-    getGlobalTempDir: () => '/mock/temp',
-  },
-}));
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    GEMINI_DIR: '.gemini',
+    homedir: () => '/mock/home',
+    Storage: {
+      ...actual.Storage,
+      getGlobalTempDir: () => '/mock/temp',
+    },
+  };
+});
 
 vi.mock('../../config/settings.js', () => ({
   DEFAULT_MODEL_CONFIGS: {},
@@ -67,10 +81,11 @@ describe('Notifications', () => {
   const mockUseUIState = vi.mocked(useUIState);
   const mockUseIsScreenReaderEnabled = vi.mocked(useIsScreenReaderEnabled);
   const mockFsAccess = vi.mocked(fs.access);
-  const mockFsWriteFile = vi.mocked(fs.writeFile);
+  const mockFsUnlink = vi.mocked(fs.unlink);
 
   beforeEach(() => {
     vi.clearAllMocks();
+    persistentStateMock.reset();
     mockUseAppContext.mockReturnValue({
       startupWarnings: [],
       version: '1.0.0',
@@ -133,51 +148,47 @@ describe('Notifications', () => {
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('renders screen reader nudge when enabled and not seen', async () => {
+  it('renders screen reader nudge when enabled and not seen (no legacy file)', async () => {
     mockUseIsScreenReaderEnabled.mockReturnValue(true);
-
-    let rejectAccess: (err: Error) => void;
-    mockFsAccess.mockImplementation(
-      () =>
-        new Promise((_, reject) => {
-          rejectAccess = reject;
-        }),
-    );
+    persistentStateMock.setData({ hasSeenScreenReaderNudge: false });
+    mockFsAccess.mockRejectedValue(new Error('No legacy file'));
 
     const { lastFrame } = render(<Notifications />);
 
-    // Trigger rejection inside act
-    await act(async () => {
-      rejectAccess(new Error('File not found'));
-    });
-
-    // Wait for effect to propagate
-    await vi.waitFor(() => {
-      expect(mockFsWriteFile).toHaveBeenCalled();
-    });
+    expect(lastFrame()).toContain('screen reader-friendly view');
+    expect(persistentStateMock.set).toHaveBeenCalledWith(
+      'hasSeenScreenReaderNudge',
+      true,
+    );
 
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('does not render screen reader nudge when already seen', async () => {
+  it('migrates legacy screen reader nudge file', async () => {
     mockUseIsScreenReaderEnabled.mockReturnValue(true);
+    persistentStateMock.setData({ hasSeenScreenReaderNudge: undefined });
+    mockFsAccess.mockResolvedValue(undefined);
 
-    let resolveAccess: (val: undefined) => void;
-    mockFsAccess.mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          resolveAccess = resolve;
-        }),
-    );
+    render(<Notifications />);
+
+    await act(async () => {
+      await vi.waitFor(() => {
+        expect(persistentStateMock.set).toHaveBeenCalledWith(
+          'hasSeenScreenReaderNudge',
+          true,
+        );
+        expect(mockFsUnlink).toHaveBeenCalled();
+      });
+    });
+  });
+
+  it('does not render screen reader nudge when already seen in persistent state', async () => {
+    mockUseIsScreenReaderEnabled.mockReturnValue(true);
+    persistentStateMock.setData({ hasSeenScreenReaderNudge: true });
 
     const { lastFrame } = render(<Notifications />);
 
-    // Trigger resolution inside act
-    await act(async () => {
-      resolveAccess(undefined);
-    });
-
     expect(lastFrame()).toBe('');
-    expect(mockFsWriteFile).not.toHaveBeenCalled();
+    expect(persistentStateMock.set).not.toHaveBeenCalled();
   });
 });
