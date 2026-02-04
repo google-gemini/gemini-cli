@@ -44,8 +44,9 @@ will show you a diff of the proposed modifications.
 
 ## Next steps
 
-- Explore the technical [File system tools reference](../tools/file-system.md)
-  for detailed tool parameters.
-- Learn about [Ignoring files](../cli/gemini-ignore.md) to control what Gemini
-  can see.
-- See the [Command reference](../cli/commands.md) for related slash commands.
+- Explore the technical
+  [File system tools reference](../../tools/file-system.md) for detailed tool
+  parameters.
+- Learn about [Ignoring files](../../cli/gemini-ignore.md) to control what
+  Gemini can see.
+- See the [Command reference](../../cli/commands.md) for related slash commands.

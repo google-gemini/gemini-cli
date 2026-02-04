@@ -38,8 +38,15 @@ gemini "Extract the version number from package.json" --output-format json | jq 
 
 ## Next steps
 
-- Explore the [Headless mode technical reference](../cli/headless.md) for JSON
+- Explore the [Headless mode technical reference](../../cli/headless.md) for
+  JSON
+
   schemas and event types.
+
 - Learn about [Shell commands](./shell-commands.md) for deeper system
+
   integration.
-- See the [Cheatsheet](../cli/cli-reference.md) for more command-line options.
+
+- See the [Cheatsheet](../../cli/cli-reference.md) for more command-line
+
+  options.

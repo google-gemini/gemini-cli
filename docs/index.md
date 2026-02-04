@@ -26,6 +26,8 @@ The fastest path to setting up and using Gemini CLI.
   on your system.
 - **[Authentication](./get-started/authentication.md):** Setup instructions for
   personal and enterprise accounts.
+- **[Examples](./get-started/examples.md):** Practical examples of Gemini CLI in
+  action.
 - **[Cheatsheet](./cli/cli-reference.md):** A quick reference for common
   commands and options.
 
@@ -33,22 +35,20 @@ The fastest path to setting up and using Gemini CLI.
 
 User-focused guides and tutorials for daily development workflows.
 
-- **[Examples](./get-started/examples.md):** Practical examples of Gemini CLI in
-  action.
-- **[File management](./tutorials/file-management.md):** How to work with local
-  files and directories.
-- **[Memory & context](./tutorials/memory-management.md):** Managing persistent
-  instructions and facts.
-- **[Shell commands](./tutorials/shell-commands.md):** Executing system commands
-  safely.
-- **[Session & history](./tutorials/session-management.md):** Resuming,
+- **[File management](./cli/tutorials/file-management.md):** How to work with
+  local files and directories.
+- **[Memory & context](./cli/tutorials/memory-management.md):** Managing
+  persistent instructions and facts.
+- **[Shell commands](./cli/tutorials/shell-commands.md):** Executing system
+  commands safely.
+- **[Session & history](./cli/tutorials/session-management.md):** Resuming,
   managing, and rewinding conversations.
-- **[Task planning](./tutorials/task-planning.md):** Using todos for complex
+- **[Task planning](./cli/tutorials/task-planning.md):** Using todos for complex
   agent workflows.
-- **[Web tools](./tutorials/web-tools.md):** Searching and fetching content from
-  the web.
-- **[Agent skills](./cli/tutorials/skills-getting-started.md):** Getting started
-  with specialized expertise.
+- **[Web tools](./cli/tutorials/web-tools.md):** Searching and fetching content
+  from the web.
+- **[Agent skills tutorial](./cli/tutorials/skills-getting-started.md):**
+  Getting started with specialized expertise.
 
 ### Features
 

@@ -22,7 +22,8 @@ Before you begin, ensure you have the following installed and configured:
 
 To add the server, you need to update your Gemini CLI settings.
 
-1.  Open your [`.gemini/settings.json` file](../get-started/configuration.md).
+1.  Open your
+    [`.gemini/settings.json` file](../../get-started/configuration.md).
 2.  Add the `mcpServers` configuration block:
 
 ```json
@@ -65,7 +66,7 @@ background. You can then use natural language prompts to perform GitHub actions:
 
 ## Next steps
 
-- Explore the [MCP servers reference](../tools/mcp-server.md) for more
+- Explore the [MCP servers reference](../../tools/mcp-server.md) for more
   transports and options.
 - Learn about [Agent Skills](./agent-skills.md) for task-specific procedural
   knowledge.

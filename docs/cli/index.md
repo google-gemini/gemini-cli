@@ -12,26 +12,24 @@ Gemini CLI in your daily development workflow.
 
 - **[Quickstart](../get-started/index.md):** Get up and running with Gemini CLI
   in minutes.
-- **[Agent skills](./tutorials/skills-getting-started.md):** Learn how to use
-  and manage specialized expertise.
-- **[Automation](../tutorials/automation.md):** Script and automate tasks using
-  headless mode.
 - **[Examples](../get-started/examples.md):** See practical examples of Gemini
   CLI in action.
-- **[File management](../tutorials/file-management.md):** How to include,
-  search, and modify local files.
-- **[MCP setup](../tutorials/mcp-setup.md):** Configure Model Context Protocol
+- **[Agent skills tutorial](./tutorials/skills-getting-started.md):** Learn how
+  to use and manage specialized expertise.
+- **[File management](./tutorials/file-management.md):** How to include, search,
+  and modify local files.
+- **[MCP setup](./tutorials/mcp-setup.md):** Configure Model Context Protocol
   servers for custom tools.
-- **[Memory & context](../tutorials/memory-management.md):** Manage persistent
+- **[Memory & context](./tutorials/memory-management.md):** Manage persistent
   instructions and individual facts.
-- **[Session & history](../tutorials/session-management.md):** Resume, manage,
+- **[Session & history](./tutorials/session-management.md):** Resume, manage,
   and rewind your conversations.
-- **[Shell commands](../tutorials/shell-commands.md):** Execute system commands
+- **[Shell commands](./tutorials/shell-commands.md):** Execute system commands
   safely directly from your prompt.
-- **[Task planning](../tutorials/task-planning.md):** Using todos for complex,
+- **[Task planning](./tutorials/task-planning.md):** Using todos for complex,
   multi-step agent requests.
-- **[Web tools](../tutorials/web-tools.md):** Searching and fetching content
-  from the web.
+- **[Web tools](./tutorials/web-tools.md):** Searching and fetching content from
+  the web.
 
 ## Features
 

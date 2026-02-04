@@ -41,7 +41,7 @@ time.
 ## Next steps
 
 - Read the detailed guide on
-  [Providing context with GEMINI.md](../cli/gemini-md.md).
-- See the [Memory tool reference](../tools/memory.md) for technical details.
-- Explore the [Command reference](../cli/commands.md) for more `/memory`
+  [Providing context with GEMINI.md](../../cli/gemini-md.md).
+- See the [Memory tool reference](../../tools/memory.md) for technical details.
+- Explore the [Command reference](../../cli/commands.md) for more `/memory`
   sub-commands.

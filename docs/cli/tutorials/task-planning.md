@@ -26,7 +26,7 @@ You can monitor the agent's progress directly in the CLI.
 
 ## Next steps
 
-- See the [Todo tool reference](../tools/todos.md) for more details on task
+- See the [Todo tool reference](../../tools/todos.md) for more details on task
   states.
 - Learn about [Session management](./session-management.md) to track
   long-running projects.

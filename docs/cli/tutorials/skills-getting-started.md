@@ -92,6 +92,6 @@ script:
 
 ## Next Steps
 
-- Explore [Agent Skills Authoring Guide](../skills.md#creating-a-skill) to learn
-  about more advanced skill features.
+- Explore [Agent Skills Authoring Guide](../../cli/skills.md#creating-a-skill)
+  to learn about more advanced skill features.
 - Learn how to share skills via [Extensions](../../extensions/index.md).

@@ -41,8 +41,8 @@ When you rewind, you can choose to:
 
 ## Next steps
 
-- Read the full [Session management guide](../cli/session-management.md) for
+- Read the full [Session management guide](../../cli/session-management.md) for
   configuration and details.
-- See the [Rewind guide](../cli/rewind.md) for more details on the interface.
-- Explore the [Command reference](../cli/commands.md) for all session-related
+- See the [Rewind guide](../../cli/rewind.md) for more details on the interface.
+- Explore the [Command reference](../../cli/commands.md) for all session-related
   commands.

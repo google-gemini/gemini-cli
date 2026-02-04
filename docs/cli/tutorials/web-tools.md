@@ -31,7 +31,7 @@ according to your instructions.
 
 ## Next steps
 
-- See the [Web search tool reference](../tools/web-search.md) for technical
+- See the [Web search tool reference](../../tools/web-search.md) for technical
   details.
-- See the [Web fetch tool reference](../tools/web-fetch.md) for URL limits and
-  fallback behavior.
+- See the [Web fetch tool reference](../../tools/web-fetch.md) for URL limits
+  and fallback behavior.

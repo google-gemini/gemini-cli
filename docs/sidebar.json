@@ -6,31 +6,37 @@
       { "label": "Quickstart", "slug": "docs/get-started" },
       { "label": "Installation", "slug": "docs/get-started/installation" },
       { "label": "Authentication", "slug": "docs/get-started/authentication" },
+      { "label": "Examples", "slug": "docs/get-started/examples" },
       { "label": "Cheatsheet", "slug": "docs/cli/cli-reference" }
     ]
   },
   {
     "label": "Use Gemini CLI",
     "items": [
-      { "label": "Examples", "slug": "docs/get-started/examples" },
-      { "label": "File management", "slug": "docs/tutorials/file-management" },
+      {
+        "label": "File management",
+        "slug": "docs/cli/tutorials/file-management"
+      },
       {
         "label": "Memory & context",
-        "slug": "docs/tutorials/memory-management"
+        "slug": "docs/cli/tutorials/memory-management"
       },
-      { "label": "Shell commands", "slug": "docs/tutorials/shell-commands" },
+      {
+        "label": "Shell commands",
+        "slug": "docs/cli/tutorials/shell-commands"
+      },
       {
         "label": "Session & history",
-        "slug": "docs/tutorials/session-management"
+        "slug": "docs/cli/tutorials/session-management"
       },
-      { "label": "Task planning", "slug": "docs/tutorials/task-planning" },
-      { "label": "Web tools", "slug": "docs/tutorials/web-tools" },
+      { "label": "Task planning", "slug": "docs/cli/tutorials/task-planning" },
+      { "label": "Web tools", "slug": "docs/cli/tutorials/web-tools" },
       {
-        "label": "Agent skills",
+        "label": "Agent skills tutorial",
         "slug": "docs/cli/tutorials/skills-getting-started"
       },
-      { "label": "MCP setup", "slug": "docs/tutorials/mcp-setup" },
-      { "label": "Automation", "slug": "docs/tutorials/automation" }
+      { "label": "MCP setup", "slug": "docs/cli/tutorials/mcp-setup" },
+      { "label": "Automation", "slug": "docs/cli/tutorials/automation" }
     ]
   },
   {

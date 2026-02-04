@@ -43,14 +43,14 @@ shell command requested by the AI. You will see the exact command and can choose
 to allow it once, allow it for the rest of the session, or deny it.
 
 > **Security Note:** Use caution when allowing AI to execute arbitrary shell
-> commands. Use [Sandboxing](../cli/sandbox.md) for an extra layer of
+> commands. Use [Sandboxing](../../cli/sandbox.md) for an extra layer of
 > protection.
 
 ## Next steps
 
-- See the [Shell tool reference](../tools/shell.md) for technical parameters and
-  configuration options.
-- Learn how to [Sandbox tool execution](../cli/sandbox.md) for enhanced
+- See the [Shell tool reference](../../tools/shell.md) for technical parameters
+  and configuration options.
+- Learn how to [Sandbox tool execution](../../cli/sandbox.md) for enhanced
   security.
-- Explore [Trusted folders](../cli/trusted-folders.md) to manage command
+- Explore [Trusted folders](../../cli/trusted-folders.md) to manage command
   permissions.
