@@ -108,14 +108,16 @@ const assertHasLabel = (expectedLabel: string) => {
     if (match?.[1]) {
       jsonString = match[1];
     } else {
+      // Attempt to find JSON object directly if markdown block is missing
       const firstBrace = responseText.indexOf('{');
       const lastBrace = responseText.lastIndexOf('}');
-      if (firstBrace === -1 || lastBrace === -1 || lastBrace < firstBrace) {
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        jsonString = responseText.substring(firstBrace, lastBrace + 1);
+      } else {
         throw new Error(
           `Could not find a JSON object in the response: "${escapeHtml(responseText)}"`,
         );
       }
-      jsonString = responseText.substring(firstBrace, lastBrace + 1);
     }
 
     let data: { labels_to_set?: string[] };

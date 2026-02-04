@@ -303,9 +303,13 @@ export class TestRig {
   fakeResponsesPath?: string;
   // Original fake responses file path for rewriting goldens in record mode.
   originalFakeResponsesPath?: string;
-  _activityLogFile?: string;
+  private _activityLogFile?: string;
   private _interactiveRuns: InteractiveRun[] = [];
   private _spawnedProcesses: ChildProcess[] = [];
+
+  setActivityLogFile(path: string) {
+    this._activityLogFile = path;
+  }
 
   setup(
     testName: string,

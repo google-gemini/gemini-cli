@@ -37,10 +37,10 @@ export type EvalPolicy = 'ALWAYS_PASSES' | 'USUALLY_PASSES';
 
 export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
   const fn = async () => {
-    const rig = new TestRig() as any;
+    const rig = new TestRig();
     const { logDir, sanitizedName } = await prepareLogDir(evalCase.name);
     const activityLogFile = path.join(logDir, `${sanitizedName}.jsonl`);
-    rig._activityLogFile = activityLogFile;
+    rig.setActivityLogFile(activityLogFile);
     const logFile = path.join(logDir, `${sanitizedName}.log`);
     let isSuccess = false;
     try {

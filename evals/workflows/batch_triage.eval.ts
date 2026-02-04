@@ -108,18 +108,20 @@ const assertHasIssueLabel = (issueNumber: number, expectedLabel: string) => {
     if (match?.[1]) {
       jsonString = match[1];
     } else {
+      // Attempt to find JSON array directly if markdown block is missing
       const firstBracket = responseText.indexOf('[');
       const lastBracket = responseText.lastIndexOf(']');
       if (
-        firstBracket === -1 ||
-        lastBracket === -1 ||
-        lastBracket < firstBracket
+        firstBracket !== -1 &&
+        lastBracket !== -1 &&
+        lastBracket > firstBracket
       ) {
+        jsonString = responseText.substring(firstBracket, lastBracket + 1);
+      } else {
         throw new Error(
           `Could not find a JSON array in the response: "${escapeHtml(responseText)}"`,
         );
       }
-      jsonString = responseText.substring(firstBracket, lastBracket + 1);
     }
 
     let data: { issue_number: number; labels_to_add: string[] }[];
