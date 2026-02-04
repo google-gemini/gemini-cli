@@ -272,6 +272,27 @@ export class InteractiveRun {
   }
 }
 
+function isObject(item: any): item is Record<string, any> {
+  return !!(item && typeof item === 'object' && !Array.isArray(item));
+}
+
+function deepMerge(target: any, source: any): any {
+  if (!isObject(target) || !isObject(source)) {
+    return source;
+  }
+  const output = { ...target };
+  Object.keys(source).forEach((key) => {
+    const targetValue = target[key];
+    const sourceValue = source[key];
+    if (isObject(targetValue) && isObject(sourceValue)) {
+      output[key] = deepMerge(targetValue, sourceValue);
+    } else {
+      output[key] = sourceValue;
+    }
+  });
+  return output;
+}
+
 export class TestRig {
   testDir: string | null = null;
   homeDir: string | null = null;
@@ -316,45 +337,54 @@ export class TestRig {
     const projectGeminiDir = join(this.testDir!, GEMINI_DIR);
     mkdirSync(projectGeminiDir, { recursive: true });
 
+    const userGeminiDir = join(this.homeDir!, GEMINI_DIR);
+    mkdirSync(userGeminiDir, { recursive: true });
+
     // In sandbox mode, use an absolute path for telemetry inside the container
     // The container mounts the test directory at the same path as the host
     const telemetryPath = join(this.homeDir!, 'telemetry.log'); // Always use home directory for telemetry
 
-    const settings = {
-      general: {
-        // Nightly releases sometimes becomes out of sync with local code and
-        // triggers auto-update, which causes tests to fail.
-        disableAutoUpdate: true,
-        previewFeatures: false,
-      },
-      telemetry: {
-        enabled: true,
-        target: 'local',
-        otlpEndpoint: '',
-        outfile: telemetryPath,
-      },
-      security: {
-        auth: {
-          selectedType: 'gemini-api-key',
+    const settings = deepMerge(
+      {
+        general: {
+          // Nightly releases sometimes becomes out of sync with local code and
+          // triggers auto-update, which causes tests to fail.
+          disableAutoUpdate: true,
+          previewFeatures: false,
         },
-        folderTrust: {
-          enabled: false,
+        telemetry: {
+          enabled: true,
+          target: 'local',
+          otlpEndpoint: '',
+          outfile: telemetryPath,
         },
+        security: {
+          auth: {
+            selectedType: 'gemini-api-key',
+          },
+          folderTrust: {
+            enabled: false,
+          },
+        },
+        ui: {
+          useAlternateBuffer: true,
+        },
+        model: {
+          name: DEFAULT_GEMINI_MODEL,
+        },
+        sandbox:
+          env['GEMINI_SANDBOX'] !== 'false' ? env['GEMINI_SANDBOX'] : false,
+        // Don't show the IDE connection dialog when running from VsCode
+        ide: { enabled: false, hasSeenNudge: true },
       },
-      ui: {
-        useAlternateBuffer: true,
-      },
-      model: {
-        name: DEFAULT_GEMINI_MODEL,
-      },
-      sandbox:
-        env['GEMINI_SANDBOX'] !== 'false' ? env['GEMINI_SANDBOX'] : false,
-      // Don't show the IDE connection dialog when running from VsCode
-      ide: { enabled: false, hasSeenNudge: true },
-      ...overrideSettings, // Allow tests to override/add settings
-    };
+      overrideSettings ?? {},
+    );
     writeFileSync(
       join(projectGeminiDir, 'settings.json'),
+      JSON.stringify(settings, null, 2),
+    );
+    writeFileSync(
+      join(userGeminiDir, 'settings.json'),
       JSON.stringify(settings, null, 2),
     );
   }
