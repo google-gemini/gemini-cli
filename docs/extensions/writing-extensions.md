@@ -264,7 +264,7 @@ primary ways of releasing extensions are via a Git repository or through GitHub
 Releases. Using a public Git repository is the simplest method.
 
 For detailed instructions on both methods, please refer to the
-[Extension Releasing Guide](./releasing.md).
+[Extension Releasing Guide](./broken-link/releasing.md).
 
 ## Conclusion
 
