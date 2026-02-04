@@ -68,12 +68,14 @@ function getStats(reports) {
           if (!testStats[name]) {
             testStats[name] = { passed: 0, failed: 0, total: 0 };
           }
-          testStats[name].total++;
           if (assertion.status === 'passed') {
             testStats[name].passed++;
-          } else {
+            testStats[name].total++;
+          } else if (assertion.status === 'failed') {
             testStats[name].failed++;
+            testStats[name].total++;
           }
+          // Ignore skipped/pending tests
         }
       }
     } catch (error) {
