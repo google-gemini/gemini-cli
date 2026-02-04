@@ -1469,6 +1469,7 @@ describe('loadCliConfig with admin.mcp.config', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings({
+      mcpServers: localMcpServers,
       admin: {
         ...baseSettings.admin,
         mcp: { enabled: true, config: {} },
@@ -1490,6 +1491,7 @@ describe('loadCliConfig with admin.mcp.config', () => {
       },
     };
     const settings = createTestMergedSettings({
+      mcpServers: localMcpServers,
       admin: {
         ...baseSettings.admin,
         mcp: { enabled: true, config: adminAllowlist },
@@ -1513,6 +1515,7 @@ describe('loadCliConfig with admin.mcp.config', () => {
       },
     };
     const settings = createTestMergedSettings({
+      mcpServers: localMcpServers,
       admin: {
         ...baseSettings.admin,
         mcp: { enabled: true, config: adminAllowlist },
@@ -1546,6 +1549,7 @@ describe('loadCliConfig with admin.mcp.config', () => {
       },
     };
     const settings = createTestMergedSettings({
+      mcpServers: localMcpServers,
       admin: {
         ...baseSettings.admin,
         mcp: { enabled: true, config: adminAllowlist },
