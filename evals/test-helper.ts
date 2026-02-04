@@ -45,6 +45,14 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
     try {
       rig.setup(evalCase.name, evalCase.params);
 
+      // Symlink node modules to reduce the amount of time needed to
+      // bootstrap test projects.
+      const rootNodeModules = path.join(process.cwd(), 'node_modules');
+      const testNodeModules = path.join(rig.testDir || '', 'node_modules');
+      if (fs.existsSync(rootNodeModules)) {
+        fs.symlinkSync(rootNodeModules, testNodeModules, 'dir');
+      }
+
       if (evalCase.files) {
         const acknowledgedAgents: Record<string, Record<string, string>> = {};
         const projectRoot = fs.realpathSync(rig.testDir!);
