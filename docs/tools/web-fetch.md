@@ -1,13 +1,14 @@
 # Web fetch tool (`web_fetch`)
 
-This document describes the `web_fetch` tool for the Gemini CLI.
+The `web_fetch` tool lets you summarize, compare, or extract information from
+specific web pages. Use this tool to process content from URLs directly within
+your prompts.
 
 ## Description
 
-Use `web_fetch` to summarize, compare, or extract information from web pages.
 The `web_fetch` tool processes content from one or more URLs (up to 20) embedded
-in a prompt. `web_fetch` takes a natural language prompt and returns a generated
-response.
+in a prompt. It takes a natural language prompt and returns a generated response
+based on the fetched content.
 
 ### Arguments
 
@@ -23,13 +24,12 @@ response.
 ## How to use `web_fetch` with the Gemini CLI
 
 To use `web_fetch` with the Gemini CLI, provide a natural language prompt that
-contains URLs. The tool will ask for confirmation before fetching any URLs. Once
-confirmed, the tool will process URLs through Gemini API's `urlContext`.
+contains URLs. The tool asks for confirmation before fetching any URLs. Once
+confirmed, the tool processes URLs through the Gemini API's `urlContext`.
 
-If the Gemini API cannot access the URL, the tool will fall back to fetching
-content directly from the local machine. The tool will format the response,
-including source attribution and citations where possible. The tool will then
-provide the response to the user.
+If the Gemini API cannot access the URL, the tool falls back to fetching content
+directly from the local machine. The tool formats the response, including source
+attribution and citations where possible.
 
 Usage:
 
@@ -53,7 +53,16 @@ web_fetch(prompt="What are the differences in the conclusions of these two paper
 
 ## Important notes
 
+When using the web fetch tool, keep the following considerations in mind
+regarding URL access and response quality.
+
 - **URL processing:** `web_fetch` relies on the Gemini API's ability to access
   and process the given URLs.
-- **Output quality:** The quality of the output will depend on the clarity of
-  the instructions in the prompt.
+- **Output quality:** The quality of the output depends on the clarity of the
+  instructions in the prompt.
+
+## Next steps
+
+- Learn how to [Perform web searches](./web-search.md) to find relevant URLs.
+- Explore the [File system tools](./file-system.md) for local content
+  processing.

@@ -18,10 +18,12 @@
       { "label": "File management", "slug": "docs/tools/file-system" },
       { "label": "Memory management", "slug": "docs/tools/memory" },
       { "label": "Project context (GEMINI.md)", "slug": "docs/cli/gemini-md" },
-      { "label": "Shell commands", "slug": "docs/tools/shell" },
+      { "label": "Rewind", "slug": "docs/cli/rewind" },
       { "label": "Session management", "slug": "docs/cli/session-management" },
+      { "label": "Shell commands", "slug": "docs/tools/shell" },
       { "label": "Todos", "slug": "docs/tools/todos" },
-      { "label": "Web search and fetch", "slug": "docs/tools/web-search" }
+      { "label": "Web fetch", "slug": "docs/tools/web-fetch" },
+      { "label": "Web search", "slug": "docs/tools/web-search" }
     ]
   },
   {
@@ -32,6 +34,11 @@
         "slug": "docs/cli/gemini-ignore"
       },
       { "label": "Model selection", "slug": "docs/cli/model" },
+      { "label": "Model routing", "slug": "docs/cli/model-routing" },
+      {
+        "label": "Advanced model configuration",
+        "slug": "docs/cli/generation-settings"
+      },
       { "label": "Settings", "slug": "docs/cli/settings" },
       { "label": "Themes", "slug": "docs/cli/themes" },
       { "label": "Token caching", "slug": "docs/cli/token-caching" },

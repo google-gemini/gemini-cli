@@ -1,4 +1,4 @@
-# CLI cheatsheet
+# Gemini CLI cheatsheet
 
 This page provides a reference for commonly used Gemini CLI commands, options,
 and parameters.
@@ -9,8 +9,7 @@ and parameters.
 | ---------------------------------- | ---------------------------------- | --------------------------------------------------- |
 | `gemini`                           | Start interactive REPL             | `gemini`                                            |
 | `gemini "query"`                   | Query non-interactively, then exit | `gemini "explain this project"`                     |
-| `gemini -p "query"`                | Query via SDK, then exit           | `gemini -p "explain this function"`                 |
-| `cat file \| gemini -p "query"`    | Process piped content              | `cat logs.txt \| gemini -p "explain"`               |
+| `cat file \| gemini`               | Process piped content              | `cat logs.txt \| gemini`                            |
 | `gemini -i "query"`                | Execute and continue interactively | `gemini -i "What is the purpose of this project?"`  |
 | `gemini -r "latest"`               | Continue most recent session       | `gemini -r "latest"`                                |
 | `gemini -r "latest" "query"`       | Continue session with a new prompt | `gemini -r "latest" "Check for type errors"`        |
@@ -33,7 +32,6 @@ and parameters.
 | `--version`                      | `-v`  | -       | -         | Show CLI version number and exit                                                                           |
 | `--help`                         | `-h`  | -       | -         | Show help information                                                                                      |
 | `--model`                        | `-m`  | string  | `auto`    | Model to use. See [Model Selection](#model-selection) for available values.                                |
-| `--prompt`                       | `-p`  | string  | -         | Prompt text. Appended to stdin input if provided. **Deprecated:** Use positional arguments instead.        |
 | `--prompt-interactive`           | `-i`  | string  | -         | Execute prompt and continue in interactive mode                                                            |
 | `--sandbox`                      | `-s`  | boolean | `false`   | Run in a sandboxed environment for safer execution                                                         |
 | `--approval-mode`                | -     | string  | `default` | Approval mode for tool execution. Choices: `default`, `auto_edit`, `yolo`                                  |

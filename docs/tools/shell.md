@@ -1,18 +1,17 @@
 # Shell tool (`run_shell_command`)
 
-This document describes the `run_shell_command` tool for the Gemini CLI.
+The `run_shell_command` tool lets you interact with the underlying system, run
+scripts, and perform command-line operations directly from the Gemini CLI.
 
 ## Description
 
-Use `run_shell_command` to interact with the underlying system, run scripts, or
-perform command-line operations. `run_shell_command` executes a given shell
-command, including interactive commands that require user input (e.g., `vim`,
-`git rebase -i`) if the `tools.shell.enableInteractiveShell` setting is set to
-`true`.
+Use `run_shell_command` to execute shell commands, including interactive
+commands that require user input (for example, `vim` or `git rebase -i`) if the
+`tools.shell.enableInteractiveShell` setting is set to `true`.
 
-On Windows, commands are executed with `powershell.exe -NoProfile -Command`
-(unless you explicitly point `ComSpec` at another shell). On other platforms,
-they are executed with `bash -c`.
+On Windows, commands execute with `powershell.exe -NoProfile -Command` (unless
+you explicitly point `ComSpec` at another shell). On other platforms, they
+execute with `bash -c`.
 
 ### Arguments
 
@@ -20,16 +19,19 @@ they are executed with `bash -c`.
 
 - `command` (string, required): The exact shell command to execute.
 - `description` (string, optional): A brief description of the command's
-  purpose, which will be shown to the user.
-- `directory` (string, optional): The directory (relative to the project root)
-  in which to execute the command. If not provided, the command runs in the
-  project root.
+  purpose, which is shown to you for confirmation.
+- `dir_path` (string, optional): The directory (relative to the project root) in
+  which to execute the command. If not provided, the command runs in the project
+  root.
+- `is_background` (boolean, optional): Set to `true` if this command should run
+  in the background (for example, for long-running servers or watchers).
 
 ## How to use `run_shell_command` with the Gemini CLI
 
-When using `run_shell_command`, the command is executed as a subprocess.
-`run_shell_command` can start background processes using `&`. The tool returns
-detailed information about the execution, including:
+When you use `run_shell_command`, the command executes as a subprocess.
+`run_shell_command` can start background processes using `&` (on non-interactive
+shells) or via the `is_background` parameter. The tool returns detailed
+information about the execution, including:
 
 - `Command`: The command that was executed.
 - `Directory`: The directory where the command was run.
@@ -43,7 +45,7 @@ detailed information about the execution, including:
 Usage:
 
 ```
-run_shell_command(command="Your commands.", description="Your description of the command.", directory="Your execution directory.")
+run_shell_command(command="Your commands.", description="Your description of the command.", dir_path="Your execution directory.")
 ```
 
 ## `run_shell_command` examples
@@ -57,7 +59,7 @@ run_shell_command(command="ls -la")
 Run a script in a specific directory:
 
 ```
-run_shell_command(command="./my_script.sh", directory="scripts", description="Run my custom script")
+run_shell_command(command="./my_script.sh", dir_path="scripts", description="Run my custom script")
 ```
 
 Start a background server:
@@ -73,11 +75,11 @@ You can configure the behavior of the `run_shell_command` tool by modifying your
 
 ### Enabling interactive commands
 
-To enable interactive commands, you need to set the
-`tools.shell.enableInteractiveShell` setting to `true`. This will use `node-pty`
-for shell command execution, which allows for interactive sessions. If
-`node-pty` is not available, it will fall back to the `child_process`
-implementation, which does not support interactive commands.
+To enable interactive commands, you must set the
+`tools.shell.enableInteractiveShell` setting to `true`. This uses `node-pty` for
+shell command execution, which allows for interactive sessions. If `node-pty` is
+not available, it falls back to the `child_process` implementation, which does
+not support interactive commands.
 
 **Example `settings.json`:**
 
@@ -93,9 +95,11 @@ implementation, which does not support interactive commands.
 
 ### Showing color in output
 
-To show color in the shell output, you need to set the `tools.shell.showColor`
-setting to `true`. **Note: This setting only applies when
-`tools.shell.enableInteractiveShell` is enabled.**
+To show color in the shell output, you must set the `tools.shell.showColor`
+setting to `true`.
+
+> **Note:** This setting only applies when `tools.shell.enableInteractiveShell`
+> is enabled.
 
 **Example `settings.json`:**
 
@@ -112,8 +116,10 @@ setting to `true`. **Note: This setting only applies when
 ### Setting the pager
 
 You can set a custom pager for the shell output by setting the
-`tools.shell.pager` setting. The default pager is `cat`. **Note: This setting
-only applies when `tools.shell.enableInteractiveShell` is enabled.**
+`tools.shell.pager` setting. The default pager is `cat`.
+
+> **Note:** This setting only applies when `tools.shell.enableInteractiveShell`
+> is enabled.
 
 **Example `settings.json`:**
 
@@ -129,10 +135,10 @@ only applies when `tools.shell.enableInteractiveShell` is enabled.**
 
 ## Interactive commands
 
-The `run_shell_command` tool now supports interactive commands by integrating a
-pseudo-terminal (pty). This allows you to run commands that require real-time
-user input, such as text editors (`vim`, `nano`), terminal-based UIs (`htop`),
-and interactive version control operations (`git rebase -i`).
+The `run_shell_command` tool supports interactive commands by integrating a
+pseudo-terminal (pty). This lets you run commands that require real-time user
+input, such as text editors (`vim`, `nano`), terminal-based UIs (`htop`), and
+interactive version control operations (`git rebase -i`).
 
 When an interactive command is running, you can send input to it from the Gemini
 CLI. To focus on the interactive shell, press `Tab`. The terminal output,
@@ -140,20 +146,23 @@ including complex TUIs, will be rendered correctly.
 
 ## Important notes
 
+When using the shell tool, follow these best practices to ensure security and
+reliability.
+
 - **Security:** Be cautious when executing commands, especially those
   constructed from user input, to prevent security vulnerabilities.
 - **Error handling:** Check the `Stderr`, `Error`, and `Exit Code` fields to
   determine if a command executed successfully.
 - **Background processes:** When a command is run in the background with `&`,
-  the tool will return immediately and the process will continue to run in the
-  background. The `Background PIDs` field will contain the process ID of the
+  the tool returns immediately and the process continues to run in the
+  background. The `Background PIDs` field contains the process ID of the
   background process.
 
 ## Environment variables
 
 When `run_shell_command` executes a command, it sets the `GEMINI_CLI=1`
-environment variable in the subprocess's environment. This allows scripts or
-tools to detect if they are being run from within the Gemini CLI.
+environment variable in the subprocess's environment. This lets scripts or tools
+detect if they are being run from within Gemini CLI.
 
 ## Command restrictions
 
@@ -184,6 +193,9 @@ The validation logic is designed to be secure and flexible:
     matches an allowed prefix in `tools.core`.
 
 ### Command restriction examples
+
+The following examples demonstrate how to configure command restrictions using
+various strategies.
 
 **Allow only specific command prefixes**
 
@@ -255,6 +267,14 @@ To block all shell commands, add the `run_shell_command` wildcard to
 
 Command-specific restrictions in `excludeTools` for `run_shell_command` are
 based on simple string matching and can be easily bypassed. This feature is
-**not a security mechanism** and should not be relied upon to safely execute
-untrusted code. It is recommended to use `coreTools` to explicitly select
-commands that can be executed.
+**not a security mechanism** and must not be relied upon to safely execute
+untrusted code. We recommend using `coreTools` to explicitly select commands
+that can be executed.
+
+## Next steps
+
+- Learn how to [Sandbox tool execution](../cli/sandbox.md) for enhanced
+  security.
+- Explore the [File system tools](./file-system.md) for direct file access.
+- Read about [Trusted folders](../cli/trusted-folders.md) to manage tool
+  permissions.

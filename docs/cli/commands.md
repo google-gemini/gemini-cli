@@ -230,9 +230,13 @@ Slash commands provide meta-level control over the CLI itself.
 
 - **`/rewind`**
   - **Description:** Navigates backward through the conversation history,
-    allowing you to review past interactions and potentially revert to a
-    previous state. This feature helps in managing complex or branched
-    conversations.
+    letting you review past interactions and potentially revert both chat state
+    and file changes.
+  - **Usage:** Press **Esc** twice as a shortcut.
+  - **Features:**
+    - **Select Interaction:** Preview user prompts and file changes.
+    - **Action Selection:** Choose to rewind history only, revert code changes
+      only, or both.
 
 - **`/resume`**
   - **Description:** Browse and resume previous conversation sessions. Opens an

@@ -1,13 +1,14 @@
 # Todo tool (`write_todos`)
 
-This document describes the `write_todos` tool for the Gemini CLI.
+The `write_todos` tool lets the Gemini agent create and manage a list of
+subtasks for complex user requests. Use this tool to track the agent's progress
+and stay aligned on multi-step plans.
 
 ## Description
 
-The `write_todos` tool allows the Gemini agent to create and manage a list of
-subtasks for complex user requests. This provides you, the user, with greater
-visibility into the agent's plan and its current progress. It also helps with
-alignment where the agent is less likely to lose track of its current goal.
+The `write_todos` tool provides you with greater visibility into the agent's
+plan and its current progress. It also helps with alignment where the agent is
+less likely to lose track of its current goal.
 
 ### Arguments
 
@@ -18,6 +19,18 @@ alignment where the agent is less likely to lose track of its current goal.
   - `description` (string): The task description.
   - `status` (string): The current status (`pending`, `in_progress`,
     `completed`, or `cancelled`).
+
+## Usage
+
+The `write_todos` tool is used exclusively by the Gemini agent to manage its
+internal plan. You cannot create or modify todo items directly.
+
+Instead, you can interact with the todo list visually in the CLI:
+
+- **View progress:** When an agent is working on a complex task, the current
+  `in_progress` item is displayed above the input prompt.
+- **Toggle full list:** Press **Ctrl+T** at any time to show or hide the
+  complete list of subtasks and their statuses.
 
 ## Behavior
 
@@ -50,8 +63,18 @@ write_todos({
 
 ## Important notes
 
+When using the todo tool, keep the following considerations in mind regarding
+its visibility and intended use.
+
 - **Enabling:** This tool is enabled by default. You can disable it in your
   `settings.json` file by setting `"useWriteTodos": false`.
 
 - **Intended use:** This tool is primarily used by the agent for complex,
   multi-turn tasks. It is generally not used for simple, single-turn questions.
+
+## Next steps
+
+- Explore the [Command reference](../cli/commands.md) for related slash
+  commands.
+- Learn about [Session management](../cli/session-management.md) to track
+  long-running tasks.

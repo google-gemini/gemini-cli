@@ -10,7 +10,7 @@ current working directory where you launched the CLI) for security. Paths that
 you provide to these tools are generally expected to be absolute or are resolved
 relative to this root directory.
 
-## 1. `list_directory` (ReadFolder)
+## `list_directory` (ReadFolder)
 
 `list_directory` lists the names of files and subdirectories directly within a
 specified directory path. It can optionally ignore entries matching provided
@@ -20,11 +20,15 @@ glob patterns.
 - **Display name:** ReadFolder
 - **File:** `ls.ts`
 - **Parameters:**
-  - `path` (string, required): The absolute path to the directory to list.
+  - `dir_path` (string, required): The absolute path to the directory to list.
   - `ignore` (array of strings, optional): A list of glob patterns to exclude
-    from the listing (e.g., `["*.log", ".git"]`).
-  - `respect_git_ignore` (boolean, optional): Whether to respect `.gitignore`
-    patterns when listing files. Defaults to `true`.
+    from the listing (for example, `["*.log", ".git"]`).
+  - `file_filtering_options` (object, optional): Configuration for file
+    filtering.
+    - `respect_git_ignore` (boolean, optional): Whether to respect `.gitignore`
+      patterns. Defaults to `true`.
+    - `respect_gemini_ignore` (boolean, optional): Whether to respect
+      `.geminiignore` patterns. Defaults to `true`.
 - **Behavior:**
   - Returns a list of file and directory names.
   - Indicates whether each entry is a directory.
@@ -33,7 +37,7 @@ glob patterns.
   `Directory listing for /path/to/your/folder:\n[DIR] subfolder1\nfile1.txt\nfile2.png`
 - **Confirmation:** No.
 
-## 2. `read_file` (ReadFile)
+## `read_file` (ReadFile)
 
 `read_file` reads and returns the content of a specified file. This tool handles
 text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC,
@@ -44,12 +48,12 @@ Other binary file types are generally skipped.
 - **Display name:** ReadFile
 - **File:** `read-file.ts`
 - **Parameters:**
-  - `path` (string, required): The absolute path to the file to read.
+  - `file_path` (string, required): The absolute path to the file to read.
   - `offset` (number, optional): For text files, the 0-based line number to
     start reading from. Requires `limit` to be set.
   - `limit` (number, optional): For text files, the maximum number of lines to
-    read. If omitted, reads a default maximum (e.g., 2000 lines) or the entire
-    file if feasible.
+    read. If omitted, reads a default maximum (for example, 2000 lines) or the
+    entire file if feasible.
 - **Behavior:**
   - For text files: Returns the content. If `offset` and `limit` are used,
     returns only that slice of lines. Indicates if content was truncated due to
@@ -60,16 +64,16 @@ Other binary file types are generally skipped.
     message indicating it's a generic binary file.
 - **Output:** (`llmContent`):
   - For text files: The file content, potentially prefixed with a truncation
-    message (e.g.,
+    message (for example,
     `[File content truncated: showing lines 1-100 of 500 total lines...]\nActual file content...`).
   - For image/audio/PDF files: An object containing `inlineData` with `mimeType`
-    and base64 `data` (e.g.,
+    and base64 `data` (for example,
     `{ inlineData: { mimeType: 'image/png', data: 'base64encodedstring' } }`).
   - For other binary files: A message like
     `Cannot display content of binary file: /path/to/data.bin`.
 - **Confirmation:** No.
 
-## 3. `write_file` (WriteFile)
+## `write_file` (WriteFile)
 
 `write_file` writes content to a specified file. If the file exists, it will be
 overwritten. If the file doesn't exist, it (and any necessary parent
@@ -84,29 +88,31 @@ directories) will be created.
 - **Behavior:**
   - Writes the provided `content` to the `file_path`.
   - Creates parent directories if they don't exist.
-- **Output (`llmContent`):** A success message, e.g.,
+- **Output (`llmContent`):** A success message, for example,
   `Successfully overwrote file: /path/to/your/file.txt` or
   `Successfully created and wrote to new file: /path/to/new/file.txt`.
 - **Confirmation:** Yes. Shows a diff of changes and asks for user approval
   before writing.
 
-## 4. `glob` (FindFiles)
+## `glob` (FindFiles)
 
-`glob` finds files matching specific glob patterns (e.g., `src/**/*.ts`,
+`glob` finds files matching specific glob patterns (for example, `src/**/*.ts`,
 `*.md`), returning absolute paths sorted by modification time (newest first).
 
 - **Tool name:** `glob`
 - **Display name:** FindFiles
 - **File:** `glob.ts`
 - **Parameters:**
-  - `pattern` (string, required): The glob pattern to match against (e.g.,
-    `"*.py"`, `"src/**/*.js"`).
-  - `path` (string, optional): The absolute path to the directory to search
+  - `pattern` (string, required): The glob pattern to match against (for
+    example, `"*.py"`, `"src/**/*.js"`).
+  - `dir_path` (string, optional): The absolute path to the directory to search
     within. If omitted, searches the tool's root directory.
   - `case_sensitive` (boolean, optional): Whether the search should be
     case-sensitive. Defaults to `false`.
-  - `respect_git_ignore` (boolean, optional): Whether to respect .gitignore
+  - `respect_git_ignore` (boolean, optional): Whether to respect `.gitignore`
     patterns when finding files. Defaults to `true`.
+  - `respect_gemini_ignore` (boolean, optional): Whether to respect
+    `.geminiignore` patterns. Defaults to `true`.
 - **Behavior:**
   - Searches for files matching the glob pattern within the specified directory.
   - Returns a list of absolute paths, sorted with the most recently modified
@@ -117,7 +123,7 @@ directories) will be created.
   `Found 5 file(s) matching "*.ts" within src, sorted by modification time (newest first):\nsrc/file1.ts\nsrc/subdir/file2.ts...`
 - **Confirmation:** No.
 
-## 5. `search_file_content` (SearchText)
+## `search_file_content` (SearchText)
 
 `search_file_content` searches for a regular expression pattern within the
 content of files in a specified directory. Can filter files by a glob pattern.
@@ -129,18 +135,18 @@ numbers.
 - **File:** `grep.ts`
 - **Parameters:**
   - `pattern` (string, required): The regular expression (regex) to search for
-    (e.g., `"function\s+myFunction"`).
-  - `path` (string, optional): The absolute path to the directory to search
+    (for example, `"function\s+myFunction"`).
+  - `dir_path` (string, optional): The absolute path to the directory to search
     within. Defaults to the current working directory.
   - `include` (string, optional): A glob pattern to filter which files are
-    searched (e.g., `"*.js"`, `"src/**/*.{ts,tsx}"`). If omitted, searches most
-    files (respecting common ignores).
+    searched (for example, `"*.js"`, `"src/**/*.{ts,tsx}"`). If omitted,
+    searches most files (respecting common ignores).
 - **Behavior:**
   - Uses `git grep` if available in a Git repository for speed; otherwise, falls
     back to system `grep` or a JavaScript-based search.
   - Returns a list of matching lines, each prefixed with its file path (relative
     to the search directory) and line number.
-- **Output (`llmContent`):** A formatted string of matches, e.g.:
+- **Output (`llmContent`):** A formatted string of matches, for example:
   ```
   Found 3 matches for pattern "myFunction" in path "." (filter: "*.ts"):
   ---
@@ -154,7 +160,32 @@ numbers.
   ```
 - **Confirmation:** No.
 
-## 6. `replace` (Edit)
+## `read_many_files` (ReadManyFiles)
+
+`read_many_files` reads and concatenates the content of multiple files matching
+glob patterns. It is primarily used for text-based files but can also process
+images, audio, and PDF files if they are explicitly requested.
+
+- **Tool name:** `read_many_files`
+- **Display name:** ReadManyFiles
+- **File:** `read-many-files.ts`
+- **Parameters:**
+  - `include` (array of strings, required): Glob patterns or paths to include.
+  - `exclude` (array of strings, optional): Glob patterns to exclude.
+  - `useDefaultExcludes` (boolean, optional): Whether to apply default exclusion
+    patterns (for example, `node_modules`, `.git`). Defaults to `true`.
+  - `file_filtering_options` (object, optional): Configuration for file
+    filtering.
+- **Behavior:**
+  - Searches for files across all configured workspace directories.
+  - Concatenates text file contents with `--- {filePath} ---` separators.
+  - Handles asset files (images, PDF, audio) only if they match explicit
+    patterns in the `include` argument.
+- **Output (`llmContent`):** A concatenated string of file contents, terminating
+  with a reference content marker.
+- **Confirmation:** No.
+
+## `replace` (Edit)
 
 `replace` replaces text within a file. By default, replaces a single occurrence,
 but can replace multiple occurrences when `expected_replacements` is specified.
@@ -166,13 +197,15 @@ context around the `old_string` to ensure it modifies the correct location.
 - **File:** `edit.ts`
 - **Parameters:**
   - `file_path` (string, required): The absolute path to the file to modify.
+  - `instruction` (string, required): A clear, semantic instruction for the
+    change (for example, "Add a null check to fix a potential crash").
   - `old_string` (string, required): The exact literal text to replace.
 
     **CRITICAL:** This string must uniquely identify the single instance to
-    change. It should include at least 3 lines of context _before_ and _after_
-    the target text, matching whitespace and indentation precisely. If
-    `old_string` is empty, the tool attempts to create a new file at `file_path`
-    with `new_string` as content.
+    change. It must include at least 3 lines of context _before_ and _after_ the
+    target text, matching whitespace and indentation precisely. If `old_string`
+    is empty, the tool attempts to create a new file at `file_path` with
+    `new_string` as content.
 
   - `new_string` (string, required): The exact literal text to replace
     `old_string` with.
@@ -195,8 +228,7 @@ context around the `old_string` to ensure it modifies the correct location.
     - This self-correction process attempts to identify the unique segment the
       model intended to modify, making the `replace` operation more robust even
       with slightly imperfect initial context.
-- **Failure conditions:** Despite the correction mechanism, the tool will fail
-  if:
+- **Failure conditions:** Despite the correction mechanism, the tool fails if:
   - `file_path` is not absolute or is outside the root directory.
   - `old_string` is not empty, but the `file_path` does not exist.
   - `old_string` is empty, but the `file_path` already exists.
@@ -207,7 +239,7 @@ context around the `old_string` to ensure it modifies the correct location.
   - On success:
     `Successfully modified file: /path/to/file.txt (1 replacements).` or
     `Created new file: /path/to/new_file.txt with provided content.`
-  - On failure: An error message explaining the reason (e.g.,
+  - On failure: An error message explaining the reason (for example,
     `Failed to edit, 0 occurrences found...`,
     `Failed to edit, expected 1 occurrences but found 2...`).
 - **Confirmation:** Yes. Shows a diff of the proposed changes and asks for user
@@ -215,3 +247,10 @@ context around the `old_string` to ensure it modifies the correct location.
 
 These file system tools provide a foundation for the Gemini CLI to understand
 and interact with your local project context.
+
+## Next steps
+
+- Learn how to [Provide context](../cli/gemini-md.md) using context files.
+- See how to execute [Shell commands](./shell.md) safely.
+- Explore [Ignoring files](../cli/gemini-ignore.md) to exclude data from the
+  model.
