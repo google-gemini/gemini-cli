@@ -456,11 +456,11 @@ function toolUsageInteractive(interactive: boolean): string {
   if (interactive) {
     return `
 - **Background Processes:** Use background processes (via \`&\`) for commands that are unlikely to stop on their own, e.g. \`node server.js &\`. If unsure, ask the user.
-- **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`ctrl + f\` to focus into the shell to provide input.`;
+- **Interactive Commands:** Never use interactive shell commands unless absolutely necessary. **ALWAYS** use arguments to bypass prompts for **EVERY** tool in use that supports it, even if that command is part of a chain or larger command. For example: 'git --no-pager', 'vitest run', and 'npx --yes' to bypass interactive prompts.`;
   }
   return `
 - **Background Processes:** Use background processes (via \`&\`) for commands that are unlikely to stop on their own, e.g. \`node server.js &\`.
-- **Interactive Commands:** Only execute non-interactive commands. e.g.: use 'git --no-pager'`;
+- **Interactive Commands:** Never use interactive shell commands. **ALWAYS** use arguments to bypass prompts for **EVERY** tool in use that supports it, even if that command is part of a chain or larger command. For example: 'git --no-pager', 'vitest run', and 'npx --yes' to bypass interactive prompts.`;
 }
 
 function toolUsageRememberingFacts(
