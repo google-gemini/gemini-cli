@@ -41,6 +41,7 @@ import {
   MOCK_TOOL_SHOULD_CONFIRM_EXECUTE,
 } from '../test-utils/mock-tool.js';
 import * as modifiableToolModule from '../tools/modifiable-tool.js';
+import * as editorModule from '../utils/editor.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 import type { PolicyEngine } from '../policy/policy-engine.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
@@ -1762,6 +1763,10 @@ describe('CoreToolScheduler Sequential Execution', () => {
   });
 
   it('should pass confirmation diff data into modifyWithEditor overrides', async () => {
+    const resolveEditorAsyncSpy = vi
+      .spyOn(editorModule, 'resolveEditorAsync')
+      .mockResolvedValue('vscode');
+
     const modifyWithEditorSpy = vi
       .spyOn(modifiableToolModule, 'modifyWithEditor')
       .mockResolvedValue({
@@ -1842,6 +1847,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
     });
 
     modifyWithEditorSpy.mockRestore();
+    resolveEditorAsyncSpy.mockRestore();
   });
 
   it('should handle inline modify with empty new content', async () => {
