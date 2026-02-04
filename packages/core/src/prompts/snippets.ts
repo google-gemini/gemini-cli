@@ -27,6 +27,7 @@ export interface SystemPromptOptions {
   agentSkills?: AgentSkillOptions[];
   hookContext?: boolean;
   primaryWorkflows?: PrimaryWorkflowsOptions;
+  planningWorkflow?: PlanningWorkflowOptions;
   operationalGuidelines?: OperationalGuidelinesOptions;
   sandbox?: SandboxMode;
   gitRepo?: GitRepoOptions;
@@ -65,7 +66,7 @@ export interface FinalReminderOptions {
   readFileToolName: string;
 }
 
-export interface ApprovalModePlanOptions {
+export interface PlanningWorkflowOptions {
   planModeToolsList: string;
   plansDir: string;
 }
@@ -93,7 +94,11 @@ ${renderAgentSkills(options.agentSkills)}
 
 ${renderHookContext(options.hookContext)}
 
-${renderPrimaryWorkflows(options.primaryWorkflows)}
+${
+  options.planningWorkflow
+    ? renderPlanningWorkflow(options.planningWorkflow)
+    : renderPrimaryWorkflows(options.primaryWorkflows)
+}
 
 ${renderOperationalGuidelines(options.operationalGuidelines)}
 
@@ -111,14 +116,11 @@ ${renderFinalReminder(options.finalReminder)}
 export function renderFinalShell(
   basePrompt: string,
   userMemory?: string,
-  planOptions?: ApprovalModePlanOptions,
 ): string {
   return `
 ${basePrompt.trim()}
 
 ${renderUserMemory(userMemory)}
-
-${renderApprovalModePlan(planOptions)}
 `.trim();
 }
 
@@ -196,7 +198,7 @@ export function renderPrimaryWorkflows(
 When requested to perform tasks like fixing bugs, adding features, refactoring, or explaining code, follow this sequence:
 ${workflowStepUnderstand(options)}
 ${workflowStepPlan(options)}
-3. **Implement:** Use the available tools (e.g., '${EDIT_TOOL_NAME}', '${WRITE_FILE_TOOL_NAME}' '${SHELL_TOOL_NAME}' ...) to act on the plan, strictly adhering to the project's established conventions (detailed under 'Core Mandates').
+3. **Implement:** Use the available tools (e.g., '${EDIT_TOOL_NAME}', '${WRITE_FILE_TOOL_NAME}' '${SHELL_TOOL_NAME}' ...) to act on the plan. Strictly adhere to the project's established conventions (detailed under 'Core Mandates'). Before making manual code changes, check if an ecosystem tool (like 'eslint --fix', 'prettier --write', 'go fmt', 'cargo fmt') is available in the project to perform the task automatically.
 4. **Verify (Tests):** If applicable and feasible, verify the changes using the project's testing procedures. Identify the correct test commands and frameworks by examining 'README' files, build/package configuration (e.g., 'package.json'), or existing test execution patterns. NEVER assume standard test commands. When executing test commands, prefer "run once" or "CI" modes to ensure the command terminates after completion.
 5. **Verify (Standards):** VERY IMPORTANT: After making code changes, execute the project-specific build, linting and type-checking commands (e.g., 'tsc', 'npm run lint', 'ruff check .') that you have identified for this project (or obtained from the user). This ensures code quality and adherence to standards.${workflowVerifyStandardsSuffix(options.interactive)}
 6. **Finalize:** After all verification passes, consider the task complete. Do not remove or revert any changes or created files (like tests). Await the user's next instruction.
@@ -290,8 +292,8 @@ export function renderUserMemory(memory?: string): string {
   return `\n---\n\n${memory.trim()}`;
 }
 
-export function renderApprovalModePlan(
-  options?: ApprovalModePlanOptions,
+export function renderPlanningWorkflow(
+  options?: PlanningWorkflowOptions,
 ): string {
   if (!options) return '';
   return `
