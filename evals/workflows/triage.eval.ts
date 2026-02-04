@@ -9,7 +9,6 @@ import { evalTest } from '../test-helper.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import yaml from 'js-yaml';
-import { WORKFLOW_TARGET_MODELS } from './constants.js';
 
 // Read the workflow file to extract the prompt
 const workflowPath = path.join(
@@ -148,7 +147,6 @@ describe('triage_agent', () => {
       ),
     ],
     params: { settings: TRIAGE_SETTINGS },
-    targetModels: WORKFLOW_TARGET_MODELS,
     assert: assertHasLabel('area/core'),
   });
 
@@ -164,7 +162,6 @@ describe('triage_agent', () => {
       ),
     ],
     params: { settings: TRIAGE_SETTINGS },
-    targetModels: WORKFLOW_TARGET_MODELS,
     assert: assertHasLabel('area/platform'),
   });
 
@@ -180,7 +177,6 @@ describe('triage_agent', () => {
       ),
     ],
     params: { settings: TRIAGE_SETTINGS },
-    targetModels: WORKFLOW_TARGET_MODELS,
     assert: assertHasLabel('area/platform'),
   });
 
@@ -196,7 +192,6 @@ describe('triage_agent', () => {
       ),
     ],
     params: { settings: TRIAGE_SETTINGS },
-    targetModels: WORKFLOW_TARGET_MODELS,
     assert: assertHasLabel('area/core'),
   });
 
@@ -212,7 +207,6 @@ describe('triage_agent', () => {
       ),
     ],
     params: { settings: TRIAGE_SETTINGS },
-    targetModels: WORKFLOW_TARGET_MODELS,
     assert: assertHasLabel('area/platform'),
   });
 
@@ -228,7 +222,6 @@ describe('triage_agent', () => {
       ),
     ],
     params: { settings: TRIAGE_SETTINGS },
-    targetModels: WORKFLOW_TARGET_MODELS,
     assert: assertHasLabel('area/core'),
   });
 
@@ -244,7 +237,6 @@ describe('triage_agent', () => {
       ),
     ],
     params: { settings: TRIAGE_SETTINGS },
-    targetModels: WORKFLOW_TARGET_MODELS,
     assert: assertHasLabel('area/agent'),
   });
 
@@ -260,7 +252,6 @@ describe('triage_agent', () => {
       ),
     ],
     params: { settings: TRIAGE_SETTINGS },
-    targetModels: WORKFLOW_TARGET_MODELS,
     assert: assertHasLabel('area/extensions'),
   });
 
@@ -273,7 +264,6 @@ describe('triage_agent', () => {
       createPrompt('Buy cheap rolex', 'Click here for discount.'),
     ],
     params: { settings: TRIAGE_SETTINGS },
-    targetModels: WORKFLOW_TARGET_MODELS,
     assert: assertHasLabel('area/unknown'),
   });
 
@@ -289,7 +279,6 @@ describe('triage_agent', () => {
       ),
     ],
     params: { settings: TRIAGE_SETTINGS },
-    targetModels: WORKFLOW_TARGET_MODELS,
     assert: assertHasLabel('area/core'),
   });
 
@@ -305,7 +294,6 @@ describe('triage_agent', () => {
       ),
     ],
     params: { settings: TRIAGE_SETTINGS },
-    targetModels: WORKFLOW_TARGET_MODELS,
     assert: assertHasLabel('area/agent'),
   });
 
@@ -321,7 +309,6 @@ describe('triage_agent', () => {
       ),
     ],
     params: { settings: TRIAGE_SETTINGS },
-    targetModels: WORKFLOW_TARGET_MODELS,
     assert: assertHasLabel('area/enterprise'),
   });
 
@@ -334,7 +321,6 @@ describe('triage_agent', () => {
       createPrompt('It does not work', 'I tried to use it and it failed.'),
     ],
     params: { settings: TRIAGE_SETTINGS },
-    targetModels: WORKFLOW_TARGET_MODELS,
     assert: assertHasLabel('area/unknown'),
   });
 
@@ -350,7 +336,6 @@ describe('triage_agent', () => {
       ),
     ],
     params: { settings: TRIAGE_SETTINGS },
-    targetModels: WORKFLOW_TARGET_MODELS,
     assert: assertHasLabel('area/security'),
   });
 
@@ -366,7 +351,6 @@ describe('triage_agent', () => {
       ),
     ],
     params: { settings: TRIAGE_SETTINGS },
-    targetModels: WORKFLOW_TARGET_MODELS,
     assert: assertHasLabel('area/non-interactive'),
   });
 
@@ -382,7 +366,6 @@ describe('triage_agent', () => {
       ),
     ],
     params: { settings: TRIAGE_SETTINGS },
-    targetModels: WORKFLOW_TARGET_MODELS,
     assert: assertHasLabel('area/agent'),
   });
 
@@ -398,7 +381,6 @@ describe('triage_agent', () => {
       ),
     ],
     params: { settings: TRIAGE_SETTINGS },
-    targetModels: WORKFLOW_TARGET_MODELS,
     assert: assertHasLabel('area/core'),
   });
 
@@ -414,7 +396,6 @@ describe('triage_agent', () => {
       ),
     ],
     params: { settings: TRIAGE_SETTINGS },
-    targetModels: WORKFLOW_TARGET_MODELS,
     assert: assertHasLabel('area/security'),
   });
 
@@ -427,7 +408,6 @@ describe('triage_agent', () => {
       createPrompt('asdfasdf', 'qwerqwer zxcvbnm'),
     ],
     params: { settings: TRIAGE_SETTINGS },
-    targetModels: WORKFLOW_TARGET_MODELS,
     assert: assertHasLabel('area/unknown'),
   });
 });

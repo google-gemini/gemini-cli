@@ -9,7 +9,6 @@ import { evalTest } from '../test-helper.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import yaml from 'js-yaml';
-import { WORKFLOW_TARGET_MODELS } from './constants.js';
 
 // Read the workflow file to extract the prompt and settings
 const workflowPath = path.join(
@@ -66,7 +65,6 @@ describe('dedup_agent', () => {
     params: {
       settings: DEDUP_SETTINGS,
     },
-    targetModels: WORKFLOW_TARGET_MODELS,
     files: {
       github_env: '',
       // Mock gh binary
@@ -147,7 +145,6 @@ if (args.includes('issue view')) {
     params: {
       settings: DEDUP_SETTINGS,
     },
-    targetModels: WORKFLOW_TARGET_MODELS,
     files: {
       github_env: '',
       'bin/gh': `#!/usr/bin/env node
@@ -219,7 +216,6 @@ if (args.includes('issue view')) {
     params: {
       settings: DEDUP_SETTINGS,
     },
-    targetModels: WORKFLOW_TARGET_MODELS,
     files: {
       github_env: '',
       'bin/gh': `#!/usr/bin/env node
@@ -290,7 +286,6 @@ if (args.includes('issue view')) {
     params: {
       settings: DEDUP_SETTINGS,
     },
-    targetModels: WORKFLOW_TARGET_MODELS,
     files: {
       github_env: '',
       'bin/gh': `#!/usr/bin/env node
@@ -361,7 +356,6 @@ if (args.includes('issue view')) {
     params: {
       settings: DEDUP_SETTINGS,
     },
-    targetModels: WORKFLOW_TARGET_MODELS,
     files: {
       github_env: '',
       'bin/gh': `#!/usr/bin/env node
