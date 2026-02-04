@@ -11,7 +11,33 @@ import {
   toFriendlyError,
   BadRequestError,
   ForbiddenError,
+  getErrorMessage,
 } from './errors.js';
+
+describe('getErrorMessage', () => {
+  it('should return plain error message', () => {
+    expect(getErrorMessage(new Error('plain error'))).toBe('plain error');
+  });
+
+  it('should handle non-Error inputs', () => {
+    expect(getErrorMessage('string error')).toBe('string error');
+    expect(getErrorMessage(123)).toBe('123');
+  });
+
+  it('should handle structured HTTP errors via toFriendlyError', () => {
+    const error = {
+      response: {
+        data: {
+          error: {
+            code: 400,
+            message: 'Bad Request Message',
+          },
+        },
+      },
+    };
+    expect(getErrorMessage(error)).toBe('Bad Request Message');
+  });
+});
 
 describe('isAuthenticationError', () => {
   it('should detect error with code: 401 property (MCP SDK style)', () => {
