@@ -22,7 +22,11 @@ import {
   FocusHint,
 } from './ToolShared.js';
 import type { ToolMessageProps } from './ToolMessage.js';
-import { ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
+import { ToolCallStatus } from '../../types.js';
+import {
+  ACTIVE_SHELL_MAX_LINES,
+  SHELL_HISTORY_MAX_LINES,
+} from '../../constants.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 import type { Config } from '@google/gemini-cli-core';
 
@@ -161,7 +165,11 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
             (isAlternateBuffer && isThisShellFocused) ||
             availableTerminalHeight === undefined
               ? undefined
-              : ACTIVE_SHELL_MAX_LINES
+              : status === ToolCallStatus.Success ||
+                  status === ToolCallStatus.Error ||
+                  status === ToolCallStatus.Canceled
+                ? SHELL_HISTORY_MAX_LINES
+                : ACTIVE_SHELL_MAX_LINES
           }
         />
         {isThisShellFocused && config && (

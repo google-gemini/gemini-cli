@@ -1550,7 +1550,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
           keyMatchers[Command.UNFOCUS_SHELL_INPUT](key)) &&
         (activePtyId || (isBackgroundShellVisible && backgroundShells.size > 0))
       ) {
-        if (key.name === 'tab' && key.shift) {
+        if (keyMatchers[Command.SHELL_LEAVE_FOCUS](key)) {
           // Always change focus
           setEmbeddedShellFocused(false);
           return true;

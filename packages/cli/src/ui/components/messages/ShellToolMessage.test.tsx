@@ -229,5 +229,29 @@ describe('<ShellToolMessage />', () => {
         });
       });
     });
+
+    it('passes SHELL_HISTORY_MAX_LINES when status is Success', async () => {
+      const { ToolResultDisplay: MockToolResultDisplay } = await import(
+        './ToolResultDisplay.js'
+      );
+      const { SHELL_HISTORY_MAX_LINES } = await import('../../constants.js');
+
+      const props: ShellToolMessageProps = {
+        ...baseProps,
+        status: ToolCallStatus.Success,
+        availableTerminalHeight: 20, // Constrained
+      };
+
+      renderWithProviders(<ShellToolMessage {...props} />, { uiActions });
+
+      await waitFor(() => {
+        const lastCallProps = vi
+          .mocked(MockToolResultDisplay)
+          .mock.calls.at(-1)?.[0];
+        expect(lastCallProps).toMatchObject({
+          maxLines: SHELL_HISTORY_MAX_LINES,
+        });
+      });
+    });
   });
 });
