@@ -38,6 +38,7 @@ describe('ExitPlanModeTool', () => {
     mockConfig = {
       getTargetDir: vi.fn().mockReturnValue(tempRootDir),
       setApprovalMode: vi.fn(),
+      setApprovedPlanPath: vi.fn(),
       storage: {
         getProjectTempPlansDir: vi.fn().mockReturnValue(mockPlansDir),
       } as unknown as Config['storage'],
@@ -200,6 +201,7 @@ The approved implementation plan is stored at: ${expectedPath}
 Read and follow the plan strictly during implementation.`,
         returnDisplay: `Plan approved: ${expectedPath}`,
       });
+      expect(mockConfig.setApprovedPlanPath).toHaveBeenCalledWith(expectedPath);
     });
 
     it('should return approval message when plan is approved with AUTO_EDIT mode', async () => {
@@ -230,6 +232,7 @@ Read and follow the plan strictly during implementation.`,
       expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
         ApprovalMode.AUTO_EDIT,
       );
+      expect(mockConfig.setApprovedPlanPath).toHaveBeenCalledWith(expectedPath);
     });
 
     it('should return feedback message when plan is rejected with feedback', async () => {
