@@ -171,7 +171,7 @@ export async function resolveConfirmation(
         // This prevents the infinite loop issue reported in #7669
         outcome = ToolConfirmationOutcome.Cancel;
       }
-    } else if (response.payload?.newContent) {
+    } else if (response.payload && 'newContent' in response.payload) {
       await handleInlineModification(deps, toolCall, response.payload, signal);
       outcome = ToolConfirmationOutcome.ProceedOnce;
     }
