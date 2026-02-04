@@ -231,7 +231,7 @@ ${shellEfficiencyGuidelines(options.enableShellEfficiency)}
 
 ## Tool Usage
 - **Parallelism:** Execute multiple independent tool calls in parallel when feasible (i.e. searching the codebase).
-- **Command Execution:** Use the '${SHELL_TOOL_NAME}' tool for running shell commands, remembering the safety rule to explain modifying commands first. When using tools to apply fixes (e.g. \`eslint --fix\`), prefer invoking the executable directly to ensure flags are passed correctly.${toolUsageInteractive(options.interactive)}${toolUsageRememberingFacts(options)}
+- **Command Execution:** Use the '${SHELL_TOOL_NAME}' tool for running shell commands, remembering the safety rule to explain modifying commands first.${toolUsageInteractive(options.interactive)}${toolUsageRememberingFacts(options)}
 - **Respect User Confirmations:** Most tool calls (also denoted as 'function calls') will first require confirmation from the user, where they will either approve or cancel the function call. If a user cancels a function call, respect their choice and do _not_ try to make the function call again. It is okay to request the tool call again _only_ if the user requests that same tool call on a subsequent prompt. When a user cancels a function call, assume best intentions from the user and consider inquiring if they prefer any alternative paths forward.
 
 ## Interaction Details

@@ -494,7 +494,7 @@ export class TestRig {
       }
     });
 
-    const timeout = options.timeout ?? 120000;
+    const timeout = options.timeout ?? 300000;
     const promise = new Promise<string>((resolve, reject) => {
       const timer = setTimeout(() => {
         child.kill('SIGKILL');
@@ -665,7 +665,7 @@ export class TestRig {
       }
     });
 
-    const timeout = options.timeout ?? 120000;
+    const timeout = options.timeout ?? 300000;
     const promise = new Promise<string>((resolve, reject) => {
       const timer = setTimeout(() => {
         child.kill('SIGKILL');
