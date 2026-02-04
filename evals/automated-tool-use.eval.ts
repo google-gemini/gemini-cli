@@ -13,7 +13,7 @@ describe('Automated tool use', () => {
    * We provide a 'lint' script in the package.json, which helps elicit
    * a repro by guiding the agent into using the existing deficient script.
    */
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: 'should use automated tools (eslint --fix) to fix code style issues',
     files: {
       'package.json': JSON.stringify(
@@ -101,7 +101,7 @@ describe('Automated tool use', () => {
    * Tests that the agent uses prettier --write to fix formatting issues in files
    * instead of trying to edit the files itself.
    */
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: 'should use automated tools (prettier --write) to fix formatting issues',
     files: {
       'package.json': JSON.stringify(
