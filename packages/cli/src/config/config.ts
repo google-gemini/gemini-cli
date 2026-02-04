@@ -701,6 +701,8 @@ export async function loadCliConfig(
           args: undefined,
           env: undefined,
           cwd: undefined,
+          httpUrl: undefined,
+          tcp: undefined,
         };
 
         if (

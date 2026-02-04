@@ -1530,6 +1530,8 @@ describe('loadCliConfig with admin.mcp.config', () => {
       args: undefined,
       env: undefined,
       cwd: undefined,
+      httpUrl: undefined,
+      tcp: undefined,
     });
   });
 
