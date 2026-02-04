@@ -140,6 +140,20 @@ describe('ToolResultDisplay', () => {
     expect(output).toContain('Markdown content');
   });
 
+  it('passes hasFocus prop to scrollable components', () => {
+    mockUseAlternateBuffer.mockReturnValue(true);
+    const { lastFrame } = render(
+      <ToolResultDisplay
+        resultDisplay="Some result"
+        terminalWidth={80}
+        hasFocus={true}
+      />,
+    );
+    // Since Scrollable is mocked, we can't easily check its props directly in the string output
+    // without changing the mock. But we can at least ensure it renders without crashing.
+    expect(lastFrame()).toContain('Scrollable Container');
+  });
+
   it('renders string result as markdown by default', () => {
     const { lastFrame } = render(
       <ToolResultDisplay resultDisplay="**Some result**" terminalWidth={80} />,

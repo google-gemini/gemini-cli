@@ -33,6 +33,7 @@ export interface ToolResultDisplayProps {
   terminalWidth: number;
   renderOutputAsMarkdown?: boolean;
   maxLines?: number;
+  hasFocus?: boolean;
 }
 
 interface FileDiffResult {
@@ -46,6 +47,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   terminalWidth,
   renderOutputAsMarkdown = true,
   maxLines,
+  hasFocus = false,
 }) => {
   const { renderMarkdown } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
@@ -177,7 +179,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
             estimatedItemHeight={() => 1}
             keyExtractor={(_: AnsiLine, index: number) => index.toString()}
             initialScrollIndex={SCROLL_TO_ITEM_END}
-            hasFocus={true}
+            hasFocus={hasFocus}
           />
         </Box>
       );
@@ -186,7 +188,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
       <Scrollable
         width={childWidth}
         maxHeight={maxLines ?? availableHeight}
-        hasFocus={true} // Allow scrolling via keyboard (Shift+Up/Down)
+        hasFocus={hasFocus} // Allow scrolling via keyboard (Shift+Up/Down)
         scrollToBottom={true}
       >
         {content}
