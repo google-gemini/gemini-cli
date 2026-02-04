@@ -15,6 +15,7 @@ import {
 } from '../contexts/UIStateContext.js';
 import { ConfigContext } from '../contexts/ConfigContext.js';
 import { SettingsContext } from '../contexts/SettingsContext.js';
+import { createMockSettings } from '../../test-utils/settings.js';
 import type { TextBuffer } from './shared/text-buffer.js';
 
 // Mock child components to simplify testing
@@ -67,14 +68,6 @@ const createMockConfig = (overrides = {}) => ({
     getDisplayableSkills: vi.fn(() => ['skill1', 'skill2']),
   })),
   ...overrides,
-});
-
-const createMockSettings = (merged = {}) => ({
-  merged: {
-    hooksConfig: { notifications: true },
-    ui: { hideContextSummary: false },
-    ...merged,
-  },
 });
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
