@@ -39,12 +39,14 @@ const createPrompt = () => {
   );
 };
 
+const tsxPath = path.join(process.cwd(), 'node_modules', '.bin', 'tsx');
+
 const REFRESH_SETTINGS = {
   ...ORIGINAL_SETTINGS,
   mcpServers: {
     issue_deduplication: {
-      command: 'npx',
-      args: ['tsx', mockMcpPath],
+      command: tsxPath,
+      args: [mockMcpPath],
     },
   },
 };
