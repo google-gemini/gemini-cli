@@ -11,8 +11,8 @@ Slash commands provide meta-level control over the CLI itself.
 ### Built-in Commands
 
 - **`/about`**
-  - **Description:** Show version info. Please share this information when
-    filing issues.
+  - **Description:** Show version info. Share this information when filing
+    issues.
 
 - **`/auth`**
   - **Description:** Open a dialog that lets you change the authentication

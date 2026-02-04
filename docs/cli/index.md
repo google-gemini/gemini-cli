@@ -5,97 +5,89 @@ models directly into your development workflow. It lets you interact with AI
 using your local files, shell environment, and project context, creating a
 bridge between generative AI and your system tools.
 
-## When to use Gemini CLI
+## User guides
 
-Use Gemini CLI when you need an AI assistant that understands your local
-environment and can actively help you manage your codebase.
+These guides provide step-by-step instructions and practical examples for using
+Gemini CLI in your daily development workflow.
 
-- **Interactive development:** Chat with the model to brainstorm architecture,
-  debug complex errors, or generate new features while the model has access to
-  your source code.
-- **System automation:** Execute shell commands and file operations through the
-  model to automate repetitive tasks like setting up test environments or
-  refactoring large sets of files.
-- **Scripting and piping:** Integrate AI into your terminal pipelines by using
-  headless mode to process data between different command-line tools.
-- **Context-aware instructions:** Define persistent project rules and coding
-  standards using `GEMINI.md` files so the model always follows your preferred
-  patterns.
+- **[Quickstart](../get-started/index.md):** Get up and running with Gemini CLI
+  in minutes.
+- **[Agent skills](./tutorials/skills-getting-started.md):** Learn how to use
+  and manage specialized expertise.
+- **[Automation](../tutorials/automation.md):** Script and automate tasks using
+  headless mode.
+- **[Examples](../get-started/examples.md):** See practical examples of Gemini
+  CLI in action.
+- **[File management](../tutorials/file-management.md):** How to include,
+  search, and modify local files.
+- **[MCP setup](../tutorials/mcp-setup.md):** Configure Model Context Protocol
+  servers for custom tools.
+- **[Memory & context](../tutorials/memory-management.md):** Manage persistent
+  instructions and individual facts.
+- **[Session & history](../tutorials/session-management.md):** Resume, manage,
+  and rewind your conversations.
+- **[Shell commands](../tutorials/shell-commands.md):** Execute system commands
+  safely directly from your prompt.
+- **[Task planning](../tutorials/task-planning.md):** Using todos for complex,
+  multi-step agent requests.
+- **[Web tools](../tutorials/web-tools.md):** Searching and fetching content
+  from the web.
 
-## Basic features
+## Features
 
-The following features provide the core functionality for interacting with
-Gemini CLI and configuring your daily workflow.
+Technical reference documentation for each capability of Gemini CLI.
 
-- **[Commands](./commands.md):** Use built-in slash commands to manage your
-  session and interface.
-- **[Custom commands](./custom-commands.md):** Create your own shortcuts for
-  frequently used prompts and patterns.
-- **[Headless mode](./headless.md):** Run the CLI programmatically for scripting
-  and heavy automation.
-- **[Keyboard shortcuts](./keyboard-shortcuts.md):** Improve your terminal
-  efficiency with built-in shortcuts.
-- **[Model selection](./model.md):** Choose between Gemini Pro, Flash, or the
-  recommended Auto setting.
-- **[Rewind](./rewind.md):** Undo recent interactions and revert file changes
-  with precision.
-- **[Session management](./session-management.md):** Resume previous
-  conversations and browse your session history.
-- **[Settings](./settings.md):** Customize the CLI's behavior, privacy, and
-  display options.
-- **[Themes](./themes.md):** Personalize the CLI's visual appearance.
-- **[Tutorials](./tutorials.md):** Follow guided walkthroughs for common
-  development tasks.
-
-## Advanced features
-
-These advanced capabilities let you extend the CLI's power, enhance security,
-and optimize your development environment.
-
+- **[Activate skill tool](../tools/activate-skill.md):** Internal mechanism for
+  loading expert procedures.
 - **[Advanced model configuration](./generation-settings.md):** Fine-tune
   generation parameters like temperature and thinking budget.
-- **[Agent Skills](./skills.md):** Grant the model specialized expertise through
-  procedural workflows.
-- **[Checkpointing](./checkpointing.md):** Protect your work with automatic
-  snapshots of your session and files.
-- **[Context files (GEMINI.md)](./gemini-md.md):** Provide hierarchical,
-  persistent instructions to the model.
-- **[Enterprise configuration](./enterprise.md):** Manage deployments and
-  controls in professional environments.
-- **[Ignoring files (.geminiignore)](./gemini-ignore.md):** Exclude sensitive
-  data or large build artifacts from the model's view.
-- **[Model routing](./model-routing.md):** Enable automatic fallback models to
-  ensure your sessions are never interrupted by server issues.
-- **[Sandboxing](./sandbox.md):** Run tool executions in secure, containerized
-  environments.
-- **[System prompt override](./system-prompt.md):** Completely replace the
-  built‑in system instructions for highly specialized tasks.
-- **[Telemetry](./telemetry.md):** Monitor usage and performance metrics.
-- **[Token caching](./token-caching.md):** Reduce costs and improve speed by
-  caching frequently used context.
-- **[Trusted folders](./trusted-folders.md):** Control which projects can access
-  privileged system tools.
-
-## Non-interactive mode
-
-Gemini CLI supports a non-interactive mode that is ideal for scripting and shell
-integration. In this mode, the CLI executes your request and exits immediately.
-
-If you are running the CLI in a non-TTY environment (for example, in a script or
-a CI pipeline), positional arguments automatically trigger non-interactive mode:
-
-```bash
-gemini "What is fine tuning?"
-```
-
-You can also pipe input directly to the CLI:
-
-```bash
-echo "What is fine tuning?" | gemini
-```
-
-For more details on automation and scripting, see the
-**[Headless mode](./headless.md)** guide.
+- **[Agent Skills](./skills.md):** Core expertise framework.
+- **[Ask user tool](../tools/ask-user.md):** Internal dialog system for
+  clarification.
+- **[Checkpointing](./checkpointing.md):** Automatic session snapshots.
+- **[Custom commands](./custom-commands.md):** Personalized shortcuts.
+- **[Enterprise configuration](./enterprise.md):** Professional environment
+  controls.
+- **[Extensions](../extensions/index.md):** Core extensibility framework.
+- **[File system tools reference](../tools/file-system.md):** Technical details
+  for local file operations.
+- **[Headless mode reference](./headless.md):** Programmatic and scripting
+  interface.
+- **[Hooks](../hooks/index.md):** Technical specification for interception
+  points.
+- **[IDE integration](../ide-integration/index.md):** Architecture for editor
+  companions.
+- **[Ignore files (.geminiignore)](./gemini-ignore.md):** Exclusion pattern
+  reference.
+- **[Internal documentation tool](../tools/internal-docs.md):** Technical lookup
+  for CLI features.
+- **[MCP servers reference](../tools/mcp-server.md):** Transport and protocol
+  specification.
+- **[Memory tool reference](../tools/memory.md):** Storage details for
+  persistent facts.
+- **[Model routing](./model-routing.md):** Automatic fallback resilience.
+- **[Model selection reference](./model.md):** Manual and automatic model
+  selection.
+- **[Project context (GEMINI.md)](./gemini-md.md):** Technical hierarchy of
+  context files.
+- **[Rewind](./rewind.md):** State restoration reference.
+- **[Sandboxing reference](./sandbox.md):** Isolate tool execution.
+- **[Settings reference](./settings.md):** Full `settings.json` schema.
+- **[Shell tool reference](../tools/shell.md):** Detailed system execution
+  parameters.
+- **[System prompt override](./system-prompt.md):** Instruction replacement
+  logic.
+- **[Telemetry reference](./telemetry.md):** Usage and performance metric
+  details.
+- **[Themes reference](./themes.md):** UI personalization technical guide.
+- **[Todo tool reference](../tools/todos.md):** Progress tracking specification.
+- **[Token caching reference](./token-caching.md):** Performance optimization.
+- **[Trusted folders reference](./trusted-folders.md):** Security permission
+  logic.
+- **[Web fetch tool reference](../tools/web-fetch.md):** URL retrieval and
+  extraction details.
+- **[Web search tool reference](../tools/web-search.md):** Google Search
+  integration technicals.
 
 ## Next steps
 
@@ -103,5 +95,4 @@ For more details on automation and scripting, see the
   slash commands.
 - Read about [Project context](./gemini-md.md) to understand how to provide
   persistent instructions to the model.
-- Check out the [Tutorials](./tutorials.md) for guided walkthroughs of common
-  workflows.
+- See the [CLI reference](./cli-reference.md) for a quick cheatsheet of flags.

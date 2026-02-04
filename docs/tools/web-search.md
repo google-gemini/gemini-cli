@@ -1,54 +1,32 @@
 # Web search tool (`google_web_search`)
 
-The `google_web_search` tool lets you perform web searches using Google Search
-via the Gemini API. Use this tool to retrieve up-to-date information, news, and
-facts from the internet.
+The `google_web_search` tool allows the Gemini agent to retrieve up-to-date
+information, news, and facts from the internet via Google Search.
 
-## Description
+## Technical reference
 
-The `google_web_search` tool returns a summary of web results with sources. It
-is useful for answering questions about current events or finding information
-not present in the model's training data.
+The agent uses this tool when your request requires knowledge of current events
+or specific online documentation not available in its internal training data.
 
 ### Arguments
 
-`google_web_search` takes one argument:
+- `query` (string, required): The search query to be executed.
 
-- `query` (string, required): The search query.
+## Technical behavior
 
-## How to use `google_web_search` with the Gemini CLI
+- **Grounding:** Returns a generated summary based on search results.
+- **Citations:** Includes source URIs and titles for factual grounding.
+- **Processing:** The Gemini API processes the search results before returning a
+  synthesized response to the agent.
 
-The `google_web_search` tool sends a query to the Gemini API, which then
-performs a web search. The tool returns a generated response based on the search
-results, including citations and sources.
+## Use cases
 
-Usage:
-
-```
-google_web_search(query="Your query goes here.")
-```
-
-## `google_web_search` examples
-
-Get information on a topic:
-
-```
-google_web_search(query="latest advancements in AI-powered code generation")
-```
-
-## Important notes
-
-When using the web search tool, keep the following details in mind regarding the
-nature of the returned information.
-
-- **Response returned:** The `google_web_search` tool returns a processed
-  summary, not a raw list of search results.
-- **Citations:** The response includes citations to the sources used to generate
-  the summary.
+- Researching the latest version of a software library or API.
+- Finding solutions to recent software bugs or security vulnerabilities.
+- Retrieving news or documentation updated after the model's knowledge cutoff.
 
 ## Next steps
 
-- Explore the [Web fetch tool](./web-fetch.md) to extract content from specific
-  URLs.
-- Learn how to [Provide context](../cli/gemini-md.md) to guide the search
-  queries.
+- Follow the [Web tools guide](../tutorials/web-tools.md) for practical usage
+  examples.
+- Explore the [Web fetch tool reference](./web-fetch.md) for direct URL access.

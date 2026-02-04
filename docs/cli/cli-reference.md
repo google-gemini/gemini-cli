@@ -51,8 +51,8 @@ and parameters.
 
 ## Model selection
 
-The `--model` (or `-m`) flag allows you to specify which Gemini model to use.
-You can use either model aliases (user-friendly names) or concrete model names.
+The `--model` (or `-m`) flag lets you specify which Gemini model to use. You can
+use either model aliases (user-friendly names) or concrete model names.
 
 ### Model aliases
 
@@ -97,3 +97,9 @@ See [Extensions Documentation](../extensions/index.md) for more details.
 | `gemini mcp list`                                             | List all configured MCP servers | `gemini mcp list`                                                                                    |
 
 See [MCP Server Integration](../tools/mcp-server.md) for more details.
+
+## Next steps
+
+- Explore the [User guides](./index.md#user-guides) for practical examples.
+- See the [Command reference](./commands.md) for a full list of slash commands.
+- Learn about [Configuration](./configuration.md) to customize your environment.
