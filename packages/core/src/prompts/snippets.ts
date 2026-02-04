@@ -41,18 +41,21 @@ export interface CoreMandatesOptions {
   interactive: boolean;
   isGemini3: boolean;
   hasSkills: boolean;
+  isYolo: boolean;
 }
 
 export interface PrimaryWorkflowsOptions {
   interactive: boolean;
   enableCodebaseInvestigator: boolean;
   enableWriteTodosTool: boolean;
+  isYolo: boolean;
 }
 
 export interface OperationalGuidelinesOptions {
   interactive: boolean;
   isGemini3: boolean;
   enableShellEfficiency: boolean;
+  isYolo: boolean;
 }
 
 export type SandboxMode = 'macos-seatbelt' | 'generic' | 'outside';
@@ -142,7 +145,7 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
 - **Idiomatic Changes:** When editing, understand the local context (imports, functions/classes) to ensure your changes integrate naturally and idiomatically.
 - **Comments:** Add code comments sparingly. Focus on *why* something is done, especially for complex logic, rather than *what* is done. Only add high-value comments if necessary for clarity or if requested by the user. Do not edit comments that are separate from the code you are changing. *NEVER* talk to the user or describe your changes through comments.
 - **Proactiveness:** Fulfill the user's request thoroughly. When adding features or fixing bugs, this includes adding tests to ensure quality. Consider all created files, especially tests, to be permanent artifacts unless the user says otherwise.
-- ${mandateConfirm(options.interactive)}
+- ${mandateConfirm(options)}
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandateSkillGuidance(options.hasSkills)}${mandateExplainBeforeActing(options.isGemini3)}${mandateContinueWork(options.interactive)}
 `.trim();
@@ -205,7 +208,7 @@ ${workflowStepPlan(options)}
 
 **Goal:** Autonomously implement and deliver a visually appealing, substantially complete, and functional prototype. Utilize all tools at your disposal to implement the application. Some tools you may especially find useful are '${WRITE_FILE_TOOL_NAME}', '${EDIT_TOOL_NAME}' and '${SHELL_TOOL_NAME}'.
 
-${newApplicationSteps(options.interactive)}
+${newApplicationSteps(options)}
 `.trim();
 }
 
@@ -213,6 +216,24 @@ export function renderOperationalGuidelines(
   options?: OperationalGuidelinesOptions,
 ): string {
   if (!options) return '';
+
+  const safetyRules = options.isYolo
+    ? `
+## Security and Safety Rules (YOLO MODE)
+- **Extreme Caution Required:** You are operating in YOLO mode. **All tool calls, including critical ones like shell commands and file modifications, will be automatically approved and executed without any user confirmation.**
+- **Responsibility:** You are solely responsible for the safety and correctness of your actions. Before executing any command, verify it double-check for potential destructive side effects or security risks.
+- **Security First:** Always apply security best practices. Never introduce code that exposes, logs, or commits secrets, API keys, or other sensitive information.`
+    : `
+## Security and Safety Rules
+- **Explain Critical Commands:** Before executing commands with '${SHELL_TOOL_NAME}' that modify the file system, codebase, or system state, you *must* provide a brief explanation of the command's purpose and potential impact. Prioritize user understanding and safety. You should not ask permission to use the tool; the user will be presented with a confirmation dialogue upon use (you do not need to tell them this).
+- **Security First:** Always apply security best practices. Never introduce code that exposes, logs, or commits secrets, API keys, or other sensitive information.`;
+
+  const respectUserConfirmations = options.isYolo
+    ? `
+- **Auto-Approval Active:** Most tool calls (also denoted as 'function calls') will be **automatically approved**. You do not need to wait for or respect user confirmations for these actions as they will not be prompted.`
+    : `
+- **Respect User Confirmations:** Most tool calls (also denoted as 'function calls') will first require confirmation from the user, where they will either approve or cancel the function call. If a user cancels a function call, respect their choice and do _not_ try to make the function call again. It is okay to request the tool call again _only_ if the user requests that same tool call on a subsequent prompt. When a user cancels a function call, assume best intentions from the user and consider inquiring if they prefer any alternative paths forward.`;
+
   return `
 # Operational Guidelines
 ${shellEfficiencyGuidelines(options.enableShellEfficiency)}
@@ -225,14 +246,12 @@ ${shellEfficiencyGuidelines(options.enableShellEfficiency)}
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls or code blocks unless specifically part of the required code/command itself.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly (1-2 sentences) without excessive justification. Offer alternatives if appropriate.
 
-## Security and Safety Rules
-- **Explain Critical Commands:** Before executing commands with '${SHELL_TOOL_NAME}' that modify the file system, codebase, or system state, you *must* provide a brief explanation of the command's purpose and potential impact. Prioritize user understanding and safety. You should not ask permission to use the tool; the user will be presented with a confirmation dialogue upon use (you do not need to tell them this).
-- **Security First:** Always apply security best practices. Never introduce code that exposes, logs, or commits secrets, API keys, or other sensitive information.
+${safetyRules}
 
 ## Tool Usage
 - **Parallelism:** Execute multiple independent tool calls in parallel when feasible (i.e. searching the codebase).
 - **Command Execution:** Use the '${SHELL_TOOL_NAME}' tool for running shell commands, remembering the safety rule to explain modifying commands first.${toolUsageInteractive(options.interactive)}${toolUsageRememberingFacts(options)}
-- **Respect User Confirmations:** Most tool calls (also denoted as 'function calls') will first require confirmation from the user, where they will either approve or cancel the function call. If a user cancels a function call, respect their choice and do _not_ try to make the function call again. It is okay to request the tool call again _only_ if the user requests that same tool call on a subsequent prompt. When a user cancels a function call, assume best intentions from the user and consider inquiring if they prefer any alternative paths forward.
+${respectUserConfirmations}
 
 ## Interaction Details
 - **Help Command:** The user can use '/help' to display help information.
@@ -343,8 +362,11 @@ ${options.planModeToolsList}
 
 // --- Leaf Helpers (Strictly strings or simple calls) ---
 
-function mandateConfirm(interactive: boolean): string {
-  return interactive
+function mandateConfirm(options: CoreMandatesOptions): string {
+  if (options.isYolo) {
+    return '**YOLO Mode (Auto-Approval):** You are operating in YOLO mode. All your tool calls will be automatically approved by the system. You do NOT need to ask for user confirmation for tool executions or plans. Proceed proactively to fulfill the request.';
+  }
+  return options.interactive
     ? "**Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If the user implies a change (e.g., reports a bug) without explicitly asking for a fix, **ask for confirmation first**. If asked *how* to do something, explain first, don't just do it."
     : '**Handle Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request. If the user implies a change (e.g., reports a bug) without explicitly asking for a fix, do not perform it automatically.';
 }
@@ -376,16 +398,20 @@ Use '${READ_FILE_TOOL_NAME}' to understand context and validate any assumptions 
 }
 
 function workflowStepPlan(options: PrimaryWorkflowsOptions): string {
+  const confirmationClause = options.isYolo
+    ? 'Proceed with your plan proactively since you are in YOLO mode.'
+    : "If the user's request implies a change but does not explicitly state it, **YOU MUST ASK** for confirmation before modifying code.";
+
   if (options.enableCodebaseInvestigator && options.enableWriteTodosTool) {
-    return `2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. If the user's request implies a change but does not explicitly state it, **YOU MUST ASK** for confirmation before modifying code. If 'codebase_investigator' was used, do not ignore the output of the agent, you must use it as the foundation of your plan. For complex tasks, break them down into smaller, manageable subtasks and use the \`${WRITE_TODOS_TOOL_NAME}\` tool to track your progress. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`;
+    return `2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. ${confirmationClause} If 'codebase_investigator' was used, do not ignore the output of the agent, you must use it as the foundation of your plan. For complex tasks, break them down into smaller, manageable subtasks and use the \`${WRITE_TODOS_TOOL_NAME}\` tool to track your progress. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`;
   }
   if (options.enableCodebaseInvestigator) {
-    return `2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. If the user's request implies a change but does not explicitly state it, **YOU MUST ASK** for confirmation before modifying code. If 'codebase_investigator' was used, do not ignore the output of the agent, you must use it as the foundation of your plan. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`;
+    return `2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. ${confirmationClause} If 'codebase_investigator' was used, do not ignore the output of the agent, you must use it as the foundation of your plan. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`;
   }
   if (options.enableWriteTodosTool) {
-    return `2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. If the user's request implies a change but does not explicitly state it, **YOU MUST ASK** for confirmation before modifying code. For complex tasks, break them down into smaller, manageable subtasks and use the \`${WRITE_TODOS_TOOL_NAME}\` tool to track your progress. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`;
+    return `2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. ${confirmationClause} For complex tasks, break them down into smaller, manageable subtasks and use the \`${WRITE_TODOS_TOOL_NAME}\` tool to track your progress. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`;
   }
-  return "2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. If the user's request implies a change but does not explicitly state it, **YOU MUST ASK** for confirmation before modifying code. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.";
+  return `2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. ${confirmationClause} Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`;
 }
 
 function workflowVerifyStandardsSuffix(interactive: boolean): string {
@@ -394,8 +420,12 @@ function workflowVerifyStandardsSuffix(interactive: boolean): string {
     : '';
 }
 
-function newApplicationSteps(interactive: boolean): string {
-  if (interactive) {
+function newApplicationSteps(options: PrimaryWorkflowsOptions): string {
+  const approvalStep = options.isYolo
+    ? '3. **Plan Awareness:** Formulate your plan and proceed immediately to implementation. You do NOT need to wait for user approval.'
+    : '3. **User Approval:** Obtain user approval for the proposed plan.';
+
+  if (options.interactive) {
     return `
 1. **Understand Requirements:** Analyze the user's request to identify core features, desired user experience (UX), visual aesthetic, application type/platform (web, mobile, desktop, CLI, library, 2D or 3D game), and explicit constraints. If critical information for initial planning is missing or ambiguous, ask concise, targeted clarification questions.
 2. **Propose Plan:** Formulate an internal development plan. Present a clear, concise, high-level summary to the user. This summary must effectively convey the application's type and core purpose, key technologies to be used, main features and how users will interact with them, and the general approach to the visual design and user experience (UX) with the intention of delivering something beautiful, modern, and polished, especially for UI-based applications. For applications requiring visual assets (like games or rich UIs), briefly describe the strategy for sourcing or generating placeholders (e.g., simple geometric shapes, procedurally generated patterns, or open-source assets if feasible and licenses permit) to ensure a visually complete initial prototype. Ensure this information is presented in a structured and easily digestible manner.
@@ -407,7 +437,7 @@ function newApplicationSteps(interactive: boolean): string {
   - **Mobile App:** Compose Multiplatform (Kotlin Multiplatform) or Flutter (Dart) using Material Design libraries and principles, when sharing code between Android and iOS. Jetpack Compose (Kotlin JVM) with Material Design principles or SwiftUI (Swift) for native apps targeted at either Android or iOS, respectively.
   - **3d Games:** HTML/CSS/JavaScript with Three.js.
   - **2d Games:** HTML/CSS/JavaScript.
-3. **User Approval:** Obtain user approval for the proposed plan.
+${approvalStep}
 4. **Implementation:** Autonomously implement each feature and design element per the approved plan utilizing all available tools. When starting ensure you scaffold the application using '${SHELL_TOOL_NAME}' for commands like 'npm init', 'npx create-react-app'. Aim for full scope completion. Proactively create or source necessary placeholder assets (e.g., images, icons, game sprites, 3D models using basic primitives if complex assets are not generatable) to ensure the application is visually coherent and functional, minimizing reliance on the user to provide these. If the model can generate simple assets (e.g., a uniformly colored square sprite, a simple 3D cube), it should do so. Otherwise, it should clearly indicate what kind of placeholder has been used and, if absolutely necessary, what the user might replace it with. Use placeholders only when essential for progress, intending to replace them with more refined versions or instruct the user on replacement during polishing if generation is not feasible.
 5. **Verify:** Review work against the original request, the approved plan. Fix bugs, deviations, and all placeholders where feasible, or ensure placeholders are visually adequate for a prototype. Ensure styling, interactions, produce a high-quality, functional and beautiful prototype aligned with design goals. Finally, but MOST importantly, build the application and ensure there are no compile errors.
 6. **Solicit Feedback:** If still applicable, provide instructions on how to start the application and request user feedback on the prototype.`.trim();
@@ -466,9 +496,10 @@ function toolUsageRememberingFacts(
 ): string {
   const base = `
 - **Remembering Facts:** Use the '${MEMORY_TOOL_NAME}' tool to remember specific, *user-related* facts or preferences when the user explicitly asks, or when they state a clear, concise piece of information that would help personalize or streamline *your future interactions with them* (e.g., preferred coding style, common project paths they use, personal tool aliases). This tool is for user-specific information that should persist across sessions. Do *not* use it for general project context or information.`;
-  const suffix = options.interactive
-    ? ' If unsure whether to save something, you can ask the user, "Should I remember that for you?"'
-    : '';
+  const suffix =
+    options.interactive && !options.isYolo
+      ? ' If unsure whether to save something, you can ask the user, "Should I remember that for you?"'
+      : '';
   return base + suffix;
 }
 

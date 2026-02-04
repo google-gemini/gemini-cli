@@ -272,6 +272,16 @@ describe('Core System Prompt (prompts.ts)', () => {
       expect(prompt).toMatchSnapshot();
     });
 
+    it('should include YOLO mode instructions', () => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.YOLO);
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).toContain('**YOLO Mode (Auto-Approval):**');
+      expect(prompt).toContain(
+        'You do NOT need to ask for user confirmation for tool executions or plans.',
+      );
+      expect(prompt).toMatchSnapshot();
+    });
+
     it('should only list available tools in PLAN mode', () => {
       vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
       // Only enable a subset of tools, including ask_user
