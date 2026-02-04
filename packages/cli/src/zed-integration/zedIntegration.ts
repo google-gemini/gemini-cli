@@ -37,6 +37,7 @@ import {
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
+import { getAcpErrorMessage } from './acpErrors.js';
 import { Readable, Writable } from 'node:stream';
 import type { Content, Part, FunctionCall } from '@google/genai';
 import type { LoadedSettings } from '../config/settings.js';
@@ -142,7 +143,10 @@ export class GeminiAgent {
     try {
       await this.config.refreshAuth(method);
     } catch (e) {
-      throw new acp.RequestError(getErrorStatus(e) || 401, getErrorMessage(e));
+      throw new acp.RequestError(
+        getErrorStatus(e) || 401,
+        getAcpErrorMessage(e),
+      );
     }
     this.settings.setValue(
       SettingScope.User,
@@ -184,7 +188,7 @@ export class GeminiAgent {
       }
     } catch (e) {
       isAuthenticated = false;
-      authErrorMessage = getErrorMessage(e);
+      authErrorMessage = getAcpErrorMessage(e);
       debugLogger.error(
         `Authentication failed: ${e instanceof Error ? e.stack : e}`,
       );
@@ -546,7 +550,7 @@ export class Session {
 
         throw new acp.RequestError(
           getErrorStatus(error) || 500,
-          getErrorMessage(error),
+          getAcpErrorMessage(error),
         );
       }
 

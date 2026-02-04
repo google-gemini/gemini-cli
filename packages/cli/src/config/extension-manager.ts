@@ -70,6 +70,7 @@ import {
 } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
 import { themeManager } from '../ui/themes/theme-manager.js';
+import { getFormattedSettingValue } from '../commands/extensions/utils.js';
 
 interface ExtensionManagerParams {
   enabledExtensionOverrides?: string[];
@@ -648,12 +649,7 @@ Would you like to attempt to install via "git clone" instead?`,
           resolvedSettings.push({
             name: setting.name,
             envVar: setting.envVar,
-            value:
-              value === undefined
-                ? '[not set]'
-                : setting.sensitive
-                  ? '***'
-                  : value,
+            value,
             sensitive: setting.sensitive ?? false,
             scope,
             source,
@@ -941,7 +937,7 @@ Would you like to attempt to install via "git clone" instead?`,
           }
           scope += ')';
         }
-        output += `\n  ${setting.name}: ${setting.value} ${scope}`;
+        output += `\n  ${setting.name}: ${getFormattedSettingValue(setting)} ${scope}`;
       });
     }
     return output;
