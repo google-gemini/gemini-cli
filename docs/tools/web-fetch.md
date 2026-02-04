@@ -30,6 +30,6 @@ specific operations like summarization or extraction.
 
 ## Next steps
 
-- Follow the [Web tools guide](../tutorials/web-tools.md) for practical usage
-  examples.
+- Follow the [Web tools guide](../cli/tutorials/web-tools.md) for practical
+  usage examples.
 - See the [Web search tool reference](./web-search.md) for general queries.

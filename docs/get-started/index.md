@@ -66,8 +66,8 @@ To explore the power of Gemini CLI, see [Gemini CLI examples](./examples.md).
 
 ## Next steps
 
-- Follow the [File management](../tutorials/file-management.md) guide to start
-  working with your codebase.
-- See [Shell commands](../tutorials/shell-commands.md) to learn about terminal
-  integration.
+- Follow the [File management](../cli/tutorials/file-management.md) guide to
+  start working with your codebase.
+- See [Shell commands](../cli/tutorials/shell-commands.md) to learn about
+  terminal integration.
 - Explore the full range of [User guides](../cli/index.md#user-guides).

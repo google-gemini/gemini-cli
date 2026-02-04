@@ -30,6 +30,6 @@ updates to the CLI interface.
 
 ## Next steps
 
-- Follow the [Task planning tutorial](../tutorials/task-planning.md) for usage
-  details.
+- Follow the [Task planning tutorial](../cli/tutorials/task-planning.md) for
+  usage details.
 - Learn about [Session management](../cli/session-management.md) for context.

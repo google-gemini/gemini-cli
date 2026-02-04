@@ -45,6 +45,6 @@ execution:
 
 ## Next steps
 
-- Follow the [Automation tutorial](../tutorials/automation.md) for practical
+- Follow the [Automation tutorial](./tutorials/automation.md) for practical
   scripting examples.
 - See the [CLI reference](./cli-reference.md) for all available flags.

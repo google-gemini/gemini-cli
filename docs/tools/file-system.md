@@ -85,7 +85,7 @@ and context.
 
 ## Next steps
 
-- Follow the [File management tutorial](../tutorials/file-management.md) for
+- Follow the [File management tutorial](../cli/tutorials/file-management.md) for
   practical examples.
 - Learn about [Trusted folders](../cli/trusted-folders.md) to manage access
   permissions.

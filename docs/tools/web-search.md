@@ -27,6 +27,6 @@ or specific online documentation not available in its internal training data.
 
 ## Next steps
 
-- Follow the [Web tools guide](../tutorials/web-tools.md) for practical usage
-  examples.
+- Follow the [Web tools guide](../cli/tutorials/web-tools.md) for practical
+  usage examples.
 - Explore the [Web fetch tool reference](./web-fetch.md) for direct URL access.

@@ -57,6 +57,6 @@ settings:
 
 ## Next steps
 
-- Follow the [Shell commands tutorial](../tutorials/shell-commands.md) for
+- Follow the [Shell commands tutorial](../cli/tutorials/shell-commands.md) for
   practical examples.
 - Learn about [Sandboxing](../cli/sandbox.md) to isolate command execution.

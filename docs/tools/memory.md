@@ -29,7 +29,7 @@ global `GEMINI.md` file (typically located at `~/.gemini/GEMINI.md`).
 
 ## Next steps
 
-- Follow the [Memory management guide](../tutorials/memory-management.md) for
-  practical examples.
+- Follow the [Memory management guide](../cli/tutorials/memory-management.md)
+  for practical examples.
 - Learn how the [Project context (GEMINI.md)](../cli/gemini-md.md) system loads
   this information.

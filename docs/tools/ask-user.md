@@ -38,5 +38,5 @@ manually.
 
 ## Next steps
 
-- Learn about [Memory management](../tutorials/memory-management.md) to reduce
-  the need for clarification.
+- Learn about [Memory management](../cli/tutorials/memory-management.md) to
+  reduce the need for clarification.
