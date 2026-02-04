@@ -35,18 +35,6 @@ export * from '@google/gemini-cli-test-utils';
 //   This may take a really long time and is not recommended.
 export type EvalPolicy = 'ALWAYS_PASSES' | 'USUALLY_PASSES';
 
-export interface EvalCase {
-  name: string;
-  params?: Record<string, any>;
-  prompt: string | string[];
-  timeout?: number;
-  env?: Record<string, string>;
-  files?: Record<string, string>;
-  approvalMode?: 'default' | 'auto_edit' | 'yolo' | 'plan';
-  targetModels?: string[];
-  assert: (rig: TestRig, result: string) => Promise<void>;
-}
-
 export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
   const fn = async () => {
     const rig = new TestRig() as any;
@@ -169,16 +157,6 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
     }
   };
 
-  const currentModel = process.env.GEMINI_MODEL;
-  if (
-    evalCase.targetModels &&
-    currentModel &&
-    !evalCase.targetModels.includes(currentModel)
-  ) {
-    it.skip(`${evalCase.name} (skipped for model ${currentModel})`, fn);
-    return;
-  }
-
   if (policy === 'USUALLY_PASSES' && !process.env['RUN_EVALS']) {
     it.skip(evalCase.name, fn);
   } else {
@@ -191,4 +169,15 @@ async function prepareLogDir(name: string) {
   await fs.promises.mkdir(logDir, { recursive: true });
   const sanitizedName = name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
   return { logDir, sanitizedName };
+}
+
+export interface EvalCase {
+  name: string;
+  params?: Record<string, any>;
+  prompt: string | string[];
+  timeout?: number;
+  env?: Record<string, string>;
+  files?: Record<string, string>;
+  approvalMode?: 'default' | 'auto_edit' | 'yolo' | 'plan';
+  assert: (rig: TestRig, result: string) => Promise<void>;
 }
