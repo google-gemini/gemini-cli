@@ -123,7 +123,7 @@ jobs:
                 - The repository is ${{ github.repository }} and the issue number is ${{ github.event.issue.number }}.
                 - Use the `duplicates` tool with the `repo` and `issue_number` to find potential duplicates for the current issue. Do not use the `threshold` parameter.
                 - If no duplicates are found, you are done.
-                - Print the JSON output from the `duplicates` tool to the logs.
+                - Use the `echo` command to print the JSON output from the `duplicates` tool to the logs.
             2.  **Refine Duplicates List (if necessary):**
                 - If the `duplicates` tool returns between 1 and 14 results, you must refine the list.
                 - For each potential duplicate issue, run `gh issue view <issue-number> --json title,body,comments` to fetch its content.
