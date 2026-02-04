@@ -162,14 +162,11 @@ export async function resolveConfirmation(
         signal,
       );
       if (!modResult.success) {
-        // Editor is not available - emit error feedback and break the loop
-        // by cancelling the operation to prevent infinite loop
+        // Editor is not available - emit error feedback and stay in the loop
+        // to return to previous confirmation screen.
         if (modResult.error) {
           coreEvents.emitFeedback('error', modResult.error);
         }
-        // Break the loop by changing outcome to Cancel
-        // This prevents the infinite loop issue reported in #7669
-        outcome = ToolConfirmationOutcome.Cancel;
       }
     } else if (response.payload && 'newContent' in response.payload) {
       await handleInlineModification(deps, toolCall, response.payload, signal);
@@ -222,27 +219,21 @@ async function handleExternalModification(
 ): Promise<ExternalModificationResult> {
   const { state, modifier, getPreferredEditor } = deps;
 
-  // Use the new resolveEditorAsync function which handles:
-  // 1. Checking if preferred editor is available
-  // 2. Auto-detecting an available editor if none is configured
-  // 3. Providing helpful error messages
-  // Using async version to avoid blocking the event loop
   const preferredEditor = getPreferredEditor();
-  const resolution = await resolveEditorAsync(preferredEditor);
+  const editor = await resolveEditorAsync(preferredEditor, signal);
 
-  if (!resolution.editor) {
+  if (!editor) {
     // No editor available - return failure with error message
     return {
       success: false,
       error:
-        resolution.error ||
         'No external editor is available. Please run /editor to configure one.',
     };
   }
 
   const result = await modifier.handleModifyWithEditor(
     state.firstActiveCall as WaitingToolCall,
-    resolution.editor,
+    editor,
     signal,
   );
   if (result) {

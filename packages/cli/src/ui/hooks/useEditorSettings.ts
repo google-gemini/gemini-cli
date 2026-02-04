@@ -15,6 +15,8 @@ import {
   allowEditorTypeInSandbox,
   checkHasEditorType,
   getEditorDisplayName,
+  coreEvents,
+  CoreEvent,
 } from '@google/gemini-cli-core';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 
@@ -66,6 +68,7 @@ export const useEditorSettings = (
         );
         setEditorError(null);
         setIsEditorDialogOpen(false);
+        coreEvents.emit(CoreEvent.EditorSelected, { editor: editorType });
       } catch (error) {
         setEditorError(`Failed to set editor preference: ${error}`);
       }
@@ -75,6 +78,7 @@ export const useEditorSettings = (
 
   const exitEditorDialog = useCallback(() => {
     setIsEditorDialogOpen(false);
+    coreEvents.emit(CoreEvent.EditorSelected, { editor: undefined });
   }, []);
 
   return {

@@ -6,8 +6,9 @@
 
 import { exec, execSync, spawn, spawnSync } from 'node:child_process';
 import { promisify } from 'node:util';
+import { once } from 'node:events';
 import { debugLogger } from './debugLogger.js';
-import { coreEvents, CoreEvent } from './events.js';
+import { coreEvents, CoreEvent, type EditorSelectedPayload } from './events.js';
 
 const GUI_EDITORS = [
   'vscode',
@@ -123,20 +124,21 @@ const editorCommands: Record<
   hx: { win32: ['hx'], default: ['hx'] },
 };
 
-export function checkHasEditorType(editor: EditorType): boolean {
+function getEditorCommands(editor: EditorType): string[] {
   const commandConfig = editorCommands[editor];
-  const commands =
-    process.platform === 'win32' ? commandConfig.win32 : commandConfig.default;
-  return commands.some((cmd) => commandExists(cmd));
+  return process.platform === 'win32'
+    ? commandConfig.win32
+    : commandConfig.default;
+}
+
+export function checkHasEditorType(editor: EditorType): boolean {
+  return getEditorCommands(editor).some((cmd) => commandExists(cmd));
 }
 
 export async function checkHasEditorTypeAsync(
   editor: EditorType,
 ): Promise<boolean> {
-  const commandConfig = editorCommands[editor];
-  const commands =
-    process.platform === 'win32' ? commandConfig.win32 : commandConfig.default;
-  for (const cmd of commands) {
+  for (const cmd of getEditorCommands(editor)) {
     if (await commandExistsAsync(cmd)) {
       return true;
     }
@@ -145,9 +147,7 @@ export async function checkHasEditorTypeAsync(
 }
 
 export function getEditorCommand(editor: EditorType): string {
-  const commandConfig = editorCommands[editor];
-  const commands =
-    process.platform === 'win32' ? commandConfig.win32 : commandConfig.default;
+  const commands = getEditorCommands(editor);
   return (
     commands.slice(0, -1).find((cmd) => commandExists(cmd)) ||
     commands[commands.length - 1]
@@ -163,15 +163,20 @@ export function allowEditorTypeInSandbox(editor: EditorType): boolean {
   return true;
 }
 
+function isEditorTypeAvailable(
+  editor: string | undefined,
+): editor is EditorType {
+  return (
+    !!editor && isValidEditorType(editor) && allowEditorTypeInSandbox(editor)
+  );
+}
+
 /**
  * Check if the editor is valid and can be used.
  * Returns false if preferred editor is not set / invalid / not available / not allowed in sandbox.
  */
 export function isEditorAvailable(editor: string | undefined): boolean {
-  if (editor && isValidEditorType(editor)) {
-    return checkHasEditorType(editor) && allowEditorTypeInSandbox(editor);
-  }
-  return false;
+  return isEditorTypeAvailable(editor) && checkHasEditorType(editor);
 }
 
 /**
@@ -182,155 +187,29 @@ export function isEditorAvailable(editor: string | undefined): boolean {
 export async function isEditorAvailableAsync(
   editor: string | undefined,
 ): Promise<boolean> {
-  if (editor && isValidEditorType(editor)) {
-    return (
-      (await checkHasEditorTypeAsync(editor)) &&
-      allowEditorTypeInSandbox(editor)
-    );
-  }
-  return false;
+  return (
+    isEditorTypeAvailable(editor) && (await checkHasEditorTypeAsync(editor))
+  );
 }
 
 /**
- * Detects the first available editor from the supported list.
- * Prioritizes terminal editors (vim, neovim, emacs, hx) as they work in all environments
- * including sandboxed mode, then falls back to GUI editors.
- * Returns undefined if no supported editor is found.
- */
-export function detectFirstAvailableEditor(): EditorType | undefined {
-  // Prioritize terminal editors as they work in sandbox mode
-  for (const editor of TERMINAL_EDITORS) {
-    if (isEditorAvailable(editor)) {
-      return editor;
-    }
-  }
-  // Fall back to GUI editors (won't work in sandbox mode but checked above)
-  for (const editor of GUI_EDITORS) {
-    if (isEditorAvailable(editor)) {
-      return editor;
-    }
-  }
-  return undefined;
-}
-
-/**
- * Async version of detectFirstAvailableEditor.
- * Detects the first available editor from the supported list without blocking the event loop.
- * Prioritizes terminal editors (vim, neovim, emacs, hx) as they work in all environments
- * including sandboxed mode, then falls back to GUI editors.
- * Returns undefined if no supported editor is found.
- */
-export async function detectFirstAvailableEditorAsync(): Promise<
-  EditorType | undefined
-> {
-  // Prioritize terminal editors as they work in sandbox mode
-  for (const editor of TERMINAL_EDITORS) {
-    if (await isEditorAvailableAsync(editor)) {
-      return editor;
-    }
-  }
-  // Fall back to GUI editors (won't work in sandbox mode but checked above)
-  for (const editor of GUI_EDITORS) {
-    if (await isEditorAvailableAsync(editor)) {
-      return editor;
-    }
-  }
-  return undefined;
-}
-
-/**
- * Result of attempting to resolve an editor for use.
- */
-export interface EditorResolutionResult {
-  /** The editor to use, if available */
-  editor?: EditorType;
-  /** Error message if no editor is available */
-  error?: string;
-}
-
-/**
- * Resolves an editor to use for external editing.
- * 1. If a preferred editor is set and available, uses it.
- * 2. If a preferred editor is set but not available, returns an error.
- * 3. If no preferred editor is set, attempts to auto-detect an available editor.
- * 4. If no editor can be found, returns an error with instructions.
- *
- * @deprecated Use resolveEditorAsync instead to avoid blocking the event loop.
- */
-export function resolveEditor(
-  preferredEditor: EditorType | undefined,
-): EditorResolutionResult {
-  // Case 1: Preferred editor is set
-  if (preferredEditor) {
-    if (isEditorAvailable(preferredEditor)) {
-      return { editor: preferredEditor };
-    }
-    // Preferred editor is set but not available
-    const displayName = getEditorDisplayName(preferredEditor);
-    if (!checkHasEditorType(preferredEditor)) {
-      return {
-        error: `${displayName} is configured as your preferred editor but is not installed. Please install it or run /editor to choose a different editor.`,
-      };
-    }
-    // If the editor is installed but not available, it must be due to sandbox restrictions.
-    return {
-      error: `${displayName} cannot be used in sandbox mode. Please run /editor to choose a terminal-based editor (vim, neovim, emacs, or helix).`,
-    };
-  }
-
-  // Case 2: No preferred editor set, try to auto-detect
-  const detectedEditor = detectFirstAvailableEditor();
-  if (detectedEditor) {
-    return { editor: detectedEditor };
-  }
-
-  // Case 3: No editor available at all
-  return {
-    error:
-      'No external editor is configured or available. Please run /editor to set your preferred editor, or install one of the supported editors: vim, neovim, emacs, helix, VS Code, Cursor, Zed, or Windsurf.',
-  };
-}
-
-/**
- * Async version of resolveEditor.
  * Resolves an editor to use for external editing without blocking the event loop.
  * 1. If a preferred editor is set and available, uses it.
- * 2. If a preferred editor is set but not available, returns an error.
- * 3. If no preferred editor is set, attempts to auto-detect an available editor.
- * 4. If no editor can be found, returns an error with instructions.
+ * 2. If no preferred editor is set (or preferred is unavailable), requests selection from user and waits for it.
  */
 export async function resolveEditorAsync(
   preferredEditor: EditorType | undefined,
-): Promise<EditorResolutionResult> {
-  // Case 1: Preferred editor is set
-  if (preferredEditor) {
-    if (await isEditorAvailableAsync(preferredEditor)) {
-      return { editor: preferredEditor };
-    }
-    // Preferred editor is set but not available
-    const displayName = getEditorDisplayName(preferredEditor);
-    if (!(await checkHasEditorTypeAsync(preferredEditor))) {
-      return {
-        error: `${displayName} is configured as your preferred editor but is not installed. Please install it or run /editor to choose a different editor.`,
-      };
-    }
-    // If the editor is installed but not available, it must be due to sandbox restrictions.
-    return {
-      error: `${displayName} cannot be used in sandbox mode. Please run /editor to choose a terminal-based editor (vim, neovim, emacs, or helix).`,
-    };
+  signal?: AbortSignal,
+): Promise<EditorType | undefined> {
+  if (preferredEditor && (await isEditorAvailableAsync(preferredEditor))) {
+    return preferredEditor;
   }
 
-  // Case 2: No preferred editor set, try to auto-detect
-  const detectedEditor = await detectFirstAvailableEditorAsync();
-  if (detectedEditor) {
-    return { editor: detectedEditor };
-  }
+  coreEvents.emit(CoreEvent.RequestEditorSelection);
 
-  // Case 3: No editor available at all
-  return {
-    error:
-      'No external editor is configured or available. Please run /editor to set your preferred editor, or install one of the supported editors: vim, neovim, emacs, helix, VS Code, Cursor, Zed, or Windsurf.',
-  };
+  return once(coreEvents, CoreEvent.EditorSelected, { signal })
+    .then(([payload]) => (payload as EditorSelectedPayload).editor)
+    .catch(() => undefined);
 }
 
 /**

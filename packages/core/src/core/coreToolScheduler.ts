@@ -752,18 +752,19 @@ export class CoreToolScheduler {
     } else if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
       const waitingToolCall = toolCall as WaitingToolCall;
 
-      // Use resolveEditorAsync to check availability and auto-detect if needed
-      // Using async version to avoid blocking the event loop
       const preferredEditor = this.getPreferredEditor();
-      const resolution = await resolveEditorAsync(preferredEditor);
+      const editor = await resolveEditorAsync(preferredEditor, signal);
 
-      if (!resolution.editor) {
-        // No editor available - emit error feedback and cancel the operation
-        // This fixes the infinite loop issue reported in #7669
-        if (resolution.error) {
-          coreEvents.emitFeedback('error', resolution.error);
-        }
-        this.cancelAll(signal);
+      if (!editor) {
+        // No editor available - emit error feedback and return to previous confirmation screen
+        coreEvents.emitFeedback(
+          'error',
+          'No external editor is available. Please run /editor to configure one.',
+        );
+        this.setStatusInternal(callId, 'awaiting_approval', signal, {
+          ...waitingToolCall.confirmationDetails,
+          isModifying: false,
+        } as ToolCallConfirmationDetails);
         return;
       }
 
@@ -774,7 +775,7 @@ export class CoreToolScheduler {
 
       const result = await this.toolModifier.handleModifyWithEditor(
         waitingToolCall,
-        resolution.editor,
+        editor,
         signal,
       );
 
