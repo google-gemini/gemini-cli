@@ -453,7 +453,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
   }
 }
 
-function getShellToolDescription(enableInteractiveShell: boolean): string {
+export function getShellToolDescription(
+  enableInteractiveShell: boolean,
+): string {
   const returnedInfo = `
 
       The following information is returned:
@@ -478,7 +480,7 @@ function getShellToolDescription(enableInteractiveShell: boolean): string {
   }
 }
 
-function getCommandDescription(): string {
+export function getCommandDescription(): string {
   if (os.platform() === 'win32') {
     return 'Exact command to execute as `powershell.exe -NoProfile -Command <command>`';
   } else {
@@ -504,31 +506,7 @@ export class ShellTool extends BaseDeclarativeTool<
       'Shell',
       getShellToolDescription(config.getEnableInteractiveShell()),
       Kind.Execute,
-      {
-        type: 'object',
-        properties: {
-          command: {
-            type: 'string',
-            description: getCommandDescription(),
-          },
-          description: {
-            type: 'string',
-            description:
-              'Brief description of the command for the user. Be specific and concise. Ideally a single sentence. Can be up to 3 sentences for clarity. No line breaks.',
-          },
-          dir_path: {
-            type: 'string',
-            description:
-              '(OPTIONAL) The path of the directory to run the command in. If not provided, the project root directory is used. Must be a directory within the workspace and must already exist.',
-          },
-          is_background: {
-            type: 'boolean',
-            description:
-              'Set to true if this command should be run in the background (e.g. for long-running servers or watchers). The command will be started, allowed to run for a brief moment to check for immediate errors, and then moved to the background.',
-          },
-        },
-        required: ['command'],
-      },
+      SHELL_DEFINITION.base.parameters!,
       messageBus,
       false, // output is not markdown
       true, // output can be updated
