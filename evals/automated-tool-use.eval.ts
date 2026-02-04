@@ -96,4 +96,75 @@ describe('Automated tool use', () => {
       ).toBe(true);
     },
   });
+
+  /**
+   * Tests that the agent uses prettier --write to fix formatting issues in files
+   * instead of trying to edit the files itself.
+   */
+  evalTest('ALWAYS_PASSES', {
+    name: 'should use automated tools (prettier --write) to fix formatting issues',
+    files: {
+      'package.json': JSON.stringify(
+        {
+          name: 'typescript-project',
+          version: '1.0.0',
+          type: 'module',
+          scripts: {},
+          devDependencies: {
+            prettier: '^3.0.0',
+            typescript: '^5.0.0',
+          },
+        },
+        null,
+        2,
+      ),
+      '.prettierrc': JSON.stringify(
+        {
+          semi: true,
+          singleQuote: true,
+        },
+        null,
+        2,
+      ),
+      'src/app.ts': `
+export function main() {
+    const data={   name:'test',
+      val:123
+    }
+console.log(data)
+}
+`,
+    },
+    prompt:
+      'Fix the formatting errors in this project. Make sure to avoid interactive commands.',
+    assert: async (rig) => {
+      // Check if run_shell_command was used with --write
+      const toolCalls = rig.readToolLogs();
+      const shellCommands = toolCalls.filter(
+        (call) => call.toolRequest.name === 'run_shell_command',
+      );
+
+      const hasFixCommand = shellCommands.some((call) => {
+        let args = call.toolRequest.args;
+        if (typeof args === 'string') {
+          try {
+            args = JSON.parse(args);
+          } catch (e) {
+            return false;
+          }
+        }
+        const cmd = (args as any)['command'];
+        return (
+          cmd &&
+          cmd.includes('prettier') &&
+          (cmd.includes('--write') || cmd.includes('-w'))
+        );
+      });
+
+      expect(
+        hasFixCommand,
+        'Expected agent to use prettier --write via run_shell_command',
+      ).toBe(true);
+    },
+  });
 });
