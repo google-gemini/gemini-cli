@@ -1599,7 +1599,12 @@ describe('loadCliConfig with admin.mcp.config', () => {
       url: 'https://admin-server-a.com/sse',
       trust: true,
     });
-    expect(serverA?.command).toBeUndefined();
+    expect(serverA).not.toHaveProperty('command');
+    expect(serverA).not.toHaveProperty('args');
+    expect(serverA).not.toHaveProperty('env');
+    expect(serverA).not.toHaveProperty('cwd');
+    expect(serverA).not.toHaveProperty('httpUrl');
+    expect(serverA).not.toHaveProperty('tcp');
   });
 
   it('should use local tool filters when admin does not define them', async () => {

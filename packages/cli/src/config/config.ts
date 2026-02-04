@@ -699,13 +699,15 @@ export async function loadCliConfig(
           url: adminConfig.url,
           type: adminConfig.type,
           trust: adminConfig.trust,
-          command: undefined,
-          args: undefined,
-          env: undefined,
-          cwd: undefined,
-          httpUrl: undefined,
-          tcp: undefined,
         };
+
+        // Remove local connection details
+        delete mergedConfig.command;
+        delete mergedConfig.args;
+        delete mergedConfig.env;
+        delete mergedConfig.cwd;
+        delete mergedConfig.httpUrl;
+        delete mergedConfig.tcp;
 
         if (
           (adminConfig.includeTools && adminConfig.includeTools.length > 0) ||
