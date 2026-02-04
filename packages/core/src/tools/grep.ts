@@ -48,11 +48,6 @@ export interface GrepToolParams {
   include?: string;
 
   /**
-   * Optional: A string that must be present in the file for it to be included (logical AND).
-   */
-  filter?: string;
-
-  /**
    * Optional: Maximum number of matches to return per file.
    */
   max_matches_per_file?: number;
@@ -225,7 +220,6 @@ class GrepToolInvocation extends BaseToolInvocation<
             pattern: this.params.pattern,
             path: searchDir,
             include: this.params.include,
-            filter: this.params.filter,
             maxMatches: remainingLimit,
             maxMatchesPerFile: this.params.max_matches_per_file,
             signal: timeoutController.signal,
@@ -355,7 +349,6 @@ class GrepToolInvocation extends BaseToolInvocation<
     pattern: string;
     path: string; // Expects absolute path
     include?: string;
-    filter?: string;
     maxMatches: number;
     maxMatchesPerFile?: number;
     signal: AbortSignal;
@@ -364,7 +357,6 @@ class GrepToolInvocation extends BaseToolInvocation<
       pattern,
       path: absolutePath,
       include,
-      filter,
       maxMatches,
       maxMatchesPerFile,
     } = options;
@@ -390,116 +382,34 @@ class GrepToolInvocation extends BaseToolInvocation<
         }
 
         try {
-          // If a filter is provided, first find files matching the filter.
-          // This simulates "grep -l 'filter' | xargs grep 'pattern'".
-          if (filter) {
-            const filterArgs = [
-              'grep',
-              '--untracked',
-              '-l', // List filenames only
-              '--ignore-case',
-              '-E', // Extended regex (optional, but consistent)
-              filter,
-            ];
-            if (include) {
-              filterArgs.push('--', include);
-            }
+          // Normal execution without filter
+          const generator = execStreaming('git', gitArgs, {
+            cwd: absolutePath,
+            signal: options.signal,
+            allowedExitCodes: [0, 1],
+          });
 
-            const filesGenerator = execStreaming('git', filterArgs, {
-              cwd: absolutePath,
-              signal: options.signal,
-              allowedExitCodes: [0, 1],
-            });
+          const results: GrepMatch[] = [];
+          const matchesPerFile = new Map<string, number>();
 
-            const matchingFiles: string[] = [];
-            for await (const fileLine of filesGenerator) {
-              if (fileLine.trim()) {
-                matchingFiles.push(fileLine.trim());
+          for await (const line of generator) {
+            const match = this.parseGrepLine(line, absolutePath);
+            if (match) {
+              if (maxMatchesPerFile) {
+                const count = matchesPerFile.get(match.filePath) || 0;
+                if (count >= maxMatchesPerFile) {
+                  continue;
+                }
+                matchesPerFile.set(match.filePath, count + 1);
+              }
+
+              results.push(match);
+              if (results.length >= maxMatches) {
+                break;
               }
             }
-
-            if (matchingFiles.length === 0) {
-              return [];
-            }
-
-            // If we have files, search ONLY within those files.
-            // We append the list of files to the main search command.
-            // Note: This could hit command line length limits if matchingFiles is huge.
-            // For now, we assume the filter reduces the set significantly.
-            // git grep expects paths after '--' or just as arguments.
-            // We need to be careful with '--' if include was used.
-            // Actually, if we provide explicit file paths, include glob is irrelevant for the second grep.
-            // So we can drop the include glob and just pass the files.
-
-            // Reset args for the second command
-            const filteredGitArgs = [
-              'grep',
-              '--untracked',
-              '-n',
-              '-E',
-              '--ignore-case',
-              pattern,
-              '--',
-              ...matchingFiles,
-            ];
-
-            const generator = execStreaming('git', filteredGitArgs, {
-              cwd: absolutePath,
-              signal: options.signal,
-              allowedExitCodes: [0, 1],
-            });
-
-            const results: GrepMatch[] = [];
-            const matchesPerFile = new Map<string, number>();
-
-            for await (const line of generator) {
-              const match = this.parseGrepLine(line, absolutePath);
-              if (match) {
-                if (maxMatchesPerFile) {
-                  const count = matchesPerFile.get(match.filePath) || 0;
-                  if (count >= maxMatchesPerFile) {
-                    continue;
-                  }
-                  matchesPerFile.set(match.filePath, count + 1);
-                }
-
-                results.push(match);
-                if (results.length >= maxMatches) {
-                  break;
-                }
-              }
-            }
-            return results;
-          } else {
-            // Normal execution without filter
-            const generator = execStreaming('git', gitArgs, {
-              cwd: absolutePath,
-              signal: options.signal,
-              allowedExitCodes: [0, 1],
-            });
-
-            const results: GrepMatch[] = [];
-            const matchesPerFile = new Map<string, number>();
-
-            for await (const line of generator) {
-              const match = this.parseGrepLine(line, absolutePath);
-              if (match) {
-                if (maxMatchesPerFile) {
-                  const count = matchesPerFile.get(match.filePath) || 0;
-                  if (count >= maxMatchesPerFile) {
-                    continue;
-                  }
-                  matchesPerFile.set(match.filePath, count + 1);
-                }
-
-                results.push(match);
-                if (results.length >= maxMatches) {
-                  break;
-                }
-              }
-            }
-            return results;
           }
+          return results;
         } catch (gitError: unknown) {
           debugLogger.debug(
             `GrepLogic: git grep failed: ${getErrorMessage(
@@ -541,114 +451,48 @@ class GrepToolInvocation extends BaseToolInvocation<
           .filter((dir): dir is string => !!dir);
         commonExcludes.forEach((dir) => grepArgs.push(`--exclude-dir=${dir}`));
 
-        // If filter is present, we first find matching files using grep -l
-        if (filter) {
-          const filterArgs = ['-r', '-l', '-E', '-I'];
-          commonExcludes.forEach((dir) =>
-            filterArgs.push(`--exclude-dir=${dir}`),
-          );
-          if (include) {
-            filterArgs.push(`--include=${include}`);
-          }
-          filterArgs.push(filter);
-          filterArgs.push('.');
+        // Normal system grep execution
+        if (include) {
+          grepArgs.push(`--include=${include}`);
+        }
 
-          const filesGenerator = execStreaming('grep', filterArgs, {
+        if (maxMatchesPerFile) {
+          grepArgs.push(`-m`, maxMatchesPerFile.toString());
+        }
+
+        grepArgs.push(pattern);
+        grepArgs.push('.');
+
+        const results: GrepMatch[] = [];
+        try {
+          const generator = execStreaming('grep', grepArgs, {
             cwd: absolutePath,
             signal: options.signal,
             allowedExitCodes: [0, 1],
           });
 
-          const matchingFiles: string[] = [];
-          for await (const fileLine of filesGenerator) {
-            if (fileLine.trim()) {
-              matchingFiles.push(fileLine.trim());
-            }
-          }
-
-          if (matchingFiles.length === 0) {
-            return [];
-          }
-
-          // Search within the filtered files
-          const filteredGrepArgs = ['-n', '-H', '-E', '-I'];
-          if (maxMatchesPerFile) {
-            filteredGrepArgs.push(`-m`, maxMatchesPerFile.toString());
-          }
-          filteredGrepArgs.push(pattern);
-          filteredGrepArgs.push(...matchingFiles);
-
-          const results: GrepMatch[] = [];
-          // execStreaming will handle potentially large arg list by failing if too large,
-          // but for now we assume it fits or rely on fallback.
-          // Ideally we'd chunk it.
-          try {
-            const generator = execStreaming('grep', filteredGrepArgs, {
-              cwd: absolutePath,
-              signal: options.signal,
-              allowedExitCodes: [0, 1],
-            });
-
-            for await (const line of generator) {
-              const match = this.parseGrepLine(line, absolutePath);
-              if (match) {
-                results.push(match);
-                if (results.length >= maxMatches) {
-                  break;
-                }
+          for await (const line of generator) {
+            const match = this.parseGrepLine(line, absolutePath);
+            if (match) {
+              results.push(match);
+              if (results.length >= maxMatches) {
+                break;
               }
             }
+          }
+          return results;
+        } catch (grepError: unknown) {
+          if (
+            grepError instanceof Error &&
+            /Permission denied|Is a directory/i.test(grepError.message)
+          ) {
             return results;
-          } catch (e) {
-            debugLogger.debug(
-              `GrepLogic: System grep (second pass) failed: ${getErrorMessage(e)}`,
-            );
-            // Fallback to JS if second pass fails (e.g. arg list too long)
           }
-        } else {
-          // Normal system grep execution
-          if (include) {
-            grepArgs.push(`--include=${include}`);
-          }
-
-          if (maxMatchesPerFile) {
-            grepArgs.push(`-m`, maxMatchesPerFile.toString());
-          }
-
-          grepArgs.push(pattern);
-          grepArgs.push('.');
-
-          const results: GrepMatch[] = [];
-          try {
-            const generator = execStreaming('grep', grepArgs, {
-              cwd: absolutePath,
-              signal: options.signal,
-              allowedExitCodes: [0, 1],
-            });
-
-            for await (const line of generator) {
-              const match = this.parseGrepLine(line, absolutePath);
-              if (match) {
-                results.push(match);
-                if (results.length >= maxMatches) {
-                  break;
-                }
-              }
-            }
-            return results;
-          } catch (grepError: unknown) {
-            if (
-              grepError instanceof Error &&
-              /Permission denied|Is a directory/i.test(grepError.message)
-            ) {
-              return results;
-            }
-            debugLogger.debug(
-              `GrepLogic: System grep failed: ${getErrorMessage(
-                grepError,
-              )}. Falling back...`,
-            );
-          }
+          debugLogger.debug(
+            `GrepLogic: System grep failed: ${getErrorMessage(
+              grepError,
+            )}. Falling back...`,
+          );
         }
       }
 
@@ -670,7 +514,6 @@ class GrepToolInvocation extends BaseToolInvocation<
       });
 
       const regex = new RegExp(pattern, 'i');
-      const filterRegex = filter ? new RegExp(filter, 'i') : null;
       const allMatches: GrepMatch[] = [];
 
       for await (const filePath of filesStream) {
@@ -687,11 +530,6 @@ class GrepToolInvocation extends BaseToolInvocation<
 
         try {
           const content = await fsPromises.readFile(fileAbsolutePath, 'utf8');
-
-          // Check filter first if present
-          if (filterRegex && !filterRegex.test(content)) {
-            continue;
-          }
 
           const lines = content.split(/\r?\n/);
           let fileMatchCount = 0;
