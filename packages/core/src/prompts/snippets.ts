@@ -142,7 +142,6 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
 - **Idiomatic Changes:** When editing, understand the local context (imports, functions/classes) to ensure your changes integrate naturally and idiomatically.
 - **Comments:** Add code comments sparingly. Focus on *why* something is done, especially for complex logic, rather than *what* is done. Only add high-value comments if necessary for clarity or if requested by the user. Do not edit comments that are separate from the code you are changing. *NEVER* talk to the user or describe your changes through comments.
 - **Proactiveness:** Fulfill the user's request thoroughly. When adding features or fixing bugs, this includes adding tests to ensure quality. Consider all created files, especially tests, to be permanent artifacts unless the user says otherwise.
-- **Non-interactive Execution:** You MUST use non-interactive flags (e.g. 'run', 'CI', '--no-pager') for all shell commands. NEVER start interactive sessions (like 'vitest' without 'run').
 - ${mandateConfirm(options.interactive)}
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandateSkillGuidance(options.hasSkills)}${mandateExplainBeforeActing(options.isGemini3)}${mandateContinueWork(options.interactive)}
@@ -455,11 +454,11 @@ function toolUsageInteractive(interactive: boolean): string {
   if (interactive) {
     return `
 - **Background Processes:** Use background processes (via \`&\`) for commands that are unlikely to stop on their own, e.g. \`node server.js &\`. If unsure, ask the user.
-- **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`ctrl + f\` to focus into the shell to provide input.`;
+- **Interactive Commands:** Never use interactive shell commands. **ALWAYS** use arguments to bypass prompts for **EVERY** tool in use that supports it, even if that command is part of a chain or larger command. For example: 'git --no-pager', 'vitest run', and 'npx --yes' to bypass interactive prompts.`;
   }
   return `
 - **Background Processes:** Use background processes (via \`&\`) for commands that are unlikely to stop on their own, e.g. \`node server.js &\`.
-- **Interactive Commands:** Only execute non-interactive commands. For test runners like 'vitest', YOU MUST append 'run' or '--run' (e.g. 'npx vitest run') to avoid watch mode hangs. Use 'git --no-pager'. When running tests, you MUST output the specific pass/fail counts (e.g. "1 passed") from the tool result. Do NOT just say "All tests passed". If 'npx' is used, ensure dependencies are installed first (e.g. 'npm install') or use flags to prevent interactive prompts if applicable.`;
+- **Interactive Commands:** Never use interactive shell commands. **ALWAYS** use arguments to bypass prompts for **EVERY** tool in use that supports it, even if that command is part of a chain or larger command. For example: 'git --no-pager', 'vitest run', and 'npx --yes' to bypass interactive prompts.`;
 }
 
 function toolUsageRememberingFacts(
