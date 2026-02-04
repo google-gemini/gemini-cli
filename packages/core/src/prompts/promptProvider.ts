@@ -77,13 +77,6 @@ export class PromptProvider {
       }
     }
 
-    const planOptions: snippets.ApprovalModePlanOptions | undefined = isPlanMode
-      ? {
-          planModeToolsList,
-          plansDir: config.storage.getProjectTempPlansDir(),
-        }
-      : undefined;
-
     let basePrompt: string;
 
     // --- Template File Override ---
@@ -143,11 +136,7 @@ export class PromptProvider {
         planningWorkflow: this.withSection(
           'planningWorkflow',
           () => ({
-            planModeToolsList: PLAN_MODE_TOOLS.filter((t) =>
-              new Set(toolNames).has(t),
-            )
-              .map((t) => `- \`${t}\``)
-              .join('\n'),
+            planModeToolsList,
             plansDir: config.storage.getProjectTempPlansDir(),
           }),
           isPlanMode,
