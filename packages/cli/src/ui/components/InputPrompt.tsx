@@ -80,6 +80,43 @@ export function isTerminalPasteTrusted(
   return kittyProtocolSupported;
 }
 
+
+/**
+ * Helper function to create a placeholder for large paste content
+ * and store it for later substitution.
+ */
+function handleLargePaste(
+  text: string,
+  buffer: TextBuffer,
+  fastPasteContentRef: React.MutableRefObject<Record<string, string>>,
+  fastPasteCounterRef: React.MutableRefObject<number>,
+): void {
+  const FAST_PASTE_THRESHOLD = 500;
+  if (text.length <= FAST_PASTE_THRESHOLD) {
+    return;
+  }
+
+  const lineCount = (text.match(/\n/g) || []).length + 1;
+  fastPasteCounterRef.current++;
+  const suffix =
+    fastPasteCounterRef.current > 1
+      ? ` #${fastPasteCounterRef.current}`
+      : '';
+  const placeholder =
+    lineCount > 1
+      ? `[Pasted Text: ${lineCount} lines${suffix}]`
+      : `[Pasted Text: ${text.length} chars${suffix}]`;
+
+  const offset = buffer.getOffset();
+  buffer.replaceRangeByOffset(offset, offset, placeholder);
+
+  // Use the proper addPastedContent method instead of direct mutation
+  buffer.addPastedContent(placeholder, text);
+
+  // Also store in our fast ref for combined lookup
+  fastPasteContentRef.current[placeholder] = text;
+}
+
 export interface InputPromptProps {
   buffer: TextBuffer;
   onSubmit: (value: string) => void;
@@ -407,23 +444,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       } else {
         const textToInsert = await clipboardy.read();
         // OPTIMIZATION: Intercept large pastes BEFORE buffer processing
-        const FAST_PASTE_THRESHOLD_CTRLV = 500;
-        if (textToInsert.length > FAST_PASTE_THRESHOLD_CTRLV) {
-          const lineCount = (textToInsert.match(/\n/g) || []).length + 1;
-          fastPasteCounterRef.current++;
-          const suffix =
-            fastPasteCounterRef.current > 1
-              ? ` #${fastPasteCounterRef.current}`
-              : '';
-          const placeholder =
-            lineCount > 1
-              ? `[Pasted Text: ${lineCount} lines${suffix}]`
-              : `[Pasted Text: ${textToInsert.length} chars${suffix}]`;
-          const offset = buffer.getOffset();
-          buffer.replaceRangeByOffset(offset, offset, placeholder);
-          fastPasteContentRef.current[placeholder] = textToInsert;
-          if (!buffer.pastedContent) buffer.pastedContent = {};
-          buffer.pastedContent[placeholder] = textToInsert;
+        if (textToInsert.length > 500) {
+          handleLargePaste(
+            textToInsert,
+            buffer,
+            fastPasteContentRef,
+            fastPasteCounterRef,
+          );
         } else {
           buffer.insert(textToInsert, { paste: true });
         }
@@ -552,24 +579,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
         // Ensure we never accidentally interpret paste as regular input.
         // OPTIMIZATION: Intercept large pastes BEFORE buffer processing
-        const FAST_PASTE_THRESHOLD = 500;
-        if (key.sequence && key.sequence.length > FAST_PASTE_THRESHOLD) {
-          const pasteText = key.sequence;
-          const lineCount = (pasteText.match(/\n/g) || []).length + 1;
-          fastPasteCounterRef.current++;
-          const suffix =
-            fastPasteCounterRef.current > 1
-              ? ` #${fastPasteCounterRef.current}`
-              : '';
-          const placeholder =
-            lineCount > 1
-              ? `[Pasted Text: ${lineCount} lines${suffix}]`
-              : `[Pasted Text: ${pasteText.length} chars${suffix}]`;
-          const offset = buffer.getOffset();
-          buffer.replaceRangeByOffset(offset, offset, placeholder);
-          fastPasteContentRef.current[placeholder] = pasteText;
-          if (!buffer.pastedContent) buffer.pastedContent = {};
-          buffer.pastedContent[placeholder] = pasteText;
+        if (key.sequence && key.sequence.length > 500) {
+          handleLargePaste(
+            key.sequence,
+            buffer,
+            fastPasteContentRef,
+            fastPasteCounterRef,
+          );
           return true;
         }
         buffer.handleInput(key);
