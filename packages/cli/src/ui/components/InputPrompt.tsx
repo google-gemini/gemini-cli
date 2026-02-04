@@ -169,6 +169,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   >(null);
   const pasteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const innerBoxRef = useRef<DOMElement>(null);
+  // Fast paste optimization refs - store large paste content to avoid buffer processing lag
+  const fastPasteContentRef = useRef<Record<string, string>>({});
+  const fastPasteCounterRef = useRef<number>(0);
 
   const [reverseSearchActive, setReverseSearchActive] = useState(false);
   const [commandSearchActive, setCommandSearchActive] = useState(false);
@@ -247,14 +250,22 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {
-      let processedValue = submittedValue;
-      if (buffer.pastedContent) {
-        // Replace placeholders like [Pasted Text: 6 lines] with actual content
-        processedValue = processedValue.replace(
-          PASTED_TEXT_PLACEHOLDER_REGEX,
-          (match) => buffer.pastedContent[match] || match,
-        );
-      }
+          let processedValue = submittedValue;
+    // Use our fast refs first, then fallback to buffer.pastedContent
+    const combinedContent = {
+      ...buffer.pastedContent,
+      ...fastPasteContentRef.current,
+    };
+    if (Object.keys(combinedContent).length > 0) {
+      // Replace placeholders like [Pasted Text: 6 lines] with actual content
+      processedValue = processedValue.replace(
+        PASTED_TEXT_PLACEHOLDER_REGEX,
+        (match) => combinedContent[match] || match,
+      );
+      // Clean up fast paste refs after submit
+      fastPasteContentRef.current = {};
+      fastPasteCounterRef.current = 0;
+    }
 
       if (shellModeActive) {
         shellHistory.addCommandToHistory(processedValue);
@@ -395,7 +406,27 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         stdout.write('\x1b]52;c;?\x07');
       } else {
         const textToInsert = await clipboardy.read();
-        buffer.insert(textToInsert, { paste: true });
+        // OPTIMIZATION: Intercept large pastes BEFORE buffer processing
+        const FAST_PASTE_THRESHOLD_CTRLV = 500;
+        if (textToInsert.length > FAST_PASTE_THRESHOLD_CTRLV) {
+          const lineCount = (textToInsert.match(/\n/g) || []).length + 1;
+          fastPasteCounterRef.current++;
+          const suffix =
+            fastPasteCounterRef.current > 1
+              ? ` #${fastPasteCounterRef.current}`
+              : '';
+          const placeholder =
+            lineCount > 1
+              ? `[Pasted Text: ${lineCount} lines${suffix}]`
+              : `[Pasted Text: ${textToInsert.length} chars${suffix}]`;
+          const offset = buffer.getOffset();
+          buffer.replaceRangeByOffset(offset, offset, placeholder);
+          fastPasteContentRef.current[placeholder] = textToInsert;
+          if (!buffer.pastedContent) buffer.pastedContent = {};
+          buffer.pastedContent[placeholder] = textToInsert;
+        } else {
+          buffer.insert(textToInsert, { paste: true });
+        }
       }
     } catch (error) {
       debugLogger.error('Error handling paste:', error);
@@ -520,6 +551,27 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           }, 40);
         }
         // Ensure we never accidentally interpret paste as regular input.
+        // OPTIMIZATION: Intercept large pastes BEFORE buffer processing
+        const FAST_PASTE_THRESHOLD = 500;
+        if (key.sequence && key.sequence.length > FAST_PASTE_THRESHOLD) {
+          const pasteText = key.sequence;
+          const lineCount = (pasteText.match(/\n/g) || []).length + 1;
+          fastPasteCounterRef.current++;
+          const suffix =
+            fastPasteCounterRef.current > 1
+              ? ` #${fastPasteCounterRef.current}`
+              : '';
+          const placeholder =
+            lineCount > 1
+              ? `[Pasted Text: ${lineCount} lines${suffix}]`
+              : `[Pasted Text: ${pasteText.length} chars${suffix}]`;
+          const offset = buffer.getOffset();
+          buffer.replaceRangeByOffset(offset, offset, placeholder);
+          fastPasteContentRef.current[placeholder] = pasteText;
+          if (!buffer.pastedContent) buffer.pastedContent = {};
+          buffer.pastedContent[placeholder] = pasteText;
+          return true;
+        }
         buffer.handleInput(key);
         return true;
       }
