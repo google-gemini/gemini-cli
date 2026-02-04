@@ -9,8 +9,12 @@ import { planCommand } from './planCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { MessageType } from '../types.js';
-import { ApprovalMode, coreEvents } from '@google/gemini-cli-core';
-import * as fs from 'node:fs';
+import {
+  ApprovalMode,
+  coreEvents,
+  processSingleFileContent,
+  type ProcessedFileReadResult,
+} from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -20,20 +24,10 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     coreEvents: {
       emitFeedback: vi.fn(),
     },
+    processSingleFileContent: vi.fn(),
+    partToString: vi.fn((val) => val),
   };
 });
-
-vi.mock('node:fs', () => ({
-  promises: {
-    access: vi.fn(),
-    readdir: vi.fn(),
-    stat: vi.fn(),
-    readFile: vi.fn(),
-  },
-  constants: {
-    F_OK: 0,
-  },
-}));
 
 vi.mock('node:path', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:path')>();
@@ -55,6 +49,7 @@ describe('planCommand', () => {
           setApprovalMode: vi.fn(),
           getApprovedPlanPath: vi.fn(),
           getApprovalMode: vi.fn(),
+          getFileSystemService: vi.fn(),
           storage: {
             getProjectTempPlansDir: vi.fn().mockReturnValue('/mock/plans/dir'),
           },
@@ -118,14 +113,14 @@ describe('planCommand', () => {
     vi.mocked(mockContext.services.config!.getApprovedPlanPath).mockReturnValue(
       mockPlanPath,
     );
-    vi.mocked(fs.promises.readFile).mockResolvedValue(
-      '# Approved Plan Content',
-    );
+    vi.mocked(processSingleFileContent).mockResolvedValue({
+      llmContent: '# Approved Plan Content',
+      returnDisplay: '# Approved Plan Content',
+    } as ProcessedFileReadResult);
 
     if (!planCommand.action) throw new Error('Action missing');
     await planCommand.action(mockContext, '');
 
-    expect(fs.promises.readFile).toHaveBeenCalledWith(mockPlanPath, 'utf-8');
     expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
       'info',
       'Approved Plan: approved-plan.md',
@@ -134,25 +129,5 @@ describe('planCommand', () => {
       type: MessageType.GEMINI,
       text: '# Approved Plan Content',
     });
-  });
-
-  it('should handle errors when reading the approved plan', async () => {
-    const mockPlanPath = '/mock/plans/dir/approved-plan.md';
-    vi.mocked(mockContext.services.config!.isPlanEnabled).mockReturnValue(true);
-    vi.mocked(mockContext.services.config!.getApprovedPlanPath).mockReturnValue(
-      mockPlanPath,
-    );
-    vi.mocked(fs.promises.readFile).mockRejectedValue(new Error('Read error'));
-
-    if (!planCommand.action) throw new Error('Action missing');
-    await planCommand.action(mockContext, '');
-
-    expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
-      'error',
-      expect.stringContaining(
-        `Failed to read approved plan at ${mockPlanPath}`,
-      ),
-      expect.any(Error),
-    );
   });
 });

@@ -5,9 +5,14 @@
  */
 
 import { CommandKind, type SlashCommand } from './types.js';
-import { ApprovalMode, coreEvents, debugLogger } from '@google/gemini-cli-core';
+import {
+  ApprovalMode,
+  coreEvents,
+  debugLogger,
+  processSingleFileContent,
+  partToString,
+} from '@google/gemini-cli-core';
 import { MessageType } from '../types.js';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 export const planCommand: SlashCommand = {
@@ -23,14 +28,12 @@ export const planCommand: SlashCommand = {
     }
 
     const previousApprovalMode = config.getApprovalMode();
-    // Switch to plan mode
     config.setApprovalMode(ApprovalMode.PLAN);
 
     if (previousApprovalMode !== ApprovalMode.PLAN) {
       coreEvents.emitFeedback('info', 'Switched to Plan Mode.');
     }
 
-    // Find and display the latest plan
     const approvedPlanPath = config.getApprovedPlanPath();
 
     if (!approvedPlanPath) {
@@ -42,14 +45,18 @@ export const planCommand: SlashCommand = {
     }
 
     try {
-      const content = await fs.promises.readFile(approvedPlanPath, 'utf-8');
+      const content = await processSingleFileContent(
+        approvedPlanPath,
+        config.storage.getProjectTempPlansDir(),
+        config.getFileSystemService(),
+      );
       const fileName = path.basename(approvedPlanPath);
 
       coreEvents.emitFeedback('info', `Approved Plan: ${fileName}`);
 
       context.ui.addItem({
         type: MessageType.GEMINI,
-        text: content,
+        text: partToString(content.llmContent),
       });
     } catch (error) {
       coreEvents.emitFeedback(
