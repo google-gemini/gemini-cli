@@ -627,12 +627,12 @@ export class Config {
   private latestApiRequest: GenerateContentParameters | undefined;
   private lastModeSwitchTime: number = Date.now();
 
-  private activePlanPath: string | undefined;
+  private approvedPlanPath: string | undefined;
 
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
     this.clientVersion = params.clientVersion ?? 'unknown';
-    this.activePlanPath = undefined;
+    this.approvedPlanPath = undefined;
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
     this.fileSystemService = new StandardFileSystemService();
@@ -1709,12 +1709,12 @@ export class Config {
     return this.planEnabled;
   }
 
-  getActivePlanPath(): string | undefined {
-    return this.activePlanPath;
+  getApprovedPlanPath(): string | undefined {
+    return this.approvedPlanPath;
   }
 
-  setActivePlanPath(path: string | undefined): void {
-    this.activePlanPath = path;
+  setApprovedPlanPath(path: string | undefined): void {
+    this.approvedPlanPath = path;
   }
 
   isAgentsEnabled(): boolean {

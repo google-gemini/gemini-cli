@@ -53,7 +53,7 @@ describe('planCommand', () => {
         config: {
           isPlanEnabled: vi.fn(),
           setApprovalMode: vi.fn(),
-          getActivePlanPath: vi.fn(),
+          getApprovedPlanPath: vi.fn(),
           storage: {
             getProjectTempPlansDir: vi.fn().mockReturnValue('/mock/plans/dir'),
           },
@@ -78,24 +78,9 @@ describe('planCommand', () => {
     );
   });
 
-  it('should show error if plan mode is not enabled', async () => {
-    vi.mocked(mockContext.services.config!.isPlanEnabled).mockReturnValue(
-      false,
-    );
-
-    if (!planCommand.action) throw new Error('Action missing');
-    await planCommand.action(mockContext, '');
-
-    expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
-      'error',
-      expect.stringContaining('Plan mode is experimental'),
-    );
-    expect(mockContext.services.config!.setApprovalMode).not.toHaveBeenCalled();
-  });
-
   it('should switch to plan mode if enabled', async () => {
     vi.mocked(mockContext.services.config!.isPlanEnabled).mockReturnValue(true);
-    vi.mocked(mockContext.services.config!.getActivePlanPath).mockReturnValue(
+    vi.mocked(mockContext.services.config!.getApprovedPlanPath).mockReturnValue(
       undefined,
     );
 
@@ -113,7 +98,7 @@ describe('planCommand', () => {
 
   it('should show "No active plan found" if no active plan path in config', async () => {
     vi.mocked(mockContext.services.config!.isPlanEnabled).mockReturnValue(true);
-    vi.mocked(mockContext.services.config!.getActivePlanPath).mockReturnValue(
+    vi.mocked(mockContext.services.config!.getApprovedPlanPath).mockReturnValue(
       undefined,
     );
 
@@ -129,7 +114,7 @@ describe('planCommand', () => {
   it('should display the active plan from config', async () => {
     const mockPlanPath = '/mock/plans/dir/active-plan.md';
     vi.mocked(mockContext.services.config!.isPlanEnabled).mockReturnValue(true);
-    vi.mocked(mockContext.services.config!.getActivePlanPath).mockReturnValue(
+    vi.mocked(mockContext.services.config!.getApprovedPlanPath).mockReturnValue(
       mockPlanPath,
     );
     vi.mocked(fs.promises.readFile).mockResolvedValue('# Active Plan Content');
@@ -151,7 +136,7 @@ describe('planCommand', () => {
   it('should handle errors when reading the active plan', async () => {
     const mockPlanPath = '/mock/plans/dir/active-plan.md';
     vi.mocked(mockContext.services.config!.isPlanEnabled).mockReturnValue(true);
-    vi.mocked(mockContext.services.config!.getActivePlanPath).mockReturnValue(
+    vi.mocked(mockContext.services.config!.getApprovedPlanPath).mockReturnValue(
       mockPlanPath,
     );
     vi.mocked(fs.promises.readFile).mockRejectedValue(new Error('Read error'));

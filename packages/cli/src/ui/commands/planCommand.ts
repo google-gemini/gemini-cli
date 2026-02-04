@@ -22,23 +22,18 @@ export const planCommand: SlashCommand = {
       return;
     }
 
-    // Check if plan mode is enabled
-    if (!config.isPlanEnabled()) {
-      coreEvents.emitFeedback(
-        'error',
-        'Plan mode is experimental. Enable it in your settings (experimental.plan) to use this command.',
-      );
-      return;
-    }
-
+    const previousApprovalMode = config.getApprovalMode();
     // Switch to plan mode
     config.setApprovalMode(ApprovalMode.PLAN);
-    coreEvents.emitFeedback('info', 'Switched to Plan Mode.');
+
+    if (previousApprovalMode !== ApprovalMode.PLAN) {
+      coreEvents.emitFeedback('info', 'Switched to Plan Mode.');
+    }
 
     // Find and display the latest plan
-    const activePlanPath = config.getActivePlanPath();
+    const approvedPlanPath = config.getApprovedPlanPath();
 
-    if (!activePlanPath) {
+    if (!approvedPlanPath) {
       coreEvents.emitFeedback(
         'error',
         'No active plan found. Please create and approve a plan first.',
@@ -47,8 +42,8 @@ export const planCommand: SlashCommand = {
     }
 
     try {
-      const content = await fs.promises.readFile(activePlanPath, 'utf-8');
-      const fileName = path.basename(activePlanPath);
+      const content = await fs.promises.readFile(approvedPlanPath, 'utf-8');
+      const fileName = path.basename(approvedPlanPath);
 
       coreEvents.emitFeedback('info', `Active Plan: ${fileName}`);
 
@@ -59,7 +54,7 @@ export const planCommand: SlashCommand = {
     } catch (error) {
       coreEvents.emitFeedback(
         'error',
-        `Failed to read active plan at ${activePlanPath}: ${error}`,
+        `Failed to read active plan at ${approvedPlanPath}: ${error}`,
         error,
       );
     }
