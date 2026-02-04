@@ -34,6 +34,23 @@ export const UserMessage: React.FC<UserMessageProps> = ({ text, width }) => {
 
   const displayText = useMemo(() => {
     if (!text) return text;
+
+    // Truncate very long messages to prevent terminal freeze during rendering
+    const MAX_DISPLAY_LENGTH = 2000;
+    const MAX_LINES = 50;
+
+    if (text.length > MAX_DISPLAY_LENGTH) {
+      const lineCount = (text.match(/\n/g) || []).length + 1;
+      const preview = text.substring(0, 200).split('\n').slice(0, 3).join('\n');
+      return `${preview}\n\n[... Message with ${text.length.toLocaleString()} characters and ${lineCount} lines - sent to model ...]`;
+    }
+
+    const lines = text.split('\n');
+    if (lines.length > MAX_LINES) {
+      const previewLines = lines.slice(0, 5);
+      return `${previewLines.join('\n')}\n\n[... Message with ${lines.length} lines - sent to model ...]`;
+    }
+
     return text
       .split('\n')
       .map((line) => {
