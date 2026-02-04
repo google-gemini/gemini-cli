@@ -8,7 +8,7 @@ discoverable capability.
 
 ## Overview
 
-Unlike general context files ([`GEMINI.md`](./gemini-msd.md)), which provide
+Unlike general context files ([`GEMINI.md`](./gemini-md.md)), which provide
 persistent workspace-wide background, Skills represent **on-demand expertise**.
 This allows Gemini to maintain a vast library of specialized capabilities—such
 as security auditing, cloud deployments, or codebase migrations—without
