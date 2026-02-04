@@ -5,10 +5,8 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import {
-  renderWithProviders,
-  createMockSettings,
-} from '../../test-utils/render.js';
+import { renderWithProviders } from '../../test-utils/render.js';
+import { createMockSettings } from '../../test-utils/settings.js';
 import { Footer } from './Footer.js';
 import { tildeifyPath, ToolCallDecision } from '@google/gemini-cli-core';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
