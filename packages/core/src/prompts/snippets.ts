@@ -454,7 +454,7 @@ function toolUsageInteractive(interactive: boolean): string {
   if (interactive) {
     return `
 - **Background Processes:** Use background processes (via \`&\`) for commands that are unlikely to stop on their own, e.g. \`node server.js &\`. If unsure, ask the user.
-- **Interactive Commands:** Never use interactive shell commands. **ALWAYS** use arguments to bypass prompts for **EVERY** tool in use that supports it, even if that command is part of a chain or larger command. For example: 'git --no-pager', 'vitest run', and 'npx --yes' to bypass interactive prompts.`;
+- **Interactive Commands:** Never use interactive shell commands unless absolutely necessary. **ALWAYS** use arguments to bypass prompts for **EVERY** tool in use that supports it, even if that command is part of a chain or larger command. For example: 'git --no-pager', 'vitest run', and 'npx --yes' to bypass interactive prompts.`;
   }
   return `
 - **Background Processes:** Use background processes (via \`&\`) for commands that are unlikely to stop on their own, e.g. \`node server.js &\`.

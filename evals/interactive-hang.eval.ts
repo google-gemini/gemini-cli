@@ -2,8 +2,13 @@ import { describe, expect } from 'vitest';
 import { evalTest } from './test-helper.js';
 
 describe('interactive_commands', () => {
-  evalTest('ALWAYS_PASSES', {
-    name: 'should hang when running vitest directly',
+  /**
+   * Validates that the agent does not use interactive commands unprompted.
+   * Interactive commands block the progress of the agent, requiring user
+   * intervention.
+   */
+  evalTest('USUALLY_PASSES', {
+    name: 'should not use interactive commands',
     prompt: 'Execute tests.',
     files: {
       'package.json': JSON.stringify(
