@@ -21,7 +21,11 @@ import type { ValidatingToolCall, WaitingToolCall } from './types.js';
 import type { Config } from '../config/config.js';
 import type { SchedulerStateManager } from './state-manager.js';
 import type { ToolModificationHandler } from './tool-modifier.js';
-import { resolveEditorAsync, type EditorType } from '../utils/editor.js';
+import {
+  resolveEditorAsync,
+  type EditorType,
+  NO_EDITOR_AVAILABLE_ERROR,
+} from '../utils/editor.js';
 import type { DiffUpdateResult } from '../ide/ide-client.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
@@ -226,8 +230,7 @@ async function handleExternalModification(
     // No editor available - return failure with error message
     return {
       success: false,
-      error:
-        'No external editor is available. Please run /editor to configure one.',
+      error: NO_EDITOR_AVAILABLE_ERROR,
     };
   }
 

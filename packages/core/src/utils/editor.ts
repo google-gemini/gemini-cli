@@ -25,6 +25,9 @@ const GUI_EDITORS_SET = new Set<string>(GUI_EDITORS);
 const TERMINAL_EDITORS_SET = new Set<string>(TERMINAL_EDITORS);
 const EDITORS_SET = new Set<string>(EDITORS);
 
+export const NO_EDITOR_AVAILABLE_ERROR =
+  'No external editor is available. Please run /editor to configure one.';
+
 export const DEFAULT_GUI_EDITOR: GuiEditorType = 'vscode';
 
 export type GuiEditorType = (typeof GUI_EDITORS)[number];

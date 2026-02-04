@@ -12,7 +12,11 @@ import {
   type ToolConfirmationPayload,
   ToolConfirmationOutcome,
 } from '../tools/tools.js';
-import { resolveEditorAsync, type EditorType } from '../utils/editor.js';
+import {
+  resolveEditorAsync,
+  type EditorType,
+  NO_EDITOR_AVAILABLE_ERROR,
+} from '../utils/editor.js';
 import { coreEvents } from '../utils/events.js';
 import type { Config } from '../config/config.js';
 import { PolicyDecision } from '../policy/types.js';
@@ -757,10 +761,7 @@ export class CoreToolScheduler {
 
       if (!editor) {
         // No editor available - emit error feedback and return to previous confirmation screen
-        coreEvents.emitFeedback(
-          'error',
-          'No external editor is available. Please run /editor to configure one.',
-        );
+        coreEvents.emitFeedback('error', NO_EDITOR_AVAILABLE_ERROR);
         this.setStatusInternal(callId, 'awaiting_approval', signal, {
           ...waitingToolCall.confirmationDetails,
           isModifying: false,
