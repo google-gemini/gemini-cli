@@ -413,6 +413,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     const maxTimeMinutes =
       this.definition.runConfig.maxTimeMinutes ?? DEFAULT_MAX_TIME_MINUTES;
+    const maxTurns = this.definition.runConfig.maxTurns ?? DEFAULT_MAX_TURNS;
+
     const timeoutController = new AbortController();
     const timeoutId = setTimeout(
       () => timeoutController.abort(new Error('Agent timed out.')),
@@ -447,7 +449,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
       while (true) {
         // Check for termination conditions like max turns.
-        const reason = this.checkTermination(startTime, turnCounter);
+        const reason = this.checkTermination(turnCounter, maxTurns);
         if (reason) {
           terminateReason = reason;
           break;
@@ -505,18 +507,13 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         } else {
           // Recovery Failed. Set the final error message based on the *original* reason.
           if (terminateReason === AgentTerminateMode.TIMEOUT) {
-            const actualMaxTime =
-              this.definition.runConfig.maxTimeMinutes ??
-              DEFAULT_MAX_TIME_MINUTES;
-            finalResult = `Agent timed out after ${actualMaxTime} minutes.`;
+            finalResult = `Agent timed out after ${maxTimeMinutes} minutes.`;
             this.emitActivity('ERROR', {
               error: finalResult,
               context: 'timeout',
             });
           } else if (terminateReason === AgentTerminateMode.MAX_TURNS) {
-            const actualMaxTurns =
-              this.definition.runConfig.maxTurns ?? DEFAULT_MAX_TURNS;
-            finalResult = `Agent reached max turns limit (${actualMaxTurns}).`;
+            finalResult = `Agent reached max turns limit (${maxTurns}).`;
             this.emitActivity('ERROR', {
               error: finalResult,
               context: 'max_turns',
@@ -580,9 +577,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         }
 
         // Recovery failed or wasn't possible
-        const actualMaxTime =
-          this.definition.runConfig.maxTimeMinutes ?? DEFAULT_MAX_TIME_MINUTES;
-        finalResult = `Agent timed out after ${actualMaxTime} minutes.`;
+        finalResult = `Agent timed out after ${maxTimeMinutes} minutes.`;
         this.emitActivity('ERROR', {
           error: finalResult,
           context: 'timeout',
@@ -1173,12 +1168,9 @@ Important Rules:
    * @returns The reason for termination, or `null` if execution can continue.
    */
   private checkTermination(
-    startTime: number,
     turnCounter: number,
+    maxTurns: number,
   ): AgentTerminateMode | null {
-    const { runConfig } = this.definition;
-
-    const maxTurns = runConfig.maxTurns ?? DEFAULT_MAX_TURNS;
     if (turnCounter >= maxTurns) {
       return AgentTerminateMode.MAX_TURNS;
     }

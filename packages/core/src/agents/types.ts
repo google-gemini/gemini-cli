@@ -197,7 +197,7 @@ export interface RunConfig {
    * The maximum execution time for the agent in minutes.
    * If not specified, defaults to DEFAULT_MAX_TIME_MINUTES (5).
    */
-  maxTimeMinutes: number;
+  maxTimeMinutes?: number;
   /**
    * The maximum number of conversational turns.
    * If not specified, defaults to DEFAULT_MAX_TURNS (15).
