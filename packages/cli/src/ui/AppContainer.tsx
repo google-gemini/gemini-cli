@@ -189,7 +189,11 @@ export const AppContainer = (props: AppContainerProps) => {
   const { config, initializationResult, resumedSessionData } = props;
   const settings = useSettings();
 
-  const voice = useVoiceInput({ whisperPath: settings.merged.voice?.whisperPath });
+  const voiceConfig = useMemo(
+    () => ({ whisperPath: settings.merged.voice?.whisperPath }),
+    [settings.merged.voice?.whisperPath],
+  );
+  const voice = useVoiceInput(voiceConfig);
 
   const historyManager = useHistory({
     chatRecordingService: config.getGeminiClient()?.getChatRecordingService(),

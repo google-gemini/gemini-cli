@@ -27,6 +27,8 @@ import {
 import { type HistoryItemToolGroup, StreamingState } from '../ui/types.js';
 import { ToolActionsProvider } from '../ui/contexts/ToolActionsContext.js';
 import { AskUserActionsProvider } from '../ui/contexts/AskUserActionsContext.js';
+import { VoiceContext } from '../ui/contexts/VoiceContext.js';
+import type { VoiceInputReturn } from '../ui/hooks/useVoiceInput.js';
 
 import { makeFakeConfig, type Config } from '@google/gemini-cli-core';
 import { FakePersistentState } from './persistentStateFake.js';
@@ -167,6 +169,19 @@ export const mockAppState: AppState = {
   startupWarnings: [],
 };
 
+const mockVoiceReturn: VoiceInputReturn = {
+  state: {
+    isRecording: false,
+    isTranscribing: false,
+    transcript: null,
+    error: null,
+  },
+  startRecording: vi.fn(async () => {}),
+  stopRecording: vi.fn(async () => {}),
+  toggleRecording: vi.fn(async () => {}),
+  clearTranscript: vi.fn(),
+};
+
 const mockUIActions: UIActions = {
   handleThemeSelect: vi.fn(),
   closeThemeDialog: vi.fn(),
@@ -226,6 +241,7 @@ export const renderWithProviders = (
     uiActions,
     persistentState,
     appState = mockAppState,
+    voice = mockVoiceReturn,
   }: {
     shellFocus?: boolean;
     settings?: LoadedSettings;
@@ -240,6 +256,7 @@ export const renderWithProviders = (
       set?: typeof persistentStateMock.set;
     };
     appState?: AppState;
+    voice?: VoiceInputReturn;
   } = {},
 ): ReturnType<typeof render> & { simulateClick: typeof simulateClick } => {
   const baseState: UIState = new Proxy(
@@ -308,28 +325,30 @@ export const renderWithProviders = (
                       config={config}
                       toolCalls={allToolCalls}
                     >
-                      <AskUserActionsProvider
-                        request={null}
-                        onSubmit={vi.fn()}
-                        onCancel={vi.fn()}
-                      >
-                        <KeypressProvider>
-                          <MouseProvider
-                            mouseEventsEnabled={mouseEventsEnabled}
-                          >
-                            <ScrollProvider>
-                              <Box
-                                width={terminalWidth}
-                                flexShrink={0}
-                                flexGrow={0}
-                                flexDirection="column"
-                              >
-                                {component}
-                              </Box>
-                            </ScrollProvider>
-                          </MouseProvider>
-                        </KeypressProvider>
-                      </AskUserActionsProvider>
+                      <VoiceContext.Provider value={voice}>
+                        <AskUserActionsProvider
+                          request={null}
+                          onSubmit={vi.fn()}
+                          onCancel={vi.fn()}
+                        >
+                          <KeypressProvider>
+                            <MouseProvider
+                              mouseEventsEnabled={mouseEventsEnabled}
+                            >
+                              <ScrollProvider>
+                                <Box
+                                  width={terminalWidth}
+                                  flexShrink={0}
+                                  flexGrow={0}
+                                  flexDirection="column"
+                                >
+                                  {component}
+                                </Box>
+                              </ScrollProvider>
+                            </MouseProvider>
+                          </KeypressProvider>
+                        </AskUserActionsProvider>
+                      </VoiceContext.Provider>
                     </ToolActionsProvider>
                   </UIActionsContext.Provider>
                 </StreamingContext.Provider>

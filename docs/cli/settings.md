@@ -65,6 +65,12 @@ they appear in the UI.
 | Enable Loading Phrases         | `ui.accessibility.enableLoadingPhrases` | Enable loading phrases during operations.                                                                                                                         | `true`  |
 | Screen Reader Mode             | `ui.accessibility.screenReader`         | Render output in plain-text to be more screen reader accessible                                                                                                   | `false` |
 
+### Voice
+
+| UI Label            | Setting             | Description                                             | Default     |
+| ------------------- | ------------------- | ------------------------------------------------------- | ----------- |
+| Whisper Binary Path | `voice.whisperPath` | Path to the whisper executable (e.g. /path/to/whisper). | `undefined` |
+
 ### IDE
 
 | UI Label | Setting       | Description                  | Default |

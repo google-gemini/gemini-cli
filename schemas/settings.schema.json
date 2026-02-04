@@ -374,6 +374,22 @@
       },
       "additionalProperties": false
     },
+    "voice": {
+      "title": "Voice Input",
+      "description": "Settings for voice input.",
+      "markdownDescription": "Settings for voice input.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "whisperPath": {
+          "title": "Whisper Binary Path",
+          "description": "Path to the whisper executable (e.g. /path/to/whisper).",
+          "markdownDescription": "Path to the whisper executable (e.g. /path/to/whisper).\n\n- Category: `General`\n- Requires restart: `no`",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
     "ide": {
       "title": "IDE",
       "description": "IDE integration settings.",
