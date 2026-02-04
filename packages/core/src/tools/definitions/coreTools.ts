@@ -6,6 +6,7 @@
 
 import type { ToolDefinition } from './types.js';
 import { READ_FILE_TOOL_NAME, SHELL_TOOL_NAME } from '../tool-names.js';
+import { getCommandDescription } from '../shell.js';
 
 export const READ_FILE_DEFINITION: ToolDefinition = {
   base: {
@@ -43,7 +44,7 @@ export const SHELL_DEFINITION: ToolDefinition = {
       properties: {
         command: {
           type: 'string',
-          description: 'The command to execute.',
+          description: getCommandDescription(),
         },
         description: {
           type: 'string',
