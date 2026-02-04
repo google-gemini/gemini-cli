@@ -18,6 +18,7 @@ import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 import { Scrollable } from '../shared/Scrollable.js';
 import { ScrollableList } from '../shared/ScrollableList.js';
 import { SCROLL_TO_ITEM_END } from '../shared/VirtualizedList.js';
+import { ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 6; // for tool name, status, padding, and 'ShowMoreLines' hint
@@ -91,6 +92,45 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
 
   if (!truncatedResultDisplay) return null;
 
+  // 1. Early return for background tools (Todos)
+  if (
+    typeof truncatedResultDisplay === 'object' &&
+    'todos' in truncatedResultDisplay
+  ) {
+    // display nothing, as the TodoTray will handle rendering todos
+    return null;
+  }
+
+  // 2. High-performance path: Virtualized ANSI in interactive mode
+  if (isAlternateBuffer && Array.isArray(truncatedResultDisplay)) {
+    // If availableHeight is undefined, fallback to a safe default to prevents infinite loop
+    // where Container grows -> List renders more -> Container grows.
+    const limit = maxLines ?? availableHeight ?? ACTIVE_SHELL_MAX_LINES;
+    const listHeight = Math.min(
+      (truncatedResultDisplay as AnsiOutput).length,
+      limit,
+    );
+
+    return (
+      <Box width={childWidth} flexDirection="column" maxHeight={listHeight}>
+        <ScrollableList
+          width={childWidth}
+          data={truncatedResultDisplay as AnsiOutput}
+          renderItem={({ item }: { item: AnsiLine }) => (
+            <Box height={1} overflow="hidden">
+              <AnsiLineText line={item} />
+            </Box>
+          )}
+          estimatedItemHeight={() => 1}
+          keyExtractor={(_: AnsiLine, index: number) => index.toString()}
+          initialScrollIndex={SCROLL_TO_ITEM_END}
+          hasFocus={hasFocus}
+        />
+      </Box>
+    );
+  }
+
+  // 3. Compute content node for non-virtualized paths
   // Check if string content is valid JSON and pretty-print it
   const prettyJSON =
     typeof truncatedResultDisplay === 'string'
@@ -140,12 +180,6 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
         terminalWidth={childWidth}
       />
     );
-  } else if (
-    typeof truncatedResultDisplay === 'object' &&
-    'todos' in truncatedResultDisplay
-  ) {
-    // display nothing, as the TodoTray will handle rendering todos
-    return null;
   } else {
     content = (
       <AnsiOutputText
@@ -162,28 +196,8 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
     );
   }
 
+  // 4. Final render based on session mode
   if (isAlternateBuffer) {
-    if (Array.isArray(truncatedResultDisplay)) {
-      return (
-        <Box
-          width={childWidth}
-          flexDirection="column"
-          height={maxLines ?? availableHeight}
-        >
-          <ScrollableList
-            width={childWidth}
-            data={truncatedResultDisplay as AnsiOutput}
-            renderItem={({ item }: { item: AnsiLine }) => (
-              <AnsiLineText line={item} />
-            )}
-            estimatedItemHeight={() => 1}
-            keyExtractor={(_: AnsiLine, index: number) => index.toString()}
-            initialScrollIndex={SCROLL_TO_ITEM_END}
-            hasFocus={hasFocus}
-          />
-        </Box>
-      );
-    }
     return (
       <Scrollable
         width={childWidth}

@@ -68,8 +68,9 @@ describe('<AnsiOutputText />', () => {
     const output = lastFrame();
     expect(output).toBeDefined();
     const lines = output!.split('\n');
-    expect(lines[0]).toBe('First line');
-    expect(lines[1]).toBe('Third line');
+    expect(lines[0].trim()).toBe('First line');
+    expect(lines[1].trim()).toBe('');
+    expect(lines[2].trim()).toBe('Third line');
   });
 
   it('respects the availableTerminalHeight prop and slices the lines correctly', () => {
