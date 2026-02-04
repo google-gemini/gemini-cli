@@ -1029,7 +1029,7 @@ export async function discoverTools(
         if (isReadOnly) {
           cliConfig.getPolicyEngine().addRule({
             toolName: tool.getFullyQualifiedName(),
-            decision: PolicyDecision.ALLOW,
+            decision: PolicyDecision.ASK_USER,
             priority: 50, // Match priority of built-in plan tools
             modes: [ApprovalMode.PLAN],
             source: `MCP Annotation (readOnlyHint) - ${mcpServerName}`,

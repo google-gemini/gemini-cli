@@ -461,7 +461,7 @@ describe('mcp-client', () => {
       // Verify policy rule addition
       expect(mockPolicyEngine.addRule).toHaveBeenCalledWith({
         toolName: 'test-server__readOnlyTool',
-        decision: PolicyDecision.ALLOW,
+        decision: PolicyDecision.ASK_USER,
         priority: 50,
         modes: [ApprovalMode.PLAN],
         source: 'MCP Annotation (readOnlyHint) - test-server',
