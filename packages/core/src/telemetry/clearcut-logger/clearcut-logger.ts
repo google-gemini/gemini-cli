@@ -18,6 +18,7 @@ import type {
   LoopDetectedEvent,
   NextSpeakerCheckEvent,
   SlashCommandEvent,
+  RewindEvent,
   MalformedJsonResponseEvent,
   IdeConnectionEvent,
   ConversationFinishedEvent,
@@ -78,6 +79,7 @@ export enum EventNames {
   LOOP_DETECTION_DISABLED = 'loop_detection_disabled',
   NEXT_SPEAKER_CHECK = 'next_speaker_check',
   SLASH_COMMAND = 'slash_command',
+  REWIND = 'rewind',
   MALFORMED_JSON_RESPONSE = 'malformed_json_response',
   IDE_CONNECTION = 'ide_connection',
   KITTY_SEQUENCE_OVERFLOW = 'kitty_sequence_overflow',
@@ -945,6 +947,18 @@ export class ClearcutLogger {
     this.flushIfNeeded();
   }
 
+  logRewindEvent(event: RewindEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_REWIND_OUTCOME,
+        value: event.outcome,
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.REWIND, data));
+    this.flushIfNeeded();
+  }
+
   logMalformedJsonResponseEvent(event: MalformedJsonResponseEvent): void {
     const data: EventValue[] = [
       {
@@ -1231,6 +1245,28 @@ export class ClearcutLogger {
       data.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_FAILURE_REASON,
         value: event.error_message,
+      });
+    }
+
+    if (event.reasoning && this.config?.getTelemetryLogPromptsEnabled()) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_REASONING,
+        value: event.reasoning,
+      });
+    }
+
+    if (event.enable_numerical_routing !== undefined) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_NUMERICAL_ENABLED,
+        value: event.enable_numerical_routing.toString(),
+      });
+    }
+
+    if (event.classifier_threshold) {
+      data.push({
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_ROUTING_CLASSIFIER_THRESHOLD,
+        value: event.classifier_threshold,
       });
     }
 

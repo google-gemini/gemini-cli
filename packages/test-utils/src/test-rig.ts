@@ -272,11 +272,33 @@ export class InteractiveRun {
   }
 }
 
+function isObject(item: any): item is Record<string, any> {
+  return !!(item && typeof item === 'object' && !Array.isArray(item));
+}
+
+function deepMerge(target: any, source: any): any {
+  if (!isObject(target) || !isObject(source)) {
+    return source;
+  }
+  const output = { ...target };
+  Object.keys(source).forEach((key) => {
+    const targetValue = target[key];
+    const sourceValue = source[key];
+    if (isObject(targetValue) && isObject(sourceValue)) {
+      output[key] = deepMerge(targetValue, sourceValue);
+    } else {
+      output[key] = sourceValue;
+    }
+  });
+  return output;
+}
+
 export class TestRig {
   testDir: string | null = null;
   homeDir: string | null = null;
   testName?: string;
   _lastRunStdout?: string;
+  _lastRunStderr?: string;
   // Path to the copied fake responses file for this test.
   fakeResponsesPath?: string;
   // Original fake responses file path for rewriting goldens in record mode.
@@ -315,42 +337,54 @@ export class TestRig {
     const projectGeminiDir = join(this.testDir!, GEMINI_DIR);
     mkdirSync(projectGeminiDir, { recursive: true });
 
+    const userGeminiDir = join(this.homeDir!, GEMINI_DIR);
+    mkdirSync(userGeminiDir, { recursive: true });
+
     // In sandbox mode, use an absolute path for telemetry inside the container
     // The container mounts the test directory at the same path as the host
     const telemetryPath = join(this.homeDir!, 'telemetry.log'); // Always use home directory for telemetry
 
-    const settings = {
-      general: {
-        // Nightly releases sometimes becomes out of sync with local code and
-        // triggers auto-update, which causes tests to fail.
-        disableAutoUpdate: true,
-        previewFeatures: false,
-      },
-      telemetry: {
-        enabled: true,
-        target: 'local',
-        otlpEndpoint: '',
-        outfile: telemetryPath,
-      },
-      security: {
-        auth: {
-          selectedType: 'gemini-api-key',
+    const settings = deepMerge(
+      {
+        general: {
+          // Nightly releases sometimes becomes out of sync with local code and
+          // triggers auto-update, which causes tests to fail.
+          disableAutoUpdate: true,
+          previewFeatures: false,
         },
+        telemetry: {
+          enabled: true,
+          target: 'local',
+          otlpEndpoint: '',
+          outfile: telemetryPath,
+        },
+        security: {
+          auth: {
+            selectedType: 'gemini-api-key',
+          },
+          folderTrust: {
+            enabled: false,
+          },
+        },
+        ui: {
+          useAlternateBuffer: true,
+        },
+        model: {
+          name: DEFAULT_GEMINI_MODEL,
+        },
+        sandbox:
+          env['GEMINI_SANDBOX'] !== 'false' ? env['GEMINI_SANDBOX'] : false,
+        // Don't show the IDE connection dialog when running from VsCode
+        ide: { enabled: false, hasSeenNudge: true },
       },
-      ui: {
-        useAlternateBuffer: true,
-      },
-      model: {
-        name: DEFAULT_GEMINI_MODEL,
-      },
-      sandbox:
-        env['GEMINI_SANDBOX'] !== 'false' ? env['GEMINI_SANDBOX'] : false,
-      // Don't show the IDE connection dialog when running from VsCode
-      ide: { enabled: false, hasSeenNudge: true },
-      ...overrideSettings, // Allow tests to override/add settings
-    };
+      overrideSettings ?? {},
+    );
     writeFileSync(
       join(projectGeminiDir, 'settings.json'),
+      JSON.stringify(settings, null, 2),
+    );
+    writeFileSync(
+      join(userGeminiDir, 'settings.json'),
       JSON.stringify(settings, null, 2),
     );
   }
@@ -396,6 +430,34 @@ export class TestRig {
     return { command, initialArgs };
   }
 
+  private _getCleanEnv(
+    extraEnv?: Record<string, string | undefined>,
+  ): Record<string, string | undefined> {
+    const cleanEnv: Record<string, string | undefined> = { ...process.env };
+
+    // Clear all GEMINI_ environment variables that might interfere with tests
+    // except for those we explicitly want to keep or set.
+    for (const key of Object.keys(cleanEnv)) {
+      if (
+        (key.startsWith('GEMINI_') || key.startsWith('GOOGLE_GEMINI_')) &&
+        key !== 'GEMINI_API_KEY' &&
+        key !== 'GOOGLE_API_KEY' &&
+        key !== 'GEMINI_MODEL' &&
+        key !== 'GEMINI_DEBUG' &&
+        key !== 'GEMINI_CLI_TEST_VAR' &&
+        !key.startsWith('GEMINI_CLI_ACTIVITY_LOG')
+      ) {
+        delete cleanEnv[key];
+      }
+    }
+
+    return {
+      ...cleanEnv,
+      GEMINI_CLI_HOME: this.homeDir!,
+      ...extraEnv,
+    };
+  }
+
   run(options: {
     args?: string | string[];
     stdin?: string;
@@ -433,11 +495,7 @@ export class TestRig {
     const child = spawn(command, commandArgs, {
       cwd: this.testDir!,
       stdio: 'pipe',
-      env: {
-        ...process.env,
-        GEMINI_CLI_HOME: this.homeDir!,
-        ...options.env,
-      },
+      env: this._getCleanEnv(options.env),
     });
     this._spawnedProcesses.push(child);
 
@@ -487,6 +545,7 @@ export class TestRig {
 
       child.on('close', (code: number) => {
         clearTimeout(timer);
+        this._lastRunStderr = stderr;
         if (code === 0) {
           // Store the raw stdout for Podman telemetry parsing
           this._lastRunStdout = stdout;
@@ -573,7 +632,7 @@ export class TestRig {
       const child = spawn(command, allArgs, {
         cwd: this.testDir!,
         stdio: 'pipe',
-        env: { ...process.env, GEMINI_CLI_HOME: this.homeDir! },
+        env: this._getCleanEnv(),
         signal: options?.signal,
       });
       this._spawnedProcesses.push(child);
@@ -611,11 +670,7 @@ export class TestRig {
     const child = spawn(command, commandArgs, {
       cwd: this.testDir!,
       stdio: 'pipe',
-      env: {
-        ...process.env,
-        GEMINI_CLI_HOME: this.homeDir!,
-        ...options.env,
-      },
+      env: this._getCleanEnv(options.env),
     });
     this._spawnedProcesses.push(child);
 
@@ -661,6 +716,7 @@ export class TestRig {
 
       child.on('close', (code: number) => {
         clearTimeout(timer);
+        this._lastRunStderr = stderr;
         if (code === 0) {
           this._lastRunStdout = stdout;
           const result = this._filterPodmanTelemetry(stdout);
@@ -1179,11 +1235,7 @@ export class TestRig {
     ]);
     const commandArgs = [...initialArgs];
 
-    const envVars = {
-      ...process.env,
-      GEMINI_CLI_HOME: this.homeDir!,
-      ...options?.env,
-    };
+    const envVars = this._getCleanEnv(options?.env);
 
     const ptyOptions: pty.IPtyForkOptions = {
       name: 'xterm-color',
