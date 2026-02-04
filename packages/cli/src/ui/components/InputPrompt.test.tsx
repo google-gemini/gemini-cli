@@ -3893,6 +3893,36 @@ describe('InputPrompt', () => {
       expect(buffer.togglePasteExpansion).toHaveBeenCalledWith(id, 1, 0);
     });
 
+    it('expands placeholder when cursor is immediately after it (natural position after paste)', () => {
+      const id = '[Pasted Text: 6 lines]';
+      const buffer = {
+        cursor: [0, id.length], // Cursor immediately after placeholder
+        pastedContent: { [id]: 'content' },
+        transformationsByLine: [
+          [
+            {
+              logStart: 0,
+              logEnd: id.length,
+              logicalText: id,
+              collapsedText: id,
+              type: 'paste',
+              id,
+            },
+          ],
+        ],
+        expandedPaste: null,
+        getExpandedPasteAtLine: vi.fn().mockReturnValue(null),
+        togglePasteExpansion: vi.fn(),
+      } as unknown as TextBuffer;
+
+      expect(tryTogglePasteExpansion(buffer)).toBe(true);
+      expect(buffer.togglePasteExpansion).toHaveBeenCalledWith(
+        id,
+        0,
+        id.length,
+      );
+    });
+
     it('shows hint when cursor is not on placeholder but placeholders exist', () => {
       const id = '[Pasted Text: 6 lines]';
       const buffer = {

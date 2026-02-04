@@ -163,14 +163,25 @@ export function tryTogglePasteExpansion(
     return true;
   }
 
-  // 2. Check if cursor is inside an expanded paste region — collapse it
+  // 2. Check if cursor is immediately after a paste placeholder (natural position after paste)
+  const transforms = buffer.transformationsByLine[row];
+  if (transforms) {
+    for (const t of transforms) {
+      if (t.type === 'paste' && t.id && col === t.logEnd) {
+        buffer.togglePasteExpansion(t.id, row, col);
+        return true;
+      }
+    }
+  }
+
+  // 3. Check if cursor is inside an expanded paste region — collapse it
   const expandedId = buffer.getExpandedPasteAtLine(row);
   if (expandedId) {
     buffer.togglePasteExpansion(expandedId, row, col);
     return true;
   }
 
-  // 3. Placeholders exist but cursor isn't on one — show hint
+  // 4. Placeholders exist but cursor isn't on one — show hint
   onHintMessage?.('Move cursor within placeholder to expand');
   return true;
 }
