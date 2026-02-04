@@ -106,7 +106,7 @@ jobs:
 
             1.  **Extract Repository Information:** The repository is ${{ github.repository }}.
             2.  **Refresh Embeddings:** Call the `refresh` tool with the correct `repo`. Do not use the `force` parameter.
-            3.  **Log Output:** Use the `echo` command to print the JSON output from the `refresh` tool to the logs.
+            3.  **Log Output:** After the `refresh` tool completes, use the `echo` command to print the tool's JSON output to the logs.
 
             ## Guidelines
 
