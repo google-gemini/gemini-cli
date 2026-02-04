@@ -146,8 +146,8 @@ it yourself; just report it.
 | `tools`        | array  | No       | List of tool names this agent can use. If omitted, it may have access to a default set.                                    |
 | `model`        | string | No       | Specific model to use (e.g., `gemini-2.5-pro`). Defaults to `inherit` (uses the main session model).                       |
 | `temperature`  | number | No       | Model temperature (0.0 - 2.0).                                                                                             |
-| `max_turns`    | number | No       | Maximum number of conversation turns allowed for this agent before it must return.                                         |
-| `timeout_mins` | number | No       | Maximum execution time in minutes.                                                                                         |
+| `max_turns`    | number | No       | Maximum number of conversation turns allowed for this agent before it must return. Defaults to `15`.                       |
+| `timeout_mins` | number | No       | Maximum execution time in minutes. Defaults to `5`.                                                                        |
 
 ### Optimizing your sub-agent
 

@@ -10,10 +10,8 @@ import type {
   ToolCallConfirmationDetails,
   Config,
 } from '@google/gemini-cli-core';
-import {
-  renderWithProviders,
-  createMockSettings,
-} from '../../../test-utils/render.js';
+import { renderWithProviders } from '../../../test-utils/render.js';
+import { createMockSettings } from '../../../test-utils/settings.js';
 import { useToolActions } from '../../contexts/ToolActionsContext.js';
 
 vi.mock('../../contexts/ToolActionsContext.js', async (importOriginal) => {

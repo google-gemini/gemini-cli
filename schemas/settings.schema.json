@@ -1314,8 +1314,8 @@
             "enabled": {
               "title": "Folder Trust",
               "description": "Setting to track whether Folder trust is enabled.",
-              "markdownDescription": "Setting to track whether Folder trust is enabled.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
-              "default": false,
+              "markdownDescription": "Setting to track whether Folder trust is enabled.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
               "type": "boolean"
             }
           },
