@@ -166,9 +166,9 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
   };
 
   if (policy === 'USUALLY_PASSES' && !process.env['RUN_EVALS']) {
-    it.skip(evalCase.name, fn);
+    it.skip(evalCase.name, fn, evalCase.timeout);
   } else {
-    it(evalCase.name, fn);
+    it(evalCase.name, fn, evalCase.timeout);
   }
 }
 

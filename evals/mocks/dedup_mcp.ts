@@ -53,82 +53,83 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
 }));
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  if (request.params.name === 'duplicates') {
-    const issueNumber = request.params.arguments?.issue_number;
+  switch (request.params.name) {
+    case 'duplicates': {
+      const issueNumber = request.params.arguments?.issue_number;
 
-    // Logic to return different results based on issue number
-    if (issueNumber === 101) {
+      // Logic to return different results based on issue number
+      switch (issueNumber) {
+        case 101:
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify([
+                  { number: 201, similarity: 0.95 },
+                  { number: 202, similarity: 0.85 },
+                ]),
+              },
+            ],
+          };
+
+        // Edge Case: False Positive / Ambiguous
+        case 301:
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify([
+                  { number: 302, similarity: 0.88 }, // High similarity but different root cause
+                ]),
+              },
+            ],
+          };
+
+        // Edge Case: Low similarity (should reject)
+        case 401:
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify([{ number: 402, similarity: 0.75 }]),
+              },
+            ],
+          };
+
+        // Edge Case: Multiple duplicates
+        case 501:
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify([
+                  { number: 502, similarity: 0.92 },
+                  { number: 503, similarity: 0.91 },
+                ]),
+              },
+            ],
+          };
+
+        default:
+          return {
+            content: [{ type: 'text', text: '[]' }],
+          };
+      }
+    }
+
+    case 'refresh':
       return {
         content: [
           {
             type: 'text',
-            text: JSON.stringify([
-              { number: 201, similarity: 0.95 },
-              { number: 202, similarity: 0.85 },
-            ]),
+            text: JSON.stringify({ status: 'success', refreshed_count: 10 }),
           },
         ],
       };
-    }
 
-    // Edge Case: False Positive / Ambiguous
-    if (issueNumber === 301) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify([
-              { number: 302, similarity: 0.88 }, // High similarity but different root cause
-            ]),
-          },
-        ],
-      };
-    }
-
-    // Edge Case: Low similarity (should reject)
-    if (issueNumber === 401) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify([{ number: 402, similarity: 0.75 }]),
-          },
-        ],
-      };
-    }
-
-    // Edge Case: Multiple duplicates
-    if (issueNumber === 501) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify([
-              { number: 502, similarity: 0.92 },
-              { number: 503, similarity: 0.91 },
-            ]),
-          },
-        ],
-      };
-    }
-
-    return {
-      content: [{ type: 'text', text: '[]' }],
-    };
+    default:
+      throw new Error('Tool not found');
   }
-
-  if (request.params.name === 'refresh') {
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({ status: 'success', refreshed_count: 10 }),
-        },
-      ],
-    };
-  }
-
-  throw new Error('Tool not found');
 });
 
 const transport = new StdioServerTransport();
