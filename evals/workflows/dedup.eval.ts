@@ -40,12 +40,14 @@ const createPrompt = (issueNumber: number) => {
   ).replace(/\${{ github\.event\.issue\.number }}/g, issueNumber.toString());
 };
 
+const tsxPath = path.join(process.cwd(), 'node_modules', '.bin', 'tsx');
+
 const DEDUP_SETTINGS = {
   ...ORIGINAL_SETTINGS,
   mcpServers: {
     issue_deduplication: {
-      command: 'npx',
-      args: ['tsx', mockMcpPath],
+      command: tsxPath,
+      args: [mockMcpPath],
     },
   },
 };
