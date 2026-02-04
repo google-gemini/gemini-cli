@@ -88,11 +88,6 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
   override async shouldConfirmExecute(
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    if (this.definition.kind !== 'remote') {
-      // Local agents should execute without confirmation. Inner tool calls will bubble up their own confirmations to the user.
-      return false;
-    }
-
     const invocation = this.buildSubInvocation(this.definition, this.params);
     return invocation.shouldConfirmExecute(abortSignal);
   }
