@@ -37,9 +37,10 @@ export type EvalPolicy = 'ALWAYS_PASSES' | 'USUALLY_PASSES';
 
 export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
   const fn = async () => {
-    const rig = new TestRig();
+    const rig = new TestRig() as any;
     const { logDir, sanitizedName } = await prepareLogDir(evalCase.name);
     const activityLogFile = path.join(logDir, `${sanitizedName}.jsonl`);
+    rig._activityLogFile = activityLogFile;
     const logFile = path.join(logDir, `${sanitizedName}.log`);
     let isSuccess = false;
     try {
@@ -53,6 +54,9 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
           const fullPath = path.join(rig.testDir!, filePath);
           fs.mkdirSync(path.dirname(fullPath), { recursive: true });
           fs.writeFileSync(fullPath, content);
+          if (filePath.startsWith('bin/')) {
+            fs.chmodSync(fullPath, 0o755);
+          }
 
           // If it's an agent file, calculate hash for acknowledgement
           if (
@@ -118,6 +122,8 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
         timeout: evalCase.timeout,
         env: {
           GEMINI_CLI_ACTIVITY_LOG_FILE: activityLogFile,
+          PATH: `${path.join(rig.testDir!, 'bin')}${path.delimiter}${process.env.PATH}`,
+          ...evalCase.env,
         },
       });
 
@@ -168,8 +174,9 @@ async function prepareLogDir(name: string) {
 export interface EvalCase {
   name: string;
   params?: Record<string, any>;
-  prompt: string;
+  prompt: string | string[];
   timeout?: number;
+  env?: Record<string, string>;
   files?: Record<string, string>;
   approvalMode?: 'default' | 'auto_edit' | 'yolo' | 'plan';
   assert: (rig: TestRig, result: string) => Promise<void>;

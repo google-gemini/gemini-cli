@@ -257,6 +257,13 @@ jobs:
             area/unknown
             - Description: Issues that do not clearly fit into any other defined area/ category, or where information is too limited to make a determination. Use this when no other area is appropriate.
 
+            ## Final Instructions
+
+            - Output ONLY valid JSON format.
+            - Do NOT include any introductory or concluding remarks, explanations, or additional text.
+            - Do NOT include any thoughts or reasoning outside the JSON block.
+            - Ensure the output is a single JSON object with a "labels_to_set" array.
+
       - name: 'Apply Labels to Issue'
         if: |-
           ${{ steps.gemini_issue_analysis.outputs.summary != '' }}
