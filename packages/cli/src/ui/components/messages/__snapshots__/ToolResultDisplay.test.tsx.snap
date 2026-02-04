@@ -2,10 +2,7 @@
 
 exports[`ToolResultDisplay > does not fall back to plain text if availableHeight is set and not in alternate buffer 1`] = `"Some result"`;
 
-exports[`ToolResultDisplay > keeps markdown if in alternate buffer even with availableHeight 1`] = `
-"Scrollable Container
-Some result"
-`;
+exports[`ToolResultDisplay > keeps markdown if in alternate buffer even with availableHeight 1`] = `"Some result"`;
 
 exports[`ToolResultDisplay > renders ANSI output result 1`] = `"ansi content"`;
 

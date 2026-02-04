@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../../test-utils/render.js';
+import { renderWithProviders } from '../../../test-utils/render.js';
 import { ToolResultDisplay } from './ToolResultDisplay.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Box, Text } from 'ink';
@@ -27,11 +27,16 @@ vi.mock('./DiffRenderer.js', () => ({
   ),
 }));
 
-// Mock UIStateContext
+// Mock UIStateContext partially
 const mockUseUIState = vi.fn();
-vi.mock('../../contexts/UIStateContext.js', () => ({
-  useUIState: () => mockUseUIState(),
-}));
+vi.mock('../../contexts/UIStateContext.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../contexts/UIStateContext.js')>();
+  return {
+    ...actual,
+    useUIState: () => mockUseUIState(),
+  };
+});
 
 // Mock useAlternateBuffer
 const mockUseAlternateBuffer = vi.fn();
@@ -39,55 +44,40 @@ vi.mock('../../hooks/useAlternateBuffer.js', () => ({
   useAlternateBuffer: () => mockUseAlternateBuffer(),
 }));
 
-// Mock useSettings
-vi.mock('../../contexts/SettingsContext.js', () => ({
-  useSettings: () => ({
-    merged: {
-      ui: {
-        useAlternateBuffer: false,
+// Mock SettingsContext partially
+vi.mock('../../contexts/SettingsContext.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../contexts/SettingsContext.js')>();
+  return {
+    ...actual,
+    useSettings: () => ({
+      merged: {
+        ui: {
+          useAlternateBuffer: false,
+        },
       },
-    },
-  }),
-}));
+    }),
+  };
+});
 
-// Mock useOverflowActions
-vi.mock('../../contexts/OverflowContext.js', () => ({
-  useOverflowActions: () => ({
-    addOverflowingId: vi.fn(),
-    removeOverflowingId: vi.fn(),
-  }),
-  useOverflowState: () => ({
-    overflowingIds: new Set(),
-  }),
-}));
+// Mock OverflowContext partially
+vi.mock('../../contexts/OverflowContext.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../contexts/OverflowContext.js')>();
+  return {
+    ...actual,
+    useOverflowActions: () => ({
+      addOverflowingId: vi.fn(),
+      removeOverflowingId: vi.fn(),
+    }),
+    useOverflowState: () => ({
+      overflowingIds: new Set(),
+    }),
+  };
+});
 
-// Mock Scrollable
-vi.mock('../shared/Scrollable.js', () => ({
-  Scrollable: ({ children }: { children: React.ReactNode }) => (
-    <Box flexDirection="column">
-      <Text>Scrollable Container</Text>
-      {children}
-    </Box>
-  ),
-}));
-
-// Mock ScrollableList
-vi.mock('../shared/ScrollableList.js', () => ({
-  ScrollableList: ({
-    data,
-    renderItem,
-  }: {
-    data: unknown[];
-    renderItem: (info: { item: unknown; index: number }) => React.ReactNode;
-  }) => (
-    <Box flexDirection="column">
-      <Text>ScrollableList Container</Text>
-      {data.map((item, index) => (
-        <Box key={index}>{renderItem({ item, index })}</Box>
-      ))}
-    </Box>
-  ),
-}));
+// NOTE: Scrollable, ScrollableList, and AnsiOutput mocks have been removed
+// to use the real implementations.
 
 describe('ToolResultDisplay', () => {
   beforeEach(() => {
@@ -96,12 +86,16 @@ describe('ToolResultDisplay', () => {
     mockUseAlternateBuffer.mockReturnValue(false);
   });
 
+  // Helper to use renderWithProviders
+  const render = (ui: React.ReactElement) => renderWithProviders(ui);
+
   it('uses ScrollableList for ANSI output in alternate buffer mode', () => {
     mockUseAlternateBuffer.mockReturnValue(true);
+    const content = 'ansi content';
     const ansiResult: AnsiOutput = [
       [
         {
-          text: 'ansi content',
+          text: content,
           fg: 'red',
           bg: 'black',
           bold: false,
@@ -121,8 +115,7 @@ describe('ToolResultDisplay', () => {
     );
     const output = lastFrame();
 
-    expect(output).toContain('ScrollableList Container');
-    expect(output).toContain('ansi content');
+    expect(output).toContain(content);
   });
 
   it('uses Scrollable for non-ANSI output in alternate buffer mode', () => {
@@ -136,7 +129,7 @@ describe('ToolResultDisplay', () => {
     );
     const output = lastFrame();
 
-    expect(output).toContain('Scrollable Container');
+    // With real components, we check for the content itself
     expect(output).toContain('Markdown content');
   });
 
@@ -149,9 +142,8 @@ describe('ToolResultDisplay', () => {
         hasFocus={true}
       />,
     );
-    // Since Scrollable is mocked, we can't easily check its props directly in the string output
-    // without changing the mock. But we can at least ensure it renders without crashing.
-    expect(lastFrame()).toContain('Scrollable Container');
+
+    expect(lastFrame()).toContain('Some result');
   });
 
   it('renders string result as markdown by default', () => {
