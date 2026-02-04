@@ -4,26 +4,23 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  Config,
-  ConversationRecord,
-  MessageRecord,
-} from '@google/gemini-cli-core';
 import {
+  checkExhaustive,
   partListUnionToString,
   SESSION_FILE_PREFIX,
-
-  SessionEndReason,
-  SessionStartSource,
-  flushTelemetry,
-  uiTelemetryService} from '@google/gemini-cli-core';
+  type Config,
+  type ConversationRecord,
+  type MessageRecord,
+} from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { stripUnsafeCharacters } from '../ui/utils/textUtils.js';
-import { randomUUID } from 'node:crypto';
-import { type CommandContext } from '../ui/commands/types.js';
-import { MessageType } from '../ui/types.js';
-
+import type { Part } from '@google/genai';
+import {
+  MessageType,
+  ToolCallStatus,
+  type HistoryItemWithoutId,
+} from '../ui/types.js';
 
 /**
  * Constant for the resume "latest" identifier.
@@ -524,84 +521,188 @@ export class SessionSelector {
 }
 
 /**
- * Starts a new session by:
- * 1. Firing SessionEnd event
- * 2. Resetting the chat client
- * 3. Generating a new session ID
- * 4. Initializing chat recording
- * 5. Firing SessionStart event
- * 6. Flushing telemetry
- *
- * @param context - The command context
- * @param source - The source of the session start (e.g., 'clear' or 'new') (default: 'clear' as it shares behavior)
- * @param clearScreen - Whether to clear the screen (default: false)
+ * Converts session/conversation data into UI history and Gemini client history formats.
  */
-export async function startNewSession(
-  context: CommandContext,
-  source: SessionStartSource = SessionStartSource.Clear,
-  clearScreen = false,
-): Promise<void> {
-  const geminiClient = context.services.config?.getGeminiClient();
-  const config = context.services.config;
-  const chatRecordingService = context.services.config
-    ?.getGeminiClient()
-    ?.getChat()
-    .getChatRecordingService();
+export function convertSessionToHistoryFormats(
+  messages: ConversationRecord['messages'],
+): {
+  uiHistory: HistoryItemWithoutId[];
+  clientHistory: Array<{ role: 'user' | 'model'; parts: Part[] }>;
+} {
+  const uiHistory: HistoryItemWithoutId[] = [];
 
-  // Fire SessionEnd hook before starting new session
-  await config?.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Clear);
+  for (const msg of messages) {
+    // Add the message only if it has content
+    const displayContentString = msg.displayContent
+      ? partListUnionToString(msg.displayContent)
+      : undefined;
+    const contentString = partListUnionToString(msg.content);
+    const uiText = displayContentString || contentString;
 
-  if (geminiClient) {
-    if (clearScreen) {
-      context.ui.setDebugMessage('Clearing terminal and resetting chat.');
-    } else {
-      context.ui.setDebugMessage('Resetting chat for new session.');
+    if (uiText.trim()) {
+      let messageType: MessageType;
+      switch (msg.type) {
+        case 'user':
+          messageType = MessageType.USER;
+          break;
+        case 'info':
+          messageType = MessageType.INFO;
+          break;
+        case 'error':
+          messageType = MessageType.ERROR;
+          break;
+        case 'warning':
+          messageType = MessageType.WARNING;
+          break;
+        case 'gemini':
+          messageType = MessageType.GEMINI;
+          break;
+        default:
+          checkExhaustive(msg);
+          messageType = MessageType.GEMINI;
+          break;
+      }
+
+      uiHistory.push({
+        type: messageType,
+        text: uiText,
+      });
     }
-    await geminiClient.resetChat();
-  } else if (clearScreen) {
-    context.ui.setDebugMessage('Clearing terminal.');
+
+    // Add tool calls if present
+    if (
+      msg.type !== 'user' &&
+      'toolCalls' in msg &&
+      msg.toolCalls &&
+      msg.toolCalls.length > 0
+    ) {
+      uiHistory.push({
+        type: 'tool_group',
+        tools: msg.toolCalls.map((tool) => ({
+          callId: tool.id,
+          name: tool.displayName || tool.name,
+          description: tool.description || '',
+          renderOutputAsMarkdown: tool.renderOutputAsMarkdown ?? true,
+          status:
+            tool.status === 'success'
+              ? ToolCallStatus.Success
+              : ToolCallStatus.Error,
+          resultDisplay: tool.resultDisplay,
+          confirmationDetails: undefined,
+        })),
+      });
+    }
   }
 
-  // Start a new conversation recording with a new session ID
-  if (config && chatRecordingService) {
-    const newSessionId = randomUUID();
-    config.setSessionId(newSessionId);
-    chatRecordingService.initialize();
+  // Convert to Gemini client history format
+  const clientHistory: Array<{ role: 'user' | 'model'; parts: Part[] }> = [];
+
+  for (const msg of messages) {
+    // Skip system/error messages and user slash commands
+    if (msg.type === 'info' || msg.type === 'error' || msg.type === 'warning') {
+      continue;
+    }
+
+    if (msg.type === 'user') {
+      // Skip user slash commands
+      const contentString = partListUnionToString(msg.content);
+      if (
+        contentString.trim().startsWith('/') ||
+        contentString.trim().startsWith('?')
+      ) {
+        continue;
+      }
+
+      // Add regular user message
+      clientHistory.push({
+        role: 'user',
+        parts: Array.isArray(msg.content)
+          ? (msg.content as Part[])
+          : [{ text: contentString }],
+      });
+    } else if (msg.type === 'gemini') {
+      // Handle Gemini messages with potential tool calls
+      const hasToolCalls = msg.toolCalls && msg.toolCalls.length > 0;
+
+      if (hasToolCalls) {
+        // Create model message with function calls
+        const modelParts: Part[] = [];
+
+        // Add text content if present
+        const contentString = partListUnionToString(msg.content);
+        if (msg.content && contentString.trim()) {
+          modelParts.push({ text: contentString });
+        }
+
+        // Add function calls
+        for (const toolCall of msg.toolCalls!) {
+          modelParts.push({
+            functionCall: {
+              name: toolCall.name,
+              args: toolCall.args,
+              ...(toolCall.id && { id: toolCall.id }),
+            },
+          });
+        }
+
+        clientHistory.push({
+          role: 'model',
+          parts: modelParts,
+        });
+
+        // Create single function response message with all tool call responses
+        const functionResponseParts: Part[] = [];
+        for (const toolCall of msg.toolCalls!) {
+          if (toolCall.result) {
+            // Convert PartListUnion result to function response format
+            let responseData: Part;
+
+            if (typeof toolCall.result === 'string') {
+              responseData = {
+                functionResponse: {
+                  id: toolCall.id,
+                  name: toolCall.name,
+                  response: {
+                    output: toolCall.result,
+                  },
+                },
+              };
+            } else if (Array.isArray(toolCall.result)) {
+              // toolCall.result is an array containing properly formatted
+              // function responses
+              functionResponseParts.push(...(toolCall.result as Part[]));
+              continue;
+            } else {
+              // Fallback for non-array results
+              responseData = toolCall.result;
+            }
+
+            functionResponseParts.push(responseData);
+          }
+        }
+
+        // Only add user message if we have function responses
+        if (functionResponseParts.length > 0) {
+          clientHistory.push({
+            role: 'user',
+            parts: functionResponseParts,
+          });
+        }
+      } else {
+        // Regular Gemini message without tool calls
+        const contentString = partListUnionToString(msg.content);
+        if (msg.content && contentString.trim()) {
+          clientHistory.push({
+            role: 'model',
+            parts: [{ text: contentString }],
+          });
+        }
+      }
+    }
   }
 
-  // Fire SessionStart hook after clearing
-  const result = await config?.getHookSystem()?.fireSessionStartEvent(source);
-
-  // Give the event loop a chance to process any pending telemetry operations
-  await new Promise((resolve) => setImmediate(resolve));
-
-  // Flush telemetry
-  if (config) {
-    await flushTelemetry(config);
-  }
-
-  uiTelemetryService.setLastPromptTokenCount(0);
-
-  if (clearScreen) {
-    context.ui.clear();
-  } else {
-    // Notify user if not clearing screen
-    context.ui.addItem(
-      {
-        type: MessageType.INFO,
-        text: 'Started a new chat session. Previous session saved.',
-      },
-      Date.now(),
-    );
-  }
-
-  if (result?.finalOutput?.systemMessage) {
-    context.ui.addItem(
-      {
-        type: MessageType.INFO,
-        text: result.finalOutput.systemMessage,
-      },
-      Date.now(),
-    );
-  }
+  return {
+    uiHistory,
+    clientHistory,
+  };
 }

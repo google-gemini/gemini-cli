@@ -215,14 +215,6 @@ a few things you can try in order of recommendation:
     MCP servers of their own. This should not be used as an airtight security
     mechanism.
 
-- **`autoAccept`** (boolean):
-  - **Description:** Controls whether the CLI automatically accepts and executes
-    tool calls that are considered safe (e.g., read-only operations) without
-    explicit user confirmation. If set to `true`, the CLI will bypass the
-    confirmation prompt for tools deemed safe.
-  - **Default:** `false`
-  - **Example:** `"autoAccept": true`
-
 - **`theme`** (string):
   - **Description:** Sets the visual [theme](../cli/themes.md) for Gemini CLI.
   - **Default:** `"Default"`

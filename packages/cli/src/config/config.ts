@@ -31,6 +31,7 @@ import {
   debugLogger,
   loadServerHierarchicalMemory,
   WEB_FETCH_TOOL_NAME,
+  ASK_USER_TOOL_NAME,
   getVersion,
   PREVIEW_GEMINI_MODEL_AUTO,
   type HookDefinition,
@@ -433,7 +434,7 @@ export async function loadCliConfig(
   const ideMode = settings.ide?.enabled ?? false;
 
   const folderTrust = settings.security?.folderTrust?.enabled ?? false;
-  const trustedFolder = isWorkspaceTrusted(settings)?.isTrusted ?? false;
+  const trustedFolder = isWorkspaceTrusted(settings, cwd)?.isTrusted ?? false;
 
   // Set the context filename in the server's memoryTool module BEFORE loading memory
   // TODO(b/343434939): This is a bit of a hack. The contextFileName should ideally be passed
@@ -596,6 +597,10 @@ export async function loadCliConfig(
   // In non-interactive mode, exclude tools that require a prompt.
   const extraExcludes: string[] = [];
   if (!interactive) {
+    // ask_user requires user interaction and must be excluded in all
+    // non-interactive modes, regardless of the approval mode.
+    extraExcludes.push(ASK_USER_TOOL_NAME);
+
     const defaultExcludes = [
       SHELL_TOOL_NAME,
       EDIT_TOOL_NAME,
@@ -762,6 +767,7 @@ export async function loadCliConfig(
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,
+    disableLoopDetection: settings.model?.disableLoopDetection,
     compressionThreshold: settings.model?.compressionThreshold,
     folderTrust,
     interactive,
