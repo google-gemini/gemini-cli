@@ -67,6 +67,20 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   const combinedPaddingAndBorderWidth = 4;
   const childWidth = terminalWidth - combinedPaddingAndBorderWidth;
 
+  const keyExtractor = React.useCallback(
+    (_: AnsiLine, index: number) => index.toString(),
+    [],
+  );
+
+  const renderVirtualizedAnsiLine = React.useCallback(
+    ({ item }: { item: AnsiLine }) => (
+      <Box height={1} overflow="hidden">
+        <AnsiLineText line={item} />
+      </Box>
+    ),
+    [],
+  );
+
   const truncatedResultDisplay = React.useMemo(() => {
     // Only truncate string output if not in alternate buffer mode to ensure
     // we can scroll through the full output.
@@ -116,13 +130,9 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
         <ScrollableList
           width={childWidth}
           data={truncatedResultDisplay as AnsiOutput}
-          renderItem={({ item }: { item: AnsiLine }) => (
-            <Box height={1} overflow="hidden">
-              <AnsiLineText line={item} />
-            </Box>
-          )}
+          renderItem={renderVirtualizedAnsiLine}
           estimatedItemHeight={() => 1}
-          keyExtractor={(_: AnsiLine, index: number) => index.toString()}
+          keyExtractor={keyExtractor}
           initialScrollIndex={SCROLL_TO_ITEM_END}
           hasFocus={hasFocus}
         />
