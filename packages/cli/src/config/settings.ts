@@ -360,7 +360,10 @@ export class LoadedSettings {
     }
 
     admin.secureModeEnabled = !strictModeDisabled;
-    admin.mcp = { enabled: mcpSetting?.mcpEnabled };
+    admin.mcp = {
+      enabled: mcpSetting?.mcpEnabled,
+      config: mcpSetting?.mcpConfig?.mcpServers,
+    };
     admin.extensions = {
       enabled: cliFeatureSetting?.extensionsSetting?.extensionsEnabled,
     };

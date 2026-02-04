@@ -17,6 +17,7 @@ import {
   type ExtensionLoader,
   debugLogger,
   ApprovalMode,
+  type MCPServerConfig,
 } from '@google/gemini-cli-core';
 import { loadCliConfig, parseArguments, type CliArgs } from './config.js';
 import { type Settings, createTestMergedSettings } from './settings.js';
@@ -1428,6 +1429,198 @@ describe('loadCliConfig with allowed-mcp-server-names', () => {
     const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getAllowedMcpServers()).toEqual(['server2', 'server3']);
     expect(config.getBlockedMcpServers()).toEqual([]);
+  });
+});
+
+describe('loadCliConfig with admin.mcp.config', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  const localMcpServers: Record<string, MCPServerConfig> = {
+    serverA: {
+      command: 'npx',
+      args: ['-y', '@mcp/server-a'],
+      env: { KEY: 'VALUE' },
+      cwd: '/local/cwd',
+      trust: false,
+    },
+    serverB: {
+      command: 'npx',
+      args: ['-y', '@mcp/server-b'],
+      trust: false,
+    },
+  };
+
+  const baseSettings = createTestMergedSettings({
+    mcp: { serverCommand: 'npx -y @mcp/default-server' },
+    mcpServers: localMcpServers,
+  });
+
+  it('should use local configuration if admin allowlist is empty', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings({
+      admin: {
+        ...baseSettings.admin,
+        mcp: { enabled: true, config: {} },
+      },
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    expect(config.getMcpServers()).toEqual(localMcpServers);
+    expect(config.getMcpServerCommand()).toBe('npx -y @mcp/default-server');
+  });
+
+  it('should ignore locally configured servers not present in the allowlist', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const adminAllowlist: Record<string, MCPServerConfig> = {
+      serverA: {
+        type: 'sse',
+        url: 'https://admin-server-a.com/sse',
+        trust: true,
+      },
+    };
+    const settings = createTestMergedSettings({
+      admin: {
+        ...baseSettings.admin,
+        mcp: { enabled: true, config: adminAllowlist },
+      },
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+
+    const mergedServers = config.getMcpServers();
+    expect(mergedServers).toHaveProperty('serverA');
+    expect(mergedServers).not.toHaveProperty('serverB');
+  });
+
+  it('should clear command, args, env, and cwd for present servers', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const adminAllowlist: Record<string, MCPServerConfig> = {
+      serverA: {
+        type: 'sse',
+        url: 'https://admin-server-a.com/sse',
+        trust: true,
+      },
+    };
+    const settings = createTestMergedSettings({
+      admin: {
+        ...baseSettings.admin,
+        mcp: { enabled: true, config: adminAllowlist },
+      },
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+
+    const serverA = config.getMcpServers()?.['serverA'];
+    expect(serverA).toEqual({
+      ...localMcpServers['serverA'],
+      type: 'sse',
+      url: 'https://admin-server-a.com/sse',
+      trust: true,
+      command: undefined,
+      args: undefined,
+      env: undefined,
+      cwd: undefined,
+    });
+  });
+
+  it('should not initialize a server if it is in allowlist but missing locally', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const adminAllowlist: Record<string, MCPServerConfig> = {
+      serverC: {
+        type: 'sse',
+        url: 'https://admin-server-c.com/sse',
+        trust: true,
+      },
+    };
+    const settings = createTestMergedSettings({
+      admin: {
+        ...baseSettings.admin,
+        mcp: { enabled: true, config: adminAllowlist },
+      },
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+
+    const mergedServers = config.getMcpServers();
+    expect(mergedServers).not.toHaveProperty('serverC');
+    expect(Object.keys(mergedServers || {})).toHaveLength(0);
+  });
+
+  it('should merge local fields and prefer admin tool filters', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const adminAllowlist: Record<string, MCPServerConfig> = {
+      serverA: {
+        type: 'sse',
+        url: 'https://admin-server-a.com/sse',
+        trust: true,
+        includeTools: ['admin_tool'],
+      },
+    };
+    const localMcpServersWithTools: Record<string, MCPServerConfig> = {
+      serverA: {
+        ...localMcpServers['serverA'],
+        includeTools: ['local_tool'],
+        timeout: 1234,
+      },
+    };
+    const settings = createTestMergedSettings({
+      mcpServers: localMcpServersWithTools,
+      admin: {
+        ...baseSettings.admin,
+        mcp: { enabled: true, config: adminAllowlist },
+      },
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+
+    const serverA = config.getMcpServers()?.['serverA'];
+    expect(serverA).toMatchObject({
+      timeout: 1234,
+      includeTools: ['admin_tool'],
+      type: 'sse',
+      url: 'https://admin-server-a.com/sse',
+      trust: true,
+    });
+    expect(serverA?.command).toBeUndefined();
+  });
+
+  it('should use local tool filters when admin does not define them', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const adminAllowlist: Record<string, MCPServerConfig> = {
+      serverA: {
+        type: 'sse',
+        url: 'https://admin-server-a.com/sse',
+        trust: true,
+      },
+    };
+    const localMcpServersWithTools: Record<string, MCPServerConfig> = {
+      serverA: {
+        ...localMcpServers['serverA'],
+        includeTools: ['local_tool'],
+      },
+    };
+    const settings = createTestMergedSettings({
+      mcpServers: localMcpServersWithTools,
+      admin: {
+        ...baseSettings.admin,
+        mcp: { enabled: true, config: adminAllowlist },
+      },
+    });
+    const config = await loadCliConfig(settings, 'test-session', argv);
+
+    const serverA = config.getMcpServers()?.['serverA'];
+    expect(serverA?.includeTools).toEqual(['local_tool']);
   });
 });
 
