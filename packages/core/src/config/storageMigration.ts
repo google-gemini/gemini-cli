@@ -17,7 +17,10 @@ export class StorageMigration {
    * @param oldPath The old directory path (hash-based).
    * @param newPath The new directory path (slug-based).
    */
-  static migrateDirectory(oldPath: string, newPath: string): void {
+  static async migrateDirectory(
+    oldPath: string,
+    newPath: string,
+  ): Promise<void> {
     try {
       // If the new path already exists, we consider migration done or skipped to avoid overwriting.
       // If the old path doesn't exist, there's nothing to migrate.
@@ -27,8 +30,10 @@ export class StorageMigration {
 
       // Ensure the parent directory of the new path exists
       const parentDir = path.dirname(newPath);
-      fs.mkdirSync(parentDir, { recursive: true });
-      fs.renameSync(oldPath, newPath);
+      await fs.promises.mkdir(parentDir, { recursive: true });
+
+      // Copy (safer and handles cross-device moves)
+      await fs.promises.cp(oldPath, newPath, { recursive: true });
     } catch (e) {
       debugLogger.debug(
         `Storage Migration: Failed to move ${oldPath} to ${newPath}:`,

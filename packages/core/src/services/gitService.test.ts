@@ -20,10 +20,8 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import { GEMINI_DIR, homedir as pathsHomedir } from '../utils/paths.js';
 import { spawnAsync } from '../utils/shell-utils.js';
-import {
-  initMockProjectRegistry,
-  PROJECT_SLUG,
-} from '../test-utils/mockProjectRegistry.js';
+
+const PROJECT_SLUG = 'project-slug';
 
 vi.mock('../utils/shell-utils.js', () => ({
   spawnAsync: vi.fn(),
@@ -128,7 +126,6 @@ describe('GitService', () => {
     hoistedMockCommit.mockResolvedValue({
       commit: 'initial',
     });
-    initMockProjectRegistry();
     storage = new Storage(projectRoot);
   });
 
@@ -179,7 +176,7 @@ describe('GitService', () => {
     let repoDir: string;
     let gitConfigPath: string;
 
-    beforeEach(() => {
+    beforeEach(async () => {
       repoDir = path.join(homedir, GEMINI_DIR, 'history', PROJECT_SLUG);
       gitConfigPath = path.join(repoDir, '.gitconfig');
     });

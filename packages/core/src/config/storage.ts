@@ -21,6 +21,7 @@ const AGENTS_DIR_NAME = '.agents';
 export class Storage {
   private readonly targetDir: string;
   private projectIdentifier: string | undefined;
+  private initPromise: Promise<void> | undefined;
 
   constructor(targetDir: string) {
     this.targetDir = targetDir;
@@ -151,48 +152,59 @@ export class Storage {
 
   private getProjectIdentifier(): string {
     if (!this.projectIdentifier) {
-      // Lazily initialize.
-      this.initialize();
+      throw new Error('Storage must be initialized before use');
     }
-    return this.projectIdentifier!;
+    return this.projectIdentifier;
   }
 
   /**
    * Initializes storage by setting up the project registry and performing migrations.
    */
-  private initialize(): void {
-    const registryPath = path.join(
-      Storage.getGlobalGeminiDir(),
-      'projects.json',
-    );
-    const registry = new ProjectRegistry(registryPath, [
-      Storage.getGlobalTempDir(),
-      path.join(Storage.getGlobalGeminiDir(), 'history'),
-    ]);
-    registry.initialize();
+  async initialize(): Promise<void> {
+    if (this.initPromise) {
+      return this.initPromise;
+    }
 
-    this.projectIdentifier = registry.getShortId(this.getProjectRoot());
-    this.performMigration();
+    this.initPromise = (async () => {
+      if (this.projectIdentifier) {
+        return;
+      }
+
+      const registryPath = path.join(
+        Storage.getGlobalGeminiDir(),
+        'projects.json',
+      );
+      const registry = new ProjectRegistry(registryPath, [
+        Storage.getGlobalTempDir(),
+        path.join(Storage.getGlobalGeminiDir(), 'history'),
+      ]);
+      await registry.initialize();
+
+      this.projectIdentifier = await registry.getShortId(this.getProjectRoot());
+      await this.performMigration();
+    })();
+
+    return this.initPromise;
   }
 
   /**
    * Performs migration of legacy hash-based directories to the new slug-based format.
    * This is called internally by initialize().
    */
-  private performMigration(): void {
+  private async performMigration(): Promise<void> {
     const shortId = this.getProjectIdentifier();
     const oldHash = this.getFilePathHash(this.getProjectRoot());
 
     // Migrate Temp Dir
     const newTempDir = path.join(Storage.getGlobalTempDir(), shortId);
     const oldTempDir = path.join(Storage.getGlobalTempDir(), oldHash);
-    StorageMigration.migrateDirectory(oldTempDir, newTempDir);
+    await StorageMigration.migrateDirectory(oldTempDir, newTempDir);
 
     // Migrate History Dir
     const historyDir = path.join(Storage.getGlobalGeminiDir(), 'history');
     const newHistoryDir = path.join(historyDir, shortId);
     const oldHistoryDir = path.join(historyDir, oldHash);
-    StorageMigration.migrateDirectory(oldHistoryDir, newHistoryDir);
+    await StorageMigration.migrateDirectory(oldHistoryDir, newHistoryDir);
   }
 
   getHistoryDir(): string {

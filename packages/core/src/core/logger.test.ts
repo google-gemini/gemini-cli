@@ -28,11 +28,8 @@ import type { Content } from '@google/genai';
 import os from 'node:os';
 import { GEMINI_DIR } from '../utils/paths.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import {
-  initMockProjectRegistry,
-  PROJECT_SLUG,
-} from 'src/test-utils/mockProjectRegistry.js';
 
+const PROJECT_SLUG = 'project-slug';
 const TMP_DIR_NAME = 'tmp';
 const LOG_FILE_NAME = 'logs.json';
 const CHECKPOINT_FILE_NAME = 'checkpoint.json';
@@ -80,7 +77,6 @@ describe('Logger', () => {
 
   beforeEach(async () => {
     vi.resetAllMocks();
-    initMockProjectRegistry();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2025-01-01T12:00:00.000Z'));
     // Clean up before the test
