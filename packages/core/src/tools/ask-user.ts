@@ -90,7 +90,7 @@ export class AskUserTool extends BaseDeclarativeTool<
                 placeholder: {
                   type: 'string',
                   description:
-                    "Only applies when type='text'. Hint text shown in the input field.",
+                    "Hint text shown in the input field. For type='text', shown in the main input. For type='choice', shown in the 'Other' custom input.",
                 },
               },
             },

@@ -21,7 +21,7 @@ import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
-import { DISCOVERED_TOOL_PREFIX } from './tool-names.js';
+import { DISCOVERED_TOOL_PREFIX, TOOL_LEGACY_ALIASES } from './tool-names.js';
 
 type ToolParams = Record<string, unknown>;
 
@@ -531,6 +531,18 @@ export class ToolRegistry {
    */
   getTool(name: string): AnyDeclarativeTool | undefined {
     let tool = this.allKnownTools.get(name);
+
+    // If not found, check legacy aliases
+    if (!tool && TOOL_LEGACY_ALIASES[name]) {
+      const currentName = TOOL_LEGACY_ALIASES[name];
+      tool = this.allKnownTools.get(currentName);
+      if (tool) {
+        debugLogger.debug(
+          `Resolved legacy tool name "${name}" to current name "${currentName}"`,
+        );
+      }
+    }
+
     if (!tool && name.includes('__')) {
       for (const t of this.allKnownTools.values()) {
         if (t instanceof DiscoveredMCPTool) {

@@ -18,7 +18,7 @@ import {
   type IndividualToolCallDisplay,
 } from '../types.js';
 
-import { checkExhaustive } from '../../utils/checks.js';
+import { checkExhaustive } from '@google/gemini-cli-core';
 
 export function mapCoreStatusToDisplayStatus(
   coreStatus: CoreStatus,

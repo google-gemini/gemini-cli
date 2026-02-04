@@ -197,9 +197,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     reverseSearchActive,
   );
 
+  const reversedUserMessages = useMemo(
+    () => [...userMessages].reverse(),
+    [userMessages],
+  );
+
   const commandSearchCompletion = useReverseSearchCompletion(
     buffer,
-    userMessages,
+    reversedUserMessages,
     commandSearchActive,
   );
 
@@ -479,6 +484,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       // focused.
       /// We want to handle paste even when not focused to support drag and drop.
       if (!focus && key.name !== 'paste') {
+        return false;
+      }
+
+      if (
+        key.name === 'escape' &&
+        (streamingState === StreamingState.Responding ||
+          streamingState === StreamingState.WaitingForConfirmation)
+      ) {
         return false;
       }
 
@@ -977,6 +990,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       backgroundShells.size,
       backgroundShellHeight,
       history,
+      streamingState,
     ],
   );
 

@@ -11,10 +11,11 @@ import { URL } from 'node:url';
 import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
 import type { OAuthToken } from './token-storage/types.js';
 import { MCPOAuthTokenStorage } from './oauth-token-storage.js';
-import { getErrorMessage } from '../utils/errors.js';
+import { getErrorMessage, FatalCancellationError } from '../utils/errors.js';
 import { OAuthUtils, ResourceMismatchError } from './oauth-utils.js';
 import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { getConsentForOauth } from '../utils/authConsent.js';
 
 export const OAUTH_DISPLAY_MESSAGE_EVENT = 'oauth-display-message' as const;
 
@@ -898,8 +899,14 @@ export class MCPOAuthProvider {
       mcpServerUrl,
     );
 
-    displayMessage(`Authentication required for MCP Server: '${serverName}'
-→ Opening your browser for OAuth sign-in...
+    const userConsent = await getConsentForOauth(
+      `Authentication required for MCP Server: '${serverName}.'`,
+    );
+    if (!userConsent) {
+      throw new FatalCancellationError('Authentication cancelled by user.');
+    }
+
+    displayMessage(`→ Opening your browser for OAuth sign-in...
 
 If the browser does not open, copy and paste this URL into your browser:
 ${authUrl}

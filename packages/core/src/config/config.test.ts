@@ -2087,8 +2087,7 @@ describe('Config Quota & Preview Model Access', () => {
       await config.refreshAuth(AuthType.USE_GEMINI);
 
       expect(config.getUserTier()).toBe(mockTier);
-      // TODO(#1275): User tier name is disabled until re-enabled.
-      expect(config.getUserTierName()).toBeUndefined();
+      expect(config.getUserTierName()).toBe(mockTierName);
     });
   });
 

@@ -4,10 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  renderWithProviders,
-  createMockSettings,
-} from '../../test-utils/render.js';
+import { renderWithProviders } from '../../test-utils/render.js';
+import { createMockSettings } from '../../test-utils/settings.js';
 import { waitFor } from '../../test-utils/async.js';
 import { act, useState } from 'react';
 import type { InputPromptProps } from './InputPrompt.js';
@@ -2774,6 +2772,23 @@ describe('InputPrompt', () => {
         expect(frame).not.toContain('←');
       });
       unmount();
+    });
+
+    it('ensures Ctrl+R search results are prioritized newest-to-oldest by reversing userMessages', async () => {
+      props.shellModeActive = false;
+      props.userMessages = ['oldest', 'middle', 'newest'];
+
+      renderWithProviders(<InputPrompt {...props} />);
+
+      const calls = vi.mocked(useReverseSearchCompletion).mock.calls;
+      const commandSearchCall = calls.find(
+        (call) =>
+          call[1] === props.userMessages ||
+          (Array.isArray(call[1]) && call[1][0] === 'newest'),
+      );
+
+      expect(commandSearchCall).toBeDefined();
+      expect(commandSearchCall![1]).toEqual(['newest', 'middle', 'oldest']);
     });
   });
 

@@ -203,6 +203,23 @@ with the actual Gemini CLI process, which inherits the environment variable.
 This makes it significantly more difficult for a user to bypass the enforced
 settings.
 
+## User isolation in shared environments
+
+In shared compute environments (like ML experiment runners or shared build
+servers), you can isolate Gemini CLI state by overriding the user's home
+directory.
+
+By default, Gemini CLI stores configuration and history in `~/.gemini`. You can
+use the `GEMINI_CLI_HOME` environment variable to point to a unique directory
+for a specific user or job. The CLI will create a `.gemini` folder inside the
+specified path.
+
+```bash
+# Isolate state for a specific job
+export GEMINI_CLI_HOME="/tmp/gemini-job-123"
+gemini
+```
+
 ## Restricting tool access
 
 You can significantly enhance security by controlling which tools the Gemini
