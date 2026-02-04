@@ -1503,15 +1503,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
         keyMatchers[Command.FOCUS_SHELL_INPUT](key) &&
         (activePtyId || (isBackgroundShellVisible && backgroundShells.size > 0))
       ) {
-        if (key.name === 'tab' && key.shift) {
-          // Always change focus
-          setEmbeddedShellFocused(false);
-          return true;
-        }
-
         if (embeddedShellFocused) {
           handleWarning('Press Shift+Tab to focus out.');
-          return true;
+          return false;
         }
 
         const now = Date.now();
@@ -1547,6 +1541,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
         // Not idle, just focus it
         setEmbeddedShellFocused(true);
         return true;
+      } else if (keyMatchers[Command.UNFOCUS_SHELL_INPUT](key)) {
+        if (embeddedShellFocused) {
+          setEmbeddedShellFocused(false);
+          return true;
+        }
+        return false;
       } else if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL](key)) {
         if (activePtyId) {
           backgroundCurrentShell();

@@ -10,6 +10,8 @@ import { ShellInputPrompt } from '../ShellInputPrompt.js';
 import { StickyHeader } from '../StickyHeader.js';
 import { useUIActions } from '../../contexts/UIActionsContext.js';
 import { useMouseClick } from '../../hooks/useMouseClick.js';
+import { useKeypress } from '../../hooks/useKeypress.js';
+import { Command, keyMatchers } from '../../keyMatchers.js';
 import { ToolResultDisplay } from './ToolResultDisplay.js';
 import {
   ToolStatusIndicator,
@@ -88,6 +90,17 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   useMouseClick(headerRef, handleFocus, { isActive: !!isThisShellFocusable });
 
   useMouseClick(contentRef, handleFocus, { isActive: !!isThisShellFocusable });
+
+  useKeypress(
+    (key) => {
+      if (keyMatchers[Command.FOCUS_SHELL_INPUT](key)) {
+        handleFocus();
+        return true;
+      }
+      return false;
+    },
+    { isActive: !!isThisShellFocusable && !isThisShellFocused },
+  );
 
   const wasFocusedRef = React.useRef(false);
 

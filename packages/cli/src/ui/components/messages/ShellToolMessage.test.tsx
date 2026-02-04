@@ -162,7 +162,7 @@ describe('<ShellToolMessage />', () => {
 
       // Verify it is initially focused
       await waitFor(() => {
-        expect(lastFrame()).toContain('(Focused)');
+        expect(lastFrame()).toContain('(Shift+Tab to unfocus)');
       });
 
       // Now update status to Success

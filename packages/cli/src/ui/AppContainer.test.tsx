@@ -1940,6 +1940,38 @@ describe('AppContainer State Management', () => {
         unmount();
       });
     });
+
+    describe('Focus Handling (Tab / Shift+Tab)', () => {
+      beforeEach(() => {
+        // Mock activePtyId to enable focus
+        mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
+          activePtyId: 1,
+        });
+      });
+
+      it('should focus shell input on Tab', async () => {
+        await setupKeypressTest();
+
+        pressKey({ name: 'tab', shift: false });
+
+        expect(capturedUIState.embeddedShellFocused).toBe(true);
+        unmount();
+      });
+
+      it('should unfocus shell input on Shift+Tab', async () => {
+        await setupKeypressTest();
+
+        // Focus first
+        pressKey({ name: 'tab', shift: false });
+        expect(capturedUIState.embeddedShellFocused).toBe(true);
+
+        // Unfocus via Shift+Tab
+        pressKey({ name: 'tab', shift: true });
+        expect(capturedUIState.embeddedShellFocused).toBe(false);
+        unmount();
+      });
+    });
   });
 
   describe('Copy Mode (CTRL+S)', () => {

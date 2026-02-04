@@ -117,7 +117,7 @@ export const FocusHint: React.FC<{
   return (
     <Box marginLeft={1} flexShrink={0}>
       <Text color={theme.text.accent}>
-        {isThisShellFocused ? '(Focused)' : '(tab to focus)'}
+        {isThisShellFocused ? '(Shift+Tab to unfocus)' : '(tab to focus)'}
       </Text>
     </Box>
   );

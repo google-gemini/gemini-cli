@@ -188,7 +188,7 @@ export const BackgroundShellDisplay = ({
       }
 
       if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL](key)) {
-        return true;
+        return false;
       }
 
       if (keyMatchers[Command.KILL_BACKGROUND_SHELL](key)) {

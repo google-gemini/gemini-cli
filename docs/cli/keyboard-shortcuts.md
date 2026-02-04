@@ -115,7 +115,7 @@ available combinations.
 | Tab                                                                                                   | `Tab (no Shift)`           |
 | Tab                                                                                                   | `Tab (no Shift)`           |
 | Focus the shell input from the gemini input.                                                          | `Tab (no Shift)`           |
-| Focus the Gemini input from the shell input.                                                          | `Tab`                      |
+| Focus the Gemini input from the shell input.                                                          | `Shift + Tab`              |
 | Clear the terminal screen and redraw the UI.                                                          | `Ctrl + L`                 |
 | Restart the application.                                                                              | `R`                        |
 | Suspend the application (not yet implemented).                                                        | `Ctrl + Z`                 |
