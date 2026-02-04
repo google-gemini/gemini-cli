@@ -16,7 +16,7 @@ const GUI_EDITORS = [
   'zed',
   'antigravity',
 ] as const;
-const TERMINAL_EDITORS = ['vim', 'neovim', 'emacs', 'hx'] as const;
+const TERMINAL_EDITORS = ['vim', 'neovim', 'emacs', 'hx', 'kak'] as const;
 const EDITORS = [...GUI_EDITORS, ...TERMINAL_EDITORS] as const;
 
 const GUI_EDITORS_SET = new Set<string>(GUI_EDITORS);
@@ -50,6 +50,7 @@ export const EDITOR_DISPLAY_NAMES: Record<EditorType, string> = {
   emacs: 'Emacs',
   antigravity: 'Antigravity',
   hx: 'Helix',
+  kak: 'Kakoune',
 };
 
 export function getEditorDisplayName(editor: EditorType): string {
@@ -106,6 +107,7 @@ const editorCommands: Record<
     default: ['agy', 'antigravity'],
   },
   hx: { win32: ['hx'], default: ['hx'] },
+  kak: { win32: ['kak'], default: ['kak'] },
 };
 
 export function checkHasEditorType(editor: EditorType): boolean {

@@ -79,6 +79,7 @@ describe('editor utils', () => {
         win32Commands: ['agy.cmd', 'antigravity.cmd', 'antigravity'],
       },
       { editor: 'hx', commands: ['hx'], win32Commands: ['hx'] },
+      { editor: 'kak', commands: ['kak'], win32Commands: ['kak'] },
     ];
 
     for (const { editor, commands, win32Commands } of testCases) {
@@ -466,6 +467,15 @@ describe('editor utils', () => {
       expect(allowEditorTypeInSandbox('hx')).toBe(true);
     });
 
+    it('should allow kak in sandbox mode', () => {
+      vi.stubEnv('SANDBOX', 'sandbox');
+      expect(allowEditorTypeInSandbox('kak')).toBe(true);
+    });
+
+    it('should allow kak when not in sandbox mode', () => {
+      expect(allowEditorTypeInSandbox('kak')).toBe(true);
+    });
+
     const guiEditors: EditorType[] = [
       'vscode',
       'vscodium',
@@ -540,6 +550,12 @@ describe('editor utils', () => {
       (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/nvim'));
       vi.stubEnv('SANDBOX', 'sandbox');
       expect(isEditorAvailable('neovim')).toBe(true);
+    });
+
+    it('should return true for kak when installed and in sandbox mode', () => {
+      (execSync as Mock).mockReturnValue(Buffer.from('/usr/bin/kak'));
+      vi.stubEnv('SANDBOX', 'sandbox');
+      expect(isEditorAvailable('kak')).toBe(true);
     });
   });
 });
