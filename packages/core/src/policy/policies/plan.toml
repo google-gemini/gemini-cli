@@ -31,6 +31,7 @@
 decision = "deny"
 priority = 20
 modes = ["plan"]
+deny_message = "You are in Plan Mode - adjust your prompt to only use read and search tools."
 
 # Explicitly Allow Read-Only Tools in Plan mode.
 
@@ -41,7 +42,7 @@ priority = 50
 modes = ["plan"]
 
 [[rule]]
-toolName = "search_file_content"
+toolName = "grep_search"
 decision = "allow"
 priority = 50
 modes = ["plan"]
@@ -66,6 +67,12 @@ modes = ["plan"]
 
 [[rule]]
 toolName = "ask_user"
+decision = "ask_user"
+priority = 50
+modes = ["plan"]
+
+[[rule]]
+toolName = "exit_plan_mode"
 decision = "ask_user"
 priority = 50
 modes = ["plan"]

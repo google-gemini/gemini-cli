@@ -17,12 +17,36 @@ vi.mock('fs', async (importOriginal) => {
 });
 
 import { Storage } from './storage.js';
-import { GEMINI_DIR } from '../utils/paths.js';
+import { GEMINI_DIR, homedir } from '../utils/paths.js';
+
+vi.mock('../utils/paths.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/paths.js')>();
+  return {
+    ...actual,
+    homedir: vi.fn(actual.homedir),
+  };
+});
 
 describe('Storage – getGlobalSettingsPath', () => {
   it('returns path to ~/.gemini/settings.json', () => {
     const expected = path.join(os.homedir(), GEMINI_DIR, 'settings.json');
     expect(Storage.getGlobalSettingsPath()).toBe(expected);
+  });
+});
+
+describe('Storage - Security', () => {
+  it('falls back to tmp for gemini but returns empty for agents if the home directory cannot be determined', () => {
+    vi.mocked(homedir).mockReturnValue('');
+
+    // .gemini falls back for backward compatibility
+    expect(Storage.getGlobalGeminiDir()).toBe(
+      path.join(os.tmpdir(), GEMINI_DIR),
+    );
+
+    // .agents returns empty to avoid insecure fallback WITHOUT throwing error
+    expect(Storage.getGlobalAgentsDir()).toBe('');
+
+    vi.mocked(homedir).mockReturnValue(os.homedir());
   });
 });
 

@@ -15,11 +15,12 @@ export function isNodeError(error: unknown): error is NodeJS.ErrnoException {
 }
 
 export function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
+  const friendlyError = toFriendlyError(error);
+  if (friendlyError instanceof Error) {
+    return friendlyError.message;
   }
   try {
-    return String(error);
+    return String(friendlyError);
   } catch {
     return 'Failed to get error details';
   }

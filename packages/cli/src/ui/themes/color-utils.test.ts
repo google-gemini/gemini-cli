@@ -12,6 +12,9 @@ import {
   CSS_NAME_TO_HEX_MAP,
   INK_SUPPORTED_NAMES,
   getThemeTypeFromBackgroundColor,
+  getLuminance,
+  parseColor,
+  shouldSwitchTheme,
 } from './color-utils.js';
 
 describe('Color Utils', () => {
@@ -277,6 +280,151 @@ describe('Color Utils', () => {
     it('should handle colors without # prefix', () => {
       expect(getThemeTypeFromBackgroundColor('ffffff')).toBe('light');
       expect(getThemeTypeFromBackgroundColor('000000')).toBe('dark');
+    });
+  });
+
+  describe('getLuminance', () => {
+    it('should calculate luminance correctly', () => {
+      // White: 0.2126*255 + 0.7152*255 + 0.0722*255 = 255
+      expect(getLuminance('#ffffff')).toBeCloseTo(255);
+      // Black: 0.2126*0 + 0.7152*0 + 0.0722*0 = 0
+      expect(getLuminance('#000000')).toBeCloseTo(0);
+      // Pure Red: 0.2126*255 = 54.213
+      expect(getLuminance('#ff0000')).toBeCloseTo(54.213);
+      // Pure Green: 0.7152*255 = 182.376
+      expect(getLuminance('#00ff00')).toBeCloseTo(182.376);
+      // Pure Blue: 0.0722*255 = 18.411
+      expect(getLuminance('#0000ff')).toBeCloseTo(18.411);
+    });
+
+    it('should handle colors without # prefix', () => {
+      expect(getLuminance('ffffff')).toBeCloseTo(255);
+    });
+
+    it('should handle 3-digit hex codes', () => {
+      // #fff -> #ffffff -> 255
+      expect(getLuminance('#fff')).toBeCloseTo(255);
+      // #000 -> #000000 -> 0
+      expect(getLuminance('#000')).toBeCloseTo(0);
+      // #f00 -> #ff0000 -> 54.213
+      expect(getLuminance('#f00')).toBeCloseTo(54.213);
+    });
+  });
+
+  describe('parseColor', () => {
+    it('should parse 1-digit components', () => {
+      // F/F/F => #ffffff
+      expect(parseColor('f', 'f', 'f')).toBe('#ffffff');
+      // 0/0/0 => #000000
+      expect(parseColor('0', '0', '0')).toBe('#000000');
+    });
+
+    it('should parse 2-digit components', () => {
+      // ff/ff/ff => #ffffff
+      expect(parseColor('ff', 'ff', 'ff')).toBe('#ffffff');
+      // 80/80/80 => #808080
+      expect(parseColor('80', '80', '80')).toBe('#808080');
+    });
+
+    it('should parse 4-digit components (standard X11)', () => {
+      // ffff/ffff/ffff => #ffffff (65535/65535 * 255 = 255)
+      expect(parseColor('ffff', 'ffff', 'ffff')).toBe('#ffffff');
+      // 0000/0000/0000 => #000000
+      expect(parseColor('0000', '0000', '0000')).toBe('#000000');
+      // 7fff/7fff/7fff => approx #7f7f7f (32767/65535 * 255 = 127.498... -> 127 -> 7f)
+      expect(parseColor('7fff', '7fff', '7fff')).toBe('#7f7f7f');
+    });
+
+    it('should handle mixed case', () => {
+      expect(parseColor('FFFF', 'FFFF', 'FFFF')).toBe('#ffffff');
+      expect(parseColor('Ffff', 'fFFF', 'ffFF')).toBe('#ffffff');
+    });
+  });
+
+  describe('shouldSwitchTheme', () => {
+    const DEFAULT_THEME = 'default';
+    const DEFAULT_LIGHT_THEME = 'default-light';
+    const LIGHT_THRESHOLD = 140;
+    const DARK_THRESHOLD = 110;
+
+    it('should switch to light theme if luminance > threshold and current is default', () => {
+      // 141 > 140
+      expect(
+        shouldSwitchTheme(
+          DEFAULT_THEME,
+          LIGHT_THRESHOLD + 1,
+          DEFAULT_THEME,
+          DEFAULT_LIGHT_THEME,
+        ),
+      ).toBe(DEFAULT_LIGHT_THEME);
+
+      // Undefined current theme counts as default
+      expect(
+        shouldSwitchTheme(
+          undefined,
+          LIGHT_THRESHOLD + 1,
+          DEFAULT_THEME,
+          DEFAULT_LIGHT_THEME,
+        ),
+      ).toBe(DEFAULT_LIGHT_THEME);
+    });
+
+    it('should NOT switch to light theme if luminance <= threshold', () => {
+      // 140 <= 140
+      expect(
+        shouldSwitchTheme(
+          DEFAULT_THEME,
+          LIGHT_THRESHOLD,
+          DEFAULT_THEME,
+          DEFAULT_LIGHT_THEME,
+        ),
+      ).toBeUndefined();
+    });
+
+    it('should NOT switch to light theme if current theme is not default', () => {
+      expect(
+        shouldSwitchTheme(
+          'custom-theme',
+          LIGHT_THRESHOLD + 1,
+          DEFAULT_THEME,
+          DEFAULT_LIGHT_THEME,
+        ),
+      ).toBeUndefined();
+    });
+
+    it('should switch to dark theme if luminance < threshold and current is default light', () => {
+      // 109 < 110
+      expect(
+        shouldSwitchTheme(
+          DEFAULT_LIGHT_THEME,
+          DARK_THRESHOLD - 1,
+          DEFAULT_THEME,
+          DEFAULT_LIGHT_THEME,
+        ),
+      ).toBe(DEFAULT_THEME);
+    });
+
+    it('should NOT switch to dark theme if luminance >= threshold', () => {
+      // 110 >= 110
+      expect(
+        shouldSwitchTheme(
+          DEFAULT_LIGHT_THEME,
+          DARK_THRESHOLD,
+          DEFAULT_THEME,
+          DEFAULT_LIGHT_THEME,
+        ),
+      ).toBeUndefined();
+    });
+
+    it('should NOT switch to dark theme if current theme is not default light', () => {
+      expect(
+        shouldSwitchTheme(
+          'custom-theme',
+          DARK_THRESHOLD - 1,
+          DEFAULT_THEME,
+          DEFAULT_LIGHT_THEME,
+        ),
+      ).toBeUndefined();
     });
   });
 });
