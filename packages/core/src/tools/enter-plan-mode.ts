@@ -32,14 +32,15 @@ export class EnterPlanModeTool extends BaseDeclarativeTool<
     super(
       ENTER_PLAN_MODE_TOOL_NAME,
       'Enter Plan Mode',
-      'Switch to Plan Mode to safely research, design, and plan complex changes using read-only tools before starting implementation.',
+      'Switch to Plan Mode to safely research, design, and plan complex changes using read-only tools.',
       Kind.Plan,
       {
         type: 'object',
         properties: {
           reason: {
             type: 'string',
-            description: 'Optional reason for entering plan mode.',
+            description:
+              'Short reason explaining why you are entering plan mode.',
           },
         },
       },
