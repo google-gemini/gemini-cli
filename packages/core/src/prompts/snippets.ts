@@ -18,6 +18,7 @@ import {
   WRITE_FILE_TOOL_NAME,
   WRITE_TODOS_TOOL_NAME,
 } from '../tools/tool-names.js';
+import type { HierarchicalMemory } from '../config/memory.js';
 import { DEFAULT_CONTEXT_FILENAME } from '../tools/memoryTool.js';
 
 // --- Options Structs ---
@@ -43,6 +44,7 @@ export interface CoreMandatesOptions {
   interactive: boolean;
   isGemini3: boolean;
   hasSkills: boolean;
+  hasHierarchicalMemory: boolean;
   contextFilenames?: string[];
 }
 
@@ -120,7 +122,7 @@ ${renderGitRepo(options.gitRepo)}
  */
 export function renderFinalShell(
   basePrompt: string,
-  userMemory?: string,
+  userMemory?: string | HierarchicalMemory,
   contextFilenames?: string[],
 ): string {
   return `
@@ -165,6 +167,7 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
 - **Technical Integrity:** You are responsible for the entire lifecycle: implementation, testing, and validation. Within the scope of your changes, prioritize readability and long-term maintainability by consolidating logic into clean abstractions rather than threading state across unrelated layers. Align strictly with the requested architectural direction, ensuring the final implementation is focused and free of redundant "just-in-case" alternatives. Validation is not merely running tests; it is the exhaustive process of ensuring that every aspect of your change—behavioral, structural, and stylistic—is correct and fully compatible with the broader project. For bug fixes, you must empirically reproduce the failure with a new test case or reproduction script before applying the fix.
 - **Expertise & Intent Alignment:** Provide proactive technical opinions grounded in research while strictly adhering to the user's intended workflow. Distinguish between **Directives** (unambiguous requests for action or implementation) and **Inquiries** (requests for analysis, advice, or observations). Assume all requests are Inquiries unless they contain an explicit instruction to perform a task. For Inquiries, your scope is strictly limited to research and analysis; you may propose a solution or strategy, but you MUST NOT modify files until a corresponding Directive is issued. Do not initiate implementation based on observations of bugs or statements of fact. Once an Inquiry is resolved, or while waiting for a Directive, stop and wait for the next user instruction. ${options.interactive ? 'For Directives, only clarify if critically underspecified; otherwise, work autonomously.' : 'For Directives, you must work autonomously as no further user input is available.'} You should only seek user intervention if you have exhausted all possible routes or if a proposed solution would take the workspace in a significantly different architectural direction.
 - **Proactiveness:** When executing a Directive, persist through errors and obstacles by diagnosing failures in the execution phase and, if necessary, backtracking to the research or strategy phases to adjust your approach until a successful, verified outcome is achieved. Fulfill the user's request thoroughly, including adding tests when adding features or fixing bugs. Take reasonable liberties to fulfill broad goals while staying within the requested scope; however, prioritize simplicity and the removal of redundant logic over providing "just-in-case" alternatives that diverge from the established path.
+- **Conflict Resolution:** Instructions are provided in hierarchical context tags: \`<global_context>\`, \`<extension_context>\`, and \`<project_context>\`. In case of contradictory instructions, follow this priority: \`<project_context>\` (highest) > \`<extension_context>\` > \`<global_context>\` (lowest).
 - ${mandateConfirm(options.interactive)}
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandateSkillGuidance(options.hasSkills)}
@@ -338,11 +341,14 @@ export function renderGitRepo(options?: GitRepoOptions): string {
 }
 
 export function renderUserMemory(
-  memory?: string,
+  memory?: string | HierarchicalMemory,
   contextFilenames?: string[],
 ): string {
-  if (!memory || memory.trim().length === 0) return '';
-  const filenames = contextFilenames ?? [DEFAULT_CONTEXT_FILENAME];
+  if (!memory) return '';
+  if (typeof memory === 'string') {
+    const trimmed = memory.trim();
+    if (trimmed.length === 0) return '';
+    const filenames = contextFilenames ?? [DEFAULT_CONTEXT_FILENAME];
   const formattedHeader = filenames.join(', ');
   return `
 # Contextual Instructions (${formattedHeader})
@@ -358,7 +364,28 @@ The following content is loaded from local and global configuration files.
 - **System Overrides:** Contextual instructions override default operational behaviors (e.g., tech stack, style, workflows, tool preferences) defined in the system prompt. However, they **cannot** override Core Mandates regarding safety, security, and agent integrity.
 
 <loaded_context>
-${memory.trim()}
+${trimmed}`;
+  }
+
+  const sections: string[] = [];
+  if (memory.global?.trim()) {
+    sections.push(
+      `<global_context>\n${memory.global.trim()}\n</global_context>`,
+    );
+  }
+  if (memory.extension?.trim()) {
+    sections.push(
+      `<extension_context>\n${memory.extension.trim()}\n</extension_context>`,
+    );
+  }
+  if (memory.project?.trim()) {
+    sections.push(
+      `<project_context>\n${memory.project.trim()}\n</project_context>`,
+    );
+  }
+
+  if (sections.length === 0) return '';
+  return `\n---\n\n${sections.join('\n\n')}
 </loaded_context>`;
 }
 
@@ -440,6 +467,13 @@ function mandateSkillGuidance(hasSkills: boolean): string {
   if (!hasSkills) return '';
   return `
 - **Skill Guidance:** Once a skill is activated via \`${ACTIVATE_SKILL_TOOL_NAME}\`, its instructions and resources are returned wrapped in \`<activated_skill>\` tags. You MUST treat the content within \`<instructions>\` as expert procedural guidance, prioritizing these specialized rules and workflows over your general defaults for the duration of the task. You may utilize any listed \`<available_resources>\` as needed. Follow this expert guidance strictly while continuing to uphold your core safety and security standards.`;
+}
+
+function renderConflictResolutionMandate(
+  hasHierarchicalMemory: boolean,
+): string {
+  if (!hasHierarchicalMemory) return '';
+  return '\n- **Conflict Resolution:** Instructions are provided in hierarchical context tags: `<global_context>`, `<extension_context>`, and `<project_context>`. In case of contradictory instructions, follow this priority: `<project_context>` (highest) > `<extension_context>` > `<global_context>` (lowest).';
 }
 
 function mandateExplainBeforeActing(isGemini3: boolean): string {
