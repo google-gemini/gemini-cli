@@ -441,6 +441,7 @@ npm install -g @google/gemini-cli
   .geminiignore by @alisa-alisa in
   [#16487](https://github.com/google-gemini/gemini-cli/pull/16487)
 - feat: add review-frontend-and-fix command by @galz10 in
-  [#17707](https://github.com/google-gemini/gemini-cli/pull/17707) Full
-  Changelog:
-  https://github.com/google-gemini/gemini-cli/compare/v0.26.0...v0.27.0
+  [#17707](https://github.com/google-gemini/gemini-cli/pull/17707)
+
+**Full changelog**:
+https://github.com/google-gemini/gemini-cli/compare/v0.26.0...v0.27.0
