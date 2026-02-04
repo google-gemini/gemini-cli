@@ -800,7 +800,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`security.folderTrust.enabled`** (boolean):
   - **Description:** Setting to track whether Folder trust is enabled.
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`security.environmentVariableRedaction.allowed`** (array):
