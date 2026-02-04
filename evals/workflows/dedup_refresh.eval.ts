@@ -9,7 +9,6 @@ import { evalTest } from '../test-helper.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import yaml from 'js-yaml';
-import { WORKFLOW_TARGET_MODELS } from './constants.js';
 
 // Read the workflow file to extract the prompt and settings
 const workflowPath = path.join(
@@ -62,7 +61,6 @@ describe('dedup_refresh_agent', () => {
     params: {
       settings: REFRESH_SETTINGS,
     },
-    targetModels: WORKFLOW_TARGET_MODELS,
     assert: async (rig: any, result) => {
       // result is the JSON output
       const output = JSON.parse(result);

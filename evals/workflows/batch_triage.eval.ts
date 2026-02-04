@@ -9,7 +9,6 @@ import { evalTest } from '../test-helper.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import yaml from 'js-yaml';
-import { WORKFLOW_TARGET_MODELS } from './constants.js';
 
 // Read the workflow file to extract the prompt
 const workflowPath = path.join(
@@ -159,7 +158,6 @@ describe('batch_triage_agent', () => {
       ]),
     },
     params: { settings: BATCH_TRIAGE_SETTINGS },
-    targetModels: WORKFLOW_TARGET_MODELS,
     assert: assertHasIssueLabel(101, 'area/core'),
   });
 
@@ -177,7 +175,6 @@ describe('batch_triage_agent', () => {
       ]),
     },
     params: { settings: BATCH_TRIAGE_SETTINGS },
-    targetModels: WORKFLOW_TARGET_MODELS,
     assert: assertHasIssueLabel(102, 'area/platform'),
   });
 
@@ -200,7 +197,6 @@ describe('batch_triage_agent', () => {
       ]),
     },
     params: { settings: BATCH_TRIAGE_SETTINGS },
-    targetModels: WORKFLOW_TARGET_MODELS,
     assert: async (rig: any, result) => {
       // Assert issue 103 has area/core
       await assertHasIssueLabel(103, 'area/core')(rig, result);
@@ -223,7 +219,6 @@ describe('batch_triage_agent', () => {
       ]),
     },
     params: { settings: BATCH_TRIAGE_SETTINGS },
-    targetModels: WORKFLOW_TARGET_MODELS,
     assert: assertHasIssueLabel(105, 'status/need-retesting'),
   });
 
@@ -241,7 +236,6 @@ describe('batch_triage_agent', () => {
       ]),
     },
     params: { settings: BATCH_TRIAGE_SETTINGS },
-    targetModels: WORKFLOW_TARGET_MODELS,
     assert: assertHasIssueLabel(106, 'status/need-information'),
   });
 
@@ -259,7 +253,6 @@ describe('batch_triage_agent', () => {
       ]),
     },
     params: { settings: BATCH_TRIAGE_SETTINGS },
-    targetModels: WORKFLOW_TARGET_MODELS,
     assert: async (rig: any, result) => {
       await assertHasIssueLabel(107, 'area/core')(rig, result);
       await assertHasIssueLabel(108, 'area/platform')(rig, result);
