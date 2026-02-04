@@ -98,6 +98,17 @@ vi.mock('../ui/commands/toolsCommand.js', () => ({ toolsCommand: {} }));
 vi.mock('../ui/commands/skillsCommand.js', () => ({
   skillsCommand: { name: 'skills' },
 }));
+vi.mock('../ui/commands/planCommand.js', async () => {
+  const { CommandKind } = await import('../ui/commands/types.js');
+  return {
+    planCommand: {
+      name: 'plan',
+      description: 'Plan command',
+      kind: CommandKind.BUILT_IN,
+    },
+  };
+});
+
 vi.mock('../ui/commands/mcpCommand.js', () => ({
   mcpCommand: {
     name: 'mcp',
@@ -215,6 +226,22 @@ describe('BuiltinCommandLoader', () => {
     const commands = await loader.loadCommands(new AbortController().signal);
     const agentsCmd = commands.find((c) => c.name === 'agents');
     expect(agentsCmd).toBeDefined();
+  });
+
+  it('should include plan command when plan mode is enabled', async () => {
+    (mockConfig.isPlanEnabled as Mock).mockReturnValue(true);
+    const loader = new BuiltinCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const planCmd = commands.find((c) => c.name === 'plan');
+    expect(planCmd).toBeDefined();
+  });
+
+  it('should exclude plan command when plan mode is disabled', async () => {
+    (mockConfig.isPlanEnabled as Mock).mockReturnValue(false);
+    const loader = new BuiltinCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const planCmd = commands.find((c) => c.name === 'plan');
+    expect(planCmd).toBeUndefined();
   });
 
   it('should exclude agents command when agents are disabled', async () => {
