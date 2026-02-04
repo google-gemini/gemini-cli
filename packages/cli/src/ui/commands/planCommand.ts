@@ -36,7 +36,7 @@ export const planCommand: SlashCommand = {
     if (!approvedPlanPath) {
       coreEvents.emitFeedback(
         'error',
-        'No active plan found. Please create and approve a plan first.',
+        'No approved plan found. Please create and approve a plan first.',
       );
       return;
     }
@@ -45,7 +45,7 @@ export const planCommand: SlashCommand = {
       const content = await fs.promises.readFile(approvedPlanPath, 'utf-8');
       const fileName = path.basename(approvedPlanPath);
 
-      coreEvents.emitFeedback('info', `Active Plan: ${fileName}`);
+      coreEvents.emitFeedback('info', `Approved Plan: ${fileName}`);
 
       context.ui.addItem({
         type: MessageType.GEMINI,
@@ -54,7 +54,7 @@ export const planCommand: SlashCommand = {
     } catch (error) {
       coreEvents.emitFeedback(
         'error',
-        `Failed to read active plan at ${approvedPlanPath}: ${error}`,
+        `Failed to read approved plan at ${approvedPlanPath}: ${error}`,
         error,
       );
     }
