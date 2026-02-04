@@ -16,6 +16,7 @@ import {
 } from './agentLoader.js';
 import { GEMINI_MODEL_ALIAS_PRO } from '../config/models.js';
 import type { LocalAgentDefinition } from './types.js';
+import { DEFAULT_MAX_TIME_MINUTES, DEFAULT_MAX_TURNS } from './types.js';
 
 describe('loader', () => {
   let tempDir: string;
@@ -237,7 +238,8 @@ Body`);
           },
         },
         runConfig: {
-          maxTimeMinutes: 5,
+          maxTimeMinutes: DEFAULT_MAX_TIME_MINUTES,
+          maxTurns: DEFAULT_MAX_TURNS,
         },
         inputConfig: {
           inputSchema: {
