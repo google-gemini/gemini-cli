@@ -103,14 +103,20 @@ const assertHasLabel = (expectedLabel: string) => {
 
     // The model response JSON is in the 'response' field
     const responseText = output.response;
-    const firstBrace = responseText.indexOf('{');
-    const lastBrace = responseText.lastIndexOf('}');
-    if (firstBrace === -1 || lastBrace === -1 || lastBrace < firstBrace) {
-      throw new Error(
-        `Could not find a JSON object in the response: "${escapeHtml(responseText)}"`,
-      );
+    let jsonString: string;
+    const match = responseText.match(/```json\s*([\s\S]*?)\s*```/);
+    if (match?.[1]) {
+      jsonString = match[1];
+    } else {
+      const firstBrace = responseText.indexOf('{');
+      const lastBrace = responseText.lastIndexOf('}');
+      if (firstBrace === -1 || lastBrace === -1 || lastBrace < firstBrace) {
+        throw new Error(
+          `Could not find a JSON object in the response: "${escapeHtml(responseText)}"`,
+        );
+      }
+      jsonString = responseText.substring(firstBrace, lastBrace + 1);
     }
-    const jsonString = responseText.substring(firstBrace, lastBrace + 1);
 
     let data: { labels_to_set?: string[] };
     try {
