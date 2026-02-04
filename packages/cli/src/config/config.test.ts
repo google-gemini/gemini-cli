@@ -1469,6 +1469,7 @@ describe('loadCliConfig with admin.mcp.config', () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings({
+      mcp: baseSettings.mcp,
       mcpServers: localMcpServers,
       admin: {
         ...baseSettings.admin,
@@ -1491,6 +1492,7 @@ describe('loadCliConfig with admin.mcp.config', () => {
       },
     };
     const settings = createTestMergedSettings({
+      mcp: baseSettings.mcp,
       mcpServers: localMcpServers,
       admin: {
         ...baseSettings.admin,
