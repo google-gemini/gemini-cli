@@ -5,7 +5,11 @@
  */
 
 import * as osActual from 'node:os';
-import { FatalConfigError, ideContextStore } from '@google/gemini-cli-core';
+import {
+  FatalConfigError,
+  ideContextStore,
+  AuthType,
+} from '@google/gemini-cli-core';
 import {
   describe,
   it,
@@ -26,6 +30,9 @@ import {
   isWorkspaceTrusted,
   resetTrustedFoldersForTesting,
 } from './trustedFolders.js';
+import { loadEnvironment, getSettingsSchema } from './settings.js';
+import { createMockSettings } from '../test-utils/settings.js';
+import { validateAuthMethod } from './auth.js';
 import type { Settings } from './settings.js';
 
 vi.mock('os', async (importOriginal) => {
@@ -53,7 +60,7 @@ vi.mock('fs', async (importOriginal) => {
     readFileSync: vi.fn(),
     writeFileSync: vi.fn(),
     mkdirSync: vi.fn(),
-    realpathSync: vi.fn((p) => p),
+    realpathSync: vi.fn().mockImplementation((p) => p),
   };
 });
 vi.mock('strip-json-comments', () => ({
@@ -575,6 +582,62 @@ describe('invalid trust levels', () => {
     mockRules[mockCwd] = 'INVALID_TRUST_LEVEL' as TrustLevel;
 
     expect(() => isWorkspaceTrusted(mockSettings)).toThrow(FatalConfigError);
+  });
+});
+
+describe('Verification: Auth and Trust Interaction', () => {
+  let mockCwd: string;
+  const mockRules: Record<string, TrustLevel> = {};
+
+  beforeEach(() => {
+    vi.stubEnv('GEMINI_API_KEY', '');
+    resetTrustedFoldersForTesting();
+    vi.spyOn(process, 'cwd').mockImplementation(() => mockCwd);
+    vi.spyOn(fs, 'readFileSync').mockImplementation((p) => {
+      if (p === getTrustedFoldersPath()) {
+        return JSON.stringify(mockRules);
+      }
+      if (p === path.resolve(mockCwd, '.env')) {
+        return 'GEMINI_API_KEY=shhh-secret';
+      }
+      return '{}';
+    });
+    vi.spyOn(fs, 'existsSync').mockImplementation(
+      (p) =>
+        p === getTrustedFoldersPath() || p === path.resolve(mockCwd, '.env'),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    Object.keys(mockRules).forEach((key) => delete mockRules[key]);
+  });
+
+  it('should verify loadEnvironment returns early and validateAuthMethod fails when untrusted', () => {
+    // 1. Mock untrusted workspace
+    mockCwd = '/home/user/untrusted';
+    mockRules[mockCwd] = TrustLevel.DO_NOT_TRUST;
+
+    // 2. Load environment (should return early)
+    const settings = createMockSettings({
+      security: { folderTrust: { enabled: true } },
+    });
+    loadEnvironment(settings.merged, mockCwd);
+
+    // 3. Verify env var NOT loaded
+    expect(process.env['GEMINI_API_KEY']).toBe('');
+
+    // 4. Verify validateAuthMethod fails
+    const result = validateAuthMethod(AuthType.USE_GEMINI);
+    expect(result).toContain(
+      'you must specify the GEMINI_API_KEY environment variable',
+    );
+  });
+
+  it('should identify if sandbox flag is available in Settings', () => {
+    const schema = getSettingsSchema();
+    expect(schema.tools.properties).toBeDefined();
+    expect('sandbox' in schema.tools.properties).toBe(true);
   });
 });
 
