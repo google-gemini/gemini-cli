@@ -89,7 +89,7 @@ gemini skills enable my-expertise
 gemini skills disable my-expertise --scope workspace
 ```
 
-## How it Works (Security & Privacy)
+## How it Works
 
 1.  **Discovery**: At the start of a session, Gemini CLI scans the discovery
     tiers and injects the name and description of all enabled skills into the
@@ -105,6 +105,13 @@ gemini skills disable my-expertise --scope workspace
       it permission to read any bundled assets.
 5.  **Execution**: The model proceeds with the specialized expertise active. It
     is instructed to prioritize the skill's procedural guidance within reason.
+
+### Skill activation
+
+Once a skill is activated (typically by Gemini identifying a task that matches
+the skill's description and your approval), its specialized instructions and
+resources are loaded into the agent's context. A skill remains active and its
+guidance is prioritized for the duration of the session.
 
 ## Creating your own skills
 
