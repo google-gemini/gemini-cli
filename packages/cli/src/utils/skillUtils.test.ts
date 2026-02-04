@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { installSkill } from './skillUtils.js';
+import { installSkill, linkSkill } from './skillUtils.js';
 
 describe('skillUtils', () => {
   let tempDir: string;
@@ -22,6 +22,94 @@ describe('skillUtils', () => {
   afterEach(async () => {
     await fs.rm(tempDir, { recursive: true, force: true });
     vi.restoreAllMocks();
+  });
+
+  describe('linkSkill', () => {
+    it('should successfully link from a local directory', async () => {
+      // Create a mock skill directory
+      const mockSkillSourceDir = path.join(tempDir, 'mock-skill-source');
+      const skillSubDir = path.join(mockSkillSourceDir, 'test-skill');
+      await fs.mkdir(skillSubDir, { recursive: true });
+      await fs.writeFile(
+        path.join(skillSubDir, 'SKILL.md'),
+        '---\nname: test-skill\ndescription: test\n---\nbody',
+      );
+
+      const skills = await linkSkill(mockSkillSourceDir, 'workspace', () => {});
+      expect(skills.length).toBe(1);
+      expect(skills[0].name).toBe('test-skill');
+
+      const linkedPath = path.join(tempDir, '.gemini/skills', 'test-skill');
+      const stats = await fs.lstat(linkedPath);
+      expect(stats.isSymbolicLink()).toBe(true);
+
+      const linkTarget = await fs.readlink(linkedPath);
+      expect(path.resolve(linkTarget)).toBe(path.resolve(skillSubDir));
+    });
+
+    it('should overwrite existing skill at destination', async () => {
+      const mockSkillSourceDir = path.join(tempDir, 'mock-skill-source');
+      const skillSubDir = path.join(mockSkillSourceDir, 'test-skill');
+      await fs.mkdir(skillSubDir, { recursive: true });
+      await fs.writeFile(
+        path.join(skillSubDir, 'SKILL.md'),
+        '---\nname: test-skill\ndescription: test\n---\nbody',
+      );
+
+      const targetDir = path.join(tempDir, '.gemini/skills');
+      await fs.mkdir(targetDir, { recursive: true });
+      const existingPath = path.join(targetDir, 'test-skill');
+      await fs.mkdir(existingPath);
+
+      const skills = await linkSkill(mockSkillSourceDir, 'workspace', () => {});
+      expect(skills.length).toBe(1);
+
+      const stats = await fs.lstat(existingPath);
+      expect(stats.isSymbolicLink()).toBe(true);
+    });
+
+    it('should abort linking if consent is rejected', async () => {
+      const mockSkillSourceDir = path.join(tempDir, 'mock-skill-source');
+      const skillSubDir = path.join(mockSkillSourceDir, 'test-skill');
+      await fs.mkdir(skillSubDir, { recursive: true });
+      await fs.writeFile(
+        path.join(skillSubDir, 'SKILL.md'),
+        '---\nname: test-skill\ndescription: test\n---\nbody',
+      );
+
+      const requestConsent = vi.fn().mockResolvedValue(false);
+
+      await expect(
+        linkSkill(mockSkillSourceDir, 'workspace', () => {}, requestConsent),
+      ).rejects.toThrow('Skill linking cancelled by user.');
+
+      expect(requestConsent).toHaveBeenCalled();
+
+      // Verify it was NOT linked
+      const linkedPath = path.join(tempDir, '.gemini/skills', 'test-skill');
+      const exists = await fs.lstat(linkedPath).catch(() => null);
+      expect(exists).toBeNull();
+    });
+
+    it('should throw error if multiple skills with same name are discovered', async () => {
+      const mockSkillSourceDir = path.join(tempDir, 'mock-skill-source');
+      const skillDir1 = path.join(mockSkillSourceDir, 'skill1');
+      const skillDir2 = path.join(mockSkillSourceDir, 'skill2');
+      await fs.mkdir(skillDir1, { recursive: true });
+      await fs.mkdir(skillDir2, { recursive: true });
+      await fs.writeFile(
+        path.join(skillDir1, 'SKILL.md'),
+        '---\nname: duplicate-skill\ndescription: desc1\n---\nbody1',
+      );
+      await fs.writeFile(
+        path.join(skillDir2, 'SKILL.md'),
+        '---\nname: duplicate-skill\ndescription: desc2\n---\nbody2',
+      );
+
+      await expect(
+        linkSkill(mockSkillSourceDir, 'workspace', () => {}),
+      ).rejects.toThrow('Duplicate skill name "duplicate-skill" found');
+    });
   });
 
   it('should successfully install from a .skill file', async () => {
