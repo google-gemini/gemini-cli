@@ -11,6 +11,7 @@ import {
   useCallback,
   useMemo,
   useEffect,
+  useState,
 } from 'react';
 import type React from 'react';
 import {
@@ -49,6 +50,12 @@ function ScrollableList<T>(
   const { hasFocus, width } = props;
   const virtualizedListRef = useRef<VirtualizedListRef<T>>(null);
   const containerRef = useRef<DOMElement>(null);
+  const [containerNode, setContainerNode] = useState<DOMElement | null>(null);
+
+  const setContainerRef = useCallback((node: DOMElement | null) => {
+    (containerRef as React.MutableRefObject<DOMElement | null>).current = node;
+    setContainerNode(node);
+  }, []);
 
   useImperativeHandle(
     ref,
@@ -229,11 +236,11 @@ function ScrollableList<T>(
     ],
   );
 
-  useScrollable(scrollableEntry, hasFocus);
+  useScrollable(scrollableEntry, hasFocus && containerNode !== null);
 
   return (
     <Box
-      ref={containerRef}
+      ref={setContainerRef}
       flexGrow={1}
       flexDirection="column"
       overflow="hidden"

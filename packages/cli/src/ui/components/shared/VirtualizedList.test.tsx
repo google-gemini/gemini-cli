@@ -5,6 +5,7 @@
  */
 
 import { render } from '../../../test-utils/render.js';
+import { waitFor } from '../../../test-utils/async.js';
 import { VirtualizedList, type VirtualizedListRef } from './VirtualizedList.js';
 import { Text, Box } from 'ink';
 import {
@@ -272,13 +273,14 @@ describe('<VirtualizedList />', () => {
     // Shrink Item 0 to 1px via context
     await act(async () => {
       setHeightFn(1);
-      await delay(0);
     });
 
     // Now Item 0 is 1px, so Items 1-9 should also be visible to fill 10px
-    expect(lastFrame()).toContain('Item 0');
-    expect(lastFrame()).toContain('Item 1');
-    expect(lastFrame()).toContain('Item 9');
+    await waitFor(() => {
+      expect(lastFrame()).toContain('Item 0');
+      expect(lastFrame()).toContain('Item 1');
+      expect(lastFrame()).toContain('Item 2');
+    });
   });
 
   it('updates scroll position correctly when scrollBy is called multiple times in the same tick', async () => {

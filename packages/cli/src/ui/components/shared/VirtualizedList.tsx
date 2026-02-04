@@ -5,20 +5,19 @@
  */
 
 import {
-  useState,
   useRef,
-  useLayoutEffect,
   forwardRef,
   useImperativeHandle,
   useEffect,
   useMemo,
   useCallback,
+  useReducer,
 } from 'react';
 import type React from 'react';
 import { theme } from '../../semantic-colors.js';
 import { useBatchedScroll } from '../../hooks/useBatchedScroll.js';
 
-import { type DOMElement, measureElement, Box } from 'ink';
+import { type DOMElement, measureElement, Box, ResizeObserver } from 'ink';
 
 export const SCROLL_TO_ITEM_END = Number.MAX_SAFE_INTEGER;
 
@@ -66,6 +65,45 @@ function findLastIndex<T>(
   return -1;
 }
 
+type ScrollAnchor = { index: number; offset: number };
+
+type State = {
+  scrollAnchor: ScrollAnchor;
+  isStickingToBottom: boolean;
+  containerHeight: number;
+  heights: number[];
+  prevDataLength: number;
+  prevTotalHeight: number;
+  prevScrollTop: number;
+  prevContainerHeight: number;
+  isInitialScrollSet: boolean;
+};
+
+type Action =
+  | { type: 'SET_CONTAINER_HEIGHT'; height: number }
+  | {
+      type: 'UPDATE_ITEM_HEIGHTS';
+      updates: Array<{ index: number; height: number }>;
+    }
+  | { type: 'SYNC_SCROLL' }
+  | {
+      type: 'SET_DATA';
+      dataLength: number;
+      estimatedItemHeight: (index: number) => number;
+    }
+  | { type: 'SCROLL_TO'; anchor: ScrollAnchor; sticking?: boolean };
+
+function getAnchorForScrollTop(
+  scrollTop: number,
+  offsets: number[],
+): ScrollAnchor {
+  const index = findLastIndex(offsets, (offset) => offset <= scrollTop);
+  if (index === -1) {
+    return { index: 0, offset: 0 };
+  }
+  return { index, offset: scrollTop - offsets[index] };
+}
+
 function VirtualizedList<T>(
   props: VirtualizedListProps<T>,
   ref: React.Ref<VirtualizedListRef<T>>,
@@ -78,47 +116,228 @@ function VirtualizedList<T>(
     initialScrollIndex,
     initialScrollOffsetInIndex,
   } = props;
-  const dataRef = useRef(data);
+
+  const [state, dispatch] = useReducer(
+    (state: State, action: Action): State => {
+      const getDerived = (heights: number[], dataLength: number) => {
+        const offsets: number[] = [0];
+        let totalHeight = 0;
+        for (let i = 0; i < dataLength; i++) {
+          const height = heights[i] ?? estimatedItemHeight(i);
+          totalHeight += height;
+          offsets.push(totalHeight);
+        }
+        return { totalHeight, offsets };
+      };
+
+      const getScrollTop = (
+        anchor: ScrollAnchor,
+        offsets: number[],
+        heights: number[],
+        containerHeight: number,
+      ) => {
+        const offset = offsets[anchor.index];
+        if (typeof offset !== 'number') return 0;
+        if (anchor.offset === SCROLL_TO_ITEM_END) {
+          const itemHeight = heights[anchor.index] ?? 0;
+          return Math.max(0, offset + itemHeight - containerHeight);
+        }
+        return offset + anchor.offset;
+      };
+
+      const syncScrollInternal = (
+        s: State,
+        nextHeights?: number[],
+        nextDataLength?: number,
+      ): State => {
+        const heights = nextHeights ?? s.heights;
+        const dataLength = nextDataLength ?? s.prevDataLength;
+        const { totalHeight, offsets } = getDerived(heights, dataLength);
+
+        let nextAnchor = s.scrollAnchor;
+        let nextSticking = s.isStickingToBottom;
+        let nextInitialSet = s.isInitialScrollSet;
+
+        const currentScrollTop = getScrollTop(
+          nextAnchor,
+          offsets,
+          heights,
+          s.containerHeight,
+        );
+
+        // Initial scroll - only apply once we have measurements
+        if (
+          !nextInitialSet &&
+          offsets.length > 1 &&
+          totalHeight > 0 &&
+          s.containerHeight > 0
+        ) {
+          if (typeof initialScrollIndex === 'number') {
+            const scrollToEnd =
+              initialScrollIndex === SCROLL_TO_ITEM_END ||
+              (initialScrollIndex >= dataLength - 1 &&
+                initialScrollOffsetInIndex === SCROLL_TO_ITEM_END);
+
+            if (scrollToEnd) {
+              nextAnchor = {
+                index: dataLength > 0 ? dataLength - 1 : 0,
+                offset: SCROLL_TO_ITEM_END,
+              };
+              nextSticking = true;
+            } else {
+              const index = Math.max(
+                0,
+                Math.min(dataLength - 1, initialScrollIndex),
+              );
+              const offset = initialScrollOffsetInIndex ?? 0;
+              const targetTop = (offsets[index] ?? 0) + offset;
+              const clampedTop = Math.max(
+                0,
+                Math.min(totalHeight - s.containerHeight, targetTop),
+              );
+              nextAnchor = getAnchorForScrollTop(clampedTop, offsets);
+              nextSticking =
+                clampedTop >= totalHeight - s.containerHeight - 1 &&
+                totalHeight > s.containerHeight;
+            }
+          }
+          nextInitialSet = true;
+        } else {
+          // Normal sync logic
+          const wasAtBottom =
+            s.prevTotalHeight <= s.prevContainerHeight ||
+            s.prevScrollTop >= s.prevTotalHeight - s.prevContainerHeight - 1;
+
+          if (
+            wasAtBottom &&
+            currentScrollTop >= s.prevScrollTop &&
+            totalHeight > s.containerHeight
+          ) {
+            nextSticking = true;
+          }
+
+          const listGrew = dataLength > s.prevDataLength;
+          const containerChanged = s.prevContainerHeight !== s.containerHeight;
+
+          if (
+            (listGrew && (nextSticking || wasAtBottom)) ||
+            (nextSticking && containerChanged)
+          ) {
+            nextAnchor = {
+              index: dataLength > 0 ? dataLength - 1 : 0,
+              offset: SCROLL_TO_ITEM_END,
+            };
+            nextSticking = true;
+          } else if (
+            (nextAnchor.index >= dataLength ||
+              (s.containerHeight > 0 &&
+                currentScrollTop > totalHeight - s.containerHeight)) &&
+            dataLength > 0
+          ) {
+            const newTop = Math.max(0, totalHeight - s.containerHeight);
+            nextAnchor = getAnchorForScrollTop(newTop, offsets);
+          } else if (dataLength === 0) {
+            nextAnchor = { index: 0, offset: 0 };
+            nextSticking = false;
+          }
+        }
+
+        return {
+          ...s,
+          heights,
+          prevDataLength: dataLength,
+          scrollAnchor: nextAnchor,
+          isStickingToBottom: nextSticking,
+          isInitialScrollSet: nextInitialSet,
+          prevTotalHeight: totalHeight,
+          prevScrollTop: getScrollTop(
+            nextAnchor,
+            offsets,
+            heights,
+            s.containerHeight,
+          ),
+          prevContainerHeight: s.containerHeight,
+        };
+      };
+
+      switch (action.type) {
+        case 'SET_CONTAINER_HEIGHT':
+          if (state.containerHeight === action.height) return state;
+          return syncScrollInternal({
+            ...state,
+            containerHeight: action.height,
+          });
+        case 'UPDATE_ITEM_HEIGHTS': {
+          const newHeights = [...state.heights];
+          let changed = false;
+          for (const { index, height } of action.updates) {
+            if (newHeights[index] !== height) {
+              newHeights[index] = height;
+              changed = true;
+            }
+          }
+          if (!changed) return state;
+          return syncScrollInternal(state, newHeights);
+        }
+        case 'SET_DATA': {
+          if (action.dataLength === state.prevDataLength) return state;
+          const newHeights = [...state.heights];
+          if (action.dataLength < newHeights.length) {
+            newHeights.length = action.dataLength;
+          } else {
+            for (let i = newHeights.length; i < action.dataLength; i++) {
+              newHeights[i] = action.estimatedItemHeight(i);
+            }
+          }
+          return syncScrollInternal(state, newHeights, action.dataLength);
+        }
+        case 'SYNC_SCROLL':
+          return syncScrollInternal(state);
+        case 'SCROLL_TO': {
+          const { heights, prevDataLength, containerHeight } = state;
+          const { offsets, totalHeight } = getDerived(heights, prevDataLength);
+          const newTop = getScrollTop(
+            action.anchor,
+            offsets,
+            heights,
+            containerHeight,
+          );
+          return {
+            ...state,
+            scrollAnchor: action.anchor,
+            isStickingToBottom:
+              action.sticking ??
+              (containerHeight > 0 &&
+                newTop >= totalHeight - containerHeight - 1),
+            prevScrollTop: newTop,
+          };
+        }
+        default:
+          return state;
+      }
+    },
+    {
+      scrollAnchor: { index: 0, offset: 0 },
+      isStickingToBottom: false,
+      containerHeight: 0,
+      heights: data.map((_, i) => estimatedItemHeight(i)),
+      prevDataLength: data.length,
+      prevTotalHeight: 0,
+      prevScrollTop: 0,
+      prevContainerHeight: 0,
+      isInitialScrollSet: false,
+    },
+  );
+
+  const { scrollAnchor, containerHeight, heights } = state;
+
   useEffect(() => {
-    dataRef.current = data;
-  }, [data]);
-
-  const [scrollAnchor, setScrollAnchor] = useState(() => {
-    const scrollToEnd =
-      initialScrollIndex === SCROLL_TO_ITEM_END ||
-      (typeof initialScrollIndex === 'number' &&
-        initialScrollIndex >= data.length - 1 &&
-        initialScrollOffsetInIndex === SCROLL_TO_ITEM_END);
-
-    if (scrollToEnd) {
-      return {
-        index: data.length > 0 ? data.length - 1 : 0,
-        offset: SCROLL_TO_ITEM_END,
-      };
-    }
-
-    if (typeof initialScrollIndex === 'number') {
-      return {
-        index: Math.max(0, Math.min(data.length - 1, initialScrollIndex)),
-        offset: initialScrollOffsetInIndex ?? 0,
-      };
-    }
-
-    return { index: 0, offset: 0 };
-  });
-  const [isStickingToBottom, setIsStickingToBottom] = useState(() => {
-    const scrollToEnd =
-      initialScrollIndex === SCROLL_TO_ITEM_END ||
-      (typeof initialScrollIndex === 'number' &&
-        initialScrollIndex >= data.length - 1 &&
-        initialScrollOffsetInIndex === SCROLL_TO_ITEM_END);
-    return scrollToEnd;
-  });
-  const containerRef = useRef<DOMElement>(null);
-  const [containerHeight, setContainerHeight] = useState(0);
-  const itemRefs = useRef<Array<DOMElement | null>>([]);
-  const [heights, setHeights] = useState<number[]>([]);
-  const isInitialScrollSet = useRef(false);
+    dispatch({
+      type: 'SET_DATA',
+      dataLength: data.length,
+      estimatedItemHeight,
+    });
+  }, [data.length, estimatedItemHeight]);
 
   const { totalHeight, offsets } = useMemo(() => {
     const offsets: number[] = [0];
@@ -129,213 +348,96 @@ function VirtualizedList<T>(
       offsets.push(totalHeight);
     }
     return { totalHeight, offsets };
-  }, [heights, data, estimatedItemHeight]);
-
-  useEffect(() => {
-    setHeights((prevHeights) => {
-      if (data.length === prevHeights.length) {
-        return prevHeights;
-      }
-
-      const newHeights = [...prevHeights];
-      if (data.length < prevHeights.length) {
-        newHeights.length = data.length;
-      } else {
-        for (let i = prevHeights.length; i < data.length; i++) {
-          newHeights[i] = estimatedItemHeight(i);
-        }
-      }
-      return newHeights;
-    });
-  }, [data, estimatedItemHeight]);
-
-  // This layout effect needs to run on every render to correctly measure the
-  // container and ensure we recompute the layout if it has changed.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useLayoutEffect(() => {
-    if (containerRef.current) {
-      const height = Math.round(measureElement(containerRef.current).height);
-      if (containerHeight !== height) {
-        setContainerHeight(height);
-      }
-    }
-
-    let newHeights: number[] | null = null;
-    for (let i = startIndex; i <= endIndex; i++) {
-      const itemRef = itemRefs.current[i];
-      if (itemRef) {
-        const height = Math.round(measureElement(itemRef).height);
-        if (height !== heights[i]) {
-          if (!newHeights) {
-            newHeights = [...heights];
-          }
-          newHeights[i] = height;
-        }
-      }
-    }
-    if (newHeights) {
-      setHeights(newHeights);
-    }
-  });
-
-  const scrollableContainerHeight = containerRef.current
-    ? Math.round(measureElement(containerRef.current).height)
-    : containerHeight;
-
-  const getAnchorForScrollTop = useCallback(
-    (
-      scrollTop: number,
-      offsets: number[],
-    ): { index: number; offset: number } => {
-      const index = findLastIndex(offsets, (offset) => offset <= scrollTop);
-      if (index === -1) {
-        return { index: 0, offset: 0 };
-      }
-
-      return { index, offset: scrollTop - offsets[index] };
-    },
-    [],
-  );
+  }, [heights, data.length, estimatedItemHeight]);
 
   const scrollTop = useMemo(() => {
     const offset = offsets[scrollAnchor.index];
-    if (typeof offset !== 'number') {
-      return 0;
-    }
-
+    if (typeof offset !== 'number') return 0;
     if (scrollAnchor.offset === SCROLL_TO_ITEM_END) {
       const itemHeight = heights[scrollAnchor.index] ?? 0;
-      return offset + itemHeight - scrollableContainerHeight;
+      return Math.max(0, offset + itemHeight - containerHeight);
     }
-
     return offset + scrollAnchor.offset;
-  }, [scrollAnchor, offsets, heights, scrollableContainerHeight]);
+  }, [scrollAnchor, offsets, heights, containerHeight]);
 
-  const prevDataLength = useRef(data.length);
-  const prevTotalHeight = useRef(totalHeight);
-  const prevScrollTop = useRef(scrollTop);
-  const prevContainerHeight = useRef(scrollableContainerHeight);
+  const itemRefs = useRef<Array<DOMElement | null>>([]);
+  const elementToIndexRef = useRef(new Map<DOMElement, number>());
+  const itemsObserverRef = useRef<ResizeObserver | null>(null);
 
-  useLayoutEffect(() => {
-    const contentPreviouslyFit =
-      prevTotalHeight.current <= prevContainerHeight.current;
-    const wasScrolledToBottomPixels =
-      prevScrollTop.current >=
-      prevTotalHeight.current - prevContainerHeight.current - 1;
-    const wasAtBottom = contentPreviouslyFit || wasScrolledToBottomPixels;
+  useEffect(() => () => itemsObserverRef.current?.disconnect(), []);
 
-    // If the user was at the bottom, they are now sticking. This handles
-    // manually scrolling back to the bottom.
-    if (wasAtBottom && scrollTop >= prevScrollTop.current) {
-      setIsStickingToBottom(true);
+  const setItemRef = useCallback((el: DOMElement | null, index: number) => {
+    const prevEl = itemRefs.current[index];
+    if (prevEl === el) return;
+    if (prevEl && itemsObserverRef.current) {
+      itemsObserverRef.current.unobserve(prevEl);
+      elementToIndexRef.current.delete(prevEl);
     }
+    itemRefs.current[index] = el;
+    if (el) {
+      elementToIndexRef.current.set(el, index);
+      if (!itemsObserverRef.current) {
+        itemsObserverRef.current = new ResizeObserver((entries) => {
+          const updates = entries
+            .map((entry) => {
+              const idx = elementToIndexRef.current.get(entry.target);
+              return idx !== undefined
+                ? { index: idx, height: Math.round(entry.contentRect.height) }
+                : null;
+            })
+            .filter((u): u is { index: number; height: number } => u !== null);
 
-    const listGrew = data.length > prevDataLength.current;
-    const containerChanged =
-      prevContainerHeight.current !== scrollableContainerHeight;
-
-    // We scroll to the end if:
-    // 1. The list grew AND we were already at the bottom (or sticking).
-    // 2. We are sticking to the bottom AND the container size changed.
-    if (
-      (listGrew && (isStickingToBottom || wasAtBottom)) ||
-      (isStickingToBottom && containerChanged)
-    ) {
-      setScrollAnchor({
-        index: data.length > 0 ? data.length - 1 : 0,
-        offset: SCROLL_TO_ITEM_END,
-      });
-      // If we are scrolling to the bottom, we are by definition sticking.
-      if (!isStickingToBottom) {
-        setIsStickingToBottom(true);
-      }
-    }
-    // Scenario 2: The list has changed (shrunk) in a way that our
-    // current scroll position or anchor is invalid. We should adjust to the bottom.
-    else if (
-      (scrollAnchor.index >= data.length ||
-        scrollTop > totalHeight - scrollableContainerHeight) &&
-      data.length > 0
-    ) {
-      const newScrollTop = Math.max(0, totalHeight - scrollableContainerHeight);
-      setScrollAnchor(getAnchorForScrollTop(newScrollTop, offsets));
-    } else if (data.length === 0) {
-      // List is now empty, reset scroll to top.
-      setScrollAnchor({ index: 0, offset: 0 });
-    }
-
-    // Update refs for the next render cycle.
-    prevDataLength.current = data.length;
-    prevTotalHeight.current = totalHeight;
-    prevScrollTop.current = scrollTop;
-    prevContainerHeight.current = scrollableContainerHeight;
-  }, [
-    data.length,
-    totalHeight,
-    scrollTop,
-    scrollableContainerHeight,
-    scrollAnchor.index,
-    getAnchorForScrollTop,
-    offsets,
-    isStickingToBottom,
-  ]);
-
-  useLayoutEffect(() => {
-    if (
-      isInitialScrollSet.current ||
-      offsets.length <= 1 ||
-      totalHeight <= 0 ||
-      containerHeight <= 0
-    ) {
-      return;
-    }
-
-    if (typeof initialScrollIndex === 'number') {
-      const scrollToEnd =
-        initialScrollIndex === SCROLL_TO_ITEM_END ||
-        (initialScrollIndex >= data.length - 1 &&
-          initialScrollOffsetInIndex === SCROLL_TO_ITEM_END);
-
-      if (scrollToEnd) {
-        setScrollAnchor({
-          index: data.length - 1,
-          offset: SCROLL_TO_ITEM_END,
+          if (updates.length > 0) {
+            dispatch({ type: 'UPDATE_ITEM_HEIGHTS', updates });
+          }
         });
-        setIsStickingToBottom(true);
-        isInitialScrollSet.current = true;
-        return;
       }
-
-      const index = Math.max(0, Math.min(data.length - 1, initialScrollIndex));
-      const offset = initialScrollOffsetInIndex ?? 0;
-      const newScrollTop = (offsets[index] ?? 0) + offset;
-
-      const clampedScrollTop = Math.max(
-        0,
-        Math.min(totalHeight - scrollableContainerHeight, newScrollTop),
-      );
-
-      setScrollAnchor(getAnchorForScrollTop(clampedScrollTop, offsets));
-      isInitialScrollSet.current = true;
+      itemsObserverRef.current.observe(el);
     }
-  }, [
-    initialScrollIndex,
-    initialScrollOffsetInIndex,
-    offsets,
-    totalHeight,
-    containerHeight,
-    getAnchorForScrollTop,
-    data.length,
-    heights,
-    scrollableContainerHeight,
-  ]);
+  }, []);
+
+  const containerRef = useRef<DOMElement>(null);
+  const containerObserverRef = useRef<ResizeObserver | null>(null);
+  const setContainerRef = useCallback((node: DOMElement | null) => {
+    containerObserverRef.current?.disconnect();
+    (containerRef as React.MutableRefObject<DOMElement | null>).current = node;
+    if (node) {
+      dispatch({
+        type: 'SET_CONTAINER_HEIGHT',
+        height: Math.round(measureElement(node).height),
+      });
+      const observer = new ResizeObserver((entries) => {
+        const entry = entries[0];
+        if (entry)
+          dispatch({
+            type: 'SET_CONTAINER_HEIGHT',
+            height: Math.round(entry.contentRect.height),
+          });
+      });
+      observer.observe(node);
+      containerObserverRef.current = observer;
+    }
+  }, []);
+
+  const innerObserverRef = useRef<ResizeObserver | null>(null);
+  const setInnerRef = useCallback((node: DOMElement | null) => {
+    innerObserverRef.current?.disconnect();
+    if (node) {
+      dispatch({ type: 'SYNC_SCROLL' });
+      const observer = new ResizeObserver(() =>
+        dispatch({ type: 'SYNC_SCROLL' }),
+      );
+      observer.observe(node);
+      innerObserverRef.current = observer;
+    }
+  }, []);
 
   const startIndex = Math.max(
     0,
     findLastIndex(offsets, (offset) => offset <= scrollTop) - 1,
   );
   const endIndexOffset = offsets.findIndex(
-    (offset) => offset > scrollTop + scrollableContainerHeight,
+    (offset) => offset > scrollTop + containerHeight,
   );
   const endIndex =
     endIndexOffset === -1
@@ -354,9 +456,7 @@ function VirtualizedList<T>(
         <Box
           key={keyExtractor(item, i)}
           width="100%"
-          ref={(el) => {
-            itemRefs.current[i] = el;
-          }}
+          ref={(el) => setItemRef(el, i)}
         >
           {renderItem({ item, index: i })}
         </Box>,
@@ -370,84 +470,71 @@ function VirtualizedList<T>(
     ref,
     () => ({
       scrollBy: (delta: number) => {
-        if (delta < 0) {
-          setIsStickingToBottom(false);
-        }
-        const currentScrollTop = getScrollTop();
-        const newScrollTop = Math.max(
+        const currentTop = getScrollTop();
+        const newTop = Math.max(
           0,
-          Math.min(
-            totalHeight - scrollableContainerHeight,
-            currentScrollTop + delta,
-          ),
+          Math.min(totalHeight - containerHeight, currentTop + delta),
         );
-        setPendingScrollTop(newScrollTop);
-        setScrollAnchor(getAnchorForScrollTop(newScrollTop, offsets));
+        setPendingScrollTop(newTop);
+        dispatch({
+          type: 'SCROLL_TO',
+          anchor: getAnchorForScrollTop(newTop, offsets),
+        });
       },
       scrollTo: (offset: number) => {
-        setIsStickingToBottom(false);
-        const newScrollTop = Math.max(
+        const newTop = Math.max(
           0,
-          Math.min(totalHeight - scrollableContainerHeight, offset),
+          Math.min(totalHeight - containerHeight, offset),
         );
-        setPendingScrollTop(newScrollTop);
-        setScrollAnchor(getAnchorForScrollTop(newScrollTop, offsets));
+        setPendingScrollTop(newTop);
+        dispatch({
+          type: 'SCROLL_TO',
+          anchor: getAnchorForScrollTop(newTop, offsets),
+        });
       },
       scrollToEnd: () => {
-        setIsStickingToBottom(true);
         if (data.length > 0) {
-          setScrollAnchor({
-            index: data.length - 1,
-            offset: SCROLL_TO_ITEM_END,
+          dispatch({
+            type: 'SCROLL_TO',
+            anchor: { index: data.length - 1, offset: SCROLL_TO_ITEM_END },
+            sticking: true,
           });
         }
       },
-      scrollToIndex: ({
-        index,
-        viewOffset = 0,
-        viewPosition = 0,
-      }: {
-        index: number;
-        viewOffset?: number;
-        viewPosition?: number;
-      }) => {
-        setIsStickingToBottom(false);
+      scrollToIndex: ({ index, viewOffset = 0, viewPosition = 0 }) => {
         const offset = offsets[index];
         if (offset !== undefined) {
-          const newScrollTop = Math.max(
+          const newTop = Math.max(
             0,
             Math.min(
-              totalHeight - scrollableContainerHeight,
-              offset - viewPosition * scrollableContainerHeight + viewOffset,
+              totalHeight - containerHeight,
+              offset - viewPosition * containerHeight + viewOffset,
             ),
           );
-          setPendingScrollTop(newScrollTop);
-          setScrollAnchor(getAnchorForScrollTop(newScrollTop, offsets));
+          setPendingScrollTop(newTop);
+          dispatch({
+            type: 'SCROLL_TO',
+            anchor: getAnchorForScrollTop(newTop, offsets),
+          });
         }
       },
-      scrollToItem: ({
-        item,
-        viewOffset = 0,
-        viewPosition = 0,
-      }: {
-        item: T;
-        viewOffset?: number;
-        viewPosition?: number;
-      }) => {
-        setIsStickingToBottom(false);
+      scrollToItem: ({ item, viewOffset = 0, viewPosition = 0 }) => {
         const index = data.indexOf(item);
         if (index !== -1) {
           const offset = offsets[index];
           if (offset !== undefined) {
-            const newScrollTop = Math.max(
+            const newTop = Math.max(
               0,
               Math.min(
-                totalHeight - scrollableContainerHeight,
-                offset - viewPosition * scrollableContainerHeight + viewOffset,
+                totalHeight - containerHeight,
+                offset - viewPosition * containerHeight + viewOffset,
               ),
             );
-            setPendingScrollTop(newScrollTop);
-            setScrollAnchor(getAnchorForScrollTop(newScrollTop, offsets));
+            setPendingScrollTop(newTop);
+            dispatch({
+              type: 'SCROLL_TO',
+              anchor: getAnchorForScrollTop(newTop, offsets),
+            });
           }
         }
       },
@@ -462,18 +549,16 @@ function VirtualizedList<T>(
       offsets,
       scrollAnchor,
       totalHeight,
-      getAnchorForScrollTop,
       data,
-      scrollableContainerHeight,
+      containerHeight,
       getScrollTop,
       setPendingScrollTop,
-      containerHeight,
     ],
   );
 
   return (
     <Box
-      ref={containerRef}
+      ref={setContainerRef}
       overflowY="scroll"
       overflowX="hidden"
       scrollTop={scrollTop}
@@ -483,7 +568,7 @@ function VirtualizedList<T>(
       flexDirection="column"
       paddingRight={1}
     >
-      <Box flexShrink={0} width="100%" flexDirection="column">
+      <Box ref={setInnerRef} flexShrink={0} width="100%" flexDirection="column">
         <Box height={topSpacerHeight} flexShrink={0} />
         {renderedItems}
         <Box height={bottomSpacerHeight} flexShrink={0} />
