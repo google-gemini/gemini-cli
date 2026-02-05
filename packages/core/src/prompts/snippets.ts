@@ -69,6 +69,7 @@ export interface FinalReminderOptions {
 export interface PlanningWorkflowOptions {
   planModeToolsList: string;
   plansDir: string;
+  approvedPlanPath?: string;
 }
 
 export interface AgentSkillOptions {
@@ -338,10 +339,21 @@ ${options.planModeToolsList}
 - If plan is approved, you can begin implementation
 - If plan is rejected, address the feedback and iterate on the plan
 
+${renderApprovedPlanSection(options.approvedPlanPath)}
+
 ## Constraints
 - You may ONLY use the read-only tools listed above
 - You MUST NOT modify source code, configs, or any files
 - If asked to modify code, explain you are in Plan Mode and suggest exiting Plan Mode to enable edits`.trim();
+}
+
+function renderApprovedPlanSection(approvedPlanPath?: string): string {
+  if (!approvedPlanPath) return '';
+  return `## Approved Plan
+An approved plan is available for this task.
+- **Iterate:** You should default to refining the existing approved plan.
+- **New Plan:** Only create a new plan file if the user explicitly asks for a "new plan" or if the current request is for a completely different feature or bug.
+`;
 }
 
 // --- Leaf Helpers (Strictly strings or simple calls) ---
