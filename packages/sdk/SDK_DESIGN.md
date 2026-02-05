@@ -141,33 +141,34 @@ Validation (these are probably hardest to validate):
 
 ## `Custom Skills`
 
-> **Status:** Not Implemented.
+> **Status:** Implemented. `skillDir`, `skillRoot` helpers and `GeminiCliAgent`
+> support loading skills from filesystem.
 
 Custom skills can be referenced by individual directories or by "skill roots"
 (directories containing many skills).
 
-```ts
-import { GeminiCliAgent, skillDir, skillRoot } from '@google/gemini-cli-sdk';
+### Directory Structure
 
-const agent = new GeminiCliAgent({
-  skills: [skillDir('/path/to/single/skill'), skillRoot('/path/to/skills/dir')],
-});
+```
+skill-dir/
+  SKILL.md  (Metadata and instructions)
+  tools/    (Optional directory for tools)
+    my-tool.js
 ```
 
-**NOTE:** I would like to support fully in-memory skills (including reference
-files); however, it seems like that would currently require a pretty significant
-refactor so we'll focus on filesystem skills for now. In an ideal future state,
-we could do something like:
+### Usage
 
-```ts
-import { GeminiCliAgent, skill } from '@google/gemini-cli-sdk';
+```typescript
+import { GeminiCliAgent, skillDir, skillRoot } from '@google/gemini-sdk';
 
-const mySkill = skill({
-  name: 'my-skill',
-  description: 'description of when my skill should be used',
-  content: 'This is the SKILL.md content',
-  // it can also be a function
-  content: (ctx) => `This is dynamic content.`,
+const agent = new GeminiCliAgent({
+  instructions: 'You are a helpful assistant.',
+  skills: [
+    // Load a single skill from a directory
+    skillDir('./my-skill'),
+    // Load all skills found in subdirectories of this root
+    skillRoot('./skills-collection'),
+  ],
 });
 ```
 
@@ -318,16 +319,16 @@ export interface AgentShellProcess {
 
 Based on the current implementation status, we can proceed with:
 
-## Feature 2: Custom Skills Support
+## Feature 3: Custom Hooks Support
 
-Implement support for loading and registering custom skills. This involves
-adding a `skills` option to `GeminiCliAgentOptions` and implementing the logic
-to read skill definitions from directories.
+Implement support for loading and registering custom hooks. This involves adding
+a `hooks` option to `GeminiCliAgentOptions`.
 
 **Tasks:**
 
-1.  Add `skills` option to `GeminiCliAgentOptions`.
-2.  Implement `skillDir` and `skillRoot` helpers to load skills from the
-    filesystem.
-3.  Update `GeminiCliAgent` to register loaded skills with the internal tool
-    registry.
+1.  Define `Hook` interface and helper functions.
+2.  Add `hooks` option to `GeminiCliAgentOptions`.
+3.  Implement hook registration logic in `GeminiCliAgent`.
+
+IMPORTANT: Hook signatures should be strongly typed all the way through. You'll
+need to create a mapping of the string event name to the request/response types.
