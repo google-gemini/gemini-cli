@@ -1788,10 +1788,6 @@ export class Config {
    * @returns true if the path is allowed, false otherwise.
    */
   isPathAllowed(absolutePath: string): boolean {
-    if (this.interactive && path.isAbsolute(absolutePath)) {
-      return true;
-    }
-
     const realpath = (p: string) => {
       let resolved: string;
       try {
