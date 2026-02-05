@@ -46,4 +46,21 @@ describe('<GeminiMessage /> - Raw Markdown Display Snapshots', () => {
       expect(lastFrame()).toMatchSnapshot();
     },
   );
+
+  it('wraps long lines correctly in raw markdown mode', () => {
+    const terminalWidth = 20;
+    const text =
+      'This is a long line that should wrap correctly without truncation';
+    const { lastFrame } = renderWithProviders(
+      <GeminiMessage
+        text={text}
+        isPending={false}
+        terminalWidth={terminalWidth}
+      />,
+      {
+        uiState: { renderMarkdown: false, streamingState: StreamingState.Idle },
+      },
+    );
+    expect(lastFrame()).toMatchSnapshot();
+  });
 });

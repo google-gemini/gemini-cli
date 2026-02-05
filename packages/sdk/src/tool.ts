@@ -94,8 +94,8 @@ export class SdkTool<T extends z.ZodTypeAny> extends BaseDeclarativeTool<
   constructor(
     private readonly definition: Tool<T>,
     messageBus: MessageBus,
-
-    _agent?: unknown, // To prevent unused variable error, but ideally we'd pass agent here if needed
+    _agent?: unknown,
+    private readonly context?: SessionContext,
   ) {
     super(
       definition.name,
@@ -105,6 +105,10 @@ export class SdkTool<T extends z.ZodTypeAny> extends BaseDeclarativeTool<
       zodToJsonSchema(definition.inputSchema),
       messageBus,
     );
+  }
+
+  bindContext(context: SessionContext): SdkTool<T> {
+    return new SdkTool(this.definition, this.messageBus, undefined, context);
   }
 
   createInvocationWithContext(
@@ -117,7 +121,7 @@ export class SdkTool<T extends z.ZodTypeAny> extends BaseDeclarativeTool<
       params,
       messageBus,
       this.definition.action,
-      context,
+      context || this.context,
       toolName || this.name,
       this.definition.sendErrorsToModel,
     );
@@ -132,7 +136,7 @@ export class SdkTool<T extends z.ZodTypeAny> extends BaseDeclarativeTool<
       params,
       messageBus,
       this.definition.action,
-      undefined,
+      this.context,
       toolName || this.name,
       this.definition.sendErrorsToModel,
     );
