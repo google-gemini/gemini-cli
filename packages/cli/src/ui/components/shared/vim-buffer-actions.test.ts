@@ -855,6 +855,124 @@ describe('vim-buffer-actions', () => {
     });
   });
 
+  describe('Line Boundary Commands', () => {
+    describe('vim_delete_to_line_start', () => {
+      it('should delete from cursor to start of line', () => {
+        const state = createTestState(['hello world'], 0, 5);
+        const action = {
+          type: 'vim_delete_to_line_start' as const,
+        }; // Cast to any until types are added
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines[0]).toBe(' world');
+        expect(result.cursorCol).toBe(0);
+      });
+
+      it('should do nothing if already at start of line', () => {
+        const state = createTestState(['hello world'], 0, 0);
+        const action = {
+          type: 'vim_delete_to_line_start' as const,
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines[0]).toBe('hello world');
+        expect(result.cursorCol).toBe(0);
+      });
+    });
+
+    describe('vim_change_to_line_start', () => {
+      it('should delete from cursor to start of line', () => {
+        const state = createTestState(['hello world'], 0, 5);
+        const action = {
+          type: 'vim_change_to_line_start' as const,
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines[0]).toBe(' world');
+        expect(result.cursorCol).toBe(0);
+      });
+    });
+
+    describe('vim_delete_to_first_non_whitespace', () => {
+      it('should delete backwards to first non-whitespace', () => {
+        const state = createTestState(['   hello world'], 0, 5); // on 'e', 'h' is at 3
+        const action = {
+          type: 'vim_delete_to_first_non_whitespace' as const,
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        // Range [3, 5). 3='h', 4='e'. 'he' deleted.
+        expect(result.lines[0]).toBe('   llo world');
+        expect(result.cursorCol).toBe(3);
+      });
+
+      it('should delete forwards to first non-whitespace', () => {
+        const state = createTestState(['   hello world'], 0, 0);
+        const action = {
+          type: 'vim_delete_to_first_non_whitespace' as const,
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        // Range [0, 3). '   ' deleted.
+        expect(result.lines[0]).toBe('hello world');
+        expect(result.cursorCol).toBe(0);
+      });
+
+      it('should do nothing if on first non-whitespace', () => {
+        const state = createTestState(['   hello world'], 0, 3);
+        const action = {
+          type: 'vim_delete_to_first_non_whitespace' as const,
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines[0]).toBe('   hello world');
+        expect(result.cursorCol).toBe(3);
+      });
+
+      it('should handle line with only whitespace', () => {
+        const state = createTestState(['     '], 0, 2);
+        const action = {
+          type: 'vim_delete_to_first_non_whitespace' as const,
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines[0]).toBe('  ');
+      });
+
+      it('should delete entire line content if line is all whitespace and cursor is at start', () => {
+        const state = createTestState(['     '], 0, 0);
+        const action = {
+          type: 'vim_delete_to_first_non_whitespace' as const,
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines[0]).toBe('');
+      });
+    });
+
+    describe('vim_change_to_first_non_whitespace', () => {
+      it('should delete to first non-whitespace (backward)', () => {
+        const state = createTestState(['   hello world'], 0, 5);
+        const action = {
+          type: 'vim_change_to_first_non_whitespace' as const,
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines[0]).toBe('   llo world');
+        expect(result.cursorCol).toBe(3);
+      });
+    });
+  });
+
   describe('Change commands', () => {
     describe('vim_change_word_forward', () => {
       it('should delete from cursor to next word start', () => {
