@@ -189,6 +189,16 @@ const SETTINGS_SCHEMA = {
         description: 'Enable Vim keybindings',
         showInDialog: true,
       },
+      vimModeCursorShape: {
+        type: 'boolean',
+        label: 'Vim Mode Cursor Shape',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Change cursor shape based on Vim mode (Block for Normal, Bar for Insert). Requires a terminal that supports DECSCUSR escape sequences (most modern terminals).',
+        showInDialog: true,
+      },
       enableAutoUpdate: {
         type: 'boolean',
         label: 'Enable Auto Update',

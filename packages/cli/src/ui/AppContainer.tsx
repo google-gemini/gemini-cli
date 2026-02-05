@@ -142,6 +142,7 @@ import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialo
 import { NewAgentsChoice } from './components/NewAgentsNotification.js';
 import { isSlashCommand } from './utils/commandUtils.js';
 import { useTerminalTheme } from './hooks/useTerminalTheme.js';
+import { useVimCursorShape } from './hooks/useVimCursorShape.js';
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
   return pendingHistoryItems.some((item) => {
@@ -187,6 +188,8 @@ const SHELL_HEIGHT_PADDING = 10;
 export const AppContainer = (props: AppContainerProps) => {
   const { config, initializationResult, resumedSessionData } = props;
   const settings = useSettings();
+
+  useVimCursorShape();
 
   const historyManager = useHistory({
     chatRecordingService: config.getGeminiClient()?.getChatRecordingService(),
@@ -435,6 +438,11 @@ export const AppContainer = (props: AppContainerProps) => {
     registerCleanup(async () => {
       // Turn off mouse scroll.
       disableMouseEvents();
+
+      // Reset cursor shape to steady block (only if vim cursor shape feature is not enabled)
+      if (!settings.merged.general.vimModeCursorShape) {
+        writeToStdout('\x1b[2 q');
+      }
 
       // Kill all background shells
       for (const pid of backgroundShellsRef.current.keys()) {

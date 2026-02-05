@@ -328,6 +328,33 @@ describe('SettingsSchema', () => {
       ).toBe('Enable debug logging of keystrokes to the console.');
     });
 
+    it('should have vimModeCursorShape setting in schema', () => {
+      expect(
+        getSettingsSchema().general.properties.vimModeCursorShape,
+      ).toBeDefined();
+      expect(
+        getSettingsSchema().general.properties.vimModeCursorShape.type,
+      ).toBe('boolean');
+      expect(
+        getSettingsSchema().general.properties.vimModeCursorShape.category,
+      ).toBe('General');
+      expect(
+        getSettingsSchema().general.properties.vimModeCursorShape.default,
+      ).toBe(false);
+      expect(
+        getSettingsSchema().general.properties.vimModeCursorShape
+          .requiresRestart,
+      ).toBe(false);
+      expect(
+        getSettingsSchema().general.properties.vimModeCursorShape.showInDialog,
+      ).toBe(true);
+      expect(
+        getSettingsSchema().general.properties.vimModeCursorShape.description,
+      ).toBe(
+        'Change cursor shape based on Vim mode (Block for Normal, Line for Insert)',
+      );
+    });
+
     it('should have previewFeatures setting in schema', () => {
       expect(
         getSettingsSchema().general.properties.previewFeatures,
