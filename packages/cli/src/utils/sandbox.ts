@@ -460,6 +460,20 @@ export async function start_sandbox(
       args.push('--env', `GOOGLE_API_KEY=${process.env['GOOGLE_API_KEY']}`);
     }
 
+    // copy GOOGLE_GEMINI_BASE_URL and GOOGLE_VERTEX_BASE_URL
+    if (process.env['GOOGLE_GEMINI_BASE_URL']) {
+      args.push(
+        '--env',
+        `GOOGLE_GEMINI_BASE_URL=${process.env['GOOGLE_GEMINI_BASE_URL']}`,
+      );
+    }
+    if (process.env['GOOGLE_VERTEX_BASE_URL']) {
+      args.push(
+        '--env',
+        `GOOGLE_VERTEX_BASE_URL=${process.env['GOOGLE_VERTEX_BASE_URL']}`,
+      );
+    }
+
     // copy GOOGLE_GENAI_USE_VERTEXAI
     if (process.env['GOOGLE_GENAI_USE_VERTEXAI']) {
       args.push(

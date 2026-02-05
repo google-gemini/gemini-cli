@@ -41,7 +41,10 @@ function getInitialTrustState(
     };
   }
 
-  const { isTrusted, source } = isWorkspaceTrusted(settings.merged);
+  const { isTrusted, source } = isWorkspaceTrusted(
+    settings.merged,
+    process.cwd(),
+  );
 
   const isInheritedTrust =
     isTrusted &&
@@ -85,7 +88,8 @@ export const usePermissionsModifyTrust = (
   );
   const [needsRestart, setNeedsRestart] = useState(false);
 
-  const isFolderTrustEnabled = !!settings.merged.security.folderTrust.enabled;
+  const isFolderTrustEnabled =
+    settings.merged.security.folderTrust.enabled ?? true;
 
   const updateTrustLevel = useCallback(
     (trustLevel: TrustLevel) => {
@@ -99,7 +103,10 @@ export const usePermissionsModifyTrust = (
       }
 
       // All logic below only applies when editing the current workspace.
-      const wasTrusted = isWorkspaceTrusted(settings.merged).isTrusted;
+      const wasTrusted = isWorkspaceTrusted(
+        settings.merged,
+        process.cwd(),
+      ).isTrusted;
 
       // Create a temporary config to check the new trust status without writing
       const currentConfig = loadTrustedFolders().user.config;
@@ -107,6 +114,7 @@ export const usePermissionsModifyTrust = (
 
       const { isTrusted, source } = isWorkspaceTrusted(
         settings.merged,
+        process.cwd(),
         newConfig,
       );
 

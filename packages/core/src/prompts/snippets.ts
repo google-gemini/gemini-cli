@@ -8,6 +8,7 @@ import {
   ACTIVATE_SKILL_TOOL_NAME,
   ASK_USER_TOOL_NAME,
   EDIT_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
   MEMORY_TOOL_NAME,
@@ -26,6 +27,7 @@ export interface SystemPromptOptions {
   agentSkills?: AgentSkillOptions[];
   hookContext?: boolean;
   primaryWorkflows?: PrimaryWorkflowsOptions;
+  planningWorkflow?: PlanningWorkflowOptions;
   operationalGuidelines?: OperationalGuidelinesOptions;
   sandbox?: SandboxMode;
   gitRepo?: GitRepoOptions;
@@ -64,7 +66,7 @@ export interface FinalReminderOptions {
   readFileToolName: string;
 }
 
-export interface ApprovalModePlanOptions {
+export interface PlanningWorkflowOptions {
   planModeToolsList: string;
   plansDir: string;
 }
@@ -92,7 +94,11 @@ ${renderAgentSkills(options.agentSkills)}
 
 ${renderHookContext(options.hookContext)}
 
-${renderPrimaryWorkflows(options.primaryWorkflows)}
+${
+  options.planningWorkflow
+    ? renderPlanningWorkflow(options.planningWorkflow)
+    : renderPrimaryWorkflows(options.primaryWorkflows)
+}
 
 ${renderOperationalGuidelines(options.operationalGuidelines)}
 
@@ -110,14 +116,11 @@ ${renderFinalReminder(options.finalReminder)}
 export function renderFinalShell(
   basePrompt: string,
   userMemory?: string,
-  planOptions?: ApprovalModePlanOptions,
 ): string {
   return `
 ${basePrompt.trim()}
 
 ${renderUserMemory(userMemory)}
-
-${renderApprovalModePlan(planOptions)}
 `.trim();
 }
 
@@ -195,7 +198,7 @@ export function renderPrimaryWorkflows(
 When requested to perform tasks like fixing bugs, adding features, refactoring, or explaining code, follow this sequence:
 ${workflowStepUnderstand(options)}
 ${workflowStepPlan(options)}
-3. **Implement:** Use the available tools (e.g., '${EDIT_TOOL_NAME}', '${WRITE_FILE_TOOL_NAME}' '${SHELL_TOOL_NAME}' ...) to act on the plan, strictly adhering to the project's established conventions (detailed under 'Core Mandates').
+3. **Implement:** Use the available tools (e.g., '${EDIT_TOOL_NAME}', '${WRITE_FILE_TOOL_NAME}' '${SHELL_TOOL_NAME}' ...) to act on the plan. Strictly adhere to the project's established conventions (detailed under 'Core Mandates'). Before making manual code changes, check if an ecosystem tool (like 'eslint --fix', 'prettier --write', 'go fmt', 'cargo fmt') is available in the project to perform the task automatically.
 4. **Verify (Tests):** If applicable and feasible, verify the changes using the project's testing procedures. Identify the correct test commands and frameworks by examining 'README' files, build/package configuration (e.g., 'package.json'), or existing test execution patterns. NEVER assume standard test commands. When executing test commands, prefer "run once" or "CI" modes to ensure the command terminates after completion.
 5. **Verify (Standards):** VERY IMPORTANT: After making code changes, execute the project-specific build, linting and type-checking commands (e.g., 'tsc', 'npm run lint', 'ruff check .') that you have identified for this project (or obtained from the user). This ensures code quality and adherence to standards.${workflowVerifyStandardsSuffix(options.interactive)}
 6. **Finalize:** After all verification passes, consider the task complete. Do not remove or revert any changes or created files (like tests). Await the user's next instruction.
@@ -289,8 +292,8 @@ export function renderUserMemory(memory?: string): string {
   return `\n---\n\n${memory.trim()}`;
 }
 
-export function renderApprovalModePlan(
-  options?: ApprovalModePlanOptions,
+export function renderPlanningWorkflow(
+  options?: PlanningWorkflowOptions,
 ): string {
   if (!options) return '';
   return `
@@ -302,9 +305,11 @@ You are operating in **Plan Mode** - a structured planning workflow for designin
 The following read-only tools are available in Plan Mode:
 ${options.planModeToolsList}
 - \`${WRITE_FILE_TOOL_NAME}\` - Save plans to the plans directory (see Plan Storage below)
+- \`${EDIT_TOOL_NAME}\` - Update plans in the plans directory
 
 ## Plan Storage
-- Save your plans as Markdown (.md) files directly to: \`${options.plansDir}/\`
+- Save your plans as Markdown (.md) files ONLY within: \`${options.plansDir}/\`
+- You are restricted to writing files within this directory while in Plan Mode.
 - Use descriptive filenames: \`feature-name.md\` or \`bugfix-description.md\`
 
 ## Workflow Phases
@@ -326,12 +331,12 @@ ${options.planModeToolsList}
 - Only begin this phase after exploration is complete
 - Create a detailed implementation plan with clear steps
 - Include file paths, function signatures, and code snippets where helpful
-- After saving the plan, present the full content of the markdown file to the user for review
+- Save the implementation plan to the designated plans directory
 
 ### Phase 4: Review & Approval
-- Ask the user if they approve the plan, want revisions, or want to reject it
-- Address feedback and iterate as needed
-- **When the user approves the plan**, prompt them to switch out of Plan Mode to begin implementation by pressing Shift+Tab to cycle to a different approval mode
+- Present the plan and request approval for the finalized plan using the \`${EXIT_PLAN_MODE_TOOL_NAME}\` tool
+- If plan is approved, you can begin implementation
+- If plan is rejected, address the feedback and iterate on the plan
 
 ## Constraints
 - You may ONLY use the read-only tools listed above
@@ -427,6 +432,10 @@ function newApplicationSteps(interactive: boolean): string {
 
 function shellEfficiencyGuidelines(enabled: boolean): string {
   if (!enabled) return '';
+  const isWindows = process.platform === 'win32';
+  const inspectExample = isWindows
+    ? "using commands like 'type' or 'findstr' (on CMD) and 'Get-Content' or 'Select-String' (on PowerShell)"
+    : "using commands like 'grep', 'tail', 'head'";
   return `
 ## Shell tool output token efficiency:
 
@@ -437,7 +446,7 @@ IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
 - If a command is expected to produce a lot of output, use quiet or silent flags where available and appropriate.
 - Always consider the trade-off between output verbosity and the need for information. If a command's full output is essential for understanding the result, avoid overly aggressive quieting that might obscure important details.
 - If a command does not have quiet/silent flags or for commands with potentially long output that may not be useful, redirect stdout and stderr to temp files in the project's temporary directory. For example: 'command > <temp_dir>/out.log 2> <temp_dir>/err.log'.
-- After the command runs, inspect the temp files (e.g. '<temp_dir>/out.log' and '<temp_dir>/err.log') using commands like 'grep', 'tail', 'head', ... (or platform equivalents). Remove the temp files when done.`;
+- After the command runs, inspect the temp files (e.g. '<temp_dir>/out.log' and '<temp_dir>/err.log') ${inspectExample}. Remove the temp files when done.`;
 }
 
 function toneAndStyleNoChitchat(isGemini3: boolean): string {
@@ -451,12 +460,12 @@ function toneAndStyleNoChitchat(isGemini3: boolean): string {
 function toolUsageInteractive(interactive: boolean): string {
   if (interactive) {
     return `
-- **Background Processes:** Use background processes (via \`&\`) for commands that are unlikely to stop on their own, e.g. \`node server.js &\`. If unsure, ask the user.
-- **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`ctrl + f\` to focus into the shell to provide input.`;
+- **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true. If unsure, ask the user.
+- **Interactive Commands:** Never use interactive shell commands unless absolutely necessary. **ALWAYS** use arguments to bypass prompts for **EVERY** tool in use that supports it, even if that command is part of a chain or larger command. For example: 'git --no-pager', 'vitest run', and 'npx --yes' to bypass interactive prompts.`;
   }
   return `
-- **Background Processes:** Use background processes (via \`&\`) for commands that are unlikely to stop on their own, e.g. \`node server.js &\`.
-- **Interactive Commands:** Only execute non-interactive commands. e.g.: use 'git --no-pager'`;
+- **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true.
+- **Interactive Commands:** Never use interactive shell commands. **ALWAYS** use arguments to bypass prompts for **EVERY** tool in use that supports it, even if that command is part of a chain or larger command. For example: 'git --no-pager', 'vitest run', and 'npx --yes' to bypass interactive prompts.`;
 }
 
 function toolUsageRememberingFacts(

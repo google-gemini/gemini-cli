@@ -11,6 +11,7 @@ export enum AppEvent {
   Flicker = 'flicker',
   SelectionWarning = 'selection-warning',
   PasteTimeout = 'paste-timeout',
+  TerminalBackground = 'terminal-background',
 }
 
 export interface AppEvents {
@@ -18,6 +19,7 @@ export interface AppEvents {
   [AppEvent.Flicker]: never[];
   [AppEvent.SelectionWarning]: never[];
   [AppEvent.PasteTimeout]: never[];
+  [AppEvent.TerminalBackground]: [string];
 }
 
 export const appEvents = new EventEmitter<AppEvents>();
