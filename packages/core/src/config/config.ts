@@ -952,7 +952,7 @@ export class Config {
     }
 
     await this.geminiClient.initialize();
-    await this.syncPlanModeTools();
+    this.syncPlanModeTools();
   }
 
   getContentGenerator(): ContentGenerator {
@@ -1494,9 +1494,7 @@ export class Config {
       currentMode !== mode &&
       (currentMode === ApprovalMode.PLAN || mode === ApprovalMode.PLAN);
     if (isPlanModeTransition) {
-      this.syncPlanModeTools().catch((err) => {
-        debugLogger.error('Failed to sync plan mode tools', err);
-      });
+      this.syncPlanModeTools();
       this.updateSystemInstructionIfInitialized();
     }
   }
@@ -1504,7 +1502,7 @@ export class Config {
   /**
    * Synchronizes enter/exit plan mode tools based on current mode.
    */
-  async syncPlanModeTools(): Promise<void> {
+  syncPlanModeTools(): void {
     const isPlanMode = this.getApprovalMode() === ApprovalMode.PLAN;
     const registry = this.getToolRegistry();
 
@@ -1525,7 +1523,9 @@ export class Config {
     }
 
     if (this.geminiClient?.isInitialized()) {
-      await this.geminiClient.setTools();
+      this.geminiClient.setTools().catch((err) => {
+        debugLogger.error('Failed to update tools', err);
+      });
     }
   }
 

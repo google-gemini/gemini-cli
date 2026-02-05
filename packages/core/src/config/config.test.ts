@@ -1328,6 +1328,11 @@ describe('setApprovalMode with folder trust', () => {
   it('should update system instruction when entering Plan mode', () => {
     const config = new Config(baseParams);
     vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+    vi.spyOn(config, 'getToolRegistry').mockReturnValue({
+      getTool: vi.fn().mockReturnValue(undefined),
+      unregisterTool: vi.fn(),
+      registerTool: vi.fn(),
+    } as unknown as ReturnType<Config['getToolRegistry']>);
     const updateSpy = vi.spyOn(config, 'updateSystemInstructionIfInitialized');
 
     config.setApprovalMode(ApprovalMode.PLAN);
@@ -1341,6 +1346,11 @@ describe('setApprovalMode with folder trust', () => {
       approvalMode: ApprovalMode.PLAN,
     });
     vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+    vi.spyOn(config, 'getToolRegistry').mockReturnValue({
+      getTool: vi.fn().mockReturnValue(undefined),
+      unregisterTool: vi.fn(),
+      registerTool: vi.fn(),
+    } as unknown as ReturnType<Config['getToolRegistry']>);
     const updateSpy = vi.spyOn(config, 'updateSystemInstructionIfInitialized');
 
     config.setApprovalMode(ApprovalMode.DEFAULT);
@@ -2430,7 +2440,7 @@ describe('syncPlanModeTools', () => {
       return undefined;
     });
 
-    await config.syncPlanModeTools();
+    config.syncPlanModeTools();
 
     expect(unregisterSpy).toHaveBeenCalledWith('enter_plan_mode');
     expect(registerSpy).toHaveBeenCalledWith(expect.anything());
@@ -2457,7 +2467,7 @@ describe('syncPlanModeTools', () => {
       return undefined;
     });
 
-    await config.syncPlanModeTools();
+    config.syncPlanModeTools();
 
     expect(unregisterSpy).toHaveBeenCalledWith('exit_plan_mode');
     expect(registerSpy).toHaveBeenCalledWith(expect.anything());
@@ -2476,7 +2486,7 @@ describe('syncPlanModeTools', () => {
       .spyOn(client, 'setTools')
       .mockResolvedValue(undefined);
 
-    await config.syncPlanModeTools();
+    config.syncPlanModeTools();
 
     expect(setToolsSpy).toHaveBeenCalled();
   });
