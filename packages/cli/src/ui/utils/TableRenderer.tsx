@@ -32,13 +32,26 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   rows,
   terminalWidth,
 }) => {
+  // Clean headers: remove bold markers since we already render headers as bold
+  // and having them can break wrapping when the markers are split across lines.
+  const cleanedHeaders = headers.map((header) =>
+    header.replace(/\*\*(.*?)\*\*/g, '$1'),
+  );
+
   // --- Step 1: Define Constraints per Column ---
-  const constraints = headers.map((header, colIndex) => {
+  const constraints = cleanedHeaders.map((header, colIndex) => {
     const headerWidth = getPlainTextLength(header);
 
     // Calculate max content width and max word width for this column
     let maxContentWidth = headerWidth;
     let maxWordWidth = 0;
+
+    // Consider header words for min width calculation to allow header wrapping
+    const headerWords = header.split(/\s+/);
+    for (const word of headerWords) {
+      const wordWidth = getPlainTextLength(word);
+      maxWordWidth = Math.max(maxWordWidth, wordWidth);
+    }
 
     rows.forEach((row) => {
       const cell = row[colIndex] || '';
@@ -54,8 +67,8 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     });
 
     // min: used to guarantee minimum column width and prevent wrapping mid-word
-    // Defaults to header width or max word width
-    const minWidth = Math.max(headerWidth, maxWordWidth);
+    // Defaults to max word width (from header or content)
+    const minWidth = maxWordWidth;
 
     // max: used to determine how much the column can grow if space allows
     // Ensure max is never smaller than min
@@ -66,7 +79,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
 
   // --- Step 2: Calculate Available Space ---
   // Fixed overhead: borders (n+1) + padding (2n)
-  const fixedOverhead = headers.length + 1 + headers.length * 2;
+  const fixedOverhead = cleanedHeaders.length + 1 + cleanedHeaders.length * 2;
   const availableWidth = Math.max(0, terminalWidth - fixedOverhead - 2);
 
   // --- Step 3: Allocation Algorithm ---
@@ -77,7 +90,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     // Case A: Not enough space even for minimums.
     // We must scale all the columns except the ones that are very short(<=10 characters)
     const shortColumns = constraints.filter(
-      (c) => c.minWidth === c.maxWidth && c.minWidth <= MIN_COLUMN_WIDTH,
+      (c) => c.maxWidth <= MIN_COLUMN_WIDTH,
     );
     const totalShortColumnWidth = shortColumns.reduce(
       (sum, c) => sum + c.minWidth,
@@ -91,11 +104,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
       (availableWidth - finalTotalShortColumnWidth) /
       (totalMinWidth - finalTotalShortColumnWidth);
     finalContentWidths = constraints.map((c) => {
-      if (
-        c.minWidth === c.maxWidth &&
-        c.minWidth <= MIN_COLUMN_WIDTH &&
-        finalTotalShortColumnWidth > 0
-      ) {
+      if (c.maxWidth <= MIN_COLUMN_WIDTH && finalTotalShortColumnWidth > 0) {
         return c.minWidth;
       }
       return Math.floor(c.minWidth * scale);
@@ -240,7 +249,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
       Header row
       Keep the rowIndex as -1 to differentiate from data rows
       */}
-      {renderDataRow(headers, -1, true)}
+      {renderDataRow(cleanedHeaders, -1, true)}
 
       {/* Middle border */}
       {renderBorder('middle')}

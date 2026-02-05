@@ -1,5 +1,17 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`TableRenderer > handles wrapped bold headers without showing markers 1`] = `
+"
+┌────────────────┐
+│ Very Long Bold │
+│ Header That    │
+│ Will Wrap      │
+├────────────────┤
+│ Data           │
+└────────────────┘
+"
+`;
+
 exports[`TableRenderer > renders a 3x3 table correctly 1`] = `
 "
 ┌────────────────────────┬────────────────────────┬────────────────────────┐
@@ -9,6 +21,79 @@ exports[`TableRenderer > renders a 3x3 table correctly 1`] = `
 │ Row 2, Col 1           │ Row 2, Col 2           │ Row 2, Col 3           │
 │ Row 3, Col 1           │ Row 3, Col 2           │ Row 3, Col 3           │
 └────────────────────────┴────────────────────────┴────────────────────────┘
+"
+`;
+
+exports[`TableRenderer > renders a complex table with mixed content lengths correctly 1`] = `
+"
+┌─────────────────────────────┬──────────────────────────────┬─────────────────────────────┬────────────────────────────
+──┬─────┬────────┬─────────┬───────┐
+│ Comprehensive Architectural │ Implementation Details for   │ Longitudinal Performance    │ Strategic Security
+Framework │ Key │ Status │ Version │ Owner │
+│ Specification for the       │ the High-Throughput          │ Analysis Across             │ for Mitigating
+Sophisticated │     │        │         │       │
+│ Distributed Infrastructure  │ Asynchronous Message         │ Multi-Regional Cloud        │ Cross-Site Scripting
+│     │        │         │       │
+│ Layer                       │ Processing Pipeline with     │ Deployment Clusters         │ Vulnerabilities
+│     │        │         │       │
+│                             │ Extended Scalability         │                             │
+│     │        │         │       │
+│                             │ Features and Redundancy      │                             │
+│     │        │         │       │
+│                             │ Protocols                    │                             │
+│     │        │         │       │
+├─────────────────────────────┼──────────────────────────────┼─────────────────────────────┼────────────────────────────
+──┼─────┼────────┼─────────┼───────┤
+│ The primary architecture    │ Each message is processed    │ Historical data indicates a │ A multi-layered defense
+│ INF │ Active │ v2.4    │ J.    │
+│ utilizes a decoupled        │ through a series of          │ significant reduction in    │ strategy incorporates
+│     │        │         │ Doe   │
+│ microservices approach,     │ specialized workers that     │ tail latency when utilizing │ content security policies,
+│     │        │         │       │
+│ leveraging container        │ handle data transformation,  │ edge computing nodes closer │ input sanitization
+│     │        │         │       │
+│ orchestration for           │ validation, and persistent   │ to the geographic location  │ libraries, and regular
+│     │        │         │       │
+│ scalability and fault       │ storage using a persistent   │ of the end-user base.       │ automated penetration
+│     │        │         │       │
+│ tolerance in high-load      │ queue.                       │                             │ testing routines.
+│     │        │         │       │
+│ scenarios.                  │                              │ Monitoring tools have       │
+│     │        │         │       │
+│                             │ The pipeline features        │ captured a steady increase  │ Developers are required to
+│     │        │         │       │
+│ This layer provides the     │ built-in retry mechanisms    │ in throughput efficiency    │ undergo mandatory security
+│     │        │         │       │
+│ fundamental building blocks │ with exponential backoff to  │ since the introduction of   │ training focusing on the
+│     │        │         │       │
+│ for service discovery, load │ ensure message delivery      │ the vectorized query engine │ OWASP Top Ten to ensure
+that │     │        │         │       │
+│ balancing, and              │ integrity even during        │ in the primary data         │ security is integrated into
+│     │        │         │       │
+│ inter-service communication │ transient network or service │ warehouse.                  │ the initial design phase.
+│     │        │         │       │
+│ via highly efficient        │ failures.                    │                             │
+│     │        │         │       │
+│ protocol buffers.           │                              │ Resource utilization        │ The implementation of a
+│     │        │         │       │
+│                             │ Horizontal autoscaling is    │ metrics demonstrate that    │ robust Identity and Access
+│     │        │         │       │
+│ Advanced telemetry and      │ triggered automatically      │ the transition to           │ Management system ensures
+│     │        │         │       │
+│ logging integrations allow  │ based on the depth of the    │ serverless compute for      │ that the principle of least
+│     │        │         │       │
+│ for real-time monitoring of │ processing queue, ensuring   │ intermittent tasks has      │ privilege is strictly
+│     │        │         │       │
+│ system health and rapid     │ consistent performance       │ resulted in a thirty        │ enforced across all
+│     │        │         │       │
+│ identification of           │ during unexpected traffic    │ percent cost optimization.  │ environments.
+│     │        │         │       │
+│ bottlenecks within the      │ spikes.                      │                             │
+│     │        │         │       │
+│ service mesh.               │                              │                             │
+│     │        │         │       │
+└─────────────────────────────┴──────────────────────────────┴─────────────────────────────┴────────────────────────────
+──┴─────┴────────┴─────────┴───────┘
 "
 `;
 
@@ -23,6 +108,16 @@ exports[`TableRenderer > renders a table with long headers and 4 columns correct
 │ Data 2.1        │ Data 2.2        │ Data 2.3         │ Data 2.4         │
 │ Data 3.1        │ Data 3.2        │ Data 3.3         │ Data 3.4         │
 └─────────────────┴─────────────────┴──────────────────┴──────────────────┘
+"
+`;
+
+exports[`TableRenderer > strips bold markers from headers and renders them correctly 1`] = `
+"
+┌───────────────┬───────────────────┐
+│ Bold Header   │ Normal Header     │
+├───────────────┼───────────────────┤
+│ Data 1        │ Data 2            │
+└───────────────┴───────────────────┘
 "
 `;
 

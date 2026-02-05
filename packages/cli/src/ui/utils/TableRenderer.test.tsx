@@ -152,4 +152,95 @@ describe('TableRenderer', () => {
     expect(output).toContain('Start. Stop.');
     expect(output).toMatchSnapshot();
   });
+
+  it('strips bold markers from headers and renders them correctly', () => {
+    const headers = ['**Bold Header**', 'Normal Header'];
+    const rows = [['Data 1', 'Data 2']];
+    const terminalWidth = 40;
+
+    const { lastFrame } = renderWithProviders(
+      <TableRenderer
+        headers={headers}
+        rows={rows}
+        terminalWidth={terminalWidth}
+      />,
+    );
+
+    const output = lastFrame();
+    // The output should NOT contain the literal '**'
+    expect(output).not.toContain('**Bold Header**');
+    expect(output).toContain('Bold Header');
+    expect(output).toMatchSnapshot();
+  });
+
+  it('handles wrapped bold headers without showing markers', () => {
+    const headers = ['**Very Long Bold Header That Will Wrap**'];
+    const rows = [['Data']];
+    const terminalWidth = 20;
+
+    const { lastFrame } = renderWithProviders(
+      <TableRenderer
+        headers={headers}
+        rows={rows}
+        terminalWidth={terminalWidth}
+      />,
+    );
+
+    const output = lastFrame();
+    // Markers should be gone
+    expect(output).not.toContain('**');
+    expect(output).toContain('Very Long');
+    expect(output).toMatchSnapshot();
+  });
+
+  it('renders a complex table with mixed content lengths correctly', () => {
+    const headers = [
+      'Comprehensive Architectural Specification for the Distributed Infrastructure Layer',
+      'Implementation Details for the High-Throughput Asynchronous Message Processing Pipeline with Extended Scalability Features and Redundancy Protocols',
+      'Longitudinal Performance Analysis Across Multi-Regional Cloud Deployment Clusters',
+      'Strategic Security Framework for Mitigating Sophisticated Cross-Site Scripting Vulnerabilities',
+      'Key',
+      'Status',
+      'Version',
+      'Owner',
+    ];
+    const rows = [
+      [
+        'The primary architecture utilizes a decoupled microservices approach, leveraging container orchestration for scalability and fault tolerance in high-load scenarios.\n\nThis layer provides the fundamental building blocks for service discovery, load balancing, and inter-service communication via highly efficient protocol buffers.\n\nAdvanced telemetry and logging integrations allow for real-time monitoring of system health and rapid identification of bottlenecks within the service mesh.',
+        'Each message is processed through a series of specialized workers that handle data transformation, validation, and persistent storage using a persistent queue.\n\nThe pipeline features built-in retry mechanisms with exponential backoff to ensure message delivery integrity even during transient network or service failures.\n\nHorizontal autoscaling is triggered automatically based on the depth of the processing queue, ensuring consistent performance during unexpected traffic spikes.',
+        'Historical data indicates a significant reduction in tail latency when utilizing edge computing nodes closer to the geographic location of the end-user base.\n\nMonitoring tools have captured a steady increase in throughput efficiency since the introduction of the vectorized query engine in the primary data warehouse.\n\nResource utilization metrics demonstrate that the transition to serverless compute for intermittent tasks has resulted in a thirty percent cost optimization.',
+        'A multi-layered defense strategy incorporates content security policies, input sanitization libraries, and regular automated penetration testing routines.\n\nDevelopers are required to undergo mandatory security training focusing on the OWASP Top Ten to ensure that security is integrated into the initial design phase.\n\nThe implementation of a robust Identity and Access Management system ensures that the principle of least privilege is strictly enforced across all environments.',
+        'INF',
+        'Active',
+        'v2.4',
+        'J. Doe',
+      ],
+    ];
+
+    const terminalWidth = 160;
+
+    const { lastFrame } = renderWithProviders(
+      <TableRenderer
+        headers={headers}
+        rows={rows}
+        terminalWidth={terminalWidth}
+      />,
+    );
+
+    const output = lastFrame();
+
+    expect(output).toContain('Comprehensive Architectural');
+    expect(output).toContain('protocol buffers');
+    expect(output).toContain('exponential backoff');
+    expect(output).toContain('vectorized query engine');
+    expect(output).toContain('OWASP Top Ten');
+    expect(output).toContain('INF');
+    expect(output).toContain('Active');
+    expect(output).toContain('v2.4');
+    // "J. Doe" might wrap due to column width constraints
+    expect(output).toContain('J.');
+    expect(output).toContain('Doe');
+
+    expect(output).toMatchSnapshot();
+  });
 });
