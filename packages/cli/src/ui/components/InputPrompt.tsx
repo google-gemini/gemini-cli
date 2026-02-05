@@ -488,6 +488,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return false;
       }
 
+      // Handle escape to close shortcuts panel first, before letting it bubble
+      // up for cancellation. This ensures pressing Escape once closes the panel,
+      // and pressing again cancels the operation.
+      if (shortcutsHelpVisible && key.name === 'escape') {
+        setShortcutsHelpVisible(false);
+        return true;
+      }
+
       if (
         key.name === 'escape' &&
         (streamingState === StreamingState.Responding ||
@@ -531,11 +539,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           buffer.handleInput(key);
           return true;
         }
-        if (
-          keyMatchers[Command.ESCAPE](key) ||
-          key.name === 'backspace' ||
-          key.sequence === '\b'
-        ) {
+        // Escape is handled earlier to ensure it closes the panel before
+        // potentially cancelling an operation
+        if (key.name === 'backspace' || key.sequence === '\b') {
           setShortcutsHelpVisible(false);
           return true;
         }
