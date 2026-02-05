@@ -1,0 +1,74 @@
+# This workflow is triggered on every new release.
+# It uses Gemini to generate release notes and creates a PR with the changes.
+name: Generate Release Notes
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  generate-release-notes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # The user-level skills need to be available to the workflow
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Get release information
+        id: release_info
+        run: |
+          VERSION="${{ github.event.release.tag_name }}"
+          # Get the previous release tag
+          PREVIOUS_VERSION=$(gh release list --limit 1 --exclude-drafts --exclude-prereleases --json tagName -q '.[0].tagName' | sed 's/^v//')
+          
+          # Sanitize the release body to be passed as a command-line argument
+          # This replaces newlines with a special marker to be undone in the prompt
+          RAW_CHANGELOG=$(echo "${{ github.event.release.body }}" | tr '\n' '%%NEWLINE%%')
+
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "PREVIOUS_VERSION=$PREVIOUS_VERSION" >> $GITHUB_OUTPUT
+          echo "RAW_CHANGELOG=$RAW_CHANGELOG" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Generate Changelog with Gemini
+        uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
+        env:
+          VERSION: ${{ steps.release_info.outputs.VERSION }}
+          PREVIOUS_VERSION: ${{ steps.release_info.outputs.PREVIOUS_VERSION }}
+          RAW_CHANGELOG: ${{ steps.release_info.outputs.RAW_CHANGELOG }}
+        with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          prompt: |
+            Activate the 'docs-changelog' skill.
+
+            **Release Information:**
+            - New Version: $VERSION
+            - Previous Version: $PREVIOUS_VERSION
+            - Release Date: $(date +%Y-%m-%d)
+            - Raw Changelog Data (newlines replaced with '%%NEWLINE%%'): $RAW_CHANGELOG
+
+            Execute the release notes generation process using the information provided.
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "docs(changelog): update for ${{ steps.release_info.outputs.VERSION }}"
+          title: "Changelog for ${{ steps.release_info.outputs.VERSION }}"
+          body: |
+            This PR contains the auto-generated changelog for the ${{ steps.release_info.outputs.VERSION }} release.
+
+            Please review and merge.
+          branch: "changelog-${{ steps.release_info.outputs.VERSION }}"
+          delete-branch: true
