@@ -456,7 +456,8 @@ export class TestRig {
   } {
     const isNpmReleaseTest =
       env['INTEGRATION_TEST_USE_INSTALLED_GEMINI'] === 'true';
-    const command = isNpmReleaseTest ? 'gemini' : 'node';
+    const geminiCommand = os.platform() === 'win32' ? 'gemini.cmd' : 'gemini';
+    const command = isNpmReleaseTest ? geminiCommand : 'node';
     const initialArgs = isNpmReleaseTest
       ? extraInitialArgs
       : [BUNDLE_PATH, ...extraInitialArgs];
