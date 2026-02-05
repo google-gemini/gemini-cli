@@ -35,8 +35,9 @@ Regardless of the type of release, the following information is expected:
 *   **Raw changelog data:** A list of all pull requests and changes
     included in the release, in the format `description by @author in
     #pr_number`.
-*   **Previous version number:** The version number of the last release
-    (e.g., `v0.26.0`).
+*   **Previous version number:** The version number of the last release can be
+    calculated by decreasing the minor version number by one and setting the
+    patch or bug fix version number.
 
 ## Procedure
 
