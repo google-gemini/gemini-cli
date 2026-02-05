@@ -238,6 +238,7 @@ export const useSlashCommandProcessor = (
         dispatchExtensionStateUpdate: actions.dispatchExtensionStateUpdate,
         addConfirmUpdateExtensionRequest:
           actions.addConfirmUpdateExtensionRequest,
+        setConfirmationRequest,
         removeComponent: () => setCustomDialog(null),
         toggleBackgroundShell: actions.toggleBackgroundShell,
         toggleShortcutsHelp: actions.toggleShortcutsHelp,
@@ -260,6 +261,7 @@ export const useSlashCommandProcessor = (
       actions,
       pendingItem,
       setPendingItem,
+      setConfirmationRequest,
       toggleVimEnabled,
       sessionShellAllowlist,
       reloadCommands,

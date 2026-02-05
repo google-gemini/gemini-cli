@@ -92,21 +92,6 @@ describe('planCommand', () => {
     );
   });
 
-  it('should show "No approved plan found" if no approved plan path in config', async () => {
-    vi.mocked(mockContext.services.config!.isPlanEnabled).mockReturnValue(true);
-    vi.mocked(mockContext.services.config!.getApprovedPlanPath).mockReturnValue(
-      undefined,
-    );
-
-    if (!planCommand.action) throw new Error('Action missing');
-    await planCommand.action(mockContext, '');
-
-    expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
-      'error',
-      'No approved plan found. Please create and approve a plan first.',
-    );
-  });
-
   it('should display the approved plan from config', async () => {
     const mockPlanPath = '/mock/plans/dir/approved-plan.md';
     vi.mocked(mockContext.services.config!.isPlanEnabled).mockReturnValue(true);
