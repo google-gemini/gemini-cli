@@ -58,9 +58,6 @@ describe('Card', () => {
 
       const output = lastFrame();
 
-      // eslint-disable-next-line no-console
-      console.log(output);
-
       expect(output).toMatchSnapshot();
     },
   );
