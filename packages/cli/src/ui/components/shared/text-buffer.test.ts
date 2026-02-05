@@ -1215,6 +1215,79 @@ describe('useTextBuffer', () => {
       act(() => result.current.move('end')); // visual cursor to [1,3] (end of "one")
       expect(getBufferState(result).visualCursor).toEqual([1, 3]); // "one" is 3 chars
     });
+
+    it('move: up/down should work on a single logical line that wraps to multiple visual lines', () => {
+      // Create a single logical line that wraps to multiple visual lines
+      // With viewport width 10, "This is a very long line" should wrap to:
+      // "This is a"
+      // "very long"
+      // "line"
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: 'This is a very long line',
+          viewport: { width: 10, height: 5 },
+          isValidPath: () => false,
+        }),
+      );
+
+      // Verify we have multiple visual lines from a single logical line
+      expect(result.current.allVisualLines.length).toBeGreaterThan(1);
+      expect(result.current.lines.length).toBe(1); // Single logical line
+
+      // Move cursor to end of text using right arrow (should be on last visual line)
+      // The text is 24 chars, so 24 right moves should put us at the end
+      for (let i = 0; i < 24; i++) {
+        act(() => result.current.move('right'));
+      }
+
+      // Should be on the last visual line
+      const stateAtEnd = getBufferState(result);
+      expect(stateAtEnd.visualCursor[0]).toBeGreaterThan(0);
+      const visualRowBeforeUp = stateAtEnd.visualCursor[0];
+
+      // Now press up - should move to previous visual line
+      act(() => result.current.move('up'));
+      const stateAfterUp = getBufferState(result);
+
+      // Visual row should decrease by 1 (moved up within wrapped lines)
+      expect(stateAfterUp.visualCursor[0]).toBe(visualRowBeforeUp - 1);
+
+      // Now press down - should move back to the last visual line
+      act(() => result.current.move('down'));
+      const stateAfterDown = getBufferState(result);
+      expect(stateAfterDown.visualCursor[0]).toBe(visualRowBeforeUp);
+    });
+
+    it('move: up/down should work after typing text that wraps (via insert)', () => {
+      // Test that up/down work correctly after typing (not just initial text)
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: '',
+          viewport: { width: 10, height: 5 },
+          isValidPath: () => false,
+        }),
+      );
+
+      // Type text character by character (simulating user input)
+      const textToType = 'This is a very long line';
+      for (const char of textToType) {
+        act(() => result.current.insert(char, { paste: false }));
+      }
+
+      // Verify we have multiple visual lines
+      expect(result.current.allVisualLines.length).toBeGreaterThan(1);
+      expect(result.current.lines.length).toBe(1);
+
+      // After typing, cursor should be at the end (on the last visual line)
+      const stateAfterTyping = getBufferState(result);
+      expect(stateAfterTyping.visualCursor[0]).toBeGreaterThan(0);
+      const visualRowAtEnd = stateAfterTyping.visualCursor[0];
+
+      // Now press up - should move to previous visual line
+      act(() => result.current.move('up'));
+      const stateAfterUp = getBufferState(result);
+      expect(stateAfterUp.visualCursor[0]).toBe(visualRowAtEnd - 1);
+    });
   });
 
   describe('Visual Layout & Viewport', () => {

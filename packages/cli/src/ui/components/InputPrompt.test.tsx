@@ -336,6 +336,50 @@ describe('InputPrompt', () => {
     unmount();
   });
 
+  it('should move cursor within wrapped text on up arrow in shell mode', async () => {
+    props.shellModeActive = true;
+    props.buffer.allVisualLines = ['This is a', 'very long', 'line'];
+    props.buffer.visualCursor = [2, 4]; // Not at top
+    props.buffer.visualScrollRow = 0;
+
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    await act(async () => {
+      stdin.write('\u001B[A'); // Up arrow
+    });
+
+    await waitFor(() => {
+      expect(props.buffer.handleInput).toHaveBeenCalled();
+    });
+    expect(mockShellHistory.getPreviousCommand).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('should move cursor within wrapped text on down arrow in shell mode', async () => {
+    props.shellModeActive = true;
+    props.buffer.allVisualLines = ['This is a', 'very long', 'line'];
+    props.buffer.visualCursor = [0, 4]; // Not at bottom
+    props.buffer.visualScrollRow = 0;
+
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    await act(async () => {
+      stdin.write('\u001B[B'); // Down arrow
+    });
+
+    await waitFor(() => {
+      expect(props.buffer.handleInput).toHaveBeenCalled();
+    });
+    expect(mockShellHistory.getNextCommand).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
   it('should set the buffer text when a shell history command is retrieved', async () => {
     props.shellModeActive = true;
     vi.mocked(mockShellHistory.getPreviousCommand).mockReturnValue(
@@ -522,6 +566,52 @@ describe('InputPrompt', () => {
       expect(mockBuffer.setText).toHaveBeenCalledWith('');
       expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
     });
+    unmount();
+  });
+
+  it('should call buffer.handleInput for up arrow when cursor is NOT on first visual line of wrapped text (issue #17997)', async () => {
+    // Setup: multiple visual lines (wrapped text) with cursor on line 2
+    props.buffer.allVisualLines = ['This is a', 'very long', 'line'];
+    props.buffer.visualCursor = [2, 4]; // Cursor on 3rd visual line
+    props.buffer.visualScrollRow = 0;
+
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    await act(async () => {
+      stdin.write('\u001B[A'); // Up arrow
+    });
+
+    // Should call buffer.handleInput for cursor movement, NOT history navigation
+    await waitFor(() => {
+      expect(props.buffer.handleInput).toHaveBeenCalled();
+    });
+    expect(mockInputHistory.navigateUp).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('should call inputHistory.navigateUp for up arrow when cursor IS on first visual line of wrapped text', async () => {
+    // Setup: multiple visual lines (wrapped text) with cursor on line 0
+    props.buffer.allVisualLines = ['This is a', 'very long', 'line'];
+    props.buffer.visualCursor = [0, 5]; // Cursor on 1st visual line
+    props.buffer.visualScrollRow = 0;
+
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    await act(async () => {
+      stdin.write('\u001B[A'); // Up arrow
+    });
+
+    // Should navigate history because cursor is at the top
+    await waitFor(() => {
+      expect(mockInputHistory.navigateUp).toHaveBeenCalled();
+    });
+    expect(props.buffer.handleInput).not.toHaveBeenCalled();
+
     unmount();
   });
 
