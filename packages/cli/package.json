@@ -36,6 +36,7 @@
     "@modelcontextprotocol/sdk": "^1.23.0",
     "@types/update-notifier": "^6.0.8",
     "ansi-regex": "^6.2.2",
+    "chalk": "^5.4.1",
     "clipboardy": "^5.0.0",
     "color-convert": "^2.0.1",
     "command-exists": "^1.2.9",
