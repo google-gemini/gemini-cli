@@ -305,6 +305,7 @@ You are operating in **Plan Mode** - a structured planning workflow for designin
 The following read-only tools are available in Plan Mode:
 ${options.planModeToolsList}
 - \`${WRITE_FILE_TOOL_NAME}\` - Save plans to the plans directory (see Plan Storage below)
+- \`${EDIT_TOOL_NAME}\` - Update plans in the plans directory
 
 ## Plan Storage
 - Save your plans as Markdown (.md) files ONLY within: \`${options.plansDir}/\`
@@ -431,6 +432,10 @@ function newApplicationSteps(interactive: boolean): string {
 
 function shellEfficiencyGuidelines(enabled: boolean): string {
   if (!enabled) return '';
+  const isWindows = process.platform === 'win32';
+  const inspectExample = isWindows
+    ? "using commands like 'type' or 'findstr' (on CMD) and 'Get-Content' or 'Select-String' (on PowerShell)"
+    : "using commands like 'grep', 'tail', 'head'";
   return `
 ## Shell tool output token efficiency:
 
@@ -441,7 +446,7 @@ IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
 - If a command is expected to produce a lot of output, use quiet or silent flags where available and appropriate.
 - Always consider the trade-off between output verbosity and the need for information. If a command's full output is essential for understanding the result, avoid overly aggressive quieting that might obscure important details.
 - If a command does not have quiet/silent flags or for commands with potentially long output that may not be useful, redirect stdout and stderr to temp files in the project's temporary directory. For example: 'command > <temp_dir>/out.log 2> <temp_dir>/err.log'.
-- After the command runs, inspect the temp files (e.g. '<temp_dir>/out.log' and '<temp_dir>/err.log') using commands like 'grep', 'tail', 'head', ... (or platform equivalents). Remove the temp files when done.`;
+- After the command runs, inspect the temp files (e.g. '<temp_dir>/out.log' and '<temp_dir>/err.log') ${inspectExample}. Remove the temp files when done.`;
 }
 
 function toneAndStyleNoChitchat(isGemini3: boolean): string {
@@ -455,11 +460,11 @@ function toneAndStyleNoChitchat(isGemini3: boolean): string {
 function toolUsageInteractive(interactive: boolean): string {
   if (interactive) {
     return `
-- **Background Processes:** Use background processes (via \`&\`) for commands that are unlikely to stop on their own, e.g. \`node server.js &\`. If unsure, ask the user.
+- **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true. If unsure, ask the user.
 - **Interactive Commands:** Never use interactive shell commands unless absolutely necessary. **ALWAYS** use arguments to bypass prompts for **EVERY** tool in use that supports it, even if that command is part of a chain or larger command. For example: 'git --no-pager', 'vitest run', and 'npx --yes' to bypass interactive prompts.`;
   }
   return `
-- **Background Processes:** Use background processes (via \`&\`) for commands that are unlikely to stop on their own, e.g. \`node server.js &\`.
+- **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true.
 - **Interactive Commands:** Never use interactive shell commands. **ALWAYS** use arguments to bypass prompts for **EVERY** tool in use that supports it, even if that command is part of a chain or larger command. For example: 'git --no-pager', 'vitest run', and 'npx --yes' to bypass interactive prompts.`;
 }
 
