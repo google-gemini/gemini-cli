@@ -177,9 +177,8 @@ The following read-only tools are available in Plan Mode:
 - If plan is rejected, address the feedback and iterate on the plan
 
 ## Approved Plan
-An approved plan exists at: \`/tmp/plans/feature-x.md\`.
-Treat this file as the source of truth for the plan.
-- **Iterate:** You should default to reading this file using \`read_file\` and updating it with new refinements.
+An approved plan has been identified for this task.
+- **Iterate:** You should default to iterating on the existing approved plan.
 - **New Plan:** Only create a new plan file if the user explicitly asks for a "new plan" or if the current request is for a completely different feature/bug.
 
 ## Constraints

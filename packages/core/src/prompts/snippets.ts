@@ -339,22 +339,21 @@ ${options.planModeToolsList}
 - If plan is approved, you can begin implementation
 - If plan is rejected, address the feedback and iterate on the plan
 
-${
-  options.approvedPlanPath
-    ? `## Approved Plan
-An approved plan exists at: \`${options.approvedPlanPath}\`.
-Treat this file as the source of truth for the plan.
-- **Iterate:** You should default to reading this file using \`${READ_FILE_TOOL_NAME}\` and updating it with new refinements.
-- **New Plan:** Only create a new plan file if the user explicitly asks for a "new plan" or if the current request is for a completely different feature/bug.
-
-`
-    : ''
-}
+${renderApprovedPlanSection(options.approvedPlanPath)}
 
 ## Constraints
 - You may ONLY use the read-only tools listed above
 - You MUST NOT modify source code, configs, or any files
 - If asked to modify code, explain you are in Plan Mode and suggest exiting Plan Mode to enable edits`.trim();
+}
+
+function renderApprovedPlanSection(approvedPlanPath?: string): string {
+  if (!approvedPlanPath) return '';
+  return `## Approved Plan
+An approved plan has been identified for this task.
+- **Iterate:** You should default to iterating on the existing approved plan.
+- **New Plan:** Only create a new plan file if the user explicitly asks for a "new plan" or if the current request is for a completely different feature/bug.
+`;
 }
 
 // --- Leaf Helpers (Strictly strings or simple calls) ---
