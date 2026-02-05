@@ -141,8 +141,8 @@ Validation (these are probably hardest to validate):
 
 ## `Custom Skills`
 
-> **Status:** Implemented. `skillDir`, `skillRoot` helpers and `GeminiCliAgent`
-> support loading skills from filesystem.
+> **Status:** Implemented. `skillDir` helper and `GeminiCliAgent` support
+> loading skills from filesystem.
 
 Custom skills can be referenced by individual directories or by "skill roots"
 (directories containing many skills).
@@ -159,7 +159,7 @@ skill-dir/
 ### Usage
 
 ```typescript
-import { GeminiCliAgent, skillDir, skillRoot } from '@google/gemini-sdk';
+import { GeminiCliAgent, skillDir } from '@google/gemini-sdk';
 
 const agent = new GeminiCliAgent({
   instructions: 'You are a helpful assistant.',
@@ -167,7 +167,7 @@ const agent = new GeminiCliAgent({
     // Load a single skill from a directory
     skillDir('./my-skill'),
     // Load all skills found in subdirectories of this root
-    skillRoot('./skills-collection'),
+    skillDir('./skills-collection'),
   ],
 });
 ```

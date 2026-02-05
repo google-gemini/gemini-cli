@@ -44,10 +44,10 @@ export interface GeminiCliAgentOptions {
 }
 
 export class GeminiCliAgent {
-  private config: Config;
+  private readonly config: Config;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private tools: Array<Tool<any>>;
-  private skillRefs: SkillReference[];
+  private readonly tools: Array<Tool<any>>;
+  private readonly skillRefs: SkillReference[];
   private readonly instructions: SystemInstructions;
   private instructionsLoaded = false;
 
@@ -97,7 +97,7 @@ export class GeminiCliAgent {
 
         const loadPromises = this.skillRefs.map(async (ref) => {
           try {
-            if (ref.type === 'dir' || ref.type === 'root') {
+            if (ref.type === 'dir') {
               return await loadSkillsFromDir(ref.path);
             }
           } catch (e) {

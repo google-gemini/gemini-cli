@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { GeminiCliAgent } from './agent.js';
-import { skillDir, skillRoot } from './skills.js';
+import { skillDir } from './skills.js';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
@@ -62,7 +62,7 @@ describe('GeminiCliAgent Skills Integration', () => {
 
     const agent = new GeminiCliAgent({
       instructions: 'You are a helpful assistant.',
-      skills: [skillRoot(SKILL_ROOT)],
+      skills: [skillDir(SKILL_ROOT)],
       // If recording, use real model + record path.
       // If testing, use auto model + fake path.
       model: RECORD_MODE ? 'gemini-2.0-flash' : undefined,
