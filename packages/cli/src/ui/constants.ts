@@ -24,6 +24,8 @@ export const TOOL_STATUS = {
   CONFIRMING: '?',
   CANCELED: '-',
   ERROR: 'x',
+  WARNING: '⚠',
+  INFORMATION: 'ℹ',
 } as const;
 
 // Maximum number of MCP resources to display per server before truncating
