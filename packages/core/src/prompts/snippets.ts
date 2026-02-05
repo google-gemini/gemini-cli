@@ -135,7 +135,15 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
   return `
 # Core Mandates
 
-- **Context Efficiency:** Minimize unnecessary context usage by reading as much as is needed to solve the problem best, but no more. Use '${GREP_TOOL_NAME}' to find matching lines and '${READ_FILE_TOOL_NAME}' with 'limit' to read only the necessary large files.
+- **Context Efficiency:**
+  - Avoid wasting context window by using 'offset' and 'limit to scope ${READ_FILE_TOOL_NAME} results to just enough information to definitively answer the question.
+  - Extra tool calls can negate any benefits of limits, so balance frugality with the cost of having to iterate.
+  - Some ${READ_FILE_TOOL_NAME}examples:
+    - Use 'offset' and 'limit' to read a single contiguous range from a file when you only need a range within.
+    - Use 'offset' and 'limit' to read a single contiguous range that covers two ranges that are near each other, rather than using an extra read tool call.
+    - Do not use 'offset' or 'limit' when trying to deeply understand a file.
+    - Do not use 'offset' or 'limit' when you have several ranges of interest that are not near each other and doing so would require more than one tool call.
+
 - **Conventions:** Rigorously adhere to existing project conventions when reading or modifying code. Analyze surrounding code, tests, and configuration first.
 - **Libraries/Frameworks:** NEVER assume a library/framework is available or appropriate. Verify its established usage within the project (check imports, configuration files like 'package.json', 'Cargo.toml', 'requirements.txt', 'build.gradle', etc., or observe neighboring files) before employing it.
 - **Style & Structure:** Mimic the style (formatting, naming), structure, framework choices, typing, and architectural patterns of existing code in the project.
