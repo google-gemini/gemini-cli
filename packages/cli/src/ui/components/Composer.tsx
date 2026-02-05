@@ -56,22 +56,9 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
       flexGrow={0}
       flexShrink={0}
     >
-      {(!uiState.embeddedShellFocused || uiState.isBackgroundShellVisible) && (
-        <LoadingIndicator
-          thought={
-            uiState.streamingState === StreamingState.WaitingForConfirmation ||
-            config.getAccessibility()?.enableLoadingPhrases === false
-              ? undefined
-              : uiState.thought
-          }
-          currentLoadingPhrase={
-            config.getAccessibility()?.enableLoadingPhrases === false
-              ? undefined
-              : uiState.currentLoadingPhrase
-          }
-          elapsedTime={uiState.elapsedTime}
-        />
-      )}
+      {/*
+        Loading indicator now renders inline beside the shortcuts hint.
+      */}
 
       {(!uiState.slashCommands ||
         !uiState.isConfigInitialized ||
@@ -102,10 +89,43 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           justifyContent="space-between"
           width="100%"
         >
-          <ShortcutsHint />
-          <Box flexGrow={1} justifyContent="flex-end" flexDirection="row">
-            <StatusDisplay hideContextSummary={hideContextSummary} />
-          </Box>
+          {(!uiState.embeddedShellFocused ||
+            uiState.isBackgroundShellVisible) &&
+          (uiState.streamingState !== StreamingState.Idle ||
+            (uiState.elapsedTime > 0 &&
+              (Boolean(uiState.currentLoadingPhrase) ||
+                Boolean(uiState.thought)))) ? (
+            <LoadingIndicator
+              inline
+              thought={
+                uiState.streamingState ===
+                  StreamingState.WaitingForConfirmation ||
+                config.getAccessibility()?.enableLoadingPhrases === false
+                  ? undefined
+                  : uiState.thought
+              }
+              currentLoadingPhrase={
+                config.getAccessibility()?.enableLoadingPhrases === false
+                  ? undefined
+                  : uiState.currentLoadingPhrase
+              }
+              elapsedTime={uiState.elapsedTime}
+            />
+          ) : (
+            <ShortcutsHint />
+          )}
+          {!(
+            (!uiState.embeddedShellFocused ||
+              uiState.isBackgroundShellVisible) &&
+            (uiState.streamingState !== StreamingState.Idle ||
+              (uiState.elapsedTime > 0 &&
+                (Boolean(uiState.currentLoadingPhrase) ||
+                  Boolean(uiState.thought))))
+          ) && (
+            <Box flexGrow={1} justifyContent="flex-end" flexDirection="row">
+              <StatusDisplay hideContextSummary={hideContextSummary} />
+            </Box>
+          )}
         </Box>
         <Box paddingTop={isNarrow ? 1 : 0}>
           {showApprovalModeIndicator !== ApprovalMode.DEFAULT &&
