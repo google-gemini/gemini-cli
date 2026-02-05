@@ -38,6 +38,10 @@ const CMD_TYPES = {
   CHANGE_LINE: 'cc',
   DELETE_TO_EOL: 'D',
   CHANGE_TO_EOL: 'C',
+  DELETE_TO_LINE_START: 'd0',
+  CHANGE_TO_LINE_START: 'c0',
+  DELETE_TO_FIRST_NON_WHITESPACE: 'd^',
+  CHANGE_TO_FIRST_NON_WHITESPACE: 'c^',
   CHANGE_MOVEMENT: {
     LEFT: 'ch',
     DOWN: 'cj',
@@ -285,6 +289,28 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
         case CMD_TYPES.CHANGE_TO_EOL: {
           buffer.vimChangeToEndOfLine();
+          updateMode('INSERT');
+          break;
+        }
+
+        case CMD_TYPES.DELETE_TO_LINE_START: {
+          buffer.vimDeleteToLineStart();
+          break;
+        }
+
+        case CMD_TYPES.CHANGE_TO_LINE_START: {
+          buffer.vimChangeToLineStart();
+          updateMode('INSERT');
+          break;
+        }
+
+        case CMD_TYPES.DELETE_TO_FIRST_NON_WHITESPACE: {
+          buffer.vimDeleteToFirstNonWhitespace();
+          break;
+        }
+
+        case CMD_TYPES.CHANGE_TO_FIRST_NON_WHITESPACE: {
+          buffer.vimChangeToFirstNonWhitespace();
           updateMode('INSERT');
           break;
         }
@@ -691,22 +717,76 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
           }
 
           case '0': {
-            // Move to start of line
-            buffer.vimMoveToLineStart();
+            if (state.pendingOperator === 'd') {
+              executeCommand(CMD_TYPES.DELETE_TO_LINE_START, 1);
+              dispatch({
+                type: 'SET_LAST_COMMAND',
+                command: { type: CMD_TYPES.DELETE_TO_LINE_START, count: 1 },
+              });
+              dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
+            } else if (state.pendingOperator === 'c') {
+              executeCommand(CMD_TYPES.CHANGE_TO_LINE_START, 1);
+              dispatch({
+                type: 'SET_LAST_COMMAND',
+                command: { type: CMD_TYPES.CHANGE_TO_LINE_START, count: 1 },
+              });
+              dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
+            } else {
+              // Move to start of line
+              buffer.vimMoveToLineStart();
+            }
             dispatch({ type: 'CLEAR_COUNT' });
             return true;
           }
 
           case '$': {
-            // Move to end of line
-            buffer.vimMoveToLineEnd();
+            if (state.pendingOperator === 'd') {
+              executeCommand(CMD_TYPES.DELETE_TO_EOL, 1);
+              dispatch({
+                type: 'SET_LAST_COMMAND',
+                command: { type: CMD_TYPES.DELETE_TO_EOL, count: 1 },
+              });
+              dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
+            } else if (state.pendingOperator === 'c') {
+              executeCommand(CMD_TYPES.CHANGE_TO_EOL, 1);
+              dispatch({
+                type: 'SET_LAST_COMMAND',
+                command: { type: CMD_TYPES.CHANGE_TO_EOL, count: 1 },
+              });
+              dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
+            } else {
+              // Move to end of line
+              buffer.vimMoveToLineEnd();
+            }
             dispatch({ type: 'CLEAR_COUNT' });
             return true;
           }
 
           case '^': {
-            // Move to first non-whitespace character
-            buffer.vimMoveToFirstNonWhitespace();
+            if (state.pendingOperator === 'd') {
+              executeCommand(CMD_TYPES.DELETE_TO_FIRST_NON_WHITESPACE, 1);
+              dispatch({
+                type: 'SET_LAST_COMMAND',
+                command: {
+                  type: CMD_TYPES.DELETE_TO_FIRST_NON_WHITESPACE,
+                  count: 1,
+                },
+              });
+              dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
+            } else if (state.pendingOperator === 'c') {
+              executeCommand(CMD_TYPES.CHANGE_TO_FIRST_NON_WHITESPACE, 1);
+              dispatch({
+                type: 'SET_LAST_COMMAND',
+                command: {
+                  type: CMD_TYPES.CHANGE_TO_FIRST_NON_WHITESPACE,
+                  count: 1,
+                },
+              });
+              dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
+            } else {
+              // Move to first non-whitespace character
+              buffer.vimMoveToFirstNonWhitespace();
+            }
             dispatch({ type: 'CLEAR_COUNT' });
             return true;
           }

@@ -1655,6 +1655,10 @@ export type TextBufferAction =
   | { type: 'vim_change_line'; payload: { count: number } }
   | { type: 'vim_delete_to_end_of_line' }
   | { type: 'vim_change_to_end_of_line' }
+  | { type: 'vim_delete_to_line_start' }
+  | { type: 'vim_change_to_line_start' }
+  | { type: 'vim_delete_to_first_non_whitespace' }
+  | { type: 'vim_change_to_first_non_whitespace' }
   | {
       type: 'vim_change_movement';
       payload: { movement: 'h' | 'j' | 'k' | 'l'; count: number };
@@ -2458,6 +2462,10 @@ function textBufferReducerLogic(
     case 'vim_move_to_first_line':
     case 'vim_move_to_last_line':
     case 'vim_move_to_line':
+    case 'vim_delete_to_line_start':
+    case 'vim_change_to_line_start':
+    case 'vim_delete_to_first_non_whitespace':
+    case 'vim_change_to_first_non_whitespace':
     case 'vim_escape_insert_mode':
       return handleVimAction(state, action as VimAction);
 
@@ -2946,6 +2954,22 @@ export function useTextBuffer({
 
   const vimChangeToEndOfLine = useCallback((): void => {
     dispatch({ type: 'vim_change_to_end_of_line' });
+  }, []);
+
+  const vimDeleteToLineStart = useCallback((): void => {
+    dispatch({ type: 'vim_delete_to_line_start' });
+  }, []);
+
+  const vimChangeToLineStart = useCallback((): void => {
+    dispatch({ type: 'vim_change_to_line_start' });
+  }, []);
+
+  const vimDeleteToFirstNonWhitespace = useCallback((): void => {
+    dispatch({ type: 'vim_delete_to_first_non_whitespace' });
+  }, []);
+
+  const vimChangeToFirstNonWhitespace = useCallback((): void => {
+    dispatch({ type: 'vim_change_to_first_non_whitespace' });
   }, []);
 
   const vimChangeMovement = useCallback(
@@ -3506,6 +3530,10 @@ export function useTextBuffer({
       vimChangeLine,
       vimDeleteToEndOfLine,
       vimChangeToEndOfLine,
+      vimDeleteToLineStart,
+      vimChangeToLineStart,
+      vimDeleteToFirstNonWhitespace,
+      vimChangeToFirstNonWhitespace,
       vimChangeMovement,
       vimMoveLeft,
       vimMoveRight,
@@ -3588,6 +3616,10 @@ export function useTextBuffer({
       vimChangeLine,
       vimDeleteToEndOfLine,
       vimChangeToEndOfLine,
+      vimDeleteToLineStart,
+      vimChangeToLineStart,
+      vimDeleteToFirstNonWhitespace,
+      vimChangeToFirstNonWhitespace,
       vimChangeMovement,
       vimMoveLeft,
       vimMoveRight,
@@ -3833,6 +3865,22 @@ export interface TextBuffer {
    * Change from cursor to end of line (vim 'C' command)
    */
   vimChangeToEndOfLine: () => void;
+  /**
+   * Delete from cursor to start of line (vim 'd0' command)
+   */
+  vimDeleteToLineStart: () => void;
+  /**
+   * Change from cursor to start of line (vim 'c0' command)
+   */
+  vimChangeToLineStart: () => void;
+  /**
+   * Delete from cursor to first non-whitespace character (vim 'd^' command)
+   */
+  vimDeleteToFirstNonWhitespace: () => void;
+  /**
+   * Change from cursor to first non-whitespace character (vim 'c^' command)
+   */
+  vimChangeToFirstNonWhitespace: () => void;
   /**
    * Change movement operations (vim 'ch', 'cj', 'ck', 'cl' commands)
    */

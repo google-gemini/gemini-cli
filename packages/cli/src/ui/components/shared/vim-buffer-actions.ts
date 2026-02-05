@@ -40,6 +40,10 @@ export type VimAction = Extract<
   | { type: 'vim_change_line' }
   | { type: 'vim_delete_to_end_of_line' }
   | { type: 'vim_change_to_end_of_line' }
+  | { type: 'vim_delete_to_line_start' }
+  | { type: 'vim_change_to_line_start' }
+  | { type: 'vim_delete_to_first_non_whitespace' }
+  | { type: 'vim_change_to_first_non_whitespace' }
   | { type: 'vim_change_movement' }
   | { type: 'vim_move_left' }
   | { type: 'vim_move_right' }
@@ -383,6 +387,54 @@ export function handleVimAction(
         endCol,
         '',
       );
+    }
+
+    case 'vim_delete_to_line_start':
+    case 'vim_change_to_line_start': {
+      if (cursorCol > 0) {
+        const nextState = detachExpandedPaste(pushUndo(state));
+        return replaceRangeInternal(
+          nextState,
+          cursorRow,
+          0,
+          cursorRow,
+          cursorCol,
+          '',
+        );
+      }
+      return state;
+    }
+
+    case 'vim_delete_to_first_non_whitespace':
+    case 'vim_change_to_first_non_whitespace': {
+      const currentLine = lines[cursorRow] || '';
+      let firstNonWhitespaceCol = 0;
+      const lineCodePoints = toCodePoints(currentLine);
+      while (
+        firstNonWhitespaceCol < lineCodePoints.length &&
+        /\s/.test(lineCodePoints[firstNonWhitespaceCol])
+      ) {
+        firstNonWhitespaceCol++;
+      }
+
+      // If line is all whitespace, firstNonWhitespaceCol equals line length.
+      // This results in deleting/changing from cursor to end of line,
+      // which is consistent with vim's d^ behavior on whitespace-only lines.
+      const startCol = Math.min(cursorCol, firstNonWhitespaceCol);
+      const endCol = Math.max(cursorCol, firstNonWhitespaceCol);
+
+      if (startCol !== endCol) {
+        const nextState = detachExpandedPaste(pushUndo(state));
+        return replaceRangeInternal(
+          nextState,
+          cursorRow,
+          startCol,
+          cursorRow,
+          endCol,
+          '',
+        );
+      }
+      return state;
     }
 
     case 'vim_delete_to_end_of_line':
