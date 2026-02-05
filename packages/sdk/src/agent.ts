@@ -13,6 +13,7 @@ import {
   type ToolCallRequestInfo,
   type ServerGeminiStreamEvent,
   type GeminiClient,
+  scheduleAgentTools,
 } from '@google/gemini-cli-core';
 
 import { type Tool, SdkTool, type z } from './tool.js';
@@ -26,8 +27,8 @@ export interface GeminiCliAgentOptions {
 }
 
 export class GeminiCliAgent {
-  private config: Config;
-  private tools: Array<Tool<z.ZodType>>;
+  private readonly config: Config;
+  private readonly tools: Array<Tool<z.ZodType>>;
 
   constructor(options: GeminiCliAgentOptions) {
     const cwd = options.cwd || process.cwd();
@@ -49,7 +50,10 @@ export class GeminiCliAgent {
     this.config = new Config(configParams);
   }
 
-  async *sendStream(prompt: string): AsyncGenerator<ServerGeminiStreamEvent> {
+  async *sendStream(
+    prompt: string,
+    signal?: AbortSignal,
+  ): AsyncGenerator<ServerGeminiStreamEvent> {
     // Lazy initialization of auth and client
     if (!this.config.getContentGenerator()) {
       // Simple auth detection
@@ -74,82 +78,54 @@ export class GeminiCliAgent {
     }
 
     const client = this.config.getGeminiClient();
-    const registry = this.config.getToolRegistry();
 
     let request: Parameters<GeminiClient['sendMessageStream']>[0] = [
       { text: prompt },
     ];
-    // TODO: support AbortSignal cancellation properly
-    const signal = new AbortController().signal;
+    const abortSignal = signal ?? new AbortController().signal;
     const sessionId = this.config.getSessionId();
 
     while (true) {
       // sendMessageStream returns AsyncGenerator<ServerGeminiStreamEvent, Turn>
-      const stream = client.sendMessageStream(request, signal, sessionId);
+      const stream = client.sendMessageStream(request, abortSignal, sessionId);
 
-      const toolCalls: ToolCallRequestInfo[] = [];
+      const toolCallsToSchedule: ToolCallRequestInfo[] = [];
 
       for await (const event of stream) {
         yield event;
         if (event.type === GeminiEventType.ToolCallRequest) {
-          toolCalls.push(event.value);
-        }
-      }
-
-      if (toolCalls.length === 0) {
-        break;
-      }
-
-      const functionResponses: Array<Record<string, unknown>> = [];
-      for (const toolCall of toolCalls) {
-        const tool = registry.getTool(toolCall.name);
-        if (!tool) {
-          functionResponses.push({
-            functionResponse: {
-              name: toolCall.name,
-              response: { error: `Tool ${toolCall.name} not found` },
-              id: toolCall.callId,
-            },
-          });
-          continue;
-        }
-
-        try {
+          const toolCall = event.value;
           let args = toolCall.args;
           if (typeof args === 'string') {
             args = JSON.parse(args);
           }
-
-          // Cast toolCall.args to object to satisfy AnyDeclarativeTool.build
-          const invocation = tool.build(args as object);
-
-          // Check if the tool execution requires confirmation according to policy
-          const confirmation = await invocation.shouldConfirmExecute(signal);
-          if (confirmation) {
-            throw new Error(
-              `Tool execution for '${toolCall.name}' requires confirmation, which is not supported in this SDK version.`,
-            );
-          }
-
-          const result = await invocation.execute(signal);
-
-          functionResponses.push({
-            functionResponse: {
-              name: toolCall.name,
-              response: { result: result.llmContent },
-              id: toolCall.callId,
-            },
-          });
-        } catch (e) {
-          functionResponses.push({
-            functionResponse: {
-              name: toolCall.name,
-              response: { error: e instanceof Error ? e.message : String(e) },
-              id: toolCall.callId,
-            },
+          toolCallsToSchedule.push({
+            ...toolCall,
+            args,
+            isClientInitiated: false,
+            prompt_id: sessionId,
           });
         }
       }
+
+      if (toolCallsToSchedule.length === 0) {
+        break;
+      }
+
+      const completedCalls = await scheduleAgentTools(
+        this.config,
+        toolCallsToSchedule,
+        {
+          schedulerId: sessionId,
+          toolRegistry: this.config.getToolRegistry(),
+          signal: abortSignal,
+        },
+      );
+
+      const functionResponses = completedCalls.flatMap(
+        (call) => call.response.responseParts,
+      );
+
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       request = functionResponses as unknown as Parameters<
         GeminiClient['sendMessageStream']
