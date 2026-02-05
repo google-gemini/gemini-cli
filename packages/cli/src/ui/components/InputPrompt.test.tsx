@@ -43,6 +43,7 @@ import { StreamingState } from '../types.js';
 import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 import type { UIState } from '../contexts/UIStateContext.js';
 import { isLowColorDepth } from '../utils/terminalUtils.js';
+import { cpLen } from '../utils/textUtils.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import type { Key } from '../hooks/useKeypress.js';
 
@@ -160,16 +161,19 @@ describe('InputPrompt', () => {
         (newText: string, cursorPosition?: 'start' | 'end' | number) => {
           mockBuffer.text = newText;
           mockBuffer.lines = [newText];
+          let col = 0;
           if (typeof cursorPosition === 'number') {
-            mockBuffer.cursor = [0, cursorPosition];
+            col = cursorPosition;
           } else if (cursorPosition === 'start') {
-            mockBuffer.cursor = [0, 0];
+            col = 0;
           } else {
-            mockBuffer.cursor = [0, newText.length];
+            col = newText.length;
           }
+          mockBuffer.cursor = [0, col];
           mockBuffer.viewportVisualLines = [newText];
           mockBuffer.allVisualLines = [newText];
           mockBuffer.visualToLogicalMap = [[0, 0]];
+          mockBuffer.visualCursor = [0, col];
         },
       ),
       replaceRangeByOffset: vi.fn(),
@@ -187,7 +191,15 @@ describe('InputPrompt', () => {
         }
         return false;
       }),
-      move: vi.fn(),
+      move: vi.fn((dir: string) => {
+        if (dir === 'home') {
+          mockBuffer.visualCursor = [mockBuffer.visualCursor[0], 0];
+        } else if (dir === 'end') {
+          const line =
+            mockBuffer.allVisualLines[mockBuffer.visualCursor[0]] || '';
+          mockBuffer.visualCursor = [mockBuffer.visualCursor[0], cpLen(line)];
+        }
+      }),
       moveToOffset: vi.fn((offset: number) => {
         mockBuffer.cursor = [0, offset];
       }),
@@ -388,12 +400,12 @@ describe('InputPrompt', () => {
     });
 
     await act(async () => {
-      stdin.write('\u001B[A'); // Up arrow
+      stdin.write('\u0010'); // Ctrl+P
     });
     await waitFor(() => expect(mockInputHistory.navigateUp).toHaveBeenCalled());
 
     await act(async () => {
-      stdin.write('\u001B[B'); // Down arrow
+      stdin.write('\u000E'); // Ctrl+N
     });
     await waitFor(() =>
       expect(mockInputHistory.navigateDown).toHaveBeenCalled(),
@@ -410,6 +422,100 @@ describe('InputPrompt', () => {
     expect(mockShellHistory.getNextCommand).not.toHaveBeenCalled();
     expect(mockShellHistory.addCommandToHistory).not.toHaveBeenCalled();
     unmount();
+  });
+
+  describe('arrow key navigation', () => {
+    it('should move to start of line on Up arrow if on first line but not at start', async () => {
+      mockBuffer.allVisualLines = ['line 1', 'line 2'];
+      mockBuffer.visualCursor = [0, 5]; // First line, not at start
+      mockBuffer.visualScrollRow = 0;
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\u001B[A'); // Up arrow
+      });
+
+      await waitFor(() => {
+        expect(mockBuffer.move).toHaveBeenCalledWith('home');
+        expect(mockInputHistory.navigateUp).not.toHaveBeenCalled();
+      });
+      unmount();
+    });
+
+    it('should navigate history on Up arrow if on first line and at start', async () => {
+      mockBuffer.allVisualLines = ['line 1', 'line 2'];
+      mockBuffer.visualCursor = [0, 0]; // First line, at start
+      mockBuffer.visualScrollRow = 0;
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\u001B[A'); // Up arrow
+      });
+
+      await waitFor(() => {
+        expect(mockBuffer.move).not.toHaveBeenCalledWith('home');
+        expect(mockInputHistory.navigateUp).toHaveBeenCalled();
+      });
+      unmount();
+    });
+
+    it('should move to end of line on Down arrow if on last line but not at end', async () => {
+      mockBuffer.allVisualLines = ['line 1', 'line 2'];
+      mockBuffer.visualCursor = [1, 0]; // Last line, not at end
+      mockBuffer.visualScrollRow = 0;
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\u001B[B'); // Down arrow
+      });
+
+      await waitFor(() => {
+        expect(mockBuffer.move).toHaveBeenCalledWith('end');
+        expect(mockInputHistory.navigateDown).not.toHaveBeenCalled();
+      });
+      unmount();
+    });
+
+    it('should navigate history on Down arrow if on last line and at end', async () => {
+      mockBuffer.allVisualLines = ['line 1', 'line 2'];
+      mockBuffer.visualCursor = [1, 6]; // Last line, at end ("line 2" is length 6)
+      mockBuffer.visualScrollRow = 0;
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\u001B[B'); // Down arrow
+      });
+
+      await waitFor(() => {
+        expect(mockBuffer.move).not.toHaveBeenCalledWith('end');
+        expect(mockInputHistory.navigateDown).toHaveBeenCalled();
+      });
+      unmount();
+    });
   });
 
   it('should call completion.navigateUp for both up arrow and Ctrl+P when suggestions are showing', async () => {
@@ -492,11 +598,11 @@ describe('InputPrompt', () => {
     });
 
     await act(async () => {
-      stdin.write('\u001B[A'); // Up arrow
+      stdin.write('\u0010'); // Ctrl+P
     });
     await waitFor(() => expect(mockInputHistory.navigateUp).toHaveBeenCalled());
     await act(async () => {
-      stdin.write('\u001B[B'); // Down arrow
+      stdin.write('\u000E'); // Ctrl+N
     });
     await waitFor(() =>
       expect(mockInputHistory.navigateDown).toHaveBeenCalled(),
@@ -3778,6 +3884,10 @@ describe('InputPrompt', () => {
         // Then go down
         await act(async () => {
           stdin.write(key);
+          if (key === '\u001B[B') {
+            // Second press to actually navigate history
+            stdin.write(key);
+          }
         });
 
         await waitFor(() => {

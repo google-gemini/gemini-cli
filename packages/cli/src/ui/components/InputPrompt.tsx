@@ -851,6 +851,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
 
         if (isHistoryUp) {
+          if (
+            keyMatchers[Command.NAVIGATION_UP](key) &&
+            buffer.visualCursor[1] > 0
+          ) {
+            buffer.move('home');
+            return true;
+          }
           // Check for queued messages first when input is empty
           // If no queued messages, inputHistory.navigateUp() is called inside tryLoadQueuedMessages
           if (tryLoadQueuedMessages()) {
@@ -860,41 +867,43 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           inputHistory.navigateUp();
           return true;
         }
-        if (keyMatchers[Command.HISTORY_DOWN](key)) {
-          inputHistory.navigateDown();
-          return true;
-        }
-        // Handle arrow-up/down for history on single-line or at edges
-        if (
-          keyMatchers[Command.NAVIGATION_UP](key) &&
-          (buffer.allVisualLines.length === 1 ||
-            (buffer.visualCursor[0] === 0 && buffer.visualScrollRow === 0))
-        ) {
-          // Check for queued messages first when input is empty
-          // If no queued messages, inputHistory.navigateUp() is called inside tryLoadQueuedMessages
-          if (tryLoadQueuedMessages()) {
+        if (isHistoryDown) {
+          if (
+            keyMatchers[Command.NAVIGATION_DOWN](key) &&
+            buffer.visualCursor[1] <
+              cpLen(buffer.allVisualLines[buffer.visualCursor[0]] || '')
+          ) {
+            buffer.move('end');
             return true;
           }
-          // Only navigate history if popAllMessages doesn't exist
-          inputHistory.navigateUp();
-          return true;
-        }
-        if (
-          keyMatchers[Command.NAVIGATION_DOWN](key) &&
-          (buffer.allVisualLines.length === 1 ||
-            buffer.visualCursor[0] === buffer.allVisualLines.length - 1)
-        ) {
           inputHistory.navigateDown();
           return true;
         }
       } else {
         // Shell History Navigation
         if (keyMatchers[Command.NAVIGATION_UP](key)) {
+          if (
+            (buffer.allVisualLines.length === 1 ||
+              (buffer.visualCursor[0] === 0 && buffer.visualScrollRow === 0)) &&
+            buffer.visualCursor[1] > 0
+          ) {
+            buffer.move('home');
+            return true;
+          }
           const prevCommand = shellHistory.getPreviousCommand();
           if (prevCommand !== null) buffer.setText(prevCommand);
           return true;
         }
         if (keyMatchers[Command.NAVIGATION_DOWN](key)) {
+          if (
+            (buffer.allVisualLines.length === 1 ||
+              buffer.visualCursor[0] === buffer.allVisualLines.length - 1) &&
+            buffer.visualCursor[1] <
+              cpLen(buffer.allVisualLines[buffer.visualCursor[0]] || '')
+          ) {
+            buffer.move('end');
+            return true;
+          }
           const nextCommand = shellHistory.getNextCommand();
           if (nextCommand !== null) buffer.setText(nextCommand);
           return true;
