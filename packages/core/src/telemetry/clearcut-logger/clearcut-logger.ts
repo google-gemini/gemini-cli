@@ -45,6 +45,7 @@ import type {
   HookCallEvent,
   ApprovalModeSwitchEvent,
   ApprovalModeDurationEvent,
+  PlanExecutionEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
@@ -106,6 +107,7 @@ export enum EventNames {
   HOOK_CALL = 'hook_call',
   APPROVAL_MODE_SWITCH = 'approval_mode_switch',
   APPROVAL_MODE_DURATION = 'approval_mode_duration',
+  PLAN_EXECUTION = 'plan_execution',
 }
 
 export interface LogResponse {
@@ -1540,6 +1542,18 @@ export class ClearcutLogger {
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.APPROVAL_MODE_DURATION, data),
     );
+    this.flushIfNeeded();
+  }
+
+  logPlanExecutionEvent(event: PlanExecutionEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_APPROVAL_MODE,
+        value: event.approval_mode,
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.PLAN_EXECUTION, data));
     this.flushIfNeeded();
   }
 
