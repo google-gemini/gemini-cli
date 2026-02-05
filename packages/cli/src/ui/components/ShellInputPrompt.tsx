@@ -10,6 +10,8 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { ShellExecutionService } from '@google/gemini-cli-core';
 import { keyToAnsi, type Key } from '../hooks/keyToAnsi.js';
 import { Command, keyMatchers } from '../keyMatchers.js';
+import { useUIActions } from '../contexts/UIActionsContext.js';
+import { formatCommand } from '../utils/keybindingUtils.js';
 
 export interface ShellInputPromptProps {
   activeShellPtyId: number | null;
@@ -20,6 +22,7 @@ export const ShellInputPrompt: React.FC<ShellInputPromptProps> = ({
   activeShellPtyId,
   focus = true,
 }) => {
+  const { handleWarning } = useUIActions();
   const handleShellInputSubmit = useCallback(
     (input: string) => {
       if (activeShellPtyId) {
@@ -45,6 +48,12 @@ export const ShellInputPrompt: React.FC<ShellInputPromptProps> = ({
         return false;
       }
 
+      if (keyMatchers[Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING](key)) {
+        handleWarning(
+          `Press ${formatCommand(Command.UNFOCUS_SHELL_INPUT)} to focus out.`,
+        );
+      }
+
       if (key.ctrl && key.shift && key.name === 'up') {
         ShellExecutionService.scrollPty(activeShellPtyId, -1);
         return true;
@@ -63,7 +72,7 @@ export const ShellInputPrompt: React.FC<ShellInputPromptProps> = ({
 
       return false;
     },
-    [focus, handleShellInputSubmit, activeShellPtyId],
+    [focus, handleShellInputSubmit, activeShellPtyId, handleWarning],
   );
 
   useKeypress(handleInput, { isActive: focus });

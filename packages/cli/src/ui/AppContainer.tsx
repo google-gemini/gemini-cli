@@ -1205,6 +1205,21 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   useEffect(() => {
     if (
+      !activePtyId &&
+      (!isBackgroundShellVisible || backgroundShells.size === 0) &&
+      embeddedShellFocused
+    ) {
+      setEmbeddedShellFocused(false);
+    }
+  }, [
+    activePtyId,
+    isBackgroundShellVisible,
+    backgroundShells.size,
+    embeddedShellFocused,
+  ]);
+
+  useEffect(() => {
+    if (
       initialPrompt &&
       isConfigInitialized &&
       !initialPromptSubmitted.current &&
@@ -1289,22 +1304,19 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, []);
 
   useEffect(() => {
-    const handleSelectionWarning = () => {
-      handleWarning('Press Ctrl-S to enter selection mode to copy text.');
-    };
     const handlePasteTimeout = () => {
       handleWarning('Paste Timed out. Possibly due to slow connection.');
     };
-    appEvents.on(AppEvent.SelectionWarning, handleSelectionWarning);
     appEvents.on(AppEvent.PasteTimeout, handlePasteTimeout);
+    const warningTimeout = warningTimeoutRef.current;
+    const tabFocusTimeout = tabFocusTimeoutRef.current;
     return () => {
-      appEvents.off(AppEvent.SelectionWarning, handleSelectionWarning);
       appEvents.off(AppEvent.PasteTimeout, handlePasteTimeout);
-      if (warningTimeoutRef.current) {
-        clearTimeout(warningTimeoutRef.current);
+      if (warningTimeout) {
+        clearTimeout(warningTimeout);
       }
-      if (tabFocusTimeoutRef.current) {
-        clearTimeout(tabFocusTimeoutRef.current);
+      if (tabFocusTimeout) {
+        clearTimeout(tabFocusTimeout);
       }
     };
   }, [handleWarning]);
@@ -1504,42 +1516,30 @@ Logging in with Google... Restarting Gemini CLI to continue.
         (activePtyId || (isBackgroundShellVisible && backgroundShells.size > 0))
       ) {
         if (embeddedShellFocused) {
-          handleWarning('Press Shift+Tab to focus out.');
           return false;
         }
 
         const now = Date.now();
         // If the shell hasn't produced output in the last 100ms, it's considered idle.
         const isIdle = now - lastOutputTimeRef.current >= 100;
-        if (isIdle && !activePtyId) {
+
+        if (isIdle && !activePtyId && !isBackgroundShellVisible) {
           if (tabFocusTimeoutRef.current) {
             clearTimeout(tabFocusTimeoutRef.current);
           }
           toggleBackgroundShell();
-          if (!isBackgroundShellVisible) {
-            // We are about to show it, so focus it
-            setEmbeddedShellFocused(true);
-            if (backgroundShells.size > 1) {
-              setIsBackgroundShellListOpen(true);
-            }
-          } else {
-            // We are about to hide it
-            tabFocusTimeoutRef.current = setTimeout(() => {
-              tabFocusTimeoutRef.current = null;
-              // If the shell produced output since the tab press, we assume it handled the tab
-              // (e.g. autocomplete) so we should not toggle focus.
-              if (lastOutputTimeRef.current > now) {
-                handleWarning('Press Shift+Tab to focus out.');
-                return;
-              }
-              setEmbeddedShellFocused(false);
-            }, 100);
+          // We are about to show it, so focus it
+          setEmbeddedShellFocused(true);
+          if (backgroundShells.size > 1) {
+            setIsBackgroundShellListOpen(true);
           }
           return true;
         }
 
-        // Not idle, just focus it
-        setEmbeddedShellFocused(true);
+        // Not idle, has active PTY, or already visible - just focus it
+        if (!embeddedShellFocused) {
+          setEmbeddedShellFocused(true);
+        }
         return true;
       } else if (keyMatchers[Command.UNFOCUS_SHELL_INPUT](key)) {
         if (embeddedShellFocused) {
@@ -1552,19 +1552,15 @@ Logging in with Google... Restarting Gemini CLI to continue.
           backgroundCurrentShell();
           // After backgrounding, we explicitly do NOT show or focus the background UI.
         } else {
-          if (isBackgroundShellVisible && !embeddedShellFocused) {
+          toggleBackgroundShell();
+          // Toggle focus based on intent: if we were hiding, unfocus; if showing, focus.
+          if (!isBackgroundShellVisible && backgroundShells.size > 0) {
             setEmbeddedShellFocused(true);
-          } else {
-            toggleBackgroundShell();
-            // Toggle focus based on intent: if we were hiding, unfocus; if showing, focus.
-            if (!isBackgroundShellVisible && backgroundShells.size > 0) {
-              setEmbeddedShellFocused(true);
-              if (backgroundShells.size > 1) {
-                setIsBackgroundShellListOpen(true);
-              }
-            } else {
-              setEmbeddedShellFocused(false);
+            if (backgroundShells.size > 1) {
+              setIsBackgroundShellListOpen(true);
             }
+          } else {
+            setEmbeddedShellFocused(false);
           }
         }
         return true;

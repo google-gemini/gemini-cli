@@ -9,6 +9,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BackgroundShellDisplay } from './BackgroundShellDisplay.js';
 import { type BackgroundShell } from '../hooks/shellCommandProcessor.js';
 import { ShellExecutionService } from '@google/gemini-cli-core';
+import { Command } from '../keyMatchers.js';
+import { formatCommand } from '../utils/keybindingUtils.js';
 import { act } from 'react';
 import { type Key, type KeypressHandler } from '../contexts/KeypressContext.js';
 import { ScrollProvider } from '../contexts/ScrollProvider.js';
@@ -452,7 +454,7 @@ describe('<BackgroundShellDisplay />', () => {
     });
 
     expect(mockHandleWarning).toHaveBeenCalledWith(
-      'Press Shift+Tab to focus out.',
+      `Press ${formatCommand(Command.UNFOCUS_BACKGROUND_SHELL)} to focus out.`,
     );
     expect(mockSetEmbeddedShellFocused).not.toHaveBeenCalled();
   });

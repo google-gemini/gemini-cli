@@ -10,8 +10,6 @@ import { ShellInputPrompt } from '../ShellInputPrompt.js';
 import { StickyHeader } from '../StickyHeader.js';
 import { useUIActions } from '../../contexts/UIActionsContext.js';
 import { useMouseClick } from '../../hooks/useMouseClick.js';
-import { useKeypress } from '../../hooks/useKeypress.js';
-import { Command, keyMatchers } from '../../keyMatchers.js';
 import { ToolResultDisplay } from './ToolResultDisplay.js';
 import {
   ToolStatusIndicator,
@@ -91,30 +89,24 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
 
   useMouseClick(contentRef, handleFocus, { isActive: !!isThisShellFocusable });
 
-  useKeypress(
-    (key) => {
-      if (keyMatchers[Command.FOCUS_SHELL_INPUT](key)) {
-        handleFocus();
-        return true;
-      }
-      return false;
-    },
-    { isActive: !!isThisShellFocusable && !isThisShellFocused },
-  );
-
-  const wasFocusedRef = React.useRef(false);
-
   React.useEffect(() => {
-    if (isThisShellFocused) {
-      wasFocusedRef.current = true;
-    } else if (wasFocusedRef.current) {
-      if (embeddedShellFocused) {
-        setEmbeddedShellFocused(false);
-      }
-
-      wasFocusedRef.current = false;
+    // If this shell was focused but is no longer focused (e.g. it finished),
+    // and it IS the shell that is currently considered focused in the UI context,
+    // then we should clear the global focus state.
+    if (
+      !isThisShellFocused &&
+      ptyId === activeShellPtyId &&
+      embeddedShellFocused
+    ) {
+      setEmbeddedShellFocused(false);
     }
-  }, [isThisShellFocused, embeddedShellFocused, setEmbeddedShellFocused]);
+  }, [
+    isThisShellFocused,
+    ptyId,
+    activeShellPtyId,
+    embeddedShellFocused,
+    setEmbeddedShellFocused,
+  ]);
 
   const { shouldShowFocusHint } = useFocusHint(
     isThisShellFocusable,
