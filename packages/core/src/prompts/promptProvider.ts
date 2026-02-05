@@ -23,13 +23,8 @@ import {
   PLAN_MODE_TOOLS,
   WRITE_TODOS_TOOL_NAME,
   READ_FILE_TOOL_NAME,
-  ENTER_PLAN_MODE_TOOL_NAME,
-  EXIT_PLAN_MODE_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { resolveModel, isPreviewModel } from '../config/models.js';
-import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
-import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
-import { debugLogger } from '../utils/debugLogger.js';
 
 /**
  * Orchestrates prompt generation by gathering context and building options.
@@ -38,11 +33,11 @@ export class PromptProvider {
   /**
    * Generates the core system prompt.
    */
-  async getCoreSystemPrompt(
+  getCoreSystemPrompt(
     config: Config,
     userMemory?: string,
     interactiveOverride?: boolean,
-  ): Promise<string> {
+  ): string {
     const systemMdResolution = resolvePathFromEnv(
       process.env['GEMINI_SYSTEM_MD'],
     );
@@ -51,9 +46,6 @@ export class PromptProvider {
     const approvalMode = config.getApprovalMode?.() ?? ApprovalMode.DEFAULT;
     const isPlanMode = approvalMode === ApprovalMode.PLAN;
     const skills = config.getSkillManager().getSkills();
-
-    // Filter out enter/exit plan mode tools based on current mode
-    await this.syncPlanModeTools(config, isPlanMode);
     const toolNames = config.getToolRegistry().getAllToolNames();
 
     const desiredModel = resolveModel(
@@ -170,40 +162,6 @@ export class PromptProvider {
 
   getCompressionPrompt(): string {
     return snippets.getCompressionPrompt();
-  }
-
-  private async syncPlanModeTools(
-    config: Config,
-    isPlanMode: boolean,
-  ): Promise<void> {
-    const registry = config.getToolRegistry();
-
-    if (isPlanMode) {
-      if (registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
-        registry.unregisterTool(ENTER_PLAN_MODE_TOOL_NAME);
-      }
-      if (!registry.getTool(EXIT_PLAN_MODE_TOOL_NAME)) {
-        const tool = new ExitPlanModeTool(config, config.getMessageBus());
-        registry.registerTool(tool);
-      }
-    } else {
-      if (registry.getTool(EXIT_PLAN_MODE_TOOL_NAME)) {
-        registry.unregisterTool(EXIT_PLAN_MODE_TOOL_NAME);
-      }
-      if (!registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
-        const tool = new EnterPlanModeTool(config, config.getMessageBus());
-        registry.registerTool(tool);
-      }
-    }
-
-    const geminiClient = config.getGeminiClient();
-    if (geminiClient) {
-      try {
-        await geminiClient.setTools();
-      } catch (err) {
-        debugLogger.error('Failed to update tools', err);
-      }
-    }
   }
 
   private withSection<T>(

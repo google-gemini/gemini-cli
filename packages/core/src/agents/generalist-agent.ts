@@ -7,7 +7,7 @@
 import { z } from 'zod';
 import type { Config } from '../config/config.js';
 import { getCoreSystemPrompt } from '../core/prompts.js';
-import type { LocalAgentDefinition, PromptConfig } from './types.js';
+import type { LocalAgentDefinition } from './types.js';
 
 const GeneralistAgentSchema = z.object({
   response: z.string().describe('The final response from the agent.'),
@@ -52,11 +52,11 @@ export const GeneralistAgent = (
       tools,
     };
   },
-  get promptConfig(): PromptConfig {
+  get promptConfig() {
     return {
       systemPrompt: getCoreSystemPrompt(
         config,
-        /*userMemory=*/ undefined,
+        /*useMemory=*/ undefined,
         /*interactiveOverride=*/ false,
       ),
       query: '${request}',

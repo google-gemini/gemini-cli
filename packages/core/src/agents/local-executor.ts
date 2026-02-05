@@ -747,7 +747,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     );
 
     // Build system instruction from the templated prompt string.
-    const systemInstruction = (await promptConfig.systemPrompt)
+    const systemInstruction = promptConfig.systemPrompt
       ? await this.buildSystemPrompt(inputs)
       : undefined;
 
@@ -1105,13 +1105,12 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   /** Builds the system prompt from the agent definition and inputs. */
   private async buildSystemPrompt(inputs: AgentInputs): Promise<string> {
     const { promptConfig } = this.definition;
-    const systemPrompt = await promptConfig.systemPrompt;
-    if (!systemPrompt) {
+    if (!promptConfig.systemPrompt) {
       return '';
     }
 
     // Inject user inputs into the prompt template.
-    let finalPrompt = templateString(systemPrompt, inputs);
+    let finalPrompt = templateString(promptConfig.systemPrompt, inputs);
 
     // Append environment context (CWD and folder structure).
     const dirContext = await getDirectoryContextString(this.runtimeContext);

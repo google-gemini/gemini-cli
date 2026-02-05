@@ -111,6 +111,8 @@ vi.mock('../core/client.js', () => ({
     initialize: vi.fn().mockResolvedValue(undefined),
     stripThoughtsFromHistory: vi.fn(),
     isInitialized: vi.fn().mockReturnValue(false),
+    setTools: vi.fn().mockResolvedValue(undefined),
+    updateSystemInstruction: vi.fn(),
   })),
 }));
 
@@ -199,6 +201,8 @@ import { getExperiments } from '../code_assist/experiments/experiments.js';
 import type { CodeAssistServer } from '../code_assist/server.js';
 import { ContextManager } from '../services/contextManager.js';
 import { UserTierId } from 'src/code_assist/types.js';
+import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
+import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
 
 vi.mock('../core/baseLlmClient.js');
 vi.mock('../core/tokenLimits.js', () => ({
@@ -2396,5 +2400,80 @@ describe('Plans Directory Initialization', () => {
 
     const context = config.getWorkspaceContext();
     expect(context.getDirectories()).not.toContain(plansDir);
+  });
+});
+
+describe('syncPlanModeTools', () => {
+  const baseParams: ConfigParameters = {
+    sessionId: 'test-session',
+    targetDir: '.',
+    debugMode: false,
+    model: 'test-model',
+    cwd: '.',
+  };
+
+  it('should register ExitPlanModeTool and unregister EnterPlanModeTool when in PLAN mode', async () => {
+    const config = new Config({
+      ...baseParams,
+      approvalMode: ApprovalMode.PLAN,
+    });
+    const registry = config.getToolRegistry();
+
+    const registerSpy = vi.spyOn(registry, 'registerTool');
+    const unregisterSpy = vi.spyOn(registry, 'unregisterTool');
+    const getToolSpy = vi.spyOn(registry, 'getTool');
+
+    getToolSpy.mockImplementation((name) => {
+      if (name === 'enter_plan_mode')
+        return new EnterPlanModeTool(config, config.getMessageBus());
+      return undefined;
+    });
+
+    await config.syncPlanModeTools();
+
+    expect(unregisterSpy).toHaveBeenCalledWith('enter_plan_mode');
+    expect(registerSpy).toHaveBeenCalledWith(expect.anything());
+    const registeredTool = registerSpy.mock.calls[0][0];
+    const { ExitPlanModeTool } = await import('../tools/exit-plan-mode.js');
+    expect(registeredTool).toBeInstanceOf(ExitPlanModeTool);
+  });
+
+  it('should register EnterPlanModeTool and unregister ExitPlanModeTool when NOT in PLAN mode', async () => {
+    const config = new Config({
+      ...baseParams,
+      approvalMode: ApprovalMode.DEFAULT,
+    });
+    const registry = config.getToolRegistry();
+
+    const registerSpy = vi.spyOn(registry, 'registerTool');
+    const unregisterSpy = vi.spyOn(registry, 'unregisterTool');
+    const getToolSpy = vi.spyOn(registry, 'getTool');
+
+    getToolSpy.mockImplementation((name) => {
+      if (name === 'exit_plan_mode')
+        return new ExitPlanModeTool(config, config.getMessageBus());
+      return undefined;
+    });
+
+    await config.syncPlanModeTools();
+
+    expect(unregisterSpy).toHaveBeenCalledWith('exit_plan_mode');
+    expect(registerSpy).toHaveBeenCalledWith(expect.anything());
+    const registeredTool = registerSpy.mock.calls[0][0];
+    const { EnterPlanModeTool } = await import('../tools/enter-plan-mode.js');
+    expect(registeredTool).toBeInstanceOf(EnterPlanModeTool);
+  });
+
+  it('should call geminiClient.setTools if initialized', async () => {
+    const config = new Config(baseParams);
+    const client = config.getGeminiClient();
+    vi.spyOn(client, 'isInitialized').mockReturnValue(true);
+    const setToolsSpy = vi
+      .spyOn(client, 'setTools')
+      .mockResolvedValue(undefined);
+
+    await config.syncPlanModeTools();
+
+    expect(setToolsSpy).toHaveBeenCalled();
   });
 });
