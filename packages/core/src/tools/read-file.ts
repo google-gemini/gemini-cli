@@ -117,8 +117,20 @@ class ReadFileToolInvocation extends BaseToolInvocation<
 IMPORTANT: The file content has been truncated.
 Status: Showing lines ${start}-${end} of ${total} total lines.
 Action: To read more of the file, you can use the 'offset' and 'limit' parameters in a subsequent 'read_file' call. For example, to read the next section of the file, use offset: ${nextOffset}.
-
+${this.params.offset ? 'Remember: pass a start_line when you edit this file.' : ''}
 --- FILE CONTENT (truncated) ---
+${result.llmContent}`;
+    } else if (
+      typeof result.llmContent === 'string' &&
+      result.linesShown &&
+      result.originalLineCount
+    ) {
+      const [start, end] = result.linesShown;
+      const total = result.originalLineCount;
+      llmContent = `
+Status: Showing lines ${start}-${end} of ${total} total lines.
+
+--- FILE CONTENT ---
 ${result.llmContent}`;
     } else {
       llmContent = result.llmContent || '';

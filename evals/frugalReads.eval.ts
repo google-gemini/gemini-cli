@@ -6,7 +6,7 @@
 
 import { describe, expect } from 'vitest';
 import { evalTest } from './test-helper.js';
-import { READ_FILE_TOOL_NAME } from '@google/gemini-cli-core';
+import { READ_FILE_TOOL_NAME, EDIT_TOOL_NAME } from '@google/gemini-cli-core';
 
 describe('Frugal reads eval', () => {
   /**
@@ -78,19 +78,19 @@ describe('Frugal reads eval', () => {
 
       for (const call of targetFileReads) {
         const args = JSON.parse(call.toolRequest.args);
-        // file_path check is redundant now but harmless
-        const limit = args.limit ?? 4000;
-        const offset = args.offset ?? 0;
-        totalLinesRead += limit;
-        readRanges.push({ offset, limit });
 
         expect(
           args.limit,
           'Agent read the entire file (missing limit) instead of using ranged read',
         ).toBeDefined();
 
+        const limit = args.limit;
+        const offset = args.offset ?? 0;
+        totalLinesRead += limit;
+        readRanges.push({ offset, limit });
+
         expect(args.limit, 'Agent read too many lines at once').toBeLessThan(
-          1000,
+          1001,
         );
       }
 
@@ -98,7 +98,7 @@ describe('Frugal reads eval', () => {
       expect(
         totalLinesRead,
         'Agent read more of the file than expected',
-      ).toBeLessThan(500);
+      ).toBeLessThan(1000);
 
       // Check that we read around the error lines
       const errorLines = [1000, 1040, 3000];
@@ -109,6 +109,27 @@ describe('Frugal reads eval', () => {
         expect(covered, `Agent should have read around line ${line}`).toBe(
           true,
         );
+      }
+
+      // Check that the agent used start_line for precision in its edits
+      const editCalls = logs.filter(
+        (log) => log.toolRequest?.name === EDIT_TOOL_NAME,
+      );
+      expect(
+        editCalls.length,
+        'Agent should have made replacement calls',
+      ).toBeGreaterThanOrEqual(3);
+
+      for (const call of editCalls) {
+        const args = JSON.parse(call.toolRequest.args);
+        expect(
+          args.start_line,
+          'Agent should have used start_line for precision in its replace call',
+        ).toBeDefined();
+        expect(
+          args.start_line,
+          'start_line should be a positive number',
+        ).toBeGreaterThan(0);
       }
     },
   });

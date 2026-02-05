@@ -729,6 +729,56 @@ describe('EditTool', () => {
     );
   });
 
+  describe('start_line', () => {
+    const testFile = 'start_line_test.txt';
+    let filePath: string;
+
+    beforeEach(() => {
+      filePath = path.join(rootDir, testFile);
+    });
+
+    it('should skip occurrences before start_line and replace the first one after', async () => {
+      const content = 'match\nmatch\nmatch\nmatch';
+      fs.writeFileSync(filePath, content, 'utf8');
+
+      // Target the 3rd match (line 3)
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace the 3rd match',
+        old_string: 'match',
+        new_string: 'replacement',
+        start_line: 3,
+      };
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error).toBeUndefined();
+      const finalContent = fs.readFileSync(filePath, 'utf8');
+      expect(finalContent).toBe('match\nmatch\nreplacement\nmatch');
+      expect(result.llmContent).toContain('(1 replacements)');
+    });
+
+    it('should return error if no match found after start_line', async () => {
+      const content = 'match\nmatch\nmatch\nmatch';
+      fs.writeFileSync(filePath, content, 'utf8');
+
+      // Target match after line 5 (doesn't exist)
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace match after line 5',
+        old_string: 'match',
+        new_string: 'replacement',
+        start_line: 5,
+      };
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error?.type).toBe(ToolErrorType.EDIT_NO_OCCURRENCE_FOUND);
+    });
+  });
+
   describe('IDE mode', () => {
     const testFile = 'edit_me.txt';
     let filePath: string;

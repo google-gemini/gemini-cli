@@ -113,11 +113,37 @@ async function calculateExactReplacement(
   context: ReplacementContext,
 ): Promise<ReplacementResult | null> {
   const { currentContent, params } = context;
-  const { old_string, new_string } = params;
+  const { old_string, new_string, start_line } = params;
 
   const normalizedCode = currentContent;
   const normalizedSearch = old_string.replace(/\r\n/g, '\n');
   const normalizedReplace = new_string.replace(/\r\n/g, '\n');
+
+  if (start_line) {
+    const lines = normalizedCode.split('\n');
+    const precedingLines = lines.slice(0, start_line - 1);
+    const startIndex = precedingLines.reduce(
+      (acc, line) => acc + line.length + 1,
+      0,
+    );
+
+    const matchIndex = normalizedCode.indexOf(normalizedSearch, startIndex);
+    if (matchIndex !== -1) {
+      const before = normalizedCode.substring(0, matchIndex);
+      const after = normalizedCode.substring(
+        matchIndex + normalizedSearch.length,
+      );
+      let modifiedCode = before + normalizedReplace + after;
+      modifiedCode = restoreTrailingNewline(currentContent, modifiedCode);
+      return {
+        newContent: modifiedCode,
+        occurrences: 1,
+        finalOldString: normalizedSearch,
+        finalNewString: normalizedReplace,
+      };
+    }
+    return null;
+  }
 
   const exactOccurrences = normalizedCode.split(normalizedSearch).length - 1;
   if (exactOccurrences > 0) {
@@ -142,7 +168,7 @@ async function calculateFlexibleReplacement(
   context: ReplacementContext,
 ): Promise<ReplacementResult | null> {
   const { currentContent, params } = context;
-  const { old_string, new_string } = params;
+  const { old_string, new_string, start_line } = params;
 
   const normalizedCode = currentContent;
   const normalizedSearch = old_string.replace(/\r\n/g, '\n');
@@ -155,7 +181,7 @@ async function calculateFlexibleReplacement(
   const replaceLines = normalizedReplace.split('\n');
 
   let flexibleOccurrences = 0;
-  let i = 0;
+  let i = start_line ? start_line - 1 : 0;
   while (i <= sourceLines.length - searchLinesStripped.length) {
     const window = sourceLines.slice(i, i + searchLinesStripped.length);
     const windowStripped = window.map((line: string) => line.trim());
@@ -176,6 +202,9 @@ async function calculateFlexibleReplacement(
         searchLinesStripped.length,
         newBlockWithIndent.join('\n'),
       );
+      if (start_line) {
+        break;
+      }
       i += replaceLines.length;
     } else {
       i++;
@@ -200,7 +229,7 @@ async function calculateRegexReplacement(
   context: ReplacementContext,
 ): Promise<ReplacementResult | null> {
   const { currentContent, params } = context;
-  const { old_string, new_string } = params;
+  const { old_string, new_string, start_line } = params;
 
   // Normalize line endings for consistent processing.
   const normalizedSearch = old_string.replace(/\r\n/g, '\n');
@@ -230,6 +259,40 @@ async function calculateRegexReplacement(
   // 'm' flag enables multi-line mode, so '^' matches the start of any line.
   const finalPattern = `^(\\s*)${pattern}`;
   const flexibleRegex = new RegExp(finalPattern, 'm');
+
+  if (start_line) {
+    const lines = currentContent.split('\n');
+    const precedingLines = lines.slice(0, start_line - 1);
+    const startIndex = precedingLines.reduce(
+      (acc, line) => acc + line.length + 1,
+      0,
+    );
+    const searchRegion = currentContent.substring(startIndex);
+    const localMatch = flexibleRegex.exec(searchRegion);
+
+    if (localMatch) {
+      const globalIndex = startIndex + localMatch.index;
+      const indentation = localMatch[1] || '';
+      const newLines = normalizedReplace.split('\n');
+      const newBlockWithIndent = newLines
+        .map((line) => `${indentation}${line}`)
+        .join('\n');
+
+      const before = currentContent.substring(0, globalIndex);
+      const after = currentContent.substring(
+        globalIndex + localMatch[0].length,
+      );
+      const modifiedCode = before + newBlockWithIndent + after;
+
+      return {
+        newContent: restoreTrailingNewline(currentContent, modifiedCode),
+        occurrences: 1,
+        finalOldString: normalizedSearch,
+        finalNewString: normalizedReplace,
+      };
+    }
+    return null;
+  }
 
   const match = flexibleRegex.exec(currentContent);
 
@@ -374,6 +437,13 @@ export interface EditToolParams {
    * Use when you want to replace multiple occurrences.
    */
   expected_replacements?: number;
+
+  /**
+   * The line number where the search should start.
+   * Useful when there are multiple occurrences of old_string and you want to target a specific one.
+   * 1-based line number.
+   */
+  start_line?: number;
 
   /**
    * The instruction for what needs to be done.
@@ -951,7 +1021,7 @@ A good instruction should concisely answer:
           },
           old_string: {
             description:
-              'The exact literal text to replace, preferably unescaped. For single replacements (default), include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string is not the exact literal text (i.e. you escaped it) or does not match exactly, the tool will fail.',
+              'The exact literal text to replace, preferably unescaped. For single replacements (default), include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string is not the exact literal text (i.e. you escaped it) or does not match exactly, the tool will fail. The tool also fails if there are multiple matches, unless you provide a start_line',
             type: 'string',
           },
           new_string: {
@@ -963,6 +1033,12 @@ A good instruction should concisely answer:
             type: 'number',
             description:
               'Number of replacements expected. Defaults to 1 if not specified. Use when you want to replace multiple occurrences.',
+            minimum: 1,
+          },
+          start_line: {
+            type: 'number',
+            description:
+              'The line number where the search for old_string should start. Providing a start_line improves edit reliability by making it so that multiple matches for old_string is not a failure. Always provide a start_line when editing a file that you did not read fully.',
             minimum: 1,
           },
         },
