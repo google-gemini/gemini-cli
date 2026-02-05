@@ -583,6 +583,7 @@ describe('useVim hook', () => {
     it('should handle W (next big word)', () => {
       const testBuffer = createMockBuffer('hello world test');
       const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'W' }));
@@ -594,6 +595,7 @@ describe('useVim hook', () => {
     it('should handle B (previous big word)', () => {
       const testBuffer = createMockBuffer('hello world test', [0, 6]);
       const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'B' }));
@@ -605,6 +607,7 @@ describe('useVim hook', () => {
     it('should handle E (end of big word)', () => {
       const testBuffer = createMockBuffer('hello world test');
       const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'E' }));
@@ -616,6 +619,7 @@ describe('useVim hook', () => {
     it('should handle dW (delete big word forward)', () => {
       const testBuffer = createMockBuffer('hello.world test', [0, 0]);
       const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'd' }));
@@ -630,6 +634,7 @@ describe('useVim hook', () => {
     it('should handle cW (change big word forward)', () => {
       const testBuffer = createMockBuffer('hello.world test', [0, 0]);
       const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'c' }));
@@ -645,6 +650,7 @@ describe('useVim hook', () => {
     it('should handle dB (delete big word backward)', () => {
       const testBuffer = createMockBuffer('hello.world test', [0, 11]);
       const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'd' }));
@@ -659,6 +665,7 @@ describe('useVim hook', () => {
     it('should handle dE (delete big word end)', () => {
       const testBuffer = createMockBuffer('hello.world test', [0, 0]);
       const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
 
       act(() => {
         result.current.handleInput(createKey({ sequence: 'd' }));
