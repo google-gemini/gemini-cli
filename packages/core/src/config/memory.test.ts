@@ -22,21 +22,24 @@ describe('memory', () => {
       expect(flattenMemory({})).toBe('');
     });
 
-    it('should return content without headers if only global memory is present', () => {
+    it('should return content with headers even if only global memory is present', () => {
       expect(flattenMemory({ global: 'global content' })).toBe(
-        'global content',
+        `--- Global ---
+global content`,
       );
     });
 
-    it('should return content without headers if only extension memory is present', () => {
+    it('should return content with headers even if only extension memory is present', () => {
       expect(flattenMemory({ extension: 'extension content' })).toBe(
-        'extension content',
+        `--- Extension ---
+extension content`,
       );
     });
 
-    it('should return content without headers if only project memory is present', () => {
+    it('should return content with headers even if only project memory is present', () => {
       expect(flattenMemory({ project: 'project content' })).toBe(
-        'project content',
+        `--- Project ---
+project content`,
       );
     });
 

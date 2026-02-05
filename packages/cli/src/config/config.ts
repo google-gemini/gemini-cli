@@ -38,12 +38,10 @@ import {
   GEMINI_MODEL_ALIAS_AUTO,
   getAdminErrorMessage,
   Config,
-} from '@google/gemini-cli-core';
-import type {
-  MCPServerConfig,
-  HookDefinition,
-  HookEventName,
-  OutputFormat,
+  type MCPServerConfig,
+  type HookDefinition,
+  type HookEventName,
+  type OutputFormat,
 } from '@google/gemini-cli-core';
 import {
   type Settings,

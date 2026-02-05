@@ -103,6 +103,13 @@ export class PromptProvider {
       basePrompt = applySubstitutions(basePrompt, config, skillsPrompt);
     } else {
       // --- Standard Composition ---
+      const hasHierarchicalMemory =
+        typeof userMemory === 'object' &&
+        userMemory !== null &&
+        (!!userMemory.global?.trim() ||
+          !!userMemory.extension?.trim() ||
+          !!userMemory.project?.trim());
+
       const options: snippets.SystemPromptOptions = {
         preamble: this.withSection('preamble', () => ({
           interactive: interactiveMode,
@@ -111,6 +118,7 @@ export class PromptProvider {
           interactive: interactiveMode,
           isGemini3,
           hasSkills: skills.length > 0,
+          hasHierarchicalMemory,
         })),
         agentContexts: this.withSection('agentContexts', () =>
           config.getAgentRegistry().getDirectoryContext(),

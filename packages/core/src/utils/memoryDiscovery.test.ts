@@ -10,8 +10,9 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import {
   loadServerHierarchicalMemory,
-  loadGlobalMemory,
-  loadEnvironmentMemory,
+  getGlobalMemoryPaths,
+  getExtensionMemoryPaths,
+  getEnvironmentMemoryPaths,
   loadJitSubdirectoryMemory,
   refreshServerHierarchicalMemory,
 } from './memoryDiscovery.js';
@@ -21,7 +22,7 @@ import {
 } from '../tools/memoryTool.js';
 import { flattenMemory } from '../config/memory.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import { GEMINI_DIR } from './paths.js';
+import { GEMINI_DIR, normalizePath } from './paths.js';
 import type { HierarchicalMemory } from '../config/memory.js';
 
 function flattenResult(result: {
@@ -32,6 +33,7 @@ function flattenResult(result: {
   return {
     ...result,
     memoryContent: flattenMemory(result.memoryContent),
+    filePaths: result.filePaths.map((p) => normalizePath(p)),
   };
 }
 import { Config, type GeminiCLIExtension } from '../config/config.js';
@@ -52,6 +54,10 @@ vi.mock('../utils/paths.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../utils/paths.js')>();
   return {
     ...actual,
+    normalizePath: (p: string) => {
+      const resolved = path.resolve(p);
+      return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+    },
     homedir: vi.fn(),
   };
 });
@@ -67,18 +73,20 @@ describe('memoryDiscovery', () => {
 
   async function createEmptyDir(fullPath: string) {
     await fsPromises.mkdir(fullPath, { recursive: true });
-    return fullPath;
+    return normalizePath(fullPath);
   }
 
   async function createTestFile(fullPath: string, fileContents: string) {
     await fsPromises.mkdir(path.dirname(fullPath), { recursive: true });
     await fsPromises.writeFile(fullPath, fileContents);
-    return path.resolve(testRootDir, fullPath);
+    return normalizePath(path.resolve(testRootDir, fullPath));
   }
 
   beforeEach(async () => {
-    testRootDir = await fsPromises.mkdtemp(
-      path.join(os.tmpdir(), 'folder-structure-test-'),
+    testRootDir = normalizePath(
+      await fsPromises.mkdtemp(
+        path.join(os.tmpdir(), 'folder-structure-test-'),
+      ),
     );
 
     vi.resetAllMocks();
@@ -92,6 +100,9 @@ describe('memoryDiscovery', () => {
     vi.mocked(os.homedir).mockReturnValue(homedir);
     vi.mocked(pathsHomedir).mockReturnValue(homedir);
   });
+
+  const normMarker = (p: string) =>
+    process.platform === 'win32' ? p.toLowerCase() : p;
 
   afterEach(async () => {
     vi.unstubAllEnvs();
@@ -145,8 +156,15 @@ describe('memoryDiscovery', () => {
         'Src directory memory', // Untrusted
       );
 
-      const filepath = path.join(homedir, GEMINI_DIR, DEFAULT_CONTEXT_FILENAME);
-      await createTestFile(filepath, 'default context content'); // In user home dir (outside untrusted space).
+      const filepathInput = path.join(
+        homedir,
+        GEMINI_DIR,
+        DEFAULT_CONTEXT_FILENAME,
+      );
+      const filepath = await createTestFile(
+        filepathInput,
+        'default context content',
+      ); // In user home dir (outside untrusted space).
       const { fileCount, memoryContent, filePaths } = flattenResult(
         await loadServerHierarchicalMemory(
           cwd,
@@ -204,7 +222,8 @@ describe('memoryDiscovery', () => {
       ...result,
       memoryContent: flattenMemory(result.memoryContent),
     }).toEqual({
-      memoryContent: `--- Context from: ${path.relative(cwd, defaultContextFile)} ---
+      memoryContent: `--- Global ---
+--- Context from: ${path.relative(cwd, defaultContextFile)} ---
 default context content
 --- End of Context from: ${path.relative(cwd, defaultContextFile)} ---`,
       fileCount: 1,
@@ -233,9 +252,10 @@ default context content
     );
 
     expect(result).toEqual({
-      memoryContent: `--- Context from: ${path.relative(cwd, customContextFile)} ---
+      memoryContent: `--- Global ---
+--- Context from: ${normMarker(path.relative(cwd, customContextFile))} ---
 custom context content
---- End of Context from: ${path.relative(cwd, customContextFile)} ---`,
+--- End of Context from: ${normMarker(path.relative(cwd, customContextFile))} ---`,
       fileCount: 1,
       filePaths: [customContextFile],
     });
@@ -266,13 +286,14 @@ custom context content
     );
 
     expect(result).toEqual({
-      memoryContent: `--- Context from: ${path.relative(cwd, projectContextFile)} ---
+      memoryContent: `--- Project ---
+--- Context from: ${normMarker(path.relative(cwd, projectContextFile))} ---
 project context content
---- End of Context from: ${path.relative(cwd, projectContextFile)} ---
+--- End of Context from: ${normMarker(path.relative(cwd, projectContextFile))} ---
 
---- Context from: ${path.relative(cwd, cwdContextFile)} ---
+--- Context from: ${normMarker(path.relative(cwd, cwdContextFile))} ---
 cwd context content
---- End of Context from: ${path.relative(cwd, cwdContextFile)} ---`,
+--- End of Context from: ${normMarker(path.relative(cwd, cwdContextFile))} ---`,
       fileCount: 2,
       filePaths: [projectContextFile, cwdContextFile],
     });
@@ -303,13 +324,14 @@ cwd context content
     );
 
     expect(result).toEqual({
-      memoryContent: `--- Context from: ${customFilename} ---
+      memoryContent: `--- Project ---
+--- Context from: ${normMarker(customFilename)} ---
 CWD custom memory
---- End of Context from: ${customFilename} ---
+--- End of Context from: ${normMarker(customFilename)} ---
 
---- Context from: ${path.join('subdir', customFilename)} ---
+--- Context from: ${normMarker(path.join('subdir', customFilename))} ---
 Subdir custom memory
---- End of Context from: ${path.join('subdir', customFilename)} ---`,
+--- End of Context from: ${normMarker(path.join('subdir', customFilename))} ---`,
       fileCount: 2,
       filePaths: [cwdCustomFile, subdirCustomFile],
     });
@@ -337,13 +359,14 @@ Subdir custom memory
     );
 
     expect(result).toEqual({
-      memoryContent: `--- Context from: ${path.relative(cwd, projectRootGeminiFile)} ---
+      memoryContent: `--- Project ---
+--- Context from: ${normMarker(path.relative(cwd, projectRootGeminiFile))} ---
 Project root memory
---- End of Context from: ${path.relative(cwd, projectRootGeminiFile)} ---
+--- End of Context from: ${normMarker(path.relative(cwd, projectRootGeminiFile))} ---
 
---- Context from: ${path.relative(cwd, srcGeminiFile)} ---
+--- Context from: ${normMarker(path.relative(cwd, srcGeminiFile))} ---
 Src directory memory
---- End of Context from: ${path.relative(cwd, srcGeminiFile)} ---`,
+--- End of Context from: ${normMarker(path.relative(cwd, srcGeminiFile))} ---`,
       fileCount: 2,
       filePaths: [projectRootGeminiFile, srcGeminiFile],
     });
@@ -371,13 +394,14 @@ Src directory memory
     );
 
     expect(result).toEqual({
-      memoryContent: `--- Context from: ${DEFAULT_CONTEXT_FILENAME} ---
+      memoryContent: `--- Project ---
+--- Context from: ${normMarker(DEFAULT_CONTEXT_FILENAME)} ---
 CWD memory
---- End of Context from: ${DEFAULT_CONTEXT_FILENAME} ---
+--- End of Context from: ${normMarker(DEFAULT_CONTEXT_FILENAME)} ---
 
---- Context from: ${path.join('subdir', DEFAULT_CONTEXT_FILENAME)} ---
+--- Context from: ${normMarker(path.join('subdir', DEFAULT_CONTEXT_FILENAME))} ---
 Subdir memory
---- End of Context from: ${path.join('subdir', DEFAULT_CONTEXT_FILENAME)} ---`,
+--- End of Context from: ${normMarker(path.join('subdir', DEFAULT_CONTEXT_FILENAME))} ---`,
       fileCount: 2,
       filePaths: [cwdGeminiFile, subDirGeminiFile],
     });
@@ -418,26 +442,26 @@ Subdir memory
 
     expect(result).toEqual({
       memoryContent: `--- Global ---
---- Context from: ${path.relative(cwd, defaultContextFile)} ---
+--- Context from: ${normMarker(path.relative(cwd, defaultContextFile))} ---
 default context content
---- End of Context from: ${path.relative(cwd, defaultContextFile)} ---
+--- End of Context from: ${normMarker(path.relative(cwd, defaultContextFile))} ---
 
 --- Project ---
---- Context from: ${path.relative(cwd, rootGeminiFile)} ---
+--- Context from: ${normMarker(path.relative(cwd, rootGeminiFile))} ---
 Project parent memory
---- End of Context from: ${path.relative(cwd, rootGeminiFile)} ---
+--- End of Context from: ${normMarker(path.relative(cwd, rootGeminiFile))} ---
 
---- Context from: ${path.relative(cwd, projectRootGeminiFile)} ---
+--- Context from: ${normMarker(path.relative(cwd, projectRootGeminiFile))} ---
 Project root memory
---- End of Context from: ${path.relative(cwd, projectRootGeminiFile)} ---
+--- End of Context from: ${normMarker(path.relative(cwd, projectRootGeminiFile))} ---
 
---- Context from: ${path.relative(cwd, cwdGeminiFile)} ---
+--- Context from: ${normMarker(path.relative(cwd, cwdGeminiFile))} ---
 CWD memory
---- End of Context from: ${path.relative(cwd, cwdGeminiFile)} ---
+--- End of Context from: ${normMarker(path.relative(cwd, cwdGeminiFile))} ---
 
---- Context from: ${path.relative(cwd, subDirGeminiFile)} ---
+--- Context from: ${normMarker(path.relative(cwd, subDirGeminiFile))} ---
 Subdir memory
---- End of Context from: ${path.relative(cwd, subDirGeminiFile)} ---`,
+--- End of Context from: ${normMarker(path.relative(cwd, subDirGeminiFile))} ---`,
       fileCount: 5,
       filePaths: [
         defaultContextFile,
@@ -481,9 +505,10 @@ Subdir memory
     );
 
     expect(result).toEqual({
-      memoryContent: `--- Context from: ${path.relative(cwd, regularSubDirGeminiFile)} ---
+      memoryContent: `--- Project ---
+--- Context from: ${normMarker(path.relative(cwd, regularSubDirGeminiFile))} ---
 My code memory
---- End of Context from: ${path.relative(cwd, regularSubDirGeminiFile)} ---`,
+--- End of Context from: ${normMarker(path.relative(cwd, regularSubDirGeminiFile))} ---`,
       fileCount: 1,
       filePaths: [regularSubDirGeminiFile],
     });
@@ -565,9 +590,10 @@ My code memory
     );
 
     expect(result).toEqual({
-      memoryContent: `--- Context from: ${path.relative(cwd, extensionFilePath)} ---
+      memoryContent: `--- Extension ---
+--- Context from: ${normMarker(path.relative(cwd, extensionFilePath))} ---
 Extension memory content
---- End of Context from: ${path.relative(cwd, extensionFilePath)} ---`,
+--- End of Context from: ${normMarker(path.relative(cwd, extensionFilePath))} ---`,
       fileCount: 1,
       filePaths: [extensionFilePath],
     });
@@ -594,9 +620,10 @@ Extension memory content
     );
 
     expect(result).toEqual({
-      memoryContent: `--- Context from: ${path.relative(cwd, includedFile)} ---
+      memoryContent: `--- Project ---
+--- Context from: ${normMarker(path.relative(cwd, includedFile))} ---
 included directory memory
---- End of Context from: ${path.relative(cwd, includedFile)} ---`,
+--- End of Context from: ${normMarker(path.relative(cwd, includedFile))} ---`,
       fileCount: 1,
       filePaths: [includedFile],
     });
@@ -684,28 +711,64 @@ included directory memory
     expect(childOccurrences).toBe(1);
   });
 
-  describe('loadGlobalMemory', () => {
-    it('should load global memory file if it exists', async () => {
+  describe('getGlobalMemoryPaths', () => {
+    it('should find global memory file if it exists', async () => {
       const globalMemoryFile = await createTestFile(
         path.join(homedir, GEMINI_DIR, DEFAULT_CONTEXT_FILENAME),
         'Global memory content',
       );
 
-      const result = await loadGlobalMemory();
+      const result = await getGlobalMemoryPaths();
 
-      expect(result.files).toHaveLength(1);
-      expect(result.files[0].path).toBe(globalMemoryFile);
-      expect(result.files[0].content).toBe('Global memory content');
+      expect(result).toHaveLength(1);
+      expect(result[0]).toBe(globalMemoryFile);
     });
 
-    it('should return empty content if global memory file does not exist', async () => {
-      const result = await loadGlobalMemory();
+    it('should return empty array if global memory file does not exist', async () => {
+      const result = await getGlobalMemoryPaths();
 
-      expect(result.files).toHaveLength(0);
+      expect(result).toHaveLength(0);
     });
   });
 
-  describe('loadEnvironmentMemory', () => {
+  describe('getExtensionMemoryPaths', () => {
+    it('should return active extension context files', async () => {
+      const extFile = await createTestFile(
+        path.join(testRootDir, 'ext', 'GEMINI.md'),
+        'Extension content',
+      );
+      const loader = new SimpleExtensionLoader([
+        {
+          isActive: true,
+          contextFiles: [extFile],
+        } as GeminiCLIExtension,
+      ]);
+
+      const result = getExtensionMemoryPaths(loader);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toBe(extFile);
+    });
+
+    it('should ignore inactive extensions', async () => {
+      const extFile = await createTestFile(
+        path.join(testRootDir, 'ext', 'GEMINI.md'),
+        'Extension content',
+      );
+      const loader = new SimpleExtensionLoader([
+        {
+          isActive: false,
+          contextFiles: [extFile],
+        } as GeminiCLIExtension,
+      ]);
+
+      const result = getExtensionMemoryPaths(loader);
+
+      expect(result).toHaveLength(0);
+    });
+  });
+
+  describe('getEnvironmentMemoryPaths', () => {
     it('should NOT traverse upward beyond trusted root (even with .git)', async () => {
       // Setup: /temp/parent/repo/.git
       const parentDir = await createEmptyDir(path.join(testRootDir, 'parent'));
@@ -728,11 +791,10 @@ included directory memory
 
       // Trust srcDir. Should ONLY load srcFile.
       // Repo and Parent are NOT trusted.
-      const result = await loadEnvironmentMemory([srcDir]);
+      const result = await getEnvironmentMemoryPaths([srcDir]);
 
-      expect(result.files).toHaveLength(1);
-      expect(result.files[0].path).toBe(srcFile);
-      expect(result.files[0].content).toBe('Src content');
+      expect(result).toHaveLength(1);
+      expect(result[0]).toBe(srcFile);
     });
 
     it('should NOT traverse upward beyond trusted root (no .git)', async () => {
@@ -751,14 +813,13 @@ included directory memory
 
       // Trust notesDir. Should load NOTHING because notesDir has no file,
       // and we do not traverse up to docsDir.
-      const resultNotes = await loadEnvironmentMemory([notesDir]);
-      expect(resultNotes.files).toHaveLength(0);
+      const resultNotes = await getEnvironmentMemoryPaths([notesDir]);
+      expect(resultNotes).toHaveLength(0);
 
       // Trust docsDir. Should load docsFile, but NOT homeFile.
-      const resultDocs = await loadEnvironmentMemory([docsDir]);
-      expect(resultDocs.files).toHaveLength(1);
-      expect(resultDocs.files[0].path).toBe(docsFile);
-      expect(resultDocs.files[0].content).toBe('Docs content');
+      const resultDocs = await getEnvironmentMemoryPaths([docsDir]);
+      expect(resultDocs).toHaveLength(1);
+      expect(resultDocs[0]).toBe(docsFile);
     });
 
     it('should deduplicate paths when same root is trusted multiple times', async () => {
@@ -771,10 +832,10 @@ included directory memory
       );
 
       // Trust repoDir twice.
-      const result = await loadEnvironmentMemory([repoDir, repoDir]);
+      const result = await getEnvironmentMemoryPaths([repoDir, repoDir]);
 
-      expect(result.files).toHaveLength(1);
-      expect(result.files[0].path).toBe(repoFile);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toBe(repoFile);
     });
 
     it('should keep multiple memory files from the same directory adjacent and in order', async () => {
@@ -795,16 +856,14 @@ included directory memory
         'Secondary content',
       );
 
-      const result = await loadEnvironmentMemory([dir]);
+      const result = await getEnvironmentMemoryPaths([dir]);
 
-      expect(result.files).toHaveLength(2);
+      expect(result).toHaveLength(2);
       // Verify order: PRIMARY should come before SECONDARY because they are
       // sorted by path and PRIMARY.md comes before SECONDARY.md alphabetically
       // if in same dir.
-      expect(result.files[0].path).toBe(primaryFile);
-      expect(result.files[1].path).toBe(secondaryFile);
-      expect(result.files[0].content).toBe('Primary content');
-      expect(result.files[1].content).toBe('Secondary content');
+      expect(result[0]).toBe(primaryFile);
+      expect(result[1]).toBe(secondaryFile);
     });
   });
 
@@ -958,7 +1017,7 @@ included directory memory
     expect(flattenedMemory).toContain('Really cool custom context!');
     expect(config.getUserMemory()).toStrictEqual(refreshResult.memoryContent);
     expect(refreshResult.filePaths[0]).toContain(
-      path.join(extensionPath, 'CustomContext.md'),
+      normMarker(path.join(extensionPath, 'CustomContext.md')),
     );
     expect(config.getGeminiMdFilePaths()).equals(refreshResult.filePaths);
     expect(mockEventListener).toHaveBeenCalledExactlyOnceWith({

@@ -29,7 +29,6 @@ export function flattenMemory(memory?: string | HierarchicalMemory): string {
   }
 
   if (sections.length === 0) return '';
-  if (sections.length === 1) return sections[0].content;
 
   return sections.map((s) => `--- ${s.name} ---\n${s.content}`).join('\n\n');
 }

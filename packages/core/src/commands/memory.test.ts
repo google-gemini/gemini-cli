@@ -136,7 +136,7 @@ describe('memory commands', () => {
       if (result.type === 'message') {
         expect(result.messageType).toBe('info');
         expect(result.content).toBe(
-          'Memory refreshed successfully. Loaded 17 characters from 2 file(s).',
+          'Memory refreshed successfully. Loaded 33 characters from 2 file(s).',
         );
       }
     });
