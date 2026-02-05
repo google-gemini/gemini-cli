@@ -332,7 +332,7 @@ export type McpConfigDefinition = z.infer<typeof McpConfigDefinitionSchema>;
 
 const McpSettingSchema = z.object({
   mcpEnabled: z.boolean().optional(),
-  overrideMcpConfigJson: z.string().optional(),
+  mcpConfigJson: z.string().optional(),
 });
 
 // Schema for internal application use (parsed mcpConfig)

@@ -29,9 +29,9 @@ export function sanitizeAdminSettings(
   const sanitized = result.data;
   let mcpConfig;
 
-  if (sanitized.mcpSetting?.overrideMcpConfigJson) {
+  if (sanitized.mcpSetting?.mcpConfigJson) {
     try {
-      const parsed = JSON.parse(sanitized.mcpSetting.overrideMcpConfigJson);
+      const parsed = JSON.parse(sanitized.mcpSetting.mcpConfigJson);
       const validationResult = McpConfigDefinitionSchema.safeParse(parsed);
 
       if (validationResult.success) {

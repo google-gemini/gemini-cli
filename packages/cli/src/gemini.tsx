@@ -161,12 +161,13 @@ export function setupUnhandledRejectionHandler() {
 This is an unexpected error. Please file a bug report using the /bug tool.
 CRITICAL: Unhandled Promise Rejection!
 =========================================
-Reason: ${reason}${reason instanceof Error && reason.stack
+Reason: ${reason}${
+      reason instanceof Error && reason.stack
         ? `
 Stack trace:
 ${reason.stack}`
         : ''
-      }`;
+    }`;
     debugLogger.error(errorMessage);
     if (!unhandledRejectionOccurred) {
       unhandledRejectionOccurred = true;
@@ -439,9 +440,6 @@ export async function main() {
   }
 
   // Run deferred command now that we have admin settings.
-  console.error("remoteAdminSettings", remoteAdminSettings)
-  console.error("settings.merged.admin", settings.merged.admin)
-  console.error("settings.merged.mcpServers", settings.merged.mcpServers)
   await runDeferredCommand(settings.merged);
 
   // hop into sandbox if we are outside and sandboxing is enabled
@@ -508,7 +506,6 @@ export async function main() {
   // may have side effects.
   {
     const loadConfigHandle = startupProfiler.start('load_cli_config');
-    console.error("settings.merged", settings.merged.mcpServers)
     const config = await loadCliConfig(settings.merged, sessionId, argv, {
       projectHooks: settings.workspace.settings.hooks,
     });
@@ -616,7 +613,7 @@ export async function main() {
 
     if (
       settings.merged.security.auth.selectedType ===
-      AuthType.LOGIN_WITH_GOOGLE &&
+        AuthType.LOGIN_WITH_GOOGLE &&
       config.isBrowserLaunchSuppressed()
     ) {
       // Do oauth before app renders to make copying the link possible.
@@ -821,7 +818,6 @@ function setupAdminControlsListener() {
       settings?: AdminControlsSettings;
     };
     if (message?.type === 'admin-settings' && message.settings) {
-      console.error(message.settings)
       if (config) {
         config.setRemoteAdminSettings(message.settings);
       } else {
