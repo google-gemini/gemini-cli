@@ -4342,6 +4342,18 @@ describe('InputPrompt', () => {
           vi.mocked(clipboardy.read).mockResolvedValue('clipboard text');
         },
       },
+      {
+        name: 'Ctrl+R hotkey is pressed',
+        input: '\x12',
+      },
+      {
+        name: 'Ctrl+X hotkey is pressed',
+        input: '\x18',
+      },
+      {
+        name: 'F12 hotkey is pressed',
+        input: '\x1b[24~',
+      },
     ])(
       'should close shortcuts help when a $name',
       async ({ input, setupMocks, mouseEventsEnabled }) => {
