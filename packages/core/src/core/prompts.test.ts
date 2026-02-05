@@ -22,10 +22,6 @@ import {
   DEFAULT_GEMINI_MODEL,
 } from '../config/models.js';
 import { ApprovalMode } from '../policy/types.js';
-import {
-  ENTER_PLAN_MODE_TOOL_NAME,
-  EXIT_PLAN_MODE_TOOL_NAME,
-} from '../tools/tool-names.js';
 
 // Mock tool names if they are dynamically generated or complex
 vi.mock('../tools/ls', () => ({ LSTool: { Name: 'list_directory' } }));
@@ -66,7 +62,14 @@ describe('Core System Prompt (prompts.ts)', () => {
     mockConfig = {
       getToolRegistry: vi.fn().mockReturnValue({
         getAllToolNames: vi.fn().mockReturnValue([]),
+        unregisterTool: vi.fn(),
+        registerTool: vi.fn(),
+        getTool: vi.fn().mockReturnValue(undefined),
       }),
+      getGeminiClient: vi.fn().mockReturnValue({
+        setTools: vi.fn().mockResolvedValue(undefined),
+      }),
+      getMessageBus: vi.fn(),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
@@ -219,7 +222,14 @@ describe('Core System Prompt (prompts.ts)', () => {
       const testConfig = {
         getToolRegistry: vi.fn().mockReturnValue({
           getAllToolNames: vi.fn().mockReturnValue(toolNames),
+          getTool: vi.fn().mockReturnValue(undefined),
+          unregisterTool: vi.fn(),
+          registerTool: vi.fn(),
         }),
+        getGeminiClient: vi.fn().mockReturnValue({
+          setTools: vi.fn().mockResolvedValue(undefined),
+        }),
+        getMessageBus: vi.fn(),
         getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
         storage: {
           getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
@@ -260,26 +270,78 @@ describe('Core System Prompt (prompts.ts)', () => {
   );
 
   describe('ApprovalMode in System Prompt', () => {
-    it('should include PLAN mode instructions and warning against calling enter_plan_mode', () => {
+    it('should include PLAN mode instructions', () => {
       vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
       const prompt = getCoreSystemPrompt(mockConfig);
       expect(prompt).toContain('# Active Approval Mode: Plan');
-      expect(prompt).toContain(
-        `**Note:** You are ALREADY in Plan Mode. Do NOT call \`${ENTER_PLAN_MODE_TOOL_NAME}\`.`,
-      );
       expect(prompt).toMatchSnapshot();
     });
 
-    it('should include warning against calling exit_plan_mode for DEFAULT mode', () => {
+    it('should NOT include approval mode instructions for DEFAULT mode', () => {
       vi.mocked(mockConfig.getApprovalMode).mockReturnValue(
         ApprovalMode.DEFAULT,
       );
       const prompt = getCoreSystemPrompt(mockConfig);
       expect(prompt).not.toContain('# Active Approval Mode: Plan');
-      expect(prompt).toContain(
-        `**Note:** You are NOT in Plan Mode. Do NOT call \`${EXIT_PLAN_MODE_TOOL_NAME}\`.`,
-      );
       expect(prompt).toMatchSnapshot();
+    });
+
+    it('should synchronize tools when switching to PLAN mode', () => {
+      const mockUnregister = vi.fn();
+      const mockRegister = vi.fn();
+      const mockGeminiClient = {
+        setTools: vi.fn().mockResolvedValue(undefined),
+      };
+
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
+      vi.mocked(mockConfig.getToolRegistry).mockReturnValue({
+        unregisterTool: mockUnregister,
+        registerTool: mockRegister,
+        getAllToolNames: vi.fn().mockReturnValue([]),
+        getTool: vi.fn().mockImplementation((name) => {
+          if (name === 'enter_plan_mode') return {} as never; // Pretend it exists
+          return undefined;
+        }),
+      } as unknown as ReturnType<Config['getToolRegistry']>);
+      vi.mocked(mockConfig.getGeminiClient).mockReturnValue(
+        mockGeminiClient as unknown as ReturnType<Config['getGeminiClient']>,
+      );
+
+      getCoreSystemPrompt(mockConfig);
+
+      expect(mockUnregister).toHaveBeenCalledWith('enter_plan_mode');
+      expect(mockRegister).toHaveBeenCalled(); // Should register exit_plan_mode
+      expect(mockGeminiClient.setTools).toHaveBeenCalled();
+    });
+
+    it('should synchronize tools when switching to DEFAULT mode', () => {
+      const mockUnregister = vi.fn();
+      const mockRegister = vi.fn();
+      const mockGeminiClient = {
+        setTools: vi.fn().mockResolvedValue(undefined),
+      };
+
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(
+        ApprovalMode.DEFAULT,
+      );
+      vi.mocked(mockConfig.getToolRegistry).mockReturnValue({
+        unregisterTool: mockUnregister,
+        registerTool: mockRegister,
+        getAllToolNames: vi.fn().mockReturnValue([]),
+        getTool: vi.fn().mockImplementation((name) => {
+          if (name === 'exit_plan_mode') return {} as never; // Pretend it exists
+          return undefined;
+        }),
+      } as unknown as ReturnType<Config['getToolRegistry']>);
+      vi.mocked(mockConfig.getGeminiClient).mockReturnValue(
+        mockGeminiClient as unknown as ReturnType<Config['getGeminiClient']>,
+      );
+
+      getCoreSystemPrompt(mockConfig);
+
+      expect(mockUnregister).toHaveBeenCalledWith('exit_plan_mode');
+      expect(mockRegister).toHaveBeenCalled(); // Should register enter_plan_mode
+      expect(mockGeminiClient.setTools).toHaveBeenCalled();
     });
 
     it('should only list available tools in PLAN mode', () => {

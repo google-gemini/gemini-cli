@@ -21,10 +21,6 @@ import {
 import { PromptRegistry } from '../prompts/prompt-registry.js';
 import { ResourceRegistry } from '../resources/resource-registry.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
-import {
-  ENTER_PLAN_MODE_TOOL_NAME,
-  EXIT_PLAN_MODE_TOOL_NAME,
-} from '../tools/tool-names.js';
 import { LSTool } from '../tools/ls.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { GrepTool } from '../tools/grep.js';
@@ -1333,16 +1329,6 @@ export class Config {
         excludeToolsSet.add(tool);
       }
     }
-
-    const mode = this.getApprovalMode();
-    if (mode === ApprovalMode.PLAN) {
-      excludeToolsSet.add(ENTER_PLAN_MODE_TOOL_NAME);
-      excludeToolsSet.delete(EXIT_PLAN_MODE_TOOL_NAME);
-    } else {
-      excludeToolsSet.add(EXIT_PLAN_MODE_TOOL_NAME);
-      excludeToolsSet.delete(ENTER_PLAN_MODE_TOOL_NAME);
-    }
-
     return excludeToolsSet;
   }
 

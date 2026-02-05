@@ -8,7 +8,6 @@ import {
   ACTIVATE_SKILL_TOOL_NAME,
   ASK_USER_TOOL_NAME,
   EDIT_TOOL_NAME,
-  ENTER_PLAN_MODE_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
@@ -195,8 +194,6 @@ export function renderPrimaryWorkflows(
   return `
 # Primary Workflows
 
-**Note:** You are NOT in Plan Mode. Do NOT call \`${EXIT_PLAN_MODE_TOOL_NAME}\`.
-
 ## Software Engineering Tasks
 When requested to perform tasks like fixing bugs, adding features, refactoring, or explaining code, follow this sequence:
 ${workflowStepUnderstand(options)}
@@ -308,8 +305,6 @@ You are operating in **Plan Mode** - a structured planning workflow for designin
 The following read-only tools are available in Plan Mode:
 ${options.planModeToolsList}
 - \`${WRITE_FILE_TOOL_NAME}\` - Save plans to the plans directory (see Plan Storage below)
-
-**Note:** You are ALREADY in Plan Mode. Do NOT call \`${ENTER_PLAN_MODE_TOOL_NAME}\`.
 
 ## Plan Storage
 - Save your plans as Markdown (.md) files ONLY within: \`${options.plansDir}/\`
