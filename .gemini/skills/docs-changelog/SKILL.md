@@ -23,6 +23,8 @@ This skill covers two types of releases:
 *   **Preview Releases:** Pre-release versions for testing and feedback. These
     updates only modify `docs/changelogs/preview.md`.
 
+Ignore all other releases, such as nightly releases.
+
 ### Expected Inputs
 
 Regardless of the type of release, the following information is expected:
@@ -50,7 +52,10 @@ Regardless of the type of release, the following information is expected:
 
 ### Analyze Raw Changelog Data
 
-1.  Review the complete list of changes.
+1.  Review the complete list of changes. If it is a patch or a bug fix with few
+    changes, skip to the "Update `docs/changelogs/latest.md` or
+    `docs/changelogs/preview.md`" section.
+
 2.  Group related changes into high-level categories such as
     important features, "UI/UX Improvements", and "Bug Fixes". Use the existing
     announcements in `docs/changelogs/index.md` as an example.
@@ -77,8 +82,11 @@ Write concise summaries including the primary PR and author
 ### Update `docs/changelogs/latest.md` or `docs/changelogs/preview.md`
 
 1. Read current content and use `write_file` to replace it with the new
-  version number, date, comprehensive highlights, and the full
-  "What's Changed" list. 
+  version number, and date.
+  
+  If it is a patch or bug fix with few changes, simply add these
+  changes to the "What's Changed" list. Otherwise, replace comprehensive
+  highlights, and the full "What's Changed" list. 
 
 2. For each item in the "What's Changed" list, keep usernames in plaintext, and
   add github links for each issue number. Example:
@@ -90,11 +98,15 @@ Write concise summaries including the primary PR and author
 
 4. Do not add the "New Contributors" section.
 
-5. Ensure lines are wrapped to 80 characters.
+5. Update the "Full changelog:" link with the previous version and the new
+vesion, unless it is a patch or a bug fix, in which case simply update the
+link's new version and keep the previous version the same.
+
+6. Ensure lines are wrapped to 80 characters.
 
 ### Update `docs/changelogs/index.md`
 
-Skip this step for preview releases.
+Skip this step for patches, bug fixes, or preview releases.
 
 Insert a new "Announcements" section for the new version directly
 above the previous version's section. Ensure lines are wrapped to
