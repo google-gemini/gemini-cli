@@ -25,6 +25,7 @@ import {
 import {
   Config,
   debugLogger,
+  applyAdminAllowlist,
   ExtensionDisableEvent,
   ExtensionEnableEvent,
   ExtensionInstallEvent,
@@ -909,8 +910,32 @@ Would you like to attempt to install via "git clone" instead?`,
     }
     if (extension.mcpServers) {
       output += `\n MCP servers:`;
+
+      const adminMcpConfig = this.settings.admin?.mcp?.config;
+      const adminMcpEnabled = this.settings.admin?.mcp?.enabled ?? true;
+
       Object.keys(extension.mcpServers).forEach((key) => {
-        output += `\n  ${key}`;
+        let blockedMessage = '';
+        if (!adminMcpEnabled) {
+          blockedMessage = ' (blocked by admin: MCP disabled)';
+        } else if (adminMcpConfig && Object.keys(adminMcpConfig).length > 0) {
+          // Check if this server is allowed by the admin allowlist
+          // We can reuse applyAdminAllowlist for a single item check
+          // But since we don't have the server config easily here without looking it up again or trusting the structure...
+          // Actually, applyAdminAllowlist takes a Record<string, MCPServerConfig>
+          // So we construct a dummy record
+          const serverConfig = extension.mcpServers?.[key];
+          if (serverConfig) {
+            const filtered = applyAdminAllowlist(
+              { [key]: serverConfig },
+              adminMcpConfig,
+            );
+            if (Object.keys(filtered.mcpServers).length === 0) {
+              blockedMessage = ' (blocked by admin allowlist)';
+            }
+          }
+        }
+        output += `\n  ${key}${blockedMessage}`;
       });
     }
     if (extension.excludeTools) {

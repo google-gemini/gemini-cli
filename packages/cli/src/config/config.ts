@@ -693,15 +693,14 @@ export async function loadCliConfig(
   const adminAllowlist = settings.admin?.mcp?.config;
   let mcpServerCommand = mcpEnabled ? settings.mcp?.serverCommand : undefined;
   let mcpServers = mcpEnabled ? settings.mcpServers : {};
-  console.error("cli settings")
-  console.error(mcpEnabled)
-  console.error(settings.mcpServers)
-  console.error(mcpServers)
+
+  let blockedMcpServersFromAdmin: string[] = [];
 
   if (mcpEnabled) {
-
     if (adminAllowlist && Object.keys(adminAllowlist).length > 0) {
-      mcpServers = applyAdminAllowlist(mcpServers, adminAllowlist);
+      const result = applyAdminAllowlist(mcpServers, adminAllowlist);
+      mcpServers = result.mcpServers;
+      blockedMcpServersFromAdmin = result.blockedServerNames;
 
       mcpServerCommand = undefined;
     }
@@ -739,7 +738,7 @@ export async function loadCliConfig(
     blockedMcpServers: mcpEnabled
       ? argv.allowedMcpServerNames
         ? undefined
-        : settings.mcp?.excluded
+        : [...(settings.mcp?.excluded || []), ...blockedMcpServersFromAdmin]
       : undefined,
     blockedEnvironmentVariables:
       settings.security?.environmentVariableRedaction?.blocked,

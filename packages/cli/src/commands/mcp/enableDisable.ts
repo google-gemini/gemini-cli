@@ -37,7 +37,7 @@ async function handleEnable(args: Args): Promise<void> {
   }
 
   // Get all servers including extensions
-  const servers = await getMcpServersFromConfig(settings);
+  const { mcpServers: servers } = await getMcpServersFromConfig(settings);
   const normalizedServerNames = Object.keys(servers).map(normalizeServerId);
   if (!normalizedServerNames.includes(name)) {
     debugLogger.log(
@@ -50,6 +50,7 @@ async function handleEnable(args: Args): Promise<void> {
     adminMcpEnabled: settings.admin?.mcp?.enabled ?? true,
     allowedList: settings.mcp?.allowed,
     excludedList: settings.mcp?.excluded,
+    adminAllowlist: settings.admin?.mcp?.config,
   });
 
   if (
@@ -86,7 +87,7 @@ async function handleDisable(args: Args): Promise<void> {
   }
 
   // Get all servers including extensions
-  const servers = await getMcpServersFromConfig(settings);
+  const { mcpServers: servers } = await getMcpServersFromConfig(settings);
   const normalizedServerNames = Object.keys(servers).map(normalizeServerId);
   if (!normalizedServerNames.includes(name)) {
     debugLogger.log(

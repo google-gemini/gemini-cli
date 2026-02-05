@@ -21,15 +21,17 @@ import type { MCPServerConfig } from '../../config/config.js';
 export function applyAdminAllowlist(
   localMcpServers: Record<string, MCPServerConfig>,
   adminAllowlist: Record<string, MCPServerConfig> | undefined,
-): Record<string, MCPServerConfig> {
-  console.error('applyAdminAllowlist')
-  console.error(localMcpServers)
-  console.error(adminAllowlist)
+): {
+  mcpServers: Record<string, MCPServerConfig>;
+  blockedServerNames: string[];
+} {
   if (!adminAllowlist || Object.keys(adminAllowlist).length === 0) {
-    return localMcpServers;
+    return { mcpServers: localMcpServers, blockedServerNames: [] };
   }
 
   const filteredMcpServers: Record<string, MCPServerConfig> = {};
+  const blockedServerNames: string[] = [];
+
   for (const [serverId, localConfig] of Object.entries(localMcpServers)) {
     const adminConfig = adminAllowlist[serverId];
     if (adminConfig) {
@@ -57,7 +59,9 @@ export function applyAdminAllowlist(
       }
 
       filteredMcpServers[serverId] = mergedConfig;
+    } else {
+      blockedServerNames.push(serverId);
     }
   }
-  return filteredMcpServers;
+  return { mcpServers: filteredMcpServers, blockedServerNames };
 }

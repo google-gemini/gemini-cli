@@ -13,14 +13,20 @@ describe('applyAdminAllowlist', () => {
     const localServers: Record<string, MCPServerConfig> = {
       server1: { command: 'cmd1' },
     };
-    expect(applyAdminAllowlist(localServers, undefined)).toBe(localServers);
+    expect(applyAdminAllowlist(localServers, undefined)).toEqual({
+      mcpServers: localServers,
+      blockedServerNames: [],
+    });
   });
 
   it('should return original servers if allowlist is empty', () => {
     const localServers: Record<string, MCPServerConfig> = {
       server1: { command: 'cmd1' },
     };
-    expect(applyAdminAllowlist(localServers, {})).toBe(localServers);
+    expect(applyAdminAllowlist(localServers, {})).toEqual({
+      mcpServers: localServers,
+      blockedServerNames: [],
+    });
   });
 
   it('should filter servers not in allowlist', () => {
@@ -31,30 +37,31 @@ describe('applyAdminAllowlist', () => {
     const allowlist: Record<string, MCPServerConfig> = {
       server1: { url: 'http://server1' },
     };
-    
+
     const result = applyAdminAllowlist(localServers, allowlist);
-    expect(Object.keys(result)).toEqual(['server1']);
+    expect(Object.keys(result.mcpServers)).toEqual(['server1']);
+    expect(result.blockedServerNames).toEqual(['server2']);
   });
 
   it('should override connection details with allowlist values', () => {
     const localServers: Record<string, MCPServerConfig> = {
-      server1: { 
-        command: 'local-cmd', 
+      server1: {
+        command: 'local-cmd',
         args: ['local-arg'],
         env: { LOCAL: 'true' },
-        description: 'Local description'
+        description: 'Local description',
       },
     };
     const allowlist: Record<string, MCPServerConfig> = {
-      server1: { 
-        url: 'http://admin-url', 
+      server1: {
+        url: 'http://admin-url',
         type: 'sse',
-        trust: true 
+        trust: true,
       },
     };
 
     const result = applyAdminAllowlist(localServers, allowlist);
-    const server = result['server1'];
+    const server = result.mcpServers['server1'];
 
     expect(server).toBeDefined();
     expect(server?.url).toBe('http://admin-url');
@@ -73,27 +80,27 @@ describe('applyAdminAllowlist', () => {
       server1: { command: 'cmd1' },
     };
     const allowlist: Record<string, MCPServerConfig> = {
-      server1: { 
+      server1: {
         url: 'http://url',
         includeTools: ['tool1'],
-        excludeTools: ['tool2']
+        excludeTools: ['tool2'],
       },
     };
 
     const result = applyAdminAllowlist(localServers, allowlist);
-    expect(result['server1']?.includeTools).toEqual(['tool1']);
-    expect(result['server1']?.excludeTools).toEqual(['tool2']);
+    expect(result.mcpServers['server1']?.includeTools).toEqual(['tool1']);
+    expect(result.mcpServers['server1']?.excludeTools).toEqual(['tool2']);
   });
 
   it('should not apply empty tool restrictions from allowlist', () => {
     const localServers: Record<string, MCPServerConfig> = {
-      server1: { 
+      server1: {
         command: 'cmd1',
         includeTools: ['local-tool'],
       },
     };
     const allowlist: Record<string, MCPServerConfig> = {
-      server1: { 
+      server1: {
         url: 'http://url',
         includeTools: [],
       },
@@ -101,6 +108,6 @@ describe('applyAdminAllowlist', () => {
 
     const result = applyAdminAllowlist(localServers, allowlist);
     // Should keep local tool restrictions if admin ones are empty/undefined
-    expect(result['server1']?.includeTools).toEqual(['local-tool']);
+    expect(result.mcpServers['server1']?.includeTools).toEqual(['local-tool']);
   });
 });
