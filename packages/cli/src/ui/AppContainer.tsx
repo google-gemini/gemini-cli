@@ -142,6 +142,7 @@ import { NewAgentsChoice } from './components/NewAgentsNotification.js';
 import { isSlashCommand } from './utils/commandUtils.js';
 import { useTerminalTheme } from './hooks/useTerminalTheme.js';
 import { useTimedMessage } from './hooks/useTimedMessage.js';
+import { isITerm2 } from './utils/terminalUtils.js';
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
   return pendingHistoryItems.some((item) => {
@@ -1480,8 +1481,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setShowErrorDetails((prev) => !prev);
         return true;
       } else if (keyMatchers[Command.SUSPEND_APP](key)) {
+        const undoMessage = isITerm2()
+          ? 'Undo has been moved to Option + Z'
+          : 'Undo has been moved to Alt/Option + Z or Cmd + Z';
         showTransientMessage({
-          text: 'Undo has been moved to Cmd + Z or Alt/Opt + Z',
+          text: undoMessage,
           type: TransientMessageType.Warning,
         });
         return true;

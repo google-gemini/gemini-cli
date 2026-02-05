@@ -995,6 +995,10 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** If false, disallows MCP servers from being used.
   - **Default:** `true`
 
+- **`admin.mcp.config`** (object):
+  - **Description:** Admin-configured MCP servers.
+  - **Default:** `{}`
+
 - **`admin.skills.enabled`** (boolean):
   - **Description:** If false, disallows agent skills from being used.
   - **Default:** `true`
