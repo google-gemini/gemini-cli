@@ -89,25 +89,6 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
 
   useMouseClick(contentRef, handleFocus, { isActive: !!isThisShellFocusable });
 
-  React.useEffect(() => {
-    // If this shell was focused but is no longer focused (e.g. it finished),
-    // and it IS the shell that is currently considered focused in the UI context,
-    // then we should clear the global focus state.
-    if (
-      !isThisShellFocused &&
-      ptyId === activeShellPtyId &&
-      embeddedShellFocused
-    ) {
-      setEmbeddedShellFocused(false);
-    }
-  }, [
-    isThisShellFocused,
-    ptyId,
-    activeShellPtyId,
-    embeddedShellFocused,
-    setEmbeddedShellFocused,
-  ]);
-
   const { shouldShowFocusHint } = useFocusHint(
     isThisShellFocusable,
     isThisShellFocused,

@@ -1205,21 +1205,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   useEffect(() => {
     if (
-      !activePtyId &&
-      (!isBackgroundShellVisible || backgroundShells.size === 0) &&
-      embeddedShellFocused
-    ) {
-      setEmbeddedShellFocused(false);
-    }
-  }, [
-    activePtyId,
-    isBackgroundShellVisible,
-    backgroundShells.size,
-    embeddedShellFocused,
-  ]);
-
-  useEffect(() => {
-    if (
       initialPrompt &&
       isConfigInitialized &&
       !initialPromptSubmitted.current &&
@@ -1291,7 +1276,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
   useIncludeDirsTrust(config, isTrustedFolder, historyManager, setCustomDialog);
 
   const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const tabFocusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleWarning = useCallback((message: string) => {
     setWarningMessage(message);
@@ -1303,21 +1287,20 @@ Logging in with Google... Restarting Gemini CLI to continue.
     }, WARNING_PROMPT_DURATION_MS);
   }, []);
 
+  // Handle timeout cleanup on unmount
+  useEffect(() => () => {
+      if (warningTimeoutRef.current) {
+        clearTimeout(warningTimeoutRef.current);
+      }
+    }, []);
+
   useEffect(() => {
     const handlePasteTimeout = () => {
       handleWarning('Paste Timed out. Possibly due to slow connection.');
     };
     appEvents.on(AppEvent.PasteTimeout, handlePasteTimeout);
-    const warningTimeout = warningTimeoutRef.current;
-    const tabFocusTimeout = tabFocusTimeoutRef.current;
     return () => {
       appEvents.off(AppEvent.PasteTimeout, handlePasteTimeout);
-      if (warningTimeout) {
-        clearTimeout(warningTimeout);
-      }
-      if (tabFocusTimeout) {
-        clearTimeout(tabFocusTimeout);
-      }
     };
   }, [handleWarning]);
 
@@ -1524,9 +1507,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
         const isIdle = now - lastOutputTimeRef.current >= 100;
 
         if (isIdle && !activePtyId && !isBackgroundShellVisible) {
-          if (tabFocusTimeoutRef.current) {
-            clearTimeout(tabFocusTimeoutRef.current);
-          }
           toggleBackgroundShell();
           // We are about to show it, so focus it
           setEmbeddedShellFocused(true);
@@ -1598,7 +1578,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isBackgroundShellVisible,
       setIsBackgroundShellListOpen,
       lastOutputTimeRef,
-      tabFocusTimeoutRef,
       handleWarning,
     ],
   );

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { act } from 'react';
+import React from 'react';
 import {
   ShellToolMessage,
   type ShellToolMessageProps,
@@ -77,16 +77,6 @@ describe('<ShellToolMessage />', () => {
     setEmbeddedShellFocused: mockSetEmbeddedShellFocused,
   };
 
-  // Helper to render with context
-  const renderWithContext = (
-    ui: React.ReactElement,
-    streamingState: StreamingState,
-  ) =>
-    renderWithProviders(ui, {
-      uiActions,
-      uiState: { streamingState },
-    });
-
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -138,41 +128,6 @@ describe('<ShellToolMessage />', () => {
 
       await waitFor(() => {
         expect(mockSetEmbeddedShellFocused).toHaveBeenCalledWith(true);
-      });
-    });
-
-    it('resets focus when shell finishes', async () => {
-      let updateStatus: (s: ToolCallStatus) => void = () => {};
-
-      const Wrapper = () => {
-        const [status, setStatus] = React.useState(ToolCallStatus.Executing);
-        updateStatus = setStatus;
-        return (
-          <ShellToolMessage
-            {...shellProps}
-            status={status}
-            embeddedShellFocused={true}
-            activeShellPtyId={1}
-            ptyId={1}
-          />
-        );
-      };
-
-      const { lastFrame } = renderWithContext(<Wrapper />, StreamingState.Idle);
-
-      // Verify it is initially focused
-      await waitFor(() => {
-        expect(lastFrame()).toContain('(Shift+Tab to unfocus)');
-      });
-
-      // Now update status to Success
-      await act(async () => {
-        updateStatus(ToolCallStatus.Success);
-      });
-
-      // Should call setEmbeddedShellFocused(false) because isThisShellFocused became false
-      await waitFor(() => {
-        expect(mockSetEmbeddedShellFocused).toHaveBeenCalledWith(false);
       });
     });
   });
