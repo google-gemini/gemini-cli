@@ -104,6 +104,7 @@ import { TerminalProvider } from './ui/contexts/TerminalContext.js';
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { profiler } from './ui/components/DebugProfiler.js';
 import { runDeferredCommand } from './deferred.js';
+import { SlashCommandConflictHandler } from './services/SlashCommandConflictHandler.js';
 
 const SLOW_RENDER_MS = 200;
 
@@ -335,6 +336,11 @@ export async function main() {
   });
 
   setupUnhandledRejectionHandler();
+
+  const slashCommandConflictHandler = new SlashCommandConflictHandler();
+  slashCommandConflictHandler.start();
+  registerCleanup(() => slashCommandConflictHandler.stop());
+
   const loadSettingsHandle = startupProfiler.start('load_settings');
   const settings = loadSettings();
   loadSettingsHandle?.end();

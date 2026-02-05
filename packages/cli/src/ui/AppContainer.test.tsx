@@ -20,7 +20,7 @@ import { cleanup } from 'ink-testing-library';
 import { act, useContext, type ReactElement } from 'react';
 import { AppContainer } from './AppContainer.js';
 import { SettingsContext } from './contexts/SettingsContext.js';
-import { type TrackedToolCall } from './hooks/useReactToolScheduler.js';
+import { type TrackedToolCall } from './hooks/useToolScheduler.js';
 import {
   type Config,
   makeFakeConfig,
@@ -197,7 +197,8 @@ import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
-import { useKeypress } from './hooks/useKeypress.js';
+import { useKeypress, type Key } from './hooks/useKeypress.js';
+import * as useKeypressModule from './hooks/useKeypress.js';
 import { measureElement } from 'ink';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import {
@@ -2088,6 +2089,128 @@ describe('AppContainer State Management', () => {
 
         unmount();
       });
+    });
+  });
+
+  describe('Shortcuts Help Visibility', () => {
+    let handleGlobalKeypress: (key: Key) => boolean;
+    let mockedUseKeypress: Mock;
+    let rerender: () => void;
+    let unmount: () => void;
+
+    const setupShortcutsVisibilityTest = async () => {
+      const renderResult = renderAppContainer();
+      await act(async () => {
+        vi.advanceTimersByTime(0);
+      });
+      rerender = () => renderResult.rerender(getAppContainer());
+      unmount = renderResult.unmount;
+    };
+
+    const pressKey = (key: Partial<Key>) => {
+      act(() => {
+        handleGlobalKeypress({
+          name: 'r',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          insertable: false,
+          sequence: '',
+          ...key,
+        } as Key);
+      });
+      rerender();
+    };
+
+    beforeEach(() => {
+      mockedUseKeypress = vi.spyOn(useKeypressModule, 'useKeypress') as Mock;
+      mockedUseKeypress.mockImplementation(
+        (callback: (key: Key) => boolean, options: { isActive: boolean }) => {
+          // AppContainer registers multiple keypress handlers; capture only
+          // active handlers so inactive copy-mode handler doesn't override.
+          if (options?.isActive) {
+            handleGlobalKeypress = callback;
+          }
+        },
+      );
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      mockedUseKeypress.mockRestore();
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    it('dismisses shortcuts help when a registered hotkey is pressed', async () => {
+      await setupShortcutsVisibilityTest();
+
+      act(() => {
+        capturedUIActions.setShortcutsHelpVisible(true);
+      });
+      rerender();
+      expect(capturedUIState.shortcutsHelpVisible).toBe(true);
+
+      pressKey({ name: 'r', ctrl: true, sequence: '\x12' }); // Ctrl+R
+      expect(capturedUIState.shortcutsHelpVisible).toBe(false);
+
+      unmount();
+    });
+
+    it('dismisses shortcuts help when streaming starts', async () => {
+      await setupShortcutsVisibilityTest();
+
+      act(() => {
+        capturedUIActions.setShortcutsHelpVisible(true);
+      });
+      rerender();
+      expect(capturedUIState.shortcutsHelpVisible).toBe(true);
+
+      mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        streamingState: 'responding',
+      });
+
+      await act(async () => {
+        rerender();
+      });
+      await waitFor(() => {
+        expect(capturedUIState.shortcutsHelpVisible).toBe(false);
+      });
+
+      unmount();
+    });
+
+    it('dismisses shortcuts help when action-required confirmation appears', async () => {
+      await setupShortcutsVisibilityTest();
+
+      act(() => {
+        capturedUIActions.setShortcutsHelpVisible(true);
+      });
+      rerender();
+      expect(capturedUIState.shortcutsHelpVisible).toBe(true);
+
+      mockedUseSlashCommandProcessor.mockReturnValue({
+        handleSlashCommand: vi.fn(),
+        slashCommands: [],
+        pendingHistoryItems: [],
+        commandContext: {},
+        shellConfirmationRequest: null,
+        confirmationRequest: {
+          prompt: 'Confirm this action?',
+          onConfirm: vi.fn(),
+        },
+      });
+
+      await act(async () => {
+        rerender();
+      });
+      await waitFor(() => {
+        expect(capturedUIState.shortcutsHelpVisible).toBe(false);
+      });
+
+      unmount();
     });
   });
 
