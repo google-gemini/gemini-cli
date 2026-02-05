@@ -161,16 +161,12 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
           terminalWidth={terminalWidth}
           renderOutputAsMarkdown={renderOutputAsMarkdown}
           hasFocus={isThisShellFocused}
-          maxLines={
-            (isAlternateBuffer && isThisShellFocused) ||
-            availableTerminalHeight === undefined
-              ? undefined
-              : status === ToolCallStatus.Success ||
-                  status === ToolCallStatus.Error ||
-                  status === ToolCallStatus.Canceled
-                ? SHELL_HISTORY_MAX_LINES
-                : ACTIVE_SHELL_MAX_LINES
-          }
+          maxLines={getShellMaxLines(
+            status,
+            isAlternateBuffer,
+            isThisShellFocused,
+            availableTerminalHeight,
+          )}
         />
         {isThisShellFocused && config && (
           <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>
@@ -185,3 +181,36 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
     </>
   );
 };
+
+/**
+ * Calculates the maximum number of lines to display for shell output.
+ *
+ * For completed processes (Success, Error, Canceled), it returns SHELL_HISTORY_MAX_LINES.
+ * For active processes, it returns undefined (unlimited) if the terminal is in
+ * alternate buffer mode and focused, or if availableTerminalHeight is undefined
+ * (signaling unlimited). Otherwise, it returns ACTIVE_SHELL_MAX_LINES.
+ */
+function getShellMaxLines(
+  status: ToolCallStatus,
+  isAlternateBuffer: boolean,
+  isThisShellFocused: boolean,
+  availableTerminalHeight: number | undefined,
+): number | undefined {
+  if (
+    status === ToolCallStatus.Success ||
+    status === ToolCallStatus.Error ||
+    status === ToolCallStatus.Canceled
+  ) {
+    return SHELL_HISTORY_MAX_LINES;
+  }
+
+  if (
+    (isAlternateBuffer && isThisShellFocused) ||
+    availableTerminalHeight === undefined
+  ) {
+    // availableTerminalHeight being undefined means unlimited
+    return undefined;
+  }
+
+  return ACTIVE_SHELL_MAX_LINES;
+}

@@ -253,5 +253,88 @@ describe('<ShellToolMessage />', () => {
         });
       });
     });
+
+    it('passes SHELL_HISTORY_MAX_LINES when status is Success even if availableTerminalHeight is undefined', async () => {
+      const { ToolResultDisplay: MockToolResultDisplay } = await import(
+        './ToolResultDisplay.js'
+      );
+      const { SHELL_HISTORY_MAX_LINES } = await import('../../constants.js');
+
+      const props: ShellToolMessageProps = {
+        ...baseProps,
+        status: ToolCallStatus.Success,
+        availableTerminalHeight: undefined,
+      };
+
+      renderWithProviders(<ShellToolMessage {...props} />, { uiActions });
+
+      await waitFor(() => {
+        const lastCallProps = vi
+          .mocked(MockToolResultDisplay)
+          .mock.calls.at(-1)?.[0];
+        expect(lastCallProps).toMatchObject({
+          maxLines: SHELL_HISTORY_MAX_LINES,
+        });
+      });
+    });
+
+    it('passes undefined when in alternate buffer and focused while executing', async () => {
+      const { ToolResultDisplay: MockToolResultDisplay } = await import(
+        './ToolResultDisplay.js'
+      );
+
+      const props: ShellToolMessageProps = {
+        ...baseProps,
+        status: ToolCallStatus.Executing,
+        availableTerminalHeight: 20,
+        ptyId: 1,
+        activeShellPtyId: 1,
+        embeddedShellFocused: true,
+      };
+
+      renderWithProviders(<ShellToolMessage {...props} />, {
+        uiActions,
+        useAlternateBuffer: true,
+      });
+
+      await waitFor(() => {
+        const lastCallProps = vi
+          .mocked(MockToolResultDisplay)
+          .mock.calls.at(-1)?.[0];
+        expect(lastCallProps).toMatchObject({
+          maxLines: undefined,
+        });
+      });
+    });
+
+    it('passes SHELL_HISTORY_MAX_LINES when finished even if previously in alternate buffer and focused', async () => {
+      const { ToolResultDisplay: MockToolResultDisplay } = await import(
+        './ToolResultDisplay.js'
+      );
+      const { SHELL_HISTORY_MAX_LINES } = await import('../../constants.js');
+
+      const props: ShellToolMessageProps = {
+        ...baseProps,
+        status: ToolCallStatus.Success,
+        availableTerminalHeight: 20,
+        ptyId: 1,
+        activeShellPtyId: 1,
+        embeddedShellFocused: true,
+      };
+
+      renderWithProviders(<ShellToolMessage {...props} />, {
+        uiActions,
+        useAlternateBuffer: true,
+      });
+
+      await waitFor(() => {
+        const lastCallProps = vi
+          .mocked(MockToolResultDisplay)
+          .mock.calls.at(-1)?.[0];
+        expect(lastCallProps).toMatchObject({
+          maxLines: SHELL_HISTORY_MAX_LINES,
+        });
+      });
+    });
   });
 });

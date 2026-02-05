@@ -327,7 +327,7 @@ describe('ToolResultDisplay', () => {
     expect(output).toContain('Line 3');
   });
 
-  it('does not truncate ANSI output when availableTerminalHeight is undefined', () => {
+  it('truncates ANSI output when maxLines is provided, even if availableTerminalHeight is undefined', () => {
     const ansiResult: AnsiOutput = Array.from({ length: 50 }, (_, i) => [
       {
         text: `Line ${i + 1}`,
@@ -350,8 +350,8 @@ describe('ToolResultDisplay', () => {
     );
     const output = lastFrame();
 
-    // In unconstrained mode, it should NOT truncate to 25 lines
-    expect(output).toContain('Line 1');
+    // It SHOULD truncate to 25 lines because maxLines is provided
+    expect(output).not.toContain('Line 1');
     expect(output).toContain('Line 50');
   });
 });

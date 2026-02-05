@@ -191,6 +191,10 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
       />
     );
   } else {
+    const shouldDisableTruncation =
+      isAlternateBuffer ||
+      (availableTerminalHeight === undefined && maxLines === undefined);
+
     content = (
       <AnsiOutputText
         data={truncatedResultDisplay as AnsiOutput}
@@ -199,9 +203,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
         }
         width={childWidth}
         maxLines={isAlternateBuffer ? undefined : maxLines}
-        disableTruncation={
-          isAlternateBuffer || availableTerminalHeight === undefined
-        }
+        disableTruncation={shouldDisableTruncation}
       />
     );
   }
