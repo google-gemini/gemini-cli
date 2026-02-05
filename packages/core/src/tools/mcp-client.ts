@@ -43,6 +43,7 @@ import { AuthProviderType } from '../config/config.js';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { ServiceAccountImpersonationProvider } from '../mcp/sa-impersonation-provider.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
+import { XcodeMcpBridgeFixTransport } from './xcode-mcp-fix-transport.js';
 
 import type { CallableTool, FunctionCall, Part, Tool } from '@google/genai';
 import { basename } from 'node:path';
@@ -145,7 +146,7 @@ export class McpClient {
     }
     this.updateStatus(MCPServerStatus.CONNECTING);
     try {
-      this.client = await connectToMcpServer(
+      const { client, transport } = await connectToMcpServer(
         this.clientVersion,
         this.serverName,
         this.serverConfig,
@@ -153,11 +154,13 @@ export class McpClient {
         this.workspaceContext,
         this.cliConfig.sanitizationConfig,
       );
+      this.client = client;
+      this.transport = transport;
 
       this.registerNotificationHandlers();
 
       const originalOnError = this.client.onerror;
-      this.client.onerror = (error) => {
+      this.client.onerror = async (error) => {
         if (this.status !== MCPServerStatus.CONNECTED) {
           return;
         }
@@ -168,6 +171,14 @@ export class McpClient {
           error,
         );
         this.updateStatus(MCPServerStatus.DISCONNECTED);
+        // Close transport to prevent memory leaks
+        if (this.transport) {
+          try {
+            await this.transport.close();
+          } catch {
+            // Ignore errors when closing transport on error
+          }
+        }
       };
       this.updateStatus(MCPServerStatus.CONNECTED);
     } catch (error) {
@@ -910,8 +921,9 @@ export async function connectAndDiscover(
   updateMCPServerStatus(mcpServerName, MCPServerStatus.CONNECTING);
 
   let mcpClient: Client | undefined;
+  let transport: Transport | undefined;
   try {
-    mcpClient = await connectToMcpServer(
+    const result = await connectToMcpServer(
       clientVersion,
       mcpServerName,
       mcpServerConfig,
@@ -919,10 +931,20 @@ export async function connectAndDiscover(
       workspaceContext,
       cliConfig.sanitizationConfig,
     );
+    mcpClient = result.client;
+    transport = result.transport;
 
-    mcpClient.onerror = (error) => {
+    mcpClient.onerror = async (error) => {
       coreEvents.emitFeedback('error', `MCP ERROR (${mcpServerName}):`, error);
       updateMCPServerStatus(mcpServerName, MCPServerStatus.DISCONNECTED);
+      // Close transport to prevent memory leaks
+      if (transport) {
+        try {
+          await transport.close();
+        } catch {
+          // Ignore errors when closing transport on error
+        }
+      }
     };
 
     // Attempt to discover both prompts and tools
@@ -1318,16 +1340,18 @@ function createSSETransportWithAuth(
  * @param client The MCP client to connect
  * @param config The MCP server configuration
  * @param accessToken Optional OAuth access token for authentication
+ * @returns The transport used for connection
  */
 async function connectWithSSETransport(
   client: Client,
   config: MCPServerConfig,
   accessToken?: string | null,
-): Promise<void> {
+): Promise<Transport> {
   const transport = createSSETransportWithAuth(config, accessToken);
   await client.connect(transport, {
     timeout: config.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
   });
+  return transport;
 }
 
 /**
@@ -1357,6 +1381,7 @@ async function showAuthRequiredMessage(serverName: string): Promise<never> {
  * @param config The MCP server configuration
  * @param accessToken The OAuth access token to use
  * @param httpReturned404 Whether the HTTP transport returned 404 (indicating SSE-only server)
+ * @returns The transport used for connection
  */
 async function retryWithOAuth(
   client: Client,
@@ -1364,17 +1389,21 @@ async function retryWithOAuth(
   config: MCPServerConfig,
   accessToken: string,
   httpReturned404: boolean,
-): Promise<void> {
+): Promise<Transport> {
   if (httpReturned404) {
     // HTTP returned 404, only try SSE
     debugLogger.log(
       `Retrying SSE connection to '${serverName}' with OAuth token...`,
     );
-    await connectWithSSETransport(client, config, accessToken);
+    const transport = await connectWithSSETransport(
+      client,
+      config,
+      accessToken,
+    );
     debugLogger.log(
       `Successfully connected to '${serverName}' using SSE with OAuth.`,
     );
-    return;
+    return transport;
   }
 
   // HTTP returned 401, try HTTP with OAuth first
@@ -1398,6 +1427,7 @@ async function retryWithOAuth(
     debugLogger.log(
       `Successfully connected to '${serverName}' using HTTP with OAuth.`,
     );
+    return httpTransport;
   } catch (httpError) {
     await httpTransport.close();
 
@@ -1409,10 +1439,15 @@ async function retryWithOAuth(
       !config.httpUrl
     ) {
       debugLogger.log(`HTTP with OAuth returned 404, trying SSE with OAuth...`);
-      await connectWithSSETransport(client, config, accessToken);
+      const sseTransport = await connectWithSSETransport(
+        client,
+        config,
+        accessToken,
+      );
       debugLogger.log(
         `Successfully connected to '${serverName}' using SSE with OAuth.`,
       );
+      return sseTransport;
     } else {
       throw httpError;
     }
@@ -1426,7 +1461,7 @@ async function retryWithOAuth(
  *
  * @param mcpServerName The name of the MCP server, used for logging and identification.
  * @param mcpServerConfig The configuration specifying how to connect to the server.
- * @returns A promise that resolves to a connected MCP `Client` instance.
+ * @returns A promise that resolves to a connected MCP `Client` instance and its transport.
  * @throws An error if the connection fails or the configuration is invalid.
  */
 export async function connectToMcpServer(
@@ -1436,7 +1471,7 @@ export async function connectToMcpServer(
   debugMode: boolean,
   workspaceContext: WorkspaceContext,
   sanitizationConfig: EnvironmentSanitizationConfig,
-): Promise<Client> {
+): Promise<{ client: Client; transport: Transport }> {
   const mcpClient = new Client(
     {
       name: 'gemini-cli-mcp-client',
@@ -1508,7 +1543,7 @@ export async function connectToMcpServer(
       await mcpClient.connect(transport, {
         timeout: mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
       });
-      return mcpClient;
+      return { client: mcpClient, transport };
     } catch (error) {
       await transport.close();
       firstAttemptError = error as Error;
@@ -1539,7 +1574,7 @@ export async function connectToMcpServer(
       try {
         // Try SSE with stored OAuth token if available
         // This ensures that SSE fallback works for authenticated servers
-        await connectWithSSETransport(
+        const sseTransport = await connectWithSSETransport(
           mcpClient,
           mcpServerConfig,
           await getStoredOAuthToken(mcpServerName),
@@ -1548,7 +1583,7 @@ export async function connectToMcpServer(
         debugLogger.log(
           `MCP server '${mcpServerName}': Successfully connected using SSE transport.`,
         );
-        return mcpClient;
+        return { client: mcpClient, transport: sseTransport };
       } catch (sseFallbackError) {
         sseError = sseFallbackError as Error;
 
@@ -1655,14 +1690,14 @@ export async function connectToMcpServer(
             );
           }
 
-          await retryWithOAuth(
+          const oauthTransport = await retryWithOAuth(
             mcpClient,
             mcpServerName,
             mcpServerConfig,
             accessToken,
             httpReturned404,
           );
-          return mcpClient;
+          return { client: mcpClient, transport: oauthTransport };
         } else {
           throw new Error(
             `Failed to handle automatic OAuth for server '${mcpServerName}'`,
@@ -1743,7 +1778,7 @@ export async function connectToMcpServer(
               timeout: mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
             });
             // Connection successful with OAuth
-            return mcpClient;
+            return { client: mcpClient, transport: oauthTransport };
           } else {
             throw new Error(
               `OAuth configuration failed for '${mcpServerName}'. Please authenticate manually with /mcp auth ${mcpServerName}`,
@@ -1887,7 +1922,7 @@ export async function createTransport(
   }
 
   if (mcpServerConfig.command) {
-    const transport = new StdioClientTransport({
+    let transport: Transport = new StdioClientTransport({
       command: mcpServerConfig.command,
       args: mcpServerConfig.args || [],
       env: sanitizeEnvironment(
@@ -1910,14 +1945,38 @@ export async function createTransport(
       cwd: mcpServerConfig.cwd,
       stderr: 'pipe',
     });
+
+    // Fix for Xcode 26.3 mcpbridge non-compliant responses
+    // It returns JSON in `content` instead of `structuredContent`
+    if (
+      mcpServerConfig.command === 'xcrun' &&
+      mcpServerConfig.args?.includes('mcpbridge')
+    ) {
+      transport = new XcodeMcpBridgeFixTransport(transport);
+    }
+
     if (debugMode) {
-      transport.stderr!.on('data', (data) => {
-        const stderrStr = data.toString().trim();
-        debugLogger.debug(
-          `[DEBUG] [MCP STDERR (${mcpServerName})]: `,
-          stderrStr,
-        );
-      });
+      // The `XcodeMcpBridgeFixTransport` wrapper hides the underlying `StdioClientTransport`,
+      // which exposes `stderr` for debug logging. We need to unwrap it to attach the listener.
+
+      const underlyingTransport =
+        transport instanceof XcodeMcpBridgeFixTransport
+          ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (transport as any).transport
+          : transport;
+
+      if (
+        underlyingTransport instanceof StdioClientTransport &&
+        underlyingTransport.stderr
+      ) {
+        underlyingTransport.stderr.on('data', (data) => {
+          const stderrStr = data.toString().trim();
+          debugLogger.debug(
+            `[DEBUG] [MCP STDERR (${mcpServerName})]: `,
+            stderrStr,
+          );
+        });
+      }
     }
     return transport;
   }
