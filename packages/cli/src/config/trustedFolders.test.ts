@@ -50,6 +50,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     homedir: () => '/mock/home/user',
+    isHeadlessMode: vi.fn(() => false),
   };
 });
 vi.mock('fs', async (importOriginal) => {
@@ -493,6 +494,50 @@ describe('isWorkspaceTrusted with IDE override', () => {
       isTrusted: true,
       source: undefined,
     });
+  });
+});
+
+describe('isWorkspaceTrusted headless mode', () => {
+  const mockSettings: Settings = {
+    security: {
+      folderTrust: {
+        enabled: true,
+      },
+    },
+  };
+
+  beforeEach(() => {
+    resetTrustedFoldersForTesting();
+    vi.spyOn(fs, 'existsSync').mockReturnValue(false);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should return true when isHeadlessMode is true, ignoring config', async () => {
+    const { isHeadlessMode } = await import('@google/gemini-cli-core');
+    (isHeadlessMode as Mock).mockReturnValue(true);
+
+    expect(isWorkspaceTrusted(mockSettings)).toEqual({
+      isTrusted: true,
+      source: undefined,
+    });
+  });
+
+  it('should fall back to config when isHeadlessMode is false', async () => {
+    const { isHeadlessMode } = await import('@google/gemini-cli-core');
+    (isHeadlessMode as Mock).mockReturnValue(false);
+
+    // Config says untrusted
+    vi.spyOn(fs, 'existsSync').mockImplementation((p) =>
+      p.toString().endsWith('trustedFolders.json') ? true : false,
+    );
+    vi.spyOn(fs, 'readFileSync').mockReturnValue(
+      JSON.stringify({ [process.cwd()]: TrustLevel.DO_NOT_TRUST }),
+    );
+
+    expect(isWorkspaceTrusted(mockSettings).isTrusted).toBe(false);
   });
 });
 

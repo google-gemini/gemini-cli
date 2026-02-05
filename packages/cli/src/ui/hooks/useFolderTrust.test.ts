@@ -46,8 +46,24 @@ describe('useFolderTrust', () => {
   let onTrustChange: (isTrusted: boolean | undefined) => void;
   let addItem: Mock;
 
+  const originalStdoutIsTTY = process.stdout.isTTY;
+  const originalStdinIsTTY = process.stdin.isTTY;
+
   beforeEach(() => {
     vi.useFakeTimers();
+
+    // Default to interactive mode for tests
+    Object.defineProperty(process.stdout, 'isTTY', {
+      value: true,
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: true,
+      configurable: true,
+      writable: true,
+    });
+
     mockSettings = {
       merged: {
         security: {
@@ -75,6 +91,16 @@ describe('useFolderTrust', () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.clearAllMocks();
+    Object.defineProperty(process.stdout, 'isTTY', {
+      value: originalStdoutIsTTY,
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(process.stdin, 'isTTY', {
+      value: originalStdinIsTTY,
+      configurable: true,
+      writable: true,
+    });
   });
 
   it('should not open dialog when folder is already trusted', () => {

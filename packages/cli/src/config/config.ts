@@ -40,6 +40,7 @@ import {
   coreEvents,
   GEMINI_MODEL_ALIAS_AUTO,
   getAdminErrorMessage,
+  isHeadlessMode,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -349,7 +350,7 @@ export async function parseArguments(
 
   // -p/--prompt forces non-interactive mode; positional args default to interactive in TTY
   if (q && !result['prompt']) {
-    if (process.stdin.isTTY) {
+    if (!isHeadlessMode()) {
       startupMessages.push(
         'Positional arguments now default to interactive mode. To run in non-interactive mode, use the --prompt (-p) flag.',
       );
@@ -589,7 +590,9 @@ export async function loadCliConfig(
   const interactive =
     !!argv.promptInteractive ||
     !!argv.experimentalAcp ||
-    (process.stdin.isTTY && !argv.query && !argv.prompt && !argv.isCommand);
+    (!isHeadlessMode({ prompt: argv.prompt }) &&
+      !argv.query &&
+      !argv.isCommand);
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
   const allowedToolsSet = new Set(allowedTools);
