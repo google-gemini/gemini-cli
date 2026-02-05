@@ -96,7 +96,7 @@ export class GeminiCliAgent {
           }
           toolCallsToSchedule.push({
             ...toolCall,
-            args: args as Record<string, unknown>,
+            args,
             isClientInitiated: false,
             prompt_id: sessionId,
           });
