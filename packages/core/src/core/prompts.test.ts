@@ -185,6 +185,13 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).toMatchSnapshot(); // Snapshot the combined prompt
   });
 
+  it('should match snapshot on Windows', () => {
+    mockPlatform('win32');
+    vi.stubEnv('SANDBOX', undefined);
+    const prompt = getCoreSystemPrompt(mockConfig);
+    expect(prompt).toMatchSnapshot();
+  });
+
   it.each([
     ['true', '# Sandbox', ['# macOS Seatbelt', '# Outside of Sandbox']],
     ['sandbox-exec', '# macOS Seatbelt', ['# Sandbox', '# Outside of Sandbox']],
@@ -320,12 +327,18 @@ describe('Core System Prompt (prompts.ts)', () => {
       expect(prompt).toContain(
         "using commands like 'type' or 'findstr' (on CMD) and 'Get-Content' or 'Select-String' (on PowerShell)",
       );
+      expect(prompt).not.toContain(
+        "using commands like 'grep', 'tail', 'head'",
+      );
     });
 
     it('should include generic shell efficiency commands on non-Windows', () => {
       mockPlatform('linux');
       const prompt = getCoreSystemPrompt(mockConfig);
       expect(prompt).toContain("using commands like 'grep', 'tail', 'head'");
+      expect(prompt).not.toContain(
+        "using commands like 'type' or 'findstr' (on CMD) and 'Get-Content' or 'Select-String' (on PowerShell)",
+      );
     });
 
     it('should use is_background parameter in background process instructions', () => {
