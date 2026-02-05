@@ -22,6 +22,10 @@ import {
   DEFAULT_GEMINI_MODEL,
 } from '../config/models.js';
 import { ApprovalMode } from '../policy/types.js';
+import {
+  ENTER_PLAN_MODE_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
+} from '../tools/tool-names.js';
 
 // Mock tool names if they are dynamically generated or complex
 vi.mock('../tools/ls', () => ({ LSTool: { Name: 'list_directory' } }));
@@ -256,19 +260,25 @@ describe('Core System Prompt (prompts.ts)', () => {
   );
 
   describe('ApprovalMode in System Prompt', () => {
-    it('should include PLAN mode instructions', () => {
+    it('should include PLAN mode instructions and warning against calling enter_plan_mode', () => {
       vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
       const prompt = getCoreSystemPrompt(mockConfig);
       expect(prompt).toContain('# Active Approval Mode: Plan');
+      expect(prompt).toContain(
+        `**Note:** You are ALREADY in Plan Mode. Do NOT call \`${ENTER_PLAN_MODE_TOOL_NAME}\`.`,
+      );
       expect(prompt).toMatchSnapshot();
     });
 
-    it('should NOT include approval mode instructions for DEFAULT mode', () => {
+    it('should include warning against calling exit_plan_mode for DEFAULT mode', () => {
       vi.mocked(mockConfig.getApprovalMode).mockReturnValue(
         ApprovalMode.DEFAULT,
       );
       const prompt = getCoreSystemPrompt(mockConfig);
       expect(prompt).not.toContain('# Active Approval Mode: Plan');
+      expect(prompt).toContain(
+        `**Note:** You are NOT in Plan Mode. Do NOT call \`${EXIT_PLAN_MODE_TOOL_NAME}\`.`,
+      );
       expect(prompt).toMatchSnapshot();
     });
 

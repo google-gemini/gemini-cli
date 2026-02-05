@@ -36,7 +36,11 @@ import { RipGrepTool, canUseRipgrep } from '../tools/ripGrep.js';
 import { logRipgrepFallback } from '../telemetry/loggers.js';
 import { RipgrepFallbackEvent } from '../telemetry/types.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
-import { ACTIVATE_SKILL_TOOL_NAME } from '../tools/tool-names.js';
+import {
+  ACTIVATE_SKILL_TOOL_NAME,
+  ENTER_PLAN_MODE_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
+} from '../tools/tool-names.js';
 import type { SkillDefinition } from '../skills/skillLoader.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 import {
@@ -198,7 +202,7 @@ import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import type { CodeAssistServer } from '../code_assist/server.js';
 import { ContextManager } from '../services/contextManager.js';
-import { UserTierId } from 'src/code_assist/types.js';
+import { UserTierId } from '../code_assist/types.js';
 
 vi.mock('../core/baseLlmClient.js');
 vi.mock('../core/tokenLimits.js', () => ({
@@ -2396,5 +2400,49 @@ describe('Plans Directory Initialization', () => {
 
     const context = config.getWorkspaceContext();
     expect(context.getDirectories()).not.toContain(plansDir);
+  });
+});
+
+describe('Config Dynamic Tool Exclusion', () => {
+  const baseParams: ConfigParameters = {
+    sessionId: 'test-session',
+    targetDir: '/tmp',
+    debugMode: false,
+    model: 'gemini-pro',
+    cwd: '/tmp',
+  };
+
+  it('should exclude ENTER_PLAN_MODE_TOOL_NAME when in Plan Mode', () => {
+    const config = new Config(baseParams);
+
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+    config.setApprovalMode(ApprovalMode.PLAN);
+
+    const excluded = config.getExcludeTools();
+
+    expect(excluded?.has(ENTER_PLAN_MODE_TOOL_NAME)).toBe(true);
+    expect(excluded?.has(EXIT_PLAN_MODE_TOOL_NAME)).toBe(false);
+  });
+
+  it('should exclude EXIT_PLAN_MODE_TOOL_NAME when in Default Mode', () => {
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+    config.setApprovalMode(ApprovalMode.DEFAULT);
+
+    const excluded = config.getExcludeTools();
+
+    expect(excluded?.has(EXIT_PLAN_MODE_TOOL_NAME)).toBe(true);
+    expect(excluded?.has(ENTER_PLAN_MODE_TOOL_NAME)).toBe(false);
+  });
+
+  it('should exclude EXIT_PLAN_MODE_TOOL_NAME when in Auto-Edit Mode', () => {
+    const config = new Config(baseParams);
+    vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
+    config.setApprovalMode(ApprovalMode.AUTO_EDIT);
+
+    const excluded = config.getExcludeTools();
+
+    expect(excluded?.has(EXIT_PLAN_MODE_TOOL_NAME)).toBe(true);
+    expect(excluded?.has(ENTER_PLAN_MODE_TOOL_NAME)).toBe(false);
   });
 });
