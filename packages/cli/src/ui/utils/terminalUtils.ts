@@ -31,9 +31,7 @@ export function isITerm2(): boolean {
     return cachedIsITerm2;
   }
 
-  cachedIsITerm2 =
-    process.env['TERM_PROGRAM'] === 'iTerm.app' ||
-    !!process.env['ITERM_SESSION_ID'];
+  cachedIsITerm2 = process.env['TERM_PROGRAM'] === 'iTerm.app';
 
   return cachedIsITerm2;
 }

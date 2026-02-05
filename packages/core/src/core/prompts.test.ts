@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getCoreSystemPrompt } from './prompts.js';
 import { resolvePathFromEnv } from '../prompts/utils.js';
 import { isGitRepository } from '../utils/gitUtils.js';
@@ -53,9 +53,23 @@ vi.mock('../config/models.js', async (importOriginal) => {
 });
 
 describe('Core System Prompt (prompts.ts)', () => {
+  const mockPlatform = (platform: string) => {
+    vi.stubGlobal(
+      'process',
+      Object.create(process, {
+        platform: {
+          get: () => platform,
+        },
+      }),
+    );
+  };
+
   let mockConfig: Config;
   beforeEach(() => {
     vi.resetAllMocks();
+    // Stub process.platform to 'linux' by default for deterministic snapshots across OSes
+    mockPlatform('linux');
+
     vi.stubEnv('SANDBOX', undefined);
     vi.stubEnv('GEMINI_SYSTEM_MD', undefined);
     vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', undefined);
@@ -83,7 +97,12 @@ describe('Core System Prompt (prompts.ts)', () => {
         getSkills: vi.fn().mockReturnValue([]),
       }),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
+      getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('should include available_skills when provided in config', () => {
@@ -167,6 +186,13 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).toMatchSnapshot(); // Snapshot the combined prompt
   });
 
+  it('should match snapshot on Windows', () => {
+    mockPlatform('win32');
+    vi.stubEnv('SANDBOX', undefined);
+    const prompt = getCoreSystemPrompt(mockConfig);
+    expect(prompt).toMatchSnapshot();
+  });
+
   it.each([
     ['true', '# Sandbox', ['# macOS Seatbelt', '# Outside of Sandbox']],
     ['sandbox-exec', '# macOS Seatbelt', ['# Sandbox', '# Outside of Sandbox']],
@@ -232,6 +258,7 @@ describe('Core System Prompt (prompts.ts)', () => {
         getSkillManager: vi.fn().mockReturnValue({
           getSkills: vi.fn().mockReturnValue([]),
         }),
+        getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
       } as unknown as Config;
 
       const prompt = getCoreSystemPrompt(testConfig);
@@ -293,6 +320,82 @@ describe('Core System Prompt (prompts.ts)', () => {
       expect(prompt).not.toContain('`list_directory`');
       expect(prompt).not.toContain('`grep_search`');
     });
+
+    describe('Approved Plan in Plan Mode', () => {
+      beforeEach(() => {
+        vi.mocked(mockConfig.getApprovalMode).mockReturnValue(
+          ApprovalMode.PLAN,
+        );
+        vi.mocked(mockConfig.storage.getProjectTempPlansDir).mockReturnValue(
+          '/tmp/plans',
+        );
+      });
+
+      it('should include approved plan path when set in config', () => {
+        const planPath = '/tmp/plans/feature-x.md';
+        vi.mocked(mockConfig.getApprovedPlanPath).mockReturnValue(planPath);
+
+        const prompt = getCoreSystemPrompt(mockConfig);
+        expect(prompt).toMatchSnapshot();
+      });
+
+      it('should NOT include approved plan section if no plan is set in config', () => {
+        vi.mocked(mockConfig.getApprovedPlanPath).mockReturnValue(undefined);
+
+        const prompt = getCoreSystemPrompt(mockConfig);
+        expect(prompt).toMatchSnapshot();
+      });
+    });
+  });
+
+  describe('Platform-specific and Background Process instructions', () => {
+    it('should include Windows-specific shell efficiency commands on win32', () => {
+      mockPlatform('win32');
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).toContain(
+        "using commands like 'type' or 'findstr' (on CMD) and 'Get-Content' or 'Select-String' (on PowerShell)",
+      );
+      expect(prompt).not.toContain(
+        "using commands like 'grep', 'tail', 'head'",
+      );
+    });
+
+    it('should include generic shell efficiency commands on non-Windows', () => {
+      mockPlatform('linux');
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).toContain("using commands like 'grep', 'tail', 'head'");
+      expect(prompt).not.toContain(
+        "using commands like 'type' or 'findstr' (on CMD) and 'Get-Content' or 'Select-String' (on PowerShell)",
+      );
+    });
+
+    it('should use is_background parameter in background process instructions', () => {
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).toContain(
+        'To run a command in the background, set the `is_background` parameter to true.',
+      );
+      expect(prompt).not.toContain('via `&`');
+    });
+  });
+
+  it('should include approved plan instructions when approvedPlanPath is set', () => {
+    const planPath = '/path/to/approved/plan.md';
+    vi.mocked(mockConfig.getApprovedPlanPath).mockReturnValue(planPath);
+    const prompt = getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).toMatchSnapshot();
+  });
+
+  it('should include planning phase suggestion when enter_plan_mode tool is enabled', () => {
+    vi.mocked(mockConfig.getToolRegistry().getAllToolNames).mockReturnValue([
+      'enter_plan_mode',
+    ]);
+    const prompt = getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).toContain(
+      "For complex tasks, consider using the 'enter_plan_mode' tool to enter a dedicated planning phase before starting implementation.",
+    );
+    expect(prompt).toMatchSnapshot();
   });
 
   describe('GEMINI_SYSTEM_MD environment variable', () => {
