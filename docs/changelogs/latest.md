@@ -15,9 +15,9 @@ npm install -g @google/gemini-cli
   tool execution, improving performance and responsiveness. This includes
   migrating non-interactive flows and sub-agents to the new scheduler.
 - **Enhanced User Experience:** This release introduces several UI/UX
-  improvements, including queued tool confirmations and the
-  ability to expand and collapse large pasted text blocks. The `Settings` dialog
-  has been improved to reduce jitter and preserve focus.
+  improvements, including queued tool confirmations and the ability to expand
+  and collapse large pasted text blocks. The `Settings` dialog has been improved
+  to reduce jitter and preserve focus.
 - **Agent and Skill Improvements:** Agent Skills have been promoted to a stable
   feature. Sub-agents now use a JSON schema for input and are tracked by an
   `AgentRegistry`.
