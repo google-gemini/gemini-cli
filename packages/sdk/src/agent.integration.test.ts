@@ -61,8 +61,8 @@ describe('GeminiCliAgent Integration', () => {
     });
 
     // First turn
-    const events1 = [];
     const stream1 = agent.sendStream('What is the secret number?');
+    const events1 = [];
     for await (const event of stream1) {
       events1.push(event);
     }
@@ -72,10 +72,11 @@ describe('GeminiCliAgent Integration', () => {
       .join('');
 
     expect(responseText1).toContain('1');
+    expect(callCount).toBe(1);
 
     // Second turn
-    const events2 = [];
     const stream2 = agent.sendStream('What is the secret number now?');
+    const events2 = [];
     for await (const event of stream2) {
       events2.push(event);
     }
@@ -84,7 +85,54 @@ describe('GeminiCliAgent Integration', () => {
       .map((e) => (typeof e.value === 'string' ? e.value : ''))
       .join('');
 
-    expect(responseText2).toContain('2');
+    // Should still be 1 because instructions are only loaded once per session
+    expect(responseText2).toContain('1');
+    expect(callCount).toBe(1);
+  }, 30000);
+
+  it('handles async dynamic instructions', async () => {
+    const goldenFile = getGoldenPath('agent-async-instructions');
+
+    let callCount = 0;
+    const agent = new GeminiCliAgent({
+      instructions: async (_ctx) => {
+        await new Promise((resolve) => setTimeout(resolve, 10)); // Simulate async work
+        callCount++;
+        return `You are a helpful assistant. The secret number is ${callCount}. Always mention the secret number when asked.`;
+      },
+      model: 'gemini-2.0-flash',
+      recordResponses: RECORD_MODE ? goldenFile : undefined,
+      fakeResponses: RECORD_MODE ? undefined : goldenFile,
+    });
+
+    // First turn
+    const stream1 = agent.sendStream('What is the secret number?');
+    const events1 = [];
+    for await (const event of stream1) {
+      events1.push(event);
+    }
+    const responseText1 = events1
+      .filter((e) => e.type === 'content')
+      .map((e) => (typeof e.value === 'string' ? e.value : ''))
+      .join('');
+
+    expect(responseText1).toContain('1');
+    expect(callCount).toBe(1);
+
+    // Second turn
+    const stream2 = agent.sendStream('What is the secret number now?');
+    const events2 = [];
+    for await (const event of stream2) {
+      events2.push(event);
+    }
+    const responseText2 = events2
+      .filter((e) => e.type === 'content')
+      .map((e) => (typeof e.value === 'string' ? e.value : ''))
+      .join('');
+
+    // Should still be 1 because instructions are only loaded once per session
+    expect(responseText2).toContain('1');
+    expect(callCount).toBe(1);
   }, 30000);
 
   it('throws when dynamic instructions fail', async () => {
