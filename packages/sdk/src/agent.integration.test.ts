@@ -14,7 +14,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Set this to true locally when you need to update snapshots
-const RECORD_MODE = process.env.RECORD_NEW_RESPONSES === 'true';
+const RECORD_MODE = process.env['RECORD_NEW_RESPONSES'] === 'true';
 
 const getGoldenPath = (name: string) =>
   path.resolve(__dirname, '../test-data', `${name}.json`);
@@ -98,7 +98,6 @@ describe('GeminiCliAgent Integration', () => {
     const stream = agent.sendStream('Say hello.');
 
     await expect(async () => {
-       
       for await (const _event of stream) {
         // Just consume the stream
       }
