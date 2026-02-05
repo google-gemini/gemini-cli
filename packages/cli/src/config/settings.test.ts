@@ -76,7 +76,11 @@ import {
   LoadedSettings,
   sanitizeEnvVar,
 } from './settings.js';
-import { FatalConfigError, GEMINI_DIR } from '@google/gemini-cli-core';
+import {
+  FatalConfigError,
+  GEMINI_DIR,
+  type MCPServerConfig,
+} from '@google/gemini-cli-core';
 import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
 import {
   getSettingsSchema,
@@ -2348,6 +2352,28 @@ describe('Settings Loading and Merging', () => {
       expect(loadedSettings.merged.admin?.secureModeEnabled).toBe(false);
       expect(loadedSettings.merged.admin?.mcp?.enabled).toBe(true);
       expect(loadedSettings.merged.admin?.extensions?.enabled).toBe(true);
+    });
+
+    it('should un-nest MCP configuration from remote settings', () => {
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+      const mcpServers: Record<string, MCPServerConfig> = {
+        'admin-server': {
+          url: 'http://admin-mcp.com',
+          type: 'sse',
+          trust: true,
+        },
+      };
+
+      loadedSettings.setRemoteAdminSettings({
+        mcpSetting: {
+          mcpEnabled: true,
+          mcpConfig: {
+            mcpServers,
+          },
+        },
+      });
+
+      expect(loadedSettings.merged.admin?.mcp?.config).toEqual(mcpServers);
     });
 
     it('should set skills based on unmanagedCapabilitiesEnabled', () => {
