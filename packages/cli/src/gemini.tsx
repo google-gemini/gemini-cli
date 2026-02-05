@@ -89,7 +89,6 @@ import { SessionStatsProvider } from './ui/contexts/SessionContext.js';
 import { VimModeProvider } from './ui/contexts/VimModeContext.js';
 import { KeypressProvider } from './ui/contexts/KeypressContext.js';
 import { useKittyKeyboardProtocol } from './ui/hooks/useKittyKeyboardProtocol.js';
-import { useTerminalSize } from './ui/hooks/useTerminalSize.js';
 import {
   relaunchAppInChildProcess,
   relaunchOnExitCode,
@@ -104,6 +103,7 @@ import { TerminalProvider } from './ui/contexts/TerminalContext.js';
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { profiler } from './ui/components/DebugProfiler.js';
 import { runDeferredCommand } from './deferred.js';
+import { SlashCommandConflictHandler } from './services/SlashCommandConflictHandler.js';
 
 const SLOW_RENDER_MS = 200;
 
@@ -220,7 +220,6 @@ export async function startInteractiveUI(
   // Create wrapper component to use hooks inside render
   const AppWrapper = () => {
     useKittyKeyboardProtocol();
-    const { columns, rows } = useTerminalSize();
 
     return (
       <SettingsContext.Provider value={settings}>
@@ -239,7 +238,6 @@ export async function startInteractiveUI(
                 <SessionStatsProvider>
                   <VimModeProvider settings={settings}>
                     <AppContainer
-                      key={`${columns}-${rows}`}
                       config={config}
                       startupWarnings={startupWarnings}
                       version={version}
@@ -335,6 +333,11 @@ export async function main() {
   });
 
   setupUnhandledRejectionHandler();
+
+  const slashCommandConflictHandler = new SlashCommandConflictHandler();
+  slashCommandConflictHandler.start();
+  registerCleanup(() => slashCommandConflictHandler.stop());
+
   const loadSettingsHandle = startupProfiler.start('load_settings');
   const settings = loadSettings();
   loadSettingsHandle?.end();

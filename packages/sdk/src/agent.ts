@@ -14,6 +14,9 @@ import {
   type ServerGeminiStreamEvent,
   type GeminiClient,
   type Content,
+  scheduleAgentTools,
+  getAuthTypeFromEnv,
+  type ToolRegistry,
 } from '@google/gemini-cli-core';
 
 import { type Tool, SdkTool } from './tool.js';
@@ -59,16 +62,13 @@ export class GeminiCliAgent {
     this.config = new Config(configParams);
   }
 
-  async *sendStream(prompt: string): AsyncGenerator<ServerGeminiStreamEvent> {
+  async *sendStream(
+    prompt: string,
+    signal?: AbortSignal,
+  ): AsyncGenerator<ServerGeminiStreamEvent> {
     // Lazy initialization of auth and client
     if (!this.config.getContentGenerator()) {
-      // Simple auth detection
-      let authType = AuthType.COMPUTE_ADC;
-      if (process.env['GEMINI_API_KEY']) {
-        authType = AuthType.USE_GEMINI;
-      } else if (process.env['GOOGLE_API_KEY']) {
-        authType = AuthType.USE_VERTEX_AI;
-      }
+      const authType = getAuthTypeFromEnv() || AuthType.COMPUTE_ADC;
 
       await this.config.refreshAuth(authType);
       await this.config.initialize();
@@ -84,36 +84,44 @@ export class GeminiCliAgent {
     }
 
     const client = this.config.getGeminiClient();
-    const registry = this.config.getToolRegistry();
-
-    let request: Parameters<GeminiClient['sendMessageStream']>[0] = [
-      { text: prompt },
-    ];
-    // TODO: support AbortSignal cancellation properly
-    const signal = new AbortController().signal;
+    const abortSignal = signal ?? new AbortController().signal;
     const sessionId = this.config.getSessionId();
 
     const fs = new SdkAgentFilesystem(this.config);
     const shell = new SdkAgentShell(this.config);
 
+    let request: Parameters<GeminiClient['sendMessageStream']>[0] = [
+      { text: prompt },
+    ];
+
     while (true) {
       // sendMessageStream returns AsyncGenerator<ServerGeminiStreamEvent, Turn>
-      const stream = client.sendMessageStream(request, signal, sessionId);
+      const stream = client.sendMessageStream(request, abortSignal, sessionId);
 
-      const toolCalls: ToolCallRequestInfo[] = [];
+      const toolCallsToSchedule: ToolCallRequestInfo[] = [];
 
       for await (const event of stream) {
         yield event;
         if (event.type === GeminiEventType.ToolCallRequest) {
-          toolCalls.push(event.value);
+          const toolCall = event.value;
+          let args = toolCall.args;
+          if (typeof args === 'string') {
+            args = JSON.parse(args);
+          }
+          toolCallsToSchedule.push({
+            ...toolCall,
+            args,
+            isClientInitiated: false,
+            prompt_id: sessionId,
+          });
         }
       }
 
-      if (toolCalls.length === 0) {
+      if (toolCallsToSchedule.length === 0) {
         break;
       }
 
-      const functionResponses: Array<Record<string, unknown>> = [];
+      // Prepare SessionContext
       const transcript: Content[] = client.getHistory();
       const context: SessionContext = {
         sessionId,
@@ -125,66 +133,31 @@ export class GeminiCliAgent {
         agent: this,
       };
 
-      for (const toolCall of toolCalls) {
-        const tool = registry.getTool(toolCall.name);
-        if (!tool) {
-          functionResponses.push({
-            functionResponse: {
-              name: toolCall.name,
-              response: { error: `Tool ${toolCall.name} not found` },
-              id: toolCall.callId,
-            },
-          });
-          continue;
+      // Create a scoped registry for this turn to bind context safely
+      const originalRegistry = this.config.getToolRegistry();
+      const scopedRegistry: ToolRegistry = Object.create(originalRegistry);
+      scopedRegistry.getTool = (name: string) => {
+        const tool = originalRegistry.getTool(name);
+        if (tool instanceof SdkTool) {
+          return tool.bindContext(context);
         }
+        return tool;
+      };
 
-        try {
-          let args = toolCall.args;
-          if (typeof args === 'string') {
-            args = JSON.parse(args);
-          }
+      const completedCalls = await scheduleAgentTools(
+        this.config,
+        toolCallsToSchedule,
+        {
+          schedulerId: sessionId,
+          toolRegistry: scopedRegistry,
+          signal: abortSignal,
+        },
+      );
 
-          // Cast toolCall.args to object to satisfy AnyDeclarativeTool.build
-          const invocation =
-            tool instanceof SdkTool
-              ? tool.createInvocationWithContext(
-                  args as object,
-                  this.config.getMessageBus(),
-                  context,
-                )
-              : tool.build(args as object);
+      const functionResponses = completedCalls.flatMap(
+        (call) => call.response.responseParts,
+      );
 
-          // Check if the tool execution requires confirmation according to policy
-          const confirmation = await invocation.shouldConfirmExecute(signal);
-          if (confirmation) {
-            throw new Error(
-              `Tool execution for '${toolCall.name}' requires confirmation, which is not supported in this SDK version.`,
-            );
-          }
-          const result = await invocation.execute(signal);
-
-          functionResponses.push({
-            functionResponse: {
-              name: toolCall.name,
-              response: { result: result.llmContent },
-              id: toolCall.callId,
-            },
-          });
-        } catch (e) {
-          // eslint-disable-next-line no-console
-          console.error(`Tool execution error for ${toolCall.name}:`, e);
-          functionResponses.push({
-            functionResponse: {
-              name: toolCall.name,
-              response: {
-                error:
-                  'Error: Tool execution failed. Please try again or use a different approach.',
-              },
-              id: toolCall.callId,
-            },
-          });
-        }
-      }
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       request = functionResponses as unknown as Parameters<
         GeminiClient['sendMessageStream']

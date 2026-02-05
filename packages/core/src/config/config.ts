@@ -823,7 +823,7 @@ export class Config {
       (params.shellToolInactivityTimeout ?? 300) * 1000; // 5 minutes
     this.extensionManagement = params.extensionManagement ?? true;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
-    this.storage = new Storage(this.targetDir);
+    this.storage = new Storage(this.targetDir, this.sessionId);
 
     this.fakeResponses = params.fakeResponses;
     this.recordResponses = params.recordResponses;
@@ -1343,7 +1343,8 @@ export class Config {
       !!sandboxConfig &&
       sandboxConfig.command === 'sandbox-exec' &&
       !!seatbeltProfile &&
-      seatbeltProfile.startsWith('restrictive-')
+      (seatbeltProfile.startsWith('restrictive-') ||
+        seatbeltProfile.startsWith('strict-'))
     );
   }
 
@@ -2469,26 +2470,16 @@ export class Config {
       agentsOverrides['codebase_investigator']?.enabled !== false ||
       agentsOverrides['cli_help']?.enabled !== false
     ) {
-      const allowedTools = this.getAllowedTools();
       const definitions = this.agentRegistry.getAllDefinitions();
 
       for (const definition of definitions) {
-        const isAllowed =
-          !allowedTools || allowedTools.includes(definition.name);
-
-        if (isAllowed) {
-          try {
-            const tool = new SubagentTool(
-              definition,
-              this,
-              this.getMessageBus(),
-            );
-            registry.registerTool(tool);
-          } catch (e: unknown) {
-            debugLogger.warn(
-              `Failed to register tool for agent ${definition.name}: ${getErrorMessage(e)}`,
-            );
-          }
+        try {
+          const tool = new SubagentTool(definition, this, this.getMessageBus());
+          registry.registerTool(tool);
+        } catch (e: unknown) {
+          debugLogger.warn(
+            `Failed to register tool for agent ${definition.name}: ${getErrorMessage(e)}`,
+          );
         }
       }
     }

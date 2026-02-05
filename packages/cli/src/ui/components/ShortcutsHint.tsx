@@ -10,7 +10,12 @@ import { theme } from '../semantic-colors.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 
 export const ShortcutsHint: React.FC = () => {
-  const { shortcutsHelpVisible } = useUIState();
+  const { cleanUiDetailsVisible, shortcutsHelpVisible } = useUIState();
+
+  if (!cleanUiDetailsVisible) {
+    return <Text color={theme.text.secondary}> press tab twice for more </Text>;
+  }
+
   const highlightColor = shortcutsHelpVisible
     ? theme.text.accent
     : theme.text.secondary;
