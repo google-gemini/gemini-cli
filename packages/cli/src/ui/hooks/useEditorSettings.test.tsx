@@ -24,7 +24,7 @@ import { SettingScope } from '../../config/settings.js';
 import { MessageType } from '../types.js';
 import {
   type EditorType,
-  checkHasEditorType,
+  hasValidEditorCommand,
   allowEditorTypeInSandbox,
 } from '@google/gemini-cli-core';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -35,12 +35,12 @@ vi.mock('@google/gemini-cli-core', async () => {
   const actual = await vi.importActual('@google/gemini-cli-core');
   return {
     ...actual,
-    checkHasEditorType: vi.fn(() => true),
+    hasValidEditorCommand: vi.fn(() => true),
     allowEditorTypeInSandbox: vi.fn(() => true),
   };
 });
 
-const mockCheckHasEditorType = vi.mocked(checkHasEditorType);
+const mockCheckHasEditorType = vi.mocked(hasValidEditorCommand);
 const mockAllowEditorTypeInSandbox = vi.mocked(allowEditorTypeInSandbox);
 
 describe('useEditorSettings', () => {

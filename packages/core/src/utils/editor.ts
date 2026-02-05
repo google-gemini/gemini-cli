@@ -134,19 +134,17 @@ function getEditorCommands(editor: EditorType): string[] {
     : commandConfig.default;
 }
 
-export function checkHasEditorType(editor: EditorType): boolean {
+export function hasValidEditorCommand(editor: EditorType): boolean {
   return getEditorCommands(editor).some((cmd) => commandExists(cmd));
 }
 
-export async function checkHasEditorTypeAsync(
+export async function hasValidEditorCommandAsync(
   editor: EditorType,
 ): Promise<boolean> {
-  for (const cmd of getEditorCommands(editor)) {
-    if (await commandExistsAsync(cmd)) {
-      return true;
-    }
-  }
-  return false;
+  const results = await Promise.all(
+    getEditorCommands(editor).map((cmd) => commandExistsAsync(cmd)),
+  );
+  return results.some(Boolean);
 }
 
 export function getEditorCommand(editor: EditorType): string {
@@ -179,19 +177,18 @@ function isEditorTypeAvailable(
  * Returns false if preferred editor is not set / invalid / not available / not allowed in sandbox.
  */
 export function isEditorAvailable(editor: string | undefined): boolean {
-  return isEditorTypeAvailable(editor) && checkHasEditorType(editor);
+  return isEditorTypeAvailable(editor) && hasValidEditorCommand(editor);
 }
 
 /**
- * Async version of isEditorAvailable.
- * Check if the editor is valid and can be used without blocking the event loop.
+ * Check if the editor is valid and can be used.
  * Returns false if preferred editor is not set / invalid / not available / not allowed in sandbox.
  */
 export async function isEditorAvailableAsync(
   editor: string | undefined,
 ): Promise<boolean> {
   return (
-    isEditorTypeAvailable(editor) && (await checkHasEditorTypeAsync(editor))
+    isEditorTypeAvailable(editor) && (await hasValidEditorCommandAsync(editor))
   );
 }
 

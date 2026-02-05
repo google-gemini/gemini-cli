@@ -14,8 +14,8 @@ import {
   type Mock,
 } from 'vitest';
 import {
-  checkHasEditorType,
-  checkHasEditorTypeAsync,
+  hasValidEditorCommand,
+  hasValidEditorCommandAsync,
   getDiffCommand,
   openDiff,
   allowEditorTypeInSandbox,
@@ -56,7 +56,7 @@ describe('editor utils', () => {
     });
   });
 
-  describe('checkHasEditorType', () => {
+  describe('hasValidEditorCommand', () => {
     const testCases: Array<{
       editor: EditorType;
       commands: string[];
@@ -94,7 +94,7 @@ describe('editor utils', () => {
           (execSync as Mock).mockReturnValue(
             Buffer.from(`/usr/bin/${commands[0]}`),
           );
-          expect(checkHasEditorType(editor)).toBe(true);
+          expect(hasValidEditorCommand(editor)).toBe(true);
           expect(execSync).toHaveBeenCalledWith(`command -v ${commands[0]}`, {
             stdio: 'ignore',
           });
@@ -108,7 +108,7 @@ describe('editor utils', () => {
                 throw new Error(); // first command not found
               })
               .mockReturnValueOnce(Buffer.from(`/usr/bin/${commands[1]}`)); // second command found
-            expect(checkHasEditorType(editor)).toBe(true);
+            expect(hasValidEditorCommand(editor)).toBe(true);
             expect(execSync).toHaveBeenCalledTimes(2);
           });
         }
@@ -118,7 +118,7 @@ describe('editor utils', () => {
           (execSync as Mock).mockImplementation(() => {
             throw new Error(); // all commands not found
           });
-          expect(checkHasEditorType(editor)).toBe(false);
+          expect(hasValidEditorCommand(editor)).toBe(false);
           expect(execSync).toHaveBeenCalledTimes(commands.length);
         });
 
@@ -128,7 +128,7 @@ describe('editor utils', () => {
           (execSync as Mock).mockReturnValue(
             Buffer.from(`C:\\Program Files\\...\\${win32Commands[0]}`),
           );
-          expect(checkHasEditorType(editor)).toBe(true);
+          expect(hasValidEditorCommand(editor)).toBe(true);
           expect(execSync).toHaveBeenCalledWith(
             `where.exe ${win32Commands[0]}`,
             {
@@ -147,7 +147,7 @@ describe('editor utils', () => {
               .mockReturnValueOnce(
                 Buffer.from(`C:\\Program Files\\...\\${win32Commands[1]}`),
               ); // second command found
-            expect(checkHasEditorType(editor)).toBe(true);
+            expect(hasValidEditorCommand(editor)).toBe(true);
             expect(execSync).toHaveBeenCalledTimes(2);
           });
         }
@@ -157,7 +157,7 @@ describe('editor utils', () => {
           (execSync as Mock).mockImplementation(() => {
             throw new Error(); // all commands not found
           });
-          expect(checkHasEditorType(editor)).toBe(false);
+          expect(hasValidEditorCommand(editor)).toBe(false);
           expect(execSync).toHaveBeenCalledTimes(win32Commands.length);
         });
       });
@@ -564,23 +564,23 @@ describe('editor utils', () => {
     );
   };
 
-  describe('checkHasEditorTypeAsync', () => {
+  describe('hasValidEditorCommandAsync', () => {
     it('should return true if vim command exists', async () => {
       Object.defineProperty(process, 'platform', { value: 'linux' });
       mockExecAsync((cmd) => cmd.includes('vim'));
-      expect(await checkHasEditorTypeAsync('vim')).toBe(true);
+      expect(await hasValidEditorCommandAsync('vim')).toBe(true);
     });
 
     it('should return false if vim command does not exist', async () => {
       Object.defineProperty(process, 'platform', { value: 'linux' });
       mockExecAsync(() => false);
-      expect(await checkHasEditorTypeAsync('vim')).toBe(false);
+      expect(await hasValidEditorCommandAsync('vim')).toBe(false);
     });
 
     it('should check zed and zeditor commands in order', async () => {
       Object.defineProperty(process, 'platform', { value: 'linux' });
       mockExecAsync((cmd) => cmd.includes('zeditor'));
-      expect(await checkHasEditorTypeAsync('zed')).toBe(true);
+      expect(await hasValidEditorCommandAsync('zed')).toBe(true);
     });
   });
 

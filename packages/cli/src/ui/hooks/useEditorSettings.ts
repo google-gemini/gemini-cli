@@ -13,7 +13,7 @@ import { MessageType } from '../types.js';
 import type { EditorType } from '@google/gemini-cli-core';
 import {
   allowEditorTypeInSandbox,
-  checkHasEditorType,
+  hasValidEditorCommand,
   getEditorDisplayName,
   coreEvents,
   CoreEvent,
@@ -47,7 +47,7 @@ export const useEditorSettings = (
     (editorType: EditorType | undefined, scope: LoadableSettingScope) => {
       if (
         editorType &&
-        (!checkHasEditorType(editorType) ||
+        (!hasValidEditorCommand(editorType) ||
           !allowEditorTypeInSandbox(editorType))
       ) {
         return;

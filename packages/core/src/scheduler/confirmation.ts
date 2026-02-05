@@ -165,7 +165,7 @@ export async function resolveConfirmation(
         toolCall,
         signal,
       );
-      if (!modResult.success) {
+      if (modResult.error) {
         // Editor is not available - emit error feedback and stay in the loop
         // to return to previous confirmation screen.
         if (modResult.error) {
@@ -200,10 +200,9 @@ async function notifyHooks(
 
 /**
  * Result of attempting external modification.
+ * If error is defined, the modification failed.
  */
 interface ExternalModificationResult {
-  /** Whether the modification was successful (editor was opened) */
-  success: boolean;
   /** Error message if the modification failed */
   error?: string;
 }
@@ -228,10 +227,7 @@ async function handleExternalModification(
 
   if (!editor) {
     // No editor available - return failure with error message
-    return {
-      success: false,
-      error: NO_EDITOR_AVAILABLE_ERROR,
-    };
+    return { error: NO_EDITOR_AVAILABLE_ERROR };
   }
 
   const result = await modifier.handleModifyWithEditor(
@@ -247,7 +243,7 @@ async function handleExternalModification(
       newInvocation,
     );
   }
-  return { success: true };
+  return {};
 }
 
 /**
