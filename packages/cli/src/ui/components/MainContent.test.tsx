@@ -42,12 +42,16 @@ vi.mock('./shared/ScrollableList.js', () => ({
   ScrollableList: ({
     data,
     renderItem,
+    copyModeEnabled,
   }: {
     data: unknown[];
     renderItem: (props: { item: unknown }) => React.JSX.Element;
+    copyModeEnabled?: boolean;
   }) => (
     <Box flexDirection="column">
-      <Text>ScrollableList</Text>
+      <Text>
+        ScrollableList (copyMode:{copyModeEnabled ? 'true' : 'false'})
+      </Text>
       {data.map((item: unknown, index: number) => (
         <Box key={index}>{renderItem({ item })}</Box>
       ))}
@@ -74,6 +78,8 @@ describe('MainContent', () => {
     historyRemountKey: 0,
     bannerData: { defaultText: '', warningText: '' },
     bannerVisible: false,
+    copyModeEnabled: false,
+    terminalWidth: 100,
   };
 
   beforeEach(() => {
@@ -113,6 +119,19 @@ describe('MainContent', () => {
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();
+  });
+
+  it('passes copyModeEnabled to ScrollableList in alternate buffer mode', async () => {
+    vi.mocked(useAlternateBuffer).mockReturnValue(true);
+    const { lastFrame } = renderWithProviders(<MainContent />, {
+      uiState: {
+        ...defaultMockUiState,
+        copyModeEnabled: true,
+      } as Partial<UIState>,
+    });
+    await waitFor(() =>
+      expect(lastFrame()).toContain('ScrollableList (copyMode:true)'),
+    );
   });
 
   describe('MainContent Tool Output Height Logic', () => {
@@ -158,6 +177,7 @@ describe('MainContent', () => {
         vi.mocked(useAlternateBuffer).mockReturnValue(isAlternateBuffer);
         const ptyId = 123;
         const uiState = {
+          ...defaultMockUiState,
           history: [],
           pendingHistoryItems: [
             {

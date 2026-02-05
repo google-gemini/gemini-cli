@@ -38,6 +38,7 @@ type VirtualizedListProps<T> = {
 interface ScrollableListProps<T> extends VirtualizedListProps<T> {
   hasFocus: boolean;
   width?: string | number;
+  copyModeEnabled?: boolean;
 }
 
 export type ScrollableListRef<T> = VirtualizedListRef<T>;
@@ -249,6 +250,7 @@ function ScrollableList<T>(
         ref={virtualizedListRef}
         {...props}
         scrollbarThumbColor={scrollbarColor}
+        copyModeEnabled={props.copyModeEnabled}
       />
     </Box>
   );
