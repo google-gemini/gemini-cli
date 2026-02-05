@@ -29,7 +29,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 const memoryToolSchemaData: FunctionDeclaration = {
   name: MEMORY_TOOL_NAME,
   description:
-    'Saves a specific piece of information or fact to your long-term memory. Use this when the user explicitly asks you to remember something, or when they state a clear, concise fact that seems important to retain for future interactions.',
+    'Saves a specific piece of information, fact, or user preference to your long-term memory. Use this when the user explicitly asks you to remember something, or when they state a clear, concise fact or preference that seems important to retain for future interactions. Examples: "Always lint after building", "Never run sudo commands", "Remember my address".',
   parametersJsonSchema: {
     type: 'object',
     properties: {
@@ -40,6 +40,7 @@ const memoryToolSchemaData: FunctionDeclaration = {
       },
     },
     required: ['fact'],
+    additionalProperties: false,
   },
 };
 
@@ -131,7 +132,8 @@ async function readMemoryFileContent(): Promise<string> {
  * Computes the new content that would result from adding a memory entry
  */
 function computeNewContent(currentContent: string, fact: string): string {
-  let processedText = fact.trim();
+  // Sanitize to prevent markdown injection by collapsing to a single line.
+  let processedText = fact.replace(/[\r\n]/g, ' ').trim();
   processedText = processedText.replace(/^(-+\s*)+/, '').trim();
   const newMemoryItem = `- ${processedText}`;
 
@@ -176,6 +178,7 @@ class MemoryToolInvocation extends BaseToolInvocation<
   ToolResult
 > {
   private static readonly allowlist: Set<string> = new Set();
+  private proposedNewContent: string | undefined;
 
   constructor(
     params: SaveMemoryParams,
@@ -202,13 +205,22 @@ class MemoryToolInvocation extends BaseToolInvocation<
     }
 
     const currentContent = await readMemoryFileContent();
-    const newContent = computeNewContent(currentContent, this.params.fact);
+    const { fact, modified_by_user, modified_content } = this.params;
+
+    // If an attacker injects modified_content, use it for the diff
+    // to expose the attack to the user. Otherwise, compute from 'fact'.
+    const contentForDiff =
+      modified_by_user && modified_content !== undefined
+        ? modified_content
+        : computeNewContent(currentContent, fact);
+
+    this.proposedNewContent = contentForDiff;
 
     const fileName = path.basename(memoryFilePath);
     const fileDiff = Diff.createPatch(
       fileName,
       currentContent,
-      newContent,
+      this.proposedNewContent,
       'Current',
       'Proposed',
       DEFAULT_DIFF_OPTIONS,
@@ -221,7 +233,7 @@ class MemoryToolInvocation extends BaseToolInvocation<
       filePath: memoryFilePath,
       fileDiff,
       originalContent: currentContent,
-      newContent,
+      newContent: this.proposedNewContent,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
           MemoryToolInvocation.allowlist.add(allowlistKey);
@@ -236,44 +248,43 @@ class MemoryToolInvocation extends BaseToolInvocation<
     const { fact, modified_by_user, modified_content } = this.params;
 
     try {
+      let contentToWrite: string;
+      let successMessage: string;
+
+      // Sanitize the fact for use in the success message, matching the sanitization
+      // that happened inside computeNewContent.
+      const sanitizedFact = fact.replace(/[\r\n]/g, ' ').trim();
+
       if (modified_by_user && modified_content !== undefined) {
-        // User modified the content in external editor, write it directly
-        await fs.mkdir(path.dirname(getGlobalMemoryFilePath()), {
-          recursive: true,
-        });
-        await fs.writeFile(
-          getGlobalMemoryFilePath(),
-          modified_content,
-          'utf-8',
-        );
-        const successMessage = `Okay, I've updated the memory file with your modifications.`;
-        return {
-          llmContent: JSON.stringify({
-            success: true,
-            message: successMessage,
-          }),
-          returnDisplay: successMessage,
-        };
+        // User modified the content, so that is the source of truth.
+        contentToWrite = modified_content;
+        successMessage = `Okay, I've updated the memory file with your modifications.`;
       } else {
-        // Use the normal memory entry logic
-        await MemoryTool.performAddMemoryEntry(
-          fact,
-          getGlobalMemoryFilePath(),
-          {
-            readFile: fs.readFile,
-            writeFile: fs.writeFile,
-            mkdir: fs.mkdir,
-          },
-        );
-        const successMessage = `Okay, I've remembered that: "${fact}"`;
-        return {
-          llmContent: JSON.stringify({
-            success: true,
-            message: successMessage,
-          }),
-          returnDisplay: successMessage,
-        };
+        // User approved the proposed change without modification.
+        // The source of truth is the exact content proposed during confirmation.
+        if (this.proposedNewContent === undefined) {
+          // This case can be hit in flows without a confirmation step (e.g., --auto-confirm).
+          // As a fallback, we recompute the content now. This is safe because
+          // computeNewContent sanitizes the input.
+          const currentContent = await readMemoryFileContent();
+          this.proposedNewContent = computeNewContent(currentContent, fact);
+        }
+        contentToWrite = this.proposedNewContent;
+        successMessage = `Okay, I've remembered that: "${sanitizedFact}"`;
       }
+
+      await fs.mkdir(path.dirname(getGlobalMemoryFilePath()), {
+        recursive: true,
+      });
+      await fs.writeFile(getGlobalMemoryFilePath(), contentToWrite, 'utf-8');
+
+      return {
+        llmContent: JSON.stringify({
+          success: true,
+          message: successMessage,
+        }),
+        returnDisplay: successMessage,
+      };
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -335,41 +346,6 @@ export class MemoryTool
     );
   }
 
-  static async performAddMemoryEntry(
-    text: string,
-    memoryFilePath: string,
-    fsAdapter: {
-      readFile: (path: string, encoding: 'utf-8') => Promise<string>;
-      writeFile: (
-        path: string,
-        data: string,
-        encoding: 'utf-8',
-      ) => Promise<void>;
-      mkdir: (
-        path: string,
-        options: { recursive: boolean },
-      ) => Promise<string | undefined>;
-    },
-  ): Promise<void> {
-    try {
-      await fsAdapter.mkdir(path.dirname(memoryFilePath), { recursive: true });
-      let currentContent = '';
-      try {
-        currentContent = await fsAdapter.readFile(memoryFilePath, 'utf-8');
-      } catch (_e) {
-        // File doesn't exist, which is fine. currentContent will be empty.
-      }
-
-      const newContent = computeNewContent(currentContent, text);
-
-      await fsAdapter.writeFile(memoryFilePath, newContent, 'utf-8');
-    } catch (error) {
-      throw new Error(
-        `[MemoryTool] Failed to add memory entry: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  }
-
   getModifyContext(_abortSignal: AbortSignal): ModifyContext<SaveMemoryParams> {
     return {
       getFilePath: (_params: SaveMemoryParams) => getGlobalMemoryFilePath(),
@@ -377,7 +353,12 @@ export class MemoryTool
         readMemoryFileContent(),
       getProposedContent: async (params: SaveMemoryParams): Promise<string> => {
         const currentContent = await readMemoryFileContent();
-        return computeNewContent(currentContent, params.fact);
+        const { fact, modified_by_user, modified_content } = params;
+        // Ensure the editor is populated with the same content
+        // that the confirmation diff would show.
+        return modified_by_user && modified_content !== undefined
+          ? modified_content
+          : computeNewContent(currentContent, fact);
       },
       createUpdatedParams: (
         _oldContent: string,
