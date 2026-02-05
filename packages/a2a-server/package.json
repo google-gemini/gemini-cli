@@ -26,11 +26,11 @@
   ],
   "dependencies": {
     "@a2a-js/sdk": "^0.3.2",
-    "@google-cloud/storage": "^7.16.0",
+    "@google-cloud/storage": "^7.18.0",
     "@google/gemini-cli-core": "file:../core",
-    "express": "^5.1.0",
+    "express": "^5.2.1",
     "fs-extra": "^11.3.0",
-    "tar": "^7.5.2",
+    "tar": "^7.5.7",
     "uuid": "^11.1.0",
     "winston": "^3.17.0"
   },
