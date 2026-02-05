@@ -24,8 +24,8 @@ on GitHub.
   for tool execution, resulting in a more responsive and performant experience
   ([#17078](https://github.com/google-gemini/gemini-cli/pull/17078) by
   @abhipatel12).
-- **Enhanced User Experience:** This release includes an experimental `Plan`
-  mode, queued tool confirmations, and expandable large text pastes for a
+- **Enhanced User Experience:** This release includes queued tool
+  confirmations, and expandable large text pastes for a
   smoother workflow.
 - **New `/rewind` Command:** Easily navigate your session history with the new
   `/rewind` command
