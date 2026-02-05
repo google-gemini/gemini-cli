@@ -327,7 +327,10 @@ describe('createPolicyEngineConfig', () => {
       ApprovalMode.AUTO_EDIT,
     );
     const rule = config.rules?.find(
-      (r) => r.toolName === 'replace' && r.decision === PolicyDecision.ALLOW,
+      (r) =>
+        r.toolName === 'replace' &&
+        r.decision === PolicyDecision.ALLOW &&
+        r.modes?.includes(ApprovalMode.AUTO_EDIT),
     );
     expect(rule).toBeDefined();
     // Priority 15 in default tier → 1.015
