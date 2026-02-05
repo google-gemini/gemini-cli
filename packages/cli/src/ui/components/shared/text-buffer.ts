@@ -57,6 +57,16 @@ export const isWordCharStrict = (char: string): boolean =>
 
 export const isWhitespace = (char: string): boolean => /\s/.test(char);
 
+// Find first non-whitespace character in a line
+export const findFirstNonWhitespace = (line: string): number => {
+  let col = 0;
+  const lineCodePoints = toCodePoints(line);
+  while (col < lineCodePoints.length && /\s/.test(lineCodePoints[col])) {
+    col++;
+  }
+  return col;
+};
+
 // Check if a character is a combining mark (only diacritics for now)
 export const isCombiningMark = (char: string): boolean => /\p{M}/u.test(char);
 

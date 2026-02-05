@@ -476,6 +476,38 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
     [getCurrentCount, executeCommand, dispatch],
   );
 
+  /**
+   * Handles generic operator or motion commands (for 0, $, ^)
+   * @param deleteCmd - The delete command type
+   * @param changeCmd - The change command type
+   * @param moveAction - The function to call for normal movement
+   * @returns boolean indicating if command was handled
+   */
+  const handleOperatorOrMotion = useCallback(
+    (deleteCmd: string, changeCmd: string, moveAction: () => void): boolean => {
+      if (state.pendingOperator === 'd') {
+        executeCommand(deleteCmd, 1);
+        dispatch({
+          type: 'SET_LAST_COMMAND',
+          command: { type: deleteCmd, count: 1 },
+        });
+        dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
+      } else if (state.pendingOperator === 'c') {
+        executeCommand(changeCmd, 1);
+        dispatch({
+          type: 'SET_LAST_COMMAND',
+          command: { type: changeCmd, count: 1 },
+        });
+        dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
+      } else {
+        moveAction();
+      }
+      dispatch({ type: 'CLEAR_COUNT' });
+      return true;
+    },
+    [state.pendingOperator, executeCommand, dispatch],
+  );
+
   const handleInput = useCallback(
     (key: Key): boolean => {
       if (!vimEnabled) {
@@ -717,78 +749,27 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
           }
 
           case '0': {
-            if (state.pendingOperator === 'd') {
-              executeCommand(CMD_TYPES.DELETE_TO_LINE_START, 1);
-              dispatch({
-                type: 'SET_LAST_COMMAND',
-                command: { type: CMD_TYPES.DELETE_TO_LINE_START, count: 1 },
-              });
-              dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
-            } else if (state.pendingOperator === 'c') {
-              executeCommand(CMD_TYPES.CHANGE_TO_LINE_START, 1);
-              dispatch({
-                type: 'SET_LAST_COMMAND',
-                command: { type: CMD_TYPES.CHANGE_TO_LINE_START, count: 1 },
-              });
-              dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
-            } else {
-              // Move to start of line
-              buffer.vimMoveToLineStart();
-            }
-            dispatch({ type: 'CLEAR_COUNT' });
-            return true;
+            return handleOperatorOrMotion(
+              CMD_TYPES.DELETE_TO_LINE_START,
+              CMD_TYPES.CHANGE_TO_LINE_START,
+              () => buffer.vimMoveToLineStart(),
+            );
           }
 
           case '$': {
-            if (state.pendingOperator === 'd') {
-              executeCommand(CMD_TYPES.DELETE_TO_EOL, 1);
-              dispatch({
-                type: 'SET_LAST_COMMAND',
-                command: { type: CMD_TYPES.DELETE_TO_EOL, count: 1 },
-              });
-              dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
-            } else if (state.pendingOperator === 'c') {
-              executeCommand(CMD_TYPES.CHANGE_TO_EOL, 1);
-              dispatch({
-                type: 'SET_LAST_COMMAND',
-                command: { type: CMD_TYPES.CHANGE_TO_EOL, count: 1 },
-              });
-              dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
-            } else {
-              // Move to end of line
-              buffer.vimMoveToLineEnd();
-            }
-            dispatch({ type: 'CLEAR_COUNT' });
-            return true;
+            return handleOperatorOrMotion(
+              CMD_TYPES.DELETE_TO_EOL,
+              CMD_TYPES.CHANGE_TO_EOL,
+              () => buffer.vimMoveToLineEnd(),
+            );
           }
 
           case '^': {
-            if (state.pendingOperator === 'd') {
-              executeCommand(CMD_TYPES.DELETE_TO_FIRST_NON_WHITESPACE, 1);
-              dispatch({
-                type: 'SET_LAST_COMMAND',
-                command: {
-                  type: CMD_TYPES.DELETE_TO_FIRST_NON_WHITESPACE,
-                  count: 1,
-                },
-              });
-              dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
-            } else if (state.pendingOperator === 'c') {
-              executeCommand(CMD_TYPES.CHANGE_TO_FIRST_NON_WHITESPACE, 1);
-              dispatch({
-                type: 'SET_LAST_COMMAND',
-                command: {
-                  type: CMD_TYPES.CHANGE_TO_FIRST_NON_WHITESPACE,
-                  count: 1,
-                },
-              });
-              dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
-            } else {
-              // Move to first non-whitespace character
-              buffer.vimMoveToFirstNonWhitespace();
-            }
-            dispatch({ type: 'CLEAR_COUNT' });
-            return true;
+            return handleOperatorOrMotion(
+              CMD_TYPES.DELETE_TO_FIRST_NON_WHITESPACE,
+              CMD_TYPES.CHANGE_TO_FIRST_NON_WHITESPACE,
+              () => buffer.vimMoveToFirstNonWhitespace(),
+            );
           }
 
           case 'g': {
@@ -980,6 +961,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
       executeCommand,
       updateMode,
       checkDoubleEscape,
+      handleOperatorOrMotion,
     ],
   );
 

@@ -18,6 +18,7 @@ import {
   findPrevBigWordAcrossLines,
   findWordEndInLine,
   findBigWordEndInLine,
+  findFirstNonWhitespace,
 } from './text-buffer.js';
 import { cpLen, toCodePoints } from '../../utils/textUtils.js';
 import { assumeExhaustive } from '@google/gemini-cli-core';
@@ -408,14 +409,7 @@ export function handleVimAction(
     case 'vim_delete_to_first_non_whitespace':
     case 'vim_change_to_first_non_whitespace': {
       const currentLine = lines[cursorRow] || '';
-      let firstNonWhitespaceCol = 0;
-      const lineCodePoints = toCodePoints(currentLine);
-      while (
-        firstNonWhitespaceCol < lineCodePoints.length &&
-        /\s/.test(lineCodePoints[firstNonWhitespaceCol])
-      ) {
-        firstNonWhitespaceCol++;
-      }
+      const firstNonWhitespaceCol = findFirstNonWhitespace(currentLine);
 
       // If line is all whitespace, firstNonWhitespaceCol equals line length.
       // This results in deleting/changing from cursor to end of line,
@@ -917,13 +911,7 @@ export function handleVimAction(
     case 'vim_insert_at_line_start': {
       const { cursorRow, lines } = state;
       const currentLine = lines[cursorRow] || '';
-      let col = 0;
-
-      // Find first non-whitespace character using proper Unicode handling
-      const lineCodePoints = toCodePoints(currentLine);
-      while (col < lineCodePoints.length && /\s/.test(lineCodePoints[col])) {
-        col++;
-      }
+      const col = findFirstNonWhitespace(currentLine);
 
       return {
         ...state,
@@ -954,13 +942,7 @@ export function handleVimAction(
     case 'vim_move_to_first_nonwhitespace': {
       const { cursorRow, lines } = state;
       const currentLine = lines[cursorRow] || '';
-      let col = 0;
-
-      // Find first non-whitespace character using proper Unicode handling
-      const lineCodePoints = toCodePoints(currentLine);
-      while (col < lineCodePoints.length && /\s/.test(lineCodePoints[col])) {
-        col++;
-      }
+      const col = findFirstNonWhitespace(currentLine);
 
       return {
         ...state,
