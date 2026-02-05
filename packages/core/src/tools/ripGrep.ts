@@ -513,7 +513,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
     super(
       RipGrepTool.Name,
       'SearchText',
-      'Searches for a regular expression pattern within file contents. Utilize parameters like max_matches_per_file to avoid one file providing excessive results.',
+      'Searches for a regular expression pattern within file contents. Utilize parameters like max_matches_per_file to avoid one file providing excessive results. Defaults to 100 matches.',
       Kind.Search,
       {
         properties: {
