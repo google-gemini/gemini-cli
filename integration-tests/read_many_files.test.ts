@@ -5,7 +5,12 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig, printDebugInfo, validateModelOutput } from './test-helper.js';
+import {
+  TestRig,
+  printDebugInfo,
+  assertModelHasOutput,
+  checkModelOutputContent,
+} from './test-helper.js';
 
 describe('read_many_files', () => {
   let rig: TestRig;
@@ -50,7 +55,7 @@ describe('read_many_files', () => {
       'Expected to find either read_many_files or multiple read_file tool calls',
     ).toBeTruthy();
 
-    // Validate model output - will throw if no output
-    validateModelOutput(result, null, 'Read many files test');
+    assertModelHasOutput(result);
+    checkModelOutputContent(result, { testName: 'Read many files test' });
   });
 });
