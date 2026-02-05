@@ -563,18 +563,18 @@ export enum EventMetadataKey {
   GEMINI_CLI_ROUTING_CLASSIFIER_THRESHOLD = 147,
 
   // ==========================================================================
-  // Observation Masking Event Keys
+  // Tool Output Masking Event Keys
   // ==========================================================================
 
   // Logs the total tokens in the prunable block before masking.
-  GEMINI_CLI_OBSERVATION_MASKING_TOKENS_BEFORE = 148,
+  GEMINI_CLI_TOOL_OUTPUT_MASKING_TOKENS_BEFORE = 148,
 
   // Logs the total tokens in the masked remnants after masking.
-  GEMINI_CLI_OBSERVATION_MASKING_TOKENS_AFTER = 149,
+  GEMINI_CLI_TOOL_OUTPUT_MASKING_TOKENS_AFTER = 149,
 
   // Logs the number of tool outputs masked in this operation.
-  GEMINI_CLI_OBSERVATION_MASKING_MASKED_COUNT = 150,
+  GEMINI_CLI_TOOL_OUTPUT_MASKING_MASKED_COUNT = 150,
 
   // Logs the total prunable tokens identified at the trigger point.
-  GEMINI_CLI_OBSERVATION_MASKING_TOTAL_PRUNABLE_TOKENS = 151,
+  GEMINI_CLI_TOOL_OUTPUT_MASKING_TOTAL_PRUNABLE_TOKENS = 151,
 }

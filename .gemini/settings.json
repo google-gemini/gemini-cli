@@ -1,6 +1,6 @@
 {
   "experimental": {
-    "observationMasking": {
+    "toolOutputMasking": {
       "enabled": true
     }
   }

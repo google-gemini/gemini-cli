@@ -1462,25 +1462,24 @@ const SETTINGS_SCHEMA = {
     description: 'Setting to enable experimental features',
     showInDialog: false,
     properties: {
-      observationMasking: {
+      toolOutputMasking: {
         type: 'object',
-        label: 'Observation Masking',
+        label: 'Tool Output Masking',
         category: 'Experimental',
         requiresRestart: true,
         ignoreInDocs: true,
         default: {},
         description:
-          'Advanced settings for observation masking to manage context window efficiency.',
+          'Advanced settings for tool output masking to manage context window efficiency.',
         showInDialog: false,
         properties: {
           enabled: {
             type: 'boolean',
-            label: 'Enable Observation Masking',
+            label: 'Enable Tool Output Masking',
             category: 'Experimental',
             requiresRestart: true,
             default: false,
-            description:
-              'Enables observation masking for tool outputs to save tokens.',
+            description: 'Enables tool output masking to save tokens.',
             showInDialog: false,
           },
           toolProtectionThreshold: {
@@ -1490,12 +1489,12 @@ const SETTINGS_SCHEMA = {
             requiresRestart: true,
             default: 50000,
             description:
-              'Minimum number of tokens to protect from masking (most recent observations).',
+              'Minimum number of tokens to protect from masking (most recent tool outputs).',
             showInDialog: false,
           },
-          hysteresisThreshold: {
+          minPrunableTokensThreshold: {
             type: 'number',
-            label: 'Hysteresis Threshold',
+            label: 'Min Prunable Tokens Threshold',
             category: 'Experimental',
             requiresRestart: true,
             default: 30000,

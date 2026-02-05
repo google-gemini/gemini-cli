@@ -9,21 +9,23 @@ import path from 'node:path';
 import * as fsPromises from 'node:fs/promises';
 import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { sanitizeFilenamePart } from '../utils/fileUtils.js';
 import type { Config } from '../config/config.js';
-import { logObservationMasking } from '../telemetry/loggers.js';
+import { logToolOutputMasking } from '../telemetry/loggers.js';
 import {
   SHELL_TOOL_NAME,
   GREP_TOOL_NAME,
   READ_FILE_TOOL_NAME,
 } from '../tools/tool-names.js';
-import { ObservationMaskingEvent } from '../telemetry/types.js';
+import { ToolOutputMaskingEvent } from '../telemetry/types.js';
 
-// Observation masking defaults
+// Tool output masking defaults
 export const DEFAULT_TOOL_PROTECTION_THRESHOLD = 50000;
-export const DEFAULT_HYSTERESIS_THRESHOLD = 30000;
+export const DEFAULT_MIN_PRUNABLE_TOKENS_THRESHOLD = 30000;
 export const DEFAULT_PROTECT_LATEST_TURN = true;
+export const MASKING_INDICATOR_TAG = '<tool_output_masked_guidance';
 
-export const OBSERVATION_DIR = 'observations';
+export const TOOL_OUTPUTS_DIR = 'tool-outputs';
 
 export interface MaskingResult {
   newHistory: Content[];
@@ -32,13 +34,24 @@ export interface MaskingResult {
 }
 
 /**
- * Service to manage context window by masking bulky tool outputs (Observation Masking).
- * Follows a Hybrid Backward Scanned FIFO algorithm:
- * 1. Protect newest 50k tool tokens (optionally skipping the entire latest turn).
- * 2. Identify ALL tool outputs beyond the protection window for global aggregation.
- * 3. Trigger masking if the total prunable tokens exceed 30k.
+ * Service to manage context window efficiency by masking bulky tool outputs (Tool Output Masking).
+ *
+ * It implements a "Hybrid Backward Scanned FIFO" algorithm to balance context relevance with
+ * token savings:
+ * 1. **Protection Window**: Protects the newest `toolProtectionThreshold` (default 50k) tool tokens
+ *    from pruning. Optionally skips the entire latest conversation turn to ensure full context for
+ *    the model's next response.
+ * 2. **Global Aggregation**: Scans backwards past the protection window to identify all remaining
+ *    tool outputs that haven't been masked yet.
+ * 3. **Batch Trigger**: Trigger masking only if the total prunable tokens exceed
+ *    `minPrunableTokensThreshold` (default 30k).
+ *
+ * @remarks
+ * Effectively, this means masking only starts once the conversation contains approximately 80k
+ * tokens of prunable tool outputs (50k protected + 30k prunable buffer). Small tool outputs
+ * are preserved until they collectively reach the threshold.
  */
-export class ObservationMaskingService {
+export class ToolOutputMaskingService {
   async mask(history: Content[], config: Config): Promise<MaskingResult> {
     if (history.length === 0) {
       return { newHistory: history, maskedCount: 0, tokensSaved: 0 };
@@ -57,7 +70,7 @@ export class ObservationMaskingService {
       originalPart: Part;
     }> = [];
 
-    const maskingConfig = config.getObservationMaskingConfig();
+    const maskingConfig = config.getToolOutputMaskingConfig();
 
     // Decide where to start scanning.
     // If PROTECT_LATEST_TURN is true, we skip the most recent message (index history.length - 1).
@@ -65,7 +78,7 @@ export class ObservationMaskingService {
       ? history.length - 2
       : history.length - 1;
 
-    // Step 1: Backward scan to identify prunable tool outputs
+    // Backward scan to identify prunable tool outputs
     for (let i = scanStartIdx; i >= 0; i--) {
       const content = history[i];
       const parts = content.parts || [];
@@ -73,11 +86,15 @@ export class ObservationMaskingService {
       for (let j = parts.length - 1; j >= 0; j--) {
         const part = parts[j];
 
-        // We only care about tool responses (observations)
+        // Tool outputs (functionResponse) are the primary targets for pruning because
+        // they often contain voluminous data (e.g., shell logs, file content) that
+        // can exceed context limits. We preserve other parts—such as user text,
+        // model reasoning, and multimodal data—because they define the conversation's
+        // core intent and logic, which are harder for the model to recover if lost.
         if (!part.functionResponse) continue;
 
-        const observationContent = this.getObservationContent(part);
-        if (!observationContent || this.isAlreadyMasked(observationContent)) {
+        const toolOutputContent = this.getToolOutputContent(part);
+        if (!toolOutputContent || this.isAlreadyMasked(toolOutputContent)) {
           continue;
         }
 
@@ -93,7 +110,7 @@ export class ObservationMaskingService {
               contentIndex: i,
               partIndex: j,
               tokens: partTokens,
-              content: observationContent,
+              content: toolOutputContent,
               originalPart: part,
             });
           }
@@ -103,30 +120,31 @@ export class ObservationMaskingService {
             contentIndex: i,
             partIndex: j,
             tokens: partTokens,
-            content: observationContent,
+            content: toolOutputContent,
             originalPart: part,
           });
         }
       }
     }
 
-    // Step 2: Hysteresis trigger
-    if (totalPrunableTokens < maskingConfig.hysteresisThreshold) {
+    // Trigger pruning only if we have accumulated enough savings to justify the
+    // overhead of masking and file I/O (batch pruning threshold).
+    if (totalPrunableTokens < maskingConfig.minPrunableTokensThreshold) {
       return { newHistory: history, maskedCount: 0, tokensSaved: 0 };
     }
 
     debugLogger.debug(
-      `[ObservationMasking] Triggering masking. Prunable tool tokens: ${totalPrunableTokens.toLocaleString()} (> ${maskingConfig.hysteresisThreshold.toLocaleString()})`,
+      `[ToolOutputMasking] Triggering masking. Prunable tool tokens: ${totalPrunableTokens.toLocaleString()} (> ${maskingConfig.minPrunableTokensThreshold.toLocaleString()})`,
     );
 
-    // Step 3: Perform masking and offloading
+    // Perform masking and offloading
     const newHistory = [...history]; // Shallow copy of history
     let actualTokensSaved = 0;
-    const observationDir = path.join(
+    const toolOutputsDir = path.join(
       config.storage.getHistoryDir(),
-      OBSERVATION_DIR,
+      TOOL_OUTPUTS_DIR,
     );
-    await fsPromises.mkdir(observationDir, { recursive: true });
+    await fsPromises.mkdir(toolOutputsDir, { recursive: true });
 
     for (const item of prunableParts) {
       const { contentIndex, partIndex, content, tokens } = item;
@@ -137,10 +155,12 @@ export class ObservationMaskingService {
 
       const toolName = part.functionResponse.name || 'unknown_tool';
       const callId = part.functionResponse.id || Date.now().toString();
-      const fileName = `${toolName}_${callId}_${Math.random()
+      const safeToolName = sanitizeFilenamePart(toolName).toLowerCase();
+      const safeCallId = sanitizeFilenamePart(callId).toLowerCase();
+      const fileName = `${safeToolName}_${safeCallId}_${Math.random()
         .toString(36)
         .substring(7)}.txt`;
-      const filePath = path.join(observationDir, fileName);
+      const filePath = path.join(toolOutputsDir, fileName);
 
       await fsPromises.writeFile(filePath, content, 'utf-8');
 
@@ -196,7 +216,7 @@ export class ObservationMaskingService {
     }
 
     debugLogger.debug(
-      `[ObservationMasking] Masked ${maskedCount} tool outputs. Saved ~${actualTokensSaved.toLocaleString()} tokens.`,
+      `[ToolOutputMasking] Masked ${maskedCount} tool outputs. Saved ~${actualTokensSaved.toLocaleString()} tokens.`,
     );
 
     const result = {
@@ -209,12 +229,12 @@ export class ObservationMaskingService {
       return result;
     }
 
-    logObservationMasking(
+    logToolOutputMasking(
       config,
-      new ObservationMaskingEvent({
+      new ToolOutputMaskingEvent({
         tokens_before: totalPrunableTokens,
         tokens_after: totalPrunableTokens - actualTokensSaved,
-        masked_count: prunableParts.length,
+        masked_count: maskedCount,
         total_prunable_tokens: totalPrunableTokens,
       }),
     );
@@ -222,7 +242,7 @@ export class ObservationMaskingService {
     return result;
   }
 
-  private getObservationContent(part: Part): string | null {
+  private getToolOutputContent(part: Part): string | null {
     if (!part.functionResponse) return null;
     const response = part.functionResponse.response as Record<string, unknown>;
     if (!response) return null;
@@ -238,7 +258,7 @@ export class ObservationMaskingService {
   }
 
   private isAlreadyMasked(content: string): boolean {
-    return content.includes('<observation_masked_guidance');
+    return content.includes(MASKING_INDICATOR_TAG);
   }
 
   private formatShellPreview(response: Record<string, unknown>): string {
@@ -311,21 +331,18 @@ export class ObservationMaskingService {
   private formatMaskedSnippet(params: MaskedSnippetParams): string {
     const { toolName, filePath, fileSizeMB, totalLines, tokens, preview } =
       params;
-    return `[Observation Masked]
-<observation_masked_guidance tool_name="${toolName}">
-  <preview>${preview}</preview>
-  <details>
-    <file_path>${filePath}</file_path>
-    <file_size>${fileSizeMB}MB</file_size>
-    <line_count>${totalLines.toLocaleString()}</line_count>
-    <estimated_total_tokens>${tokens.toLocaleString()}</estimated_total_tokens>
-  </details>
-  <instructions>
-    The full output is available at the path above. 
-    You can inspect it using tools like '${GREP_TOOL_NAME}' or '${READ_FILE_TOOL_NAME}'.
-    Note: Reading the full file will use approximately ${tokens.toLocaleString()} tokens.
-  </instructions>
-</observation_masked_guidance>`;
+    return `[Tool Output Masked]
+${MASKING_INDICATOR_TAG} 
+  tool_name="${toolName}" 
+  file_path="${filePath}" 
+  total_tokens="${tokens.toLocaleString()}" 
+  line_count="${totalLines.toLocaleString()}" 
+  file_size="${fileSizeMB}MB"
+>
+${preview}
+
+... [Full output available at ${filePath}. Use '${READ_FILE_TOOL_NAME}' or '${GREP_TOOL_NAME}' to inspect.]
+</tool_output_masked_guidance>`;
   }
 }
 

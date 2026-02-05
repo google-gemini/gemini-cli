@@ -54,7 +54,7 @@ import { handleFallback } from '../fallback/handler.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
-import { ObservationMaskingService } from '../services/observationMaskingService.js';
+import { ToolOutputMaskingService } from '../services/toolOutputMaskingService.js';
 import { calculateRequestTokenCount } from '../utils/tokenCalculation.js';
 import {
   applyModelSelection,
@@ -85,7 +85,7 @@ export class GeminiClient {
 
   private readonly loopDetector: LoopDetectionService;
   private readonly compressionService: ChatCompressionService;
-  private readonly observationMaskingService: ObservationMaskingService;
+  private readonly toolOutputMaskingService: ToolOutputMaskingService;
   private lastPromptId: string;
   private currentSequenceModel: string | null = null;
   private lastSentIdeContext: IdeContext | undefined;
@@ -100,7 +100,7 @@ export class GeminiClient {
   constructor(private readonly config: Config) {
     this.loopDetector = new LoopDetectionService(config);
     this.compressionService = new ChatCompressionService();
-    this.observationMaskingService = new ObservationMaskingService();
+    this.toolOutputMaskingService = new ToolOutputMaskingService();
     this.lastPromptId = this.config.getSessionId();
 
     coreEvents.on(CoreEvent.ModelChanged, this.handleModelChanged);
@@ -565,8 +565,7 @@ export class GeminiClient {
     const remainingTokenCount =
       tokenLimit(modelForLimitCheck) - this.getChat().getLastPromptTokenCount();
 
-    // Observation Masking (FIFO)
-    await this.tryMaskObservations();
+    await this.tryMaskToolOutputs(this.getHistory());
 
     // Estimate tokens. For text-only requests, we estimate based on character length.
     // For requests with non-text parts (like images, tools), we use the countTokens API.
@@ -1064,14 +1063,14 @@ export class GeminiClient {
   }
 
   /**
-   * Masks bulky tool outputs (observations) to save context window space.
+   * Masks bulky tool outputs to save context window space.
    */
-  private async tryMaskObservations(): Promise<void> {
-    if (!this.config.getObservationMaskingEnabled()) {
+  private async tryMaskToolOutputs(history: Content[]): Promise<void> {
+    if (!this.config.getToolOutputMaskingEnabled()) {
       return;
     }
-    const result = await this.observationMaskingService.mask(
-      this.getHistory(),
+    const result = await this.toolOutputMaskingService.mask(
+      history,
       this.config,
     );
     if (result.maskedCount > 0) {

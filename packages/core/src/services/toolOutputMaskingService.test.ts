@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ObservationMaskingService } from './observationMaskingService.js';
+import { ToolOutputMaskingService } from './toolOutputMaskingService.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
 import type { Config } from '../config/config.js';
@@ -20,23 +20,23 @@ vi.mock('node:fs/promises', () => ({
   writeFile: vi.fn().mockResolvedValue(undefined),
 }));
 
-describe('ObservationMaskingService', () => {
-  let service: ObservationMaskingService;
+describe('ToolOutputMaskingService', () => {
+  let service: ToolOutputMaskingService;
   let mockConfig: Config;
 
   const mockedEstimateTokenCountSync = vi.mocked(estimateTokenCountSync);
 
   beforeEach(() => {
-    service = new ObservationMaskingService();
+    service = new ToolOutputMaskingService();
     mockConfig = {
       storage: {
         getHistoryDir: () => '/mock/history',
       },
       getUsageStatisticsEnabled: () => false,
-      getObservationMaskingConfig: () => ({
+      getToolOutputMaskingConfig: () => ({
         enabled: true,
         toolProtectionThreshold: 50000,
-        hysteresisThreshold: 30000,
+        minPrunableTokensThreshold: 30000,
         protectLatestTurn: true,
       }),
     } as unknown as Config;
@@ -121,7 +121,7 @@ describe('ObservationMaskingService', () => {
         unknown
       >;
       const content = (resp?.['output'] as string) ?? JSON.stringify(resp);
-      if (content.includes('<observation_masked_guidance')) return 100;
+      if (content.includes('<tool_output_masked_guidance')) return 100;
 
       if (toolName === 't1') return 60000;
       if (toolName === 't2') return 20000;
@@ -132,12 +132,12 @@ describe('ObservationMaskingService', () => {
     // Scanned: Turn 2 (20k), Turn 1 (60k). Total = 80k.
     // Turn 2: Cumulative = 20k. Protected (<= 50k).
     // Turn 1: Cumulative = 80k. Crossed 50k boundary. Prunabled.
-    // Total Prunable = 60k (> 30k hysteresis).
+    // Total Prunable = 60k (> 30k trigger).
     const result = await service.mask(history, mockConfig);
 
     expect(result.maskedCount).toBe(1);
     expect(getToolResponse(result.newHistory[0].parts?.[0])).toContain(
-      '<observation_masked_guidance',
+      '<tool_output_masked_guidance',
     );
     expect(getToolResponse(result.newHistory[1].parts?.[0])).toEqual(
       'B'.repeat(20000),
@@ -178,7 +178,7 @@ describe('ObservationMaskingService', () => {
         typeof resp === 'string'
           ? resp
           : resp?.output || resp?.result || JSON.stringify(resp);
-      if (content?.includes('<observation_masked_guidance')) return 100;
+      if (content?.includes('<tool_output_masked_guidance')) return 100;
       return content?.length || 0;
     });
 
@@ -230,7 +230,7 @@ describe('ObservationMaskingService', () => {
         unknown
       >;
       const content = (resp?.['output'] as string) ?? JSON.stringify(resp);
-      if (content.includes('<observation_masked_guidance')) return 100;
+      if (content.includes('<tool_output_masked_guidance')) return 100;
 
       if (name === SHELL_TOOL_NAME) return 100000;
       if (name === 'p') return 60000;
@@ -255,7 +255,7 @@ describe('ObservationMaskingService', () => {
               name: 'tool1',
               response: {
                 output:
-                  '[Observation Masked]\n<observation_masked_guidance tool_name="tool1">...</observation_masked_guidance>',
+                  '[Tool Output Masked]\n<tool_output_masked_guidance tool_name="tool1">...</tool_output_masked_guidance>',
               },
             },
           },
@@ -315,7 +315,7 @@ describe('ObservationMaskingService', () => {
         (resp?.['output'] as string) ??
         (resp?.['result'] as string) ??
         JSON.stringify(resp);
-      if (content.includes('<observation_masked_guidance')) return 100;
+      if (content.includes('<tool_output_masked_guidance')) return 100;
       return 60000;
     });
 
@@ -324,7 +324,7 @@ describe('ObservationMaskingService', () => {
     const resp = result.newHistory[0].parts![0].functionResponse!
       .response as Record<string, unknown>;
     // The entire response is replaced with { output: maskedSnippet }, guaranteeing full savings
-    expect(resp['output']).toContain('[Observation Masked]');
+    expect(resp['output']).toContain('[Tool Output Masked]');
     expect(resp['result']).toBeUndefined();
   });
 
@@ -369,7 +369,7 @@ describe('ObservationMaskingService', () => {
         unknown
       >;
       const content = (resp?.['output'] as string) ?? JSON.stringify(resp);
-      if (content.includes('<observation_masked_guidance')) return 100;
+      if (content.includes('<tool_output_masked_guidance')) return 100;
 
       if (parts[0].functionResponse?.name === 't1') return 60000;
       if (parts[0].functionResponse?.name === 'p') return 60000;
@@ -388,7 +388,7 @@ describe('ObservationMaskingService', () => {
           unknown
         >
       )['output'],
-    ).toContain('[Observation Masked]');
+    ).toContain('[Tool Output Masked]');
     expect(result.newHistory[0].parts?.[1].inlineData).toEqual({
       data: 'base64data',
       mimeType: 'image/png',
@@ -432,7 +432,7 @@ describe('ObservationMaskingService', () => {
         unknown
       >;
       const content = (resp?.['output'] as string) ?? JSON.stringify(resp);
-      if (content.includes('<observation_masked_guidance')) return 100;
+      if (content.includes('<tool_output_masked_guidance')) return 100;
 
       if (parts[0].functionResponse?.name === SHELL_TOOL_NAME) return 1000;
       if (parts[0].functionResponse?.name === 'padding') return 60000;
@@ -450,7 +450,7 @@ describe('ObservationMaskingService', () => {
 
     // We replace the random part of the filename for deterministic snapshots
     const deterministicResponse = response.replace(
-      new RegExp(`${SHELL_TOOL_NAME}_.*\\.txt`),
+      new RegExp(`${SHELL_TOOL_NAME}_[^\\s"]+\\.txt`, 'g'),
       `${SHELL_TOOL_NAME}_deterministic.txt`,
     );
 

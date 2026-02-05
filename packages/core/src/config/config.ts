@@ -149,10 +149,10 @@ export interface OutputSettings {
   format?: OutputFormat;
 }
 
-export interface ObservationMaskingConfig {
+export interface ToolOutputMaskingConfig {
   enabled: boolean;
   toolProtectionThreshold: number;
-  hysteresisThreshold: number;
+  minPrunableTokensThreshold: number;
   protectLatestTurn: boolean;
 }
 
@@ -282,9 +282,9 @@ import {
 } from './constants.js';
 import {
   DEFAULT_TOOL_PROTECTION_THRESHOLD,
-  DEFAULT_HYSTERESIS_THRESHOLD,
+  DEFAULT_MIN_PRUNABLE_TOKENS_THRESHOLD,
   DEFAULT_PROTECT_LATEST_TURN,
-} from '../services/observationMaskingService.js';
+} from '../services/toolOutputMaskingService.js';
 
 import {
   type ExtensionLoader,
@@ -474,7 +474,7 @@ export interface ConfigParameters {
   disabledSkills?: string[];
   adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
-  observationMasking?: Partial<ObservationMaskingConfig>;
+  toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
   plan?: boolean;
   onModelChange?: (model: string) => void;
@@ -612,6 +612,7 @@ export class Config {
   private pendingIncludeDirectories: string[];
   private readonly enableHooks: boolean;
   private readonly enableHooksUI: boolean;
+  private readonly toolOutputMasking: ToolOutputMaskingConfig;
   private hooks: { [K in HookEventName]?: HookDefinition[] } | undefined;
   private projectHooks:
     | ({ [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] })
@@ -642,7 +643,6 @@ export class Config {
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: AdminControlsSettings | undefined;
-  private readonly observationMasking: ObservationMaskingConfig;
   private latestApiRequest: GenerateContentParameters | undefined;
   private lastModeSwitchTime: number = Date.now();
 
@@ -735,16 +735,16 @@ export class Config {
     this.modelAvailabilityService = new ModelAvailabilityService();
     this.previewFeatures = params.previewFeatures ?? undefined;
     this.experimentalJitContext = params.experimentalJitContext ?? false;
-    this.observationMasking = {
-      enabled: params.observationMasking?.enabled ?? false,
+    this.toolOutputMasking = {
+      enabled: params.toolOutputMasking?.enabled ?? false,
       toolProtectionThreshold:
-        params.observationMasking?.toolProtectionThreshold ??
+        params.toolOutputMasking?.toolProtectionThreshold ??
         DEFAULT_TOOL_PROTECTION_THRESHOLD,
-      hysteresisThreshold:
-        params.observationMasking?.hysteresisThreshold ??
-        DEFAULT_HYSTERESIS_THRESHOLD,
+      minPrunableTokensThreshold:
+        params.toolOutputMasking?.minPrunableTokensThreshold ??
+        DEFAULT_MIN_PRUNABLE_TOKENS_THRESHOLD,
       protectLatestTurn:
-        params.observationMasking?.protectLatestTurn ??
+        params.toolOutputMasking?.protectLatestTurn ??
         DEFAULT_PROTECT_LATEST_TURN,
     };
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
@@ -1471,12 +1471,12 @@ export class Config {
     return this.experimentalJitContext;
   }
 
-  getObservationMaskingEnabled(): boolean {
-    return this.observationMasking.enabled;
+  getToolOutputMaskingEnabled(): boolean {
+    return this.toolOutputMasking.enabled;
   }
 
-  getObservationMaskingConfig(): ObservationMaskingConfig {
-    return this.observationMasking;
+  getToolOutputMaskingConfig(): ToolOutputMaskingConfig {
+    return this.toolOutputMasking;
   }
 
   getGeminiMdFileCount(): number {

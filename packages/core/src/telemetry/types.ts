@@ -1376,10 +1376,10 @@ export class ToolOutputTruncatedEvent implements BaseTelemetryEvent {
   }
 }
 
-export const EVENT_OBSERVATION_MASKING = 'gemini_cli.observation_masking';
+export const EVENT_TOOL_OUTPUT_MASKING = 'gemini_cli.tool_output_masking';
 
-export class ObservationMaskingEvent implements BaseTelemetryEvent {
-  'event.name': 'observation_masking';
+export class ToolOutputMaskingEvent implements BaseTelemetryEvent {
+  'event.name': 'tool_output_masking';
   'event.timestamp': string;
   tokens_before: number;
   tokens_after: number;
@@ -1392,7 +1392,7 @@ export class ObservationMaskingEvent implements BaseTelemetryEvent {
     masked_count: number;
     total_prunable_tokens: number;
   }) {
-    this['event.name'] = 'observation_masking';
+    this['event.name'] = 'tool_output_masking';
     this['event.timestamp'] = new Date().toISOString();
     this.tokens_before = details.tokens_before;
     this.tokens_after = details.tokens_after;
@@ -1403,7 +1403,7 @@ export class ObservationMaskingEvent implements BaseTelemetryEvent {
   toOpenTelemetryAttributes(config: Config): LogAttributes {
     return {
       ...getCommonAttributes(config),
-      'event.name': EVENT_OBSERVATION_MASKING,
+      'event.name': EVENT_TOOL_OUTPUT_MASKING,
       'event.timestamp': this['event.timestamp'],
       tokens_before: this.tokens_before,
       tokens_after: this.tokens_after,
@@ -1413,7 +1413,7 @@ export class ObservationMaskingEvent implements BaseTelemetryEvent {
   }
 
   toLogBody(): string {
-    return `Observation masking (Masked ${this.masked_count} tool outputs. Saved ${
+    return `Tool output masking (Masked ${this.masked_count} tool outputs. Saved ${
       this.tokens_before - this.tokens_after
     } tokens)`;
   }
@@ -1645,7 +1645,7 @@ export type TelemetryEvent =
   | LlmLoopCheckEvent
   | StartupStatsEvent
   | WebFetchFallbackAttemptEvent
-  | ObservationMaskingEvent
+  | ToolOutputMaskingEvent
   | EditStrategyEvent
   | PlanExecutionEvent
   | RewindEvent
