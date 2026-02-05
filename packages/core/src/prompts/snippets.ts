@@ -334,7 +334,10 @@ ${options.planModeToolsList}
 ### Phase 3: Design & Planning
 - Only begin this phase after exploration is complete
 - Create a detailed implementation plan with clear steps
-- Include file paths, function signatures, and code snippets where helpful
+- The plan MUST include:
+  - Iterative development steps (e.g., "Implement X, then verify with test Y")
+  - Specific verification steps (unit tests, manual checks, build commands)
+  - File paths, function signatures, and code snippets where helpful
 - Save the implementation plan to the designated plans directory
 
 ### Phase 4: Review & Approval
@@ -395,7 +398,7 @@ Use '${READ_FILE_TOOL_NAME}' to understand context and validate any assumptions 
 
 function workflowStepPlan(options: PrimaryWorkflowsOptions): string {
   if (options.approvedPlan) {
-    return `2. **Plan:** An approved plan is available for this task. Use this file as a guide for your implementation. You MUST read this file before proceeding. If you discover new requirements or need to change the approach, you MUST update this plan file to reflect the new reality.`;
+    return `2. **Plan:** An approved plan is available for this task. Use this file as a guide for your implementation. You MUST read this file before proceeding. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements.`;
   }
   if (options.enableCodebaseInvestigator && options.enableWriteTodosTool) {
     return `2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. If the user's request implies a change but does not explicitly state it, **YOU MUST ASK** for confirmation before modifying code. If 'codebase_investigator' was used, do not ignore the output of the agent, you must use it as the foundation of your plan. For complex tasks, break them down into smaller, manageable subtasks and use the \`${WRITE_TODOS_TOOL_NAME}\` tool to track your progress. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`;
@@ -423,8 +426,9 @@ function newApplicationSteps(options: PrimaryWorkflowsOptions): string {
   if (options.approvedPlan) {
     return `
 1. **Understand:** Read the approved plan. Use this file as a guide for your implementation.
-2. **Implement:** Implement the application according to the plan. ${NEW_APP_IMPLEMENTATION_GUIDANCE} If you discover new requirements or need to change the approach, you MUST update this plan file to reflect the new reality.
-3. **Finish:** Provide a brief summary of what was built.`.trim();
+2. **Implement:** Implement the application according to the plan. ${NEW_APP_IMPLEMENTATION_GUIDANCE} If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements.
+3. **Verify:** Review work against the original request, the approved plan. Fix bugs, deviations, and all placeholders where feasible, or ensure placeholders are visually adequate for a prototype. Ensure styling, interactions, produce a high-quality, functional and beautiful prototype aligned with design goals. Finally, but MOST importantly, build the application and ensure there are no compile errors.
+4. **Finish:** Provide a brief summary of what was built.`.trim();
   }
 
   if (interactive) {

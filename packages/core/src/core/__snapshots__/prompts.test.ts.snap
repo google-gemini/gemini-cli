@@ -56,7 +56,10 @@ The following read-only tools are available in Plan Mode:
 ### Phase 3: Design & Planning
 - Only begin this phase after exploration is complete
 - Create a detailed implementation plan with clear steps
-- Include file paths, function signatures, and code snippets where helpful
+- The plan MUST include:
+  - Iterative development steps (e.g., "Implement X, then verify with test Y")
+  - Specific verification steps (unit tests, manual checks, build commands)
+  - File paths, function signatures, and code snippets where helpful
 - Save the implementation plan to the designated plans directory
 
 ### Phase 4: Review & Approval
@@ -170,7 +173,10 @@ The following read-only tools are available in Plan Mode:
 ### Phase 3: Design & Planning
 - Only begin this phase after exploration is complete
 - Create a detailed implementation plan with clear steps
-- Include file paths, function signatures, and code snippets where helpful
+- The plan MUST include:
+  - Iterative development steps (e.g., "Implement X, then verify with test Y")
+  - Specific verification steps (unit tests, manual checks, build commands)
+  - File paths, function signatures, and code snippets where helpful
 - Save the implementation plan to the designated plans directory
 
 ### Phase 4: Review & Approval
@@ -388,7 +394,10 @@ The following read-only tools are available in Plan Mode:
 ### Phase 3: Design & Planning
 - Only begin this phase after exploration is complete
 - Create a detailed implementation plan with clear steps
-- Include file paths, function signatures, and code snippets where helpful
+- The plan MUST include:
+  - Iterative development steps (e.g., "Implement X, then verify with test Y")
+  - Specific verification steps (unit tests, manual checks, build commands)
+  - File paths, function signatures, and code snippets where helpful
 - Save the implementation plan to the designated plans directory
 
 ### Phase 4: Review & Approval
@@ -990,7 +999,7 @@ Mock Agent Directory
 When requested to perform tasks like fixing bugs, adding features, refactoring, or explaining code, follow this sequence:
 1. **Understand:** Think about the user's request and the relevant codebase context. Use 'grep_search' and 'glob' search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions.
 Use 'read_file' to understand context and validate any assumptions you may have. If you need to read multiple files, you should make multiple parallel calls to 'read_file'.
-2. **Plan:** An approved plan is available for this task. Use this file as a guide for your implementation. You MUST read this file before proceeding. If you discover new requirements or need to change the approach, you MUST update this plan file to reflect the new reality.
+2. **Plan:** An approved plan is available for this task. Use this file as a guide for your implementation. You MUST read this file before proceeding. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements.
 3. **Implement:** Use the available tools (e.g., 'replace', 'write_file' 'run_shell_command' ...) to act on the plan. Strictly adhere to the project's established conventions (detailed under 'Core Mandates'). Before making manual code changes, check if an ecosystem tool (like 'eslint --fix', 'prettier --write', 'go fmt', 'cargo fmt') is available in the project to perform the task automatically.
 4. **Verify (Tests):** If applicable and feasible, verify the changes using the project's testing procedures. Identify the correct test commands and frameworks by examining 'README' files, build/package configuration (e.g., 'package.json'), or existing test execution patterns. NEVER assume standard test commands. When executing test commands, prefer "run once" or "CI" modes to ensure the command terminates after completion.
 5. **Verify (Standards):** VERY IMPORTANT: After making code changes, execute the project-specific build, linting and type-checking commands (e.g., 'tsc', 'npm run lint', 'ruff check .') that you have identified for this project (or obtained from the user). This ensures code quality and adherence to standards. If unsure about these commands, you can ask the user if they'd like you to run them and if so how to.
@@ -1001,8 +1010,9 @@ Use 'read_file' to understand context and validate any assumptions you may have.
 **Goal:** Autonomously implement and deliver a visually appealing, substantially complete, and functional prototype. Utilize all tools at your disposal to implement the application. Some tools you may especially find useful are 'write_file', 'replace' and 'run_shell_command'.
 
 1. **Understand:** Read the approved plan. Use this file as a guide for your implementation.
-2. **Implement:** Implement the application according to the plan. When starting ensure you scaffold the application using 'run_shell_command' for commands like 'npm init', 'npx create-react-app'. Aim for full scope completion. Proactively create or source necessary placeholder assets (e.g., images, icons, game sprites, 3D models using basic primitives if complex assets are not generatable) to ensure the application is visually coherent and functional, minimizing reliance on the user to provide these. If the model can generate simple assets (e.g., a uniformly colored square sprite, a simple 3D cube), it should do so. Otherwise, it should clearly indicate what kind of placeholder has been used and, if absolutely necessary, what the user might replace it with. Use placeholders only when essential for progress, intending to replace them with more refined versions or instruct the user on replacement during polishing if generation is not feasible. If you discover new requirements or need to change the approach, you MUST update this plan file to reflect the new reality.
-3. **Finish:** Provide a brief summary of what was built.
+2. **Implement:** Implement the application according to the plan. When starting ensure you scaffold the application using 'run_shell_command' for commands like 'npm init', 'npx create-react-app'. Aim for full scope completion. Proactively create or source necessary placeholder assets (e.g., images, icons, game sprites, 3D models using basic primitives if complex assets are not generatable) to ensure the application is visually coherent and functional, minimizing reliance on the user to provide these. If the model can generate simple assets (e.g., a uniformly colored square sprite, a simple 3D cube), it should do so. Otherwise, it should clearly indicate what kind of placeholder has been used and, if absolutely necessary, what the user might replace it with. Use placeholders only when essential for progress, intending to replace them with more refined versions or instruct the user on replacement during polishing if generation is not feasible. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements.
+3. **Verify:** Review work against the original request, the approved plan. Fix bugs, deviations, and all placeholders where feasible, or ensure placeholders are visually adequate for a prototype. Ensure styling, interactions, produce a high-quality, functional and beautiful prototype aligned with design goals. Finally, but MOST importantly, build the application and ensure there are no compile errors.
+4. **Finish:** Provide a brief summary of what was built.
 
 # Operational Guidelines
 
