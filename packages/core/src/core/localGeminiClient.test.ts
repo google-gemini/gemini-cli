@@ -7,29 +7,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LocalGeminiClient } from './localGeminiClient.js';
 import type { Config } from '../config/config.js';
-import { GoogleGenAI } from '@google/genai';
-import type { Models } from '@google/genai';
+const mockGenerateContent = vi.fn();
 
-vi.mock('@google/genai');
+vi.mock('@google/genai', () => {
+  const GoogleGenAI = vi.fn().mockImplementation(() => ({
+    models: {
+      generateContent: mockGenerateContent,
+    },
+  }));
+  return { GoogleGenAI };
+});
 
 describe('LocalGeminiClient', () => {
   let mockConfig: Config;
-  let mockGenerateContent: vi.Mock; // Declare it as a vi.Mock
 
   beforeEach(() => {
     vi.clearAllMocks();
-
-    // Initialize mockGenerateContent for each test
-    mockGenerateContent = vi.fn();
-
-    // Set up the mock for GoogleGenAI constructor to return an instance
-    // with our mocked generateContent method.
-    // We need to cast the partial `models` object to `Models` and the full instance to `GoogleGenAI`.
-    (GoogleGenAI as vi.Mock).mockImplementation(() => ({
-      models: {
-        generateContent: mockGenerateContent,
-      } as Models, // Cast the partial mock to Models
-    }));
+    mockGenerateContent.mockClear();
 
     mockConfig = {
       getGemmaModelRouterSettings: vi.fn().mockReturnValue({

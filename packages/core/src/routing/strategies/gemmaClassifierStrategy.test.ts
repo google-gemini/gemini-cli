@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { Mock } from 'vitest';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GemmaClassifierStrategy } from './gemmaClassifierStrategy.js';
 import type { RoutingContext } from '../routingStrategy.js';
@@ -24,7 +25,7 @@ describe('GemmaClassifierStrategy', () => {
   let mockContext: RoutingContext;
   let mockConfig: Config;
   let mockBaseLlmClient: BaseLlmClient;
-  let mockGenerateJson: vi.Mock;
+  let mockGenerateJson: Mock;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -199,7 +200,11 @@ describe('GemmaClassifierStrategy', () => {
     const contents = calls[0][0];
     const lastTurn = contents.at(-1);
     expect(lastTurn).toBeDefined();
-    expect(lastTurn?.parts).toBeDefined();
+    if (!lastTurn?.parts) {
+      // Fail test if parts is not defined.
+      expect(lastTurn?.parts).toBeDefined();
+      return;
+    }
     const expectedLastTurn = `You are provided with a **Chat History** and the user's **Current Request** below.
 
 #### Chat History:
@@ -210,7 +215,7 @@ another user turn
 #### Current Request:
 "simple task"
 `;
-    expect(lastTurn?.parts.at(0)?.text).toEqual(expectedLastTurn);
+    expect(lastTurn.parts.at(0)?.text).toEqual(expectedLastTurn);
   });
 
   it('should respect HISTORY_SEARCH_WINDOW and HISTORY_TURNS_FOR_CONTEXT', async () => {

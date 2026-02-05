@@ -1237,8 +1237,8 @@ describe('GemmaModelRouterSettings', () => {
     const config = new Config(baseParams);
     const settings = config.getGemmaModelRouterSettings();
     expect(settings.enabled).toBe(false);
-    expect(settings.classifier?.host).toBe('http://localhost:3000');
-    expect(settings.classifier?.model).toBe('gemma3:1b');
+    expect(settings.classifier?.host).toBe('http://localhost:9379');
+    expect(settings.classifier?.model).toBe('gemma3-1b-gpu-custom');
   });
 
   it('should override default gemma model router settings when provided', () => {
@@ -1269,8 +1269,8 @@ describe('GemmaModelRouterSettings', () => {
     const config = new Config(params);
     const settings = config.getGemmaModelRouterSettings();
     expect(settings.enabled).toBe(true);
-    expect(settings.classifier?.host).toBe('http://localhost:3000');
-    expect(settings.classifier?.model).toBe('gemma3:1b');
+    expect(settings.classifier?.host).toBe('http://localhost:9379');
+    expect(settings.classifier?.model).toBe('gemma3-1b-gpu-custom');
   });
 });
 

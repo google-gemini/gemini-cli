@@ -23,8 +23,9 @@ export class LocalGeminiClient {
   constructor(config: Config) {
     const gemmaModelRouterSettings = config.getGemmaModelRouterSettings();
     this.host =
-      gemmaModelRouterSettings?.classifier?.host || 'http://localhost:3000';
-    this.model = gemmaModelRouterSettings?.classifier?.model || 'gemma3:1b';
+      gemmaModelRouterSettings?.classifier?.host || 'http://localhost:9379';
+    this.model =
+      gemmaModelRouterSettings?.classifier?.model || 'gemma3-1b-gpu-custom';
 
     if (!this.model.toLowerCase().startsWith('gemma')) {
       throw new Error(

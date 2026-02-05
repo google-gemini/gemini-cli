@@ -435,7 +435,7 @@ describe('SettingsSchema', () => {
       expect(host).toBeDefined();
       expect(host.type).toBe('string');
       expect(host.category).toBe('Experimental');
-      expect(host.default).toBe('http://localhost:3000');
+      expect(host.default).toBe('http://localhost:9379');
       expect(host.requiresRestart).toBe(true);
       expect(host.showInDialog).toBe(false);
       expect(host.description).toBe('The host of the classifier.');
@@ -444,7 +444,7 @@ describe('SettingsSchema', () => {
       expect(model).toBeDefined();
       expect(model.type).toBe('string');
       expect(model.category).toBe('Experimental');
-      expect(model.default).toBe('gemma3:1b');
+      expect(model.default).toBe('gemma3-1b-gpu-custom');
       expect(model.requiresRestart).toBe(true);
       expect(model.showInDialog).toBe(false);
       expect(model.description).toBe('The model to use for the classifier.');

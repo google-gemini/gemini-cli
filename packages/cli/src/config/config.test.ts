@@ -2668,8 +2668,8 @@ describe('loadCliConfig gemmaModelRouter', () => {
     const config = await loadCliConfig(settings, 'test-session', argv);
     expect(config.getGemmaModelRouterEnabled()).toBe(true);
     const gemmaSettings = config.getGemmaModelRouterSettings();
-    expect(gemmaSettings.classifier?.host).toBe('http://localhost:3000');
-    expect(gemmaSettings.classifier?.model).toBe('gemma3:1b');
+    expect(gemmaSettings.classifier?.host).toBe('http://localhost:9379');
+    expect(gemmaSettings.classifier?.model).toBe('gemma3-1b-gpu-custom');
   });
 });
 

@@ -1612,7 +1612,7 @@ const SETTINGS_SCHEMA = {
                 label: 'Host',
                 category: 'Experimental',
                 requiresRestart: true,
-                default: 'http://localhost:3000',
+                default: 'http://localhost:9379',
                 description: 'The host of the classifier.',
                 showInDialog: false,
               },
@@ -1621,7 +1621,7 @@ const SETTINGS_SCHEMA = {
                 label: 'Model',
                 category: 'Experimental',
                 requiresRestart: true,
-                default: 'gemma3:1b',
+                default: 'gemma3-1b-gpu-custom',
                 description: 'The model to use for the classifier.',
                 showInDialog: false,
               },
@@ -2374,7 +2374,9 @@ type InferSettings<T extends SettingsSchema> = {
         : T[K]['default']
       : T[K]['default'] extends boolean
         ? boolean
-        : T[K]['default'];
+        : T[K]['default'] extends string
+          ? string
+          : T[K]['default'];
 };
 
 type InferMergedSettings<T extends SettingsSchema> = {
@@ -2386,7 +2388,9 @@ type InferMergedSettings<T extends SettingsSchema> = {
         : T[K]['default']
       : T[K]['default'] extends boolean
         ? boolean
-        : T[K]['default'];
+        : T[K]['default'] extends string
+          ? string
+          : T[K]['default'];
 };
 
 export type Settings = InferSettings<SettingsSchemaType>;

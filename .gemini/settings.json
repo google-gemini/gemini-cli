@@ -7,7 +7,7 @@
     "gemmaModelRouter": {
       "enabled": true,
       "classifier": {
-        "host": "http://localhost:8000",
+        "host": "http://localhost:9379",
         "model": "gemma3-1b-gpu-custom"
       }
     }  

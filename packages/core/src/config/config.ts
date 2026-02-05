@@ -830,8 +830,9 @@ export class Config {
       enabled: params.gemmaModelRouter?.enabled ?? false,
       classifier: {
         host:
-          params.gemmaModelRouter?.classifier?.host ?? 'http://localhost:3000',
-        model: params.gemmaModelRouter?.classifier?.model ?? 'gemma3:1b',
+          params.gemmaModelRouter?.classifier?.host ?? 'http://localhost:9379',
+        model:
+          params.gemmaModelRouter?.classifier?.model ?? 'gemma3-1b-gpu-custom',
       },
     };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
