@@ -350,9 +350,9 @@ ${renderApprovedPlanSection(options.approvedPlanPath)}
 function renderApprovedPlanSection(approvedPlanPath?: string): string {
   if (!approvedPlanPath) return '';
   return `## Approved Plan
-An approved plan has been identified for this task.
-- **Iterate:** You should default to iterating on the existing approved plan.
-- **New Plan:** Only create a new plan file if the user explicitly asks for a "new plan" or if the current request is for a completely different feature/bug.
+An approved plan is available for this task.
+- **Iterate:** You should default to refining the existing approved plan.
+- **New Plan:** Only create a new plan file if the user explicitly asks for a "new plan" or if the current request is for a completely different feature or bug.
 `;
 }
 
