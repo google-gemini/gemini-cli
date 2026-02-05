@@ -32,6 +32,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...original,
     createTransport: vi.fn(),
+    applyAdminAllowlist: vi.fn((servers) => servers),
     MCPServerStatus: {
       CONNECTED: 'CONNECTED',
       CONNECTING: 'CONNECTING',
@@ -223,4 +224,43 @@ describe('mcp list command', () => {
       ),
     );
   });
+
+  it('should filter servers based on admin allowlist passed in settings', async () => {
+    const settingsWithAllowlist = mergeSettings({}, {}, {}, {}, true);
+    settingsWithAllowlist.admin = {
+      secureModeEnabled: false,
+      extensions: { enabled: true },
+      skills: { enabled: true },
+      mcp: {
+        enabled: true,
+        config: {
+          'allowed-server': { url: 'http://allowed' },
+        },
+      },
+    };
+
+    settingsWithAllowlist.mcpServers = {
+      'allowed-server': { command: 'cmd1' },
+      'forbidden-server': { command: 'cmd2' },
+    };
+
+    mockClient.connect.mockResolvedValue(undefined);
+    mockClient.ping.mockResolvedValue(undefined);
+
+    await listMcpServers(settingsWithAllowlist);
+
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining('allowed-server'),
+    );
+    expect(debugLogger.log).not.toHaveBeenCalledWith(
+      expect.stringContaining('forbidden-server'),
+    );
+    expect(mockedCreateTransport).toHaveBeenCalledWith(
+      'allowed-server',
+      expect.objectContaining({ url: 'http://allowed' }), // Should use admin config
+      false,
+      expect.anything(),
+    );
+  });
 });
+

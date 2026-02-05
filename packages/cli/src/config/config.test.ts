@@ -141,6 +141,10 @@ vi.mock('@google/gemini-cli-core', async () => {
       defaultDecision: ServerConfig.PolicyDecision.ASK_USER,
       approvalMode: ServerConfig.ApprovalMode.DEFAULT,
     })),
+    applyAdminAllowlist: vi.fn((servers) => servers),
+    createContentGenerator: vi.fn(),
+    createContentGeneratorConfig: vi.fn(),
+    // Add other necessary exports from core if they are missing and causing issues
   };
 });
 

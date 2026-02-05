@@ -6,12 +6,13 @@
 
 // File for 'gemini mcp list' command
 import type { CommandModule } from 'yargs';
-import { loadSettings } from '../../config/settings.js';
+import { type MergedSettings, loadSettings } from '../../config/settings.js';
 import type { MCPServerConfig } from '@google/gemini-cli-core';
 import {
   MCPServerStatus,
   createTransport,
   debugLogger,
+  applyAdminAllowlist,
 } from '@google/gemini-cli-core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
@@ -24,18 +25,25 @@ const COLOR_YELLOW = '\u001b[33m';
 const COLOR_RED = '\u001b[31m';
 const RESET_COLOR = '\u001b[0m';
 
-export async function getMcpServersFromConfig(): Promise<
-  Record<string, MCPServerConfig>
-> {
-  const settings = loadSettings();
+export async function getMcpServersFromConfig(
+  settings?: MergedSettings,
+): Promise<Record<string, MCPServerConfig>> {
+  if (!settings) {
+    settings = loadSettings().merged;
+  }
+  const mcpEnabled = settings.admin?.mcp?.enabled ?? true;
+  if (!mcpEnabled) {
+    return {};
+  }
+
   const extensionManager = new ExtensionManager({
-    settings: settings.merged,
+    settings: settings,
     workspaceDir: process.cwd(),
     requestConsent: requestConsentNonInteractive,
     requestSetting: promptForSetting,
   });
   const extensions = await extensionManager.loadExtensions();
-  const mcpServers = { ...settings.merged.mcpServers };
+  let mcpServers = { ...settings.mcpServers };
   for (const extension of extensions) {
     Object.entries(extension.mcpServers || {}).forEach(([key, server]) => {
       if (mcpServers[key]) {
@@ -47,6 +55,10 @@ export async function getMcpServersFromConfig(): Promise<
       };
     });
   }
+
+  const adminAllowlist = settings.admin?.mcp?.config;
+  mcpServers = applyAdminAllowlist(mcpServers, adminAllowlist);
+
   return mcpServers;
 }
 
@@ -59,11 +71,11 @@ async function testMCPConnection(
     version: '0.0.1',
   });
 
-  const settings = loadSettings();
+  let settings = loadSettings().merged;
   const sanitizationConfig = {
     enableEnvironmentVariableRedaction: true,
     allowedEnvironmentVariables: [],
-    blockedEnvironmentVariables: settings.merged.advanced.excludedEnvVars,
+    blockedEnvironmentVariables: settings.advanced.excludedEnvVars,
   };
 
   let transport;
@@ -103,8 +115,8 @@ async function getServerStatus(
   return testMCPConnection(serverName, server);
 }
 
-export async function listMcpServers(): Promise<void> {
-  const mcpServers = await getMcpServersFromConfig();
+export async function listMcpServers(settings?: MergedSettings): Promise<void> {
+  const mcpServers = await getMcpServersFromConfig(settings);
   const serverNames = Object.keys(mcpServers);
 
   if (serverNames.length === 0) {
@@ -154,11 +166,16 @@ export async function listMcpServers(): Promise<void> {
   }
 }
 
-export const listCommand: CommandModule = {
+interface ListArgs {
+  settings?: MergedSettings;
+}
+
+export const listCommand: CommandModule<object, ListArgs> = {
   command: 'list',
   describe: 'List all configured MCP servers',
-  handler: async () => {
-    await listMcpServers();
+  handler: async (argv) => {
+    await listMcpServers(argv.settings);
     await exitCli();
   },
 };
+

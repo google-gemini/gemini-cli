@@ -11,7 +11,7 @@ import {
   canLoadServer,
   normalizeServerId,
 } from '../../config/mcp/mcpServerEnablement.js';
-import { loadSettings } from '../../config/settings.js';
+import { type MergedSettings, loadSettings } from '../../config/settings.js';
 import { exitCli } from '../utils.js';
 import { getMcpServersFromConfig } from './list.js';
 
@@ -23,6 +23,7 @@ const RESET = '\x1b[0m';
 interface Args {
   name: string;
   session?: boolean;
+  settings?: MergedSettings;
 }
 
 async function handleEnable(args: Args): Promise<void> {
@@ -30,10 +31,13 @@ async function handleEnable(args: Args): Promise<void> {
   const name = normalizeServerId(args.name);
 
   // Check settings blocks
-  const settings = loadSettings();
+  let settings = args.settings;
+  if (!settings) {
+    settings = loadSettings().merged;
+  }
 
   // Get all servers including extensions
-  const servers = await getMcpServersFromConfig();
+  const servers = await getMcpServersFromConfig(settings);
   const normalizedServerNames = Object.keys(servers).map(normalizeServerId);
   if (!normalizedServerNames.includes(name)) {
     debugLogger.log(
@@ -43,9 +47,9 @@ async function handleEnable(args: Args): Promise<void> {
   }
 
   const result = await canLoadServer(name, {
-    adminMcpEnabled: settings.merged.admin?.mcp?.enabled ?? true,
-    allowedList: settings.merged.mcp?.allowed,
-    excludedList: settings.merged.mcp?.excluded,
+    adminMcpEnabled: settings.admin?.mcp?.enabled ?? true,
+    allowedList: settings.mcp?.allowed,
+    excludedList: settings.mcp?.excluded,
   });
 
   if (
@@ -75,8 +79,14 @@ async function handleDisable(args: Args): Promise<void> {
   const manager = McpServerEnablementManager.getInstance();
   const name = normalizeServerId(args.name);
 
+  // Check settings blocks
+  let settings = args.settings;
+  if (!settings) {
+    settings = loadSettings().merged;
+  }
+
   // Get all servers including extensions
-  const servers = await getMcpServersFromConfig();
+  const servers = await getMcpServersFromConfig(settings);
   const normalizedServerNames = Object.keys(servers).map(normalizeServerId);
   if (!normalizedServerNames.includes(name)) {
     debugLogger.log(

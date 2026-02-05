@@ -37,9 +37,9 @@ import {
   GEMINI_MODEL_ALIAS_AUTO,
   getAdminErrorMessage,
   Config,
+  applyAdminAllowlist,
 } from '@google/gemini-cli-core';
 import type {
-  MCPServerConfig,
   HookDefinition,
   HookEventName,
   OutputFormat,
@@ -693,40 +693,18 @@ export async function loadCliConfig(
   const adminAllowlist = settings.admin?.mcp?.config;
   let mcpServerCommand = mcpEnabled ? settings.mcp?.serverCommand : undefined;
   let mcpServers = mcpEnabled ? settings.mcpServers : {};
+  console.error("cli settings")
+  console.error(mcpEnabled)
+  console.error(settings.mcpServers)
+  console.error(mcpServers)
 
-  if (mcpEnabled && adminAllowlist && Object.keys(adminAllowlist).length > 0) {
-    const filteredMcpServers: Record<string, MCPServerConfig> = {};
-    for (const [serverId, localConfig] of Object.entries(mcpServers)) {
-      const adminConfig = adminAllowlist[serverId];
-      if (adminConfig) {
-        const mergedConfig = {
-          ...localConfig,
-          url: adminConfig.url,
-          type: adminConfig.type,
-          trust: adminConfig.trust,
-        };
+  if (mcpEnabled) {
 
-        // Remove local connection details
-        delete mergedConfig.command;
-        delete mergedConfig.args;
-        delete mergedConfig.env;
-        delete mergedConfig.cwd;
-        delete mergedConfig.httpUrl;
-        delete mergedConfig.tcp;
+    if (adminAllowlist && Object.keys(adminAllowlist).length > 0) {
+      mcpServers = applyAdminAllowlist(mcpServers, adminAllowlist);
 
-        if (
-          (adminConfig.includeTools && adminConfig.includeTools.length > 0) ||
-          (adminConfig.excludeTools && adminConfig.excludeTools.length > 0)
-        ) {
-          mergedConfig.includeTools = adminConfig.includeTools;
-          mergedConfig.excludeTools = adminConfig.excludeTools;
-        }
-
-        filteredMcpServers[serverId] = mergedConfig;
-      }
+      mcpServerCommand = undefined;
     }
-    mcpServers = filteredMcpServers;
-    mcpServerCommand = undefined;
   }
 
   return new Config({
