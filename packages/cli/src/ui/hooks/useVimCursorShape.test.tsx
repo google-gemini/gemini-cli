@@ -153,8 +153,8 @@ describe('useVimCursorShape', () => {
         mockVimContext.vimMode = 'INSERT';
         rerender();
 
-        // Should reset to block (cleanup) then set to bar (new effect)
-        expect(mockStdout.write).toHaveBeenCalledWith(CURSOR_STEADY_BLOCK);
+        // Should reset to default (cleanup) then set to bar (new effect)
+        expect(mockStdout.write).toHaveBeenCalledWith(CURSOR_RESET);
         expect(mockStdout.write).toHaveBeenCalledWith(CURSOR_STEADY_BAR);
         expect(mockStdout.write).toHaveBeenCalledTimes(2);
       });
@@ -190,8 +190,8 @@ describe('useVimCursorShape', () => {
         mockVimContext.vimMode = 'INSERT';
         rerender();
 
-        // Should reset to block (cleanup) then set to bar (INSERT mode)
-        expect(mockStdout.write).toHaveBeenCalledWith(CURSOR_STEADY_BLOCK);
+        // Should reset to default (cleanup) then set to bar (INSERT mode)
+        expect(mockStdout.write).toHaveBeenCalledWith(CURSOR_RESET);
         expect(mockStdout.write).toHaveBeenCalledWith(CURSOR_STEADY_BAR);
         expect(mockStdout.write).toHaveBeenCalledTimes(2);
       });
@@ -210,8 +210,8 @@ describe('useVimCursorShape', () => {
         mockSettings.merged.general.vimModeCursorShape = false;
         rerender();
 
-        // Should reset to block (cleanup) then not call again because setting is disabled
-        expect(mockStdout.write).toHaveBeenCalledWith(CURSOR_STEADY_BLOCK);
+        // Should reset to default (cleanup) then not call again because setting is disabled
+        expect(mockStdout.write).toHaveBeenCalledWith(CURSOR_RESET);
         expect(mockStdout.write).toHaveBeenCalledTimes(1);
       });
 
@@ -232,7 +232,7 @@ describe('useVimCursorShape', () => {
     });
 
     describe('cleanup', () => {
-      it('should reset to block and then default cursor on unmount', () => {
+      it('should reset to default cursor on unmount', () => {
         mockVimContext.vimEnabled = true;
         mockVimContext.vimMode = 'INSERT';
 
@@ -245,14 +245,13 @@ describe('useVimCursorShape', () => {
         });
 
         // Should call both cleanup functions:
-        // 1. First effect cleanup (reset to block)
+        // 1. First effect cleanup (reset to default)
         // 2. Final unmount cleanup (reset to default)
-        expect(mockStdout.write).toHaveBeenCalledWith(CURSOR_STEADY_BLOCK);
         expect(mockStdout.write).toHaveBeenCalledWith(CURSOR_RESET);
         expect(mockStdout.write).toHaveBeenCalledTimes(2);
       });
 
-      it('should reset to block cursor when effect dependencies change', () => {
+      it('should reset to default cursor when effect dependencies change', () => {
         mockVimContext.vimEnabled = true;
         mockVimContext.vimMode = 'NORMAL';
 
@@ -264,9 +263,9 @@ describe('useVimCursorShape', () => {
         mockVimContext.vimMode = 'INSERT';
         rerender();
 
-        // First call is cleanup (reset to block), second is new effect (set to bar)
+        // First call is cleanup (reset to default), second is new effect (set to bar)
         const calls = mockStdout.write.mock.calls;
-        expect(calls[0][0]).toBe(CURSOR_STEADY_BLOCK);
+        expect(calls[0][0]).toBe(CURSOR_RESET);
         expect(calls[1][0]).toBe(CURSOR_STEADY_BAR);
       });
     });

@@ -439,9 +439,9 @@ export const AppContainer = (props: AppContainerProps) => {
       // Turn off mouse scroll.
       disableMouseEvents();
 
-      // Reset cursor shape to steady block (only if vim cursor shape feature is not enabled)
+      // Reset cursor shape to terminal default (only if vim cursor shape feature is not enabled)
       if (!settings.merged.general.vimModeCursorShape) {
-        writeToStdout('\x1b[2 q');
+        writeToStdout('\x1b[0 q');
       }
 
       // Kill all background shells

@@ -82,23 +82,26 @@ export function useVimCursorShape() {
       stdout.write(CURSOR_STEADY_BLOCK);
     }
 
-    // Cleanup function: reset cursor to block when effect re-runs or component unmounts.
-    // This ensures the cursor is restored to a normal state when:
+    // Cleanup function: reset cursor to terminal default when effect re-runs or component unmounts.
+    // This ensures the cursor is restored to the user's original state when:
     // - The setting is disabled
     // - Vim mode changes (INSERT <-> NORMAL)
     // - Vim is enabled/disabled
     // - The component unmounts
     return () => {
-      stdout.write(CURSOR_STEADY_BLOCK);
+      stdout.write(CURSOR_RESET);
     };
   }, [enabled, vimEnabled, vimMode, stdout]);
 
   // Final cleanup on unmount - reset to terminal default cursor
   // This only runs once when the component unmounts
-  useEffect(() => () => {
+  useEffect(
+    () => () => {
       // Only reset if we've ever enabled the feature
       if (hasBeenEnabledRef.current) {
         stdout.write(CURSOR_RESET);
       }
-    }, [stdout]);
+    },
+    [stdout],
+  );
 }
