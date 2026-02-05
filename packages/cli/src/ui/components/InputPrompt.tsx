@@ -144,6 +144,8 @@ export function isLargePaste(text: string): boolean {
   );
 }
 
+const DOUBLE_TAB_CLEAN_UI_TOGGLE_WINDOW_MS = 350;
+
 /**
  * Attempt to toggle expansion of a paste placeholder in the buffer.
  * Returns true if a toggle action was performed or hint was shown, false otherwise.
@@ -211,18 +213,22 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const { merged: settings } = useSettings();
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
-  const { setEmbeddedShellFocused, setShortcutsHelpVisible } = useUIActions();
+  const {
+    setEmbeddedShellFocused,
+    setShortcutsHelpVisible,
+    toggleCleanUiDetailsVisible,
+  } = useUIActions();
   const {
     terminalWidth,
     activePtyId,
     history,
-    terminalBackgroundColor,
     backgroundShells,
     backgroundShellHeight,
     shortcutsHelpVisible,
   } = useUIState();
   const [suppressCompletion, setSuppressCompletion] = useState(false);
   const escPressCount = useRef(0);
+  const lastPlainTabPressTimeRef = useRef<number | null>(null);
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const escapeTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [recentUnsafePasteTime, setRecentUnsafePasteTime] = useState<
@@ -622,6 +628,33 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           streamingState === StreamingState.WaitingForConfirmation)
       ) {
         return false;
+      }
+
+      const isPlainTab =
+        key.name === 'tab' && !key.shift && !key.alt && !key.ctrl && !key.cmd;
+      const hasTabCompletionInteraction =
+        completion.showSuggestions ||
+        Boolean(completion.promptCompletion.text) ||
+        reverseSearchActive ||
+        commandSearchActive;
+      if (isPlainTab) {
+        if (!hasTabCompletionInteraction) {
+          const now = Date.now();
+          const isDoubleTabPress =
+            lastPlainTabPressTimeRef.current !== null &&
+            now - lastPlainTabPressTimeRef.current <=
+              DOUBLE_TAB_CLEAN_UI_TOGGLE_WINDOW_MS;
+          if (isDoubleTabPress) {
+            lastPlainTabPressTimeRef.current = null;
+            toggleCleanUiDetailsVisible();
+            return true;
+          }
+          lastPlainTabPressTimeRef.current = now;
+        } else {
+          lastPlainTabPressTimeRef.current = null;
+        }
+      } else {
+        lastPlainTabPressTimeRef.current = null;
       }
 
       if (key.name === 'paste') {
@@ -1172,6 +1205,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       kittyProtocol.enabled,
       shortcutsHelpVisible,
       setShortcutsHelpVisible,
+      toggleCleanUiDetailsVisible,
       tryLoadQueuedMessages,
       setBannerVisible,
       onSubmit,
@@ -1317,7 +1351,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const useBackgroundColor = config.getUseBackgroundColor();
   const isLowColor = isLowColorDepth();
-  const terminalBg = terminalBackgroundColor || 'black';
+  const terminalBg = theme.background.primary || 'black';
 
   // We should fallback to lines if the background color is disabled OR if it is
   // enabled but we are in a low color depth terminal where we don't have a safe

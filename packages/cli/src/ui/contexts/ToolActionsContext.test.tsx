@@ -14,7 +14,6 @@ import {
   ToolConfirmationOutcome,
   MessageBusType,
   IdeClient,
-  type ToolCallConfirmationDetails,
 } from '@google/gemini-cli-core';
 import { ToolCallStatus, type IndividualToolCallDisplay } from '../types.js';
 
@@ -51,20 +50,8 @@ describe('ToolActionsContext', () => {
       confirmationDetails: { type: 'info', title: 'title', prompt: 'prompt' },
     },
     {
-      callId: 'legacy-call',
-      name: 'legacy-tool',
-      description: 'desc',
-      status: ToolCallStatus.Confirming,
-      resultDisplay: undefined,
-      confirmationDetails: {
-        type: 'info',
-        title: 'legacy',
-        prompt: 'prompt',
-        onConfirm: vi.fn(),
-      } as ToolCallConfirmationDetails,
-    },
-    {
       callId: 'edit-call',
+      correlationId: 'corr-edit',
       name: 'edit-tool',
       description: 'desc',
       status: ToolCallStatus.Confirming,
@@ -77,8 +64,7 @@ describe('ToolActionsContext', () => {
         fileDiff: 'diff',
         originalContent: 'old',
         newContent: 'new',
-        onConfirm: vi.fn(),
-      } as ToolCallConfirmationDetails,
+      },
     },
   ];
 
@@ -92,7 +78,7 @@ describe('ToolActionsContext', () => {
     </ToolActionsProvider>
   );
 
-  it('publishes to MessageBus for tools with correlationId (Modern Path)', async () => {
+  it('publishes to MessageBus for tools with correlationId', async () => {
     const { result } = renderHook(() => useToolActions(), { wrapper });
 
     await result.current.confirm(
@@ -108,27 +94,6 @@ describe('ToolActionsContext', () => {
       outcome: ToolConfirmationOutcome.ProceedOnce,
       payload: undefined,
     });
-  });
-
-  it('calls onConfirm for legacy tools (Legacy Path)', async () => {
-    const { result } = renderHook(() => useToolActions(), { wrapper });
-    const legacyDetails = mockToolCalls[1]
-      .confirmationDetails as ToolCallConfirmationDetails;
-
-    await result.current.confirm(
-      'legacy-call',
-      ToolConfirmationOutcome.ProceedOnce,
-    );
-
-    if (legacyDetails && 'onConfirm' in legacyDetails) {
-      expect(legacyDetails.onConfirm).toHaveBeenCalledWith(
-        ToolConfirmationOutcome.ProceedOnce,
-        undefined,
-      );
-    } else {
-      throw new Error('Expected onConfirm to be present');
-    }
-    expect(mockMessageBus.publish).not.toHaveBeenCalled();
   });
 
   it('handles cancel by calling confirm with Cancel outcome', async () => {
@@ -170,13 +135,11 @@ describe('ToolActionsContext', () => {
       '/f.txt',
       'accepted',
     );
-    const editDetails = mockToolCalls[2]
-      .confirmationDetails as ToolCallConfirmationDetails;
-    if (editDetails && 'onConfirm' in editDetails) {
-      expect(editDetails.onConfirm).toHaveBeenCalled();
-    } else {
-      throw new Error('Expected onConfirm to be present');
-    }
+    expect(mockMessageBus.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        correlationId: 'corr-edit',
+      }),
+    );
   });
 
   it('updates isDiffingEnabled when IdeClient status changes', async () => {

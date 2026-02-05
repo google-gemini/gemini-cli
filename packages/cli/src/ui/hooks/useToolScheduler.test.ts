@@ -10,12 +10,10 @@ import { renderHook } from '../../test-utils/render.js';
 import { useToolScheduler } from './useToolScheduler.js';
 import {
   MessageBusType,
-  ToolConfirmationOutcome,
   Scheduler,
   type Config,
   type MessageBus,
   type CompletedToolCall,
-  type ToolCallConfirmationDetails,
   type ToolCallsUpdateMessage,
   type AnyDeclarativeTool,
   type AnyToolInvocation,
@@ -129,122 +127,6 @@ describe('useToolScheduler', () => {
       status: 'executing', // Core status
       liveOutput: 'Loading...',
       responseSubmittedToGemini: false,
-    });
-  });
-
-  it('injects onConfirm callback for awaiting_approval tools (Adapter Pattern)', async () => {
-    const { result } = renderHook(() =>
-      useToolScheduler(
-        vi.fn().mockResolvedValue(undefined),
-        mockConfig,
-        () => undefined,
-      ),
-    );
-
-    const mockToolCall = {
-      status: 'awaiting_approval' as const,
-      request: {
-        callId: 'call-1',
-        name: 'test_tool',
-        args: {},
-        isClientInitiated: false,
-        prompt_id: 'p1',
-      },
-      tool: createMockTool(),
-      invocation: createMockInvocation({
-        getDescription: () => 'Confirming test tool',
-      }),
-      confirmationDetails: { type: 'info', title: 'Confirm', prompt: 'Sure?' },
-      correlationId: 'corr-123',
-    };
-
-    act(() => {
-      void mockMessageBus.publish({
-        type: MessageBusType.TOOL_CALLS_UPDATE,
-        toolCalls: [mockToolCall],
-        schedulerId: ROOT_SCHEDULER_ID,
-      } as ToolCallsUpdateMessage);
-    });
-
-    const [toolCalls] = result.current;
-    const call = toolCalls[0];
-    if (call.status !== 'awaiting_approval') {
-      throw new Error('Expected status to be awaiting_approval');
-    }
-    const confirmationDetails =
-      call.confirmationDetails as ToolCallConfirmationDetails;
-
-    expect(confirmationDetails).toBeDefined();
-    expect(typeof confirmationDetails.onConfirm).toBe('function');
-
-    // Test that onConfirm publishes to MessageBus
-    const publishSpy = vi.spyOn(mockMessageBus, 'publish');
-    await confirmationDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce);
-
-    expect(publishSpy).toHaveBeenCalledWith({
-      type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-      correlationId: 'corr-123',
-      confirmed: true,
-      requiresUserConfirmation: false,
-      outcome: ToolConfirmationOutcome.ProceedOnce,
-      payload: undefined,
-    });
-  });
-
-  it('injects onConfirm with payload (Inline Edit support)', async () => {
-    const { result } = renderHook(() =>
-      useToolScheduler(
-        vi.fn().mockResolvedValue(undefined),
-        mockConfig,
-        () => undefined,
-      ),
-    );
-
-    const mockToolCall = {
-      status: 'awaiting_approval' as const,
-      request: {
-        callId: 'call-1',
-        name: 'test_tool',
-        args: {},
-        isClientInitiated: false,
-        prompt_id: 'p1',
-      },
-      tool: createMockTool(),
-      invocation: createMockInvocation(),
-      confirmationDetails: { type: 'edit', title: 'Edit', filePath: 'test.ts' },
-      correlationId: 'corr-edit',
-    };
-
-    act(() => {
-      void mockMessageBus.publish({
-        type: MessageBusType.TOOL_CALLS_UPDATE,
-        toolCalls: [mockToolCall],
-        schedulerId: ROOT_SCHEDULER_ID,
-      } as ToolCallsUpdateMessage);
-    });
-
-    const [toolCalls] = result.current;
-    const call = toolCalls[0];
-    if (call.status !== 'awaiting_approval') {
-      throw new Error('Expected awaiting_approval');
-    }
-    const confirmationDetails =
-      call.confirmationDetails as ToolCallConfirmationDetails;
-
-    const publishSpy = vi.spyOn(mockMessageBus, 'publish');
-    const mockPayload = { newContent: 'updated code' };
-    await confirmationDetails.onConfirm(
-      ToolConfirmationOutcome.ProceedOnce,
-      mockPayload,
-    );
-
-    expect(publishSpy).toHaveBeenCalledWith({
-      type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-      correlationId: 'corr-edit',
-      confirmed: true,
-      requiresUserConfirmation: false,
-      outcome: ToolConfirmationOutcome.ProceedOnce,
-      payload: mockPayload,
     });
   });
 
