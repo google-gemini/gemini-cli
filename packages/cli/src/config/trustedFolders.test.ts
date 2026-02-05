@@ -286,7 +286,9 @@ describe('Trusted Folders Loading', () => {
     ).toThrow(FatalConfigError);
     expect(() =>
       loadedFolders.setValue('/some/path', TrustLevel.TRUST_FOLDER),
-    ).toThrow(/Cannot update trusted folders because the configuration file is invalid/);
+    ).toThrow(
+      /Cannot update trusted folders because the configuration file is invalid/,
+    );
   });
 });
 

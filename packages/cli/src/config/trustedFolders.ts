@@ -252,10 +252,14 @@ export function saveTrustedFolders(
 
   const tempPath = `${trustedFoldersFile.path}.tmp.${Math.random().toString(36).slice(2)}`;
   try {
-    fs.writeFileSync(tempPath, JSON.stringify(trustedFoldersFile.config, null, 2), {
-      encoding: 'utf-8',
-      mode: 0o600,
-    });
+    fs.writeFileSync(
+      tempPath,
+      JSON.stringify(trustedFoldersFile.config, null, 2),
+      {
+        encoding: 'utf-8',
+        mode: 0o600,
+      },
+    );
     fs.renameSync(tempPath, trustedFoldersFile.path);
   } catch (error) {
     if (fs.existsSync(tempPath)) {
