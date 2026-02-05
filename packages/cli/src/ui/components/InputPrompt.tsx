@@ -1204,7 +1204,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   // Voice input status
   if (voiceState.isRecording) {
     statusColor = theme.status.error;
-    statusText = '🎤 Recording... (Alt+V or Ctrl+Q to stop)';
+    statusText = '🎤 Recording... (Alt+R or Ctrl+Q to stop)';
   } else if (voiceState.isTranscribing) {
     statusColor = theme.status.warning;
     statusText = '🎤 Transcribing...';
