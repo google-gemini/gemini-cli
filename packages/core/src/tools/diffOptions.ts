@@ -7,7 +7,7 @@
 import * as Diff from 'diff';
 import type { DiffStat } from './tools.js';
 
-// Use a plain object that satisfies both CreatePatchOptions and StructuredPatchOptions
+// Options for diff operations that work with both createPatch and structuredPatch functions
 export const DEFAULT_DIFF_OPTIONS = {
   context: 3,
   ignoreWhitespace: true,
