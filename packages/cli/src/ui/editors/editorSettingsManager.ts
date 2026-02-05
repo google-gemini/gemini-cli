@@ -6,7 +6,7 @@
 
 import {
   allowEditorTypeInSandbox,
-  checkHasEditorType,
+  hasValidEditorCommand,
   type EditorType,
   EDITOR_DISPLAY_NAMES,
 } from '@google/gemini-cli-core';
@@ -31,7 +31,7 @@ class EditorSettingsManager {
         disabled: false,
       },
       ...editorTypes.map((type) => {
-        const hasEditor = checkHasEditorType(type);
+        const hasEditor = hasValidEditorCommand(type);
         const isAllowedInSandbox = allowEditorTypeInSandbox(type);
 
         let labelSuffix = !isAllowedInSandbox
