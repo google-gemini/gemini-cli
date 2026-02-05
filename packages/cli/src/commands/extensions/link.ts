@@ -5,6 +5,7 @@
  */
 
 import type { CommandModule } from 'yargs';
+import chalk from 'chalk';
 import {
   debugLogger,
   type ExtensionInstallMetadata,
@@ -49,7 +50,9 @@ export async function handleLink(args: InstallArgs) {
     const extension =
       await extensionManager.installOrUpdateExtension(installMetadata);
     debugLogger.log(
-      `Extension "${extension.name}" linked successfully and enabled.`,
+      chalk.green(
+        `Extension "${extension.name}" linked successfully and enabled.`,
+      ),
     );
   } catch (error) {
     debugLogger.error(getErrorMessage(error));
