@@ -9,6 +9,7 @@ import { GeneralistAgent } from './generalist-agent.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
 import type { AgentRegistry } from './registry.js';
+import type { Config } from 'src/config/config.js';
 
 describe('GeneralistAgent', () => {
   it('should create a valid generalist agent definition', () => {
