@@ -1,4 +1,4 @@
-# Getting Started with Agent Skills
+# Get started with Agent Skills
 
 Agent Skills allow you to extend Gemini CLI with specialized expertise. This
 tutorial will guide you through creating your first skill and using it in a

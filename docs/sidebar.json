@@ -7,7 +7,8 @@
       { "label": "Installation", "slug": "docs/get-started/installation" },
       { "label": "Authentication", "slug": "docs/get-started/authentication" },
       { "label": "Examples", "slug": "docs/get-started/examples" },
-      { "label": "Cheatsheet", "slug": "docs/cli/cli-reference" }
+      { "label": "CLI cheatsheet", "slug": "docs/cli/cli-reference" },
+      { "label": "Gemini 3 on Gemini CLI", "slug": "docs/get-started/gemini-3" }
     ]
   },
   {
@@ -18,69 +19,86 @@
         "slug": "docs/cli/tutorials/file-management"
       },
       {
-        "label": "Memory & context",
+        "label": "Manage context and memory",
         "slug": "docs/cli/tutorials/memory-management"
       },
       {
-        "label": "Shell commands",
+        "label": "Execute shell commands",
         "slug": "docs/cli/tutorials/shell-commands"
       },
       {
-        "label": "Session & history",
+        "label": "Manage sessions and history",
         "slug": "docs/cli/tutorials/session-management"
       },
-      { "label": "Task planning", "slug": "docs/cli/tutorials/task-planning" },
-      { "label": "Web tools", "slug": "docs/cli/tutorials/web-tools" },
       {
-        "label": "Agent skills tutorial",
+        "label": "Plan tasks with todos",
+        "slug": "docs/cli/tutorials/task-planning"
+      },
+      {
+        "label": "Web search and fetch",
+        "slug": "docs/cli/tutorials/web-tools"
+      },
+      {
+        "label": "Get started with skills",
         "slug": "docs/cli/tutorials/skills-getting-started"
       },
-      { "label": "MCP setup", "slug": "docs/cli/tutorials/mcp-setup" },
-      { "label": "Automation", "slug": "docs/cli/tutorials/automation" }
+      {
+        "label": "Set up an MCP server",
+        "slug": "docs/cli/tutorials/mcp-setup"
+      },
+      { "label": "Automate tasks", "slug": "docs/cli/tutorials/automation" }
     ]
   },
   {
     "label": "Features",
     "items": [
-      { "label": "Activate skill tool", "slug": "docs/tools/activate-skill" },
+      {
+        "label": "Activate skill (tool)",
+        "slug": "docs/tools/activate-skill"
+      },
       { "label": "Agent skills", "slug": "docs/cli/skills" },
-      { "label": "Ask user tool", "slug": "docs/tools/ask-user" },
+      { "label": "Ask user (tool)", "slug": "docs/tools/ask-user" },
       { "label": "Checkpointing", "slug": "docs/cli/checkpointing" },
-      { "label": "Custom commands", "slug": "docs/cli/custom-commands" },
-      { "label": "Enterprise configuration", "slug": "docs/cli/enterprise" },
-      { "label": "File system tools", "slug": "docs/tools/file-system" },
+      { "label": "File system (tool)", "slug": "docs/tools/file-system" },
       { "label": "Headless mode", "slug": "docs/cli/headless" },
       { "label": "Hooks", "slug": "docs/hooks" },
       { "label": "IDE integration", "slug": "docs/ide-integration" },
+      {
+        "label": "Internal documentation (tool)",
+        "slug": "docs/tools/internal-docs"
+      },
+      { "label": "MCP servers", "slug": "docs/tools/mcp-server" },
+      { "label": "Memory (tool)", "slug": "docs/tools/memory" },
+      { "label": "Model routing", "slug": "docs/cli/model-routing" },
+      { "label": "Model selection", "slug": "docs/cli/model" },
+      { "label": "Rewind", "slug": "docs/cli/rewind" },
+      { "label": "Sandboxing", "slug": "docs/cli/sandbox" },
+      { "label": "Shell (tool)", "slug": "docs/tools/shell" },
+      { "label": "Telemetry", "slug": "docs/cli/telemetry" },
+      { "label": "Todo (tool)", "slug": "docs/tools/todos" },
+      { "label": "Token caching", "slug": "docs/cli/token-caching" },
+      { "label": "Web fetch (tool)", "slug": "docs/tools/web-fetch" },
+      { "label": "Web search (tool)", "slug": "docs/tools/web-search" }
+    ]
+  },
+  {
+    "label": "Configuration",
+    "items": [
+      { "label": "Custom commands", "slug": "docs/cli/custom-commands" },
+      { "label": "Enterprise configuration", "slug": "docs/cli/enterprise" },
       {
         "label": "Ignore files (.geminiignore)",
         "slug": "docs/cli/gemini-ignore"
       },
       {
-        "label": "Internal documentation tool",
-        "slug": "docs/tools/internal-docs"
-      },
-      { "label": "MCP servers", "slug": "docs/tools/mcp-server" },
-      { "label": "Memory tool", "slug": "docs/tools/memory" },
-      {
         "label": "Model configuration",
         "slug": "docs/cli/generation-settings"
       },
-      { "label": "Model routing", "slug": "docs/cli/model-routing" },
-      { "label": "Model selection", "slug": "docs/cli/model" },
       { "label": "Project context (GEMINI.md)", "slug": "docs/cli/gemini-md" },
-      { "label": "Rewind", "slug": "docs/cli/rewind" },
-      { "label": "Sandboxing", "slug": "docs/cli/sandbox" },
       { "label": "Settings", "slug": "docs/cli/settings" },
-      { "label": "Shell tool", "slug": "docs/tools/shell" },
       { "label": "System prompt override", "slug": "docs/cli/system-prompt" },
-      { "label": "Telemetry", "slug": "docs/cli/telemetry" },
       { "label": "Themes", "slug": "docs/cli/themes" },
-      { "label": "Todo tool", "slug": "docs/tools/todos" },
-      { "label": "Token caching", "slug": "docs/cli/token-caching" },
-      { "label": "Trusted folders", "slug": "docs/cli/trusted-folders" },
-      { "label": "Web fetch tool", "slug": "docs/tools/web-fetch" },
-      { "label": "Web search tool", "slug": "docs/tools/web-search" }
+      { "label": "Trusted folders", "slug": "docs/cli/trusted-folders" }
     ]
   },
   {
@@ -112,14 +130,6 @@
     ]
   },
   {
-    "label": "Releases",
-    "items": [
-      { "label": "Release notes", "slug": "docs/changelogs/" },
-      { "label": "Stable release", "slug": "docs/changelogs/latest" },
-      { "label": "Preview release", "slug": "docs/changelogs/preview" }
-    ]
-  },
-  {
     "label": "Resources",
     "items": [
       { "label": "FAQ", "slug": "docs/faq" },
@@ -140,6 +150,14 @@
       },
       { "label": "Local development", "slug": "docs/local-development" },
       { "label": "NPM package structure", "slug": "docs/npm" }
+    ]
+  },
+  {
+    "label": "Releases",
+    "items": [
+      { "label": "Release notes", "slug": "docs/changelogs/" },
+      { "label": "Stable release", "slug": "docs/changelogs/latest" },
+      { "label": "Preview release", "slug": "docs/changelogs/preview" }
     ]
   }
 ]
