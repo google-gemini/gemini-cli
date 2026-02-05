@@ -138,7 +138,8 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
 - **Context Efficiency:**
   - Avoid wasting context window by using 'offset' and 'limit to scope ${READ_FILE_TOOL_NAME} results to just enough information to definitively answer the question.
   - Extra tool calls can negate any benefits of limits, so balance frugality with the cost of having to iterate.
-  - Some ${READ_FILE_TOOL_NAME}examples:
+  - Some ${READ_FILE_TOOL_NAME} examples:
+    - If you need to edit a specific range in a file, use ${READ_FILE_TOOL_NAME} with 'offset' and 'limit' and pass the returned start line to ${WRITE_FILE_TOOL_NAME} to ensure the most reliable edit possible.
     - Use 'offset' and 'limit' to read a single contiguous range from a file when you only need a range within.
     - Use 'offset' and 'limit' to read a single contiguous range that covers two ranges that are near each other, rather than using an extra read tool call.
     - Do not use 'offset' or 'limit' when trying to deeply understand a file.
