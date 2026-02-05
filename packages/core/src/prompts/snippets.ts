@@ -8,6 +8,7 @@ import {
   ACTIVATE_SKILL_TOOL_NAME,
   ASK_USER_TOOL_NAME,
   EDIT_TOOL_NAME,
+  ENTER_PLAN_MODE_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
@@ -48,6 +49,8 @@ export interface PrimaryWorkflowsOptions {
   interactive: boolean;
   enableCodebaseInvestigator: boolean;
   enableWriteTodosTool: boolean;
+  enableEnterPlanModeTool: boolean;
+  approvedPlan?: { path: string };
 }
 
 export interface OperationalGuidelinesOptions {
@@ -69,6 +72,7 @@ export interface FinalReminderOptions {
 export interface PlanningWorkflowOptions {
   planModeToolsList: string;
   plansDir: string;
+  approvedPlanPath?: string;
 }
 
 export interface AgentSkillOptions {
@@ -207,7 +211,7 @@ ${workflowStepPlan(options)}
 
 **Goal:** Autonomously implement and deliver a visually appealing, substantially complete, and functional prototype. Utilize all tools at your disposal to implement the application. Some tools you may especially find useful are '${WRITE_FILE_TOOL_NAME}', '${EDIT_TOOL_NAME}' and '${SHELL_TOOL_NAME}'.
 
-${newApplicationSteps(options.interactive)}
+${newApplicationSteps(options)}
 `.trim();
 }
 
@@ -330,7 +334,10 @@ ${options.planModeToolsList}
 ### Phase 3: Design & Planning
 - Only begin this phase after exploration is complete
 - Create a detailed implementation plan with clear steps
-- Include file paths, function signatures, and code snippets where helpful
+- The plan MUST include:
+  - Iterative development steps (e.g., "Implement X, then verify with test Y")
+  - Specific verification steps (unit tests, manual checks, build commands)
+  - File paths, function signatures, and code snippets where helpful
 - Save the implementation plan to the designated plans directory
 
 ### Phase 4: Review & Approval
@@ -338,10 +345,21 @@ ${options.planModeToolsList}
 - If plan is approved, you can begin implementation
 - If plan is rejected, address the feedback and iterate on the plan
 
+${renderApprovedPlanSection(options.approvedPlanPath)}
+
 ## Constraints
 - You may ONLY use the read-only tools listed above
 - You MUST NOT modify source code, configs, or any files
 - If asked to modify code, explain you are in Plan Mode and suggest exiting Plan Mode to enable edits`.trim();
+}
+
+function renderApprovedPlanSection(approvedPlanPath?: string): string {
+  if (!approvedPlanPath) return '';
+  return `## Approved Plan
+An approved plan is available for this task.
+- **Iterate:** You should default to refining the existing approved plan.
+- **New Plan:** Only create a new plan file if the user explicitly asks for a "new plan" or if the current request is for a completely different feature or bug.
+`;
 }
 
 // --- Leaf Helpers (Strictly strings or simple calls) ---
@@ -379,6 +397,9 @@ Use '${READ_FILE_TOOL_NAME}' to understand context and validate any assumptions 
 }
 
 function workflowStepPlan(options: PrimaryWorkflowsOptions): string {
+  if (options.approvedPlan) {
+    return `2. **Plan:** An approved plan is available for this task. Use this file as a guide for your implementation. You MUST read this file before proceeding. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements.`;
+  }
   if (options.enableCodebaseInvestigator && options.enableWriteTodosTool) {
     return `2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. If the user's request implies a change but does not explicitly state it, **YOU MUST ASK** for confirmation before modifying code. If 'codebase_investigator' was used, do not ignore the output of the agent, you must use it as the foundation of your plan. For complex tasks, break them down into smaller, manageable subtasks and use the \`${WRITE_TODOS_TOOL_NAME}\` tool to track your progress. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`;
   }
@@ -397,11 +418,23 @@ function workflowVerifyStandardsSuffix(interactive: boolean): string {
     : '';
 }
 
-function newApplicationSteps(interactive: boolean): string {
+const NEW_APP_IMPLEMENTATION_GUIDANCE = `When starting ensure you scaffold the application using '${SHELL_TOOL_NAME}' for commands like 'npm init', 'npx create-react-app'. Aim for full scope completion. Proactively create or source necessary placeholder assets (e.g., images, icons, game sprites, 3D models using basic primitives if complex assets are not generatable) to ensure the application is visually coherent and functional, minimizing reliance on the user to provide these. If the model can generate simple assets (e.g., a uniformly colored square sprite, a simple 3D cube), it should do so. Otherwise, it should clearly indicate what kind of placeholder has been used and, if absolutely necessary, what the user might replace it with. Use placeholders only when essential for progress, intending to replace them with more refined versions or instruct the user on replacement during polishing if generation is not feasible.`;
+
+function newApplicationSteps(options: PrimaryWorkflowsOptions): string {
+  const interactive = options.interactive;
+
+  if (options.approvedPlan) {
+    return `
+1. **Understand:** Read the approved plan. Use this file as a guide for your implementation.
+2. **Implement:** Implement the application according to the plan. ${NEW_APP_IMPLEMENTATION_GUIDANCE} If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements.
+3. **Verify:** Review work against the original request, the approved plan. Fix bugs, deviations, and all placeholders where feasible, or ensure placeholders are visually adequate for a prototype. Ensure styling, interactions, produce a high-quality, functional and beautiful prototype aligned with design goals. Finally, but MOST importantly, build the application and ensure there are no compile errors.
+4. **Finish:** Provide a brief summary of what was built.`.trim();
+  }
+
   if (interactive) {
     return `
 1. **Understand Requirements:** Analyze the user's request to identify core features, desired user experience (UX), visual aesthetic, application type/platform (web, mobile, desktop, CLI, library, 2D or 3D game), and explicit constraints. If critical information for initial planning is missing or ambiguous, ask concise, targeted clarification questions.
-2. **Propose Plan:** Formulate an internal development plan. Present a clear, concise, high-level summary to the user. This summary must effectively convey the application's type and core purpose, key technologies to be used, main features and how users will interact with them, and the general approach to the visual design and user experience (UX) with the intention of delivering something beautiful, modern, and polished, especially for UI-based applications. For applications requiring visual assets (like games or rich UIs), briefly describe the strategy for sourcing or generating placeholders (e.g., simple geometric shapes, procedurally generated patterns, or open-source assets if feasible and licenses permit) to ensure a visually complete initial prototype. Ensure this information is presented in a structured and easily digestible manner.
+2. **Propose Plan:** Formulate an internal development plan. Present a clear, concise, high-level summary to the user. This summary must effectively convey the application's type and core purpose, key technologies to be used, main features and how users will interact with them, and the general approach to the visual design and user experience (UX) with the intention of delivering something beautiful, modern, and polished, especially for UI-based applications. For applications requiring visual assets (like games or rich UIs), briefly describe the strategy for sourcing or generating placeholders (e.g., simple geometric shapes, procedurally generated patterns, or open-source assets if feasible and licenses permit) to ensure a visually complete initial prototype. Ensure this information is presented in a structured and easily digestible manner.${planningPhaseSuggestion(options)}
   - When key technologies aren't specified, prefer the following:
   - **Websites (Frontend):** React (JavaScript/TypeScript) or Angular with Bootstrap CSS, incorporating Material Design principles for UI/UX.
   - **Back-End APIs:** Node.js with Express.js (JavaScript/TypeScript) or Python with FastAPI.
@@ -411,7 +444,7 @@ function newApplicationSteps(interactive: boolean): string {
   - **3d Games:** HTML/CSS/JavaScript with Three.js.
   - **2d Games:** HTML/CSS/JavaScript.
 3. **User Approval:** Obtain user approval for the proposed plan.
-4. **Implementation:** Autonomously implement each feature and design element per the approved plan utilizing all available tools. When starting ensure you scaffold the application using '${SHELL_TOOL_NAME}' for commands like 'npm init', 'npx create-react-app'. Aim for full scope completion. Proactively create or source necessary placeholder assets (e.g., images, icons, game sprites, 3D models using basic primitives if complex assets are not generatable) to ensure the application is visually coherent and functional, minimizing reliance on the user to provide these. If the model can generate simple assets (e.g., a uniformly colored square sprite, a simple 3D cube), it should do so. Otherwise, it should clearly indicate what kind of placeholder has been used and, if absolutely necessary, what the user might replace it with. Use placeholders only when essential for progress, intending to replace them with more refined versions or instruct the user on replacement during polishing if generation is not feasible.
+4. **Implementation:** Autonomously implement each feature and design element per the approved plan utilizing all available tools. ${NEW_APP_IMPLEMENTATION_GUIDANCE}
 5. **Verify:** Review work against the original request, the approved plan. Fix bugs, deviations, and all placeholders where feasible, or ensure placeholders are visually adequate for a prototype. Ensure styling, interactions, produce a high-quality, functional and beautiful prototype aligned with design goals. Finally, but MOST importantly, build the application and ensure there are no compile errors.
 6. **Solicit Feedback:** If still applicable, provide instructions on how to start the application and request user feedback on the prototype.`.trim();
   }
@@ -426,8 +459,15 @@ function newApplicationSteps(interactive: boolean): string {
   - **Mobile App:** Compose Multiplatform (Kotlin Multiplatform) or Flutter (Dart) using Material Design libraries and principles, when sharing code between Android and iOS. Jetpack Compose (Kotlin JVM) with Material Design principles or SwiftUI (Swift) for native apps targeted at either Android or iOS, respectively.
   - **3d Games:** HTML/CSS/JavaScript with Three.js.
   - **2d Games:** HTML/CSS/JavaScript.
-3. **Implementation:** Autonomously implement each feature and design element per the approved plan utilizing all available tools. When starting ensure you scaffold the application using '${SHELL_TOOL_NAME}' for commands like 'npm init', 'npx create-react-app'. Aim for full scope completion. Proactively create or source necessary placeholder assets (e.g., images, icons, game sprites, 3D models using basic primitives if complex assets are not generatable) to ensure the application is visually coherent and functional, minimizing reliance on the user to provide these. If the model can generate simple assets (e.g., a uniformly colored square sprite, a simple 3D cube), it should do so. Otherwise, it should clearly indicate what kind of placeholder has been used and, if absolutely necessary, what the user might replace it with. Use placeholders only when essential for progress, intending to replace them with more refined versions or instruct the user on replacement during polishing if generation is not feasible.
+3. **Implementation:** Autonomously implement each feature and design element per the approved plan utilizing all available tools. ${NEW_APP_IMPLEMENTATION_GUIDANCE}
 4. **Verify:** Review work against the original request, the approved plan. Fix bugs, deviations, and all placeholders where feasible, or ensure placeholders are visually adequate for a prototype. Ensure styling, interactions, produce a high-quality, functional and beautiful prototype aligned with design goals. Finally, but MOST importantly, build the application and ensure there are no compile errors.`.trim();
+}
+
+function planningPhaseSuggestion(options: PrimaryWorkflowsOptions): string {
+  if (options.enableEnterPlanModeTool) {
+    return ` For complex tasks, consider using the '${ENTER_PLAN_MODE_TOOL_NAME}' tool to enter a dedicated planning phase before starting implementation.`;
+  }
+  return '';
 }
 
 function shellEfficiencyGuidelines(enabled: boolean): string {
