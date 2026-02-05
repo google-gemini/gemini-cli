@@ -7,7 +7,7 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
-  // Next ID: 148
+  // Next ID: 152
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
@@ -561,4 +561,20 @@ export enum EventMetadataKey {
 
   // Logs the classifier threshold used.
   GEMINI_CLI_ROUTING_CLASSIFIER_THRESHOLD = 147,
+
+  // ==========================================================================
+  // Observation Masking Event Keys
+  // ==========================================================================
+
+  // Logs the total tokens in the prunable block before masking.
+  GEMINI_CLI_OBSERVATION_MASKING_TOKENS_BEFORE = 148,
+
+  // Logs the total tokens in the masked remnants after masking.
+  GEMINI_CLI_OBSERVATION_MASKING_TOKENS_AFTER = 149,
+
+  // Logs the number of tool outputs masked in this operation.
+  GEMINI_CLI_OBSERVATION_MASKING_MASKED_COUNT = 150,
+
+  // Logs the total prunable tokens identified at the trigger point.
+  GEMINI_CLI_OBSERVATION_MASKING_TOTAL_PRUNABLE_TOKENS = 151,
 }

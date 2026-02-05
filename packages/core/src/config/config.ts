@@ -149,6 +149,13 @@ export interface OutputSettings {
   format?: OutputFormat;
 }
 
+export interface ObservationMaskingConfig {
+  enabled: boolean;
+  toolProtectionThreshold: number;
+  hysteresisThreshold: number;
+  protectLatestTurn: boolean;
+}
+
 export interface ExtensionSetting {
   name: string;
   description: string;
@@ -273,6 +280,11 @@ import {
   DEFAULT_FILE_FILTERING_OPTIONS,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
 } from './constants.js';
+import {
+  DEFAULT_TOOL_PROTECTION_THRESHOLD,
+  DEFAULT_HYSTERESIS_THRESHOLD,
+  DEFAULT_PROTECT_LATEST_TURN,
+} from '../services/observationMaskingService.js';
 
 import {
   type ExtensionLoader,
@@ -462,6 +474,7 @@ export interface ConfigParameters {
   disabledSkills?: string[];
   adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
+  observationMasking?: Partial<ObservationMaskingConfig>;
   disableLLMCorrection?: boolean;
   plan?: boolean;
   onModelChange?: (model: string) => void;
@@ -629,6 +642,7 @@ export class Config {
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: AdminControlsSettings | undefined;
+  private readonly observationMasking: ObservationMaskingConfig;
   private latestApiRequest: GenerateContentParameters | undefined;
   private lastModeSwitchTime: number = Date.now();
 
@@ -721,6 +735,18 @@ export class Config {
     this.modelAvailabilityService = new ModelAvailabilityService();
     this.previewFeatures = params.previewFeatures ?? undefined;
     this.experimentalJitContext = params.experimentalJitContext ?? false;
+    this.observationMasking = {
+      enabled: params.observationMasking?.enabled ?? false,
+      toolProtectionThreshold:
+        params.observationMasking?.toolProtectionThreshold ??
+        DEFAULT_TOOL_PROTECTION_THRESHOLD,
+      hysteresisThreshold:
+        params.observationMasking?.hysteresisThreshold ??
+        DEFAULT_HYSTERESIS_THRESHOLD,
+      protectLatestTurn:
+        params.observationMasking?.protectLatestTurn ??
+        DEFAULT_PROTECT_LATEST_TURN,
+    };
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
     this.experimentalZedIntegration =
       params.experimentalZedIntegration ?? false;
@@ -1443,6 +1469,14 @@ export class Config {
 
   isJitContextEnabled(): boolean {
     return this.experimentalJitContext;
+  }
+
+  getObservationMaskingEnabled(): boolean {
+    return this.observationMasking.enabled;
+  }
+
+  getObservationMaskingConfig(): ObservationMaskingConfig {
+    return this.observationMasking;
   }
 
   getGeminiMdFileCount(): number {

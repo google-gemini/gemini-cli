@@ -56,6 +56,7 @@ import type {
   StartupStatsEvent,
   LlmLoopCheckEvent,
   PlanExecutionEvent,
+  ObservationMaskingEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -153,6 +154,21 @@ export function logToolOutputTruncated(
   event: ToolOutputTruncatedEvent,
 ): void {
   ClearcutLogger.getInstance(config)?.logToolOutputTruncatedEvent(event);
+  bufferTelemetryEvent(() => {
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    };
+    logger.emit(logRecord);
+  });
+}
+
+export function logObservationMasking(
+  config: Config,
+  event: ObservationMaskingEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logObservationMaskingEvent(event);
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
     const logRecord: LogRecord = {

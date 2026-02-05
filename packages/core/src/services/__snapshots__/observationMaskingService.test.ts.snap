@@ -1,0 +1,41 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ObservationMaskingService > should match the expected snapshot for a masked tool output 1`] = `
+"[Observation Masked]
+<observation_masked_guidance tool_name="run_shell_command">
+  <preview>Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+
+... [6 lines omitted] ...
+
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+Line
+</preview>
+  <details>
+    <file_path>/mock/history/observations/run_shell_command_deterministic.txt</file_path>
+    <file_size>0.00MB</file_size>
+    <line_count>4</line_count>
+    <estimated_total_tokens>1,000</estimated_total_tokens>
+  </details>
+  <instructions>
+    The full output is available at the path above. 
+    You can inspect it using tools like 'grep_search' or 'read_file'.
+    Note: Reading the full file will use approximately 1,000 tokens.
+  </instructions>
+</observation_masked_guidance>"
+`;

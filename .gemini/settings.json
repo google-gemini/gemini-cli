@@ -1,0 +1,7 @@
+{
+  "experimental": {
+    "observationMasking": {
+      "enabled": true
+    }
+  }
+}

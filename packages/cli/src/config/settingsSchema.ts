@@ -1462,6 +1462,59 @@ const SETTINGS_SCHEMA = {
     description: 'Setting to enable experimental features',
     showInDialog: false,
     properties: {
+      observationMasking: {
+        type: 'object',
+        label: 'Observation Masking',
+        category: 'Experimental',
+        requiresRestart: true,
+        ignoreInDocs: true,
+        default: {},
+        description:
+          'Advanced settings for observation masking to manage context window efficiency.',
+        showInDialog: false,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Observation Masking',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Enables observation masking for tool outputs to save tokens.',
+            showInDialog: false,
+          },
+          toolProtectionThreshold: {
+            type: 'number',
+            label: 'Tool Protection Threshold',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: 50000,
+            description:
+              'Minimum number of tokens to protect from masking (most recent observations).',
+            showInDialog: false,
+          },
+          hysteresisThreshold: {
+            type: 'number',
+            label: 'Hysteresis Threshold',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: 30000,
+            description:
+              'Minimum prunable tokens required to trigger a masking pass.',
+            showInDialog: false,
+          },
+          protectLatestTurn: {
+            type: 'boolean',
+            label: 'Protect Latest Turn',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: true,
+            description:
+              'Ensures the absolute latest turn is never masked, regardless of token count.',
+            showInDialog: false,
+          },
+        },
+      },
       enableAgents: {
         type: 'boolean',
         label: 'Enable Agents',

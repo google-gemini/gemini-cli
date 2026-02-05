@@ -224,7 +224,7 @@ export class ChatRecordingService {
    */
   recordMessage(message: {
     model: string | undefined;
-    type: ConversationRecordExtra['type'];
+    type: 'user' | 'info' | 'error' | 'warning' | 'gemini';
     content: PartListUnion;
     displayContent?: PartListUnion;
   }): void {
