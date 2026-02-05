@@ -2905,12 +2905,12 @@ export function useTextBuffer({
         return true;
       }
       if (keyMatchers[Command.MOVE_UP](key)) {
-        if (cursorRow === 0) return false;
+        if (visualCursor[0] === 0) return false;
         move('up');
         return true;
       }
       if (keyMatchers[Command.MOVE_DOWN](key)) {
-        if (cursorRow === lines.length - 1) return false;
+        if (visualCursor[0] === visualLines.length - 1) return false;
         move('down');
         return true;
       }
@@ -2930,6 +2930,13 @@ export function useTextBuffer({
         move('end');
         return true;
       }
+      if (keyMatchers[Command.CLEAR_INPUT](key)) {
+        if (text.length > 0) {
+          setText('');
+          return true;
+        }
+        return false;
+      }
       if (keyMatchers[Command.DELETE_WORD_BACKWARD](key)) {
         deleteWordLeft();
         return true;
@@ -2943,6 +2950,13 @@ export function useTextBuffer({
         return true;
       }
       if (keyMatchers[Command.DELETE_CHAR_RIGHT](key)) {
+        const lastLineIdx = lines.length - 1;
+        if (
+          cursorRow === lastLineIdx &&
+          cursorCol === cpLen(lines[lastLineIdx] ?? '')
+        ) {
+          return false;
+        }
         del();
         return true;
       }
@@ -2974,6 +2988,10 @@ export function useTextBuffer({
       cursorCol,
       lines,
       singleLine,
+      setText,
+      text,
+      visualCursor,
+      visualLines,
     ],
   );
 
@@ -3419,7 +3437,7 @@ export interface TextBuffer {
   /**
    * High level "handleInput" – receives what Ink gives us.
    */
-  handleInput: (key: Key) => void;
+  handleInput: (key: Key) => boolean;
   /**
    * Opens the current buffer contents in the user's preferred terminal text
    * editor ($VISUAL or $EDITOR, falling back to "vi").  The method blocks

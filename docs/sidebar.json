@@ -80,6 +80,10 @@
     "items": [
       { "label": "Agent skills", "slug": "docs/cli/skills" },
       {
+        "label": "Creating Agent skills",
+        "slug": "docs/cli/creating-skills"
+      },
+      {
         "label": "Sub-agents (experimental)",
         "slug": "docs/core/subagents"
       },
@@ -119,14 +123,6 @@
     "items": [
       { "label": "FAQ", "slug": "docs/faq" },
       { "label": "Quota and pricing", "slug": "docs/quota-and-pricing" },
-      {
-        "label": "Releases",
-        "items": [
-          { "label": "Release notes", "slug": "docs/changelogs/" },
-          { "label": "Stable release", "slug": "docs/changelogs/latest" },
-          { "label": "Preview release", "slug": "docs/changelogs/preview" }
-        ]
-      },
       { "label": "Terms and privacy", "slug": "docs/tos-privacy" },
       { "label": "Troubleshooting", "slug": "docs/troubleshooting" },
       { "label": "Uninstall", "slug": "docs/cli/uninstall" }
@@ -143,6 +139,14 @@
       },
       { "label": "Local development", "slug": "docs/local-development" },
       { "label": "NPM package structure", "slug": "docs/npm" }
+    ]
+  },
+  {
+    "label": "Releases",
+    "items": [
+      { "label": "Release notes", "slug": "docs/changelogs/" },
+      { "label": "Stable release", "slug": "docs/changelogs/latest" },
+      { "label": "Preview release", "slug": "docs/changelogs/preview" }
     ]
   }
 ]

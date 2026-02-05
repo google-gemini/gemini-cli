@@ -51,7 +51,6 @@ describe('ExtensionManager theme loading', () => {
         experimental: { extensionConfig: true },
         security: { blockGitExtensions: false },
         admin: { extensions: { enabled: true }, mcp: { enabled: true } },
-        tools: { enableHooks: true },
       }),
       requestConsent: async () => true,
       requestSetting: async () => '',
@@ -134,6 +133,7 @@ describe('ExtensionManager theme loading', () => {
       }),
       isTrustedFolder: () => true,
       getImportFormat: () => 'tree',
+      reloadSkills: vi.fn(),
     } as unknown as Config;
 
     await extensionManager.start(mockConfig);
@@ -209,6 +209,7 @@ describe('ExtensionManager theme loading', () => {
       getAgentRegistry: () => ({
         reload: vi.fn().mockResolvedValue(undefined),
       }),
+      reloadSkills: vi.fn(),
     } as unknown as Config;
 
     await extensionManager.start(mockConfig);

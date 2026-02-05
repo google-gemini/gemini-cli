@@ -786,6 +786,23 @@ describe('extensionSettings', () => {
       expect(await userKeychain.getSecret('VAR2')).toBeNull();
     });
 
+    it('should delete a non-sensitive setting if the new value is empty', async () => {
+      mockRequestSetting.mockResolvedValue('');
+
+      await updateSetting(
+        config,
+        '12345',
+        'VAR1',
+        mockRequestSetting,
+        ExtensionSettingScope.USER,
+        tempWorkspaceDir,
+      );
+
+      const expectedEnvPath = path.join(extensionDir, '.env');
+      const actualContent = await fsPromises.readFile(expectedEnvPath, 'utf-8');
+      expect(actualContent).not.toContain('VAR1=');
+    });
+
     it('should not throw if deleting a non-existent sensitive setting with empty value', async () => {
       mockRequestSetting.mockResolvedValue('');
       // Ensure it doesn't exist first

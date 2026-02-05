@@ -15,16 +15,16 @@ import {
 } from '../contexts/UIActionsContext.js';
 import { ConfigContext } from '../contexts/ConfigContext.js';
 import { SettingsContext } from '../contexts/SettingsContext.js';
+import { createMockSettings } from '../../test-utils/settings.js';
 // Mock VimModeContext hook
 vi.mock('../contexts/VimModeContext.js', () => ({
   useVimMode: vi.fn(() => ({
     vimEnabled: false,
-    vimMode: 'NORMAL',
+    vimMode: 'INSERT',
   })),
 }));
 import { ApprovalMode } from '@google/gemini-cli-core';
 import { StreamingState } from '../types.js';
-import { mergeSettings } from '../../config/settings.js';
 
 // Mock child components
 vi.mock('./LoadingIndicator.js', () => ({
@@ -54,7 +54,9 @@ vi.mock('./DetailedMessagesDisplay.js', () => ({
 }));
 
 vi.mock('./InputPrompt.js', () => ({
-  InputPrompt: () => <Text>InputPrompt</Text>,
+  InputPrompt: ({ placeholder }: { placeholder?: string }) => (
+    <Text>InputPrompt: {placeholder}</Text>
+  ),
   calculatePromptWidths: vi.fn(() => ({
     inputWidth: 80,
     suggestionsWidth: 40,
@@ -131,6 +133,8 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     nightly: false,
     isTrustedFolder: true,
     activeHooks: [],
+    isBackgroundShellVisible: false,
+    embeddedShellFocused: false,
     ...overrides,
   }) as UIState;
 
@@ -164,21 +168,6 @@ const createMockConfig = (overrides = {}) => ({
   ...overrides,
 });
 
-const createMockSettings = (merged = {}) => {
-  const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
-  return {
-    merged: {
-      ...defaultMergedSettings,
-      ui: {
-        ...defaultMergedSettings.ui,
-        hideFooter: false,
-        showMemoryUsage: false,
-        ...merged,
-      },
-    },
-  };
-};
-
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const renderComposer = (
   uiState: UIState,
@@ -203,7 +192,7 @@ describe('Composer', () => {
   describe('Footer Display Settings', () => {
     it('renders Footer by default when hideFooter is false', () => {
       const uiState = createMockUIState();
-      const settings = createMockSettings({ hideFooter: false });
+      const settings = createMockSettings({ ui: { hideFooter: false } });
 
       const { lastFrame } = renderComposer(uiState, settings);
 
@@ -212,7 +201,7 @@ describe('Composer', () => {
 
     it('does NOT render Footer when hideFooter is true', () => {
       const uiState = createMockUIState();
-      const settings = createMockSettings({ hideFooter: true });
+      const settings = createMockSettings({ ui: { hideFooter: true } });
 
       const { lastFrame } = renderComposer(uiState, settings);
 
@@ -241,8 +230,10 @@ describe('Composer', () => {
         getDebugMode: vi.fn(() => true),
       });
       const settings = createMockSettings({
-        hideFooter: false,
-        showMemoryUsage: true,
+        ui: {
+          hideFooter: false,
+          showMemoryUsage: true,
+        },
       });
       // Mock vim mode for this test
       const { useVimMode } = await import('../contexts/VimModeContext.js');
@@ -307,6 +298,32 @@ describe('Composer', () => {
       const output = lastFrame();
       expect(output).toContain('LoadingIndicator');
       expect(output).not.toContain('Should not show during confirmation');
+    });
+
+    it('renders LoadingIndicator when embedded shell is focused but background shell is visible', () => {
+      const uiState = createMockUIState({
+        streamingState: StreamingState.Responding,
+        embeddedShellFocused: true,
+        isBackgroundShellVisible: true,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      const output = lastFrame();
+      expect(output).toContain('LoadingIndicator');
+    });
+
+    it('does NOT render LoadingIndicator when embedded shell is focused and background shell is NOT visible', () => {
+      const uiState = createMockUIState({
+        streamingState: StreamingState.Responding,
+        embeddedShellFocused: true,
+        isBackgroundShellVisible: false,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      const output = lastFrame();
+      expect(output).not.toContain('LoadingIndicator');
     });
   });
 
@@ -485,6 +502,42 @@ describe('Composer', () => {
       const { lastFrame } = renderComposer(uiState);
 
       expect(lastFrame()).not.toContain('DetailedMessagesDisplay');
+    });
+  });
+
+  describe('Vim Mode Placeholders', () => {
+    it('shows correct placeholder in INSERT mode', async () => {
+      const uiState = createMockUIState({ isInputActive: true });
+      const { useVimMode } = await import('../contexts/VimModeContext.js');
+      vi.mocked(useVimMode).mockReturnValue({
+        vimEnabled: true,
+        vimMode: 'INSERT',
+        toggleVimEnabled: vi.fn(),
+        setVimMode: vi.fn(),
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).toContain(
+        "InputPrompt:   Press 'Esc' for NORMAL mode.",
+      );
+    });
+
+    it('shows correct placeholder in NORMAL mode', async () => {
+      const uiState = createMockUIState({ isInputActive: true });
+      const { useVimMode } = await import('../contexts/VimModeContext.js');
+      vi.mocked(useVimMode).mockReturnValue({
+        vimEnabled: true,
+        vimMode: 'NORMAL',
+        toggleVimEnabled: vi.fn(),
+        setVimMode: vi.fn(),
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).toContain(
+        "InputPrompt:   Press 'i' for INSERT mode.",
+      );
     });
   });
 });

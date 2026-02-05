@@ -1734,6 +1734,37 @@ describe('loggers', () => {
       );
     });
 
+    it('should log the event with numerical routing fields', () => {
+      const event = new ModelRoutingEvent(
+        'gemini-pro',
+        'NumericalClassifier (Strict)',
+        150,
+        '[Score: 90 / Threshold: 80] reasoning',
+        false,
+        undefined,
+        true,
+        '80',
+      );
+
+      logModelRouting(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logModelRoutingEvent,
+      ).toHaveBeenCalledWith(event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Model routing decision. Model: gemini-pro, Source: NumericalClassifier (Strict)',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
+          ...event,
+          'event.name': EVENT_MODEL_ROUTING,
+          interactive: false,
+        },
+      });
+    });
+
     it('should only log to Clearcut if OTEL SDK is not initialized', () => {
       vi.spyOn(sdk, 'isTelemetrySdkInitialized').mockReturnValue(false);
       vi.spyOn(sdk, 'bufferTelemetryEvent').mockImplementation(() => {});

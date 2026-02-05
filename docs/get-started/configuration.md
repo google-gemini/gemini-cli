@@ -170,6 +170,15 @@ their corresponding top-level category object in your `settings.json` file.
     available options.
   - **Default:** `undefined`
 
+- **`ui.autoThemeSwitching`** (boolean):
+  - **Description:** Automatically switch between default light and dark themes
+    based on terminal background color.
+  - **Default:** `true`
+
+- **`ui.terminalBackgroundPollingInterval`** (number):
+  - **Description:** Interval in seconds to poll the terminal background color.
+  - **Default:** `60`
+
 - **`ui.customThemes`** (object):
   - **Description:** Custom theme definitions.
   - **Default:** `{}`
@@ -324,6 +333,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** The fraction of context usage at which to trigger context
     compression (e.g. 0.2, 0.3).
   - **Default:** `0.5`
+  - **Requires restart:** Yes
+
+- **`model.disableLoopDetection`** (boolean):
+  - **Description:** Disable automatic detection and prevention of infinite
+    loops.
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`model.skipNextSpeakerCheck`** (boolean):
@@ -661,11 +676,6 @@ their corresponding top-level category object in your `settings.json` file.
     performance.
   - **Default:** `true`
 
-- **`tools.autoAccept`** (boolean):
-  - **Description:** Automatically accept and execute tool calls that are
-    considered safe (e.g., read-only operations).
-  - **Default:** `false`
-
 - **`tools.approvalMode`** (enum):
   - **Description:** The default approval mode for tool execution. 'default'
     prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is
@@ -733,12 +743,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
-- **`tools.enableHooks`** (boolean):
-  - **Description:** Enables the hooks system experiment. When disabled, the
-    hooks system is completely deactivated regardless of other settings.
-  - **Default:** `true`
-  - **Requires restart:** Yes
-
 #### `mcp`
 
 - **`mcp.serverCommand`** (string):
@@ -779,9 +783,16 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`security.allowedExtensions`** (array):
+  - **Description:** List of Regex patterns for allowed extensions. If nonempty,
+    only extensions that match the patterns in this list are allowed. Overrides
+    the blockGitExtensions setting.
+  - **Default:** `[]`
+  - **Requires restart:** Yes
+
 - **`security.folderTrust.enabled`** (boolean):
   - **Description:** Setting to track whether Folder trust is enabled.
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`security.environmentVariableRedaction.allowed`** (array):
@@ -984,6 +995,10 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** If false, disallows MCP servers from being used.
   - **Default:** `true`
 
+- **`admin.mcp.config`** (object):
+  - **Description:** Admin-configured MCP servers.
+  - **Default:** `{}`
+
 - **`admin.skills.enabled`** (boolean):
   - **Description:** If false, disallows agent skills from being used.
   - **Default:** `true`
@@ -1165,6 +1180,13 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - Specifies the default Gemini model to use.
   - Overrides the hardcoded default
   - Example: `export GEMINI_MODEL="gemini-3-flash-preview"`
+- **`GEMINI_CLI_HOME`**:
+  - Specifies the root directory for Gemini CLI's user-level configuration and
+    storage.
+  - By default, this is the user's system home directory. The CLI will create a
+    `.gemini` folder inside this directory.
+  - Useful for shared compute environments or keeping CLI state isolated.
+  - Example: `export GEMINI_CLI_HOME="/path/to/user/config"`
 - **`GOOGLE_API_KEY`**:
   - Your Google Cloud API key.
   - Required for using Vertex AI in express mode.
@@ -1185,6 +1207,10 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - **Description:** The path to your Google Application Credentials JSON file.
   - **Example:**
     `export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/credentials.json"`
+- **`GOOGLE_GENAI_API_VERSION`**:
+  - Specifies the API version to use for Gemini API requests.
+  - When set, overrides the default API version used by the SDK.
+  - Example: `export GOOGLE_GENAI_API_VERSION="v1"`
 - **`OTLP_GOOGLE_CLOUD_PROJECT`**:
   - Your Google Cloud Project ID for Telemetry in Google Cloud
   - Example: `export OTLP_GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"`.
