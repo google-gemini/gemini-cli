@@ -170,6 +170,20 @@
           "markdownDescription": "The color theme for the UI. See the CLI themes guide for available options.\n\n- Category: `UI`\n- Requires restart: `no`",
           "type": "string"
         },
+        "autoThemeSwitching": {
+          "title": "Auto Theme Switching",
+          "description": "Automatically switch between default light and dark themes based on terminal background color.",
+          "markdownDescription": "Automatically switch between default light and dark themes based on terminal background color.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "terminalBackgroundPollingInterval": {
+          "title": "Terminal Background Polling Interval",
+          "description": "Interval in seconds to poll the terminal background color.",
+          "markdownDescription": "Interval in seconds to poll the terminal background color.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `60`",
+          "default": 60,
+          "type": "number"
+        },
         "customThemes": {
           "title": "Custom Themes",
           "description": "Custom theme definitions.",
@@ -1293,8 +1307,8 @@
             "enabled": {
               "title": "Folder Trust",
               "description": "Setting to track whether Folder trust is enabled.",
-              "markdownDescription": "Setting to track whether Folder trust is enabled.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
-              "default": false,
+              "markdownDescription": "Setting to track whether Folder trust is enabled.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
               "type": "boolean"
             }
           },
@@ -1698,6 +1712,16 @@
               "markdownDescription": "If false, disallows MCP servers from being used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `true`",
               "default": true,
               "type": "boolean"
+            },
+            "config": {
+              "title": "MCP Config",
+              "description": "Admin-configured MCP servers.",
+              "markdownDescription": "Admin-configured MCP servers.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `{}`",
+              "default": {},
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/MCPServerConfig"
+              }
             }
           },
           "additionalProperties": false
