@@ -61,6 +61,7 @@ import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { StreamingState } from '../types.js';
+import { useVimMode } from '../contexts/VimModeContext.js';
 import { useMouseClick } from '../hooks/useMouseClick.js';
 import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
@@ -152,6 +153,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
   const { setEmbeddedShellFocused } = useUIActions();
+  const { vimEnabled, vimMode } = useVimMode();
+  const useVimCursor = useMemo(
+    () => vimEnabled && settings.general.vimModeCursorShape,
+    [vimEnabled, settings.general.vimModeCursorShape],
+  );
   const {
     terminalWidth,
     activePtyId,
@@ -215,6 +221,23 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     commandSearchCompletion.resetCompletionState;
 
   const showCursor = focus && isShellFocused && !isEmbeddedShellFocused;
+
+  const renderCursor = useCallback(
+    (char: string, showCursor: boolean): string => {
+      if (!showCursor) return char;
+
+      // Vim bar cursor for INSERT mode
+      if (useVimCursor && vimMode === 'INSERT') {
+        // Render a bar cursor: character followed by a thin vertical bar
+        const barChar = '│';
+        return char === ' ' ? barChar : char + chalk.dim(barChar);
+      }
+
+      // Block cursor (default and NORMAL mode)
+      return chalk.inverse(char);
+    },
+    [useVimCursor, vimMode],
+  );
 
   const resetEscapeState = useCallback(() => {
     if (escapeTimerRef.current) {
@@ -1266,7 +1289,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                   terminalCursorFocus={showCursor}
                   terminalCursorPosition={0}
                 >
-                  {chalk.inverse(placeholder.slice(0, 1))}
+                  {renderCursor(placeholder.slice(0, 1), showCursor)}
                   <Text color={theme.text.secondary}>
                     {placeholder.slice(1)}
                   </Text>
@@ -1329,9 +1352,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                           relativeVisualColForHighlight - segStart,
                           relativeVisualColForHighlight - segStart + 1,
                         );
-                        const highlighted = showCursor
-                          ? chalk.inverse(charToHighlight)
-                          : charToHighlight;
+                        const highlighted = renderCursor(
+                          charToHighlight,
+                          showCursor,
+                        );
                         display =
                           cpSlice(
                             display,
@@ -1372,7 +1396,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                     if (!currentLineGhost) {
                       renderedLine.push(
                         <Text key={`cursor-end-${cursorVisualColAbsolute}`}>
-                          {showCursor ? chalk.inverse(' ') : ' '}
+                          {renderCursor(' ', showCursor)}
                         </Text>,
                       );
                     }
@@ -1394,8 +1418,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
                         )}
                       >
                         {renderedLine}
-                        {showCursorBeforeGhost &&
-                          (showCursor ? chalk.inverse(' ') : ' ')}
+                        {showCursorBeforeGhost && renderCursor(' ', showCursor)}
                         {currentLineGhost && (
                           <Text color={theme.text.secondary}>
                             {currentLineGhost}
