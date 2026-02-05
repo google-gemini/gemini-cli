@@ -1201,6 +1201,79 @@ describe('Server Config (config.ts)', () => {
   });
 });
 
+describe('GemmaModelRouterSettings', () => {
+  const MODEL = DEFAULT_GEMINI_MODEL;
+  const SANDBOX: SandboxConfig = {
+    command: 'docker',
+    image: 'gemini-cli-sandbox',
+  };
+  const TARGET_DIR = '/path/to/target';
+  const DEBUG_MODE = false;
+  const QUESTION = 'test question';
+  const USER_MEMORY = 'Test User Memory';
+  const TELEMETRY_SETTINGS = { enabled: false };
+  const EMBEDDING_MODEL = 'gemini-embedding';
+  const SESSION_ID = 'test-session-id';
+  const baseParams: ConfigParameters = {
+    cwd: '/tmp',
+    embeddingModel: EMBEDDING_MODEL,
+    sandbox: SANDBOX,
+    targetDir: TARGET_DIR,
+    debugMode: DEBUG_MODE,
+    question: QUESTION,
+    userMemory: USER_MEMORY,
+    telemetry: TELEMETRY_SETTINGS,
+    sessionId: SESSION_ID,
+    model: MODEL,
+    usageStatisticsEnabled: false,
+  };
+
+  it('should default gemmaModelRouter.enabled to false', () => {
+    const config = new Config(baseParams);
+    expect(config.getGemmaModelRouterEnabled()).toBe(false);
+  });
+
+  it('should return default gemma model router settings when not provided', () => {
+    const config = new Config(baseParams);
+    const settings = config.getGemmaModelRouterSettings();
+    expect(settings.enabled).toBe(false);
+    expect(settings.classifier?.host).toBe('http://localhost:3000');
+    expect(settings.classifier?.model).toBe('gemma3:1b');
+  });
+
+  it('should override default gemma model router settings when provided', () => {
+    const params: ConfigParameters = {
+      ...baseParams,
+      gemmaModelRouter: {
+        enabled: true,
+        classifier: {
+          host: 'http://custom:1234',
+          model: 'custom-gemma',
+        },
+      },
+    };
+    const config = new Config(params);
+    const settings = config.getGemmaModelRouterSettings();
+    expect(settings.enabled).toBe(true);
+    expect(settings.classifier?.host).toBe('http://custom:1234');
+    expect(settings.classifier?.model).toBe('custom-gemma');
+  });
+
+  it('should merge partial gemma model router settings with defaults', () => {
+    const params: ConfigParameters = {
+      ...baseParams,
+      gemmaModelRouter: {
+        enabled: true,
+      },
+    };
+    const config = new Config(params);
+    const settings = config.getGemmaModelRouterSettings();
+    expect(settings.enabled).toBe(true);
+    expect(settings.classifier?.host).toBe('http://localhost:3000');
+    expect(settings.classifier?.model).toBe('gemma3:1b');
+  });
+});
+
 describe('setApprovalMode with folder trust', () => {
   const baseParams: ConfigParameters = {
     sessionId: 'test',
