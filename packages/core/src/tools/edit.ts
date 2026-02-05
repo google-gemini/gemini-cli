@@ -127,17 +127,21 @@ async function calculateExactReplacement(
       0,
     );
 
-    const matchIndex = normalizedCode.indexOf(normalizedSearch, startIndex);
-    if (matchIndex !== -1) {
-      const before = normalizedCode.substring(0, matchIndex);
-      const after = normalizedCode.substring(
-        matchIndex + normalizedSearch.length,
+    const afterStart = normalizedCode.substring(startIndex);
+    if (afterStart.includes(normalizedSearch)) {
+      const beforeStart = normalizedCode.substring(0, startIndex);
+      const replacedAfterStart = safeLiteralReplace(
+        afterStart,
+        normalizedSearch,
+        normalizedReplace,
       );
-      let modifiedCode = before + normalizedReplace + after;
+      let modifiedCode = beforeStart + replacedAfterStart;
       modifiedCode = restoreTrailingNewline(currentContent, modifiedCode);
+      const occurrences = afterStart.split(normalizedSearch).length - 1;
+
       return {
         newContent: modifiedCode,
-        occurrences: 1,
+        occurrences,
         finalOldString: normalizedSearch,
         finalNewString: normalizedReplace,
       };
@@ -202,9 +206,7 @@ async function calculateFlexibleReplacement(
         searchLinesStripped.length,
         newBlockWithIndent.join('\n'),
       );
-      if (start_line) {
-        break;
-      }
+      // If start_line was provided, we continue searching for more occurrences.
       i += replaceLines.length;
     } else {
       i++;
@@ -257,65 +259,37 @@ async function calculateRegexReplacement(
 
   // The final pattern captures leading whitespace (indentation) and then matches the token pattern.
   // 'm' flag enables multi-line mode, so '^' matches the start of any line.
+  // 'g' flag enables global replacement for all matches.
   const finalPattern = `^(\\s*)${pattern}`;
-  const flexibleRegex = new RegExp(finalPattern, 'm');
+  const globalRegex = new RegExp(finalPattern, 'mg');
 
+  let startIndex = 0;
   if (start_line) {
     const lines = currentContent.split('\n');
     const precedingLines = lines.slice(0, start_line - 1);
-    const startIndex = precedingLines.reduce(
-      (acc, line) => acc + line.length + 1,
-      0,
-    );
-    const searchRegion = currentContent.substring(startIndex);
-    const localMatch = flexibleRegex.exec(searchRegion);
+    startIndex = precedingLines.reduce((acc, line) => acc + line.length + 1, 0);
+  }
 
-    if (localMatch) {
-      const globalIndex = startIndex + localMatch.index;
-      const indentation = localMatch[1] || '';
-      const newLines = normalizedReplace.split('\n');
-      const newBlockWithIndent = newLines
-        .map((line) => `${indentation}${line}`)
-        .join('\n');
+  const searchRegion = currentContent.substring(startIndex);
+  const matches = searchRegion.match(globalRegex);
 
-      const before = currentContent.substring(0, globalIndex);
-      const after = currentContent.substring(
-        globalIndex + localMatch[0].length,
-      );
-      const modifiedCode = before + newBlockWithIndent + after;
-
-      return {
-        newContent: restoreTrailingNewline(currentContent, modifiedCode),
-        occurrences: 1,
-        finalOldString: normalizedSearch,
-        finalNewString: normalizedReplace,
-      };
-    }
+  if (!matches || matches.length === 0) {
     return null;
   }
 
-  const match = flexibleRegex.exec(currentContent);
-
-  if (!match) {
-    return null;
-  }
-
-  const indentation = match[1] || '';
   const newLines = normalizedReplace.split('\n');
-  const newBlockWithIndent = newLines
-    .map((line) => `${indentation}${line}`)
-    .join('\n');
-
-  // Use replace with the regex to substitute the matched content.
-  // Since the regex doesn't have the 'g' flag, it will only replace the first occurrence.
-  const modifiedCode = currentContent.replace(
-    flexibleRegex,
-    newBlockWithIndent,
+  const replacedRegion = searchRegion.replace(
+    globalRegex,
+    (match: string, indent: string) =>
+      newLines.map((line) => `${indent}${line}`).join('\n'),
   );
+
+  const beforeStart = currentContent.substring(0, startIndex);
+  const modifiedCode = beforeStart + replacedRegion;
 
   return {
     newContent: restoreTrailingNewline(currentContent, modifiedCode),
-    occurrences: 1, // This method is designed to find and replace only the first occurrence.
+    occurrences: matches.length,
     finalOldString: normalizedSearch,
     finalNewString: normalizedReplace,
   };
@@ -1091,7 +1065,7 @@ A good instruction should concisely answer:
     );
   }
 
-  getModifyContext(_: AbortSignal): ModifyContext<EditToolParams> {
+  getModifyContext(signal: AbortSignal): ModifyContext<EditToolParams> {
     return {
       getFilePath: (params: EditToolParams) => params.file_path,
       getCurrentContent: async (params: EditToolParams): Promise<string> => {
@@ -1106,15 +1080,28 @@ A good instruction should concisely answer:
       },
       getProposedContent: async (params: EditToolParams): Promise<string> => {
         try {
-          const currentContent = await this.config
+          let currentContent = await this.config
             .getFileSystemService()
             .readTextFile(params.file_path);
-          return applyReplacement(
+
+          const originalLineEnding = detectLineEnding(currentContent);
+          currentContent = currentContent.replace(/\r\n/g, '\n');
+
+          if (params.old_string === '' && currentContent === '') {
+            return params.new_string;
+          }
+
+          const result = await calculateReplacement(this.config, {
+            params,
             currentContent,
-            params.old_string,
-            params.new_string,
-            params.old_string === '' && currentContent === '',
-          );
+            abortSignal: signal,
+          });
+
+          let finalContent = result.newContent;
+          if (originalLineEnding === '\r\n') {
+            finalContent = finalContent.replace(/\n/g, '\r\n');
+          }
+          return finalContent;
         } catch (err) {
           if (!isNodeError(err) || err.code !== 'ENOENT') throw err;
           return '';
