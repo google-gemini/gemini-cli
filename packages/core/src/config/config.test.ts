@@ -2417,7 +2417,8 @@ describe('syncPlanModeTools', () => {
       ...baseParams,
       approvalMode: ApprovalMode.PLAN,
     });
-    const registry = config.getToolRegistry();
+    const registry = new ToolRegistry(config, config.getMessageBus());
+    vi.spyOn(config, 'getToolRegistry').mockReturnValue(registry);
 
     const registerSpy = vi.spyOn(registry, 'registerTool');
     const unregisterSpy = vi.spyOn(registry, 'unregisterTool');
@@ -2443,7 +2444,8 @@ describe('syncPlanModeTools', () => {
       ...baseParams,
       approvalMode: ApprovalMode.DEFAULT,
     });
-    const registry = config.getToolRegistry();
+    const registry = new ToolRegistry(config, config.getMessageBus());
+    vi.spyOn(config, 'getToolRegistry').mockReturnValue(registry);
 
     const registerSpy = vi.spyOn(registry, 'registerTool');
     const unregisterSpy = vi.spyOn(registry, 'unregisterTool');
@@ -2466,6 +2468,8 @@ describe('syncPlanModeTools', () => {
 
   it('should call geminiClient.setTools if initialized', async () => {
     const config = new Config(baseParams);
+    const registry = new ToolRegistry(config, config.getMessageBus());
+    vi.spyOn(config, 'getToolRegistry').mockReturnValue(registry);
     const client = config.getGeminiClient();
     vi.spyOn(client, 'isInitialized').mockReturnValue(true);
     const setToolsSpy = vi
