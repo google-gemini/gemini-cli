@@ -111,4 +111,22 @@ describe('ShellInputPrompt', () => {
 
     expect(mockWriteToPty).not.toHaveBeenCalled();
   });
+
+  it('bubbles up Shift+Tab for unfocusing', () => {
+    render(<ShellInputPrompt activeShellPtyId={1} focus={true} />);
+
+    const handler = mockUseKeypress.mock.calls[0][0];
+
+    const result = handler({
+      name: 'tab',
+      shift: true,
+      alt: false,
+      ctrl: false,
+      cmd: false,
+      sequence: '\x1b[Z',
+    });
+
+    expect(result).toBe(false);
+    expect(mockWriteToPty).not.toHaveBeenCalled();
+  });
 });

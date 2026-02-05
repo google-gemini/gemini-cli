@@ -1500,10 +1500,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setConstrainHeight(false);
         return true;
       } else if (
-        keyMatchers[Command.FOCUS_SHELL_INPUT](key) &&
+        (keyMatchers[Command.FOCUS_SHELL_INPUT](key) ||
+          keyMatchers[Command.UNFOCUS_SHELL_INPUT](key)) &&
         (activePtyId || (isBackgroundShellVisible && backgroundShells.size > 0))
       ) {
-        if (key.name === 'tab' && key.shift) {
+        if (keyMatchers[Command.UNFOCUS_SHELL_INPUT](key)) {
           // Always change focus
           setEmbeddedShellFocused(false);
           return true;

@@ -288,7 +288,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
     { key: 's', ctrl: true },
   ],
   [Command.FOCUS_SHELL_INPUT]: [{ key: 'tab', shift: false }],
-  [Command.UNFOCUS_SHELL_INPUT]: [{ key: 'tab' }],
+  [Command.UNFOCUS_SHELL_INPUT]: [{ key: 'tab', shift: true }],
   [Command.CLEAR_SCREEN]: [{ key: 'l', ctrl: true }],
   [Command.RESTART_APP]: [{ key: 'r' }],
   [Command.SUSPEND_APP]: [{ key: 'z', ctrl: true }],

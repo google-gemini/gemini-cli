@@ -1940,6 +1940,28 @@ describe('AppContainer State Management', () => {
         unmount();
       });
     });
+
+    describe('Shell Focus', () => {
+      it('should unfocus shell when Shift+Tab is pressed', async () => {
+        mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
+          activePtyId: 1,
+        });
+
+        await setupKeypressTest();
+
+        act(() => {
+          capturedUIActions.setEmbeddedShellFocused(true);
+        });
+        rerender();
+        expect(capturedUIState.embeddedShellFocused).toBe(true);
+
+        pressKey({ name: 'tab', shift: true });
+
+        expect(capturedUIState.embeddedShellFocused).toBe(false);
+        unmount();
+      });
+    });
   });
 
   describe('Copy Mode (CTRL+S)', () => {
