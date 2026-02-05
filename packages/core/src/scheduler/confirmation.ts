@@ -104,9 +104,10 @@ export async function resolveConfirmation(
     modifier: ToolModificationHandler;
     getPreferredEditor: () => EditorType | undefined;
     schedulerId: string;
+    onWaitingForConfirmation?: (waiting: boolean) => void;
   },
 ): Promise<ResolutionResult> {
-  const { state } = deps;
+  const { state, onWaitingForConfirmation } = deps;
   const callId = toolCall.request.callId;
   let outcome = ToolConfirmationOutcome.ModifyWithEditor;
   let lastDetails: SerializableConfirmationDetails | undefined;
@@ -142,12 +143,14 @@ export async function resolveConfirmation(
       correlationId,
     });
 
+    onWaitingForConfirmation?.(true);
     const response = await waitForConfirmation(
       deps.messageBus,
       correlationId,
       signal,
       ideConfirmation,
     );
+    onWaitingForConfirmation?.(false);
     outcome = response.outcome;
 
     if ('onConfirm' in details && typeof details.onConfirm === 'function') {
