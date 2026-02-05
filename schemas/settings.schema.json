@@ -201,19 +201,13 @@
           "default": false,
           "type": "boolean"
         },
-        "showInlineThinkingFull": {
-          "title": "Show Inline Thinking (Full)",
-          "description": "Show full model thinking details inline.",
-          "markdownDescription": "Show full model thinking details inline.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
-          "type": "boolean"
-        },
-        "showInlineThinkingSummary": {
-          "title": "Show Inline Thinking (Summary)",
-          "description": "Show a short summary of model thinking inline.",
-          "markdownDescription": "Show a short summary of model thinking inline.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
-          "type": "boolean"
+        "inlineThinkingMode": {
+          "title": "Inline Thinking",
+          "description": "Display model thinking inline: off, summary (truncated), or full.",
+          "markdownDescription": "Display model thinking inline: off, summary (truncated), or full.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `off`",
+          "default": "off",
+          "type": "string",
+          "enum": ["off", "summary", "full"]
         },
         "showStatusInTitle": {
           "title": "Show Thoughts in Title",

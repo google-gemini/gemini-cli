@@ -16,8 +16,7 @@ vi.mock('../contexts/SettingsContext.js', () => ({
   useSettings: () => ({
     merged: {
       ui: {
-        showInlineThinkingFull: false,
-        showInlineThinkingSummary: false,
+        inlineThinkingMode: 'off',
       },
     },
   }),

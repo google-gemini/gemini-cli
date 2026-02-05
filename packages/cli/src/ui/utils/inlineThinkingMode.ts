@@ -11,15 +11,5 @@ export type InlineThinkingMode = 'off' | 'summary' | 'full';
 export function getInlineThinkingMode(
   settings: LoadedSettings,
 ): InlineThinkingMode {
-  const ui = settings.merged.ui;
-
-  if (ui?.showInlineThinkingFull) {
-    return 'full';
-  }
-
-  if (ui?.showInlineThinkingSummary) {
-    return 'summary';
-  }
-
-  return 'off';
+  return settings.merged.ui?.inlineThinkingMode ?? 'off';
 }
