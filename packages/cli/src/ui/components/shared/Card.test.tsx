@@ -70,5 +70,3 @@ describe('Card', () => {
     },
   );
 });
-
-export type { CardProps };
