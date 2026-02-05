@@ -38,11 +38,11 @@ export class PromptProvider {
   /**
    * Generates the core system prompt.
    */
-  getCoreSystemPrompt(
+  async getCoreSystemPrompt(
     config: Config,
     userMemory?: string,
     interactiveOverride?: boolean,
-  ): string {
+  ): Promise<string> {
     const systemMdResolution = resolvePathFromEnv(
       process.env['GEMINI_SYSTEM_MD'],
     );
@@ -53,7 +53,7 @@ export class PromptProvider {
     const skills = config.getSkillManager().getSkills();
 
     // Filter out enter/exit plan mode tools based on current mode
-    this.syncPlanModeTools(config, isPlanMode);
+    await this.syncPlanModeTools(config, isPlanMode);
     const toolNames = config.getToolRegistry().getAllToolNames();
 
     const desiredModel = resolveModel(
@@ -172,7 +172,10 @@ export class PromptProvider {
     return snippets.getCompressionPrompt();
   }
 
-  private syncPlanModeTools(config: Config, isPlanMode: boolean): void {
+  private async syncPlanModeTools(
+    config: Config,
+    isPlanMode: boolean,
+  ): Promise<void> {
     const registry = config.getToolRegistry();
 
     if (isPlanMode) {
@@ -195,9 +198,11 @@ export class PromptProvider {
 
     const geminiClient = config.getGeminiClient();
     if (geminiClient) {
-      geminiClient.setTools().catch((err) => {
+      try {
+        await geminiClient.setTools();
+      } catch (err) {
         debugLogger.error('Failed to update tools', err);
-      });
+      }
     }
   }
 

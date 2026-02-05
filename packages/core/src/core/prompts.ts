@@ -19,11 +19,11 @@ export function resolvePathFromEnv(envVar?: string) {
 /**
  * Returns the core system prompt for the agent.
  */
-export function getCoreSystemPrompt(
+export async function getCoreSystemPrompt(
   config: Config,
   userMemory?: string,
   interactiveOverride?: boolean,
-): string {
+): Promise<string> {
   return new PromptProvider().getCoreSystemPrompt(
     config,
     userMemory,

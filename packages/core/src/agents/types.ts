@@ -138,7 +138,7 @@ export interface PromptConfig {
   /**
    * A single system prompt string. Supports templating using `${input_name}` syntax.
    */
-  systemPrompt?: string;
+  systemPrompt?: string | Promise<string>;
   /**
    * An array of user/model content pairs for few-shot prompting.
    */

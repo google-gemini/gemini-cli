@@ -12,7 +12,7 @@ import type { AgentRegistry } from './registry.js';
 import type { Config } from 'src/config/config.js';
 
 describe('GeneralistAgent', () => {
-  it('should create a valid generalist agent definition', () => {
+  it('should create a valid generalist agent definition', async () => {
     const config = makeFakeConfig();
     vi.spyOn(config, 'getToolRegistry').mockReturnValue({
       getAllToolNames: () => ['tool1', 'tool2', 'agent-tool'],
@@ -36,8 +36,11 @@ describe('GeneralistAgent', () => {
     expect(agent.toolConfig?.tools).toBeDefined();
     expect(agent.toolConfig?.tools).toContain('agent-tool');
     expect(agent.toolConfig?.tools).toContain('tool1');
-    expect(agent.promptConfig.systemPrompt).toContain('CLI agent');
+
+    const promptConfig = agent.promptConfig;
+    const systemPrompt = await promptConfig.systemPrompt;
+    expect(systemPrompt).toContain('CLI agent');
     // Ensure it's non-interactive
-    expect(agent.promptConfig.systemPrompt).toContain('non-interactive');
+    expect(systemPrompt).toContain('non-interactive');
   });
 });

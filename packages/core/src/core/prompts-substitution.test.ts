@@ -55,7 +55,7 @@ describe('Core System Prompt Substitution', () => {
     } as unknown as Config;
   });
 
-  it('should substitute ${AgentSkills} in custom system prompt', () => {
+  it('should substitute ${AgentSkills} in custom system prompt', async () => {
     const skills = [
       {
         name: 'test-skill',
@@ -70,7 +70,7 @@ describe('Core System Prompt Substitution', () => {
       'Skills go here: ${AgentSkills}',
     );
 
-    const prompt = getCoreSystemPrompt(mockConfig);
+    const prompt = await getCoreSystemPrompt(mockConfig);
 
     expect(prompt).toContain('Skills go here:');
     expect(prompt).toContain('<available_skills>');
@@ -78,24 +78,24 @@ describe('Core System Prompt Substitution', () => {
     expect(prompt).not.toContain('${AgentSkills}');
   });
 
-  it('should substitute ${SubAgents} in custom system prompt', () => {
+  it('should substitute ${SubAgents} in custom system prompt', async () => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.readFileSync).mockReturnValue('Agents: ${SubAgents}');
     vi.mocked(
       mockConfig.getAgentRegistry().getDirectoryContext,
     ).mockReturnValue('Actual Agent Directory');
 
-    const prompt = getCoreSystemPrompt(mockConfig);
+    const prompt = await getCoreSystemPrompt(mockConfig);
 
     expect(prompt).toContain('Agents: Actual Agent Directory');
     expect(prompt).not.toContain('${SubAgents}');
   });
 
-  it('should substitute ${AvailableTools} in custom system prompt', () => {
+  it('should substitute ${AvailableTools} in custom system prompt', async () => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.readFileSync).mockReturnValue('Tools:\n${AvailableTools}');
 
-    const prompt = getCoreSystemPrompt(mockConfig);
+    const prompt = await getCoreSystemPrompt(mockConfig);
 
     expect(prompt).toContain(
       `Tools:\n- ${toolNames.WRITE_FILE_TOOL_NAME}\n- ${toolNames.READ_FILE_TOOL_NAME}`,
@@ -103,13 +103,13 @@ describe('Core System Prompt Substitution', () => {
     expect(prompt).not.toContain('${AvailableTools}');
   });
 
-  it('should substitute tool names using the ${toolName}_ToolName pattern', () => {
+  it('should substitute tool names using the ${toolName}_ToolName pattern', async () => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.readFileSync).mockReturnValue(
       'Use ${write_file_ToolName} and ${read_file_ToolName}.',
     );
 
-    const prompt = getCoreSystemPrompt(mockConfig);
+    const prompt = await getCoreSystemPrompt(mockConfig);
 
     expect(prompt).toContain(
       `Use ${toolNames.WRITE_FILE_TOOL_NAME} and ${toolNames.READ_FILE_TOOL_NAME}.`,
@@ -118,23 +118,23 @@ describe('Core System Prompt Substitution', () => {
     expect(prompt).not.toContain('${read_file_ToolName}');
   });
 
-  it('should not substitute old patterns', () => {
+  it('should not substitute old patterns', async () => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.readFileSync).mockReturnValue(
       '${WriteFileToolName} and ${WRITE_FILE_TOOL_NAME}',
     );
 
-    const prompt = getCoreSystemPrompt(mockConfig);
+    const prompt = await getCoreSystemPrompt(mockConfig);
 
     expect(prompt).toBe('${WriteFileToolName} and ${WRITE_FILE_TOOL_NAME}');
   });
 
-  it('should not substitute disabled tool names', () => {
+  it('should not substitute disabled tool names', async () => {
     vi.mocked(mockConfig.getToolRegistry().getAllToolNames).mockReturnValue([]);
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.readFileSync).mockReturnValue('Use ${write_file_ToolName}.');
 
-    const prompt = getCoreSystemPrompt(mockConfig);
+    const prompt = await getCoreSystemPrompt(mockConfig);
 
     expect(prompt).toBe('Use ${write_file_ToolName}.');
   });
