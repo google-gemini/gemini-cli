@@ -6,7 +6,12 @@
 
 import React from 'react';
 import { Text, Box } from 'ink';
-import wrapAnsi from 'wrap-ansi';
+import {
+  type StyledChar,
+  toStyledCharacters,
+  styledCharsToString,
+  wrapStyledChars,
+} from 'ink';
 import { theme } from '../semantic-colors.js';
 import { RenderInline, getPlainTextLength } from './InlineMarkdownRenderer.js';
 
@@ -15,6 +20,8 @@ interface TableRendererProps {
   rows: string[][];
   terminalWidth: number;
 }
+
+const MIN_COLUMN_WIDTH = 10;
 
 /**
  * Custom table renderer for markdown tables
@@ -60,7 +67,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   // --- Step 2: Calculate Available Space ---
   // Fixed overhead: borders (n+1) + padding (2n)
   const fixedOverhead = headers.length + 1 + headers.length * 2;
-  const availableWidth = Math.max(0, terminalWidth - fixedOverhead - 1);
+  const availableWidth = Math.max(0, terminalWidth - fixedOverhead - 2);
 
   // --- Step 3: Allocation Algorithm ---
   const totalMinWidth = constraints.reduce((sum, c) => sum + c.min, 0);
@@ -68,9 +75,23 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
 
   if (totalMinWidth > availableWidth) {
     // Case A: Not enough space even for minimums.
-    // We must scale everything down proportionally.
-    const scale = availableWidth / totalMinWidth;
-    finalContentWidths = constraints.map((c) => Math.floor(c.min * scale));
+    // We must scale all the columns except the ones that are very short(<=10 characters)
+    const shortColumns = constraints.filter(
+      (c) => c.min === c.max && c.min <= MIN_COLUMN_WIDTH,
+    );
+    const totalShortColumnWidth = shortColumns.reduce(
+      (sum, c) => sum + c.min,
+      0,
+    );
+    const scale =
+      (availableWidth - totalShortColumnWidth) /
+      (totalMinWidth - totalShortColumnWidth);
+    finalContentWidths = constraints.map((c) => {
+      if (c.min === c.max && c.min <= MIN_COLUMN_WIDTH) {
+        return c.min;
+      }
+      return Math.floor(c.min * scale);
+    });
   } else {
     // Case B: We have space! Distribute the surplus.
     const surplus = availableWidth - totalMinWidth;
@@ -174,30 +195,15 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
       const colWidth = adjustedWidths[colIndex];
       const contentWidth = Math.max(1, colWidth - 2); // Subtract padding
 
-      // 1. Try soft wrap first (respects word boundaries)
-      // wrap-ansi with hard:false will put long words on their own line but won't split them,
-      // potentially exceeding contentWidth.
-      const softWrapped = wrapAnsi(cell, contentWidth, {
-        hard: false,
-        trim: true,
-      });
+      const contentStyledChars = toStyledCharacters(cell);
+      const wrappedStyledLines = wrapStyledChars(
+        contentStyledChars,
+        contentWidth,
+      );
 
-      // 2. Post-process to handle "Giant Words" that overflow
-      const rawLines = softWrapped.split('\n');
-      const finalLines: string[] = [];
-
-      for (const line of rawLines) {
-        if (getPlainTextLength(line) > contentWidth) {
-          // It's too long (a single giant word or URL). Force break it.
-          const forced = wrapAnsi(line, contentWidth, {
-            hard: true,
-            trim: true,
-          });
-          finalLines.push(...forced.split('\n'));
-        } else {
-          finalLines.push(line);
-        }
-      }
+      const finalLines = wrappedStyledLines.map((styledLine: StyledChar[]) =>
+        styledCharsToString(styledLine),
+      );
 
       return finalLines;
     });
