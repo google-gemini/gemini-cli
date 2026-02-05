@@ -17,7 +17,6 @@ describe('Card', () => {
       suffix: '0.26.0 → 0.27.0',
       prefix: true,
       body: 'Installed via Homebrew. Please update with "brew upgrade gemini-cli".',
-      width: 40,
     },
     {
       variant: 'information',
