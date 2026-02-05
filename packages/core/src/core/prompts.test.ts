@@ -107,15 +107,11 @@ describe('Core System Prompt (prompts.ts)', () => {
     } as unknown as Config;
   });
 
-<<<<<<< adibakm/fix-invalid-tool-calls-plan-mode
-  it('should include available_skills when provided in config', async () => {
-=======
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it('should include available_skills when provided in config', () => {
->>>>>>> main
+  it('should include available_skills when provided in config', async () => {
     const skills = [
       {
         name: 'test-skill',
