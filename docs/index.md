@@ -100,10 +100,8 @@ Connect Gemini CLI to external services and other development tools.
   the Model Context Protocol.
 - **[IDE integration](./ide-integration/index.md):** Use Gemini CLI alongside VS
   Code.
-- **[Hooks](./hooks/index.md):** (Preview) Write scripts that run on specific
-  CLI events.
-- **[Agent skills](./cli/skills.md):** (Preview) Add specialized expertise and
-  workflows.
+- **[Hooks](./hooks/index.md):** Write scripts that run on specific CLI events.
+- **[Agent skills](./cli/skills.md):** Add specialized expertise and workflows.
 - **[Sub-agents](./core/subagents.md):** (Preview) Delegate tasks to specialized
   agents.
 
