@@ -165,12 +165,10 @@ export async function resolveConfirmation(
         toolCall,
         signal,
       );
+      // Editor is not available - emit error feedback and stay in the loop
+      // to return to previous confirmation screen.
       if (modResult.error) {
-        // Editor is not available - emit error feedback and stay in the loop
-        // to return to previous confirmation screen.
-        if (modResult.error) {
-          coreEvents.emitFeedback('error', modResult.error);
-        }
+        coreEvents.emitFeedback('error', modResult.error);
       }
     } else if (response.payload && 'newContent' in response.payload) {
       await handleInlineModification(deps, toolCall, response.payload, signal);

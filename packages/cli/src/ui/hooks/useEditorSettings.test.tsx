@@ -40,7 +40,7 @@ vi.mock('@google/gemini-cli-core', async () => {
   };
 });
 
-const mockCheckHasEditorType = vi.mocked(hasValidEditorCommand);
+const mockHasValidEditorCommand = vi.mocked(hasValidEditorCommand);
 const mockAllowEditorTypeInSandbox = vi.mocked(allowEditorTypeInSandbox);
 
 describe('useEditorSettings', () => {
@@ -69,7 +69,7 @@ describe('useEditorSettings', () => {
     mockAddItem = vi.fn();
 
     // Reset mock implementations to default
-    mockCheckHasEditorType.mockReturnValue(true);
+    mockHasValidEditorCommand.mockReturnValue(true);
     mockAllowEditorTypeInSandbox.mockReturnValue(true);
   });
 
@@ -224,7 +224,7 @@ describe('useEditorSettings', () => {
   it('should not set preference for unavailable editors', () => {
     render(<TestComponent />);
 
-    mockCheckHasEditorType.mockReturnValue(false);
+    mockHasValidEditorCommand.mockReturnValue(false);
 
     const editorType: EditorType = 'vscode';
     const scope = SettingScope.User;

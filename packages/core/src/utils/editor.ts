@@ -141,10 +141,11 @@ export function hasValidEditorCommand(editor: EditorType): boolean {
 export async function hasValidEditorCommandAsync(
   editor: EditorType,
 ): Promise<boolean> {
-  const results = await Promise.all(
-    getEditorCommands(editor).map((cmd) => commandExistsAsync(cmd)),
-  );
-  return results.some(Boolean);
+  return Promise.any(
+    getEditorCommands(editor).map((cmd) =>
+      commandExistsAsync(cmd).then((exists) => exists || Promise.reject()),
+    ),
+  ).catch(() => false);
 }
 
 export function getEditorCommand(editor: EditorType): string {
