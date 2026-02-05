@@ -25,6 +25,7 @@ import { ApprovalMode } from '../policy/types.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import type { CallableTool } from '@google/genai';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { ShellTool } from '../tools/shell.js';
 
 // Mock tool names if they are dynamically generated or complex
 vi.mock('../tools/ls', () => ({ LSTool: { Name: 'list_directory' } }));
@@ -36,7 +37,10 @@ vi.mock('../tools/read-many-files', () => ({
   ReadManyFilesTool: { Name: 'read_many_files' },
 }));
 vi.mock('../tools/shell', () => ({
-  ShellTool: { Name: 'run_shell_command' },
+  ShellTool: class {
+    static readonly Name = 'run_shell_command';
+    name = 'run_shell_command';
+  },
 }));
 vi.mock('../tools/write-file', () => ({
   WriteFileTool: { Name: 'write_file' },
@@ -80,6 +84,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       getModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO),
       getActiveModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL),
       getPreviewFeatures: vi.fn().mockReturnValue(false),
+      getMessageBus: vi.fn(),
       getAgentRegistry: vi.fn().mockReturnValue({
         getDirectoryContext: vi.fn().mockReturnValue('Mock Agent Directory'),
       }),
@@ -292,6 +297,7 @@ describe('Core System Prompt (prompts.ts)', () => {
 
       vi.mocked(mockConfig.getToolRegistry().getAllTools).mockReturnValue([
         mcpTool,
+        new ShellTool(mockConfig, mockConfig.getMessageBus()),
       ]);
       vi.mocked(mockConfig.getToolRegistry().getAllToolNames).mockReturnValue([
         mcpTool.name,
@@ -300,6 +306,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       const prompt = getCoreSystemPrompt(mockConfig);
 
       expect(prompt).toContain('`read_static_value` (readonly-server)');
+      expect(prompt).not.toContain('`run_shell_command`');
     });
 
     it('should only list available tools in PLAN mode', () => {
@@ -309,7 +316,6 @@ describe('Core System Prompt (prompts.ts)', () => {
         'glob',
         'read_file',
         'ask_user',
-        'run_shell_command',
       ]);
 
       const prompt = getCoreSystemPrompt(mockConfig);
@@ -323,9 +329,6 @@ describe('Core System Prompt (prompts.ts)', () => {
       expect(prompt).not.toContain('`google_web_search`');
       expect(prompt).not.toContain('`list_directory`');
       expect(prompt).not.toContain('`grep_search`');
-
-      // should not include non read-only tools
-      expect(prompt).not.toContain('`run_shell_command`');
     });
   });
 
