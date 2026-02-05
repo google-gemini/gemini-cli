@@ -162,16 +162,12 @@ export class GemmaClassifierStrategy implements RoutingStrategy {
   readonly name = 'gemma-classifier';
 
   private flattenChatHistory(turns: Content[]): Content[] {
-    let formattedHistory = '';
-    for (const turn of turns.slice(0, -1)) {
-      let parts = '';
-      if (turn.parts) {
-        for (const part of turn.parts) {
-          parts += `${part.text}\n\n`;
-        }
-      }
-      formattedHistory += `${parts}\n`;
-    }
+    const formattedHistory = turns
+      .slice(0, -1)
+      .map((turn) =>
+        turn.parts ? turn.parts.map((part) => part.text).join('\n') : '',
+      )
+      .join('\n\n');
 
     const lastTurn = turns.at(-1);
     const userRequest =

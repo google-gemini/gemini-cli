@@ -18,6 +18,7 @@ import { ClassifierStrategy } from './strategies/classifierStrategy.js';
 import { NumericalClassifierStrategy } from './strategies/numericalClassifierStrategy.js';
 import { logModelRouting } from '../telemetry/loggers.js';
 import { ModelRoutingEvent } from '../telemetry/types.js';
+import { GemmaClassifierStrategy } from './strategies/gemmaClassifierStrategy.js';
 
 vi.mock('../config/config.js');
 vi.mock('../core/baseLlmClient.js');
@@ -27,6 +28,7 @@ vi.mock('./strategies/fallbackStrategy.js');
 vi.mock('./strategies/overrideStrategy.js');
 vi.mock('./strategies/classifierStrategy.js');
 vi.mock('./strategies/numericalClassifierStrategy.js');
+vi.mock('./strategies/gemmaClassifierStrategy.js');
 vi.mock('../telemetry/loggers.js');
 vi.mock('../telemetry/types.js');
 
@@ -45,6 +47,9 @@ describe('ModelRouterService', () => {
     vi.spyOn(mockConfig, 'getBaseLlmClient').mockReturnValue(mockBaseLlmClient);
     vi.spyOn(mockConfig, 'getNumericalRoutingEnabled').mockResolvedValue(false);
     vi.spyOn(mockConfig, 'getClassifierThreshold').mockResolvedValue(undefined);
+    vi.spyOn(mockConfig, 'getGemmaModelRouterSettings').mockReturnValue({
+      enabled: false,
+    });
 
     mockCompositeStrategy = new CompositeStrategy(
       [
@@ -84,6 +89,30 @@ describe('ModelRouterService', () => {
     expect(childStrategies[1]).toBeInstanceOf(OverrideStrategy);
     expect(childStrategies[2]).toBeInstanceOf(ClassifierStrategy);
     expect(childStrategies[3]).toBeInstanceOf(NumericalClassifierStrategy);
+    expect(childStrategies[4]).toBeInstanceOf(DefaultStrategy);
+    expect(compositeStrategyArgs[1]).toBe('agent-router');
+  });
+
+  it('should include GemmaClassifierStrategy when enabled', () => {
+    // Override the default mock for this specific test
+    vi.spyOn(mockConfig, 'getGemmaModelRouterSettings').mockReturnValue({
+      enabled: true,
+    });
+
+    // Clear previous mock calls from beforeEach
+    vi.mocked(CompositeStrategy).mockClear();
+
+    // Re-initialize the service to pick up the new config
+    service = new ModelRouterService(mockConfig);
+
+    const compositeStrategyArgs = vi.mocked(CompositeStrategy).mock.calls[0];
+    const childStrategies = compositeStrategyArgs[0];
+
+    expect(childStrategies.length).toBe(5);
+    expect(childStrategies[0]).toBeInstanceOf(FallbackStrategy);
+    expect(childStrategies[1]).toBeInstanceOf(OverrideStrategy);
+    expect(childStrategies[2]).toBeInstanceOf(GemmaClassifierStrategy);
+    expect(childStrategies[3]).toBeInstanceOf(ClassifierStrategy);
     expect(childStrategies[4]).toBeInstanceOf(DefaultStrategy);
     expect(compositeStrategyArgs[1]).toBe('agent-router');
   });
