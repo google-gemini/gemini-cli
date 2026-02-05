@@ -17,6 +17,7 @@ describe('Card', () => {
       suffix: '0.26.0 → 0.27.0',
       prefix: true,
       body: 'Installed via Homebrew. Please update with "brew upgrade gemini-cli".',
+      width: 40,
     },
     {
       variant: 'information',
@@ -46,17 +47,11 @@ describe('Card', () => {
       prefix: true,
       body: 'Listed 39 item(s).',
     },
-  ])(
+  ] as const)(
     'renders a $variant card with prefix=$prefix',
     ({ variant, title, suffix, prefix, body }) => {
       const { lastFrame } = render(
-        <Card
-          variant={variant}
-          title={title}
-          suffix={suffix}
-          prefix={prefix}
-          width={80}
-        >
+        <Card variant={variant} title={title} suffix={suffix} prefix={prefix}>
           <Text>{body}</Text>
         </Card>,
       );

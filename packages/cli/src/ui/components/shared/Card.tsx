@@ -23,7 +23,6 @@ export interface CardProps {
   children?: React.ReactNode;
   /** The styling and intent of the card. */
   variant?: 'information' | 'success' | 'warning' | 'error' | 'confirmation';
-  width?: number | string;
 }
 
 const CardDisplay: React.FC<CardProps> = ({
