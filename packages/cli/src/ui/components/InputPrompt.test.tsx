@@ -73,6 +73,10 @@ vi.mock('ink', async (importOriginal) => {
   };
 });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 const mockSlashCommands: SlashCommand[] = [
   {
     name: 'clear',
