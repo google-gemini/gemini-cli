@@ -22,6 +22,8 @@ import { validatePlanPath, validatePlanContent } from '../utils/planUtils.js';
 import { ApprovalMode } from '../policy/types.js';
 import { checkExhaustive } from '../utils/checks.js';
 import { resolveToRealPath, isSubpath } from '../utils/paths.js';
+import { logPlanExecution } from '../telemetry/loggers.js';
+import { PlanExecutionEvent } from '../telemetry/types.js';
 
 /**
  * Returns a human-readable description for an approval mode.
@@ -225,6 +227,8 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
       const newMode = payload.approvalMode ?? ApprovalMode.DEFAULT;
       this.config.setApprovalMode(newMode);
       this.config.setApprovedPlanPath(resolvedPlanPath);
+
+      logPlanExecution(this.config, new PlanExecutionEvent(newMode));
 
       const description = getApprovalModeDescription(newMode);
 
