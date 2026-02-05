@@ -7,7 +7,8 @@
 import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../../semantic-colors.js';
-import { TOOL_STATUS } from '../../constants.js';
+import { ToolStatusIndicator } from '../messages/ToolShared.js';
+import { ToolCallStatus } from '../../types.js';
 
 /**
  * Props for the Card component.
@@ -22,55 +23,39 @@ export interface CardProps {
   /** The content to be displayed inside the card. */
   children?: React.ReactNode;
   /** The styling and intent of the card. */
-  variant?: 'information' | 'success' | 'warning' | 'error' | 'confirmation';
+  status?: ToolCallStatus;
 }
 
 export const Card: React.FC<CardProps> = ({
-  variant = 'information',
+  status = ToolCallStatus.Pending,
   title,
   prefix = true,
   suffix,
   children,
 }) => {
   const getColors = () => {
-    switch (variant) {
-      case 'error':
-        return { border: theme.status.error, text: theme.status.error };
-      case 'warning':
-        return { border: theme.status.warning, text: theme.status.warning };
-      case 'success':
-        return { border: theme.status.success, text: theme.status.success };
-      case 'confirmation':
+    switch (status) {
+      case ToolCallStatus.Pending:
+        return { border: theme.border.default, text: theme.text.accent };
+      case ToolCallStatus.Confirming:
         return { border: theme.border.focused, text: theme.text.link };
-      case 'information':
-        return { border: theme.border.default, text: theme.text.primary };
+      case ToolCallStatus.Error:
+        return { border: theme.status.error, text: theme.status.error };
+      case ToolCallStatus.Success:
+        return { border: theme.border.default, text: theme.status.success };
+      case ToolCallStatus.Canceled:
+        return { border: theme.status.warning, text: theme.status.warning };
+      case ToolCallStatus.Executing:
+        return { border: theme.border.default, text: theme.status.success };
       default:
         return { border: theme.border.default, text: theme.text.primary };
-    }
-  };
-
-  const getGlyph = () => {
-    switch (variant) {
-      case 'error':
-        return TOOL_STATUS.ERROR;
-      case 'success':
-        return TOOL_STATUS.SUCCESS;
-      case 'warning':
-        return TOOL_STATUS.WARNING;
-      case 'confirmation':
-        return TOOL_STATUS.CONFIRMING;
-      case 'information':
-        return TOOL_STATUS.INFORMATION;
-      default:
-        return TOOL_STATUS.INFORMATION;
     }
   };
 
   const colors = getColors();
-  const glyph = getGlyph();
 
   return (
-    <Box flexDirection="column" marginBottom={1}>
+    <Box flexDirection="column">
       <Box width="100%" flexDirection="row">
         {/* Top border section */}
         <Box
@@ -88,7 +73,10 @@ export const Card: React.FC<CardProps> = ({
             gap={1}
             justifyContent="flex-start"
           >
-            <Box>{prefix && <Text color={colors.text}>{glyph}</Text>}</Box>
+            {/* TODO: Use shared ToolStatusIndicator component */}
+            <Box marginRight={-2}>
+              {prefix && <ToolStatusIndicator status={status} name={title} />}
+            </Box>
             <Text bold color={colors.text}>
               {title}
             </Text>
