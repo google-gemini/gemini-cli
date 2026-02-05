@@ -55,13 +55,13 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
 
     // min: used to guarantee minimum column width and prevent wrapping mid-word
     // Defaults to header width or max word width
-    const min = Math.max(headerWidth, maxWordWidth);
+    const minWidth = Math.max(headerWidth, maxWordWidth);
 
     // max: used to determine how much the column can grow if space allows
     // Ensure max is never smaller than min
-    const max = Math.max(min, maxContentWidth);
+    const maxWidth = Math.max(minWidth, maxContentWidth);
 
-    return { min, max };
+    return { minWidth, maxWidth };
   });
 
   // --- Step 2: Calculate Available Space ---
@@ -70,46 +70,54 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   const availableWidth = Math.max(0, terminalWidth - fixedOverhead - 2);
 
   // --- Step 3: Allocation Algorithm ---
-  const totalMinWidth = constraints.reduce((sum, c) => sum + c.min, 0);
+  const totalMinWidth = constraints.reduce((sum, c) => sum + c.minWidth, 0);
   let finalContentWidths: number[];
 
   if (totalMinWidth > availableWidth) {
     // Case A: Not enough space even for minimums.
     // We must scale all the columns except the ones that are very short(<=10 characters)
     const shortColumns = constraints.filter(
-      (c) => c.min === c.max && c.min <= MIN_COLUMN_WIDTH,
+      (c) => c.minWidth === c.maxWidth && c.minWidth <= MIN_COLUMN_WIDTH,
     );
     const totalShortColumnWidth = shortColumns.reduce(
-      (sum, c) => sum + c.min,
+      (sum, c) => sum + c.minWidth,
       0,
     );
+
+    const finalTotalShortColumnWidth =
+      totalShortColumnWidth >= availableWidth ? 0 : totalShortColumnWidth;
+
     const scale =
-      (availableWidth - totalShortColumnWidth) /
-      (totalMinWidth - totalShortColumnWidth);
+      (availableWidth - finalTotalShortColumnWidth) /
+      (totalMinWidth - finalTotalShortColumnWidth);
     finalContentWidths = constraints.map((c) => {
-      if (c.min === c.max && c.min <= MIN_COLUMN_WIDTH) {
-        return c.min;
+      if (
+        c.minWidth === c.maxWidth &&
+        c.minWidth <= MIN_COLUMN_WIDTH &&
+        finalTotalShortColumnWidth > 0
+      ) {
+        return c.minWidth;
       }
-      return Math.floor(c.min * scale);
+      return Math.floor(c.minWidth * scale);
     });
   } else {
     // Case B: We have space! Distribute the surplus.
     const surplus = availableWidth - totalMinWidth;
     const totalGrowthNeed = constraints.reduce(
-      (sum, c) => sum + (c.max - c.min),
+      (sum, c) => sum + (c.maxWidth - c.minWidth),
       0,
     );
 
     if (totalGrowthNeed === 0) {
       // If nobody wants to grow, simply give everyone their min.
-      finalContentWidths = constraints.map((c) => c.min);
+      finalContentWidths = constraints.map((c) => c.minWidth);
     } else {
       finalContentWidths = constraints.map((c) => {
-        const growthNeed = c.max - c.min;
+        const growthNeed = c.maxWidth - c.minWidth;
         // Calculate share: (My Need / Total Need) * Surplus
         const share = growthNeed / totalGrowthNeed;
         const extra = Math.floor(surplus * share);
-        return c.min + extra;
+        return c.minWidth + extra;
       });
     }
   }
