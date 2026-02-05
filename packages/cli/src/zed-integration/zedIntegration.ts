@@ -34,6 +34,7 @@ import {
   startupProfiler,
   Kind,
   partListUnionToString,
+  ApprovalMode,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
@@ -222,6 +223,10 @@ export class GeminiAgent {
 
     return {
       sessionId,
+      modes: {
+        availableModes: buildAvailableModes(config.isPlanEnabled()),
+        currentModeId: config.getApprovalMode(),
+      },
     };
   }
 
@@ -273,7 +278,12 @@ export class GeminiAgent {
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     session.streamHistory(sessionData.messages);
 
-    return {};
+    return {
+      modes: {
+        availableModes: buildAvailableModes(config.isPlanEnabled()),
+        currentModeId: config.getApprovalMode(),
+      },
+    };
   }
 
   private async initializeSessionConfig(
@@ -374,6 +384,16 @@ export class GeminiAgent {
     }
     return session.prompt(params);
   }
+
+  async setSessionMode(
+    params: acp.SetSessionModeRequest,
+  ): Promise<acp.SetSessionModeResponse> {
+    const session = this.sessions.get(params.sessionId);
+    if (!session) {
+      throw new Error(`Session not found: ${params.sessionId}`);
+    }
+    return session.setMode(params.modeId);
+  }
 }
 
 export class Session {
@@ -393,6 +413,15 @@ export class Session {
 
     this.pendingPrompt.abort();
     this.pendingPrompt = null;
+  }
+
+  setMode(modeId: acp.SessionModeId): acp.SetSessionModeResponse {
+    const mode = Object.values(ApprovalMode).find((m) => m === modeId);
+    if (!mode) {
+      throw new Error(`Invalid mode: ${modeId}`);
+    }
+    this.config.setApprovalMode(mode);
+    return {};
   }
 
   async streamHistory(messages: ConversationRecord['messages']): Promise<void> {
@@ -1265,4 +1294,34 @@ function toAcpToolKind(kind: Kind): acp.ToolKind {
     default:
       return 'other';
   }
+}
+
+function buildAvailableModes(isPlanEnabled: boolean): acp.SessionMode[] {
+  const modes: acp.SessionMode[] = [
+    {
+      id: ApprovalMode.DEFAULT,
+      name: 'Default',
+      description: 'Prompts for approval',
+    },
+    {
+      id: ApprovalMode.AUTO_EDIT,
+      name: 'Auto Edit',
+      description: 'Auto-approves edit tools',
+    },
+    {
+      id: ApprovalMode.YOLO,
+      name: 'YOLO',
+      description: 'Auto-approves all tools',
+    },
+  ];
+
+  if (isPlanEnabled) {
+    modes.push({
+      id: ApprovalMode.PLAN,
+      name: 'Plan',
+      description: 'Read-only mode',
+    });
+  }
+
+  return modes;
 }
