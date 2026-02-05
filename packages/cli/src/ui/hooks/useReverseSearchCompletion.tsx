@@ -39,10 +39,8 @@ export function useReverseSearchCompletion(
     suggestions,
     activeSuggestionIndex,
     visibleStartIndex,
-    showSuggestions,
     isLoadingSuggestions,
     setSuggestions,
-    setShowSuggestions,
     setActiveSuggestionIndex,
     resetCompletionState,
     navigateUp,
@@ -115,7 +113,6 @@ export function useReverseSearchCompletion(
 
     setSuggestions(matches);
     const hasAny = matches.length > 0;
-    setShowSuggestions(hasAny);
     setActiveSuggestionIndex(hasAny ? 0 : -1);
     setVisibleStartIndex(0);
 
@@ -126,11 +123,13 @@ export function useReverseSearchCompletion(
     matches,
     reverseSearchActive,
     setSuggestions,
-    setShowSuggestions,
     setActiveSuggestionIndex,
     setVisibleStartIndex,
     resetCompletionState,
   ]);
+
+  const showSuggestions =
+    reverseSearchActive && (isLoadingSuggestions || suggestions.length > 0);
 
   const handleAutocomplete = useCallback(
     (i: number) => {

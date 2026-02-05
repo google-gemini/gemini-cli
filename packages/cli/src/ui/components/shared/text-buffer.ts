@@ -1596,8 +1596,13 @@ function generatePastedTextId(
 }
 
 export type TextBufferAction =
-  | { type: 'set_text'; payload: string; pushToUndo?: boolean }
   | { type: 'insert'; payload: string; isPaste?: boolean }
+  | {
+      type: 'set_text';
+      payload: string;
+      pushToUndo?: boolean;
+      cursorPosition?: 'start' | 'end' | number;
+    }
   | { type: 'add_pasted_content'; payload: { id: string; text: string } }
   | { type: 'backspace' }
   | {
@@ -1709,12 +1714,29 @@ function textBufferReducerLogic(
         .replace(/\r\n?/g, '\n')
         .split('\n');
       const lines = newContentLines.length === 0 ? [''] : newContentLines;
-      const lastNewLineIndex = lines.length - 1;
+
+      let newCursorRow: number;
+      let newCursorCol: number;
+
+      if (typeof action.cursorPosition === 'number') {
+        [newCursorRow, newCursorCol] = offsetToLogicalPos(
+          action.payload,
+          action.cursorPosition,
+        );
+      } else if (action.cursorPosition === 'start') {
+        newCursorRow = 0;
+        newCursorCol = 0;
+      } else {
+        // Default to 'end'
+        newCursorRow = lines.length - 1;
+        newCursorCol = cpLen(lines[newCursorRow] ?? '');
+      }
+
       return {
         ...nextState,
         lines,
-        cursorRow: lastNewLineIndex,
-        cursorCol: cpLen(lines[lastNewLineIndex] ?? ''),
+        cursorRow: newCursorRow,
+        cursorCol: newCursorCol,
         preferredCol: null,
         pastedContent: action.payload === '' ? {} : nextState.pastedContent,
       };
@@ -2838,9 +2860,12 @@ export function useTextBuffer({
     dispatch({ type: 'redo' });
   }, []);
 
-  const setText = useCallback((newText: string): void => {
-    dispatch({ type: 'set_text', payload: newText });
-  }, []);
+  const setText = useCallback(
+    (newText: string, cursorPosition?: 'start' | 'end' | number): void => {
+      dispatch({ type: 'set_text', payload: newText, cursorPosition });
+    },
+    [],
+  );
 
   const deleteWordLeft = useCallback((): void => {
     dispatch({ type: 'delete_word_left' });
@@ -3638,7 +3663,7 @@ export interface TextBuffer {
    * Replaces the entire buffer content with the provided text.
    * The operation is undoable.
    */
-  setText: (text: string) => void;
+  setText: (text: string, cursorPosition?: 'start' | 'end' | number) => void;
   /**
    * Insert a single character or string without newlines.
    */
