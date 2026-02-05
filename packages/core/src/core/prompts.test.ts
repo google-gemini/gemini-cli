@@ -309,6 +309,7 @@ describe('Core System Prompt (prompts.ts)', () => {
         'glob',
         'read_file',
         'ask_user',
+        'run_shell_command',
       ]);
 
       const prompt = getCoreSystemPrompt(mockConfig);
@@ -322,6 +323,9 @@ describe('Core System Prompt (prompts.ts)', () => {
       expect(prompt).not.toContain('`google_web_search`');
       expect(prompt).not.toContain('`list_directory`');
       expect(prompt).not.toContain('`grep_search`');
+
+      // should not include non read-only tools
+      expect(prompt).not.toContain('`run_shell_command`');
     });
   });
 
