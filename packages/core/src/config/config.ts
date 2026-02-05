@@ -35,6 +35,7 @@ import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { AskUserTool } from '../tools/ask-user.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
+import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { HookDefinition, HookEventName } from '../hooks/types.js';
@@ -627,9 +628,12 @@ export class Config {
   private latestApiRequest: GenerateContentParameters | undefined;
   private lastModeSwitchTime: number = Date.now();
 
+  private approvedPlanPath: string | undefined;
+
   constructor(params: ConfigParameters) {
     this.sessionId = params.sessionId;
     this.clientVersion = params.clientVersion ?? 'unknown';
+    this.approvedPlanPath = undefined;
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
     this.fileSystemService = new StandardFileSystemService();
@@ -918,6 +922,7 @@ export class Config {
         await this.getSkillManager().discoverSkills(
           this.storage,
           this.getExtensions(),
+          this.isTrustedFolder(),
         );
         this.getSkillManager().setDisabledSkills(this.disabledSkills);
 
@@ -1046,8 +1051,7 @@ export class Config {
   }
 
   getUserTierName(): string | undefined {
-    // TODO(#1275): Re-enable user tier display when ready.
-    return undefined;
+    return this.contentGenerator?.userTierName;
   }
 
   /**
@@ -1706,6 +1710,14 @@ export class Config {
     return this.planEnabled;
   }
 
+  getApprovedPlanPath(): string | undefined {
+    return this.approvedPlanPath;
+  }
+
+  setApprovedPlanPath(path: string | undefined): void {
+    this.approvedPlanPath = path;
+  }
+
   isAgentsEnabled(): boolean {
     return this.enableAgents;
   }
@@ -1924,6 +1936,7 @@ export class Config {
       await this.getSkillManager().discoverSkills(
         this.storage,
         this.getExtensions(),
+        this.isTrustedFolder(),
       );
       this.getSkillManager().setDisabledSkills(this.disabledSkills);
 
@@ -2143,6 +2156,7 @@ export class Config {
     }
     if (this.isPlanEnabled()) {
       registerCoreTool(ExitPlanModeTool, this);
+      registerCoreTool(EnterPlanModeTool, this);
     }
 
     // Register Subagents as Tools
