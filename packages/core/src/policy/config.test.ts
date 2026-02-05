@@ -458,6 +458,21 @@ describe('createPolicyEngineConfig', () => {
       }
       return [];
     });
+    const mockStat = vi.fn(async (p) => {
+      if (typeof p === 'string' && p.includes('/tmp/mock/default/policies')) {
+        return {
+          isDirectory: () => true,
+          isFile: () => false,
+        } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
+      }
+      if (typeof p === 'string' && p.includes('default.toml')) {
+        return {
+          isDirectory: () => false,
+          isFile: () => true,
+        } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
+      }
+      return actualFs.stat(p);
+    });
     const mockReadFile = vi.fn(async (p, _o) => {
       if (typeof p === 'string' && p.includes('default.toml')) {
         return '[[rule]]\ntoolName = "glob"\ndecision = "allow"\npriority = 50\n';
@@ -466,9 +481,15 @@ describe('createPolicyEngineConfig', () => {
     });
     vi.doMock('node:fs/promises', () => ({
       ...actualFs,
-      default: { ...actualFs, readdir: mockReaddir, readFile: mockReadFile },
+      default: {
+        ...actualFs,
+        readdir: mockReaddir,
+        readFile: mockReadFile,
+        stat: mockStat,
+      },
       readdir: mockReaddir,
       readFile: mockReadFile,
+      stat: mockStat,
     }));
     vi.resetModules();
     const { createPolicyEngineConfig: createConfig } = await import(

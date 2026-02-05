@@ -140,6 +140,10 @@ vi.mock('@google/gemini-cli-core', async () => {
       defaultDecision: ServerConfig.PolicyDecision.ASK_USER,
       approvalMode: ServerConfig.ApprovalMode.DEFAULT,
     })),
+    getAdminErrorMessage: vi.fn(
+      (_feature) =>
+        `YOLO mode is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli`,
+    ),
   };
 });
 
@@ -2902,6 +2906,26 @@ describe('Policy Engine Integration in loadCliConfig', () => {
         tools: expect.objectContaining({
           exclude: expect.arrayContaining([SHELL_TOOL_NAME]),
         }),
+      }),
+      expect.anything(),
+    );
+  });
+
+  it('should pass user-provided policy paths from --policy flag to createPolicyEngineConfig', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--policy',
+      '/path/to/policy1.toml,/path/to/policy2.toml',
+    ];
+    const settings = createTestMergedSettings();
+    const argv = await parseArguments(settings);
+
+    await loadCliConfig(settings, 'test-session', argv);
+
+    expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        policyPaths: ['/path/to/policy1.toml', '/path/to/policy2.toml'],
       }),
       expect.anything(),
     );
