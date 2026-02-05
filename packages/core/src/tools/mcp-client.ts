@@ -32,6 +32,7 @@ import {
   PromptListChangedNotificationSchema,
   type Tool as McpTool,
 } from '@modelcontextprotocol/sdk/types.js';
+import { ApprovalMode, PolicyDecision } from '../policy/types.js';
 import { parse } from 'shell-quote';
 import type {
   Config,
@@ -1028,6 +1029,9 @@ export async function discoverTools(
           mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
         );
 
+        // Extract readOnlyHint from annotations
+        const isReadOnly = toolDef.annotations?.readOnlyHint === true;
+
         const tool = new DiscoveredMCPTool(
           mcpCallableTool,
           mcpServerName,
@@ -1036,11 +1040,23 @@ export async function discoverTools(
           toolDef.inputSchema ?? { type: 'object', properties: {} },
           messageBus,
           mcpServerConfig.trust,
+          isReadOnly,
           undefined,
           cliConfig,
           mcpServerConfig.extension?.name,
           mcpServerConfig.extension?.id,
         );
+
+        // If the tool is read-only, allow it in Plan mode
+        if (isReadOnly) {
+          cliConfig.getPolicyEngine().addRule({
+            toolName: tool.getFullyQualifiedName(),
+            decision: PolicyDecision.ASK_USER,
+            priority: 50, // Match priority of built-in plan tools
+            modes: [ApprovalMode.PLAN],
+            source: `MCP Annotation (readOnlyHint) - ${mcpServerName}`,
+          });
+        }
 
         discoveredTools.push(tool);
       } catch (error) {
