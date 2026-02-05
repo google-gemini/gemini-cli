@@ -60,10 +60,12 @@ import { DEFAULT_BACKGROUND_OPACITY } from '../constants.js';
 import { getSafeLowColorBackground } from '../themes/color-utils.js';
 import { isLowColorDepth } from '../utils/terminalUtils.js';
 import { useShellFocusState } from '../contexts/ShellFocusContext.js';
+import { useUIState } from '../contexts/UIStateContext.js';
 import {
-  useUIState,
+  appEvents,
+  AppEvent,
   TransientMessageType,
-} from '../contexts/UIStateContext.js';
+} from '../../utils/events.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { StreamingState } from '../types.js';
 import { useMouseClick } from '../hooks/useMouseClick.js';
@@ -142,47 +144,37 @@ export function isLargePaste(text: string): boolean {
  * Attempt to toggle expansion of a paste placeholder in the buffer.
  * Returns true if a toggle action was performed or hint was shown, false otherwise.
  */
-export function tryTogglePasteExpansion(
-  buffer: TextBuffer,
-  onHintMessage?: (msg: string) => void,
-): boolean {
+export function tryTogglePasteExpansion(buffer: TextBuffer): boolean {
   if (!buffer.pastedContent || Object.keys(buffer.pastedContent).length === 0) {
     return false;
   }
 
   const [row, col] = buffer.cursor;
 
-  // 1. Check if cursor is on a collapsed placeholder
+  // 1. Check if cursor is on or immediately after a collapsed placeholder
   const transform = getTransformUnderCursor(
     row,
     col,
     buffer.transformationsByLine,
+    { includeEdge: true },
   );
   if (transform?.type === 'paste' && transform.id) {
     buffer.togglePasteExpansion(transform.id, row, col);
     return true;
   }
 
-  // 2. Check if cursor is immediately after a paste placeholder (natural position after paste)
-  const transforms = buffer.transformationsByLine[row];
-  if (transforms) {
-    for (const t of transforms) {
-      if (t.type === 'paste' && t.id && col === t.logEnd) {
-        buffer.togglePasteExpansion(t.id, row, col);
-        return true;
-      }
-    }
-  }
-
-  // 3. Check if cursor is inside an expanded paste region — collapse it
+  // 2. Check if cursor is inside an expanded paste region — collapse it
   const expandedId = buffer.getExpandedPasteAtLine(row);
   if (expandedId) {
     buffer.togglePasteExpansion(expandedId, row, col);
     return true;
   }
 
-  // 4. Placeholders exist but cursor isn't on one — show hint
-  onHintMessage?.('Move cursor within placeholder to expand');
+  // 3. Placeholders exist but cursor isn't on one — show hint
+  appEvents.emit(AppEvent.TransientMessage, {
+    message: 'Move cursor within placeholder to expand',
+    type: TransientMessageType.Hint,
+  });
   return true;
 }
 
@@ -215,7 +207,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const { merged: settings } = useSettings();
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
-  const { setEmbeddedShellFocused, showTransientMessage } = useUIActions();
+  const { setEmbeddedShellFocused } = useUIActions();
   const {
     terminalWidth,
     activePtyId,
@@ -461,16 +453,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         const textToInsert = await clipboardy.read();
         buffer.insert(textToInsert, { paste: true });
         if (isLargePaste(textToInsert)) {
-          showTransientMessage(
-            'Press Ctrl+O to expand pasted text',
-            TransientMessageType.Hint,
-          );
+          appEvents.emit(AppEvent.TransientMessage, {
+            message: 'Press Ctrl+O to expand pasted text',
+            type: TransientMessageType.Hint,
+          });
         }
       }
     } catch (error) {
       debugLogger.error('Error handling paste:', error);
     }
-  }, [buffer, config, stdout, settings, showTransientMessage]);
+  }, [buffer, config, stdout, settings]);
 
   useMouseClick(
     innerBoxRef,
@@ -511,6 +503,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           logicalPos.row,
           logicalPos.col,
           buffer.transformationsByLine,
+          { includeEdge: true },
         );
         if (transform?.type === 'paste' && transform.id) {
           buffer.togglePasteExpansion(
@@ -592,10 +585,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         // Ensure we never accidentally interpret paste as regular input.
         buffer.handleInput(key);
         if (key.sequence && isLargePaste(key.sequence)) {
-          showTransientMessage(
-            'Press Ctrl+O to expand pasted text',
-            TransientMessageType.Hint,
-          );
+          appEvents.emit(AppEvent.TransientMessage, {
+            message: 'Press Ctrl+O to expand pasted text',
+            type: TransientMessageType.Hint,
+          });
         }
         return true;
       }
@@ -613,9 +606,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       // Ctrl+O to expand/collapse paste placeholders
       if (keyMatchers[Command.EXPAND_PASTE](key)) {
-        const handled = tryTogglePasteExpansion(buffer, (msg) =>
-          showTransientMessage(msg, TransientMessageType.Hint),
-        );
+        const handled = tryTogglePasteExpansion(buffer);
         if (handled) return true;
       }
 
@@ -1075,7 +1066,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       backgroundShellHeight,
       history,
       streamingState,
-      showTransientMessage,
     ],
   );
 

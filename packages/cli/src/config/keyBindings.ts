@@ -499,7 +499,8 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
     'Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only).',
   [Command.SHOW_MORE_LINES]:
     'Expand a height-constrained response to show additional lines when not in alternate buffer mode.',
-  [Command.EXPAND_PASTE]: 'Expand or collapse a paste placeholder.',
+  [Command.EXPAND_PASTE]:
+    'Expand or collapse a paste placeholder when cursor is over placeholder.',
   [Command.BACKGROUND_SHELL_SELECT]: 'Enter',
   [Command.BACKGROUND_SHELL_ESCAPE]: 'Esc',
   [Command.TOGGLE_BACKGROUND_SHELL]: 'Ctrl+B',

@@ -7,10 +7,8 @@
 import type React from 'react';
 import { Text } from 'ink';
 import { theme } from '../semantic-colors.js';
-import {
-  useUIState,
-  TransientMessageType,
-} from '../contexts/UIStateContext.js';
+import { useUIState } from '../contexts/UIStateContext.js';
+import { TransientMessageType } from '../../utils/events.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { ContextSummaryDisplay } from './ContextSummaryDisplay.js';
@@ -37,7 +35,10 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
     );
   }
 
-  if (uiState.transientMessage?.type === TransientMessageType.Warning) {
+  if (
+    uiState.transientMessage?.type === TransientMessageType.Warning &&
+    uiState.transientMessage.text
+  ) {
     return (
       <Text color={theme.status.warning}>{uiState.transientMessage.text}</Text>
     );
@@ -64,7 +65,10 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
     );
   }
 
-  if (uiState.transientMessage?.type === TransientMessageType.Hint) {
+  if (
+    uiState.transientMessage?.type === TransientMessageType.Hint &&
+    uiState.transientMessage.text
+  ) {
     return (
       <Text color={theme.text.secondary}>{uiState.transientMessage.text}</Text>
     );

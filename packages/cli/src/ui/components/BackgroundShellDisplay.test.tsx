@@ -13,6 +13,11 @@ import { act } from 'react';
 import { type Key, type KeypressHandler } from '../contexts/KeypressContext.js';
 import { ScrollProvider } from '../contexts/ScrollProvider.js';
 import { Box } from 'ink';
+import {
+  appEvents,
+  AppEvent,
+  TransientMessageType,
+} from '../../utils/events.js';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -20,7 +25,6 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const mockDismissBackgroundShell = vi.fn();
 const mockSetActiveBackgroundShellPid = vi.fn();
 const mockSetIsBackgroundShellListOpen = vi.fn();
-const mockShowTransientMessage = vi.fn();
 const mockSetEmbeddedShellFocused = vi.fn();
 
 vi.mock('../contexts/UIActionsContext.js', () => ({
@@ -28,7 +32,6 @@ vi.mock('../contexts/UIActionsContext.js', () => ({
     dismissBackgroundShell: mockDismissBackgroundShell,
     setActiveBackgroundShellPid: mockSetActiveBackgroundShellPid,
     setIsBackgroundShellListOpen: mockSetIsBackgroundShellListOpen,
-    showTransientMessage: mockShowTransientMessage,
     setEmbeddedShellFocused: mockSetEmbeddedShellFocused,
   }),
 }));
@@ -447,14 +450,18 @@ describe('<BackgroundShellDisplay />', () => {
       await delay(0);
     });
 
+    const emitSpy = vi.spyOn(appEvents, 'emit');
+
     act(() => {
       simulateKey({ name: 'tab' });
     });
 
-    expect(mockShowTransientMessage).toHaveBeenCalledWith(
-      'Press Shift+Tab to focus out.',
-      'warning',
-    );
+    expect(emitSpy).toHaveBeenCalledWith(AppEvent.TransientMessage, {
+      message: 'Press Shift+Tab to focus out.',
+      type: TransientMessageType.Warning,
+    });
     expect(mockSetEmbeddedShellFocused).not.toHaveBeenCalled();
+
+    emitSpy.mockRestore();
   });
 });

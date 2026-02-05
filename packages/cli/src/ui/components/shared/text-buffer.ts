@@ -803,11 +803,15 @@ export function getTransformUnderCursor(
   row: number,
   col: number,
   spansByLine: Transformation[][],
+  options: { includeEdge?: boolean } = {},
 ): Transformation | null {
   const spans = spansByLine[row];
   if (!spans || spans.length === 0) return null;
   for (const span of spans) {
-    if (col >= span.logStart && col < span.logEnd) {
+    if (
+      col >= span.logStart &&
+      (options.includeEdge ? col <= span.logEnd : col < span.logEnd)
+    ) {
       return span;
     }
     if (col < span.logStart) break;

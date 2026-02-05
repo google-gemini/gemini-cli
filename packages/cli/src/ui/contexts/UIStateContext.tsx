@@ -26,15 +26,11 @@ import type {
   ValidationIntent,
   AgentDefinition,
 } from '@google/gemini-cli-core';
+import { type TransientMessageType } from '../../utils/events.js';
 import type { DOMElement } from 'ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
 import type { ExtensionUpdateState } from '../state/extensions.js';
 import type { UpdateObject } from '../utils/updateCheck.js';
-
-export enum TransientMessageType {
-  Warning = 'warning',
-  Hint = 'hint',
-}
 
 export interface ProQuotaDialogRequest {
   failedModel: string;
@@ -154,7 +150,6 @@ export interface UIState {
   showDebugProfiler: boolean;
   showFullTodos: boolean;
   copyModeEnabled: boolean;
-  transientMessage: { text: string; type: TransientMessageType } | null;
   bannerData: {
     defaultText: string;
     warningText: string;
@@ -169,6 +164,10 @@ export interface UIState {
   isBackgroundShellListOpen: boolean;
   adminSettingsChanged: boolean;
   newAgents: AgentDefinition[] | null;
+  transientMessage: {
+    text: string;
+    type: TransientMessageType;
+  } | null;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);

@@ -8,11 +8,8 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render } from '../../test-utils/render.js';
 import { Text } from 'ink';
 import { StatusDisplay } from './StatusDisplay.js';
-import {
-  UIStateContext,
-  type UIState,
-  TransientMessageType,
-} from '../contexts/UIStateContext.js';
+import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
+import { TransientMessageType } from '../../utils/events.js';
 import { ConfigContext } from '../contexts/ConfigContext.js';
 import { SettingsContext } from '../contexts/SettingsContext.js';
 import { createMockSettings } from '../../test-utils/settings.js';

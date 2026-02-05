@@ -15,11 +15,7 @@ import {
 import { type DOMElement, measureElement } from 'ink';
 import { App } from './App.js';
 import { AppContext } from './contexts/AppContext.js';
-import {
-  UIStateContext,
-  type UIState,
-  TransientMessageType,
-} from './contexts/UIStateContext.js';
+import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
 import {
   UIActionsContext,
   type UIActions,
@@ -108,7 +104,7 @@ import { useShellInactivityStatus } from './hooks/useShellInactivityStatus.js';
 import { useFolderTrust } from './hooks/useFolderTrust.js';
 import { useIdeTrustListener } from './hooks/useIdeTrustListener.js';
 import { type IdeIntegrationNudgeResult } from './IdeIntegrationNudge.js';
-import { appEvents, AppEvent } from '../utils/events.js';
+import { appEvents, AppEvent, TransientMessageType } from '../utils/events.js';
 import { type UpdateObject } from './utils/updateCheck.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
@@ -145,6 +141,7 @@ import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialo
 import { NewAgentsChoice } from './components/NewAgentsNotification.js';
 import { isSlashCommand } from './utils/commandUtils.js';
 import { useTerminalTheme } from './hooks/useTerminalTheme.js';
+import { useTimedMessage } from './hooks/useTimedMessage.js';
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
   return pendingHistoryItems.some((item) => {
@@ -1267,10 +1264,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
   >();
   const [showEscapePrompt, setShowEscapePrompt] = useState(false);
   const [showIdeRestartPrompt, setShowIdeRestartPrompt] = useState(false);
-  const [transientMessage, setTransientMessage] = useState<{
+
+  const [transientMessage, showTransientMessage] = useTimedMessage<{
     text: string;
     type: TransientMessageType;
-  } | null>(null);
+  }>(WARNING_PROMPT_DURATION_MS);
 
   const { isFolderTrustDialogOpen, handleFolderTrustSelect, isRestarting } =
     useFolderTrust(settings, setIsTrustedFolder, historyManager.addItem);
@@ -1282,43 +1280,37 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   useIncludeDirsTrust(config, isTrustedFolder, historyManager, setCustomDialog);
 
-  const transientTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const tabFocusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const showTransientMessage = useCallback(
-    (message: string, type: TransientMessageType) => {
-      setTransientMessage({ text: message, type });
-      if (transientTimeoutRef.current) {
-        clearTimeout(transientTimeoutRef.current);
-      }
-      transientTimeoutRef.current = setTimeout(() => {
-        setTransientMessage(null);
-      }, WARNING_PROMPT_DURATION_MS);
-    },
-    [],
-  );
-
   useEffect(() => {
+    const handleTransientMessage = (payload: {
+      message: string;
+      type: TransientMessageType;
+    }) => {
+      showTransientMessage({ text: payload.message, type: payload.type });
+    };
+
     const handleSelectionWarning = () => {
-      showTransientMessage(
-        'Press Ctrl-S to enter selection mode to copy text.',
-        TransientMessageType.Warning,
-      );
+      showTransientMessage({
+        text: 'Press Ctrl-S to enter selection mode to copy text.',
+        type: TransientMessageType.Warning,
+      });
     };
     const handlePasteTimeout = () => {
-      showTransientMessage(
-        'Paste Timed out. Possibly due to slow connection.',
-        TransientMessageType.Warning,
-      );
+      showTransientMessage({
+        text: 'Paste Timed out. Possibly due to slow connection.',
+        type: TransientMessageType.Warning,
+      });
     };
+
+    appEvents.on(AppEvent.TransientMessage, handleTransientMessage);
     appEvents.on(AppEvent.SelectionWarning, handleSelectionWarning);
     appEvents.on(AppEvent.PasteTimeout, handlePasteTimeout);
+
     return () => {
+      appEvents.off(AppEvent.TransientMessage, handleTransientMessage);
       appEvents.off(AppEvent.SelectionWarning, handleSelectionWarning);
       appEvents.off(AppEvent.PasteTimeout, handlePasteTimeout);
-      if (transientTimeoutRef.current) {
-        clearTimeout(transientTimeoutRef.current);
-      }
       if (tabFocusTimeoutRef.current) {
         clearTimeout(tabFocusTimeoutRef.current);
       }
@@ -1488,10 +1480,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setShowErrorDetails((prev) => !prev);
         return true;
       } else if (keyMatchers[Command.SUSPEND_APP](key)) {
-        showTransientMessage(
-          'Undo has been moved to Cmd + Z or Alt/Opt + Z',
-          TransientMessageType.Warning,
-        );
+        showTransientMessage({
+          text: 'Undo has been moved to Cmd + Z or Alt/Opt + Z',
+          type: TransientMessageType.Warning,
+        });
         return true;
       } else if (keyMatchers[Command.SHOW_FULL_TODOS](key)) {
         setShowFullTodos((prev) => !prev);
@@ -1529,10 +1521,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
         }
 
         if (embeddedShellFocused) {
-          showTransientMessage(
-            'Press Shift+Tab to focus out.',
-            TransientMessageType.Warning,
-          );
+          showTransientMessage({
+            text: 'Press Shift+Tab to focus out.',
+            type: TransientMessageType.Warning,
+          });
           return true;
         }
 
@@ -1557,10 +1549,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
               // If the shell produced output since the tab press, we assume it handled the tab
               // (e.g. autocomplete) so we should not toggle focus.
               if (lastOutputTimeRef.current > now) {
-                showTransientMessage(
-                  'Press Shift+Tab to focus out.',
-                  TransientMessageType.Warning,
-                );
+                showTransientMessage({
+                  text: 'Press Shift+Tab to focus out.',
+                  type: TransientMessageType.Warning,
+                });
                 return;
               }
               setEmbeddedShellFocused(false);
@@ -2080,7 +2072,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleApiKeySubmit,
       handleApiKeyCancel,
       setBannerVisible,
-      showTransientMessage,
       setEmbeddedShellFocused,
       dismissBackgroundShell,
       setActiveBackgroundShellPid,
@@ -2156,7 +2147,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleApiKeySubmit,
       handleApiKeyCancel,
       setBannerVisible,
-      showTransientMessage,
       setEmbeddedShellFocused,
       dismissBackgroundShell,
       setActiveBackgroundShellPid,

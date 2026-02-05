@@ -7,7 +7,6 @@
 import { Box, Text } from 'ink';
 import { useEffect, useState, useRef } from 'react';
 import { useUIActions } from '../contexts/UIActionsContext.js';
-import { TransientMessageType } from '../contexts/UIStateContext.js';
 import { theme } from '../semantic-colors.js';
 import {
   ShellExecutionService,
@@ -20,6 +19,11 @@ import { type BackgroundShell } from '../hooks/shellCommandProcessor.js';
 import { Command, keyMatchers } from '../keyMatchers.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { commandDescriptions } from '../../config/keyBindings.js';
+import {
+  appEvents,
+  AppEvent,
+  TransientMessageType,
+} from '../../utils/events.js';
 import {
   ScrollableList,
   type ScrollableListRef,
@@ -65,7 +69,6 @@ export const BackgroundShellDisplay = ({
     dismissBackgroundShell,
     setActiveBackgroundShellPid,
     setIsBackgroundShellListOpen,
-    showTransientMessage,
     setEmbeddedShellFocused,
   } = useUIActions();
   const activeShell = shells.get(activePid);
@@ -154,10 +157,10 @@ export const BackgroundShellDisplay = ({
         !isListOpenProp &&
         keyMatchers[Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING](key)
       ) {
-        showTransientMessage(
-          `Press ${commandDescriptions[Command.UNFOCUS_BACKGROUND_SHELL]} to focus out.`,
-          TransientMessageType.Warning,
-        );
+        appEvents.emit(AppEvent.TransientMessage, {
+          message: `Press ${commandDescriptions[Command.UNFOCUS_BACKGROUND_SHELL]} to focus out.`,
+          type: TransientMessageType.Warning,
+        });
         // Fall through to allow Tab to be sent to the shell
       }
 

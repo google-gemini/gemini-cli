@@ -106,7 +106,7 @@ available combinations.
 | Toggle YOLO (auto-approval) mode for tool calls.                                                      | `Ctrl + Y`                 |
 | Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only). | `Shift + Tab`              |
 | Expand a height-constrained response to show additional lines when not in alternate buffer mode.      | `Ctrl + O`<br />`Ctrl + S` |
-| Expand or collapse a paste placeholder.                                                               | `Ctrl + O`                 |
+| Expand or collapse a paste placeholder when cursor is over placeholder.                               | `Ctrl + O`                 |
 | Ctrl+B                                                                                                | `Ctrl + B`                 |
 | Ctrl+L                                                                                                | `Ctrl + L`                 |
 | Ctrl+K                                                                                                | `Ctrl + K`                 |
@@ -137,6 +137,6 @@ available combinations.
 - `Number keys (1-9, multi-digit)` inside selection dialogs: Jump directly to
   the numbered radio option and confirm when the full number is entered.
 - `Ctrl + O`: Expand or collapse paste placeholders (`[Pasted Text: X lines]`)
-  inline.
+  inline when the cursor is over the placeholder.
 - `Double-click` on a paste placeholder (alternate buffer mode only): Expand to
   view full content inline. Double-click again to collapse.
