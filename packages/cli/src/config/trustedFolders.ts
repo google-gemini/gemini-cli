@@ -151,6 +151,15 @@ export class LoadedTrustedFolders {
   }
 
   setValue(path: string, trustLevel: TrustLevel): void {
+    if (this.errors.length > 0) {
+      const errorMessages = this.errors.map(
+        (error) => `Error in ${error.path}: ${error.message}`,
+      );
+      throw new FatalConfigError(
+        `Cannot update trusted folders because the configuration file is invalid:\n${errorMessages.join('\n')}\nPlease fix the file manually before trying to update it.`,
+      );
+    }
+
     const originalTrustLevel = this.user.config[path];
     this.user.config[path] = trustLevel;
     try {
@@ -241,11 +250,23 @@ export function saveTrustedFolders(
     fs.mkdirSync(dirPath, { recursive: true });
   }
 
-  fs.writeFileSync(
-    trustedFoldersFile.path,
-    JSON.stringify(trustedFoldersFile.config, null, 2),
-    { encoding: 'utf-8', mode: 0o600 },
-  );
+  const tempPath = `${trustedFoldersFile.path}.tmp.${Math.random().toString(36).slice(2)}`;
+  try {
+    fs.writeFileSync(tempPath, JSON.stringify(trustedFoldersFile.config, null, 2), {
+      encoding: 'utf-8',
+      mode: 0o600,
+    });
+    fs.renameSync(tempPath, trustedFoldersFile.path);
+  } catch (error) {
+    if (fs.existsSync(tempPath)) {
+      try {
+        fs.unlinkSync(tempPath);
+      } catch {
+        // Ignore errors during cleanup
+      }
+    }
+    throw error;
+  }
 }
 
 /** Is folder trust feature enabled per the current applied settings */

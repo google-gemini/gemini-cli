@@ -60,6 +60,8 @@ vi.mock('fs', async (importOriginal) => {
     readFileSync: vi.fn(),
     writeFileSync: vi.fn(),
     mkdirSync: vi.fn(),
+    renameSync: vi.fn(),
+    unlinkSync: vi.fn(),
     realpathSync: vi.fn().mockImplementation((p) => p),
   };
 });
@@ -70,12 +72,14 @@ vi.mock('strip-json-comments', () => ({
 describe('Trusted Folders Loading', () => {
   let mockStripJsonComments: Mocked<typeof stripJsonComments>;
   let mockFsWriteFileSync: Mocked<typeof fs.writeFileSync>;
+  let mockFsRenameSync: Mocked<typeof fs.renameSync>;
 
   beforeEach(() => {
     resetTrustedFoldersForTesting();
     vi.resetAllMocks();
     mockStripJsonComments = vi.mocked(stripJsonComments);
     mockFsWriteFileSync = vi.mocked(fs.writeFileSync);
+    mockFsRenameSync = vi.mocked(fs.renameSync);
     vi.mocked(osActual.homedir).mockReturnValue('/mock/home/user');
     (mockStripJsonComments as unknown as Mock).mockImplementation(
       (jsonString: string) => jsonString,
@@ -248,7 +252,7 @@ describe('Trusted Folders Loading', () => {
     delete process.env['GEMINI_CLI_TRUSTED_FOLDERS_PATH'];
   });
 
-  it('setValue should update the user config and save it', () => {
+  it('setValue should update the user config and save it atomically', () => {
     const loadedFolders = loadTrustedFolders();
     loadedFolders.setValue('/new/path', TrustLevel.TRUST_FOLDER);
 
@@ -256,10 +260,33 @@ describe('Trusted Folders Loading', () => {
       TrustLevel.TRUST_FOLDER,
     );
     expect(mockFsWriteFileSync).toHaveBeenCalledWith(
-      getTrustedFoldersPath(),
+      expect.stringContaining('trustedFolders.json.tmp.'),
       JSON.stringify({ '/new/path': TrustLevel.TRUST_FOLDER }, null, 2),
       { encoding: 'utf-8', mode: 0o600 },
     );
+    expect(mockFsRenameSync).toHaveBeenCalledWith(
+      expect.stringContaining('trustedFolders.json.tmp.'),
+      getTrustedFoldersPath(),
+    );
+  });
+
+  it('setValue should throw FatalConfigError if there were load errors', () => {
+    const userPath = getTrustedFoldersPath();
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      if (p === userPath) return 'invalid json';
+      return '{}';
+    });
+
+    const loadedFolders = loadTrustedFolders();
+    expect(loadedFolders.errors.length).toBe(1);
+
+    expect(() =>
+      loadedFolders.setValue('/some/path', TrustLevel.TRUST_FOLDER),
+    ).toThrow(FatalConfigError);
+    expect(() =>
+      loadedFolders.setValue('/some/path', TrustLevel.TRUST_FOLDER),
+    ).toThrow(/Cannot update trusted folders because the configuration file is invalid/);
   });
 });
 
