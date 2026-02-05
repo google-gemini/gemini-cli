@@ -15,7 +15,13 @@ describe('GeneralistAgent', () => {
     const config = makeFakeConfig();
     vi.spyOn(config, 'getToolRegistry').mockReturnValue({
       getAllToolNames: () => ['tool1', 'tool2', 'agent-tool'],
+      getTool: () => undefined,
+      unregisterTool: () => {},
+      registerTool: () => {},
     } as unknown as ToolRegistry);
+    vi.spyOn(config, 'getGeminiClient').mockReturnValue({
+      setTools: async () => {},
+    } as unknown as ReturnType<Config['getGeminiClient']>);
     vi.spyOn(config, 'getAgentRegistry').mockReturnValue({
       getDirectoryContext: () => 'mock directory context',
       getAllAgentNames: () => ['agent-tool'],

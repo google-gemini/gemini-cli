@@ -28,7 +28,14 @@ describe('Core System Prompt Substitution', () => {
             toolNames.WRITE_FILE_TOOL_NAME,
             toolNames.READ_FILE_TOOL_NAME,
           ]),
+        getTool: vi.fn().mockReturnValue(undefined),
+        unregisterTool: vi.fn(),
+        registerTool: vi.fn(),
       }),
+      getGeminiClient: vi.fn().mockReturnValue({
+        setTools: vi.fn().mockResolvedValue(undefined),
+      }),
+      getMessageBus: vi.fn(),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
