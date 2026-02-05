@@ -113,6 +113,8 @@ Deep technical documentation and API specifications.
 - **[Command reference](./cli/commands.md):** Detailed slash command guide.
 - **[Configuration reference](./get-started/configuration.md):** Settings and
   environment variables.
+- **[Core concepts](./core/concepts.md):** Fundamental terminology and
+  definitions.
 - **[Keyboard shortcuts](./cli/keyboard-shortcuts.md):** Productivity tips.
 - **[Policy engine](./core/policy-engine.md):** Fine-grained execution control.
 

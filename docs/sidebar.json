@@ -123,6 +123,7 @@
         "label": "Configuration reference",
         "slug": "docs/get-started/configuration"
       },
+      { "label": "Core concepts", "slug": "docs/core/concepts" },
       { "label": "Keyboard shortcuts", "slug": "docs/cli/keyboard-shortcuts" },
       { "label": "Memory import processor", "slug": "docs/core/memport" },
       { "label": "Policy engine", "slug": "docs/core/policy-engine" },
