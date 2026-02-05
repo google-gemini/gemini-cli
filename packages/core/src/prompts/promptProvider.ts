@@ -23,6 +23,7 @@ import {
   PLAN_MODE_TOOLS,
   WRITE_TODOS_TOOL_NAME,
   READ_FILE_TOOL_NAME,
+  ENTER_PLAN_MODE_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { resolveModel, isPreviewModel } from '../config/models.js';
 
@@ -47,6 +48,7 @@ export class PromptProvider {
     const isPlanMode = approvalMode === ApprovalMode.PLAN;
     const skills = config.getSkillManager().getSkills();
     const toolNames = config.getToolRegistry().getAllToolNames();
+    const approvedPlanPath = config.getApprovedPlanPath();
 
     const desiredModel = resolveModel(
       config.getActiveModel(),
@@ -107,6 +109,12 @@ export class PromptProvider {
               CodebaseInvestigatorAgent.name,
             ),
             enableWriteTodosTool: toolNames.includes(WRITE_TODOS_TOOL_NAME),
+            enableEnterPlanModeTool: toolNames.includes(
+              ENTER_PLAN_MODE_TOOL_NAME,
+            ),
+            approvedPlan: approvedPlanPath
+              ? { path: approvedPlanPath }
+              : undefined,
           }),
           !isPlanMode,
         ),

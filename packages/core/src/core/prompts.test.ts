@@ -97,7 +97,7 @@ describe('Core System Prompt (prompts.ts)', () => {
         getSkills: vi.fn().mockReturnValue([]),
       }),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
-      getApprovedPlanPath: vi.fn(),
+      getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
   });
 
@@ -258,6 +258,7 @@ describe('Core System Prompt (prompts.ts)', () => {
         getSkillManager: vi.fn().mockReturnValue({
           getSkills: vi.fn().mockReturnValue([]),
         }),
+        getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
       } as unknown as Config;
 
       const prompt = getCoreSystemPrompt(testConfig);
@@ -375,6 +376,26 @@ describe('Core System Prompt (prompts.ts)', () => {
       );
       expect(prompt).not.toContain('via `&`');
     });
+  });
+
+  it('should include approved plan instructions when approvedPlanPath is set', () => {
+    const planPath = '/path/to/approved/plan.md';
+    vi.mocked(mockConfig.getApprovedPlanPath).mockReturnValue(planPath);
+    const prompt = getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).toMatchSnapshot();
+  });
+
+  it('should include planning phase suggestion when enter_plan_mode tool is enabled', () => {
+    vi.mocked(mockConfig.getToolRegistry().getAllToolNames).mockReturnValue([
+      'enter_plan_mode',
+    ]);
+    const prompt = getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).toContain(
+      "For complex tasks, consider using the 'enter_plan_mode' tool to enter a dedicated planning phase before starting implementation.",
+    );
+    expect(prompt).toMatchSnapshot();
   });
 
   describe('GEMINI_SYSTEM_MD environment variable', () => {
