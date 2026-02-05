@@ -7,13 +7,14 @@
 import {
   Config,
   type ConfigParameters,
-  AuthType,
   PREVIEW_GEMINI_MODEL_AUTO,
   GeminiEventType,
   type ToolCallRequestInfo,
   type ServerGeminiStreamEvent,
   type GeminiClient,
   scheduleAgentTools,
+  getAuthTypeFromEnv,
+  AuthType,
 } from '@google/gemini-cli-core';
 
 import { type Tool, SdkTool, type z } from './tool.js';
@@ -56,13 +57,7 @@ export class GeminiCliAgent {
   ): AsyncGenerator<ServerGeminiStreamEvent> {
     // Lazy initialization of auth and client
     if (!this.config.getContentGenerator()) {
-      // Simple auth detection
-      let authType = AuthType.COMPUTE_ADC;
-      if (process.env['GEMINI_API_KEY']) {
-        authType = AuthType.USE_GEMINI;
-      } else if (process.env['GOOGLE_API_KEY']) {
-        authType = AuthType.USE_VERTEX_AI;
-      }
+      const authType = getAuthTypeFromEnv() || AuthType.COMPUTE_ADC;
 
       await this.config.refreshAuth(authType);
       await this.config.initialize();
