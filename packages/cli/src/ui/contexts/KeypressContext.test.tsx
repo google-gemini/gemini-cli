@@ -1309,4 +1309,57 @@ describe('KeypressContext', () => {
       }
     });
   });
+
+  describe('Greek support', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it.each([
+      {
+        lang: 'en_US.UTF-8',
+        expected: { name: 'z', alt: true, insertable: false },
+        desc: 'non-Greek locale (Option+z)',
+      },
+      {
+        lang: 'el_GR.UTF-8',
+        expected: { name: '', insertable: true },
+        desc: 'Greek LANG',
+      },
+      {
+        lcAll: 'el_GR.UTF-8',
+        expected: { name: '', insertable: true },
+        desc: 'Greek LC_ALL',
+      },
+      {
+        lang: 'en_US.UTF-8',
+        lcAll: 'el_GR.UTF-8',
+        expected: { name: '', insertable: true },
+        desc: 'LC_ALL overriding non-Greek LANG',
+      },
+      {
+        lang: 'el_GR.UTF-8',
+        char: '\u00B8',
+        expected: { name: 'z', alt: true, shift: true },
+        desc: 'Cedilla (\u00B8) in Greek locale (should be Option+Shift+z)',
+      },
+    ])(
+      'should handle $char correctly in $desc',
+      async ({ lang, lcAll, char = '\u03A9', expected }) => {
+        if (lang) vi.stubEnv('LANG', lang);
+        if (lcAll) vi.stubEnv('LC_ALL', lcAll);
+
+        const { keyHandler } = setupKeypressTest();
+
+        act(() => stdin.write(char));
+
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining({
+            ...expected,
+            sequence: char,
+          }),
+        );
+      },
+    );
+  });
 });
