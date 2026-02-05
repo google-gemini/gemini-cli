@@ -27,11 +27,14 @@ export function useTimedMessage<T>(durationMs: number) {
     [durationMs],
   );
 
-  useEffect(() => () => {
+  useEffect(
+    () => () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
-    }, []);
+    },
+    [],
+  );
 
   return [message, showMessage] as const;
 }
