@@ -103,7 +103,8 @@ vi.mock('../contexts/OverflowContext.js', () => ({
 // Create mock context providers
 const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
   ({
-    streamingState: null,
+    streamingState: StreamingState.Idle,
+    isConfigInitialized: true,
     contextFileNames: [],
     showApprovalModeIndicator: ApprovalMode.DEFAULT,
     messageQueue: [],
