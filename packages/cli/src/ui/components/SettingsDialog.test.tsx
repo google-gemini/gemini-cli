@@ -26,6 +26,7 @@ import { waitFor } from '../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SettingsDialog } from './SettingsDialog.js';
 import { LoadedSettings, SettingScope } from '../../config/settings.js';
+import { createMockSettings } from '../../test-utils/settings.js';
 import { VimModeProvider } from '../contexts/VimModeContext.js';
 import { KeypressProvider } from '../contexts/KeypressContext.js';
 import { act } from 'react';
@@ -57,56 +58,6 @@ enum TerminalKeys {
   ESCAPE = '\u001B',
   BACKSPACE = '\u0008',
 }
-
-const createMockSettings = (
-  userSettings = {},
-  systemSettings = {},
-  workspaceSettings = {},
-) =>
-  new LoadedSettings(
-    {
-      settings: { ui: { customThemes: {} }, mcpServers: {}, ...systemSettings },
-      originalSettings: {
-        ui: { customThemes: {} },
-        mcpServers: {},
-        ...systemSettings,
-      },
-      path: '/system/settings.json',
-    },
-    {
-      settings: {},
-      originalSettings: {},
-      path: '/system/system-defaults.json',
-    },
-    {
-      settings: {
-        ui: { customThemes: {} },
-        mcpServers: {},
-        ...userSettings,
-      },
-      originalSettings: {
-        ui: { customThemes: {} },
-        mcpServers: {},
-        ...userSettings,
-      },
-      path: '/user/settings.json',
-    },
-    {
-      settings: {
-        ui: { customThemes: {} },
-        mcpServers: {},
-        ...workspaceSettings,
-      },
-      originalSettings: {
-        ui: { customThemes: {} },
-        mcpServers: {},
-        ...workspaceSettings,
-      },
-      path: '/workspace/settings.json',
-    },
-    true,
-    [],
-  );
 
 vi.mock('../../config/settingsSchema.js', async (importOriginal) => {
   const original =
@@ -639,11 +590,23 @@ describe('SettingsDialog', () => {
     });
 
     it('should show different values for different scopes', () => {
-      const settings = createMockSettings(
-        { vimMode: true }, // User settings
-        { vimMode: false }, // System settings
-        { autoUpdate: false }, // Workspace settings
-      );
+      const settings = createMockSettings({
+        user: {
+          settings: { vimMode: true },
+          originalSettings: { vimMode: true },
+          path: '',
+        },
+        system: {
+          settings: { vimMode: false },
+          originalSettings: { vimMode: false },
+          path: '',
+        },
+        workspace: {
+          settings: { autoUpdate: false },
+          originalSettings: { autoUpdate: false },
+          path: '',
+        },
+      });
       const onSelect = vi.fn();
 
       const { lastFrame } = renderDialog(settings, onSelect);
@@ -733,11 +696,23 @@ describe('SettingsDialog', () => {
 
   describe('Specific Settings Behavior', () => {
     it('should show correct display values for settings with different states', () => {
-      const settings = createMockSettings(
-        { vimMode: true, hideTips: false }, // User settings
-        { hideWindowTitle: true }, // System settings
-        { ideMode: false }, // Workspace settings
-      );
+      const settings = createMockSettings({
+        user: {
+          settings: { vimMode: true, hideTips: false },
+          originalSettings: { vimMode: true, hideTips: false },
+          path: '',
+        },
+        system: {
+          settings: { hideWindowTitle: true },
+          originalSettings: { hideWindowTitle: true },
+          path: '',
+        },
+        workspace: {
+          settings: { ideMode: false },
+          originalSettings: { ideMode: false },
+          path: '',
+        },
+      });
       const onSelect = vi.fn();
 
       const { lastFrame } = renderDialog(settings, onSelect);
@@ -794,11 +769,13 @@ describe('SettingsDialog', () => {
 
   describe('Settings Display Values', () => {
     it('should show correct values for inherited settings', () => {
-      const settings = createMockSettings(
-        {},
-        { vimMode: true, hideWindowTitle: false }, // System settings
-        {},
-      );
+      const settings = createMockSettings({
+        system: {
+          settings: { vimMode: true, hideWindowTitle: false },
+          originalSettings: { vimMode: true, hideWindowTitle: false },
+          path: '',
+        },
+      });
       const onSelect = vi.fn();
 
       const { lastFrame } = renderDialog(settings, onSelect);
@@ -809,11 +786,18 @@ describe('SettingsDialog', () => {
     });
 
     it('should show override indicator for overridden settings', () => {
-      const settings = createMockSettings(
-        { vimMode: false }, // User overrides
-        { vimMode: true }, // System default
-        {},
-      );
+      const settings = createMockSettings({
+        user: {
+          settings: { vimMode: false },
+          originalSettings: { vimMode: false },
+          path: '',
+        },
+        system: {
+          settings: { vimMode: true },
+          originalSettings: { vimMode: true },
+          path: '',
+        },
+      });
       const onSelect = vi.fn();
 
       const { lastFrame } = renderDialog(settings, onSelect);
@@ -983,11 +967,13 @@ describe('SettingsDialog', () => {
   describe('Error Recovery', () => {
     it('should handle malformed settings gracefully', () => {
       // Create settings with potentially problematic values
-      const settings = createMockSettings(
-        { vimMode: null as unknown as boolean }, // Invalid value
-        {},
-        {},
-      );
+      const settings = createMockSettings({
+        user: {
+          settings: { vimMode: null as unknown as boolean },
+          originalSettings: { vimMode: null as unknown as boolean },
+          path: '',
+        },
+      });
       const onSelect = vi.fn();
 
       const { lastFrame } = renderDialog(settings, onSelect);
@@ -1198,11 +1184,13 @@ describe('SettingsDialog', () => {
         stdin.write('\r'); // Commit
       });
 
-      settings = createMockSettings(
-        { 'a.string.setting': 'new value' },
-        {},
-        {},
-      );
+      settings = createMockSettings({
+        user: {
+          settings: { 'a.string.setting': 'new value' },
+          originalSettings: { 'a.string.setting': 'new value' },
+          path: '',
+        },
+      });
       rerender(
         <KeypressProvider>
           <SettingsDialog settings={settings} onSelect={onSelect} />
@@ -1550,11 +1538,23 @@ describe('SettingsDialog', () => {
     ])(
       'should render $name correctly',
       ({ userSettings, systemSettings, workspaceSettings, stdinActions }) => {
-        const settings = createMockSettings(
-          userSettings,
-          systemSettings,
-          workspaceSettings,
-        );
+        const settings = createMockSettings({
+          user: {
+            settings: userSettings,
+            originalSettings: userSettings,
+            path: '',
+          },
+          system: {
+            settings: systemSettings,
+            originalSettings: systemSettings,
+            path: '',
+          },
+          workspace: {
+            settings: workspaceSettings,
+            originalSettings: workspaceSettings,
+            path: '',
+          },
+        });
         const onSelect = vi.fn();
 
         const { lastFrame, stdin } = renderDialog(settings, onSelect);

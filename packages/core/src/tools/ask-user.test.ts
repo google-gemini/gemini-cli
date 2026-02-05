@@ -71,7 +71,7 @@ describe('AskUserTool', () => {
       const result = tool.validateToolParams({
         questions: [{ question: 'Test?', header: 'This is way too long' }],
       });
-      expect(result).toContain('must NOT have more than 12 characters');
+      expect(result).toContain('must NOT have more than 16 characters');
     });
 
     it('should return error if options has fewer than 2 items', () => {
