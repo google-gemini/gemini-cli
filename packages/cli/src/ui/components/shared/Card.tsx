@@ -25,7 +25,7 @@ export interface CardProps {
   variant?: 'information' | 'success' | 'warning' | 'error' | 'confirmation';
 }
 
-const CardDisplay: React.FC<CardProps> = ({
+export const Card: React.FC<CardProps> = ({
   variant = 'information',
   title,
   prefix = true,
@@ -42,6 +42,8 @@ const CardDisplay: React.FC<CardProps> = ({
         return { border: theme.status.success, text: theme.status.success };
       case 'confirmation':
         return { border: theme.border.focused, text: theme.text.link };
+      case 'information':
+        return { border: theme.border.default, text: theme.text.primary };
       default:
         return { border: theme.border.default, text: theme.text.primary };
     }
@@ -57,6 +59,8 @@ const CardDisplay: React.FC<CardProps> = ({
         return TOOL_STATUS.WARNING;
       case 'confirmation':
         return TOOL_STATUS.CONFIRMING;
+      case 'information':
+        return TOOL_STATUS.INFORMATION;
       default:
         return TOOL_STATUS.INFORMATION;
     }
@@ -127,15 +131,3 @@ const CardDisplay: React.FC<CardProps> = ({
     </Box>
   );
 };
-
-export const Card: React.FC<CardProps> = ({
-  title,
-  prefix,
-  suffix,
-  children,
-  variant,
-}) => (
-  <CardDisplay title={title} prefix={prefix} suffix={suffix} variant={variant}>
-    {children}
-  </CardDisplay>
-);
