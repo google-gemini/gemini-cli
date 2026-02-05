@@ -26,7 +26,7 @@ vi.mock('../contexts/UIStateContext.js', async () => {
   const actual = await vi.importActual('../contexts/UIStateContext.js');
   return {
     ...actual,
-    useUIState: () => ({
+    useUIState: vi.fn(() => ({
       history: [
         { id: 1, role: 'user', content: 'Hello' },
         { id: 2, role: 'model', content: 'Hi there' },
@@ -41,7 +41,9 @@ vi.mock('../contexts/UIStateContext.js', async () => {
       activePtyId: undefined,
       embeddedShellFocused: false,
       historyRemountKey: 0,
-    }),
+      copyModeEnabled: false,
+      terminalWidth: 100,
+    })),
   };
 });
 
@@ -81,12 +83,16 @@ vi.mock('./shared/ScrollableList.js', () => ({
   ScrollableList: ({
     data,
     renderItem,
+    copyModeEnabled,
   }: {
     data: unknown[];
     renderItem: (props: { item: unknown }) => React.JSX.Element;
+    copyModeEnabled?: boolean;
   }) => (
     <Box flexDirection="column">
-      <Text>ScrollableList</Text>
+      <Text>
+        ScrollableList (copyMode:{copyModeEnabled ? 'true' : 'false'})
+      </Text>
       {data.map((item: unknown, index: number) => (
         <Box key={index}>{renderItem({ item })}</Box>
       ))}
@@ -96,6 +102,7 @@ vi.mock('./shared/ScrollableList.js', () => ({
 }));
 
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+import { useUIState, type UIState } from '../contexts/UIStateContext.js';
 
 describe('MainContent', () => {
   beforeEach(() => {
@@ -129,5 +136,19 @@ describe('MainContent', () => {
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();
+  });
+
+  it('passes copyModeEnabled to ScrollableList in alternate buffer mode', async () => {
+    vi.mocked(useAlternateBuffer).mockReturnValue(true);
+    const useUIStateMock = vi.mocked(useUIState);
+    useUIStateMock.mockReturnValue({
+      ...useUIStateMock(),
+      copyModeEnabled: true,
+    } as UIState);
+
+    const { lastFrame } = renderWithProviders(<MainContent />);
+    await waitFor(() =>
+      expect(lastFrame()).toContain('ScrollableList (copyMode:true)'),
+    );
   });
 });

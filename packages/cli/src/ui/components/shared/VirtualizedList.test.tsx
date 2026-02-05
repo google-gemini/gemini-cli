@@ -324,4 +324,35 @@ describe('<VirtualizedList />', () => {
 
     expect(ref.current?.getScrollState().scrollTop).toBe(4);
   });
+
+  it('renders correctly in copyModeEnabled when scrolled', async () => {
+    const longData = Array.from({ length: 100 }, (_, i) => `Item ${i}`);
+    // Use copy mode
+    const { lastFrame } = render(
+      <Box height={10} width={100}>
+        <VirtualizedList
+          data={longData}
+          renderItem={({ item }) => (
+            <Box height={1}>
+              <Text>{item}</Text>
+            </Box>
+          )}
+          keyExtractor={(item) => item}
+          estimatedItemHeight={() => 1}
+          initialScrollIndex={50}
+          copyModeEnabled={true}
+        />
+      </Box>,
+    );
+    await act(async () => {
+      await delay(0);
+    });
+
+    // Item 50 should be visible
+    expect(lastFrame()).toContain('Item 50');
+    // And surrounding items
+    expect(lastFrame()).toContain('Item 59');
+    // But far away items should not be (ensures we are actually scrolled)
+    expect(lastFrame()).not.toContain('Item 0');
+  });
 });
