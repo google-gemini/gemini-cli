@@ -17,7 +17,6 @@ import {
   scheduleAgentTools,
   getAuthTypeFromEnv,
   type ToolRegistry,
-  type SkillDefinition,
   loadSkillsFromDir,
   ActivateSkillTool,
 } from '@google/gemini-cli-core';
@@ -95,20 +94,20 @@ export class GeminiCliAgent {
       // Load additional skills from options
       if (this.skillRefs.length > 0) {
         const skillManager = this.config.getSkillManager();
-        const loadedSkills: SkillDefinition[] = [];
 
-        for (const ref of this.skillRefs) {
+        const loadPromises = this.skillRefs.map(async (ref) => {
           try {
             if (ref.type === 'dir' || ref.type === 'root') {
-              // loadSkillsFromDir handles both checking for SKILL.md in dir and */SKILL.md
-              const skills = await loadSkillsFromDir(ref.path);
-              loadedSkills.push(...skills);
+              return await loadSkillsFromDir(ref.path);
             }
           } catch (e) {
             // eslint-disable-next-line no-console
             console.error(`Failed to load skills from ${ref.path}:`, e);
           }
-        }
+          return [];
+        });
+
+        const loadedSkills = (await Promise.all(loadPromises)).flat();
 
         if (loadedSkills.length > 0) {
           skillManager.addSkills(loadedSkills);
