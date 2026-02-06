@@ -141,6 +141,7 @@ describe('InitCommand', () => {
 
     describe('when handling submit_prompt', () => {
       beforeEach(() => {
+        vi.mocked(fs.existsSync).mockReturnValue(true);
         vi.mocked(performInit).mockReturnValue({
           type: 'submit_prompt',
           content: 'Create a new GEMINI.md file.',
@@ -180,6 +181,29 @@ describe('InitCommand', () => {
           }),
           eventBus,
         );
+      });
+
+      it('passes true for replace when "replace" is the only argument', async () => {
+        vi.mocked(performInit).mockReturnValue({
+          type: 'submit_prompt',
+          content: 'Create a new GEMINI.md file.',
+        } as CommandActionReturn);
+
+        await command.execute(context, ['replace']);
+        expect(performInit).toHaveBeenCalledWith(expect.any(Boolean), true);
+      });
+
+      it('passes false for replace when explicit "replace" argument is missing or mixed', async () => {
+        vi.mocked(performInit).mockReturnValue({
+          type: 'submit_prompt',
+          content: 'Create a new GEMINI.md file.',
+        } as CommandActionReturn);
+
+        await command.execute(context, []);
+        expect(performInit).toHaveBeenCalledWith(expect.any(Boolean), false);
+
+        await command.execute(context, ['replace', 'extra']);
+        expect(performInit).toHaveBeenCalledWith(expect.any(Boolean), false);
       });
     });
   });
