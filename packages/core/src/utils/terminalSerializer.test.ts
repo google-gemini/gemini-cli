@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
-import { Terminal } from '@xterm/headless';
+import { beforeAll, describe, it, expect } from 'vitest';
+import { init, Terminal } from 'ghostty-web';
+import { installBrowserShims } from './browser-shims.js';
 import {
   serializeTerminalToObject,
   convertColorToHex,
@@ -22,13 +23,18 @@ function writeToTerminal(terminal: Terminal, data: string): Promise<void> {
 }
 
 describe('terminalSerializer', () => {
+  beforeAll(async () => {
+    installBrowserShims();
+    await init();
+  });
+
   describe('serializeTerminalToObject', () => {
     it('should handle an empty terminal', () => {
       const terminal = new Terminal({
         cols: 80,
         rows: 24,
-        allowProposedApi: true,
       });
+      terminal.open(globalThis.document.createElement('div') as any);
       const result = serializeTerminalToObject(terminal);
       expect(result).toHaveLength(24);
       result.forEach((line) => {
@@ -43,8 +49,8 @@ describe('terminalSerializer', () => {
       const terminal = new Terminal({
         cols: 80,
         rows: 24,
-        allowProposedApi: true,
       });
+      terminal.open(globalThis.document.createElement('div') as any);
       await writeToTerminal(terminal, 'Hello, world!');
       const result = serializeTerminalToObject(terminal);
       expect(result[0][0].text).toContain('Hello, world!');
@@ -54,8 +60,8 @@ describe('terminalSerializer', () => {
       const terminal = new Terminal({
         cols: 7,
         rows: 24,
-        allowProposedApi: true,
       });
+      terminal.open(globalThis.document.createElement('div') as any);
       await writeToTerminal(terminal, 'Line 1\r\nLine 2');
       const result = serializeTerminalToObject(terminal);
       expect(result[0][0].text).toBe('Line 1 ');
@@ -66,8 +72,8 @@ describe('terminalSerializer', () => {
       const terminal = new Terminal({
         cols: 80,
         rows: 24,
-        allowProposedApi: true,
       });
+      terminal.open(globalThis.document.createElement('div') as any);
       await writeToTerminal(terminal, '\x1b[1mBold text\x1b[0m');
       const result = serializeTerminalToObject(terminal);
       expect(result[0][0].bold).toBe(true);
@@ -78,8 +84,8 @@ describe('terminalSerializer', () => {
       const terminal = new Terminal({
         cols: 80,
         rows: 24,
-        allowProposedApi: true,
       });
+      terminal.open(globalThis.document.createElement('div') as any);
       await writeToTerminal(terminal, '\x1b[3mItalic text\x1b[0m');
       const result = serializeTerminalToObject(terminal);
       expect(result[0][0].italic).toBe(true);
@@ -90,8 +96,8 @@ describe('terminalSerializer', () => {
       const terminal = new Terminal({
         cols: 80,
         rows: 24,
-        allowProposedApi: true,
       });
+      terminal.open(globalThis.document.createElement('div') as any);
       await writeToTerminal(terminal, '\x1b[4mUnderlined text\x1b[0m');
       const result = serializeTerminalToObject(terminal);
       expect(result[0][0].underline).toBe(true);
@@ -102,8 +108,8 @@ describe('terminalSerializer', () => {
       const terminal = new Terminal({
         cols: 80,
         rows: 24,
-        allowProposedApi: true,
       });
+      terminal.open(globalThis.document.createElement('div') as any);
       await writeToTerminal(terminal, '\x1b[2mDim text\x1b[0m');
       const result = serializeTerminalToObject(terminal);
       expect(result[0][0].dim).toBe(true);
@@ -114,8 +120,8 @@ describe('terminalSerializer', () => {
       const terminal = new Terminal({
         cols: 80,
         rows: 24,
-        allowProposedApi: true,
       });
+      terminal.open(globalThis.document.createElement('div') as any);
       await writeToTerminal(terminal, '\x1b[7mInverse text\x1b[0m');
       const result = serializeTerminalToObject(terminal);
       expect(result[0][0].inverse).toBe(true);
@@ -126,11 +132,11 @@ describe('terminalSerializer', () => {
       const terminal = new Terminal({
         cols: 80,
         rows: 24,
-        allowProposedApi: true,
       });
+      terminal.open(globalThis.document.createElement('div') as any);
       await writeToTerminal(terminal, `${RED_FG}Red text${RESET}`);
       const result = serializeTerminalToObject(terminal);
-      expect(result[0][0].fg).toBe('#800000');
+      expect(result[0][0].fg).toBe('#cc6666');
       expect(result[0][0].text).toBe('Red text');
     });
 
@@ -138,11 +144,11 @@ describe('terminalSerializer', () => {
       const terminal = new Terminal({
         cols: 80,
         rows: 24,
-        allowProposedApi: true,
       });
+      terminal.open(globalThis.document.createElement('div') as any);
       await writeToTerminal(terminal, '\x1b[42mGreen background\x1b[0m');
       const result = serializeTerminalToObject(terminal);
-      expect(result[0][0].bg).toBe('#008000');
+      expect(result[0][0].bg).toBe('#b5bd68');
       expect(result[0][0].text).toBe('Green background');
     });
 
@@ -150,8 +156,8 @@ describe('terminalSerializer', () => {
       const terminal = new Terminal({
         cols: 80,
         rows: 24,
-        allowProposedApi: true,
       });
+      terminal.open(globalThis.document.createElement('div') as any);
       await writeToTerminal(terminal, '\x1b[38;2;100;200;50mRGB text\x1b[0m');
       const result = serializeTerminalToObject(terminal);
       expect(result[0][0].fg).toBe('#64c832');
@@ -162,13 +168,13 @@ describe('terminalSerializer', () => {
       const terminal = new Terminal({
         cols: 80,
         rows: 24,
-        allowProposedApi: true,
       });
+      terminal.open(globalThis.document.createElement('div') as any);
       await writeToTerminal(terminal, '\x1b[1;31;42mStyled text\x1b[0m');
       const result = serializeTerminalToObject(terminal);
       expect(result[0][0].bold).toBe(true);
-      expect(result[0][0].fg).toBe('#800000');
-      expect(result[0][0].bg).toBe('#008000');
+      expect(result[0][0].fg).toBe('#cc6666');
+      expect(result[0][0].bg).toBe('#b5bd68');
       expect(result[0][0].text).toBe('Styled text');
     });
 
@@ -176,8 +182,8 @@ describe('terminalSerializer', () => {
       const terminal = new Terminal({
         cols: 80,
         rows: 24,
-        allowProposedApi: true,
       });
+      terminal.open(globalThis.document.createElement('div') as any);
       await writeToTerminal(terminal, 'Cursor test');
       // Move cursor to the start of the line (0,0) using ANSI escape code
       await writeToTerminal(terminal, '\x1b[H');

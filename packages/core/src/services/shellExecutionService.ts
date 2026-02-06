@@ -18,7 +18,8 @@ import {
   type ShellType,
 } from '../utils/shell-utils.js';
 import { isBinary } from '../utils/textUtils.js';
-import pkg from '@xterm/headless';
+import { init, Terminal } from 'ghostty-web';
+import { installBrowserShims } from '../utils/browser-shims.js';
 import {
   serializeTerminalToObject,
   type AnsiOutput,
@@ -28,7 +29,6 @@ import {
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
 import { killProcessGroup } from '../utils/process-utils.js';
-const { Terminal } = pkg;
 
 const MAX_CHILD_PROCESS_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
 
@@ -128,7 +128,7 @@ export type ShellOutputEvent =
 
 interface ActivePty {
   ptyProcess: IPty;
-  headlessTerminal: pkg.Terminal;
+  headlessTerminal: Terminal;
   maxSerializedLines?: number;
 }
 
@@ -141,27 +141,27 @@ interface ActiveChildProcess {
   };
 }
 
-const getFullBufferText = (terminal: pkg.Terminal): string => {
+const getFullBufferText = (
+  terminal: Terminal,
+  scrollbackLimit?: number,
+): string => {
   const buffer = terminal.buffer.active;
   const lines: string[] = [];
-  for (let i = 0; i < buffer.length; i++) {
+
+  // ghostty-web buffer length includes the full possible scrollback + rows.
+  // We only want the lines that have actually been written.
+  // The current active screen lines are at the end of the scrollback.
+  const scrollbackLength = terminal.getScrollbackLength();
+  const rows = terminal.rows;
+  const totalRelevantLines = scrollbackLength + rows;
+
+  for (let i = 0; i < totalRelevantLines; i++) {
     const line = buffer.getLine(i);
     if (!line) {
       continue;
     }
-    // If the NEXT line is wrapped, it means it's a continuation of THIS line.
-    // We should not trim the right side of this line because trailing spaces
-    // might be significant parts of the wrapped content.
-    // If it's not wrapped, we trim normally.
-    let trimRight = true;
-    if (i + 1 < buffer.length) {
-      const nextLine = buffer.getLine(i + 1);
-      if (nextLine?.isWrapped) {
-        trimRight = false;
-      }
-    }
 
-    const lineContent = line.translateToString(trimRight);
+    const lineContent = line.translateToString(false);
 
     if (line.isWrapped && lines.length > 0) {
       lines[lines.length - 1] += lineContent;
@@ -171,8 +171,13 @@ const getFullBufferText = (terminal: pkg.Terminal): string => {
   }
 
   // Remove trailing empty lines
-  while (lines.length > 0 && lines[lines.length - 1] === '') {
+  while (lines.length > 0 && lines[lines.length - 1].trim() === '') {
     lines.pop();
+  }
+
+  // Manual truncation if the library doesn't respect scrollbackLimit
+  if (scrollbackLimit !== undefined && lines.length > scrollbackLimit) {
+    return lines.slice(lines.length - scrollbackLimit).join('\n');
   }
 
   return lines.join('\n');
@@ -575,19 +580,34 @@ export class ShellExecutionService {
       const result = new Promise<ShellExecutionResult>((resolve) => {
         this.activeResolvers.set(ptyProcess.pid, resolve);
 
-        const headlessTerminal = new Terminal({
-          allowProposedApi: true,
-          cols,
-          rows,
-          scrollback: shellExecutionConfig.scrollback ?? SCROLLBACK_LIMIT,
-        });
-        headlessTerminal.scrollToTop();
+        installBrowserShims();
 
-        this.activePtys.set(ptyProcess.pid, {
-          ptyProcess,
-          headlessTerminal,
-          maxSerializedLines: shellExecutionConfig.maxSerializedLines,
-        });
+        const initializeTerminal = async () => {
+          await init();
+
+          const scrollback =
+            shellExecutionConfig.scrollback ?? SCROLLBACK_LIMIT;
+          const headlessTerminal = new Terminal({
+            cols,
+            rows,
+            scrollback,
+          });
+
+          headlessTerminal.open(
+            globalThis.document.createElement('div') as any,
+          );
+          headlessTerminal.scrollToTop();
+
+          this.activePtys.set(ptyProcess.pid, {
+            ptyProcess,
+            headlessTerminal,
+            maxSerializedLines: shellExecutionConfig.maxSerializedLines,
+          });
+
+          return headlessTerminal;
+        };
+
+        const terminalPromise = initializeTerminal();
 
         let processingChain = Promise.resolve();
         let decoder: TextDecoder | null = null;
@@ -603,16 +623,23 @@ export class ShellExecutionService {
         let hasStartedOutput = false;
         let renderTimeout: NodeJS.Timeout | null = null;
 
-        const renderFn = () => {
+        const renderFn = async () => {
           renderTimeout = null;
 
           if (!isStreamingRawContent) {
             return;
           }
 
+          const headlessTerminal = await terminalPromise;
+
           if (!shellExecutionConfig.disableDynamicLineTrimming) {
             if (!hasStartedOutput) {
-              const bufferText = getFullBufferText(headlessTerminal);
+              const scrollbackLimit =
+                shellExecutionConfig.scrollback ?? SCROLLBACK_LIMIT;
+              const bufferText = getFullBufferText(
+                headlessTerminal,
+                scrollbackLimit,
+              );
               if (bufferText.trim().length === 0) {
                 return;
               }
@@ -622,9 +649,15 @@ export class ShellExecutionService {
 
           const buffer = headlessTerminal.buffer.active;
           const endLine = buffer.length;
+          const scrollbackLimit =
+            shellExecutionConfig.scrollback ?? SCROLLBACK_LIMIT;
           const startLine = Math.max(
             0,
-            endLine - (shellExecutionConfig.maxSerializedLines ?? 2000),
+            endLine -
+              Math.min(
+                scrollbackLimit + rows,
+                shellExecutionConfig.maxSerializedLines ?? 2000,
+              ),
           );
 
           let newOutput: AnsiOutput;
@@ -690,7 +723,9 @@ export class ShellExecutionService {
             if (renderTimeout) {
               clearTimeout(renderTimeout);
             }
-            renderFn();
+            renderFn().catch(() => {
+              // Ignore errors during final render
+            });
             return;
           }
 
@@ -699,69 +734,81 @@ export class ShellExecutionService {
           }
 
           renderTimeout = setTimeout(() => {
-            renderFn();
+            renderFn().catch(() => {
+              // Ignore errors during render
+            });
             renderTimeout = null;
           }, 68);
         };
 
-        headlessTerminal.onScroll(() => {
-          if (!isWriting) {
-            render();
-          }
+        terminalPromise.then((headlessTerminal) => {
+          headlessTerminal.onScroll(() => {
+            if (!isWriting) {
+              render();
+            }
+          });
         });
 
         const handleOutput = (data: Buffer) => {
           processingChain = processingChain.then(
             () =>
               new Promise<void>((resolve) => {
-                if (!decoder) {
-                  const encoding = getCachedEncodingForBuffer(data);
-                  try {
-                    decoder = new TextDecoder(encoding);
-                  } catch {
-                    decoder = new TextDecoder('utf-8');
+                const inner = async () => {
+                  if (!decoder) {
+                    const encoding = getCachedEncodingForBuffer(data);
+                    try {
+                      decoder = new TextDecoder(encoding);
+                    } catch {
+                      decoder = new TextDecoder('utf-8');
+                    }
                   }
-                }
 
-                outputChunks.push(data);
+                  outputChunks.push(data);
 
-                if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
-                  const sniffBuffer = Buffer.concat(outputChunks.slice(0, 20));
-                  sniffedBytes = sniffBuffer.length;
+                  if (isStreamingRawContent && sniffedBytes < MAX_SNIFF_SIZE) {
+                    const sniffBuffer = Buffer.concat(outputChunks.slice(0, 20));
+                    sniffedBytes = sniffBuffer.length;
 
-                  if (isBinary(sniffBuffer)) {
-                    isStreamingRawContent = false;
-                    const event: ShellOutputEvent = { type: 'binary_detected' };
+                    if (isBinary(sniffBuffer)) {
+                      isStreamingRawContent = false;
+                      const event: ShellOutputEvent = {
+                        type: 'binary_detected',
+                      };
+                      onOutputEvent(event);
+                      ShellExecutionService.emitEvent(ptyProcess.pid, event);
+                    }
+                  }
+
+                  if (isStreamingRawContent) {
+                    const decodedChunk = decoder.decode(data, { stream: true });
+                    if (decodedChunk.length === 0) {
+                      resolve();
+                      return;
+                    }
+                    isWriting = true;
+                    const headlessTerminal = await terminalPromise;
+                    headlessTerminal.write(decodedChunk, () => {
+                      render();
+                      isWriting = false;
+                      resolve();
+                    });
+                  } else {
+                    const totalBytes = outputChunks.reduce(
+                      (sum, chunk) => sum + chunk.length,
+                      0,
+                    );
+                    const event: ShellOutputEvent = {
+                      type: 'binary_progress',
+                      bytesReceived: totalBytes,
+                    };
                     onOutputEvent(event);
                     ShellExecutionService.emitEvent(ptyProcess.pid, event);
-                  }
-                }
-
-                if (isStreamingRawContent) {
-                  const decodedChunk = decoder.decode(data, { stream: true });
-                  if (decodedChunk.length === 0) {
                     resolve();
-                    return;
                   }
-                  isWriting = true;
-                  headlessTerminal.write(decodedChunk, () => {
-                    render();
-                    isWriting = false;
-                    resolve();
-                  });
-                } else {
-                  const totalBytes = outputChunks.reduce(
-                    (sum, chunk) => sum + chunk.length,
-                    0,
-                  );
-                  const event: ShellOutputEvent = {
-                    type: 'binary_progress',
-                    bytesReceived: totalBytes,
-                  };
-                  onOutputEvent(event);
-                  ShellExecutionService.emitEvent(ptyProcess.pid, event);
+                };
+                inner().catch(() => {
                   resolve();
-                }
+                });
               }),
           );
         };
@@ -783,7 +830,7 @@ export class ShellExecutionService {
               // Ignore errors during cleanup
             }
 
-            const finalize = () => {
+            const finalize = async () => {
               render(true);
 
               // Store exit info for late subscribers (e.g. backgrounding race condition)
@@ -809,9 +856,12 @@ export class ShellExecutionService {
 
               const finalBuffer = Buffer.concat(outputChunks);
 
+              const headlessTerminal = await terminalPromise;
+              const scrollbackLimit =
+                shellExecutionConfig.scrollback ?? SCROLLBACK_LIMIT;
               resolve({
                 rawOutput: finalBuffer,
-                output: getFullBufferText(headlessTerminal),
+                output: getFullBufferText(headlessTerminal, scrollbackLimit),
                 exitCode,
                 signal: signal ?? null,
                 error,
@@ -822,7 +872,9 @@ export class ShellExecutionService {
             };
 
             if (abortSignal.aborted) {
-              finalize();
+              finalize().catch(() => {
+                // Ignore errors during finalization
+              });
               return;
             }
 
@@ -839,7 +891,9 @@ export class ShellExecutionService {
 
             // eslint-disable-next-line @typescript-eslint/no-floating-promises
             Promise.race([processingComplete, abortFired]).then(() => {
-              finalize();
+              finalize().catch(() => {
+                // Ignore errors during finalization
+              });
             });
           },
         );
@@ -1010,7 +1064,9 @@ export class ShellExecutionService {
       const activeChild = this.activeChildProcesses.get(pid);
 
       if (activePty) {
-        output = getFullBufferText(activePty.headlessTerminal);
+        const scrollbackLimit =
+          activePty.headlessTerminal.options.scrollback ?? SCROLLBACK_LIMIT;
+        output = getFullBufferText(activePty.headlessTerminal, scrollbackLimit);
         resolve({
           rawOutput,
           output,

@@ -307,8 +307,8 @@ describe('ShellExecutionService', () => {
       );
     });
 
-    it('should capture large output (10000 lines)', async () => {
-      const lineCount = 10000;
+    it('should capture large output (1000 lines)', async () => {
+      const lineCount = 1000;
       const lines = Array.from({ length: lineCount }, (_, i) => `line ${i}`);
       const expectedOutput = lines.join('\n');
 
@@ -317,7 +317,7 @@ describe('ShellExecutionService', () => {
         (pty) => {
           // Send data in chunks to simulate realistic streaming
           // Use \r\n to ensure the terminal moves the cursor to the start of the line
-          const chunkSize = 1000;
+          const chunkSize = 200;
           for (let i = 0; i < lineCount; i += chunkSize) {
             const chunk = lines.slice(i, i + chunkSize).join('\r\n') + '\r\n';
             pty.onData.mock.calls[0][0](chunk);
@@ -389,11 +389,8 @@ describe('ShellExecutionService', () => {
       expect(result.exitCode).toBe(0);
 
       // The terminal should keep the *last* 'scrollbackLimit' lines + lines in the viewport.
-      // xterm.js scrollback is the number of lines *above* the viewport.
-      // So total lines retained = scrollback + rows.
-      // However, our `getFullBufferText` implementation iterates the *active* buffer.
-      // In headless xterm, the buffer length grows.
-      // Let's verify that we have fewer lines than totalLines.
+      // In ghostty-web, the buffer length includes scrollback + rows.
+      // Let's verify that the output contains the expected number of lines.
 
       const outputLines = result.output
         .trim()

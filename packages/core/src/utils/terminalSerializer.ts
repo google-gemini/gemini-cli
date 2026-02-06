@@ -4,7 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { IBufferCell, Terminal } from '@xterm/headless';
+import type { Terminal } from 'ghostty-web';
+
+type IBuffer = Terminal['buffer']['active'];
+type IBufferLine = ReturnType<IBuffer['getLine']>;
+type IBufferCell = ReturnType<Exclude<IBufferLine, undefined>['getCell']>;
+
 export interface AnsiToken {
   text: string;
   bold: boolean;
@@ -85,21 +90,23 @@ class Cell {
     if (cell.isUnderline()) {
       this.attributes += Attribute.underline;
     }
-    if (cell.isDim()) {
+    if (cell.isFaint()) {
       this.attributes += Attribute.dim;
     }
 
-    if (cell.isFgRGB()) {
+    const fgMode = cell.getFgColorMode();
+    if (fgMode === -1) {
       this.fgColorMode = ColorMode.RGB;
-    } else if (cell.isFgPalette()) {
+    } else if (fgMode >= 0) {
       this.fgColorMode = ColorMode.PALETTE;
     } else {
       this.fgColorMode = ColorMode.DEFAULT;
     }
 
-    if (cell.isBgRGB()) {
+    const bgMode = cell.getBgColorMode();
+    if (bgMode === -1) {
       this.bgColorMode = ColorMode.RGB;
-    } else if (cell.isBgPalette()) {
+    } else if (bgMode >= 0) {
       this.bgColorMode = ColorMode.PALETTE;
     } else {
       this.bgColorMode = ColorMode.DEFAULT;
