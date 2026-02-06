@@ -98,6 +98,7 @@ import { type LoadableSettingScope, SettingScope } from '../config/settings.js';
 import { type InitializationResult } from '../core/initializer.js';
 import { useFocus } from './hooks/useFocus.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
+import { KeypressPriority } from './contexts/KeypressContext.js';
 import { keyMatchers, Command } from './keyMatchers.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useShellInactivityStatus } from './hooks/useShellInactivityStatus.js';
@@ -1435,13 +1436,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const handleGlobalKeypress = useCallback(
     (key: Key): boolean => {
-      if (copyModeEnabled) {
-        setCopyModeEnabled(false);
-        enableMouseEvents();
-        // We don't want to process any other keys if we're in copy mode.
-        return true;
-      }
-
       // Debug log keystrokes if enabled
       if (settings.merged.general.debugKeystrokeLogging) {
         debugLogger.log('[DEBUG] Keystroke:', JSON.stringify(key));
@@ -1600,7 +1594,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       settings.merged.general.debugKeystrokeLogging,
       refreshStatic,
       setCopyModeEnabled,
-      copyModeEnabled,
       isAlternateBuffer,
       backgroundCurrentShell,
       toggleBackgroundShell,
@@ -1614,6 +1607,20 @@ Logging in with Google... Restarting Gemini CLI to continue.
   );
 
   useKeypress(handleGlobalKeypress, { isActive: true });
+
+  useKeypress(
+    () => {
+      setCopyModeEnabled(false);
+      enableMouseEvents();
+      return true;
+    },
+    {
+      isActive: copyModeEnabled,
+      // We need to receive keypresses first so they do not bubble to other
+      // handlers.
+      priority: KeypressPriority.Critical,
+    },
+  );
 
   useEffect(() => {
     // Respect hideWindowTitle settings
