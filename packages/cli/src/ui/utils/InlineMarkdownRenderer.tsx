@@ -13,7 +13,7 @@ import { debugLogger } from '@google/gemini-cli-core';
 // Regex constants defined at module level for performance (avoid recompilation)
 // Trailing characters to strip (common sentence-ending punctuation)
 // Excludes []{}>"' which can be valid parts of URLs
-const TRAILING_CHARS_REGEX = /[.,;:!?)）、。，；：！？‖‧…]/;
+const TRAILING_CHARS_REGEX = /[.,;:!?、。，；：！？‖‧…]/;
 const PARENS_REGEX = /[()（）]/g;
 
 /**
