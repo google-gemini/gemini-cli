@@ -90,8 +90,7 @@ export function useQuotaAndFallback({
         isModelNotFoundError = true;
         const messageLines = [
           `It seems like you don't have access to ${failedModel}.`,
-          `Learn more at https://goo.gle/enable-preview-features`,
-          `To disable ${failedModel}, disable "Preview features" in /settings.`,
+          `Your admin might have disabled the access. Contact them to enable the Preview Release Channel.`,
         ];
         message = messageLines.join('\n');
       } else {

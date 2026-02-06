@@ -355,10 +355,6 @@ export function SettingsDialog({
           next.delete(key);
           return next;
         });
-
-        if (key === 'general.previewFeatures') {
-          config?.setPreviewFeatures(newValue as boolean);
-        }
       } else {
         // For restart-required settings, track as modified
         setModifiedSettings((prev) => {
@@ -387,14 +383,7 @@ export function SettingsDialog({
         });
       }
     },
-    [
-      pendingSettings,
-      settings,
-      selectedScope,
-      vimEnabled,
-      toggleVimEnabled,
-      config,
-    ],
+    [pendingSettings, settings, selectedScope, vimEnabled, toggleVimEnabled],
   );
 
   // Edit commit handler
@@ -521,12 +510,6 @@ export function SettingsDialog({
               );
             });
           }
-        }
-
-        if (key === 'general.previewFeatures') {
-          const booleanDefaultValue =
-            typeof defaultValue === 'boolean' ? defaultValue : false;
-          config?.setPreviewFeatures(booleanDefaultValue);
         }
       }
 

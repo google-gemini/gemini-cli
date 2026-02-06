@@ -6,7 +6,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { persistentState } from '../../utils/persistentState.js';
-import type { Config } from '@google/gemini-cli-core';
 import crypto from 'node:crypto';
 
 const DEFAULT_MAX_BANNER_SHOWN_COUNT = 5;
@@ -16,19 +15,8 @@ interface BannerData {
   warningText: string;
 }
 
-export function useBanner(bannerData: BannerData, config: Config) {
+export function useBanner(bannerData: BannerData) {
   const { defaultText, warningText } = bannerData;
-
-  const [previewEnabled, setPreviewEnabled] = useState(
-    config.getPreviewFeatures(),
-  );
-
-  useEffect(() => {
-    const isEnabled = config.getPreviewFeatures();
-    if (isEnabled !== previewEnabled) {
-      setPreviewEnabled(isEnabled);
-    }
-  }, [config, previewEnabled]);
 
   const [bannerCounts] = useState(
     () => persistentState.get('defaultBannerShownCount') || {},
@@ -42,9 +30,7 @@ export function useBanner(bannerData: BannerData, config: Config) {
   const currentBannerCount = bannerCounts[hashedText] || 0;
 
   const showDefaultBanner =
-    warningText === '' &&
-    !previewEnabled &&
-    currentBannerCount < DEFAULT_MAX_BANNER_SHOWN_COUNT;
+    warningText === '' && currentBannerCount < DEFAULT_MAX_BANNER_SHOWN_COUNT;
 
   const rawBannerText = showDefaultBanner ? defaultText : warningText;
   const bannerText = rawBannerText.replace(/\\n/g, '\n');

@@ -482,10 +482,7 @@ export class Session {
       const functionCalls: FunctionCall[] = [];
 
       try {
-        const model = resolveModel(
-          this.config.getModel(),
-          this.config.getPreviewFeatures(),
-        );
+        const model = resolveModel(this.config.getModel());
         const responseStream = await chat.sendMessageStream(
           { model },
           nextMessage?.parts ?? [],
