@@ -13,7 +13,7 @@ import {
   createTransport,
   debugLogger,
   applyAdminAllowlist,
-  getAdminErrorMessage,
+  getAdminBlockedMcpServersMessage,
 } from '@google/gemini-cli-core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
@@ -34,10 +34,6 @@ export async function getMcpServersFromConfig(
 }> {
   if (!settings) {
     settings = loadSettings().merged;
-  }
-  const mcpEnabled = settings.admin?.mcp?.enabled ?? true;
-  if (!mcpEnabled) {
-    return { mcpServers: {}, blockedServerNames: [] };
   }
 
   const extensionManager = new ExtensionManager({
@@ -75,11 +71,11 @@ async function testMCPConnection(
     version: '0.0.1',
   });
 
-  const settings = loadSettings().merged;
+  const settings = loadSettings();
   const sanitizationConfig = {
     enableEnvironmentVariableRedaction: true,
     allowedEnvironmentVariables: [],
-    blockedEnvironmentVariables: settings.advanced.excludedEnvVars,
+    blockedEnvironmentVariables: settings.merged.advanced.excludedEnvVars,
   };
 
   let transport;
@@ -125,10 +121,8 @@ export async function listMcpServers(settings?: MergedSettings): Promise<void> {
   const serverNames = Object.keys(mcpServers);
 
   if (blockedServerNames.length > 0) {
-    const message = getAdminErrorMessage(
-      `The following MCP servers were filtered because they are not in the allowed list: ${blockedServerNames.join(
-        ', ',
-      )}`,
+    const message = getAdminBlockedMcpServersMessage(
+      blockedServerNames,
       undefined,
     );
     debugLogger.log(COLOR_YELLOW + message + RESET_COLOR + '\n');
@@ -144,7 +138,6 @@ export async function listMcpServers(settings?: MergedSettings): Promise<void> {
   debugLogger.log('Configured MCP servers:\n');
 
   for (const serverName of serverNames) {
-    // ... existing loop
     const server = mcpServers[serverName];
 
     const status = await getServerStatus(serverName, server);

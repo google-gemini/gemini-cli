@@ -25,7 +25,6 @@ import {
 import {
   Config,
   debugLogger,
-  applyAdminAllowlist,
   ExtensionDisableEvent,
   ExtensionEnableEvent,
   ExtensionInstallEvent,
@@ -49,6 +48,8 @@ import {
   type HookEventName,
   type ResolvedExtensionSetting,
   coreEvents,
+  applyAdminAllowlist,
+  getAdminBlockedMcpServersMessage,
 } from '@google/gemini-cli-core';
 import { maybeRequestConsentOrFail } from './extensions/consent.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
@@ -662,12 +663,33 @@ Would you like to attempt to install via "git clone" instead?`,
         if (this.settings.admin.mcp.enabled === false) {
           config.mcpServers = undefined;
         } else {
-          config.mcpServers = Object.fromEntries(
-            Object.entries(config.mcpServers).map(([key, value]) => [
-              key,
-              filterMcpConfig(value),
-            ]),
-          );
+          // Apply admin allowlist if configured
+          const adminAllowlist = this.settings.admin.mcp.config;
+          if (adminAllowlist && Object.keys(adminAllowlist).length > 0) {
+            const result = applyAdminAllowlist(
+              config.mcpServers,
+              adminAllowlist,
+            );
+            config.mcpServers = result.mcpServers;
+
+            if (result.blockedServerNames.length > 0) {
+              const message = getAdminBlockedMcpServersMessage(
+                result.blockedServerNames,
+                undefined,
+              );
+              coreEvents.emitConsoleLog('warn', message);
+            }
+          }
+
+          // Then apply local filtering/sanitization
+          if (config.mcpServers) {
+            config.mcpServers = Object.fromEntries(
+              Object.entries(config.mcpServers).map(([key, value]) => [
+                key,
+                filterMcpConfig(value),
+              ]),
+            );
+          }
         }
       }
 
@@ -910,32 +932,8 @@ Would you like to attempt to install via "git clone" instead?`,
     }
     if (extension.mcpServers) {
       output += `\n MCP servers:`;
-
-      const adminMcpConfig = this.settings.admin?.mcp?.config;
-      const adminMcpEnabled = this.settings.admin?.mcp?.enabled ?? true;
-
       Object.keys(extension.mcpServers).forEach((key) => {
-        let blockedMessage = '';
-        if (!adminMcpEnabled) {
-          blockedMessage = ' (blocked by admin: MCP disabled)';
-        } else if (adminMcpConfig && Object.keys(adminMcpConfig).length > 0) {
-          // Check if this server is allowed by the admin allowlist
-          // We can reuse applyAdminAllowlist for a single item check
-          // But since we don't have the server config easily here without looking it up again or trusting the structure...
-          // Actually, applyAdminAllowlist takes a Record<string, MCPServerConfig>
-          // So we construct a dummy record
-          const serverConfig = extension.mcpServers?.[key];
-          if (serverConfig) {
-            const filtered = applyAdminAllowlist(
-              { [key]: serverConfig },
-              adminMcpConfig,
-            );
-            if (Object.keys(filtered.mcpServers).length === 0) {
-              blockedMessage = ' (blocked by admin allowlist)';
-            }
-          }
-        }
-        output += `\n  ${key}${blockedMessage}`;
+        output += `\n  ${key}`;
       });
     }
     if (extension.excludeTools) {

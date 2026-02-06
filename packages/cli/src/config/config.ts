@@ -38,6 +38,7 @@ import {
   getAdminErrorMessage,
   Config,
   applyAdminAllowlist,
+  getAdminBlockedMcpServersMessage,
 } from '@google/gemini-cli-core';
 import type {
   HookDefinition,
@@ -698,6 +699,14 @@ export async function loadCliConfig(
     const result = applyAdminAllowlist(mcpServers, adminAllowlist);
     mcpServers = result.mcpServers;
     mcpServerCommand = undefined;
+
+    if (result.blockedServerNames && result.blockedServerNames.length > 0) {
+      const message = getAdminBlockedMcpServersMessage(
+        result.blockedServerNames,
+        undefined,
+      );
+      coreEvents.emitConsoleLog('warn', message);
+    }
   }
 
   return new Config({

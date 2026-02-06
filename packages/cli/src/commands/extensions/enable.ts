@@ -15,10 +15,7 @@ import {
 } from '@google/gemini-cli-core';
 import { promptForSetting } from '../../config/extensions/extensionSettings.js';
 import { exitCli } from '../utils.js';
-import {
-  McpServerEnablementManager,
-  canLoadServer,
-} from '../../config/mcp/mcpServerEnablement.js';
+import { McpServerEnablementManager } from '../../config/mcp/mcpServerEnablement.js';
 
 interface EnableArgs {
   name: string;
@@ -27,12 +24,11 @@ interface EnableArgs {
 
 export async function handleEnable(args: EnableArgs) {
   const workingDir = process.cwd();
-  const settings = loadSettings(workingDir).merged;
   const extensionManager = new ExtensionManager({
     workspaceDir: workingDir,
     requestConsent: requestConsentNonInteractive,
     requestSetting: promptForSetting,
-    settings,
+    settings: loadSettings(workingDir).merged,
   });
   await extensionManager.loadExtensions();
 
@@ -55,22 +51,9 @@ export async function handleEnable(args: EnableArgs) {
       );
 
       for (const serverName of enabledServers) {
-        const loadResult = await canLoadServer(serverName, {
-          adminMcpEnabled: settings.admin?.mcp?.enabled ?? true,
-          allowedList: settings.mcp?.allowed,
-          excludedList: settings.mcp?.excluded,
-          adminAllowlist: settings.admin?.mcp?.config,
-        });
-
-        if (!loadResult.allowed) {
-          debugLogger.log(
-            `MCP server '${serverName}' enabled in user settings, but currently blocked: ${loadResult.reason}`,
-          );
-        } else {
-          debugLogger.log(
-            `MCP server '${serverName}' was disabled - now enabled.`,
-          );
-        }
+        debugLogger.log(
+          `MCP server '${serverName}' was disabled - now enabled.`,
+        );
       }
       // Note: No restartServer() - CLI exits immediately, servers load on next session
     }

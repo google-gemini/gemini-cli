@@ -10,6 +10,7 @@ import {
   Storage,
   coreEvents,
   applyAdminAllowlist,
+  getAdminErrorMessage,
   type MCPServerConfig,
 } from '@google/gemini-cli-core';
 
@@ -135,7 +136,7 @@ export async function canLoadServer(
     if (!filtered.mcpServers[normalizedId]) {
       return {
         allowed: false,
-        reason: `Server '${serverId}' is not in the admin allowlist.`,
+        reason: getAdminErrorMessage(`Server '${serverId}'`, undefined),
         blockType: 'allowlist',
       };
     }
