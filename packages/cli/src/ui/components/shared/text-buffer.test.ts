@@ -27,6 +27,9 @@ import {
   textBufferReducer,
   findWordEndInLine,
   findNextWordStartInLine,
+  findNextBigWordStartInLine,
+  findPrevBigWordStartInLine,
+  findBigWordEndInLine,
   isWordCharStrict,
   calculateTransformationsForLine,
   calculateTransformedLine,
@@ -85,6 +88,43 @@ describe('textBufferReducer', () => {
     const state = textBufferReducer(initialState, action);
     expect(state).toHaveOnlyValidCharacters();
     expect(state).toEqual(initialState);
+  });
+
+  describe('Big Word Navigation Helpers', () => {
+    describe('findNextBigWordStartInLine (W)', () => {
+      it('should skip non-whitespace and then whitespace', () => {
+        expect(findNextBigWordStartInLine('hello world', 0)).toBe(6);
+        expect(findNextBigWordStartInLine('hello.world test', 0)).toBe(12);
+        expect(findNextBigWordStartInLine('   test', 0)).toBe(3);
+        expect(findNextBigWordStartInLine('test   ', 0)).toBe(null);
+      });
+    });
+
+    describe('findPrevBigWordStartInLine (B)', () => {
+      it('should skip whitespace backwards then non-whitespace', () => {
+        expect(findPrevBigWordStartInLine('hello world', 6)).toBe(0);
+        expect(findPrevBigWordStartInLine('hello.world test', 12)).toBe(0);
+        expect(findPrevBigWordStartInLine('   test', 3)).toBe(null); // At start of word
+        expect(findPrevBigWordStartInLine('   test', 4)).toBe(3); // Inside word
+        expect(findPrevBigWordStartInLine('test   ', 6)).toBe(0);
+      });
+    });
+
+    describe('findBigWordEndInLine (E)', () => {
+      it('should find end of current big word', () => {
+        expect(findBigWordEndInLine('hello world', 0)).toBe(4);
+        expect(findBigWordEndInLine('hello.world test', 0)).toBe(10);
+        expect(findBigWordEndInLine('hello.world test', 11)).toBe(15);
+      });
+
+      it('should skip whitespace if currently on whitespace', () => {
+        expect(findBigWordEndInLine('hello   world', 5)).toBe(12);
+      });
+
+      it('should find next big word end if at end of current', () => {
+        expect(findBigWordEndInLine('hello world', 4)).toBe(10);
+      });
+    });
   });
 
   describe('set_text action', () => {
@@ -1384,6 +1424,61 @@ describe('useTextBuffer', () => {
       expect(state.visualCursor).toEqual([0, 1]);
     });
 
+    it('move: up/down should work on wrapped lines (regression test)', () => {
+      // Line that wraps into two visual lines
+      // Viewport width 10. "0123456789ABCDE" (15 chars)
+      // Visual Line 0: "0123456789"
+      // Visual Line 1: "ABCDE"
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          viewport: { width: 10, height: 5 },
+          isValidPath: () => false,
+        }),
+      );
+
+      act(() => {
+        result.current.setText('0123456789ABCDE');
+      });
+
+      // Cursor should be at the end: logical [0, 15], visual [1, 5]
+      expect(getBufferState(result).cursor).toEqual([0, 15]);
+      expect(getBufferState(result).visualCursor).toEqual([1, 5]);
+
+      // Press Up arrow - should move to first visual line
+      // This currently fails because handleInput returns false if cursorRow === 0
+      let handledUp = false;
+      act(() => {
+        handledUp = result.current.handleInput({
+          name: 'up',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          insertable: false,
+          sequence: '\x1b[A',
+        });
+      });
+      expect(handledUp).toBe(true);
+      expect(getBufferState(result).visualCursor[0]).toBe(0);
+
+      // Press Down arrow - should move back to second visual line
+      // This would also fail if cursorRow is the last logical row
+      let handledDown = false;
+      act(() => {
+        handledDown = result.current.handleInput({
+          name: 'down',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          insertable: false,
+          sequence: '\x1b[B',
+        });
+      });
+      expect(handledDown).toBe(true);
+      expect(getBufferState(result).visualCursor[0]).toBe(1);
+    });
+
     it('moveToVisualPosition: should correctly handle wide characters (Chinese)', () => {
       const { result } = renderHook(() =>
         useTextBuffer({
@@ -1418,7 +1513,7 @@ describe('useTextBuffer', () => {
       const { result } = renderHook(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
-      act(() =>
+      act(() => {
         result.current.handleInput({
           name: 'h',
           shift: false,
@@ -1427,9 +1522,9 @@ describe('useTextBuffer', () => {
           cmd: false,
           insertable: true,
           sequence: 'h',
-        }),
-      );
-      act(() =>
+        });
+      });
+      void act(() =>
         result.current.handleInput({
           name: 'i',
           shift: false,
@@ -1447,7 +1542,7 @@ describe('useTextBuffer', () => {
       const { result } = renderHook(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
-      act(() =>
+      act(() => {
         result.current.handleInput({
           name: 'return',
           shift: false,
@@ -1456,8 +1551,8 @@ describe('useTextBuffer', () => {
           cmd: false,
           insertable: true,
           sequence: '\r',
-        }),
-      );
+        });
+      });
       expect(getBufferState(result).lines).toEqual(['', '']);
     });
 
@@ -1465,7 +1560,7 @@ describe('useTextBuffer', () => {
       const { result } = renderHook(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
-      act(() =>
+      act(() => {
         result.current.handleInput({
           name: 'j',
           shift: false,
@@ -1474,8 +1569,8 @@ describe('useTextBuffer', () => {
           cmd: false,
           insertable: false,
           sequence: '\n',
-        }),
-      );
+        });
+      });
       expect(getBufferState(result).lines).toEqual(['', '']);
     });
 
@@ -1483,7 +1578,7 @@ describe('useTextBuffer', () => {
       const { result } = renderHook(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
-      act(() =>
+      act(() => {
         result.current.handleInput({
           name: 'tab',
           shift: false,
@@ -1492,8 +1587,8 @@ describe('useTextBuffer', () => {
           cmd: false,
           insertable: false,
           sequence: '\t',
-        }),
-      );
+        });
+      });
       expect(getBufferState(result).text).toBe('');
     });
 
@@ -1501,7 +1596,7 @@ describe('useTextBuffer', () => {
       const { result } = renderHook(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
-      act(() =>
+      act(() => {
         result.current.handleInput({
           name: 'tab',
           shift: true,
@@ -1510,9 +1605,53 @@ describe('useTextBuffer', () => {
           cmd: false,
           insertable: false,
           sequence: '\u001b[9;2u',
+        });
+      });
+      expect(getBufferState(result).text).toBe('');
+    });
+
+    it('should handle CLEAR_INPUT (Ctrl+C)', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          initialText: 'hello',
+          viewport,
+          isValidPath: () => false,
         }),
       );
+      expect(getBufferState(result).text).toBe('hello');
+      let handled = false;
+      act(() => {
+        handled = result.current.handleInput({
+          name: 'c',
+          shift: false,
+          alt: false,
+          ctrl: true,
+          cmd: false,
+          insertable: false,
+          sequence: '\u0003',
+        });
+      });
+      expect(handled).toBe(true);
       expect(getBufferState(result).text).toBe('');
+    });
+
+    it('should NOT handle CLEAR_INPUT if buffer is empty', () => {
+      const { result } = renderHook(() =>
+        useTextBuffer({ viewport, isValidPath: () => false }),
+      );
+      let handled = true;
+      act(() => {
+        handled = result.current.handleInput({
+          name: 'c',
+          shift: false,
+          alt: false,
+          ctrl: true,
+          cmd: false,
+          insertable: false,
+          sequence: '\u0003',
+        });
+      });
+      expect(handled).toBe(false);
     });
 
     it('should handle "Backspace" key', () => {
@@ -1524,7 +1663,7 @@ describe('useTextBuffer', () => {
         }),
       );
       act(() => result.current.move('end'));
-      act(() =>
+      act(() => {
         result.current.handleInput({
           name: 'backspace',
           shift: false,
@@ -1533,8 +1672,8 @@ describe('useTextBuffer', () => {
           cmd: false,
           insertable: false,
           sequence: '\x7f',
-        }),
-      );
+        });
+      });
       expect(getBufferState(result).text).toBe('');
     });
 
@@ -1627,7 +1766,7 @@ describe('useTextBuffer', () => {
         }),
       );
       act(() => result.current.move('end')); // cursor [0,2]
-      act(() =>
+      act(() => {
         result.current.handleInput({
           name: 'left',
           shift: false,
@@ -1636,10 +1775,10 @@ describe('useTextBuffer', () => {
           cmd: false,
           insertable: false,
           sequence: '\x1b[D',
-        }),
-      );
+        });
+      });
       expect(getBufferState(result).cursor).toEqual([0, 1]);
-      act(() =>
+      act(() => {
         result.current.handleInput({
           name: 'right',
           shift: false,
@@ -1648,8 +1787,8 @@ describe('useTextBuffer', () => {
           cmd: false,
           insertable: false,
           sequence: '\x1b[C',
-        }),
-      );
+        });
+      });
       expect(getBufferState(result).cursor).toEqual([0, 2]);
     });
 
@@ -1659,7 +1798,7 @@ describe('useTextBuffer', () => {
       );
       const textWithAnsi = '\x1B[31mHello\x1B[0m \x1B[32mWorld\x1B[0m';
       // Simulate pasting by calling handleInput with a string longer than 1 char
-      act(() =>
+      act(() => {
         result.current.handleInput({
           name: '',
           shift: false,
@@ -1668,8 +1807,8 @@ describe('useTextBuffer', () => {
           cmd: false,
           insertable: true,
           sequence: textWithAnsi,
-        }),
-      );
+        });
+      });
       expect(getBufferState(result).text).toBe('Hello World');
     });
 
@@ -1677,7 +1816,7 @@ describe('useTextBuffer', () => {
       const { result } = renderHook(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
-      act(() =>
+      act(() => {
         result.current.handleInput({
           name: 'return',
           shift: true,
@@ -1686,8 +1825,8 @@ describe('useTextBuffer', () => {
           cmd: false,
           insertable: true,
           sequence: '\r',
-        }),
-      ); // Simulates Shift+Enter in VSCode terminal
+        });
+      }); // Simulates Shift+Enter in VSCode terminal
       expect(getBufferState(result).lines).toEqual(['', '']);
     });
 
@@ -1927,7 +2066,9 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       const { result } = renderHook(() =>
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
-      act(() => result.current.handleInput(createInput(input)));
+      act(() => {
+        result.current.handleInput(createInput(input));
+      });
       expect(getBufferState(result).text).toBe(expected);
     });
 
@@ -1936,7 +2077,9 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
       const validText = 'Hello World\nThis is a test.';
-      act(() => result.current.handleInput(createInput(validText)));
+      act(() => {
+        result.current.handleInput(createInput(validText));
+      });
       expect(getBufferState(result).text).toBe(validText);
     });
 
@@ -1950,7 +2093,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
 
       expect(largeTextWithUnsafe.length).toBeGreaterThan(5000);
 
-      act(() =>
+      act(() => {
         result.current.handleInput({
           name: '',
           shift: false,
@@ -1959,8 +2102,8 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
           cmd: false,
           insertable: true,
           sequence: largeTextWithUnsafe,
-        }),
-      );
+        });
+      });
 
       const resultText = getBufferState(result).text;
       expect(resultText).not.toContain('\x07');
@@ -1985,7 +2128,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
 
       expect(largeTextWithAnsi.length).toBeGreaterThan(5000);
 
-      act(() =>
+      act(() => {
         result.current.handleInput({
           name: '',
           shift: false,
@@ -1994,8 +2137,8 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
           cmd: false,
           insertable: true,
           sequence: largeTextWithAnsi,
-        }),
-      );
+        });
+      });
 
       const resultText = getBufferState(result).text;
       expect(resultText).not.toContain('\x1B[31m');
@@ -2010,7 +2153,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
         useTextBuffer({ viewport, isValidPath: () => false }),
       );
       const emojis = '🐍🐳🦀🦄';
-      act(() =>
+      act(() => {
         result.current.handleInput({
           name: '',
           shift: false,
@@ -2019,8 +2162,8 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
           cmd: false,
           insertable: true,
           sequence: emojis,
-        }),
-      );
+        });
+      });
       expect(getBufferState(result).text).toBe(emojis);
     });
   });
@@ -2202,7 +2345,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
           singleLine: true,
         }),
       );
-      act(() =>
+      act(() => {
         result.current.handleInput({
           name: 'return',
           shift: false,
@@ -2211,8 +2354,8 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
           cmd: false,
           insertable: true,
           sequence: '\r',
-        }),
-      );
+        });
+      });
       expect(getBufferState(result).lines).toEqual(['']);
     });
 
@@ -2224,7 +2367,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
           singleLine: true,
         }),
       );
-      act(() =>
+      act(() => {
         result.current.handleInput({
           name: 'f1',
           shift: false,
@@ -2233,8 +2376,8 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
           cmd: false,
           insertable: false,
           sequence: '\u001bOP',
-        }),
-      );
+        });
+      });
       expect(getBufferState(result).lines).toEqual(['']);
     });
 

@@ -47,6 +47,7 @@ export interface BaseMessageRecord {
   id: string;
   timestamp: string;
   content: PartListUnion;
+  displayContent?: PartListUnion;
 }
 
 /**
@@ -207,12 +208,14 @@ export class ChatRecordingService {
   private newMessage(
     type: ConversationRecordExtra['type'],
     content: PartListUnion,
+    displayContent?: PartListUnion,
   ): MessageRecord {
     return {
       id: randomUUID(),
       timestamp: new Date().toISOString(),
       type,
       content,
+      displayContent,
     };
   }
 
@@ -223,12 +226,17 @@ export class ChatRecordingService {
     model: string | undefined;
     type: ConversationRecordExtra['type'];
     content: PartListUnion;
+    displayContent?: PartListUnion;
   }): void {
     if (!this.conversationFile) return;
 
     try {
       this.updateConversation((conversation) => {
-        const msg = this.newMessage(message.type, message.content);
+        const msg = this.newMessage(
+          message.type,
+          message.content,
+          message.displayContent,
+        );
         if (msg.type === 'gemini') {
           // If it's a new Gemini message then incorporate any queued thoughts.
           conversation.messages.push({

@@ -12,7 +12,6 @@ import { extensionsCommand } from '../commands/extensions.js';
 import { skillsCommand } from '../commands/skills.js';
 import { hooksCommand } from '../commands/hooks.js';
 import {
-  Config,
   setGeminiMdFilename as setServerGeminiMdFilename,
   getCurrentGeminiMdFilename,
   ApprovalMode,
@@ -31,13 +30,19 @@ import {
   debugLogger,
   loadServerHierarchicalMemory,
   WEB_FETCH_TOOL_NAME,
+  ASK_USER_TOOL_NAME,
   getVersion,
   PREVIEW_GEMINI_MODEL_AUTO,
-  type HookDefinition,
-  type HookEventName,
-  type OutputFormat,
   coreEvents,
   GEMINI_MODEL_ALIAS_AUTO,
+  getAdminErrorMessage,
+  Config,
+} from '@google/gemini-cli-core';
+import type {
+  MCPServerConfig,
+  HookDefinition,
+  HookEventName,
+  OutputFormat,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -308,7 +313,7 @@ export async function parseArguments(
     yargsInstance.command(skillsCommand);
   }
   // Register hooks command if hooks are enabled
-  if (settings.tools?.enableHooks) {
+  if (settings.hooksConfig.enabled) {
     yargsInstance.command(hooksCommand);
   }
 
@@ -432,7 +437,7 @@ export async function loadCliConfig(
   const ideMode = settings.ide?.enabled ?? false;
 
   const folderTrust = settings.security?.folderTrust?.enabled ?? false;
-  const trustedFolder = isWorkspaceTrusted(settings)?.isTrusted ?? false;
+  const trustedFolder = isWorkspaceTrusted(settings, cwd)?.isTrusted ?? false;
 
   // Set the context filename in the server's memoryTool module BEFORE loading memory
   // TODO(b/343434939): This is a bit of a hack. The contextFileName should ideally be passed
@@ -550,7 +555,7 @@ export async function loadCliConfig(
         );
       }
       throw new FatalConfigError(
-        'Cannot start in YOLO mode since it is disabled by your admin',
+        getAdminErrorMessage('YOLO mode', undefined /* config */),
       );
     }
   } else if (approvalMode === ApprovalMode.YOLO) {
@@ -595,6 +600,10 @@ export async function loadCliConfig(
   // In non-interactive mode, exclude tools that require a prompt.
   const extraExcludes: string[] = [];
   if (!interactive) {
+    // ask_user requires user interaction and must be excluded in all
+    // non-interactive modes, regardless of the approval mode.
+    extraExcludes.push(ASK_USER_TOOL_NAME);
+
     const defaultExcludes = [
       SHELL_TOOL_NAME,
       EDIT_TOOL_NAME,
@@ -681,6 +690,45 @@ export async function loadCliConfig(
     ? mcpEnablementManager.getEnablementCallbacks()
     : undefined;
 
+  const adminAllowlist = settings.admin?.mcp?.config;
+  let mcpServerCommand = mcpEnabled ? settings.mcp?.serverCommand : undefined;
+  let mcpServers = mcpEnabled ? settings.mcpServers : {};
+
+  if (mcpEnabled && adminAllowlist && Object.keys(adminAllowlist).length > 0) {
+    const filteredMcpServers: Record<string, MCPServerConfig> = {};
+    for (const [serverId, localConfig] of Object.entries(mcpServers)) {
+      const adminConfig = adminAllowlist[serverId];
+      if (adminConfig) {
+        const mergedConfig = {
+          ...localConfig,
+          url: adminConfig.url,
+          type: adminConfig.type,
+          trust: adminConfig.trust,
+        };
+
+        // Remove local connection details
+        delete mergedConfig.command;
+        delete mergedConfig.args;
+        delete mergedConfig.env;
+        delete mergedConfig.cwd;
+        delete mergedConfig.httpUrl;
+        delete mergedConfig.tcp;
+
+        if (
+          (adminConfig.includeTools && adminConfig.includeTools.length > 0) ||
+          (adminConfig.excludeTools && adminConfig.excludeTools.length > 0)
+        ) {
+          mergedConfig.includeTools = adminConfig.includeTools;
+          mergedConfig.excludeTools = adminConfig.excludeTools;
+        }
+
+        filteredMcpServers[serverId] = mergedConfig;
+      }
+    }
+    mcpServers = filteredMcpServers;
+    mcpServerCommand = undefined;
+  }
+
   return new Config({
     sessionId,
     clientVersion: await getVersion(),
@@ -700,8 +748,8 @@ export async function loadCliConfig(
     excludeTools,
     toolDiscoveryCommand: settings.tools?.discoveryCommand,
     toolCallCommand: settings.tools?.callCommand,
-    mcpServerCommand: mcpEnabled ? settings.mcp?.serverCommand : undefined,
-    mcpServers: mcpEnabled ? settings.mcpServers : {},
+    mcpServerCommand,
+    mcpServers,
     mcpEnablementCallbacks,
     mcpEnabled,
     extensionsEnabled,
@@ -758,9 +806,11 @@ export async function loadCliConfig(
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
+    toolOutputMasking: settings.experimental?.toolOutputMasking,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,
+    disableLoopDetection: settings.model?.disableLoopDetection,
     compressionThreshold: settings.model?.compressionThreshold,
     folderTrust,
     interactive,
@@ -791,10 +841,8 @@ export async function loadCliConfig(
     acceptRawOutputRisk: argv.acceptRawOutputRisk,
     modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
-    enableHooks:
-      (settings.tools?.enableHooks ?? true) &&
-      (settings.hooksConfig?.enabled ?? true),
-    enableHooksUI: settings.tools?.enableHooks ?? true,
+    enableHooks: settings.hooksConfig.enabled,
+    enableHooksUI: settings.hooksConfig.enabled,
     hooks: settings.hooks || {},
     disabledHooks: settings.hooksConfig?.disabled || [],
     projectHooks: projectHooks || {},

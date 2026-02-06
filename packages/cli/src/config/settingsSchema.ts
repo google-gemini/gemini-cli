@@ -351,6 +351,26 @@ const SETTINGS_SCHEMA = {
           'The color theme for the UI. See the CLI themes guide for available options.',
         showInDialog: false,
       },
+      autoThemeSwitching: {
+        type: 'boolean',
+        label: 'Auto Theme Switching',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Automatically switch between default light and dark themes based on terminal background color.',
+        showInDialog: true,
+      },
+      terminalBackgroundPollingInterval: {
+        type: 'number',
+        label: 'Terminal Background Polling Interval',
+        category: 'UI',
+        requiresRestart: false,
+        default: 60,
+        description:
+          'Interval in seconds to poll the terminal background color.',
+        showInDialog: true,
+      },
       customThemes: {
         type: 'object',
         label: 'Custom Themes',
@@ -748,6 +768,16 @@ const SETTINGS_SCHEMA = {
           'The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).',
         showInDialog: true,
       },
+      disableLoopDetection: {
+        type: 'boolean',
+        label: 'Disable Loop Detection',
+        category: 'Model',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Disable automatic detection and prevention of infinite loops.',
+        showInDialog: true,
+      },
       skipNextSpeakerCheck: {
         type: 'boolean',
         label: 'Skip Next Speaker Check',
@@ -1050,17 +1080,6 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
-      autoAccept: {
-        type: 'boolean',
-        label: 'Auto Accept',
-        category: 'Tools',
-        requiresRestart: false,
-        default: false,
-        description: oneLine`
-          Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).
-        `,
-        showInDialog: true,
-      },
       approvalMode: {
         type: 'enum',
         label: 'Approval Mode',
@@ -1188,16 +1207,6 @@ const SETTINGS_SCHEMA = {
         `,
         showInDialog: true,
       },
-      enableHooks: {
-        type: 'boolean',
-        label: 'Enable Hooks System (Experimental)',
-        category: 'Advanced',
-        requiresRestart: true,
-        default: true,
-        description:
-          'Enables the hooks system experiment. When disabled, the hooks system is completely deactivated regardless of other settings.',
-        showInDialog: false,
-      },
     },
   },
 
@@ -1287,6 +1296,17 @@ const SETTINGS_SCHEMA = {
         description: 'Blocks installing and loading extensions from Git.',
         showInDialog: true,
       },
+      allowedExtensions: {
+        type: 'array',
+        label: 'Extension Source Regex Allowlist',
+        category: 'Security',
+        requiresRestart: true,
+        default: [] as string[],
+        description:
+          'List of Regex patterns for allowed extensions. If nonempty, only extensions that match the patterns in this list are allowed. Overrides the blockGitExtensions setting.',
+        showInDialog: true,
+        items: { type: 'string' },
+      },
       folderTrust: {
         type: 'object',
         label: 'Folder Trust',
@@ -1301,7 +1321,7 @@ const SETTINGS_SCHEMA = {
             label: 'Folder Trust',
             category: 'Security',
             requiresRestart: true,
-            default: false,
+            default: true,
             description: 'Setting to track whether Folder trust is enabled.',
             showInDialog: true,
           },
@@ -1451,6 +1471,58 @@ const SETTINGS_SCHEMA = {
     description: 'Setting to enable experimental features',
     showInDialog: false,
     properties: {
+      toolOutputMasking: {
+        type: 'object',
+        label: 'Tool Output Masking',
+        category: 'Experimental',
+        requiresRestart: true,
+        ignoreInDocs: true,
+        default: {},
+        description:
+          'Advanced settings for tool output masking to manage context window efficiency.',
+        showInDialog: false,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Tool Output Masking',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: false,
+            description: 'Enables tool output masking to save tokens.',
+            showInDialog: false,
+          },
+          toolProtectionThreshold: {
+            type: 'number',
+            label: 'Tool Protection Threshold',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: 50000,
+            description:
+              'Minimum number of tokens to protect from masking (most recent tool outputs).',
+            showInDialog: false,
+          },
+          minPrunableTokensThreshold: {
+            type: 'number',
+            label: 'Min Prunable Tokens Threshold',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: 30000,
+            description:
+              'Minimum prunable tokens required to trigger a masking pass.',
+            showInDialog: false,
+          },
+          protectLatestTurn: {
+            type: 'boolean',
+            label: 'Protect Latest Turn',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: true,
+            description:
+              'Ensures the absolute latest turn is never masked, regardless of token count.',
+            showInDialog: false,
+          },
+        },
+      },
       enableAgents: {
         type: 'boolean',
         label: 'Enable Agents',
@@ -1855,6 +1927,20 @@ const SETTINGS_SCHEMA = {
             description: 'If false, disallows MCP servers from being used.',
             showInDialog: false,
             mergeStrategy: MergeStrategy.REPLACE,
+          },
+          config: {
+            type: 'object',
+            label: 'MCP Config',
+            category: 'Admin',
+            requiresRestart: false,
+            default: {} as Record<string, MCPServerConfig>,
+            description: 'Admin-configured MCP servers.',
+            showInDialog: false,
+            mergeStrategy: MergeStrategy.REPLACE,
+            additionalProperties: {
+              type: 'object',
+              ref: 'MCPServerConfig',
+            },
           },
         },
       },

@@ -254,4 +254,21 @@ description:no-space-desc
     expect(skills[0].name).toBe('no-space-name');
     expect(skills[0].description).toBe('no-space-desc');
   });
+
+  it('should sanitize skill names containing invalid filename characters', async () => {
+    const skillFile = path.join(testRootDir, 'SKILL.md');
+    await fs.writeFile(
+      skillFile,
+      `---
+name: gke:prs-troubleshooter
+description: Test sanitization
+---
+`,
+    );
+
+    const skills = await loadSkillsFromDir(testRootDir);
+
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('gke-prs-troubleshooter');
+  });
 });
