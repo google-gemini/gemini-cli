@@ -139,13 +139,8 @@ export function AuthDialog({
         }
 
         if (authType === AuthType.USE_GEMINI) {
-          if (process.env['GEMINI_API_KEY'] !== undefined) {
-            setAuthState(AuthState.Unauthenticated);
-            return;
-          } else {
-            setAuthState(AuthState.AwaitingApiKeyInput);
-            return;
-          }
+          setAuthState(AuthState.AwaitingApiKeyInput);
+          return;
         }
       }
       setAuthState(AuthState.Unauthenticated);
