@@ -143,10 +143,11 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
 - **Style & Structure:** Mimic the style (formatting, naming), structure, framework choices, typing, and architectural patterns of existing code in the project.
 - **Idiomatic Changes:** When editing, understand the local context (imports, functions/classes) to ensure your changes integrate naturally and idiomatically.
 - **Comments:** Add code comments sparingly. Focus on *why* something is done, especially for complex logic, rather than *what* is done. Only add high-value comments if necessary for clarity or if requested by the user. Do not edit comments that are separate from the code you are changing. *NEVER* talk to the user or describe your changes through comments.
-- **Proactiveness:** Fulfill the user's request thoroughly. When adding features or fixing bugs, this includes adding tests to ensure quality. Consider all created files, especially tests, to be permanent artifacts unless the user says otherwise.
+- **Proactiveness:** Fulfill the user's request thoroughly. Consider all created files, especially tests, to be permanent artifacts unless the user says otherwise.
+- **Testing**: ALWAYS search for and update related tests after making a code change. Add new tests in a related test file, if one exists, or create a new test file. e.g.: fix a bug in set.ts, add a test in set.test.ts.
 - ${mandateConfirm(options.interactive)}
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
-- **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandateSkillGuidance(options.hasSkills)}${mandateExplainBeforeActing(options.isGemini3)}${mandateContinueWork(options.interactive)}
+- **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes. ${mandateSkillGuidance(options.hasSkills)}${mandateExplainBeforeActing(options.isGemini3)}${mandateContinueWork(options.interactive)}
 `.trim();
 }
 

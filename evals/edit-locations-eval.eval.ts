@@ -8,6 +8,10 @@ import { describe, expect } from 'vitest';
 import { evalTest } from './test-helper.js';
 
 describe('Edits location eval', () => {
+  /**
+   * Ensure that Gemini CLI always updates existing test files, if present,
+   * instead of creating a new one.
+   */
   evalTest('ALWAYS_PASSES', {
     name: 'should update existing test file instead of creating a new one',
     files: {
@@ -83,6 +87,11 @@ test('capitalize capitalizes the first letter', () => {
         }
       });
 
+      expect(
+        new Set(targetFiles).size,
+        'Expected only two files changed',
+      ).toEqual(2);
+      expect(targetFiles.some((f) => f?.endsWith('src/math.ts'))).toBe(true);
       expect(targetFiles.some((f) => f?.endsWith('src/math.test.ts'))).toBe(
         true,
       );
