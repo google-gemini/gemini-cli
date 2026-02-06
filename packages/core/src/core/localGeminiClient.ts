@@ -72,7 +72,7 @@ export class LocalGeminiClient {
     reminder?: string,
   ): Promise<object> {
     const geminiContents = contents.map((c) => ({
-      role: c.role === 'model' ? 'model' : 'user',
+      role: c.role,
       parts: c.parts ? c.parts.map((p) => ({ text: p.text })) : [],
     }));
 
