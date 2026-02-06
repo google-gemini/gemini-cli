@@ -10,14 +10,20 @@ import { spawn, exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { unlink, mkdtemp, stat, access, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { EventEmitter } from 'node:events';
 
 const execAsync = promisify(exec);
+
+// Event-based transcript delivery to avoid context re-renders
+// See VOICE_INFINITE_LOOP_ANALYSIS.md for details
+const transcriptEmitter = new EventEmitter();
 
 export interface VoiceInputState {
   isRecording: boolean;
   isTranscribing: boolean;
-  transcript: string | null;
   error: string | null;
+  // NOTE: transcript is intentionally NOT in state - it's delivered via events
+  // to avoid infinite render loops from context propagation
 }
 
 export interface VoiceInputReturn {
@@ -25,7 +31,19 @@ export interface VoiceInputReturn {
   startRecording: () => Promise<void>;
   stopRecording: () => Promise<void>;
   toggleRecording: () => Promise<void>;
-  clearTranscript: () => void;
+}
+
+/**
+ * Subscribe to voice transcript events.
+ * Use this instead of reading transcript from context to avoid re-renders.
+ */
+export function onVoiceTranscript(
+  callback: (transcript: string) => void,
+): () => void {
+  transcriptEmitter.on('transcript', callback);
+  return () => {
+    transcriptEmitter.off('transcript', callback);
+  };
 }
 
 // Configuration
@@ -42,7 +60,6 @@ export function useVoiceInput(config?: {
   const [state, setState] = useState<VoiceInputState>({
     isRecording: false,
     isTranscribing: false,
-    transcript: null,
     error: null,
   });
 
@@ -67,15 +84,9 @@ export function useVoiceInput(config?: {
     [],
   );
 
-  const clearTranscript = useCallback(
-    () => setState((prev) => ({ ...prev, transcript: null, error: null })),
-    [],
-  );
-
   const startRecording = useCallback(async () => {
     try {
-      debugLogger.log('useVoiceInput: startRecording called');
-      setState((prev) => ({ ...prev, isRecording: true, error: null }));
+      setState({ isRecording: true, isTranscribing: false, error: null });
 
       // Create temp directory
       const tempDir = await mkdtemp(join(tmpdir(), 'gemini-voice-'));
@@ -148,11 +159,11 @@ export function useVoiceInput(config?: {
 
       recordProcess.on('error', (err) => {
         debugLogger.error('useVoiceInput: recording process error', err);
-        setState((prev) => ({
-          ...prev,
+        setState({
           isRecording: false,
+          isTranscribing: false,
           error: `Recording error: ${err.message}`,
-        }));
+        });
       });
 
       recordProcess.on('exit', (code, signal) => {
@@ -163,14 +174,14 @@ export function useVoiceInput(config?: {
       });
     } catch (err) {
       debugLogger.error('useVoiceInput: startRecording error', err);
-      setState((prev) => ({
-        ...prev,
+      setState({
         isRecording: false,
+        isTranscribing: false,
         error:
           err instanceof Error
             ? err.message
             : 'Unknown error starting recording',
-      }));
+      });
     }
   }, []);
 
@@ -192,11 +203,7 @@ export function useVoiceInput(config?: {
         recordingProcessRef.current = null;
       }
 
-      setState((prev) => ({
-        ...prev,
-        isRecording: false,
-        isTranscribing: true,
-      }));
+      setState({ isRecording: false, isTranscribing: true, error: null });
 
       const audioFile = audioFileRef.current;
       if (!audioFile) {
@@ -347,33 +354,29 @@ export function useVoiceInput(config?: {
         .filter((line) => line.length > 0)
         .join(' ');
 
-      setState((prev) => ({
-        ...prev,
-        isTranscribing: false,
-        transcript: transcript.trim(),
-      }));
+      // Emit transcript via event instead of setting state
+      // This avoids context propagation causing infinite render loops
+      transcriptEmitter.emit('transcript', transcript.trim());
+
+      setState({ isRecording: false, isTranscribing: false, error: null });
 
       // Clean up temp files
       await unlink(audioFile).catch(() => {});
       const transcriptFile = audioFile.replace('.wav', '.txt');
       await unlink(transcriptFile).catch(() => {});
     } catch (err) {
-      setState((prev) => ({
-        ...prev,
+      setState({
         isRecording: false,
         isTranscribing: false,
         error:
           err instanceof Error
             ? err.message
             : 'Unknown error during transcription',
-      }));
+      });
     }
   }, [config?.whisperPath]);
 
   const toggleRecording = useCallback(async () => {
-    debugLogger.log('useVoiceInput: toggleRecording called', {
-      isRecording: state.isRecording,
-    });
     if (state.isRecording) {
       await stopRecording();
     } else {
@@ -387,8 +390,7 @@ export function useVoiceInput(config?: {
       startRecording,
       stopRecording,
       toggleRecording,
-      clearTranscript,
     }),
-    [state, startRecording, stopRecording, toggleRecording, clearTranscript],
+    [state, startRecording, stopRecording, toggleRecording],
   );
 }
