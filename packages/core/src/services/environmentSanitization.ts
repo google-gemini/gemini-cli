@@ -159,7 +159,18 @@ function shouldRedactEnvironmentVariable(
     return true;
   }
 
-  // These are never redacted.
+  // Redact if the value looks like a key/cert, regardless of variable name.
+  // This check must come before name-based allowlists to prevent secrets
+  // from leaking through commonly allowed variables (e.g. HOME, PATH).
+  if (value) {
+    for (const pattern of NEVER_ALLOWED_VALUE_PATTERNS) {
+      if (pattern.test(value)) {
+        return true;
+      }
+    }
+  }
+
+  // These are never redacted (safe variable names with safe values).
   if (
     ALWAYS_ALLOWED_ENVIRONMENT_VARIABLES.has(key) ||
     key.startsWith('GEMINI_CLI_')
@@ -180,15 +191,6 @@ function shouldRedactEnvironmentVariable(
   for (const pattern of NEVER_ALLOWED_NAME_PATTERNS) {
     if (pattern.test(key)) {
       return true;
-    }
-  }
-
-  // Redact if the value looks like a key/cert.
-  if (value) {
-    for (const pattern of NEVER_ALLOWED_VALUE_PATTERNS) {
-      if (pattern.test(value)) {
-        return true;
-      }
     }
   }
 
