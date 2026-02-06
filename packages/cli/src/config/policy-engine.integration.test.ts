@@ -434,8 +434,8 @@ describe('Policy Engine Integration Tests', () => {
       expect(mcpServerRule?.priority).toBe(2.1); // MCP allowed server
 
       const readOnlyToolRule = rules.find((r) => r.toolName === 'glob');
-      // Priority 50 in default tier → 1.05
-      expect(readOnlyToolRule?.priority).toBeCloseTo(1.05, 5);
+      // Priority 70 in default tier → 1.07 (Overriding Plan Mode Deny)
+      expect(readOnlyToolRule?.priority).toBeCloseTo(1.07, 5);
 
       // Verify the engine applies these priorities correctly
       expect(
@@ -590,8 +590,8 @@ describe('Policy Engine Integration Tests', () => {
       expect(server1Rule?.priority).toBe(2.1); // Allowed servers (user tier)
 
       const globRule = rules.find((r) => r.toolName === 'glob');
-      // Priority 50 in default tier → 1.05
-      expect(globRule?.priority).toBeCloseTo(1.05, 5); // Auto-accept read-only
+      // Priority 70 in default tier → 1.07
+      expect(globRule?.priority).toBeCloseTo(1.07, 5); // Auto-accept read-only
 
       // The PolicyEngine will sort these by priority when it's created
       const engine = new PolicyEngine(config);
