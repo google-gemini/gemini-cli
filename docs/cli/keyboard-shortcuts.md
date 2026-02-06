@@ -129,7 +129,9 @@ available combinations.
 - `!` on an empty prompt: Enter or exit shell mode.
 - `?` on an empty prompt: Toggle the shortcuts panel above the input. Press any
   key or `Esc` to close it, and press `?` again to close and insert a `?` into
-  the prompt.
+  the prompt. The panel shows quick-reference shortcuts such as shell mode
+  (`!`), file/folder mention (`@`), approval mode cycling (`Shift+Tab`), YOLO
+  mode (`Ctrl+Y`), rewind (`Esc Esc`), and external editor (`Ctrl+X`).
 - `\` (at end of a line) + `Enter`: Insert a newline without leaving single-line
   mode.
 - `Esc` pressed twice quickly: Clear the input prompt if it is not empty,

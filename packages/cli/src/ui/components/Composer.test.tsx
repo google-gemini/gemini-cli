@@ -24,7 +24,7 @@ vi.mock('../contexts/VimModeContext.js', () => ({
   })),
 }));
 import { ApprovalMode } from '@google/gemini-cli-core';
-import { StreamingState } from '../types.js';
+import { StreamingState, ToolCallStatus } from '../types.js';
 
 // Mock child components
 vi.mock('./LoadingIndicator.js', () => ({
@@ -278,6 +278,19 @@ describe('Composer', () => {
       expect(output).toContain('LoadingIndicator');
     });
 
+    it('keeps shortcuts hint visible while loading', () => {
+      const uiState = createMockUIState({
+        streamingState: StreamingState.Responding,
+        elapsedTime: 1,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      const output = lastFrame();
+      expect(output).toContain('LoadingIndicator');
+      expect(output).toContain('ShortcutsHint');
+    });
+
     it('renders LoadingIndicator without thought when accessibility disables loading phrases', () => {
       const uiState = createMockUIState({
         streamingState: StreamingState.Responding,
@@ -294,7 +307,7 @@ describe('Composer', () => {
       expect(output).not.toContain('Should not show');
     });
 
-    it('suppresses thought when waiting for confirmation', () => {
+    it('does not render LoadingIndicator when waiting for confirmation', () => {
       const uiState = createMockUIState({
         streamingState: StreamingState.WaitingForConfirmation,
         thought: {
@@ -306,8 +319,34 @@ describe('Composer', () => {
       const { lastFrame } = renderComposer(uiState);
 
       const output = lastFrame();
-      expect(output).toContain('LoadingIndicator');
-      expect(output).not.toContain('Should not show during confirmation');
+      expect(output).not.toContain('LoadingIndicator');
+    });
+
+    it('does not render LoadingIndicator when a tool confirmation is pending', () => {
+      const uiState = createMockUIState({
+        streamingState: StreamingState.Responding,
+        pendingHistoryItems: [
+          {
+            type: 'tool_group',
+            tools: [
+              {
+                callId: 'call-1',
+                name: 'edit',
+                description: 'edit file',
+                status: ToolCallStatus.Confirming,
+                resultDisplay: undefined,
+                confirmationDetails: undefined,
+              },
+            ],
+          },
+        ],
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      const output = lastFrame();
+      expect(output).not.toContain('LoadingIndicator');
+      expect(output).not.toContain('esc to cancel');
     });
 
     it('renders LoadingIndicator when embedded shell is focused but background shell is visible', () => {

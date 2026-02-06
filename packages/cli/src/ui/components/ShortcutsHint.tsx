@@ -15,5 +15,5 @@ export const ShortcutsHint: React.FC = () => {
     ? theme.text.accent
     : theme.text.secondary;
 
-  return <Text color={highlightColor}> ? for shortcuts</Text>;
+  return <Text color={highlightColor}> ? for shortcuts </Text>;
 };

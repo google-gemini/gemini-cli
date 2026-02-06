@@ -119,6 +119,7 @@ Slash commands provide meta-level control over the CLI itself.
 
 - **`/shortcuts`**
   - **Description:** Toggle the shortcuts panel above the input.
+  - **Shortcut:** Press `?` when the prompt is empty.
 
 - **`/hooks`**
   - **Description:** Manage hooks, which allow you to intercept and customize

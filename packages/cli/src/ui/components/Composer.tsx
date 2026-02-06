@@ -5,7 +5,7 @@
  */
 
 import { useState } from 'react';
-import { Box, useIsScreenReaderEnabled } from 'ink';
+import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { StatusDisplay } from './StatusDisplay.js';
 import { ApprovalModeIndicator } from './ApprovalModeIndicator.js';
@@ -18,6 +18,7 @@ import { InputPrompt } from './InputPrompt.js';
 import { Footer } from './Footer.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
 import { QueuedMessageDisplay } from './QueuedMessageDisplay.js';
+import { HorizontalLine } from './shared/HorizontalLine.js';
 import { OverflowProvider } from '../contexts/OverflowContext.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 import { useUIState } from '../contexts/UIStateContext.js';
@@ -27,9 +28,10 @@ import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { ApprovalMode } from '@google/gemini-cli-core';
-import { StreamingState } from '../types.js';
+import { StreamingState, ToolCallStatus } from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
+import { theme } from '../semantic-colors.js';
 
 export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const config = useConfig();
@@ -48,6 +50,31 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const suggestionsPosition = isAlternateBuffer ? 'above' : 'below';
   const hideContextSummary =
     suggestionsVisible && suggestionsPosition === 'above';
+  const hasPendingToolConfirmation = (uiState.pendingHistoryItems ?? []).some(
+    (item) =>
+      item.type === 'tool_group' &&
+      item.tools.some((tool) => tool.status === ToolCallStatus.Confirming),
+  );
+  const hasPendingActionRequired =
+    hasPendingToolConfirmation ||
+    Boolean(uiState.commandConfirmationRequest) ||
+    Boolean(uiState.authConsentRequest) ||
+    (uiState.confirmUpdateExtensionRequests?.length ?? 0) > 0 ||
+    Boolean(uiState.loopDetectionConfirmationRequest) ||
+    Boolean(uiState.proQuotaRequest) ||
+    Boolean(uiState.validationRequest) ||
+    Boolean(uiState.customDialog);
+  const showLoadingIndicator =
+    (!uiState.embeddedShellFocused || uiState.isBackgroundShellVisible) &&
+    uiState.streamingState === StreamingState.Responding &&
+    !hasPendingActionRequired;
+  const showApprovalIndicator =
+    showApprovalModeIndicator !== ApprovalMode.DEFAULT &&
+    !uiState.shellModeActive;
+  const showRawMarkdownIndicator = !uiState.renderMarkdown;
+  const showEscToCancelHint =
+    showLoadingIndicator &&
+    uiState.streamingState !== StreamingState.WaitingForConfirmation;
 
   return (
     <Box
@@ -56,10 +83,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
       flexGrow={0}
       flexShrink={0}
     >
-      {/*
-        Loading indicator now renders inline beside the shortcuts hint.
-      */}
-
       {(!uiState.slashCommands ||
         !uiState.isConfigInitialized ||
         uiState.isResuming) && (
@@ -72,68 +95,121 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
 
       <TodoTray />
 
-      <Box
-        marginTop={1}
-        justifyContent={
-          settings.merged.ui.hideContextSummary ? 'flex-start' : 'space-between'
-        }
-        width="100%"
-        flexDirection={isNarrow ? 'column' : 'row'}
-        alignItems={isNarrow ? 'flex-start' : 'center'}
-      >
+      <Box marginTop={1} width="100%" flexDirection="column">
+        {showEscToCancelHint && (
+          <Box marginLeft={3}>
+            <Text color={theme.text.secondary}>esc to cancel</Text>
+          </Box>
+        )}
         <Box
-          marginRight={1}
-          flexDirection="row"
-          alignItems="center"
-          flexGrow={1}
-          justifyContent="space-between"
           width="100%"
+          flexDirection={isNarrow ? 'column' : 'row'}
+          alignItems={isNarrow ? 'flex-start' : 'center'}
+          justifyContent={isNarrow ? 'flex-start' : 'space-between'}
         >
-          {(!uiState.embeddedShellFocused ||
-            uiState.isBackgroundShellVisible) &&
-          (uiState.streamingState !== StreamingState.Idle ||
-            (uiState.elapsedTime > 0 &&
-              (Boolean(uiState.currentLoadingPhrase) ||
-                Boolean(uiState.thought)))) ? (
-            <LoadingIndicator
-              inline
-              thought={
-                uiState.streamingState ===
-                  StreamingState.WaitingForConfirmation ||
-                config.getAccessibility()?.enableLoadingPhrases === false
-                  ? undefined
-                  : uiState.thought
-              }
-              currentLoadingPhrase={
-                config.getAccessibility()?.enableLoadingPhrases === false
-                  ? undefined
-                  : uiState.currentLoadingPhrase
-              }
-              elapsedTime={uiState.elapsedTime}
-            />
-          ) : (
-            <ShortcutsHint />
-          )}
-          {!(
-            (!uiState.embeddedShellFocused ||
-              uiState.isBackgroundShellVisible) &&
-            (uiState.streamingState !== StreamingState.Idle ||
-              (uiState.elapsedTime > 0 &&
-                (Boolean(uiState.currentLoadingPhrase) ||
-                  Boolean(uiState.thought))))
-          ) && (
-            <Box flexGrow={1} justifyContent="flex-end" flexDirection="row">
-              <StatusDisplay hideContextSummary={hideContextSummary} />
-            </Box>
-          )}
-        </Box>
-        <Box paddingTop={isNarrow ? 1 : 0}>
-          {showApprovalModeIndicator !== ApprovalMode.DEFAULT &&
-            !uiState.shellModeActive && (
-              <ApprovalModeIndicator approvalMode={showApprovalModeIndicator} />
+          <Box
+            marginLeft={1}
+            marginRight={isNarrow ? 0 : 1}
+            flexDirection="row"
+            alignItems="center"
+            flexGrow={1}
+          >
+            {showLoadingIndicator && (
+              <LoadingIndicator
+                inline
+                thought={
+                  uiState.streamingState ===
+                    StreamingState.WaitingForConfirmation ||
+                  config.getAccessibility()?.enableLoadingPhrases === false
+                    ? undefined
+                    : uiState.thought
+                }
+                currentLoadingPhrase={
+                  config.getAccessibility()?.enableLoadingPhrases === false
+                    ? undefined
+                    : uiState.currentLoadingPhrase
+                }
+                elapsedTime={uiState.elapsedTime}
+                showCancelAndTimer={false}
+              />
             )}
-          {uiState.shellModeActive && <ShellModeIndicator />}
-          {!uiState.renderMarkdown && <RawMarkdownIndicator />}
+          </Box>
+          <Box
+            marginTop={isNarrow ? 1 : 0}
+            flexDirection="column"
+            alignItems={isNarrow ? 'flex-start' : 'flex-end'}
+          >
+            <ShortcutsHint />
+          </Box>
+        </Box>
+        {uiState.shortcutsHelpVisible && <ShortcutsHelp />}
+        <HorizontalLine width={uiState.terminalWidth} />
+        <Box
+          justifyContent={
+            settings.merged.ui.hideContextSummary
+              ? 'flex-start'
+              : 'space-between'
+          }
+          width="100%"
+          flexDirection={isNarrow ? 'column' : 'row'}
+          alignItems={isNarrow ? 'flex-start' : 'center'}
+        >
+          <Box
+            marginLeft={1}
+            marginRight={isNarrow ? 0 : 1}
+            flexDirection="row"
+            alignItems="center"
+            flexGrow={1}
+          >
+            {!showLoadingIndicator && (
+              <Box
+                flexDirection={isNarrow ? 'column' : 'row'}
+                alignItems={isNarrow ? 'flex-start' : 'center'}
+              >
+                {showApprovalIndicator && (
+                  <ApprovalModeIndicator
+                    approvalMode={showApprovalModeIndicator}
+                  />
+                )}
+                {uiState.shellModeActive && (
+                  <Box
+                    marginLeft={showApprovalIndicator && !isNarrow ? 1 : 0}
+                    marginTop={showApprovalIndicator && isNarrow ? 1 : 0}
+                  >
+                    <ShellModeIndicator />
+                  </Box>
+                )}
+                {showRawMarkdownIndicator && (
+                  <Box
+                    marginLeft={
+                      (showApprovalIndicator || uiState.shellModeActive) &&
+                      !isNarrow
+                        ? 1
+                        : 0
+                    }
+                    marginTop={
+                      (showApprovalIndicator || uiState.shellModeActive) &&
+                      isNarrow
+                        ? 1
+                        : 0
+                    }
+                  >
+                    <RawMarkdownIndicator />
+                  </Box>
+                )}
+              </Box>
+            )}
+          </Box>
+
+          <Box
+            marginTop={isNarrow ? 1 : 0}
+            flexDirection="column"
+            alignItems={isNarrow ? 'flex-start' : 'flex-end'}
+          >
+            {!showLoadingIndicator && (
+              <StatusDisplay hideContextSummary={hideContextSummary} />
+            )}
+          </Box>
         </Box>
       </Box>
 
@@ -151,12 +227,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             <ShowMoreLines constrainHeight={uiState.constrainHeight} />
           </Box>
         </OverflowProvider>
-      )}
-
-      {uiState.shortcutsHelpVisible && (
-        <Box marginTop={1}>
-          <ShortcutsHelp />
-        </Box>
       )}
 
       {uiState.isInputActive && (

@@ -119,40 +119,47 @@ export const ShortcutsHelp: React.FC = () => {
   const { columns: terminalWidth } = useTerminalSize();
   const isNarrow = isNarrowWidth(terminalWidth);
   const shortcutRows = buildShortcutRows();
+  const leftInset = 1;
+  const rightInset = 2;
   const gap = 2;
-  const columnWidth = Math.max(18, Math.floor((terminalWidth - gap * 2) / 3));
-  const backgroundColor = theme.ui.dark;
+  const contentWidth = Math.max(1, terminalWidth - leftInset - rightInset);
+  const columnWidth = Math.max(18, Math.floor((contentWidth - gap * 2) / 3));
   const keyColor = theme.text.accent;
 
   if (isNarrow) {
     return (
       <Box flexDirection="column">
-        <SectionHeader title="Shortcuts (for more see /help)" />
+        <SectionHeader title="Shortcuts (for more, see /help)" />
         {shortcutRows.flat().map((item, index) => {
           const descriptionLines = wrapDescription(
             item.key,
             item.description,
-            terminalWidth,
+            contentWidth,
           );
           const keyWidth = stringWidth(item.key);
 
           return descriptionLines.map((line, lineIndex) => {
-            const prefix =
-              lineIndex === 0 ? `${item.key} ` : ' '.repeat(keyWidth + 1);
-            const text = padToWidth(`${prefix}${line}`, terminalWidth);
+            const rightPadding = Math.max(
+              0,
+              contentWidth - (keyWidth + 1 + stringWidth(line)),
+            );
+
             return (
               <Text
                 key={`${item.key}-${index}-${lineIndex}`}
-                backgroundColor={backgroundColor}
                 color={theme.text.primary}
               >
                 {lineIndex === 0 ? (
                   <>
-                    <Text color={keyColor}>{item.key}</Text>{' '}
-                    {text.slice(keyWidth + 1)}
+                    {' '.repeat(leftInset)}
+                    <Text color={keyColor}>{item.key}</Text> {line}
+                    {' '.repeat(rightPadding + rightInset)}
                   </>
                 ) : (
-                  text
+                  `${' '.repeat(leftInset)}${padToWidth(
+                    `${' '.repeat(keyWidth + 1)}${line}`,
+                    contentWidth,
+                  )}${' '.repeat(rightInset)}`
                 )}
               </Text>
             );
@@ -164,7 +171,7 @@ export const ShortcutsHelp: React.FC = () => {
 
   return (
     <Box flexDirection="column">
-      <SectionHeader title="Shortcuts (for more see /help)" />
+      <SectionHeader title="Shortcuts (for more, see /help)" />
       {shortcutRows.map((row, rowIndex) => {
         const cellLines = row.map((item) =>
           wrapText(renderItem(item), columnWidth),
@@ -199,9 +206,11 @@ export const ShortcutsHelp: React.FC = () => {
             <Box
               key={`row-${rowIndex}-line-${lineIndex}`}
               width={terminalWidth}
-              backgroundColor={backgroundColor}
               flexDirection="row"
             >
+              <Box width={leftInset}>
+                <Text>{' '.repeat(leftInset)}</Text>
+              </Box>
               <Box width={columnWidth}>{segments[0]}</Box>
               <Box width={gap}>
                 <Text>{' '.repeat(gap)}</Text>
@@ -211,6 +220,9 @@ export const ShortcutsHelp: React.FC = () => {
                 <Text>{' '.repeat(gap)}</Text>
               </Box>
               <Box width={columnWidth}>{segments[2]}</Box>
+              <Box width={rightInset}>
+                <Text>{' '.repeat(rightInset)}</Text>
+              </Box>
             </Box>
           );
         });

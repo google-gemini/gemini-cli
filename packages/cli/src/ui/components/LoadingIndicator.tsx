@@ -22,6 +22,7 @@ interface LoadingIndicatorProps {
   inline?: boolean;
   rightContent?: React.ReactNode;
   thought?: ThoughtSummary | null;
+  showCancelAndTimer?: boolean;
 }
 
 export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
@@ -30,6 +31,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   inline = false,
   rightContent,
   thought,
+  showCancelAndTimer = true,
 }) => {
   const streamingState = useStreamingContext();
   const { columns: terminalWidth } = useTerminalSize();
@@ -51,6 +53,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
       : thought?.subject || currentLoadingPhrase;
 
   const cancelAndTimerContent =
+    showCancelAndTimer &&
     streamingState !== StreamingState.WaitingForConfirmation
       ? `(esc to cancel, ${elapsedTime < 60 ? `${elapsedTime}s` : formatDuration(elapsedTime * 1000)})`
       : null;
