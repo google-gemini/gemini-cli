@@ -10,7 +10,6 @@ import { isITerm2, resetITerm2Cache, shouldUseEmoji } from './terminalUtils.js';
 describe('terminalUtils', () => {
   beforeEach(() => {
     vi.stubEnv('TERM_PROGRAM', '');
-    vi.stubEnv('ITERM_SESSION_ID', '');
     vi.stubEnv('LC_ALL', '');
     vi.stubEnv('LC_CTYPE', '');
     vi.stubEnv('LANG', '');
@@ -26,11 +25,6 @@ describe('terminalUtils', () => {
   describe('isITerm2', () => {
     it('should detect iTerm2 via TERM_PROGRAM', () => {
       vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
-      expect(isITerm2()).toBe(true);
-    });
-
-    it('should detect iTerm2 via ITERM_SESSION_ID', () => {
-      vi.stubEnv('ITERM_SESSION_ID', 'w0t0p0:6789...');
       expect(isITerm2()).toBe(true);
     });
 

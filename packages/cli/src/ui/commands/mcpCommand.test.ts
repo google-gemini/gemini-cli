@@ -60,6 +60,7 @@ const createMockMCPTool = (
     { type: 'object', properties: {} },
     mockMessageBus,
     undefined, // trust
+    undefined, // isReadOnly
     undefined, // nameOverride
     undefined, // cliConfig
     undefined, // extensionName
