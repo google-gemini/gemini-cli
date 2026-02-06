@@ -5,6 +5,7 @@
  */
 
 import { renderWithProviders } from '../../../test-utils/render.js';
+import { waitFor } from '../../../test-utils/async.js';
 import { Scrollable } from './Scrollable.js';
 import { Text } from 'ink';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -70,7 +71,7 @@ describe('<Scrollable />', () => {
     expect(lastFrame()).toMatchSnapshot();
   });
 
-  it('updates scroll position correctly when scrollBy is called multiple times in the same tick', () => {
+  it('updates scroll position correctly when scrollBy is called multiple times in the same tick', async () => {
     let capturedEntry: ScrollProviderModule.ScrollableEntry | undefined;
     vi.spyOn(ScrollProviderModule, 'useScrollable').mockImplementation(
       (entry, isActive) => {
@@ -80,22 +81,26 @@ describe('<Scrollable />', () => {
       },
     );
 
-    renderWithProviders(
-      <Scrollable hasFocus={true} height={5}>
-        <Text>Line 1</Text>
-        <Text>Line 2</Text>
-        <Text>Line 3</Text>
-        <Text>Line 4</Text>
-        <Text>Line 5</Text>
-        <Text>Line 6</Text>
-        <Text>Line 7</Text>
-        <Text>Line 8</Text>
-        <Text>Line 9</Text>
-        <Text>Line 10</Text>
-      </Scrollable>,
-    );
+    await act(async () => {
+      renderWithProviders(
+        <Scrollable hasFocus={true} height={5} scrollToBottom={true}>
+          <Text>Line 1</Text>
+          <Text>Line 2</Text>
+          <Text>Line 3</Text>
+          <Text>Line 4</Text>
+          <Text>Line 5</Text>
+          <Text>Line 6</Text>
+          <Text>Line 7</Text>
+          <Text>Line 8</Text>
+          <Text>Line 9</Text>
+          <Text>Line 10</Text>
+        </Scrollable>,
+      );
+    });
 
-    expect(capturedEntry).toBeDefined();
+    await waitFor(() => {
+      expect(capturedEntry).toBeDefined();
+    });
 
     if (!capturedEntry) {
       throw new Error('capturedEntry is undefined');
