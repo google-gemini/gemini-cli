@@ -110,6 +110,7 @@ export const WITTY_LOADING_PHRASES = [
   'Communing with the machine spirit…',
   'Letting the thoughts marinate…',
   'Just remembered where I put my keys…',
+  'Locating seahorse emoji…',
   'Pondering the orb…',
   "I've seen things you people wouldn't believe… like a user who reads loading messages.",
   'Initiating thoughtful gaze…',
