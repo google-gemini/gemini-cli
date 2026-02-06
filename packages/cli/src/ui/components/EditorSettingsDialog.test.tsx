@@ -14,12 +14,18 @@ import { act } from 'react';
 import { waitFor } from '../../test-utils/async.js';
 import { debugLogger } from '@google/gemini-cli-core';
 
+const mockEmitFeedback = vi.fn();
+
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
     isEditorAvailable: () => true, // Mock to behave predictably in CI
+    coreEvents: {
+      ...actual.coreEvents,
+      emitFeedback: (...args: unknown[]) => mockEmitFeedback(...args),
+    },
   };
 });
 
@@ -51,6 +57,7 @@ describe('EditorSettingsDialog', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockEmitFeedback.mockClear();
   });
 
   const renderWithProvider = (ui: React.ReactNode) =>
@@ -173,5 +180,66 @@ describe('EditorSettingsDialog', () => {
       );
     }
     expect(frame).toContain('(Also modified');
+  });
+
+  it('emits error only once when preferredEditor is invalid', async () => {
+    const settingsWithInvalidEditor = {
+      forScope: (_scope: string) => ({
+        settings: {
+          general: {
+            preferredEditor: 'invalid_editor_that_does_not_exist',
+          },
+        },
+      }),
+      merged: {
+        general: {
+          preferredEditor: 'invalid_editor_that_does_not_exist',
+        },
+      },
+    } as unknown as LoadedSettings;
+
+    const { rerender, stdin } = renderWithProvider(
+      <EditorSettingsDialog
+        onSelect={vi.fn()}
+        settings={settingsWithInvalidEditor}
+        onExit={vi.fn()}
+      />,
+    );
+
+    // Wait for initial effect to run
+    await waitFor(() => {
+      expect(mockEmitFeedback).toHaveBeenCalledWith(
+        'error',
+        'Editor is not supported: invalid_editor_that_does_not_exist',
+      );
+    });
+
+    // Should have been called exactly once
+    expect(mockEmitFeedback).toHaveBeenCalledTimes(1);
+
+    // Trigger re-renders by pressing Tab multiple times
+    await act(async () => {
+      stdin.write('\t');
+    });
+    await act(async () => {
+      stdin.write('\t');
+    });
+    await act(async () => {
+      stdin.write('\t');
+    });
+
+    // Re-render the component
+    rerender(
+      <KeypressProvider>
+        <EditorSettingsDialog
+          onSelect={vi.fn()}
+          settings={settingsWithInvalidEditor}
+          onExit={vi.fn()}
+        />
+      </KeypressProvider>,
+    );
+
+    // Should still have been called only once (no spam)
+    expect(mockEmitFeedback).toHaveBeenCalledTimes(1);
   });
 });
