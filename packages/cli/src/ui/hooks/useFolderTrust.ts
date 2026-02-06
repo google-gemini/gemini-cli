@@ -33,32 +33,31 @@ export const useFolderTrust = (
     let isMounted = true;
     const { isTrusted: trusted } = isWorkspaceTrusted(settings.merged);
 
-    if (isHeadlessMode()) {
-      if (isMounted) {
-        setIsTrusted(trusted);
-        setIsFolderTrustDialogOpen(false);
-        onTrustChange(true);
-      }
-      return () => {
-        isMounted = false;
-      };
-    }
-
-    if (isMounted) {
-      setIsTrusted(trusted);
-      setIsFolderTrustDialogOpen(trusted === undefined);
-      onTrustChange(trusted);
-
+    const showUntrustedMessage = () => {
       if (trusted === false && !startupMessageSent.current) {
         addItem(
           {
             type: MessageType.INFO,
-            text: 'This folder is not trusted. Some features may be disabled. Use the `/permissions` command to change the trust level.',
+            text: 'This folder is untrusted, project settings, hooks, MCPs, and GEMINI.md files will not be applied for this folder.\nUse the `/permissions` command to change the trust level.',
           },
           Date.now(),
         );
         startupMessageSent.current = true;
       }
+    };
+
+    if (isHeadlessMode()) {
+      if (isMounted) {
+        setIsTrusted(trusted);
+        setIsFolderTrustDialogOpen(false);
+        onTrustChange(true);
+        showUntrustedMessage();
+      }
+    } else if (isMounted) {
+      setIsTrusted(trusted);
+      setIsFolderTrustDialogOpen(trusted === undefined);
+      onTrustChange(trusted);
+      showUntrustedMessage();
     }
 
     return () => {

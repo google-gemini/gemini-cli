@@ -191,6 +191,7 @@ const mockUIActions: UIActions = {
   handleApiKeySubmit: vi.fn(),
   handleApiKeyCancel: vi.fn(),
   setBannerVisible: vi.fn(),
+  setShortcutsHelpVisible: vi.fn(),
   setEmbeddedShellFocused: vi.fn(),
   dismissBackgroundShell: vi.fn(),
   setActiveBackgroundShellPid: vi.fn(),

@@ -57,9 +57,9 @@ describe('<LoadingIndicator />', () => {
     elapsedTime: 5,
   };
 
-  it('should not render when streamingState is Idle', () => {
+  it('should not render when streamingState is Idle and no loading phrase or thought', () => {
     const { lastFrame } = renderWithContext(
-      <LoadingIndicator {...defaultProps} />,
+      <LoadingIndicator elapsedTime={5} />,
       StreamingState.Idle,
     );
     expect(lastFrame()).toBe('');
@@ -143,10 +143,10 @@ describe('<LoadingIndicator />', () => {
 
   it('should transition correctly between states using rerender', () => {
     const { lastFrame, rerender, unmount } = renderWithContext(
-      <LoadingIndicator {...defaultProps} />,
+      <LoadingIndicator elapsedTime={5} />,
       StreamingState.Idle,
     );
-    expect(lastFrame()).toBe(''); // Initial: Idle
+    expect(lastFrame()).toBe(''); // Initial: Idle (no loading phrase)
 
     // Transition to Responding
     rerender(
@@ -180,10 +180,10 @@ describe('<LoadingIndicator />', () => {
     // Transition back to Idle
     rerender(
       <StreamingContext.Provider value={StreamingState.Idle}>
-        <LoadingIndicator {...defaultProps} />
+        <LoadingIndicator elapsedTime={5} />
       </StreamingContext.Provider>,
     );
-    expect(lastFrame()).toBe('');
+    expect(lastFrame()).toBe(''); // Idle with no loading phrase
     unmount();
   });
 
