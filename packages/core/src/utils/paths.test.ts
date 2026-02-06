@@ -375,6 +375,12 @@ describe('shortenPath', () => {
       expect(result).toBe('.../verylongname.txt');
       expect(result.length).toBeLessThanOrEqual(20);
     });
+
+    it('should not shorten the path when maxLen is less than 0', () => {
+      const p = '/path/to/a/very/long/directory/name/file.txt';
+      expect(shortenPath(p, -1)).toBe(p);
+      expect(shortenPath(p, -100)).toBe(p);
+    });
   });
 
   describe.skipIf(process.platform !== 'win32')('on Windows', () => {
@@ -486,6 +492,12 @@ describe('shortenPath', () => {
       const result = shortenPath(p, 18);
       expect(result).toBe('\\s...\\...\\file.txt');
       expect(result.length).toBeLessThanOrEqual(18);
+    });
+
+    it('should not shorten the path when maxLen is less than 0 on Windows', () => {
+      const p = 'C:\\path\\to\\a\\very\\long\\directory\\name\\file.txt';
+      expect(shortenPath(p, -1)).toBe(p);
+      expect(shortenPath(p, -100)).toBe(p);
     });
   });
 });

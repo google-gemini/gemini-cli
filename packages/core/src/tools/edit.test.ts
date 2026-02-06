@@ -123,6 +123,7 @@ describe('EditTool', () => {
       isInteractive: () => false,
       getDisableLLMCorrection: vi.fn(() => true),
       getExperiments: () => {},
+      getTruncatePathHintThreshold: vi.fn(() => 35),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
       },

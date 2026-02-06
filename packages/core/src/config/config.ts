@@ -304,6 +304,7 @@ export {
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
 };
 
+export const DEFAULT_TRUNCATE_PATH_HINT_THRESHOLD = 35;
 export const DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD = 4_000_000;
 export const DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES = 1000;
 
@@ -442,6 +443,7 @@ export interface ConfigParameters {
   shellExecutionConfig?: ShellExecutionConfig;
   extensionManagement?: boolean;
   enablePromptCompletion?: boolean;
+  truncatePathHintThreshold?: number;
   truncateToolOutputThreshold?: number;
   truncateToolOutputLines?: number;
   enableToolOutputTruncation?: boolean;
@@ -588,6 +590,7 @@ export class Config {
   private shellExecutionConfig: ShellExecutionConfig;
   private readonly extensionManagement: boolean = true;
   private readonly enablePromptCompletion: boolean = false;
+  private readonly truncatePathHintThreshold: number;
   private readonly truncateToolOutputThreshold: number;
   private readonly truncateToolOutputLines: number;
   private compressionTruncationCounter = 0;
@@ -779,6 +782,8 @@ export class Config {
       pager: params.shellExecutionConfig?.pager ?? 'cat',
       sanitizationConfig: this.sanitizationConfig,
     };
+    this.truncatePathHintThreshold =
+      params.truncatePathHintThreshold ?? DEFAULT_TRUNCATE_PATH_HINT_THRESHOLD;
     this.truncateToolOutputThreshold =
       params.truncateToolOutputThreshold ??
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD;
@@ -2099,6 +2104,10 @@ export class Config {
 
   getEnableToolOutputTruncation(): boolean {
     return this.enableToolOutputTruncation;
+  }
+
+  getTruncatePathHintThreshold(): number {
+    return this.truncatePathHintThreshold;
   }
 
   getTruncateToolOutputThreshold(): number {

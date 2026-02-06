@@ -1187,6 +1187,13 @@
           "default": true,
           "type": "boolean"
         },
+        "truncatePathHintThreshold": {
+          "title": "Path Hint Truncation Threshold",
+          "description": "Truncate the file path shown when the agent is using a tool. This helps you identify the target file while keeping the display concise. Set to -1 to disable.",
+          "markdownDescription": "Truncate the file path shown when the agent is using a tool. This helps you identify the target file while keeping the display concise. Set to -1 to disable.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `35`",
+          "default": 35,
+          "type": "number"
+        },
         "enableToolOutputTruncation": {
           "title": "Enable Tool Output Truncation",
           "description": "Enable truncation of large tool outputs.",

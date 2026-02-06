@@ -87,6 +87,7 @@ const mockConfigInternal = {
       registerTool: vi.fn(),
       discoverTools: vi.fn(),
     }) as unknown as ToolRegistry,
+  getTruncatePathHintThreshold: vi.fn(() => 35),
   isInteractive: () => false,
 };
 const mockConfig = mockConfigInternal as unknown as Config;

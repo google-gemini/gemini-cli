@@ -720,6 +720,13 @@ their corresponding top-level category object in your `settings.json` file.
     implementation. Provides faster search performance.
   - **Default:** `true`
 
+- **`tools.truncatePathHintThreshold`** (number):
+  - **Description:** Truncate the file path shown when the agent is using a
+    tool. This helps you identify the target file while keeping the display
+    concise. Set to -1 to disable.
+  - **Default:** `35`
+  - **Requires restart:** Yes
+
 - **`tools.enableToolOutputTruncation`** (boolean):
   - **Description:** Enable truncation of large tool outputs.
   - **Default:** `true`
