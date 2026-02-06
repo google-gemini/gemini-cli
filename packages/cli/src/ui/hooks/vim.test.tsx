@@ -967,10 +967,6 @@ describe('useVim hook', () => {
       // We expect vimDeleteToLineStart to be called.
       // Since it's a mock, it won't actually modify the buffer unless we implement logic.
       // But we just want to verify the hook dispatches to it.
-      // The implementation of createMockBuffer has vi.fn() for this.
-      // However, TypeScript doesn't know about it on 'testBuffer' unless we cast it or update types.
-      // Since we updated createMockBuffer, the runtime object has it.
-      // We can check calls.
       expect(testBuffer.vimDeleteToLineStart).toHaveBeenCalled();
     });
 

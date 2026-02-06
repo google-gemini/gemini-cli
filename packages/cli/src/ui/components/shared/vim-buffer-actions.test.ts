@@ -943,10 +943,10 @@ describe('vim-buffer-actions', () => {
 
         const result = handleVimAction(state, action);
         expect(result).toHaveOnlyValidCharacters();
-        expect(result.lines[0]).toBe('  ');
+        expect(result.lines[0]).toBe('   ');
       });
 
-      it('should delete entire line content if line is all whitespace and cursor is at start', () => {
+      it('should delete from start to last character on whitespace-only line if cursor is at start', () => {
         const state = createTestState(['     '], 0, 0);
         const action = {
           type: 'vim_delete_to_first_non_whitespace' as const,
@@ -954,7 +954,26 @@ describe('vim-buffer-actions', () => {
 
         const result = handleVimAction(state, action);
         expect(result).toHaveOnlyValidCharacters();
-        expect(result.lines[0]).toBe('');
+        // Cursor at 0. Target 4. Range [0, 4).
+        // Deletes 0, 1, 2, 3.
+        // Leaves index 4 (1 space).
+        expect(result.lines[0]).toBe(' ');
+      });
+
+      it('should delete forward to last character on whitespace-only line', () => {
+        // Line with 5 spaces. Cursor at position 3 (1-based), so index 2.
+        const state = createTestState(['     '], 0, 2);
+        const action = {
+          type: 'vim_delete_to_first_non_whitespace' as const,
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        // Logic: Deletes from 2 up to 4 (last char index). Range [2, 4).
+        // Original: 0 1 2 3 4 (5 spaces)
+        // Deleted: 2, 3
+        // Result: 0 1 4 (3 spaces)
+        expect(result.lines[0]).toBe('   ');
       });
     });
 
