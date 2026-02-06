@@ -244,6 +244,10 @@ describe('mcp list command', () => {
       'forbidden-server': { command: 'cmd2' },
     };
 
+    mockedLoadSettings.mockReturnValue({
+      merged: settingsWithAllowlist,
+    });
+
     mockClient.connect.mockResolvedValue(undefined);
     mockClient.ping.mockResolvedValue(undefined);
 
