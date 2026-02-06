@@ -361,6 +361,20 @@ export class TestRig {
     this.homeDir = join(testFileDir, sanitizedName + '-home');
     mkdirSync(this.testDir, { recursive: true });
     mkdirSync(this.homeDir, { recursive: true });
+
+    if (options.settings || options.fakeResponsesPath) {
+      this.configure(options);
+    }
+  }
+
+  configure(options: {
+    settings?: Record<string, unknown>;
+    fakeResponsesPath?: string;
+  }) {
+    if (!this.testDir || !this.homeDir) {
+      throw new Error('TestRig must be setup before calling configure');
+    }
+
     if (options.fakeResponsesPath) {
       this.fakeResponsesPath = join(this.testDir, 'fake-responses.json');
       this.originalFakeResponsesPath = options.fakeResponsesPath;
@@ -371,6 +385,19 @@ export class TestRig {
 
     // Create a settings file to point the CLI to the local collector
     this._createSettingsFile(options.settings);
+  }
+
+  /**
+   * Creates a hook script file and returns a normalized path suitable for cross-platform execution.
+   */
+  createHookScript(fileName: string, content: string): string {
+    if (!this.testDir) {
+      throw new Error('TestRig must be setup before calling createHookScript');
+    }
+    const scriptPath = join(this.testDir, fileName);
+    writeFileSync(scriptPath, content);
+    // Return a path normalized for use in shell commands across platforms.
+    return scriptPath.replace(/\\/g, '/');
   }
 
   private _createSettingsFile(overrideSettings?: Record<string, unknown>) {
