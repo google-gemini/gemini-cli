@@ -61,6 +61,9 @@ powerful tool for developers.
   and `packages/core` (Backend logic).
 - **Imports:** Use specific imports and avoid restricted relative imports
   between packages (enforced by ESLint).
+- **License Headers:** For all new source code files (`.ts`, `.tsx`, `.js`),
+  include the Apache-2.0 license header with the current year (**2026**). (e.g.,
+  `Copyright 2026 Google LLC`). This is enforced by ESLint.
 
 ## Testing Conventions
 
