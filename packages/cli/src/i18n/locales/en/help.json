@@ -1,0 +1,27 @@
+{
+  "sections": {
+    "basics": "Basics:",
+    "commands": "Commands:",
+    "shortcuts": "Keyboard Shortcuts:"
+  },
+  "basics": {
+    "shellMode": "Shell mode: Execute shell commands via {symbol} (e.g., {example}) or use natural language (e.g. {natural}).",
+    "addContext": "Add context: Use {symbol} to specify files for context (e.g., {example}) to target specific files or folders."
+  },
+  "shortcuts": {
+    "altLeftRight": "Jump through words in the input",
+    "ctrlC": "Quit application",
+    "ctrlJ": "New line",
+    "ctrlJLinux": "New line (Alt+Enter works for certain linux distros)",
+    "ctrlL": "Clear the screen",
+    "ctrlX": "Open input in external editor",
+    "ctrlY": "Toggle YOLO mode",
+    "enter": "Send message",
+    "esc": "Cancel operation / Clear input (double press)",
+    "shiftTab": "Toggle auto-accepting edits",
+    "upDown": "Cycle through your prompt history"
+  },
+  "shellCommand": "shell command",
+  "mcpCommand": "Model Context Protocol command (from external servers)",
+  "shortcutsDocs": "For a full list of shortcuts, see {docsPath}"
+}

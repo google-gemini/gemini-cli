@@ -894,6 +894,13 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.language`** (string):
+  - **Description:** The language for the CLI interface. Auto-detect uses system
+    locale.
+  - **Default:** `"auto"`
+  - **Values:** `"auto"`, `"en"`
+  - **Requires restart:** Yes
+
 #### `skills`
 
 - **`skills.enabled`** (boolean):

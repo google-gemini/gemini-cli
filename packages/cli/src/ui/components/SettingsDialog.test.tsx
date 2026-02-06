@@ -1379,6 +1379,7 @@ describe('SettingsDialog', () => {
           },
           tools: {
             enableInteractiveShell: true,
+            autoAccept: true,
             useRipgrep: true,
           },
           security: {
@@ -1471,6 +1472,7 @@ describe('SettingsDialog', () => {
         userSettings: {
           tools: {
             enableInteractiveShell: true,
+            autoAccept: false,
             useRipgrep: true,
             truncateToolOutputThreshold: 25000,
             truncateToolOutputLines: 500,
@@ -1523,6 +1525,7 @@ describe('SettingsDialog', () => {
           },
           tools: {
             enableInteractiveShell: false,
+            autoAccept: false,
             useRipgrep: false,
           },
           security: {

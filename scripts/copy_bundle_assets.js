@@ -73,4 +73,15 @@ if (existsSync(builtinSkillsSrc)) {
   console.log('Copied built-in skills to bundle/builtin/');
 }
 
+// 5. Copy i18n locale files (packages/cli/src/i18n/locales)
+const localesSrc = join(root, 'packages/cli/src/i18n/locales');
+const localesDest = join(bundleDir, 'locales');
+if (existsSync(localesSrc)) {
+  cpSync(localesSrc, localesDest, {
+    recursive: true,
+    dereference: true,
+  });
+  console.log('Copied i18n locales to bundle/locales/');
+}
+
 console.log('Assets copied to bundle/');
