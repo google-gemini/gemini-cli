@@ -276,3 +276,9 @@ export interface CheckResult {
   decision: PolicyDecision;
   rule?: PolicyRule;
 }
+
+/**
+ * Priority for subagent tools (registered dynamically).
+ * Resulting transformed priority: 1.050
+ */
+export const PRIORITY_SUBAGENT_TOOL = 1.05;
