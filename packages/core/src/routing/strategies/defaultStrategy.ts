@@ -21,10 +21,7 @@ export class DefaultStrategy implements TerminalStrategy {
     config: Config,
     _baseLlmClient: BaseLlmClient,
   ): Promise<RoutingDecision> {
-    const defaultModel = resolveModel(
-      config.getModel(),
-      config.getPreviewFeatures(),
-    );
+    const defaultModel = resolveModel(config.getModel());
     return {
       model: defaultModel,
       metadata: {

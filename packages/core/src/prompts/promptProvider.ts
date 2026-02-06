@@ -52,10 +52,7 @@ export class PromptProvider {
     const enabledToolNames = new Set(toolNames);
     const approvedPlanPath = config.getApprovedPlanPath();
 
-    const desiredModel = resolveModel(
-      config.getActiveModel(),
-      config.getPreviewFeatures(),
-    );
+    const desiredModel = resolveModel(config.getActiveModel());
     const isGemini3 = isPreviewModel(desiredModel);
 
     // --- Context Gathering ---
