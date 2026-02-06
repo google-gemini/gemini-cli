@@ -141,7 +141,6 @@ vi.mock('@google/gemini-cli-core', async () => {
       defaultDecision: ServerConfig.PolicyDecision.ASK_USER,
       approvalMode: ServerConfig.ApprovalMode.DEFAULT,
     })),
-    applyAdminAllowlist: vi.fn((servers) => servers),
   };
 });
 
@@ -1512,7 +1511,7 @@ describe('loadCliConfig with admin.mcp.config', () => {
     });
     const config = await loadCliConfig(settings, 'test-session', argv);
 
-    const mergedServers = config.getMcpServers();
+    const mergedServers = config.getMcpServers() ?? {};
     expect(mergedServers).toHaveProperty('serverA');
     expect(mergedServers).not.toHaveProperty('serverB');
   });
@@ -1570,9 +1569,9 @@ describe('loadCliConfig with admin.mcp.config', () => {
     });
     const config = await loadCliConfig(settings, 'test-session', argv);
 
-    const mergedServers = config.getMcpServers();
+    const mergedServers = config.getMcpServers() ?? {};
     expect(mergedServers).not.toHaveProperty('serverC');
-    expect(Object.keys(mergedServers || {})).toHaveLength(0);
+    expect(Object.keys(mergedServers)).toHaveLength(0);
   });
 
   it('should merge local fields and prefer admin tool filters', async () => {
@@ -1602,7 +1601,7 @@ describe('loadCliConfig with admin.mcp.config', () => {
     });
     const config = await loadCliConfig(settings, 'test-session', argv);
 
-    const serverA = config.getMcpServers()?.['serverA'];
+    const serverA = (config.getMcpServers() ?? {})['serverA'];
     expect(serverA).toMatchObject({
       timeout: 1234,
       includeTools: ['admin_tool'],

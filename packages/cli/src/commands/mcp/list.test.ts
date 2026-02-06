@@ -32,7 +32,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...original,
     createTransport: vi.fn(),
-    applyAdminAllowlist: vi.fn((servers) => servers),
+
     MCPServerStatus: {
       CONNECTED: 'CONNECTED',
       CONNECTING: 'CONNECTING',
@@ -263,4 +263,3 @@ describe('mcp list command', () => {
     );
   });
 });
-

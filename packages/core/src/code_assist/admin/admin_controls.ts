@@ -253,6 +253,10 @@ export function getAdminBlockedMcpServersMessage(
   const server = config ? getCodeAssistServer(config) : undefined;
   const projectId = server?.projectId;
   const projectParam = projectId ? `?project=${projectId}` : '';
-  const serversList = blockedServers.join(', ');
-  return `The following MCP servers are not allowlisted by your administrator: ${serversList}. To enable them, please request an update to the settings at: https://goo.gle/manage-gemini-cli${projectParam}`;
+  const count = blockedServers.length;
+  const serverText = count === 1 ? 'server is' : 'servers are';
+
+  return `${count} MCP ${serverText} not allowlisted by your administrator. To enable ${
+    count === 1 ? 'it' : 'them'
+  }, please request an update to the settings at: https://goo.gle/manage-gemini-cli${projectParam}`;
 }
