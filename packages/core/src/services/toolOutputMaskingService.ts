@@ -12,18 +12,14 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { sanitizeFilenamePart } from '../utils/fileUtils.js';
 import type { Config } from '../config/config.js';
 import { logToolOutputMasking } from '../telemetry/loggers.js';
-import {
-  SHELL_TOOL_NAME,
-  GREP_TOOL_NAME,
-  READ_FILE_TOOL_NAME,
-} from '../tools/tool-names.js';
+import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import { ToolOutputMaskingEvent } from '../telemetry/types.js';
 
 // Tool output masking defaults
 export const DEFAULT_TOOL_PROTECTION_THRESHOLD = 50000;
 export const DEFAULT_MIN_PRUNABLE_TOKENS_THRESHOLD = 30000;
 export const DEFAULT_PROTECT_LATEST_TURN = true;
-export const MASKING_INDICATOR_TAG = '<tool_output_masked_guidance';
+export const MASKING_INDICATOR_TAG = '<tool_output_masked';
 
 export const TOOL_OUTPUTS_DIR = 'tool-outputs';
 
@@ -329,20 +325,12 @@ export class ToolOutputMaskingService {
   }
 
   private formatMaskedSnippet(params: MaskedSnippetParams): string {
-    const { toolName, filePath, fileSizeMB, totalLines, tokens, preview } =
-      params;
-    return `[Tool Output Masked]
-${MASKING_INDICATOR_TAG} 
-  tool_name="${toolName}" 
-  file_path="${filePath}" 
-  total_tokens="${tokens.toLocaleString()}" 
-  line_count="${totalLines.toLocaleString()}" 
-  file_size="${fileSizeMB}MB"
->
+    const { filePath, preview } = params;
+    return `${MASKING_INDICATOR_TAG}>
 ${preview}
 
-... [Full output available at ${filePath}. Use '${READ_FILE_TOOL_NAME}' or '${GREP_TOOL_NAME}' to inspect.]
-</tool_output_masked_guidance>`;
+Output too large. Full output available at: ${filePath}
+</tool_output_masked>`;
   }
 }
 

@@ -1,14 +1,7 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`ToolOutputMaskingService > should match the expected snapshot for a masked tool output 1`] = `
-"[Tool Output Masked]
-<tool_output_masked_guidance 
-  tool_name="run_shell_command" 
-  file_path="/mock/history/tool-outputs/run_shell_command_deterministic.txt" 
-  total_tokens="1,000" 
-  line_count="4" 
-  file_size="0.00MB"
->
+"<tool_output_masked>
 Line
 Line
 Line
@@ -33,6 +26,6 @@ Line
 Line
 
 
-... [Full output available at /mock/history/tool-outputs/run_shell_command_deterministic.txt. Use 'read_file' or 'grep_search' to inspect.]
-</tool_output_masked_guidance>"
+Output too large. Full output available at: /mock/history/tool-outputs/run_shell_command_deterministic.txt
+</tool_output_masked>"
 `;

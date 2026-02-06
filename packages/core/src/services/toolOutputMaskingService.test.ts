@@ -121,7 +121,7 @@ describe('ToolOutputMaskingService', () => {
         unknown
       >;
       const content = (resp?.['output'] as string) ?? JSON.stringify(resp);
-      if (content.includes('<tool_output_masked_guidance')) return 100;
+      if (content.includes('<tool_output_masked')) return 100;
 
       if (toolName === 't1') return 60000;
       if (toolName === 't2') return 20000;
@@ -137,7 +137,7 @@ describe('ToolOutputMaskingService', () => {
 
     expect(result.maskedCount).toBe(1);
     expect(getToolResponse(result.newHistory[0].parts?.[0])).toContain(
-      '<tool_output_masked_guidance',
+      '<tool_output_masked',
     );
     expect(getToolResponse(result.newHistory[1].parts?.[0])).toEqual(
       'B'.repeat(20000),
@@ -230,7 +230,7 @@ describe('ToolOutputMaskingService', () => {
         unknown
       >;
       const content = (resp?.['output'] as string) ?? JSON.stringify(resp);
-      if (content.includes('<tool_output_masked_guidance')) return 100;
+      if (content.includes('<tool_output_masked')) return 100;
 
       if (name === SHELL_TOOL_NAME) return 100000;
       if (name === 'p') return 60000;
@@ -254,8 +254,7 @@ describe('ToolOutputMaskingService', () => {
             functionResponse: {
               name: 'tool1',
               response: {
-                output:
-                  '[Tool Output Masked]\n<tool_output_masked_guidance tool_name="tool1">...</tool_output_masked_guidance>',
+                output: '<tool_output_masked>...</tool_output_masked>',
               },
             },
           },
@@ -315,17 +314,15 @@ describe('ToolOutputMaskingService', () => {
         (resp?.['output'] as string) ??
         (resp?.['result'] as string) ??
         JSON.stringify(resp);
-      if (content.includes('<tool_output_masked_guidance')) return 100;
+      if (content.includes('<tool_output_masked')) return 100;
       return 60000;
     });
 
     const result = await service.mask(history, mockConfig);
     expect(result.maskedCount).toBe(2); // both t1 and p are prunable (cumulative 60k and 120k)
-    const resp = result.newHistory[0].parts![0].functionResponse!
-      .response as Record<string, unknown>;
-    // The entire response is replaced with { output: maskedSnippet }, guaranteeing full savings
-    expect(resp['output']).toContain('[Tool Output Masked]');
-    expect(resp['result']).toBeUndefined();
+    const responseObj = result.newHistory[0].parts?.[0].functionResponse
+      ?.response as Record<string, unknown>;
+    expect(Object.keys(responseObj)).toEqual(['output']);
   });
 
   it('should preserve multimodal parts while masking tool responses', async () => {
@@ -369,7 +366,7 @@ describe('ToolOutputMaskingService', () => {
         unknown
       >;
       const content = (resp?.['output'] as string) ?? JSON.stringify(resp);
-      if (content.includes('<tool_output_masked_guidance')) return 100;
+      if (content.includes('<tool_output_masked')) return 100;
 
       if (parts[0].functionResponse?.name === 't1') return 60000;
       if (parts[0].functionResponse?.name === 'p') return 60000;
@@ -388,7 +385,7 @@ describe('ToolOutputMaskingService', () => {
           unknown
         >
       )['output'],
-    ).toContain('[Tool Output Masked]');
+    ).toContain('<tool_output_masked');
     expect(result.newHistory[0].parts?.[1].inlineData).toEqual({
       data: 'base64data',
       mimeType: 'image/png',
@@ -432,7 +429,7 @@ describe('ToolOutputMaskingService', () => {
         unknown
       >;
       const content = (resp?.['output'] as string) ?? JSON.stringify(resp);
-      if (content.includes('<tool_output_masked_guidance')) return 100;
+      if (content.includes('<tool_output_masked')) return 100;
 
       if (parts[0].functionResponse?.name === SHELL_TOOL_NAME) return 1000;
       if (parts[0].functionResponse?.name === 'padding') return 60000;
@@ -449,10 +446,13 @@ describe('ToolOutputMaskingService', () => {
     const response = responseObj['output'] as string;
 
     // We replace the random part of the filename for deterministic snapshots
-    const deterministicResponse = response.replace(
-      new RegExp(`${SHELL_TOOL_NAME}_[^\\s"]+\\.txt`, 'g'),
-      `${SHELL_TOOL_NAME}_deterministic.txt`,
-    );
+    // and normalize path separators for cross-platform compatibility
+    const deterministicResponse = response
+      .replace(
+        new RegExp(`${SHELL_TOOL_NAME}_[^\\s"]+\\.txt`, 'g'),
+        `${SHELL_TOOL_NAME}_deterministic.txt`,
+      )
+      .replace(/\\/g, '/');
 
     expect(deterministicResponse).toMatchSnapshot();
   });
