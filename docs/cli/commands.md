@@ -149,6 +149,9 @@ Slash commands provide meta-level control over the CLI itself.
     command analyzes the current directory and generates a tailored context
     file, making it simpler for them to provide project-specific instructions to
     the Gemini agent.
+  - **Usage:**
+    - `/init`: Creates a `GEMINI.md` file if it doesn't exist.
+    - `/init replace`: Overwrites the existing `GEMINI.md` file with a new one.
 
 - **`/introspect`**
   - **Description:** Provide debugging information about the current Gemini CLI
