@@ -15,7 +15,7 @@ describe('ApprovalModeIndicator', () => {
       <ApprovalModeIndicator approvalMode={ApprovalMode.AUTO_EDIT} />,
     );
     const output = lastFrame();
-    expect(output).toContain('Auto');
+    expect(output).toContain('accept edits');
     expect(output).toContain('shift+tab');
   });
 
@@ -24,7 +24,7 @@ describe('ApprovalModeIndicator', () => {
       <ApprovalModeIndicator approvalMode={ApprovalMode.PLAN} />,
     );
     const output = lastFrame();
-    expect(output).toContain('Plan');
+    expect(output).toContain('plan');
     expect(output).toContain('shift+tab');
   });
 
@@ -42,7 +42,6 @@ describe('ApprovalModeIndicator', () => {
       <ApprovalModeIndicator approvalMode={ApprovalMode.DEFAULT} />,
     );
     const output = lastFrame();
-    expect(output).toContain('Build');
-    expect(output).toContain('shift+tab');
+    expect(output).toContain('shift+tab for modes');
   });
 });

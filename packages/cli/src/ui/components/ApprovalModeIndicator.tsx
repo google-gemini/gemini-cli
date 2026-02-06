@@ -23,24 +23,24 @@ export const ApprovalModeIndicator: React.FC<ApprovalModeIndicatorProps> = ({
   switch (approvalMode) {
     case ApprovalMode.AUTO_EDIT:
       textColor = theme.status.warning;
-      textContent = 'Auto';
-      subText = ' shift+tab';
+      textContent = 'accept edits';
+      subText = 'shift+tab';
       break;
     case ApprovalMode.PLAN:
       textColor = theme.status.success;
-      textContent = 'Plan';
-      subText = ' shift+tab';
+      textContent = 'plan';
+      subText = 'shift+tab';
       break;
     case ApprovalMode.YOLO:
       textColor = theme.status.error;
       textContent = 'YOLO';
-      subText = ' shift+tab';
+      subText = 'shift+tab';
       break;
     case ApprovalMode.DEFAULT:
     default:
       textColor = theme.text.accent;
-      textContent = 'Build';
-      subText = ' shift+tab';
+      textContent = '';
+      subText = 'shift+tab for modes';
       break;
   }
 
@@ -48,6 +48,7 @@ export const ApprovalModeIndicator: React.FC<ApprovalModeIndicatorProps> = ({
     <Box>
       <Text color={textColor}>
         {textContent}
+        {textContent && subText && ' '}
         {subText && <Text color={theme.text.secondary}>{subText}</Text>}
       </Text>
     </Box>
