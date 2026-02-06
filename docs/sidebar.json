@@ -45,6 +45,7 @@
       { "label": "Custom commands", "slug": "docs/cli/custom-commands" },
       { "label": "Enterprise features", "slug": "docs/cli/enterprise" },
       { "label": "Headless mode & scripting", "slug": "docs/cli/headless" },
+      { "label": "Ralph Wiggum mode", "slug": "docs/ralph-wiggum" },
       { "label": "Sandboxing", "slug": "docs/cli/sandbox" },
       { "label": "System prompt override", "slug": "docs/cli/system-prompt" },
       { "label": "Telemetry", "slug": "docs/cli/telemetry" }

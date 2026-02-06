@@ -35,6 +35,9 @@ and parameters.
 | `--model`                        | `-m`  | string  | `auto`    | Model to use. See [Model Selection](#model-selection) for available values.                                |
 | `--prompt`                       | `-p`  | string  | -         | Prompt text. Appended to stdin input if provided. **Deprecated:** Use positional arguments instead.        |
 | `--prompt-interactive`           | `-i`  | string  | -         | Execute prompt and continue in interactive mode                                                            |
+| `--ralph-wiggum`                 | -     | boolean | `false`   | Enable Ralph Wiggum iterative loop mode                                                                    |
+| `--completion-promise`           | -     | string  | -         | String to look for to signal completion in Ralph Wiggum mode                                               |
+| `--max-iterations`               | -     | number  | `10`      | Maximum loop iterations for Ralph Wiggum mode                                                              |
 | `--sandbox`                      | `-s`  | boolean | `false`   | Run in a sandboxed environment for safer execution                                                         |
 | `--approval-mode`                | -     | string  | `default` | Approval mode for tool execution. Choices: `default`, `auto_edit`, `yolo`                                  |
 | `--yolo`                         | `-y`  | boolean | `false`   | **Deprecated.** Auto-approve all actions. Use `--approval-mode=yolo` instead.                              |

@@ -70,6 +70,11 @@ export interface CliArgs {
   prompt: string | undefined;
   promptInteractive: string | undefined;
 
+  ralphWiggum: boolean | undefined;
+  completionPromise: string | undefined;
+  maxIterations: number | undefined;
+  memoryFile: string | undefined;
+
   yolo: boolean | undefined;
   approvalMode: string | undefined;
   allowedMcpServerNames: string[] | undefined;
@@ -139,6 +144,31 @@ export async function parseArguments(
           alias: 's',
           type: 'boolean',
           description: 'Run in sandbox?',
+        })
+
+        .option('ralph-wiggum', {
+          alias: 'ralphWiggum',
+          type: 'boolean',
+          description:
+            'Enable Ralph Wiggum mode (iterative loop with YOLO mode).',
+        })
+        .option('completion-promise', {
+          alias: 'completionPromise',
+          type: 'string',
+          description:
+            'The string to look for in the output to signal completion in Ralph Wiggum mode.',
+        })
+        .option('max-iterations', {
+          alias: 'maxIterations',
+          type: 'number',
+          description: 'Maximum number of iterations for Ralph Wiggum mode.',
+        })
+        .option('memory-file', {
+          alias: 'memoryFile',
+          type: 'string',
+          description:
+            'Task-specific memory file for Ralph Wiggum mode (defaults to memories.md).',
+          default: 'memories.md',
         })
 
         .option('yolo', {

@@ -24,7 +24,7 @@ import { loadSettings, SettingScope } from './config/settings.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
-import { runNonInteractive } from './nonInteractiveCli.js';
+import { runNonInteractive, runRalphWiggum } from './nonInteractiveCli.js';
 import {
   cleanupCheckpoints,
   registerCleanup,
@@ -740,13 +740,25 @@ export async function main() {
 
     initializeOutputListenersAndFlush();
 
-    await runNonInteractive({
-      config,
-      settings,
-      input,
-      prompt_id,
-      resumedSessionData,
-    });
+    if (argv.ralphWiggum) {
+      await runRalphWiggum({
+        config,
+        settings,
+        input,
+        prompt_id,
+        resumedSessionData,
+        completionPromise: argv.completionPromise,
+        maxIterations: argv.maxIterations,
+      });
+    } else {
+      await runNonInteractive({
+        config,
+        settings,
+        input,
+        prompt_id,
+        resumedSessionData,
+      });
+    }
     // Call cleanup before process.exit, which causes cleanup to not run
     await runExitCleanup();
     process.exit(ExitCodes.SUCCESS);
