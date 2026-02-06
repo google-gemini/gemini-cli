@@ -497,7 +497,7 @@ function setupNetworkLogging(
   port: number,
   config: Config,
 ) {
-  const buffer: string[] = [];
+  const buffer: Array<Record<string, unknown>> = [];
   let ws: WebSocket | null = null;
   let reconnectTimer: NodeJS.Timeout | null = null;
   let sessionId: string | null = null;
@@ -587,8 +587,7 @@ function setupNetworkLogging(
       ws.readyState !== WebSocket.OPEN ||
       !capture.isNetworkLoggingEnabled()
     ) {
-      const data = JSON.stringify(message);
-      buffer.push(data);
+      buffer.push(message);
       if (buffer.length > MAX_BUFFER_SIZE) buffer.shift();
       return;
     }
@@ -607,13 +606,8 @@ function setupNetworkLogging(
 
     debugLogger.debug(`Flushing ${buffer.length} buffered logs...`);
     while (buffer.length > 0) {
-      const data = buffer.shift()!;
-      try {
-        const message = JSON.parse(data);
-        sendMessage(message);
-      } catch (err) {
-        debugLogger.debug('Failed to parse buffered message:', err);
-      }
+      const message = buffer.shift()!;
+      sendMessage(message);
     }
   };
 
@@ -647,8 +641,9 @@ function setupNetworkLogging(
 
   // Cleanup on process exit
   process.on('exit', () => {
-    cleanup();
+    if (reconnectTimer) clearTimeout(reconnectTimer);
     if (ws) ws.close();
+    cleanup();
   });
 }
 
