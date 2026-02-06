@@ -133,6 +133,39 @@ describe('ide-connection-utils', () => {
       expect(result).toEqual(validConfig);
     });
 
+    it('should fall back to a different PID if it matches the current workspace', async () => {
+      const targetPid = 12345;
+      const otherPid = 67890;
+      const validConfig = {
+        port: '5678',
+        workspacePath: '/test/workspace',
+      };
+      vi.mocked(fs.promises.readFile).mockRejectedValueOnce(
+        new Error('not found'),
+      );
+      (
+        vi.mocked(fs.promises.readdir) as Mock<
+          (path: fs.PathLike) => Promise<string[]>
+        >
+      ).mockResolvedValue([`gemini-ide-server-${otherPid}-111.json`]);
+      vi.mocked(fs.promises.readFile).mockResolvedValueOnce(
+        JSON.stringify(validConfig),
+      );
+
+      const result = await getConnectionConfigFromFile(targetPid);
+
+      expect(result).toEqual(validConfig);
+      expect(fs.promises.readFile).toHaveBeenCalledWith(
+        path.join(
+          '/tmp',
+          'gemini',
+          'ide',
+          `gemini-ide-server-${otherPid}-111.json`,
+        ),
+        'utf8',
+      );
+    });
+
     it('should return the first valid config when multiple workspaces are valid', async () => {
       const config1 = { port: '1111', workspacePath: '/test/workspace' };
       const config2 = { port: '2222', workspacePath: '/test/workspace2' };
