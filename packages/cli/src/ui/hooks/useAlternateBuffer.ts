@@ -20,11 +20,12 @@ import { isCloudShell } from '@google/gemini-cli-core';
  */
 export const isAlternateBufferEnabled = (settings: LoadedSettings): boolean => {
   // Honor explicit setting if present.
-  // Precedence follows the merge order: system > workspace > user.
+  // Precedence follows the merge order: system > workspace > user > systemDefaults.
   const explicit =
     settings.system?.settings.ui?.useAlternateBuffer ??
     settings.workspace?.settings.ui?.useAlternateBuffer ??
-    settings.user?.settings.ui?.useAlternateBuffer;
+    settings.user?.settings.ui?.useAlternateBuffer ??
+    settings.systemDefaults?.settings.ui?.useAlternateBuffer;
 
   if (typeof explicit === 'boolean') {
     return explicit;
