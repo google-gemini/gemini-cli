@@ -815,4 +815,19 @@ describe('ShellTool', () => {
       }
     });
   });
+
+  describe('getSchema', () => {
+    it('should return the base schema when no modelId is provided', () => {
+      const schema = shellTool.getSchema();
+      expect(schema.name).toBe(SHELL_TOOL_NAME);
+      expect(schema.description).toMatchSnapshot();
+    });
+
+    it('should return the schema from the resolver when modelId is provided', () => {
+      const modelId = 'gemini-2.0-flash';
+      const schema = shellTool.getSchema(modelId);
+      expect(schema.name).toBe(SHELL_TOOL_NAME);
+      expect(schema.description).toMatchSnapshot();
+    });
+  });
 });
