@@ -83,21 +83,22 @@ vi.mock('./shared/ScrollableList.js', () => ({
   ScrollableList: ({
     data,
     renderItem,
-    copyModeEnabled,
   }: {
     data: unknown[];
     renderItem: (props: { item: unknown }) => React.JSX.Element;
-    copyModeEnabled?: boolean;
-  }) => (
-    <Box flexDirection="column">
-      <Text>
-        ScrollableList (copyMode:{copyModeEnabled ? 'true' : 'false'})
-      </Text>
-      {data.map((item: unknown, index: number) => (
-        <Box key={index}>{renderItem({ item })}</Box>
-      ))}
-    </Box>
-  ),
+  }) => {
+    const { copyModeEnabled } = useUIState();
+    return (
+      <Box flexDirection="column">
+        <Text>
+          ScrollableList (copyMode:{copyModeEnabled ? 'true' : 'false'})
+        </Text>
+        {data.map((item: unknown, index: number) => (
+          <Box key={index}>{renderItem({ item })}</Box>
+        ))}
+      </Box>
+    );
+  },
   SCROLL_TO_ITEM_END: 0,
 }));
 
