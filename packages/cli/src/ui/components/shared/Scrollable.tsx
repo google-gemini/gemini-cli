@@ -5,14 +5,13 @@
  */
 
 import React, {
-  useState,
-  useEffect,
   useRef,
-  useLayoutEffect,
   useCallback,
   useMemo,
+  useReducer,
+  useState,
 } from 'react';
-import { Box, getInnerHeight, getScrollHeight, type DOMElement } from 'ink';
+import { Box, type DOMElement, ResizeObserver } from 'ink';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
 import { useScrollable } from '../../contexts/ScrollProvider.js';
 import { useAnimatedScrollbar } from '../../hooks/useAnimatedScrollbar.js';
@@ -29,6 +28,66 @@ interface ScrollableProps {
   flexGrow?: number;
 }
 
+type ScrollState = {
+  scrollTop: number;
+  innerHeight: number;
+  scrollHeight: number;
+  lastMeasuredChildrenCount: number;
+};
+
+type ScrollAction =
+  | { type: 'SET_INNER_HEIGHT'; height: number }
+  | {
+      type: 'SET_SCROLL_HEIGHT';
+      height: number;
+      scrollToBottom: boolean;
+      currentChildrenCount: number;
+    }
+  | { type: 'SET_SCROLL_TOP'; top: number };
+
+function scrollReducer(state: ScrollState, action: ScrollAction): ScrollState {
+  switch (action.type) {
+    case 'SET_INNER_HEIGHT': {
+      if (state.innerHeight === action.height) {
+        return state;
+      }
+      const isAtBottom =
+        state.scrollTop >= state.scrollHeight - state.innerHeight - 1;
+      let { scrollTop } = state;
+      if (isAtBottom) {
+        scrollTop = Math.max(0, state.scrollHeight - action.height);
+      }
+      return { ...state, innerHeight: action.height, scrollTop };
+    }
+    case 'SET_SCROLL_HEIGHT': {
+      if (
+        state.scrollHeight === action.height &&
+        state.lastMeasuredChildrenCount === action.currentChildrenCount
+      ) {
+        return state;
+      }
+      const isAtBottom =
+        state.scrollTop >= state.scrollHeight - state.innerHeight - 1;
+      const childCountChanged =
+        action.currentChildrenCount !== state.lastMeasuredChildrenCount;
+      let { scrollTop } = state;
+      if (isAtBottom || (action.scrollToBottom && childCountChanged)) {
+        scrollTop = Math.max(0, action.height - state.innerHeight);
+      }
+      return {
+        ...state,
+        scrollHeight: action.height,
+        scrollTop,
+        lastMeasuredChildrenCount: action.currentChildrenCount,
+      };
+    }
+    case 'SET_SCROLL_TOP':
+      return { ...state, scrollTop: action.top };
+    default:
+      return state;
+  }
+}
+
 export const Scrollable: React.FC<ScrollableProps> = ({
   children,
   width,
@@ -39,48 +98,74 @@ export const Scrollable: React.FC<ScrollableProps> = ({
   scrollToBottom,
   flexGrow,
 }) => {
-  const [scrollTop, setScrollTop] = useState(0);
-  const ref = useRef<DOMElement>(null);
-  const [size, setSize] = useState({
+  const [state, dispatch] = useReducer(scrollReducer, {
+    scrollTop: 0,
     innerHeight: 0,
     scrollHeight: 0,
+    lastMeasuredChildrenCount: React.Children.count(children),
   });
-  const sizeRef = useRef(size);
-  useEffect(() => {
-    sizeRef.current = size;
-  }, [size]);
 
-  const childrenCountRef = useRef(0);
+  const { scrollTop, innerHeight, scrollHeight } = state;
 
-  // This effect needs to run on every render to correctly measure the container
-  // and scroll to the bottom if new children are added. The if conditions
-  // prevent infinite loops.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useLayoutEffect(() => {
-    if (!ref.current) {
-      return;
+  const scrollTopRef = useRef(scrollTop);
+  scrollTopRef.current = scrollTop;
+
+  const [containerNode, setContainerNode] = useState<DOMElement | null>(null);
+  const ref = useRef<DOMElement>(null);
+
+  const sizeRef = useRef({ innerHeight, scrollHeight });
+  sizeRef.current = { innerHeight, scrollHeight };
+
+  const childrenCountRef = useRef(React.Children.count(children));
+  childrenCountRef.current = React.Children.count(children);
+
+  const containerObserverRef = useRef<ResizeObserver | null>(null);
+  const setRef = useCallback((node: DOMElement | null) => {
+    if (containerObserverRef.current) {
+      containerObserverRef.current.disconnect();
+      containerObserverRef.current = null;
     }
-    const innerHeight = Math.round(getInnerHeight(ref.current));
-    const scrollHeight = Math.round(getScrollHeight(ref.current));
+    (ref as React.MutableRefObject<DOMElement | null>).current = node;
+    setContainerNode(node);
+    if (node) {
+      containerObserverRef.current = new ResizeObserver((entries) => {
+        const entry = entries[0];
+        if (entry) {
+          const newInnerHeight = Math.round(entry.contentRect.height);
+          dispatch({ type: 'SET_INNER_HEIGHT', height: newInnerHeight });
+        }
+      });
+      containerObserverRef.current.observe(node);
+    }
+  }, []);
 
-    const isAtBottom = scrollTop >= size.scrollHeight - size.innerHeight - 1;
-
-    if (
-      size.innerHeight !== innerHeight ||
-      size.scrollHeight !== scrollHeight
-    ) {
-      setSize({ innerHeight, scrollHeight });
-      if (isAtBottom) {
-        setScrollTop(Math.max(0, scrollHeight - innerHeight));
+  const contentRef = useRef<DOMElement>(null);
+  const contentObserverRef = useRef<ResizeObserver | null>(null);
+  const setContentRef = useCallback(
+    (node: DOMElement | null) => {
+      if (contentObserverRef.current) {
+        contentObserverRef.current.disconnect();
+        contentObserverRef.current = null;
       }
-    }
-
-    const childCountCurrent = React.Children.count(children);
-    if (scrollToBottom && childrenCountRef.current !== childCountCurrent) {
-      setScrollTop(Math.max(0, scrollHeight - innerHeight));
-    }
-    childrenCountRef.current = childCountCurrent;
-  });
+      (contentRef as React.MutableRefObject<DOMElement | null>).current = node;
+      if (node) {
+        contentObserverRef.current = new ResizeObserver((entries) => {
+          const entry = entries[0];
+          if (entry) {
+            const newScrollHeight = Math.round(entry.contentRect.height);
+            dispatch({
+              type: 'SET_SCROLL_HEIGHT',
+              height: newScrollHeight,
+              scrollToBottom: !!scrollToBottom,
+              currentChildrenCount: childrenCountRef.current,
+            });
+          }
+        });
+        contentObserverRef.current.observe(node);
+      }
+    },
+    [scrollToBottom],
+  );
 
   const { getScrollTop, setPendingScrollTop } = useBatchedScroll(scrollTop);
 
@@ -93,9 +178,9 @@ export const Scrollable: React.FC<ScrollableProps> = ({
         Math.max(0, scrollHeight - innerHeight),
       );
       setPendingScrollTop(next);
-      setScrollTop(next);
+      dispatch({ type: 'SET_SCROLL_TOP', top: next });
     },
-    [sizeRef, getScrollTop, setPendingScrollTop],
+    [getScrollTop, setPendingScrollTop],
   );
 
   const { scrollbarColor, flashScrollbar, scrollByWithAnimation } =
@@ -118,10 +203,10 @@ export const Scrollable: React.FC<ScrollableProps> = ({
   const getScrollState = useCallback(
     () => ({
       scrollTop: getScrollTop(),
-      scrollHeight: size.scrollHeight,
-      innerHeight: size.innerHeight,
+      scrollHeight: state.scrollHeight,
+      innerHeight: state.innerHeight,
     }),
-    [getScrollTop, size.scrollHeight, size.innerHeight],
+    [getScrollTop, state.scrollHeight, state.innerHeight],
   );
 
   const hasFocusCallback = useCallback(() => hasFocus, [hasFocus]);
@@ -137,11 +222,11 @@ export const Scrollable: React.FC<ScrollableProps> = ({
     [getScrollState, scrollByWithAnimation, hasFocusCallback, flashScrollbar],
   );
 
-  useScrollable(scrollableEntry, hasFocus && ref.current !== null);
+  useScrollable(scrollableEntry, hasFocus && containerNode !== null);
 
   return (
     <Box
-      ref={ref}
+      ref={setRef}
       maxHeight={maxHeight}
       width={width ?? maxWidth}
       height={height}
@@ -157,7 +242,12 @@ export const Scrollable: React.FC<ScrollableProps> = ({
         based on the children's content. It also adds a right padding to
         make room for the scrollbar.
       */}
-      <Box flexShrink={0} paddingRight={1} flexDirection="column">
+      <Box
+        ref={setContentRef}
+        flexShrink={0}
+        paddingRight={1}
+        flexDirection="column"
+      >
         {children}
       </Box>
     </Box>

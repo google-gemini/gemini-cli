@@ -272,6 +272,7 @@ export async function startInteractiveUI(
       },
       patchConsole: false,
       alternateBuffer: useAlternateBuffer,
+      standardReactLayoutTiming: useAlternateBuffer,
       incrementalRendering:
         settings.merged.ui.incrementalRendering !== false && useAlternateBuffer,
     },
