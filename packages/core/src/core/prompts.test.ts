@@ -22,6 +22,9 @@ import {
   DEFAULT_GEMINI_MODEL,
 } from '../config/models.js';
 import { ApprovalMode } from '../policy/types.js';
+import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
+import type { CallableTool } from '@google/genai';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 // Mock tool names if they are dynamically generated or complex
 vi.mock('../tools/ls', () => ({ LSTool: { Name: 'list_directory' } }));
@@ -33,7 +36,10 @@ vi.mock('../tools/read-many-files', () => ({
   ReadManyFilesTool: { Name: 'read_many_files' },
 }));
 vi.mock('../tools/shell', () => ({
-  ShellTool: { Name: 'run_shell_command' },
+  ShellTool: class {
+    static readonly Name = 'run_shell_command';
+    name = 'run_shell_command';
+  },
 }));
 vi.mock('../tools/write-file', () => ({
   WriteFileTool: { Name: 'write_file' },
@@ -76,6 +82,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     mockConfig = {
       getToolRegistry: vi.fn().mockReturnValue({
         getAllToolNames: vi.fn().mockReturnValue([]),
+        getAllTools: vi.fn().mockReturnValue([]),
       }),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       storage: {
@@ -90,6 +97,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       getModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO),
       getActiveModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL),
       getPreviewFeatures: vi.fn().mockReturnValue(false),
+      getMessageBus: vi.fn(),
       getAgentRegistry: vi.fn().mockReturnValue({
         getDirectoryContext: vi.fn().mockReturnValue('Mock Agent Directory'),
       }),
@@ -297,6 +305,48 @@ describe('Core System Prompt (prompts.ts)', () => {
       const prompt = getCoreSystemPrompt(mockConfig);
       expect(prompt).not.toContain('# Active Approval Mode: Plan');
       expect(prompt).toMatchSnapshot();
+    });
+
+    it('should include read-only MCP tools in PLAN mode', () => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
+
+      const readOnlyMcpTool = new DiscoveredMCPTool(
+        {} as CallableTool,
+        'readonly-server',
+        'read_static_value',
+        'A read-only tool',
+        {},
+        {} as MessageBus,
+        false,
+        true, // isReadOnly
+      );
+
+      const nonReadOnlyMcpTool = new DiscoveredMCPTool(
+        {} as CallableTool,
+        'nonreadonly-server',
+        'non_read_static_value',
+        'A non-read-only tool',
+        {},
+        {} as MessageBus,
+        false,
+        false,
+      );
+
+      vi.mocked(mockConfig.getToolRegistry().getAllTools).mockReturnValue([
+        readOnlyMcpTool,
+        nonReadOnlyMcpTool,
+      ]);
+      vi.mocked(mockConfig.getToolRegistry().getAllToolNames).mockReturnValue([
+        readOnlyMcpTool.name,
+        nonReadOnlyMcpTool.name,
+      ]);
+
+      const prompt = getCoreSystemPrompt(mockConfig);
+
+      expect(prompt).toContain('`read_static_value` (readonly-server)');
+      expect(prompt).not.toContain(
+        '`non_read_static_value` (nonreadonly-server)',
+      );
     });
 
     it('should only list available tools in PLAN mode', () => {
