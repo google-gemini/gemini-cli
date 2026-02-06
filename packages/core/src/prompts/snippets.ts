@@ -568,6 +568,28 @@ The structure MUST be as follows:
         -->
     </key_knowledge>
 
+    <failed_approaches>
+        <!-- CRITICAL: Approaches that were tried and DID NOT WORK. This prevents the agent from retrying failed solutions. -->
+        <!-- Include: what was attempted, why it failed, and any error messages. -->
+        <!-- Example:
+         - Tried \`fs.readFileSync\` in async handler → caused event loop blocking, switched to \`fs.promises.readFile\`.
+         - Attempted to use port 3000 → EADDRINUSE, another process is using it. Using port 3001 instead.
+         - Installed \`lodash\` v3 → incompatible with ESM, upgraded to v4.
+        -->
+    </failed_approaches>
+
+    <critical_details>
+        <!-- Verbatim technical details that MUST NOT be paraphrased or approximated. Copy these exactly. -->
+        <!-- Include: specific error messages still relevant, exact URLs/ports, environment variables, version numbers. -->
+        <!-- Example:
+         - Error: "TypeError: Cannot read properties of undefined (reading 'id')" at src/auth.ts:45
+         - Dev server: http://localhost:3001
+         - API endpoint: https://api.example.com/v2/users
+         - Required env var: GEMINI_API_KEY
+         - Node version constraint: >=18.0.0
+        -->
+    </critical_details>
+
     <artifact_trail>
         <!-- Evolution of critical files and symbols. What was changed and WHY. Use this to track all significant code modifications and design decisions. -->
         <!-- Example:
