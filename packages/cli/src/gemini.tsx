@@ -193,23 +193,24 @@ ${reason.stack}`
  * @see https://github.com/google-gemini/gemini-cli/issues/15874
  */
 let isShuttingDown = false;
+
+const gracefulShutdown = async (reason: string) => {
+  // Prevent multiple concurrent shutdown attempts
+  if (isShuttingDown) {
+    return;
+  }
+  isShuttingDown = true;
+
+  debugLogger.debug(`Shutting down gracefully due to ${reason}...`);
+  try {
+    await runExitCleanup();
+  } catch (err) {
+    debugLogger.debug(`Error during cleanup for ${reason}:`, err);
+  }
+  process.exit(ExitCodes.SUCCESS);
+};
+
 export function setupSignalHandlers() {
-  const gracefulShutdown = async (signal: string) => {
-    // Prevent multiple concurrent shutdown attempts
-    if (isShuttingDown) {
-      return;
-    }
-    isShuttingDown = true;
-
-    debugLogger.debug(`Received ${signal}, shutting down gracefully...`);
-    try {
-      await runExitCleanup();
-    } catch (err) {
-      debugLogger.debug(`Error during cleanup on ${signal}:`, err);
-    }
-    process.exit(ExitCodes.SUCCESS);
-  };
-
   // SIGHUP is sent when terminal is closed - critical for preventing orphans
   process.on('SIGHUP', () => gracefulShutdown('SIGHUP'));
   process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
@@ -249,22 +250,7 @@ export function setupTtyCheck(): () => void {
         intervalId = null;
       }
 
-      debugLogger.warn(
-        'Lost controlling terminal (stdin and stdout are not TTY), exiting...',
-      );
-
-      // Prevent race condition with signal handlers
-      if (isShuttingDown) {
-        return;
-      }
-      isShuttingDown = true;
-
-      try {
-        await runExitCleanup();
-      } catch (err) {
-        debugLogger.debug('Error during TTY loss cleanup:', err);
-      }
-      process.exit(ExitCodes.SUCCESS);
+      await gracefulShutdown('TTY loss');
     }
   }, 5000);
 
