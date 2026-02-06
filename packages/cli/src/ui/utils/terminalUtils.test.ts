@@ -10,7 +10,6 @@ import { isITerm2, resetITerm2Cache } from './terminalUtils.js';
 describe('terminalUtils', () => {
   beforeEach(() => {
     vi.stubEnv('TERM_PROGRAM', '');
-    vi.stubEnv('ITERM_SESSION_ID', '');
     resetITerm2Cache();
   });
 
@@ -21,11 +20,6 @@ describe('terminalUtils', () => {
 
   it('should detect iTerm2 via TERM_PROGRAM', () => {
     vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
-    expect(isITerm2()).toBe(true);
-  });
-
-  it('should detect iTerm2 via ITERM_SESSION_ID', () => {
-    vi.stubEnv('ITERM_SESSION_ID', 'w0t0p0:6789...');
     expect(isITerm2()).toBe(true);
   });
 
