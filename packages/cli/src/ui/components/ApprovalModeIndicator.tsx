@@ -47,9 +47,13 @@ export const ApprovalModeIndicator: React.FC<ApprovalModeIndicatorProps> = ({
   return (
     <Box>
       <Text color={textColor}>
-        {textContent}
-        {textContent && subText && ' '}
-        {subText && <Text color={theme.text.secondary}>{subText}</Text>}
+        {textContent ? textContent : null}
+        {subText ? (
+          <Text color={theme.text.secondary}>
+            {textContent ? ' ' : ''}
+            {subText}
+          </Text>
+        ) : null}
       </Text>
     </Box>
   );
