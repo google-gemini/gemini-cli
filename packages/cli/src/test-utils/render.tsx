@@ -173,13 +173,11 @@ const mockVoiceReturn: VoiceInputReturn = {
   state: {
     isRecording: false,
     isTranscribing: false,
-    transcript: null,
     error: null,
   },
   startRecording: vi.fn(async () => {}),
   stopRecording: vi.fn(async () => {}),
   toggleRecording: vi.fn(async () => {}),
-  clearTranscript: vi.fn(),
 };
 
 const mockUIActions: UIActions = {

@@ -18,3 +18,6 @@ export const useVoiceContext = () => {
   }
   return context;
 };
+
+// Re-export event subscription for convenience
+export { onVoiceTranscript } from '../hooks/useVoiceInput.js';

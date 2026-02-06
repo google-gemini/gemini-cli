@@ -65,7 +65,10 @@ import { useMouseClick } from '../hooks/useMouseClick.js';
 import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
-import { useVoiceContext } from '../contexts/VoiceContext.js';
+import {
+  useVoiceContext,
+  onVoiceTranscript,
+} from '../contexts/VoiceContext.js';
 
 /**
  * Returns if the terminal can be trusted to handle paste events atomically
@@ -242,28 +245,21 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   );
 
   // Voice input hook - MUST be before handleSubmit
-  const {
-    state: voiceState,
-    toggleRecording,
-    clearTranscript,
-  } = useVoiceContext();
+  // Voice input hook - MUST be before handleSubmit
+  // NOTE: Transcript is delivered via events, not context, to avoid infinite render loops
+  // See VOICE_INFINITE_LOOP_ANALYSIS.md for details
+  const { state: voiceState, toggleRecording } = useVoiceContext();
 
-  const lastProcessedTranscriptRef = useRef<string | null>(null);
-
-  // Handle voice transcript
+  // Handle voice transcript via event listener (not context) to avoid re-renders
   useEffect(() => {
-    if (
-      voiceState.transcript &&
-      voiceState.transcript !== lastProcessedTranscriptRef.current
-    ) {
+    const handleTranscript = (transcript: string) => {
       // Insert transcribed text at cursor position
-      buffer.insert(voiceState.transcript);
-      lastProcessedTranscriptRef.current = voiceState.transcript;
-      clearTranscript();
-    } else if (!voiceState.transcript) {
-      lastProcessedTranscriptRef.current = null;
-    }
-  }, [voiceState.transcript, buffer, clearTranscript]);
+      buffer.insert(transcript);
+    };
+
+    const unsubscribe = onVoiceTranscript(handleTranscript);
+    return unsubscribe;
+  }, [buffer]);
 
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {

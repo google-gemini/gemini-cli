@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
-import { useVoiceInput } from './useVoiceInput.js';
+import { useVoiceInput, onVoiceTranscript } from './useVoiceInput.js';
 import * as child_process from 'node:child_process';
 import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
@@ -57,7 +57,6 @@ describe('useVoiceInput', () => {
     expect(result.current.state).toEqual({
       isRecording: false,
       isTranscribing: false,
-      transcript: null,
       error: null,
     });
   });
@@ -80,7 +79,7 @@ describe('useVoiceInput', () => {
     expect(spawn).toHaveBeenCalledWith('sox', expect.any(Array));
   });
 
-  it('should stop recording and transcribe', async () => {
+  it('should stop recording and emit transcript via event', async () => {
     const mockProcess = new EventEmitter() as MockProcess;
     mockProcess.kill = vi.fn(() => {
       // Simulate process exit
@@ -90,6 +89,12 @@ describe('useVoiceInput', () => {
     vi.mocked(spawn).mockReturnValue(
       mockProcess as unknown as ReturnType<typeof spawn>,
     );
+
+    // Set up event listener to capture transcript
+    const transcripts: string[] = [];
+    const unsubscribe = onVoiceTranscript((transcript) => {
+      transcripts.push(transcript);
+    });
 
     const { result } = renderHook(() => useVoiceInput());
 
@@ -104,7 +109,10 @@ describe('useVoiceInput', () => {
     });
 
     expect(result.current.state.isRecording).toBe(false);
-    expect(result.current.state.transcript).toBe('Mock transcript');
+    // Transcript is now delivered via event, not state
+    expect(transcripts).toContain('Mock transcript');
+
+    unsubscribe();
   });
 
   it('should fall back to arecord if sox is not available', async () => {

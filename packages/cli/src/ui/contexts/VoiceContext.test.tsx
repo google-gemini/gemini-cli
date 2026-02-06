@@ -16,13 +16,11 @@ describe('VoiceContext', () => {
       state: {
         isRecording: false,
         isTranscribing: false,
-        transcript: null,
         error: null,
       },
       startRecording: vi.fn(),
       stopRecording: vi.fn(),
       toggleRecording: vi.fn(),
-      clearTranscript: vi.fn(),
     };
 
     const wrapper = ({ children }: { children: React.ReactNode }) => (
