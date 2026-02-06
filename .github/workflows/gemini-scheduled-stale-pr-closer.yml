@@ -23,6 +23,7 @@ jobs:
     steps:
       - name: 'Generate GitHub App Token'
         id: 'generate_token'
+        if: "github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository"
         uses: 'actions/create-github-app-token@v1'
         with:
           app-id: '${{ secrets.APP_ID }}'
@@ -35,7 +36,7 @@ jobs:
         env:
           DRY_RUN: '${{ inputs.dry_run }}'
         with:
-          github-token: '${{ steps.generate_token.outputs.token }}'
+          github-token: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
           script: |
             const dryRun = process.env.DRY_RUN === 'true';
             const thirtyDaysAgo = new Date();
