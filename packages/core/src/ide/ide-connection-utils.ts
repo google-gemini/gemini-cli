@@ -223,10 +223,9 @@ export async function createProxyAwareFetch(ideServerHost: string) {
       });
     } catch (error) {
       // Log fetch errors to help diagnose IDE connection issues
-      logger.error(
-        `IDE fetch failed for ${url instanceof URL ? url.href : url}`,
-        error,
-      );
+      const urlString =
+        typeof url === 'string' ? url : url instanceof URL ? url.href : url.url;
+      logger.error(`IDE fetch failed for ${urlString}`, error);
       throw error;
     }
   };
