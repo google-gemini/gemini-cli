@@ -85,7 +85,6 @@
     "@types/mime-types": "^3.0.1",
     "@types/minimatch": "^5.1.2",
     "@types/mock-fs": "^4.13.4",
-    "@types/node": "^25.2.1",
     "@types/prompts": "^2.4.9",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
