@@ -105,51 +105,91 @@ export function printDebugInfo(
   return allTools;
 }
 
-// Helper to validate model output and warn about unexpected content
-export function validateModelOutput(
-  result: string,
-  expectedContent: string | (string | RegExp)[] | null = null,
-  testName = '',
-) {
-  // First, check if there's any output at all (this should fail the test if missing)
+// Helper to assert that the model returned some output
+export function assertModelHasOutput(result: string) {
   if (!result || result.trim().length === 0) {
     throw new Error('Expected LLM to return some output');
   }
+}
+
+function contentExists(result: string, content: string | RegExp): boolean {
+  if (typeof content === 'string') {
+    return result.toLowerCase().includes(content.toLowerCase());
+  } else if (content instanceof RegExp) {
+    return content.test(result);
+  }
+  return false;
+}
+
+function findMismatchedContent(
+  result: string,
+  content: string | (string | RegExp)[],
+  shouldExist: boolean,
+): (string | RegExp)[] {
+  const contents = Array.isArray(content) ? content : [content];
+  return contents.filter((c) => contentExists(result, c) !== shouldExist);
+}
+
+function logContentWarning(
+  problematicContent: (string | RegExp)[],
+  isMissing: boolean,
+  originalContent: string | (string | RegExp)[] | null | undefined,
+  result: string,
+) {
+  const message = isMissing
+    ? 'LLM did not include expected content in response'
+    : 'LLM included forbidden content in response';
+
+  console.warn(
+    `Warning: ${message}: ${problematicContent.join(', ')}.`,
+    'This is not ideal but not a test failure.',
+  );
+
+  const label = isMissing ? 'Expected content' : 'Forbidden content';
+  console.warn(`${label}:`, originalContent);
+  console.warn('Actual output:', result);
+}
+
+// Helper to check model output and warn about unexpected content
+export function checkModelOutputContent(
+  result: string,
+  {
+    expectedContent = null,
+    testName = '',
+    forbiddenContent = null,
+  }: {
+    expectedContent?: string | (string | RegExp)[] | null;
+    testName?: string;
+    forbiddenContent?: string | (string | RegExp)[] | null;
+  } = {},
+): boolean {
+  let isValid = true;
 
   // If expectedContent is provided, check for it and warn if missing
   if (expectedContent) {
-    const contents = Array.isArray(expectedContent)
-      ? expectedContent
-      : [expectedContent];
-    const missingContent = contents.filter((content) => {
-      if (typeof content === 'string') {
-        return !result.toLowerCase().includes(content.toLowerCase());
-      } else if (content instanceof RegExp) {
-        return !content.test(result);
-      }
-      return false;
-    });
+    const missingContent = findMismatchedContent(result, expectedContent, true);
 
     if (missingContent.length > 0) {
-      console.warn(
-        `Warning: LLM did not include expected content in response: ${missingContent.join(
-          ', ',
-        )}.`,
-        'This is not ideal but not a test failure.',
-      );
-      console.warn(
-        'The tool was called successfully, which is the main requirement.',
-      );
-      console.warn('Expected content:', expectedContent);
-      console.warn('Actual output:', result);
-      return false;
-    } else if (env['VERBOSE'] === 'true') {
-      console.log(`${testName}: Model output validated successfully.`);
+      logContentWarning(missingContent, true, expectedContent, result);
+      isValid = false;
     }
-    return true;
   }
 
-  return true;
+  // If forbiddenContent is provided, check for it and warn if present
+  if (forbiddenContent) {
+    const foundContent = findMismatchedContent(result, forbiddenContent, false);
+
+    if (foundContent.length > 0) {
+      logContentWarning(foundContent, false, forbiddenContent, result);
+      isValid = false;
+    }
+  }
+
+  if (isValid && env['VERBOSE'] === 'true') {
+    console.log(`${testName}: Model output content checked successfully.`);
+  }
+
+  return isValid;
 }
 
 export interface ParsedLog {
@@ -416,7 +456,8 @@ export class TestRig {
   } {
     const isNpmReleaseTest =
       env['INTEGRATION_TEST_USE_INSTALLED_GEMINI'] === 'true';
-    const command = isNpmReleaseTest ? 'gemini' : 'node';
+    const geminiCommand = os.platform() === 'win32' ? 'gemini.cmd' : 'gemini';
+    const command = isNpmReleaseTest ? geminiCommand : 'node';
     const initialArgs = isNpmReleaseTest
       ? extraInitialArgs
       : [BUNDLE_PATH, ...extraInitialArgs];

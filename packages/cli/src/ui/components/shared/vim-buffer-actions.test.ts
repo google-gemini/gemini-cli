@@ -310,6 +310,32 @@ describe('vim-buffer-actions', () => {
       });
     });
 
+    describe('vim_move_big_word_backward', () => {
+      it('should treat punctuation as part of the word (B)', () => {
+        const state = createTestState(['hello.world'], 0, 10);
+        const action = {
+          type: 'vim_move_big_word_backward' as const,
+          payload: { count: 1 },
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.cursorCol).toBe(0); // Start of 'hello'
+      });
+
+      it('should skip punctuation when moving back to previous big word', () => {
+        const state = createTestState(['word1, word2'], 0, 7);
+        const action = {
+          type: 'vim_move_big_word_backward' as const,
+          payload: { count: 1 },
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.cursorCol).toBe(0); // Start of 'word1,'
+      });
+    });
+
     describe('vim_move_word_end', () => {
       it('should move to end of current word', () => {
         const state = createTestState(['hello world'], 0, 0);
@@ -583,6 +609,44 @@ describe('vim-buffer-actions', () => {
         expect(result).toHaveOnlyValidCharacters();
         expect(result.lines[0]).toBe('hello ');
         expect(result.cursorCol).toBe(6);
+      });
+
+      it('should delete only the word characters if it is the last word followed by whitespace', () => {
+        const state = createTestState(['foo bar   '], 0, 4); // on 'b'
+        const action = {
+          type: 'vim_delete_word_forward' as const,
+          payload: { count: 1 },
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines[0]).toBe('foo    ');
+      });
+
+      it('should do nothing if cursor is on whitespace after the last word', () => {
+        const state = createTestState(['foo bar   '], 0, 8); // on one of the trailing spaces
+        const action = {
+          type: 'vim_delete_word_forward' as const,
+          payload: { count: 1 },
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines[0]).toBe('foo bar   ');
+      });
+    });
+
+    describe('vim_delete_big_word_forward', () => {
+      it('should delete only the big word characters if it is the last word followed by whitespace', () => {
+        const state = createTestState(['foo bar.baz   '], 0, 4); // on 'b'
+        const action = {
+          type: 'vim_delete_big_word_forward' as const,
+          payload: { count: 1 },
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines[0]).toBe('foo    ');
       });
     });
 

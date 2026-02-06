@@ -8,6 +8,7 @@ import { EventEmitter } from 'node:events';
 import type { AgentDefinition } from '../agents/types.js';
 import type { McpClient } from '../tools/mcp-client.js';
 import type { ExtensionEvents } from './extensionLoader.js';
+import type { EditorType } from './editor.js';
 
 /**
  * Defines the severity level for user-facing feedback.
@@ -143,6 +144,15 @@ export enum CoreEvent {
   RetryAttempt = 'retry-attempt',
   ConsentRequest = 'consent-request',
   AgentsDiscovered = 'agents-discovered',
+  RequestEditorSelection = 'request-editor-selection',
+  EditorSelected = 'editor-selected',
+}
+
+/**
+ * Payload for the 'editor-selected' event.
+ */
+export interface EditorSelectedPayload {
+  editor?: EditorType;
 }
 
 export interface CoreEvents extends ExtensionEvents {
@@ -162,6 +172,8 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.RetryAttempt]: [RetryAttemptPayload];
   [CoreEvent.ConsentRequest]: [ConsentRequestPayload];
   [CoreEvent.AgentsDiscovered]: [AgentsDiscoveredPayload];
+  [CoreEvent.RequestEditorSelection]: never[];
+  [CoreEvent.EditorSelected]: [EditorSelectedPayload];
 }
 
 type EventBacklogItem = {
