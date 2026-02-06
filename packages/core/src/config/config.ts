@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -92,14 +92,14 @@ import { ContextManager } from '../services/contextManager.js';
 import type { GenerateContentParameters } from '@google/genai';
 
 // Re-export OAuth config type
-export type { MCPOAuthConfig, AnyToolInvocation };
-import type { AnyToolInvocation } from '../tools/tools.js';
+export type { MCPOAuthConfig, AnyToolInvocation, AnyDeclarativeTool };
+import type { AnyToolInvocation, AnyDeclarativeTool } from '../tools/tools.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { Storage } from './storage.js';
 import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
 import { FileExclusions } from '../utils/ignorePatterns.js';
-import type { EventEmitter } from 'node:events';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { EventEmitter } from 'node:events';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
@@ -574,6 +574,25 @@ export class Config {
   > = new Map();
   private lastRetrievedQuota?: RetrieveUserQuotaResponse;
   private lastQuotaFetchTime = 0;
+  private lastEmittedQuotaRemaining: number | undefined;
+  private lastEmittedQuotaLimit: number | undefined;
+
+  private emitQuotaChangedEvent(): void {
+    const pooled = this.getPooledQuota();
+    if (
+      this.lastEmittedQuotaRemaining !== pooled.remaining ||
+      this.lastEmittedQuotaLimit !== pooled.limit
+    ) {
+      this.lastEmittedQuotaRemaining = pooled.remaining;
+      this.lastEmittedQuotaLimit = pooled.limit;
+      coreEvents.emitQuotaChanged(
+        pooled.remaining,
+        pooled.limit,
+        pooled.resetTime,
+      );
+    }
+  }
+
   private readonly summarizeToolOutput:
     | Record<string, SummarizeToolOutputSettings>
     | undefined;
@@ -1230,12 +1249,7 @@ export class Config {
         current.limit !== limit
       ) {
         this.modelQuotas.set(activeModel, { remaining, limit });
-        const pooled = this.getPooledQuota();
-        coreEvents.emitQuotaChanged(
-          pooled.remaining,
-          pooled.limit,
-          pooled.resetTime,
-        );
+        this.emitQuotaChangedEvent();
       }
     }
   }
@@ -1283,10 +1297,7 @@ export class Config {
     if (pooled.remaining !== undefined) {
       return pooled.remaining;
     }
-    const primaryModel = resolveModel(
-      this.getModel(),
-      this.getPreviewFeatures(),
-    );
+    const primaryModel = resolveModel(this.getModel());
     return this.modelQuotas.get(primaryModel)?.remaining;
   }
 
@@ -1295,10 +1306,7 @@ export class Config {
     if (pooled.limit !== undefined) {
       return pooled.limit;
     }
-    const primaryModel = resolveModel(
-      this.getModel(),
-      this.getPreviewFeatures(),
-    );
+    const primaryModel = resolveModel(this.getModel());
     return this.modelQuotas.get(primaryModel)?.limit;
   }
 
@@ -1307,10 +1315,7 @@ export class Config {
     if (pooled.resetTime !== undefined) {
       return pooled.resetTime;
     }
-    const primaryModel = resolveModel(
-      this.getModel(),
-      this.getPreviewFeatures(),
-    );
+    const primaryModel = resolveModel(this.getModel());
     return this.modelQuotas.get(primaryModel)?.resetTime;
   }
 
@@ -1419,12 +1424,7 @@ export class Config {
             }
           }
         }
-        const pooled = this.getPooledQuota();
-        coreEvents.emitQuotaChanged(
-          pooled.remaining,
-          pooled.limit,
-          pooled.resetTime,
-        );
+        this.emitQuotaChangedEvent();
       }
 
       const hasAccess =
@@ -2338,10 +2338,18 @@ export class Config {
     const registry = new ToolRegistry(this, this.messageBus);
 
     // helper to create & register core tools that are enabled
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const registerCoreTool = (ToolClass: any, ...args: unknown[]) => {
+    const registerCoreTool = (
+      ToolClass:
+        | (new (
+            config: Config,
+            bus: MessageBus,
+            ...args: unknown[]
+          ) => AnyDeclarativeTool)
+        | (new (bus: MessageBus) => AnyDeclarativeTool),
+      ...args: unknown[]
+    ) => {
       const className = ToolClass.name;
-      const toolName = ToolClass.Name || className;
+      const toolName = (ToolClass as { Name?: string }).Name || className;
       const coreTools = this.getCoreTools();
       // On some platforms, the className can be minified to _ClassName.
       const normalizedClassName = className.replace(/^_+/, '');
@@ -2358,10 +2366,26 @@ export class Config {
       }
 
       if (isEnabled) {
-        // Pass message bus to tools (required for policy engine integration)
-        const toolArgs = [...args, this.getMessageBus()];
-
-        registry.registerTool(new ToolClass(...toolArgs));
+        // Pass config and message bus to tools (required for policy engine integration)
+        if (
+          ToolClass === MemoryTool ||
+          ToolClass === AskUserTool ||
+          ToolClass === WriteTodosTool
+        ) {
+          const Constructor = ToolClass as new (
+            bus: MessageBus,
+          ) => AnyDeclarativeTool;
+          registry.registerTool(new Constructor(this.messageBus));
+        } else {
+          const Constructor = ToolClass as new (
+            config: Config,
+            bus: MessageBus,
+            ...args: unknown[]
+          ) => AnyDeclarativeTool;
+          registry.registerTool(
+            new Constructor(this, this.messageBus, ...args),
+          );
+        }
       }
     };
 

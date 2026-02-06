@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -44,9 +44,7 @@ export const Footer: React.FC = () => {
     nightly,
     isTrustedFolder,
     terminalWidth,
-    quotaRemaining,
-    quotaLimit,
-    quotaResetTime,
+    quotaStats,
   } = {
     model: uiState.currentModel,
     targetDir: config.getTargetDir(),
@@ -60,9 +58,7 @@ export const Footer: React.FC = () => {
     nightly: uiState.nightly,
     isTrustedFolder: uiState.isTrustedFolder,
     terminalWidth: uiState.terminalWidth,
-    quotaRemaining: uiState.quotaRemaining,
-    quotaLimit: uiState.quotaLimit,
-    quotaResetTime: uiState.quotaResetTime,
+    quotaStats: uiState.quota.stats,
   };
 
   const showMemoryUsage =
@@ -166,13 +162,13 @@ export const Footer: React.FC = () => {
                   />
                 </>
               )}
-              {quotaRemaining !== undefined && quotaLimit !== undefined && (
+              {quotaStats && (
                 <>
                   {' '}
                   <QuotaDisplay
-                    remaining={quotaRemaining}
-                    limit={quotaLimit}
-                    resetTime={quotaResetTime}
+                    remaining={quotaStats.remaining}
+                    limit={quotaStats.limit}
+                    resetTime={quotaStats.resetTime}
                   />
                 </>
               )}

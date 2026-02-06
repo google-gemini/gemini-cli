@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -1891,12 +1891,21 @@ Logging in with Google... Restarting Gemini CLI to continue.
       queueErrorMessage,
       showApprovalModeIndicator,
       currentModel,
-      userTier,
-      quotaRemaining,
-      quotaLimit,
-      quotaResetTime,
-      proQuotaRequest,
-      validationRequest,
+      quota: {
+        userTier,
+        stats:
+          quotaRemaining !== undefined ||
+          quotaLimit !== undefined ||
+          quotaResetTime !== undefined
+            ? {
+                remaining: quotaRemaining,
+                limit: quotaLimit,
+                resetTime: quotaResetTime,
+              }
+            : undefined,
+        proQuotaRequest,
+        validationRequest,
+      },
       contextFileNames,
       errorCount,
       availableTerminalHeight,

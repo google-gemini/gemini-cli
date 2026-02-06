@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -126,9 +126,17 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           userEmail={itemForDisplay.userEmail}
           tier={itemForDisplay.tier}
           currentModel={itemForDisplay.currentModel}
-          pooledRemaining={itemForDisplay.pooledRemaining}
-          pooledLimit={itemForDisplay.pooledLimit}
-          pooledResetTime={itemForDisplay.pooledResetTime}
+          quotaStats={
+            itemForDisplay.pooledRemaining !== undefined ||
+            itemForDisplay.pooledLimit !== undefined ||
+            itemForDisplay.pooledResetTime !== undefined
+              ? {
+                  remaining: itemForDisplay.pooledRemaining,
+                  limit: itemForDisplay.pooledLimit,
+                  resetTime: itemForDisplay.pooledResetTime,
+                }
+              : undefined
+          }
         />
       )}
       {itemForDisplay.type === 'model_stats' && (
@@ -137,9 +145,17 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           userEmail={itemForDisplay.userEmail}
           tier={itemForDisplay.tier}
           currentModel={itemForDisplay.currentModel}
-          pooledRemaining={itemForDisplay.pooledRemaining}
-          pooledLimit={itemForDisplay.pooledLimit}
-          pooledResetTime={itemForDisplay.pooledResetTime}
+          quotaStats={
+            itemForDisplay.pooledRemaining !== undefined ||
+            itemForDisplay.pooledLimit !== undefined ||
+            itemForDisplay.pooledResetTime !== undefined
+              ? {
+                  remaining: itemForDisplay.pooledRemaining,
+                  limit: itemForDisplay.pooledLimit,
+                  resetTime: itemForDisplay.pooledResetTime,
+                }
+              : undefined
+          }
         />
       )}
       {itemForDisplay.type === 'tool_stats' && <ToolStatsDisplay />}

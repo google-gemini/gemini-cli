@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -38,8 +38,9 @@ import { RipgrepFallbackEvent } from '../telemetry/types.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { ACTIVATE_SKILL_TOOL_NAME } from '../tools/tool-names.js';
 import type { SkillDefinition } from '../skills/skillLoader.js';
+import type { McpClientManager } from '../tools/mcp-client-manager.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
-import { DEFAULT_GEMINI_MODEL, PREVIEW_GEMINI_MODEL } from './models.js';
+import { DEFAULT_GEMINI_MODEL } from './models.js';
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -196,7 +197,9 @@ import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import type { CodeAssistServer } from '../code_assist/server.js';
 import { ContextManager } from '../services/contextManager.js';
-import { UserTierId } from 'src/code_assist/types.js';
+import { UserTierId } from '../code_assist/types.js';
+import type { ModelConfigService } from '../services/modelConfigService.js';
+import type { ModelConfigServiceConfig } from '../services/modelConfigService.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
 
@@ -246,7 +249,7 @@ describe('Server Config (config.ts)', () => {
   describe('initialize', () => {
     it('should throw an error if checkpointing is enabled and GitService fails', async () => {
       const gitError = new Error('Git is not installed');
-      (GitService.prototype.initialize as Mock).mockRejectedValue(gitError);
+      vi.mocked(GitService.prototype.initialize).mockRejectedValue(gitError);
 
       const config = new Config({
         ...baseParams,
@@ -258,7 +261,7 @@ describe('Server Config (config.ts)', () => {
 
     it('should not throw an error if checkpointing is disabled and GitService fails', async () => {
       const gitError = new Error('Git is not installed');
-      (GitService.prototype.initialize as Mock).mockRejectedValue(gitError);
+      vi.mocked(GitService.prototype.initialize).mockRejectedValue(gitError);
 
       const config = new Config({
         ...baseParams,
@@ -292,13 +295,16 @@ describe('Server Config (config.ts)', () => {
       );
       let mcpStarted = false;
 
-      (McpClientManager as unknown as Mock).mockImplementation(() => ({
-        startConfiguredMcpServers: vi.fn().mockImplementation(async () => {
-          await new Promise((resolve) => setTimeout(resolve, 50));
-          mcpStarted = true;
-        }),
-        getMcpInstructions: vi.fn(),
-      }));
+      vi.mocked(McpClientManager).mockImplementation(
+        () =>
+          ({
+            startConfiguredMcpServers: vi.fn().mockImplementation(async () => {
+              await new Promise((resolve) => setTimeout(resolve, 50));
+              mcpStarted = true;
+            }),
+            getMcpInstructions: vi.fn(),
+          }) as Partial<McpClientManager> as McpClientManager,
+      );
 
       await config.initialize();
 
@@ -318,13 +324,16 @@ describe('Server Config (config.ts)', () => {
       );
       let mcpStarted = false;
 
-      (McpClientManager as unknown as Mock).mockImplementation(() => ({
-        startConfiguredMcpServers: vi.fn().mockImplementation(async () => {
-          await new Promise((resolve) => setTimeout(resolve, 50));
-          mcpStarted = true;
-        }),
-        getMcpInstructions: vi.fn(),
-      }));
+      vi.mocked(McpClientManager).mockImplementation(
+        () =>
+          ({
+            startConfiguredMcpServers: vi.fn().mockImplementation(async () => {
+              await new Promise((resolve) => setTimeout(resolve, 50));
+              mcpStarted = true;
+            }),
+            getMcpInstructions: vi.fn(),
+          }) as Partial<McpClientManager> as McpClientManager,
+      );
 
       await config.initialize();
 
@@ -447,7 +456,9 @@ describe('Server Config (config.ts)', () => {
 
       vi.mocked(createContentGeneratorConfig).mockImplementation(
         async (_: Config, authType: AuthType | undefined) =>
-          ({ authType }) as unknown as ContentGeneratorConfig,
+          ({
+            authType,
+          }) as Partial<ContentGeneratorConfig> as ContentGeneratorConfig,
       );
 
       await config.refreshAuth(AuthType.USE_GEMINI);
@@ -460,7 +471,9 @@ describe('Server Config (config.ts)', () => {
 
       vi.mocked(createContentGeneratorConfig).mockImplementation(
         async (_: Config, authType: AuthType | undefined) =>
-          ({ authType }) as unknown as ContentGeneratorConfig,
+          ({
+            authType,
+          }) as Partial<ContentGeneratorConfig> as ContentGeneratorConfig,
       );
 
       await config.refreshAuth(AuthType.USE_GEMINI);
@@ -477,7 +490,9 @@ describe('Server Config (config.ts)', () => {
 
       vi.mocked(createContentGeneratorConfig).mockImplementation(
         async (_: Config, authType: AuthType | undefined) =>
-          ({ authType }) as unknown as ContentGeneratorConfig,
+          ({
+            authType,
+          }) as Partial<ContentGeneratorConfig> as ContentGeneratorConfig,
       );
 
       await config.refreshAuth(AuthType.USE_GEMINI);
@@ -494,7 +509,9 @@ describe('Server Config (config.ts)', () => {
 
       vi.mocked(createContentGeneratorConfig).mockImplementation(
         async (_: Config, authType: AuthType | undefined) =>
-          ({ authType }) as unknown as ContentGeneratorConfig,
+          ({
+            authType,
+          }) as Partial<ContentGeneratorConfig> as ContentGeneratorConfig,
       );
 
       await config.refreshAuth(AuthType.USE_VERTEX_AI);
@@ -1256,7 +1273,7 @@ describe('setApprovalMode with folder trust', () => {
       getTool: vi.fn().mockReturnValue(undefined),
       unregisterTool: vi.fn(),
       registerTool: vi.fn(),
-    } as unknown as ReturnType<Config['getToolRegistry']>);
+    } as Partial<ToolRegistry> as ToolRegistry);
     const updateSpy = vi.spyOn(config, 'updateSystemInstructionIfInitialized');
 
     config.setApprovalMode(ApprovalMode.PLAN);
@@ -1274,7 +1291,7 @@ describe('setApprovalMode with folder trust', () => {
       getTool: vi.fn().mockReturnValue(undefined),
       unregisterTool: vi.fn(),
       registerTool: vi.fn(),
-    } as unknown as ReturnType<Config['getToolRegistry']>);
+    } as Partial<ToolRegistry> as ToolRegistry);
     const updateSpy = vi.spyOn(config, 'updateSystemInstructionIfInitialized');
 
     config.setApprovalMode(ApprovalMode.DEFAULT);
@@ -1298,11 +1315,11 @@ describe('setApprovalMode with folder trust', () => {
     });
 
     it('should register RipGrepTool when useRipgrep is true and it is available', async () => {
-      (canUseRipgrep as Mock).mockResolvedValue(true);
+      vi.mocked(canUseRipgrep).mockResolvedValue(true);
       const config = new Config({ ...baseParams, useRipgrep: true });
       await config.initialize();
 
-      const calls = (ToolRegistry.prototype.registerTool as Mock).mock.calls;
+      const calls = vi.mocked(ToolRegistry.prototype.registerTool).mock.calls;
       const wasRipGrepRegistered = calls.some(
         (call) => call[0] instanceof vi.mocked(RipGrepTool),
       );
@@ -1316,11 +1333,11 @@ describe('setApprovalMode with folder trust', () => {
     });
 
     it('should register GrepTool as a fallback when useRipgrep is true but it is not available', async () => {
-      (canUseRipgrep as Mock).mockResolvedValue(false);
+      vi.mocked(canUseRipgrep).mockResolvedValue(false);
       const config = new Config({ ...baseParams, useRipgrep: true });
       await config.initialize();
 
-      const calls = (ToolRegistry.prototype.registerTool as Mock).mock.calls;
+      const calls = vi.mocked(ToolRegistry.prototype.registerTool).mock.calls;
       const wasRipGrepRegistered = calls.some(
         (call) => call[0] instanceof vi.mocked(RipGrepTool),
       );
@@ -1334,17 +1351,17 @@ describe('setApprovalMode with folder trust', () => {
         config,
         expect.any(RipgrepFallbackEvent),
       );
-      const event = (logRipgrepFallback as Mock).mock.calls[0][1];
+      const event = vi.mocked(logRipgrepFallback).mock.calls[0][1];
       expect(event.error).toBeUndefined();
     });
 
     it('should register GrepTool as a fallback when canUseRipgrep throws an error', async () => {
       const error = new Error('ripGrep check failed');
-      (canUseRipgrep as Mock).mockRejectedValue(error);
+      vi.mocked(canUseRipgrep).mockRejectedValue(error);
       const config = new Config({ ...baseParams, useRipgrep: true });
       await config.initialize();
 
-      const calls = (ToolRegistry.prototype.registerTool as Mock).mock.calls;
+      const calls = vi.mocked(ToolRegistry.prototype.registerTool).mock.calls;
       const wasRipGrepRegistered = calls.some(
         (call) => call[0] instanceof vi.mocked(RipGrepTool),
       );
@@ -1358,7 +1375,7 @@ describe('setApprovalMode with folder trust', () => {
         config,
         expect.any(RipgrepFallbackEvent),
       );
-      const event = (logRipgrepFallback as Mock).mock.calls[0][1];
+      const event = vi.mocked(logRipgrepFallback).mock.calls[0][1];
       expect(event.error).toBe(String(error));
     });
 
@@ -1366,7 +1383,7 @@ describe('setApprovalMode with folder trust', () => {
       const config = new Config({ ...baseParams, useRipgrep: false });
       await config.initialize();
 
-      const calls = (ToolRegistry.prototype.registerTool as Mock).mock.calls;
+      const calls = vi.mocked(ToolRegistry.prototype.registerTool).mock.calls;
       const wasRipGrepRegistered = calls.some(
         (call) => call[0] instanceof vi.mocked(RipGrepTool),
       );
@@ -1514,8 +1531,11 @@ describe('Generation Config Merging (HACK)', () => {
     };
 
     const config = new Config(params);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const serviceConfig = (config.modelConfigService as any).config;
+    const serviceConfig = (
+      config.modelConfigService as Partial<ModelConfigService> as {
+        config: ModelConfigServiceConfig;
+      }
+    ).config;
 
     // Assert that the default aliases are present
     expect(serviceConfig.aliases).toEqual(DEFAULT_MODEL_CONFIGS.aliases);
@@ -1538,8 +1558,11 @@ describe('Generation Config Merging (HACK)', () => {
     };
 
     const config = new Config(params);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const serviceConfig = (config.modelConfigService as any).config;
+    const serviceConfig = (
+      config.modelConfigService as Partial<ModelConfigService> as {
+        config: ModelConfigServiceConfig;
+      }
+    ).config;
 
     // Assert that the user's aliases are present
     expect(serviceConfig.aliases).toEqual(userAliases);
@@ -1562,8 +1585,11 @@ describe('Generation Config Merging (HACK)', () => {
     };
 
     const config = new Config(params);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const serviceConfig = (config.modelConfigService as any).config;
+    const serviceConfig = (
+      config.modelConfigService as Partial<ModelConfigService> as {
+        config: ModelConfigServiceConfig;
+      }
+    ).config;
 
     // Assert that the user's aliases are used, not the defaults
     expect(serviceConfig.aliases).toEqual(userAliases);
@@ -1573,8 +1599,11 @@ describe('Generation Config Merging (HACK)', () => {
     const params: ConfigParameters = { ...baseParams };
 
     const config = new Config(params);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const serviceConfig = (config.modelConfigService as any).config;
+    const serviceConfig = (
+      config.modelConfigService as Partial<ModelConfigService> as {
+        config: ModelConfigServiceConfig;
+      }
+    ).config;
 
     // Assert that the full default config is used
     expect(serviceConfig).toEqual(DEFAULT_MODEL_CONFIGS);
@@ -1930,8 +1959,10 @@ describe('Hooks configuration', () => {
 
 describe('Config Quota & Preview Model Access', () => {
   let config: Config;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let mockCodeAssistServer: any;
+  let mockCodeAssistServer: {
+    projectId: string;
+    retrieveUserQuota: Mock;
+  };
 
   const baseParams: ConfigParameters = {
     cwd: '/tmp',
@@ -1953,7 +1984,9 @@ describe('Config Quota & Preview Model Access', () => {
       projectId: 'test-project',
       retrieveUserQuota: vi.fn(),
     };
-    vi.mocked(getCodeAssistServer).mockReturnValue(mockCodeAssistServer);
+    vi.mocked(getCodeAssistServer).mockReturnValue(
+      mockCodeAssistServer as Partial<CodeAssistServer> as CodeAssistServer,
+    );
     config = new Config(baseParams);
   });
 
@@ -2007,8 +2040,15 @@ describe('Config Quota & Preview Model Access', () => {
       config.setModel('auto-gemini-2.5');
       await config.refreshUserQuota();
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const pooled = (config as any).getPooledQuota();
+      const pooled = (
+        config as Partial<Config> as {
+          getPooledQuota: () => {
+            remaining?: number;
+            limit?: number;
+            resetTime?: string;
+          };
+        }
+      ).getPooledQuota();
       // Pro: 10 / 0.2 = 50 total.
       // Flash: 80 / 0.8 = 100 total.
       // Pooled: (10 + 80) / (50 + 100) = 90 / 150 = 0.6
@@ -2031,8 +2071,17 @@ describe('Config Quota & Preview Model Access', () => {
       config.setModel('gemini-2.5-pro');
       await config.refreshUserQuota();
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      expect((config as any).getPooledQuota()).toEqual({});
+      expect(
+        (
+          config as Partial<Config> as {
+            getPooledQuota: () => {
+              remaining?: number;
+              limit?: number;
+              resetTime?: string;
+            };
+          }
+        ).getPooledQuota(),
+      ).toEqual({});
     });
 
     it('should update hasAccessToPreviewModel to false if buckets are undefined', async () => {
@@ -2060,6 +2109,73 @@ describe('Config Quota & Preview Model Access', () => {
     });
   });
 
+  describe('refreshUserQuotaIfStale', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2025-01-01T00:00:00Z'));
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('should refresh quota if stale', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
+        buckets: [],
+      });
+
+      // First call to initialize lastQuotaFetchTime
+      await config.refreshUserQuota();
+      expect(mockCodeAssistServer.retrieveUserQuota).toHaveBeenCalledTimes(1);
+
+      // Advance time by 31 seconds (default TTL is 30s)
+      vi.setSystemTime(Date.now() + 31_000);
+
+      await config.refreshUserQuotaIfStale();
+      expect(mockCodeAssistServer.retrieveUserQuota).toHaveBeenCalledTimes(2);
+    });
+
+    it('should not refresh quota if fresh', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
+        buckets: [],
+      });
+
+      // First call
+      await config.refreshUserQuota();
+      expect(mockCodeAssistServer.retrieveUserQuota).toHaveBeenCalledTimes(1);
+
+      // Advance time by only 10 seconds
+      vi.setSystemTime(Date.now() + 10_000);
+
+      await config.refreshUserQuotaIfStale();
+      expect(mockCodeAssistServer.retrieveUserQuota).toHaveBeenCalledTimes(1);
+    });
+
+    it('should respect custom staleMs', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
+        buckets: [],
+      });
+
+      // First call
+      await config.refreshUserQuota();
+      expect(mockCodeAssistServer.retrieveUserQuota).toHaveBeenCalledTimes(1);
+
+      // Advance time by 5 seconds
+      vi.setSystemTime(Date.now() + 5_000);
+
+      // Refresh with 2s staleMs -> should refresh
+      await config.refreshUserQuotaIfStale(2_000);
+      expect(mockCodeAssistServer.retrieveUserQuota).toHaveBeenCalledTimes(2);
+
+      // Advance by another 5 seconds
+      vi.setSystemTime(Date.now() + 5_000);
+
+      // Refresh with 10s staleMs -> should NOT refresh
+      await config.refreshUserQuotaIfStale(10_000);
+      expect(mockCodeAssistServer.retrieveUserQuota).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe('getUserTier and getUserTierName', () => {
     it('should return undefined if contentGenerator is not initialized', () => {
       const config = new Config(baseParams);
@@ -2079,7 +2195,7 @@ describe('Config Quota & Preview Model Access', () => {
       vi.mocked(createContentGenerator).mockResolvedValue({
         userTier: mockTier,
         userTierName: mockTierName,
-      } as unknown as CodeAssistServer);
+      } as Partial<CodeAssistServer> as CodeAssistServer);
 
       await config.refreshAuth(AuthType.USE_GEMINI);
 
@@ -2131,8 +2247,8 @@ describe('Config JIT Initialization', () => {
         .mockReturnValue('Environment Memory\n\nMCP Instructions'),
       getLoadedPaths: vi.fn().mockReturnValue(new Set(['/path/to/GEMINI.md'])),
     };
-    (ContextManager as unknown as Mock).mockImplementation(
-      () => mockContextManager,
+    vi.mocked(ContextManager).mockImplementation(
+      () => mockContextManager as Partial<ContextManager> as ContextManager,
     );
   });
 

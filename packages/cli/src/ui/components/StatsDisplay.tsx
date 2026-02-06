@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -30,6 +30,7 @@ import {
   isAutoModel,
 } from '@google/gemini-cli-core';
 import { useSettings } from '../contexts/SettingsContext.js';
+import type { QuotaStats } from '../types.js';
 
 // A more flexible and powerful StatRow component
 interface StatRowProps {
@@ -211,13 +212,9 @@ const ModelUsageTable: React.FC<{
             <Text color={theme.text.primary}>
               Usage limits span all sessions and reset daily.
             </Text>
-            {pooledRemaining === 0 ? (
+            {pooledRemaining === 0 && (
               <Text color={theme.text.primary}>
                 Please /auth to upgrade or switch to an API key to continue.
-              </Text>
-            ) : (
-              <Text color={theme.text.primary}>
-                /auth to upgrade or switch to API key.
               </Text>
             )}
             <Text color={theme.text.primary}>
@@ -404,9 +401,7 @@ interface StatsDisplayProps {
   userEmail?: string;
   tier?: string;
   currentModel?: string;
-  pooledRemaining?: number;
-  pooledLimit?: number;
-  pooledResetTime?: string;
+  quotaStats?: QuotaStats;
 }
 
 export const StatsDisplay: React.FC<StatsDisplayProps> = ({
@@ -417,15 +412,18 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
   userEmail,
   tier,
   currentModel,
-  pooledRemaining,
-  pooledLimit,
-  pooledResetTime,
+  quotaStats,
 }) => {
   const { stats } = useSessionStats();
   const { metrics } = stats;
   const { models, tools, files } = metrics;
   const computed = computeSessionStats(metrics);
   const settings = useSettings();
+
+  const pooledRemaining = quotaStats?.remaining;
+  const pooledLimit = quotaStats?.limit;
+  const pooledResetTime = quotaStats?.resetTime;
+
   const showUserIdentity = settings.merged.ui.showUserIdentity;
 
   const successThresholds = {
@@ -458,7 +456,7 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
       borderStyle="round"
       borderColor={theme.border.default}
       flexDirection="column"
-      paddingY={1}
+      paddingTop={1}
       paddingX={2}
       overflow="hidden"
     >

@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -161,6 +161,12 @@ export interface HistoryItemQuotaBase extends HistoryItemBase {
   pooledRemaining?: number;
   pooledLimit?: number;
   pooledResetTime?: string;
+}
+
+export interface QuotaStats {
+  remaining: number | undefined;
+  limit: number | undefined;
+  resetTime?: string;
 }
 
 export type HistoryItemStats = HistoryItemQuotaBase & {

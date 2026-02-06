@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -10,6 +10,7 @@ import type {
   ThoughtSummary,
   ConsoleMessageItem,
   ConfirmationRequest,
+  QuotaStats,
   LoopDetectionConfirmationRequest,
   HistoryItemWithoutId,
   StreamingState,
@@ -52,6 +53,13 @@ import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import { type RestartReason } from '../hooks/useIdeTrustListener.js';
 import type { TerminalBackgroundColor } from '../utils/terminalCapabilityManager.js';
 import type { BackgroundShell } from '../hooks/shellCommandProcessor.js';
+
+export interface QuotaState {
+  userTier: UserTierId | undefined;
+  stats: QuotaStats | undefined;
+  proQuotaRequest: ProQuotaDialogRequest | null;
+  validationRequest: ValidationDialogRequest | null;
+}
 
 export interface UIState {
   history: HistoryItem[];
@@ -119,12 +127,7 @@ export interface UIState {
   queueErrorMessage: string | null;
   showApprovalModeIndicator: ApprovalMode;
   // Quota-related state
-  userTier: UserTierId | undefined;
-  quotaRemaining: number | undefined;
-  quotaLimit: number | undefined;
-  quotaResetTime: string | undefined;
-  proQuotaRequest: ProQuotaDialogRequest | null;
-  validationRequest: ValidationDialogRequest | null;
+  quota: QuotaState;
   currentModel: string;
   contextFileNames: string[];
   errorCount: number;

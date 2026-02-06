@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -148,6 +148,12 @@ const baseMockUiState = {
   activePtyId: undefined,
   backgroundShells: new Map(),
   backgroundShellHeight: 0,
+  quota: {
+    userTier: undefined,
+    stats: undefined,
+    proQuotaRequest: null,
+    validationRequest: null,
+  },
 };
 
 export const mockAppState: AppState = {

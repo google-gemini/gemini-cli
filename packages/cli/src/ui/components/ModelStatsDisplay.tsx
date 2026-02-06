@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -22,6 +22,7 @@ import {
   QUOTA_THRESHOLD_HIGH,
   QUOTA_THRESHOLD_MEDIUM,
 } from '../utils/displayUtils.js';
+import type { QuotaStats } from '../types.js';
 
 interface StatRowData {
   metric: string;
@@ -36,9 +37,7 @@ interface ModelStatsDisplayProps {
   userEmail?: string;
   tier?: string;
   currentModel?: string;
-  pooledRemaining?: number;
-  pooledLimit?: number;
-  pooledResetTime?: string;
+  quotaStats?: QuotaStats;
 }
 
 export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
@@ -46,11 +45,14 @@ export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
   userEmail,
   tier,
   currentModel,
-  pooledRemaining,
-  pooledLimit,
-  pooledResetTime,
+  quotaStats,
 }) => {
   const { stats } = useSessionStats();
+
+  const pooledRemaining = quotaStats?.remaining;
+  const pooledLimit = quotaStats?.limit;
+  const pooledResetTime = quotaStats?.resetTime;
+
   const { models } = stats.metrics;
   const settings = useSettings();
   const showUserIdentity = settings.merged.ui.showUserIdentity;
@@ -63,7 +65,7 @@ export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
       <Box
         borderStyle="round"
         borderColor={theme.border.default}
-        paddingY={1}
+        paddingTop={1}
         paddingX={2}
       >
         <Text color={theme.text.primary}>
@@ -247,7 +249,7 @@ export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
       borderStyle="round"
       borderColor={theme.border.default}
       flexDirection="column"
-      paddingY={1}
+      paddingTop={1}
       paddingX={2}
     >
       <Text bold color={theme.text.accent}>
@@ -299,13 +301,9 @@ export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
             <Text color={theme.text.primary}>
               Usage limits span all sessions and reset daily.
             </Text>
-            {pooledRemaining === 0 ? (
+            {pooledRemaining === 0 && (
               <Text color={theme.text.primary}>
                 Please /auth to upgrade or switch to an API key to continue.
-              </Text>
-            ) : (
-              <Text color={theme.text.primary}>
-                /auth to upgrade or switch to API key.
               </Text>
             )}
           </Box>

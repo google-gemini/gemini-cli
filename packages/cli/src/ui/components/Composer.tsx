@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -60,8 +60,8 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     Boolean(uiState.authConsentRequest) ||
     (uiState.confirmUpdateExtensionRequests?.length ?? 0) > 0 ||
     Boolean(uiState.loopDetectionConfirmationRequest) ||
-    Boolean(uiState.proQuotaRequest) ||
-    Boolean(uiState.validationRequest) ||
+    Boolean(uiState.quota.proQuotaRequest) ||
+    Boolean(uiState.quota.validationRequest) ||
     Boolean(uiState.customDialog);
   const showLoadingIndicator =
     (!uiState.embeddedShellFocused || uiState.isBackgroundShellVisible) &&

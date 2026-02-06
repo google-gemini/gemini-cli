@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -89,6 +89,12 @@ describe('App', () => {
       warningText: '',
     },
     backgroundShells: new Map(),
+    quota: {
+      userTier: undefined,
+      stats: undefined,
+      proQuotaRequest: null,
+      validationRequest: null,
+    },
   };
 
   it('should render main content and composer when not quitting', () => {

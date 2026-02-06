@@ -24,6 +24,5 @@ exports[`<SessionSummaryDisplay /> > renders the summary display with a title 1`
 │  gemini-2.5-pro                10            500           500          2,000                    │
 │                                                                                                  │
 │  Savings Highlight: 500 (50.0%) of input tokens were served from the cache, reducing costs.      │
-│                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
 `;

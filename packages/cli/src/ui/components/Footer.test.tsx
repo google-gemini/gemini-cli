@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -136,8 +136,16 @@ describe('<Footer />', () => {
       width: 120,
       uiState: {
         sessionStats: mockSessionStats,
-        quotaRemaining: 15,
-        quotaLimit: 100,
+        quota: {
+          userTier: undefined,
+          stats: {
+            remaining: 15,
+            limit: 100,
+            resetTime: undefined,
+          },
+          proQuotaRequest: null,
+          validationRequest: null,
+        },
       },
     });
     expect(lastFrame()).toContain('/stats 15% usage remaining');
@@ -148,8 +156,16 @@ describe('<Footer />', () => {
       width: 120,
       uiState: {
         sessionStats: mockSessionStats,
-        quotaRemaining: 85,
-        quotaLimit: 100,
+        quota: {
+          userTier: undefined,
+          stats: {
+            remaining: 85,
+            limit: 100,
+            resetTime: undefined,
+          },
+          proQuotaRequest: null,
+          validationRequest: null,
+        },
       },
     });
     expect(lastFrame()).not.toContain('Usage remaining');
