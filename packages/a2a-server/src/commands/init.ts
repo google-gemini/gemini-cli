@@ -138,7 +138,7 @@ export class InitCommand implements Command {
       process.env['CODER_AGENT_WORKSPACE_PATH']!,
       'GEMINI.md',
     );
-    const replace = _args.includes('replace');
+    const replace = _args.length === 1 && _args[0] === 'replace';
     const result = performInit(fs.existsSync(geminiMdPath), replace);
 
     const taskId = uuidv4();

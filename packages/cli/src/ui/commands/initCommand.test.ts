@@ -90,6 +90,41 @@ describe('initCommand', () => {
     );
   });
 
+  it('should pass true for replace when argument is exactly "replace"', async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    const result = await initCommand.action!(mockContext, 'replace');
+
+    // Should NOT show the "already exists" message because replace=true
+    expect(result).not.toEqual(
+      expect.objectContaining({
+        type: 'message',
+        messageType: 'info',
+      }),
+    );
+    // Should proceed to create file (submit_prompt)
+    expect(fs.writeFileSync).toHaveBeenCalled();
+  });
+
+  it('should pass false for replace when argument is "replace me" or other mismatch', async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+
+    // Case: "replace me"
+    let result = await initCommand.action!(mockContext, 'replace me');
+    expect(result).toEqual({
+      type: 'message',
+      messageType: 'info',
+      content: expect.stringContaining('already exists'),
+    });
+
+    // Case: "init" (empty args - usually empty string)
+    result = await initCommand.action!(mockContext, '');
+    expect(result).toEqual({
+      type: 'message',
+      messageType: 'info',
+      content: expect.stringContaining('already exists'),
+    });
+  });
+
   it('should return an error if config is not available', async () => {
     // Arrange: Create a context without config
     const noConfigContext = createMockCommandContext();
