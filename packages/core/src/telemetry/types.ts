@@ -1376,6 +1376,49 @@ export class ToolOutputTruncatedEvent implements BaseTelemetryEvent {
   }
 }
 
+export const EVENT_TOOL_OUTPUT_MASKING = 'gemini_cli.tool_output_masking';
+
+export class ToolOutputMaskingEvent implements BaseTelemetryEvent {
+  'event.name': 'tool_output_masking';
+  'event.timestamp': string;
+  tokens_before: number;
+  tokens_after: number;
+  masked_count: number;
+  total_prunable_tokens: number;
+
+  constructor(details: {
+    tokens_before: number;
+    tokens_after: number;
+    masked_count: number;
+    total_prunable_tokens: number;
+  }) {
+    this['event.name'] = 'tool_output_masking';
+    this['event.timestamp'] = new Date().toISOString();
+    this.tokens_before = details.tokens_before;
+    this.tokens_after = details.tokens_after;
+    this.masked_count = details.masked_count;
+    this.total_prunable_tokens = details.total_prunable_tokens;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_TOOL_OUTPUT_MASKING,
+      'event.timestamp': this['event.timestamp'],
+      tokens_before: this.tokens_before,
+      tokens_after: this.tokens_after,
+      masked_count: this.masked_count,
+      total_prunable_tokens: this.total_prunable_tokens,
+    };
+  }
+
+  toLogBody(): string {
+    return `Tool output masking (Masked ${this.masked_count} tool outputs. Saved ${
+      this.tokens_before - this.tokens_after
+    } tokens)`;
+  }
+}
+
 export const EVENT_EXTENSION_UNINSTALL = 'gemini_cli.extension_uninstall';
 export class ExtensionUninstallEvent implements BaseTelemetryEvent {
   'event.name': 'extension_uninstall';
@@ -1602,6 +1645,7 @@ export type TelemetryEvent =
   | LlmLoopCheckEvent
   | StartupStatsEvent
   | WebFetchFallbackAttemptEvent
+  | ToolOutputMaskingEvent
   | EditStrategyEvent
   | PlanExecutionEvent
   | RewindEvent
