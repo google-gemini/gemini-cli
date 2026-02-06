@@ -369,20 +369,32 @@ the main release file once service account permissions are sorted out.
 
 ## Release validation
 
-After pushing a new release smoke testing should be performed to ensure that the
-packages are working as expected. This can be done by installing the packages
-locally and running a set of tests to ensure that they are functioning
-correctly.
+Every release is automatically validated immediately after publication to NPM.
+This automated gate ensures that the artifacts available to users are functional
+and contain all required files.
+
+### Automated verification
+
+The release workflows (`nightly`, `promote`, `patch`, and `manual`) include a
+mandatory verification step that runs after a successful publish. This step:
+
+1.  **Installs from NPM:** Downloads and installs the newly published version
+    from the NPM registry.
+2.  **Smoke tests:** Verifies the `gemini --version` command returns the correct
+    version string for both global installs and `npx` execution.
+3.  **Integration tests:** Runs the complete integration test suite against the
+    installed binary to detect packaging issues (for example, missing assets or
+    dependency conflicts).
+
+### Manual smoke testing
+
+While the core logic is automated, we still recommend a quick manual check to
+verify the UX "feel."
 
 - `npx -y @google/gemini-cli@latest --version` to validate the push worked as
-  expected if you were not doing a rc or dev tag
-- `npx -y @google/gemini-cli@<release tag> --version` to validate the tag pushed
-  appropriately
-- _This is destructive locally_
-  `npm uninstall @google/gemini-cli && npm uninstall -g @google/gemini-cli && npm cache clean --force &&  npm install @google/gemini-cli@<version>`
-- Smoke testing a basic run through of exercising a few llm commands and tools
-  is recommended to ensure that the packages are working as expected. We'll
-  codify this more in the future.
+  expected.
+- Execute a few basic commands and tools to ensure interactive elements (like
+  spinners and colors) look correct in your specific terminal environment.
 
 ## Local testing and validation: Changes to the packaging and publishing process
 

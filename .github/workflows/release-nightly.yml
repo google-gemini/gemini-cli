@@ -137,6 +137,17 @@ jobs:
           core-package-name: '${{ vars.CORE_PACKAGE_NAME }}'
           a2a-package-name: '${{ vars.A2A_PACKAGE_NAME }}'
 
+      - name: 'Verify Release'
+        if: "${{ steps.vars.outputs.is_dry_run != 'true' }}"
+        uses: './.github/actions/verify-release'
+        with:
+          npm-package: '${{ vars.CLI_PACKAGE_NAME }}@${{ steps.nightly_version.outputs.NPM_TAG }}'
+          expected-version: '${{ steps.nightly_version.outputs.RELEASE_VERSION }}'
+          npm-registry-url: '${{ vars.NPM_REGISTRY_URL }}'
+          npm-registry-scope: '${{ vars.NPM_REGISTRY_SCOPE }}'
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+
       - name: 'Create and Merge Pull Request'
         if: "github.event.inputs.environment != 'dev'"
         uses: './.github/actions/create-pull-request'

@@ -122,6 +122,17 @@ jobs:
           core-package-name: '${{ vars.CORE_PACKAGE_NAME }}'
           a2a-package-name: '${{ vars.A2A_PACKAGE_NAME }}'
 
+      - name: 'Verify Release'
+        if: '${{ github.event.inputs.dry_run == false }}'
+        uses: './.github/actions/verify-release'
+        with:
+          npm-package: '${{ vars.CLI_PACKAGE_NAME }}@${{ github.event.inputs.npm_channel }}'
+          expected-version: '${{ steps.release_info.outputs.RELEASE_VERSION }}'
+          npm-registry-url: '${{ vars.NPM_REGISTRY_URL }}'
+          npm-registry-scope: '${{ vars.NPM_REGISTRY_SCOPE }}'
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+
       - name: 'Create Issue on Failure'
         if: '${{ failure() && github.event.inputs.dry_run == false }}'
         env:

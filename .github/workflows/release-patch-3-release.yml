@@ -195,6 +195,17 @@ jobs:
           a2a-package-name: '${{ vars.A2A_PACKAGE_NAME }}'
           working-directory: './release'
 
+      - name: 'Verify Release'
+        if: '${{ github.event.inputs.dry_run == false }}'
+        uses: './.github/actions/verify-release'
+        with:
+          npm-package: '${{ vars.CLI_PACKAGE_NAME }}@${{ steps.patch_version.outputs.NPM_TAG }}'
+          expected-version: '${{ steps.patch_version.outputs.RELEASE_VERSION }}'
+          npm-registry-url: '${{ vars.NPM_REGISTRY_URL }}'
+          npm-registry-scope: '${{ vars.NPM_REGISTRY_SCOPE }}'
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
+
       - name: 'Create Issue on Failure'
         if: '${{ failure() && github.event.inputs.dry_run == false }}'
         env:

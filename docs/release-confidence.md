@@ -39,14 +39,22 @@ All workflows in `.github/workflows/chained_e2e.yml` must pass.
 - **Sandboxing:** Tests must pass with both `sandbox:none` and `sandbox:docker`
   on Linux.
 
-### 3. Post-deployment smoke tests
+### 3. Post-deployment verification
 
-After a release is published to npm, the `smoke-test.yml` workflow runs. This
-must pass to confirm the package is installable and the binary is executable.
+After a release is successfully published to NPM, an automated verification step
+immediately runs as part of the release workflow. This step confirms the package
+is correctly distributed and functional in a clean environment.
 
-- **Command:** `npx -y @google/gemini-cli@<tag> --version` must return the
-  correct version without error.
-- **Platform:** Currently runs on `ubuntu-latest`.
+- **Check:**
+  1.  Installs the package globally from the live NPM registry.
+  2.  Verifies the binary executes and reports the correct version:
+      `gemini --version`
+  3.  Executes the full suite of integration tests against the installed binary
+      to catch packaging regressions.
+- **Platforms:** Currently validated on **Linux, macOS, and Windows** (via
+  `.github/actions/verify-release`).
+- **Failure Handling:** If verification fails, the release workflow terminates
+  with an error, and a high-priority GitHub issue is automatically created.
 
 ## Level 2: Manual verification and dogfooding
 
