@@ -690,5 +690,58 @@ describe('ChatRecordingService', () => {
       expect(result[1].inlineData).toBeDefined();
       expect(result[1].inlineData!.mimeType).toBe('image/png');
     });
+
+    it('should handle parts appearing BEFORE the functionResponse in a content block', () => {
+      chatRecordingService.initialize();
+      const callId = 'prefix-part-call';
+
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: '',
+        model: 'gemini-pro',
+      });
+
+      chatRecordingService.recordToolCalls('gemini-pro', [
+        {
+          id: callId,
+          name: 'read_file',
+          args: { path: 'test.txt' },
+          result: [],
+          status: 'success',
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+
+      const history: Content[] = [
+        {
+          role: 'user',
+          parts: [
+            { text: 'Prefix metadata or text' },
+            {
+              functionResponse: {
+                name: 'read_file',
+                id: callId,
+                response: { output: 'file content' },
+              },
+            },
+          ],
+        },
+      ];
+
+      chatRecordingService.updateMessagesFromHistory(history);
+
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      const conversation = JSON.parse(
+        fs.readFileSync(sessionFile, 'utf8'),
+      ) as ConversationRecord;
+
+      const lastMsg = conversation.messages[0] as MessageRecord & {
+        type: 'gemini';
+      };
+      const result = lastMsg.toolCalls![0].result as Part[];
+      expect(result).toHaveLength(2);
+      expect(result[0].text).toBe('Prefix metadata or text');
+      expect(result[1].functionResponse!.id).toBe(callId);
+    });
   });
 });

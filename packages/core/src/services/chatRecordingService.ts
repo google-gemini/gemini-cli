@@ -612,18 +612,25 @@ export class ChatRecordingService {
         const partsMap = new Map<string, Part[]>();
         for (const content of history) {
           if (content.role === 'user' && content.parts) {
-            let currentCallId: string | undefined;
+            // Find all unique call IDs in this message
+            const callIds = content.parts
+              .map((p) => p.functionResponse?.id)
+              .filter((id): id is string => !!id);
+
+            if (callIds.length === 0) continue;
+
+            // Use the first ID as a seed to capture any "leading" non-ID parts
+            // in this specific content block.
+            let currentCallId = callIds[0];
             for (const part of content.parts) {
-              if (part.functionResponse && part.functionResponse.id) {
+              if (part.functionResponse?.id) {
                 currentCallId = part.functionResponse.id;
-                if (!partsMap.has(currentCallId)) {
-                  partsMap.set(currentCallId, []);
-                }
-                partsMap.get(currentCallId)!.push(part);
-              } else if (currentCallId) {
-                // This handles sibling parts (e.g. inlineData) for the same tool call in Gemini 2.x
-                partsMap.get(currentCallId)!.push(part);
               }
+
+              if (!partsMap.has(currentCallId)) {
+                partsMap.set(currentCallId, []);
+              }
+              partsMap.get(currentCallId)!.push(part);
             }
           }
         }
