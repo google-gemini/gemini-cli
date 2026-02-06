@@ -142,7 +142,8 @@ export class ToolOutputMaskingService {
     );
     const sessionId = config.getSessionId();
     if (sessionId) {
-      toolOutputsDir = path.join(toolOutputsDir, `session-${sessionId}`);
+      const safeSessionId = sanitizeFilenamePart(sessionId);
+      toolOutputsDir = path.join(toolOutputsDir, `session-${safeSessionId}`);
     }
     await fsPromises.mkdir(toolOutputsDir, { recursive: true });
 

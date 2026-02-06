@@ -316,5 +316,39 @@ describe('Tool Output Cleanup', () => {
       expect(remainingDirs).toContain('session-recent');
       expect(remainingDirs).not.toContain('session-old');
     });
+
+    it('should skip subdirectories with path traversal characters', async () => {
+      const settings: Settings = {
+        general: {
+          sessionRetention: {
+            enabled: true,
+            maxAge: '1d',
+          },
+        },
+      };
+
+      const toolOutputDir = path.join(testTempDir, TOOL_OUTPUTS_DIR);
+      await fs.mkdir(toolOutputDir, { recursive: true });
+
+      // Create an unsafe directory name
+      const unsafeDir = path.join(toolOutputDir, 'session-.._.._danger');
+      await fs.mkdir(unsafeDir, { recursive: true });
+
+      const debugSpy = vi
+        .spyOn(debugLogger, 'debug')
+        .mockImplementation(() => {});
+
+      await cleanupToolOutputFiles(settings, false, testTempDir);
+
+      expect(debugSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Skipping unsafe tool-output subdirectory'),
+      );
+
+      // Directory should still exist (it was skipped, not deleted)
+      const entries = await fs.readdir(toolOutputDir);
+      expect(entries).toContain('session-.._.._danger');
+
+      debugSpy.mockRestore();
+    });
   });
 });

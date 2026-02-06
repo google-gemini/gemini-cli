@@ -1176,6 +1176,30 @@ describe('fileUtils', () => {
       expect(result.outputFile).toBe(expectedOutputFile);
     });
 
+    it('should sanitize sessionId in filename/path', async () => {
+      const content = 'content';
+      const toolName = 'shell';
+      const id = '1';
+      const sessionId = '../../etc/passwd';
+
+      const result = await saveTruncatedToolOutput(
+        content,
+        toolName,
+        id,
+        tempRootDir,
+        sessionId,
+      );
+
+      // ../../etc/passwd -> ______etc_passwd
+      const expectedOutputFile = path.join(
+        tempRootDir,
+        'tool-outputs',
+        'session-______etc_passwd',
+        'shell_1.txt',
+      );
+      expect(result.outputFile).toBe(expectedOutputFile);
+    });
+
     it('should format multi-line output correctly', () => {
       const lines = Array.from({ length: 50 }, (_, i) => `line ${i}`);
       const content = lines.join('\n');

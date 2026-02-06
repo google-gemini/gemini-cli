@@ -8,6 +8,7 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import {
   debugLogger,
+  sanitizeFilenamePart,
   Storage,
   TOOL_OUTPUTS_DIR,
   type Config,
@@ -103,10 +104,11 @@ export async function cleanupExpiredSessions(
           }
 
           // ALSO cleanup tool outputs for this session
+          const safeSessionId = sanitizeFilenamePart(sessionId);
           const toolOutputDir = path.join(
             config.storage.getProjectTempDir(),
             TOOL_OUTPUTS_DIR,
-            `session-${sessionId}`,
+            `session-${safeSessionId}`,
           );
           try {
             await fs.rm(toolOutputDir, { recursive: true, force: true });
@@ -450,6 +452,15 @@ export async function cleanupToolOutputFiles(
     );
     for (const subdir of subdirs) {
       try {
+        // Security: Validate that the subdirectory name is a safe filename part
+        // and doesn't attempt path traversal.
+        if (subdir.name !== sanitizeFilenamePart(subdir.name)) {
+          debugLogger.debug(
+            `Skipping unsafe tool-output subdirectory: ${subdir.name}`,
+          );
+          continue;
+        }
+
         const subdirPath = path.join(toolOutputDir, subdir.name);
         const stat = await fs.stat(subdirPath);
 

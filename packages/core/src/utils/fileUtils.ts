@@ -638,7 +638,8 @@ export async function saveTruncatedToolOutput(
 
   let toolOutputDir = path.join(projectTempDir, TOOL_OUTPUTS_DIR);
   if (sessionId) {
-    toolOutputDir = path.join(toolOutputDir, `session-${sessionId}`);
+    const safeSessionId = sanitizeFilenamePart(sessionId);
+    toolOutputDir = path.join(toolOutputDir, `session-${safeSessionId}`);
   }
   const outputFile = path.join(toolOutputDir, fileName);
 
