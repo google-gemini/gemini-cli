@@ -5,6 +5,7 @@
  */
 
 import { describe, expect } from 'vitest';
+import { ApprovalMode } from '@google/gemini-cli-core';
 import { evalTest } from './test-helper.js';
 import {
   assertModelHasOutput,
@@ -17,9 +18,9 @@ describe('plan_mode', () => {
     experimental: { plan: true },
   };
 
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: 'should refuse file modification when in plan mode',
-    approvalMode: 'plan',
+    approvalMode: ApprovalMode.PLAN,
     params: {
       settings,
     },
@@ -56,9 +57,9 @@ describe('plan_mode', () => {
     },
   });
 
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: 'should enter plan mode when asked to create a plan',
-    approvalMode: 'default',
+    approvalMode: ApprovalMode.DEFAULT,
     params: {
       settings,
     },
@@ -73,9 +74,9 @@ describe('plan_mode', () => {
     },
   });
 
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: 'should exit plan mode when plan is complete and implementation is requested',
-    approvalMode: 'plan',
+    approvalMode: ApprovalMode.PLAN,
     params: {
       settings,
     },
@@ -90,6 +91,37 @@ describe('plan_mode', () => {
       expect(wasToolCalled, 'Expected exit_plan_mode tool to be called').toBe(
         true,
       );
+      assertModelHasOutput(result);
+    },
+  });
+
+  evalTest('USUALLY_PASSES', {
+    name: 'should allow file modification in plans directory when in plan mode',
+    approvalMode: ApprovalMode.PLAN,
+    params: {
+      settings,
+    },
+    prompt: 'Create a plan for a new login feature.',
+    assert: async (rig, result) => {
+      await rig.waitForTelemetryReady();
+      const toolLogs = rig.readToolLogs();
+
+      const writeCall = toolLogs.find(
+        (log) => log.toolRequest.name === 'write_file',
+      );
+
+      expect(
+        writeCall,
+        'Should attempt to modify a file in the plans directory when in plan mode',
+      ).toBeDefined();
+
+      if (writeCall) {
+        const args = JSON.parse(writeCall.toolRequest.args);
+        expect(args.file_path).toContain('.gemini/tmp');
+        expect(args.file_path).toContain('/plans/');
+        expect(args.file_path).toMatch(/\.md$/);
+      }
+
       assertModelHasOutput(result);
     },
   });
