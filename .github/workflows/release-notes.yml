@@ -57,18 +57,15 @@ jobs:
 
       - name: 'Generate Changelog with Gemini'
         uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
-        env:
-          VERSION: '${{ steps.release_info.outputs.VERSION }}'
-          RAW_CHANGELOG: '${{ steps.release_info.outputs.RAW_CHANGELOG }}'
         with:
           gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
           prompt: |
             Activate the 'docs-changelog' skill.
 
             **Release Information:**
-            - New Version: $VERSION
-            - Release Date: $TIME
-            - Raw Changelog Data: $RAW_CHANGELOG
+            - New Version: ${{ steps.release_info.outputs.VERSION }}
+            - Release Date: ${{ steps.release_info.outputs.TIME }}
+            - Raw Changelog Data: ${{ steps.release_info.outputs.RAW_CHANGELOG }}
 
             Execute the release notes generation process using the information provided.
 
