@@ -17,6 +17,7 @@ import {
 import type React from 'react';
 import { theme } from '../../semantic-colors.js';
 import { useBatchedScroll } from '../../hooks/useBatchedScroll.js';
+import { useUIState } from '../../contexts/UIStateContext.js';
 
 import { type DOMElement, measureElement, Box } from 'ink';
 
@@ -30,7 +31,6 @@ type VirtualizedListProps<T> = {
   initialScrollIndex?: number;
   initialScrollOffsetInIndex?: number;
   scrollbarThumbColor?: string;
-  copyModeEnabled?: boolean;
 };
 
 export type VirtualizedListRef<T> = {
@@ -79,6 +79,7 @@ function VirtualizedList<T>(
     initialScrollIndex,
     initialScrollOffsetInIndex,
   } = props;
+  const { copyModeEnabled } = useUIState();
   const dataRef = useRef(data);
   useEffect(() => {
     dataRef.current = data;
@@ -475,20 +476,20 @@ function VirtualizedList<T>(
   return (
     <Box
       ref={containerRef}
-      overflowY={props.copyModeEnabled ? 'hidden' : 'scroll'}
+      overflowY={copyModeEnabled ? 'hidden' : 'scroll'}
       overflowX="hidden"
-      scrollTop={props.copyModeEnabled ? 0 : scrollTop}
+      scrollTop={copyModeEnabled ? 0 : scrollTop}
       scrollbarThumbColor={props.scrollbarThumbColor ?? theme.text.secondary}
       width="100%"
       height="100%"
       flexDirection="column"
-      paddingRight={props.copyModeEnabled ? 0 : 1}
+      paddingRight={copyModeEnabled ? 0 : 1}
     >
       <Box
         flexShrink={0}
         width="100%"
         flexDirection="column"
-        marginTop={props.copyModeEnabled ? -scrollTop : 0}
+        marginTop={copyModeEnabled ? -scrollTop : 0}
       >
         <Box height={topSpacerHeight} flexShrink={0} />
         {renderedItems}

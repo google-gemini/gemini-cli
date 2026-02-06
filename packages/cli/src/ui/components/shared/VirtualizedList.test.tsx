@@ -16,6 +16,13 @@ import {
   useState,
 } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { UIState } from '../../contexts/UIStateContext.js';
+
+vi.mock('../../contexts/UIStateContext.js', () => ({
+  useUIState: vi.fn(() => ({
+    copyModeEnabled: false,
+  })),
+}));
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -326,6 +333,11 @@ describe('<VirtualizedList />', () => {
   });
 
   it('renders correctly in copyModeEnabled when scrolled', async () => {
+    const { useUIState } = await import('../../contexts/UIStateContext.js');
+    vi.mocked(useUIState).mockReturnValue({
+      copyModeEnabled: true,
+    } as Partial<UIState> as UIState);
+
     const longData = Array.from({ length: 100 }, (_, i) => `Item ${i}`);
     // Use copy mode
     const { lastFrame } = render(
@@ -340,7 +352,6 @@ describe('<VirtualizedList />', () => {
           keyExtractor={(item) => item}
           estimatedItemHeight={() => 1}
           initialScrollIndex={50}
-          copyModeEnabled={true}
         />
       </Box>,
     );
