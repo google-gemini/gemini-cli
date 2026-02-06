@@ -895,6 +895,8 @@ export class Config {
     }
     this.initialized = true;
 
+    await this.storage.initialize();
+
     // Add pending directories to workspace context
     for (const dir of this.pendingIncludeDirectories) {
       this.workspaceContext.addDirectory(dir);
