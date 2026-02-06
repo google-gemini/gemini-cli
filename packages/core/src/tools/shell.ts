@@ -44,6 +44,7 @@ import {
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { SHELL_DEFINITION } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
@@ -544,9 +545,19 @@ export class ShellTool extends BaseDeclarativeTool<
     );
   }
 
-  override getSchema(_modelId?: string) {
-    // Pure refactor: maintain existing behavior.
-    // getSchema(modelId) is now available for future model-specific overrides.
-    return super.getSchema();
+  override getSchema(modelId?: string) {
+    if (!modelId) {
+      return super.getSchema();
+    }
+
+    const declaration = resolveToolDeclaration(SHELL_DEFINITION, modelId);
+    const schema = super.getSchema();
+
+    // We use the resolved declaration but preserve the dynamic platform-specific description
+    // from the tool instance to ensure behavior remains 100% identical for now.
+    return {
+      ...declaration,
+      description: schema.description,
+    };
   }
 }
