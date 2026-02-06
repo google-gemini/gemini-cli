@@ -61,3 +61,10 @@ gemini-debug.log
 .gemini-clipboard/
 .eslintcache
 evals/logs/
+
+# Internal documentation (not for public release)
+ROADMAP.md
+TEST_IMPROVEMENTS.md
+VOICE_*.md
+AGENTS.md
+docs/voice-input-infinite-loop-fix.md
