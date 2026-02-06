@@ -1856,7 +1856,7 @@ ${JSON.stringify(
 
       expect(mockGetCoreSystemPrompt).toHaveBeenCalledWith(
         mockConfig,
-        'Global JIT Memory',
+        'Full JIT Memory',
       );
     });
 

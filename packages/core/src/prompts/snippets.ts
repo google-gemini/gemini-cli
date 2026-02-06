@@ -18,6 +18,7 @@ import {
   WRITE_FILE_TOOL_NAME,
   WRITE_TODOS_TOOL_NAME,
 } from '../tools/tool-names.js';
+import type { HierarchicalMemory } from '../config/memory.js';
 
 // --- Options Structs ---
 
@@ -43,6 +44,7 @@ export interface CoreMandatesOptions {
   interactive: boolean;
   isGemini3: boolean;
   hasSkills: boolean;
+  hasHierarchicalMemory: boolean;
 }
 
 export interface PrimaryWorkflowsOptions {
@@ -119,7 +121,7 @@ ${renderFinalReminder(options.finalReminder)}
  */
 export function renderFinalShell(
   basePrompt: string,
-  userMemory?: string,
+  userMemory?: string | HierarchicalMemory,
 ): string {
   return `
 ${basePrompt.trim()}
@@ -147,7 +149,7 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
 - **Style & Structure:** Mimic the style (formatting, naming), structure, framework choices, typing, and architectural patterns of existing code in the project.
 - **Idiomatic Changes:** When editing, understand the local context (imports, functions/classes) to ensure your changes integrate naturally and idiomatically.
 - **Comments:** Add code comments sparingly. Focus on *why* something is done, especially for complex logic, rather than *what* is done. Only add high-value comments if necessary for clarity or if requested by the user. Do not edit comments that are separate from the code you are changing. *NEVER* talk to the user or describe your changes through comments.
-- **Proactiveness:** Fulfill the user's request thoroughly. When adding features or fixing bugs, this includes adding tests to ensure quality. Consider all created files, especially tests, to be permanent artifacts unless the user says otherwise.
+- **Proactiveness:** Fulfill the user's request thoroughly. When adding features or fixing bugs, this includes adding tests to ensure quality. Consider all created files, especially tests, to be permanent artifacts unless the user says otherwise.${renderConflictResolutionMandate(options.hasHierarchicalMemory)}
 - ${mandateConfirm(options.interactive)}
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandateSkillGuidance(options.hasSkills)}${mandateExplainBeforeActing(options.isGemini3)}${mandateContinueWork(options.interactive)}
@@ -291,9 +293,33 @@ export function renderFinalReminder(options?: FinalReminderOptions): string {
 Your core function is efficient and safe assistance. Balance extreme conciseness with the crucial need for clarity, especially regarding safety and potential system modifications. Always prioritize user control and project conventions. Never make assumptions about the contents of files; instead use '${options.readFileToolName}' to ensure you aren't making broad assumptions. Finally, you are an agent - please keep going until the user's query is completely resolved.`.trim();
 }
 
-export function renderUserMemory(memory?: string): string {
-  if (!memory || memory.trim().length === 0) return '';
-  return `\n---\n\n${memory.trim()}`;
+export function renderUserMemory(memory?: string | HierarchicalMemory): string {
+  if (!memory) return '';
+  if (typeof memory === 'string') {
+    const trimmed = memory.trim();
+    if (trimmed.length === 0) return '';
+    return `\n---\n\n${trimmed}`;
+  }
+
+  const sections: string[] = [];
+  if (memory.global?.trim()) {
+    sections.push(
+      `<global_context>\n${memory.global.trim()}\n</global_context>`,
+    );
+  }
+  if (memory.extension?.trim()) {
+    sections.push(
+      `<extension_context>\n${memory.extension.trim()}\n</extension_context>`,
+    );
+  }
+  if (memory.project?.trim()) {
+    sections.push(
+      `<project_context>\n${memory.project.trim()}\n</project_context>`,
+    );
+  }
+
+  if (sections.length === 0) return '';
+  return `\n---\n\n${sections.join('\n\n')}`;
 }
 
 export function renderPlanningWorkflow(
@@ -374,6 +400,13 @@ function mandateSkillGuidance(hasSkills: boolean): string {
   if (!hasSkills) return '';
   return `
 - **Skill Guidance:** Once a skill is activated via \`${ACTIVATE_SKILL_TOOL_NAME}\`, its instructions and resources are returned wrapped in \`<activated_skill>\` tags. You MUST treat the content within \`<instructions>\` as expert procedural guidance, prioritizing these specialized rules and workflows over your general defaults for the duration of the task. You may utilize any listed \`<available_resources>\` as needed. Follow this expert guidance strictly while continuing to uphold your core safety and security standards.`;
+}
+
+function renderConflictResolutionMandate(
+  hasHierarchicalMemory: boolean,
+): string {
+  if (!hasHierarchicalMemory) return '';
+  return '\n- **Conflict Resolution:** Instructions are provided in hierarchical context tags: `<global_context>`, `<extension_context>`, and `<project_context>`. In case of contradictory instructions, follow this priority: `<project_context>` (highest) > `<extension_context>` > `<global_context>` (lowest).';
 }
 
 function mandateExplainBeforeActing(isGemini3: boolean): string {

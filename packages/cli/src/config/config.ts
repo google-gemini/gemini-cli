@@ -33,16 +33,15 @@ import {
   ASK_USER_TOOL_NAME,
   getVersion,
   PREVIEW_GEMINI_MODEL_AUTO,
+  type HierarchicalMemory,
   coreEvents,
   GEMINI_MODEL_ALIAS_AUTO,
   getAdminErrorMessage,
   Config,
-} from '@google/gemini-cli-core';
-import type {
-  MCPServerConfig,
-  HookDefinition,
-  HookEventName,
-  OutputFormat,
+  type MCPServerConfig,
+  type HookDefinition,
+  type HookEventName,
+  type OutputFormat,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -479,7 +478,7 @@ export async function loadCliConfig(
 
   const experimentalJitContext = settings.experimental?.jitContext ?? false;
 
-  let memoryContent = '';
+  let memoryContent: string | HierarchicalMemory = '';
   let fileCount = 0;
   let filePaths: string[] = [];
 
