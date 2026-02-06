@@ -48,7 +48,10 @@ describe('Hooks Agent Flow', () => {
       console.error('DEBUG: BeforeAgent hook executed');
       `;
 
-      const scriptPath = join(rig.testDir!, 'before_agent_context.cjs');
+      const scriptPath = join(rig.testDir!, 'before_agent_context.cjs').replace(
+        /\\/g,
+        '/',
+      );
       writeFileSync(scriptPath, hookScript);
 
       await rig.setup('should inject additional context via BeforeAgent hook', {
@@ -113,7 +116,10 @@ describe('Hooks Agent Flow', () => {
       }
       `;
 
-      const scriptPath = join(rig.testDir!, 'after_agent_verify.cjs');
+      const scriptPath = join(rig.testDir!, 'after_agent_verify.cjs').replace(
+        /\\/g,
+        '/',
+      );
       writeFileSync(scriptPath, hookScript);
 
       await rig.setup('should receive prompt and response in AfterAgent hook', {
@@ -165,7 +171,10 @@ describe('Hooks Agent Flow', () => {
       });
 
       // BeforeModel hook to track message counts across LLM calls
-      const messageCountFile = join(rig.testDir!, 'message-counts.json');
+      const messageCountFile = join(
+        rig.testDir!,
+        'message-counts.json',
+      ).replace(/\\/g, '/');
       const beforeModelScript = `
         const fs = require('fs');
         const input = JSON.parse(fs.readFileSync(0, 'utf-8'));
@@ -179,13 +188,31 @@ describe('Hooks Agent Flow', () => {
       const beforeModelScriptPath = join(
         rig.testDir!,
         'before_model_counter.cjs',
-      );
+      ).replace(/\\/g, '/');
       writeFileSync(beforeModelScriptPath, beforeModelScript);
+
+      const afterAgentScript = `
+        console.log(JSON.stringify({
+          decision: 'block',
+          reason: 'Security policy triggered',
+          hookSpecificOutput: {
+            hookEventName: 'AfterAgent',
+            clearContext: true
+          }
+        }));
+      `;
+      const afterAgentScriptPath = join(
+        rig.testDir!,
+        'after_agent_clear.cjs',
+      ).replace(/\\/g, '/');
+      writeFileSync(afterAgentScriptPath, afterAgentScript);
 
       await rig.setup('should process clearContext in AfterAgent hook output', {
         settings: {
-          hooks: {
+          hooksConfig: {
             enabled: true,
+          },
+          hooks: {
             BeforeModel: [
               {
                 hooks: [
@@ -202,7 +229,7 @@ describe('Hooks Agent Flow', () => {
                 hooks: [
                   {
                     type: 'command',
-                    command: `node -e "console.log(JSON.stringify({decision: 'block', reason: 'Security policy triggered', hookSpecificOutput: {hookEventName: 'AfterAgent', clearContext: true}}))"`,
+                    command: `node "${afterAgentScriptPath}"`,
                     timeout: 5000,
                   },
                 ],
@@ -239,6 +266,24 @@ describe('Hooks Agent Flow', () => {
     it('should fire BeforeAgent and AfterAgent exactly once per turn despite tool calls', async () => {
       await rig.setup(
         'should fire BeforeAgent and AfterAgent exactly once per turn despite tool calls',
+      );
+
+      const beforeAgentScript = "console.log('BeforeAgent Fired')";
+      const beforeAgentScriptPath = join(
+        rig.testDir!,
+        'before_agent_loop.cjs',
+      ).replace(/\\/g, '/');
+      writeFileSync(beforeAgentScriptPath, beforeAgentScript);
+
+      const afterAgentScript = "console.log('AfterAgent Fired')";
+      const afterAgentScriptPath = join(
+        rig.testDir!,
+        'after_agent_loop.cjs',
+      ).replace(/\\/g, '/');
+      writeFileSync(afterAgentScriptPath, afterAgentScript);
+
+      await rig.setup(
+        'should fire BeforeAgent and AfterAgent exactly once per turn despite tool calls',
         {
           fakeResponsesPath: join(
             import.meta.dirname,
@@ -254,7 +299,7 @@ describe('Hooks Agent Flow', () => {
                   hooks: [
                     {
                       type: 'command',
-                      command: `node -e "console.log('BeforeAgent Fired')"`,
+                      command: `node "${beforeAgentScriptPath}"`,
                       timeout: 5000,
                     },
                   ],
@@ -265,7 +310,7 @@ describe('Hooks Agent Flow', () => {
                   hooks: [
                     {
                       type: 'command',
-                      command: `node -e "console.log('AfterAgent Fired')"`,
+                      command: `node "${afterAgentScriptPath}"`,
                       timeout: 5000,
                     },
                   ],
