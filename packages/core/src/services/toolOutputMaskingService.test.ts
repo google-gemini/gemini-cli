@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
 import {
   ToolOutputMaskingService,
   MASKING_INDICATOR_TAG,
@@ -18,24 +21,27 @@ vi.mock('../utils/tokenCalculation.js', () => ({
   estimateTokenCountSync: vi.fn(),
 }));
 
-vi.mock('node:fs/promises', () => ({
-  mkdir: vi.fn().mockResolvedValue(undefined),
-  writeFile: vi.fn().mockResolvedValue(undefined),
-}));
-
 describe('ToolOutputMaskingService', () => {
   let service: ToolOutputMaskingService;
   let mockConfig: Config;
+  let testTempDir: string;
 
   const mockedEstimateTokenCountSync = vi.mocked(estimateTokenCountSync);
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    testTempDir = await fs.promises.mkdtemp(
+      path.join(os.tmpdir(), 'tool-masking-test-'),
+    );
+
     service = new ToolOutputMaskingService();
     mockConfig = {
       storage: {
-        getHistoryDir: () => '/mock/history',
+        getHistoryDir: () => path.join(testTempDir, 'history'),
+        getProjectTempDir: () => testTempDir,
       },
+      getSessionId: () => 'mock-session',
       getUsageStatisticsEnabled: () => false,
+      getToolOutputMaskingEnabled: () => true,
       getToolOutputMaskingConfig: () => ({
         enabled: true,
         toolProtectionThreshold: 50000,
@@ -44,6 +50,13 @@ describe('ToolOutputMaskingService', () => {
       }),
     } as unknown as Config;
     vi.clearAllMocks();
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    if (testTempDir) {
+      await fs.promises.rm(testTempDir, { recursive: true, force: true });
+    }
   });
 
   it('should not mask if total tool tokens are below protection threshold', async () => {
@@ -450,12 +463,13 @@ describe('ToolOutputMaskingService', () => {
 
     // We replace the random part of the filename for deterministic snapshots
     // and normalize path separators for cross-platform compatibility
-    const deterministicResponse = response
+    const normalizedResponse = response.replace(/\\/g, '/');
+    const deterministicResponse = normalizedResponse
+      .replace(new RegExp(testTempDir.replace(/\\/g, '/'), 'g'), '/mock/temp')
       .replace(
         new RegExp(`${SHELL_TOOL_NAME}_[^\\s"]+\\.txt`, 'g'),
         `${SHELL_TOOL_NAME}_deterministic.txt`,
-      )
-      .replace(/\\/g, '/');
+      );
 
     expect(deterministicResponse).toMatchSnapshot();
   });
