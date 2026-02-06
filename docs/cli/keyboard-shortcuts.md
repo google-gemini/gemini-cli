@@ -106,16 +106,17 @@ available combinations.
 | Toggle YOLO (auto-approval) mode for tool calls.                                                      | `Ctrl + Y`                 |
 | Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only). | `Shift + Tab`              |
 | Expand a height-constrained response to show additional lines when not in alternate buffer mode.      | `Ctrl + O`<br />`Ctrl + S` |
-| Ctrl+B                                                                                                | `Ctrl + B`                 |
-| Ctrl+L                                                                                                | `Ctrl + L`                 |
-| Ctrl+K                                                                                                | `Ctrl + K`                 |
-| Enter                                                                                                 | `Enter`                    |
-| Esc                                                                                                   | `Esc`                      |
-| Shift+Tab                                                                                             | `Shift + Tab`              |
-| Tab                                                                                                   | `Tab (no Shift)`           |
-| Tab                                                                                                   | `Tab (no Shift)`           |
-| Focus the shell input from the gemini input.                                                          | `Tab (no Shift)`           |
-| Focus the Gemini input from the shell input.                                                          | `Tab`                      |
+| Toggle current background shell visibility.                                                           | `Ctrl + B`                 |
+| Toggle background shell list.                                                                         | `Ctrl + L`                 |
+| Kill the active background shell.                                                                     | `Ctrl + K`                 |
+| Confirm selection in background shell list.                                                           | `Enter`                    |
+| Dismiss background shell list.                                                                        | `Esc`                      |
+| Move focus from background shell to Gemini.                                                           | `Shift + Tab`              |
+| Move focus from background shell list to Gemini.                                                      | `Tab (no Shift)`           |
+| Show warning when trying to unfocus background shell via Tab.                                         | `Tab (no Shift)`           |
+| Show warning when trying to unfocus shell input via Tab.                                              | `Tab (no Shift)`           |
+| Move focus from Gemini to the active shell.                                                           | `Tab (no Shift)`           |
+| Move focus from the shell back to Gemini.                                                             | `Shift + Tab`              |
 | Clear the terminal screen and redraw the UI.                                                          | `Ctrl + L`                 |
 | Restart the application.                                                                              | `R`                        |
 | Suspend the application (not yet implemented).                                                        | `Ctrl + Z`                 |
