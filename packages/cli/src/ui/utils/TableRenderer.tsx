@@ -6,6 +6,12 @@
 
 import React from 'react';
 import { Text, Box } from 'ink';
+import {
+  type StyledChar,
+  toStyledCharacters,
+  styledCharsToString,
+  wrapStyledChars,
+} from 'ink';
 import { theme } from '../semantic-colors.js';
 import { RenderInline, getPlainTextLength } from './InlineMarkdownRenderer.js';
 
@@ -14,6 +20,8 @@ interface TableRendererProps {
   rows: string[][];
   terminalWidth: number;
 }
+
+const MIN_COLUMN_WIDTH = 10;
 
 /**
  * Custom table renderer for markdown tables
@@ -24,35 +32,107 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   rows,
   terminalWidth,
 }) => {
-  // Calculate column widths using actual display width after markdown processing
-  const columnWidths = headers.map((header, index) => {
+  // Clean headers: remove bold markers since we already render headers as bold
+  // and having them can break wrapping when the markers are split across lines.
+  const cleanedHeaders = headers.map((header) =>
+    header.replace(/\*\*(.*?)\*\*/g, '$1'),
+  );
+
+  // --- Step 1: Define Constraints per Column ---
+  const constraints = cleanedHeaders.map((header, colIndex) => {
     const headerWidth = getPlainTextLength(header);
-    const maxRowWidth = Math.max(
-      ...rows.map((row) => getPlainTextLength(row[index] || '')),
-    );
-    return Math.max(headerWidth, maxRowWidth) + 2; // Add padding
+
+    // Calculate max content width and max word width for this column
+    let maxContentWidth = headerWidth;
+    let maxWordWidth = 0;
+
+    // Consider header words for min width calculation to allow header wrapping
+    const headerWords = header.split(/\s+/);
+    for (const word of headerWords) {
+      const wordWidth = getPlainTextLength(word);
+      maxWordWidth = Math.max(maxWordWidth, wordWidth);
+    }
+
+    rows.forEach((row) => {
+      const cell = row[colIndex] || '';
+      const cellWidth = getPlainTextLength(cell);
+      maxContentWidth = Math.max(maxContentWidth, cellWidth);
+
+      // Find longest word to ensure it fits without splitting
+      const words = cell.split(/\s+/);
+      for (const word of words) {
+        const wordWidth = getPlainTextLength(word);
+        maxWordWidth = Math.max(maxWordWidth, wordWidth);
+      }
+    });
+
+    // min: used to guarantee minimum column width and prevent wrapping mid-word
+    // Defaults to max word width (from header or content)
+    const minWidth = maxWordWidth;
+
+    // max: used to determine how much the column can grow if space allows
+    // Ensure max is never smaller than min
+    const maxWidth = Math.max(minWidth, maxContentWidth);
+
+    return { minWidth, maxWidth };
   });
 
-  // Ensure table fits within terminal width
-  // We calculate scale based on content width vs available width (terminal - borders)
-  // First, extract content widths by removing the 2-char padding.
-  const contentWidths = columnWidths.map((width) => Math.max(0, width - 2));
-  const totalContentWidth = contentWidths.reduce(
-    (sum, width) => sum + width,
-    0,
-  );
+  // --- Step 2: Calculate Available Space ---
+  // Fixed overhead: borders (n+1) + padding (2n)
+  const fixedOverhead = cleanedHeaders.length + 1 + cleanedHeaders.length * 2;
+  const availableWidth = Math.max(0, terminalWidth - fixedOverhead - 2);
 
-  // Fixed overhead includes padding (2 per column) and separators (1 per column + 1 final).
-  const fixedOverhead = headers.length * 2 + (headers.length + 1);
+  // --- Step 3: Allocation Algorithm ---
+  const totalMinWidth = constraints.reduce((sum, c) => sum + c.minWidth, 0);
+  let finalContentWidths: number[];
 
-  // Subtract 1 from available width to avoid edge-case wrapping on some terminals
-  const availableWidth = Math.max(0, terminalWidth - fixedOverhead - 1);
+  if (totalMinWidth > availableWidth) {
+    // Case A: Not enough space even for minimums.
+    // We must scale all the columns except the ones that are very short(<=10 characters)
+    const shortColumns = constraints.filter(
+      (c) => c.maxWidth <= MIN_COLUMN_WIDTH,
+    );
+    const totalShortColumnWidth = shortColumns.reduce(
+      (sum, c) => sum + c.minWidth,
+      0,
+    );
 
-  const scaleFactor =
-    totalContentWidth > availableWidth ? availableWidth / totalContentWidth : 1;
-  const adjustedWidths = contentWidths.map(
-    (width) => Math.floor(width * scaleFactor) + 2,
-  );
+    const finalTotalShortColumnWidth =
+      totalShortColumnWidth >= availableWidth ? 0 : totalShortColumnWidth;
+
+    const scale =
+      (availableWidth - finalTotalShortColumnWidth) /
+      (totalMinWidth - finalTotalShortColumnWidth);
+    finalContentWidths = constraints.map((c) => {
+      if (c.maxWidth <= MIN_COLUMN_WIDTH && finalTotalShortColumnWidth > 0) {
+        return c.minWidth;
+      }
+      return Math.floor(c.minWidth * scale);
+    });
+  } else {
+    // Case B: We have space! Distribute the surplus.
+    const surplus = availableWidth - totalMinWidth;
+    const totalGrowthNeed = constraints.reduce(
+      (sum, c) => sum + (c.maxWidth - c.minWidth),
+      0,
+    );
+
+    if (totalGrowthNeed === 0) {
+      // If nobody wants to grow, simply give everyone their min.
+      finalContentWidths = constraints.map((c) => c.minWidth);
+    } else {
+      finalContentWidths = constraints.map((c) => {
+        const growthNeed = c.maxWidth - c.minWidth;
+        // Calculate share: (My Need / Total Need) * Surplus
+        const share = growthNeed / totalGrowthNeed;
+        const extra = Math.floor(surplus * share);
+        return c.minWidth + extra;
+      });
+    }
+  }
+
+  // Add padding (+2) to get the visual widths expected by the renderers
+  const adjustedWidths = finalContentWidths.map((w) => w + 2);
 
   // Helper function to render a cell with proper width
   const renderCell = (
@@ -63,50 +143,17 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     const contentWidth = Math.max(0, width - 2);
     const displayWidth = getPlainTextLength(content);
 
-    let cellContent = content;
-    if (displayWidth > contentWidth) {
-      if (contentWidth <= 3) {
-        // Just truncate by character count
-        cellContent = content.substring(
-          0,
-          Math.min(content.length, contentWidth),
-        );
-      } else {
-        // Truncate preserving markdown formatting using binary search
-        let left = 0;
-        let right = content.length;
-        let bestTruncated = content;
-
-        // Binary search to find the optimal truncation point
-        while (left <= right) {
-          const mid = Math.floor((left + right) / 2);
-          const candidate = content.substring(0, mid);
-          const candidateWidth = getPlainTextLength(candidate);
-
-          if (candidateWidth <= contentWidth - 1) {
-            bestTruncated = candidate;
-            left = mid + 1;
-          } else {
-            right = mid - 1;
-          }
-        }
-
-        cellContent = bestTruncated + '…';
-      }
-    }
-
     // Calculate exact padding needed
-    const actualDisplayWidth = getPlainTextLength(cellContent);
-    const paddingNeeded = Math.max(0, contentWidth - actualDisplayWidth);
+    const paddingNeeded = Math.max(0, contentWidth - displayWidth);
 
     return (
       <Text>
         {isHeader ? (
           <Text bold color={theme.text.link}>
-            <RenderInline text={cellContent} />
+            <RenderInline text={content} />
           </Text>
         ) : (
-          <RenderInline text={cellContent} />
+          <RenderInline text={content} />
         )}
         {' '.repeat(paddingNeeded)}
       </Text>
@@ -128,8 +175,11 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     return <Text color={theme.border.default}>{border}</Text>;
   };
 
-  // Helper function to render a table row
-  const renderRow = (cells: string[], isHeader = false): React.ReactNode => {
+  // Helper function to render a single visual line of a row
+  const renderVisualRow = (
+    cells: string[],
+    isHeader = false,
+  ): React.ReactNode => {
     const renderedCells = cells.map((cell, index) => {
       const width = adjustedWidths[index] || 0;
       return renderCell(cell || '', width, isHeader);
@@ -151,21 +201,61 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     );
   };
 
+  // Handles the wrapping logic for a logical data row
+  const renderDataRow = (
+    row: string[],
+    rowIndex: number,
+    isHeader = false,
+  ): React.ReactNode => {
+    const wrappedCells = row.map((cell, colIndex) => {
+      // Get the calculated width for THIS column
+      const colWidth = adjustedWidths[colIndex];
+      const contentWidth = Math.max(1, colWidth - 2); // Subtract padding
+
+      const contentStyledChars = toStyledCharacters(cell);
+      const wrappedStyledLines = wrapStyledChars(
+        contentStyledChars,
+        contentWidth,
+      );
+
+      const finalLines = wrappedStyledLines.map((styledLine: StyledChar[]) =>
+        styledCharsToString(styledLine),
+      );
+
+      return finalLines;
+    });
+
+    const maxHeight = Math.max(...wrappedCells.map((lines) => lines.length), 1);
+
+    const visualRows: React.ReactNode[] = [];
+    for (let i = 0; i < maxHeight; i++) {
+      const visualRowCells = wrappedCells.map((lines) => lines[i] || '');
+      visualRows.push(
+        <React.Fragment key={`${rowIndex}-${i}`}>
+          {renderVisualRow(visualRowCells, isHeader)}
+        </React.Fragment>,
+      );
+    }
+
+    return <React.Fragment key={rowIndex}>{visualRows}</React.Fragment>;
+  };
+
   return (
     <Box flexDirection="column" marginY={1}>
       {/* Top border */}
       {renderBorder('top')}
 
-      {/* Header row */}
-      {renderRow(headers, true)}
+      {/* 
+      Header row
+      Keep the rowIndex as -1 to differentiate from data rows
+      */}
+      {renderDataRow(cleanedHeaders, -1, true)}
 
       {/* Middle border */}
       {renderBorder('middle')}
 
       {/* Data rows */}
-      {rows.map((row, index) => (
-        <React.Fragment key={index}>{renderRow(row)}</React.Fragment>
-      ))}
+      {rows.map((row, index) => renderDataRow(row, index))}
 
       {/* Bottom border */}
       {renderBorder('bottom')}
