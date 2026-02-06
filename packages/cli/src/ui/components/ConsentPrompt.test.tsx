@@ -67,7 +67,7 @@ describe('ConsentPrompt', () => {
     unmount();
   });
 
-  it('calls onConfirm with true when "Yes" is selected', () => {
+  it('calls onConfirm with true when "Yes" is selected', async () => {
     const prompt = 'Are you sure?';
     const { unmount } = render(
       <ConsentPrompt
@@ -78,15 +78,15 @@ describe('ConsentPrompt', () => {
     );
 
     const onSelect = MockedRadioButtonSelect.mock.calls[0][0].onSelect;
-    act(() => {
-      onSelect(true);
+    await act(async () => {
+      await onSelect(true);
     });
 
     expect(onConfirm).toHaveBeenCalledWith(true);
     unmount();
   });
 
-  it('calls onConfirm with false when "No" is selected', () => {
+  it('calls onConfirm with false when "No" is selected', async () => {
     const prompt = 'Are you sure?';
     const { unmount } = render(
       <ConsentPrompt
@@ -97,8 +97,8 @@ describe('ConsentPrompt', () => {
     );
 
     const onSelect = MockedRadioButtonSelect.mock.calls[0][0].onSelect;
-    act(() => {
-      onSelect(false);
+    await act(async () => {
+      await onSelect(false);
     });
 
     expect(onConfirm).toHaveBeenCalledWith(false);

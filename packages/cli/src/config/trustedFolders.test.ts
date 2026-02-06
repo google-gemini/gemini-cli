@@ -23,6 +23,7 @@ import {
 import * as fs from 'node:fs';
 import stripJsonComments from 'strip-json-comments';
 import * as path from 'node:path';
+import { lock } from 'proper-lockfile';
 import {
   loadTrustedFolders,
   getTrustedFoldersPath,
@@ -52,6 +53,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     homedir: () => '/mock/home/user',
   };
 });
+vi.mock('proper-lockfile');
+
 vi.mock('fs', async (importOriginal) => {
   const actualFs = await importOriginal<typeof fs>();
   return {
@@ -63,6 +66,11 @@ vi.mock('fs', async (importOriginal) => {
     renameSync: vi.fn(),
     unlinkSync: vi.fn(),
     realpathSync: vi.fn().mockImplementation((p) => p),
+    promises: {
+      mkdir: vi.fn(),
+      writeFile: vi.fn(),
+      readFile: vi.fn(),
+    },
   };
 });
 vi.mock('strip-json-comments', () => ({
@@ -72,14 +80,12 @@ vi.mock('strip-json-comments', () => ({
 describe('Trusted Folders Loading', () => {
   let mockStripJsonComments: Mocked<typeof stripJsonComments>;
   let mockFsWriteFileSync: Mocked<typeof fs.writeFileSync>;
-  let mockFsRenameSync: Mocked<typeof fs.renameSync>;
 
   beforeEach(() => {
     resetTrustedFoldersForTesting();
     vi.resetAllMocks();
     mockStripJsonComments = vi.mocked(stripJsonComments);
     mockFsWriteFileSync = vi.mocked(fs.writeFileSync);
-    mockFsRenameSync = vi.mocked(fs.renameSync);
     vi.mocked(osActual.homedir).mockReturnValue('/mock/home/user');
     (mockStripJsonComments as unknown as Mock).mockImplementation(
       (jsonString: string) => jsonString,
@@ -89,6 +95,7 @@ describe('Trusted Folders Loading', () => {
     vi.mocked(fs.realpathSync).mockImplementation((p: fs.PathLike) =>
       p.toString(),
     );
+    vi.mocked(lock).mockResolvedValue(vi.fn().mockResolvedValue(undefined));
   });
 
   afterEach(() => {
@@ -252,25 +259,22 @@ describe('Trusted Folders Loading', () => {
     delete process.env['GEMINI_CLI_TRUSTED_FOLDERS_PATH'];
   });
 
-  it('setValue should update the user config and save it atomically', () => {
+  it('setValue should update the user config and save it directly with locking', async () => {
+    vi.mocked(fs.promises.readFile).mockResolvedValue('{}');
     const loadedFolders = loadTrustedFolders();
-    loadedFolders.setValue('/new/path', TrustLevel.TRUST_FOLDER);
+    await loadedFolders.setValue('/new/path', TrustLevel.TRUST_FOLDER);
 
     expect(loadedFolders.user.config['/new/path']).toBe(
       TrustLevel.TRUST_FOLDER,
     );
     expect(mockFsWriteFileSync).toHaveBeenCalledWith(
-      expect.stringContaining('trustedFolders.json.tmp.'),
+      getTrustedFoldersPath(),
       JSON.stringify({ '/new/path': TrustLevel.TRUST_FOLDER }, null, 2),
       { encoding: 'utf-8', mode: 0o600 },
     );
-    expect(mockFsRenameSync).toHaveBeenCalledWith(
-      expect.stringContaining('trustedFolders.json.tmp.'),
-      getTrustedFoldersPath(),
-    );
   });
 
-  it('setValue should throw FatalConfigError if there were load errors', () => {
+  it('setValue should throw FatalConfigError if there were load errors', async () => {
     const userPath = getTrustedFoldersPath();
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.readFileSync).mockImplementation((p) => {
@@ -281,13 +285,75 @@ describe('Trusted Folders Loading', () => {
     const loadedFolders = loadTrustedFolders();
     expect(loadedFolders.errors.length).toBe(1);
 
-    expect(() =>
+    await expect(
       loadedFolders.setValue('/some/path', TrustLevel.TRUST_FOLDER),
-    ).toThrow(FatalConfigError);
-    expect(() =>
+    ).rejects.toThrow(FatalConfigError);
+    await expect(
       loadedFolders.setValue('/some/path', TrustLevel.TRUST_FOLDER),
-    ).toThrow(
+    ).rejects.toThrow(
       /Cannot update trusted folders because the configuration file is invalid/,
+    );
+  });
+
+  it('setValue should handle concurrent calls by waiting for the lock', async () => {
+    const userPath = getTrustedFoldersPath();
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+
+    let activeLock: Promise<void> | null = null;
+    let resolveLock: (() => void) | null = null;
+
+    vi.mocked(lock).mockImplementation(async () => {
+      // If there's an active lock, wait for it
+      while (activeLock) {
+        await activeLock;
+      }
+      activeLock = new Promise((resolve) => {
+        resolveLock = resolve;
+      });
+      return async () => {
+        activeLock = null;
+        resolveLock?.();
+      };
+    });
+
+    // Mock readFile to return current state from mockFsWriteFileSync calls
+    vi.mocked(fs.promises.readFile).mockImplementation(async () => {
+      // Find the last write to this path
+      const lastWrite = (mockFsWriteFileSync as unknown as Mock).mock.calls
+        .slice()
+        .reverse()
+        .find((call: unknown[]) => call[0] === userPath);
+      return lastWrite ? lastWrite[1] : '{}';
+    });
+
+    const loadedFolders = loadTrustedFolders();
+
+    // Start two concurrent calls
+    const p1 = loadedFolders.setValue('/path1', TrustLevel.TRUST_FOLDER);
+    const p2 = loadedFolders.setValue('/path2', TrustLevel.TRUST_FOLDER);
+
+    await Promise.all([p1, p2]);
+
+    expect(lock).toHaveBeenCalledTimes(2);
+
+    // Verify final state in memory
+    expect(loadedFolders.user.config).toEqual({
+      '/path1': TrustLevel.TRUST_FOLDER,
+      '/path2': TrustLevel.TRUST_FOLDER,
+    });
+
+    // Verify final write contains both
+    expect(mockFsWriteFileSync).toHaveBeenLastCalledWith(
+      userPath,
+      JSON.stringify(
+        {
+          '/path1': TrustLevel.TRUST_FOLDER,
+          '/path2': TrustLevel.TRUST_FOLDER,
+        },
+        null,
+        2,
+      ),
+      expect.any(Object),
     );
   });
 });

@@ -24,8 +24,8 @@ export interface BaseSelectionListProps<
 > {
   items: TItem[];
   initialIndex?: number;
-  onSelect: (value: T) => void;
-  onHighlight?: (value: T) => void;
+  onSelect: (value: T) => void | Promise<void>;
+  onHighlight?: (value: T) => void | Promise<void>;
   isFocused?: boolean;
   showNumbers?: boolean;
   showScrollArrows?: boolean;

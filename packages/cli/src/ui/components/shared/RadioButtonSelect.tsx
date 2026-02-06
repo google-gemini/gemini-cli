@@ -33,9 +33,9 @@ export interface RadioButtonSelectProps<T> {
   /** The initial index selected */
   initialIndex?: number;
   /** Function called when an item is selected. Receives the `value` of the selected item. */
-  onSelect: (value: T) => void;
+  onSelect: (value: T) => void | Promise<void>;
   /** Function called when an item is highlighted. Receives the `value` of the selected item. */
-  onHighlight?: (value: T) => void;
+  onHighlight?: (value: T) => void | Promise<void>;
   /** Whether this select input is currently focused and should respond to input. */
   isFocused?: boolean;
   /** Whether to show the scroll arrows. */

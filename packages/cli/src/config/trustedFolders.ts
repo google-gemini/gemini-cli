@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { lock } from 'proper-lockfile';
 import {
   FatalConfigError,
   getErrorMessage,
@@ -16,6 +17,8 @@ import {
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 import stripJsonComments from 'strip-json-comments';
+
+const { promises: fsPromises } = fs;
 
 export const TRUSTED_FOLDERS_FILENAME = 'trustedFolders.json';
 
@@ -150,7 +153,7 @@ export class LoadedTrustedFolders {
     return undefined;
   }
 
-  setValue(path: string, trustLevel: TrustLevel): void {
+  async setValue(folderPath: string, trustLevel: TrustLevel): Promise<void> {
     if (this.errors.length > 0) {
       const errorMessages = this.errors.map(
         (error) => `Error in ${error.path}: ${error.message}`,
@@ -160,18 +163,52 @@ export class LoadedTrustedFolders {
       );
     }
 
-    const originalTrustLevel = this.user.config[path];
-    this.user.config[path] = trustLevel;
+    const dirPath = path.dirname(this.user.path);
+    if (!fs.existsSync(dirPath)) {
+      await fsPromises.mkdir(dirPath, { recursive: true });
+    }
+
+    // lockfile requires the file to exist
+    if (!fs.existsSync(this.user.path)) {
+      await fsPromises.writeFile(this.user.path, JSON.stringify({}, null, 2), {
+        mode: 0o600,
+      });
+    }
+
+    const release = await lock(this.user.path, {
+      retries: {
+        retries: 10,
+        minTimeout: 100,
+      },
+    });
+
     try {
-      saveTrustedFolders(this.user);
-    } catch (e) {
-      // Revert the in-memory change if the save failed.
-      if (originalTrustLevel === undefined) {
-        delete this.user.config[path];
-      } else {
-        this.user.config[path] = originalTrustLevel;
+      // Re-read the file to handle concurrent updates
+      const content = await fsPromises.readFile(this.user.path, 'utf-8');
+      let config: Record<string, TrustLevel>;
+      try {
+        config = JSON.parse(stripJsonComments(content));
+      } catch {
+        config = {};
       }
-      throw e;
+
+      const originalTrustLevel = config[folderPath];
+      config[folderPath] = trustLevel;
+      this.user.config[folderPath] = trustLevel;
+
+      try {
+        saveTrustedFolders({ ...this.user, config });
+      } catch (e) {
+        // Revert the in-memory change if the save failed.
+        if (originalTrustLevel === undefined) {
+          delete this.user.config[folderPath];
+        } else {
+          this.user.config[folderPath] = originalTrustLevel;
+        }
+        throw e;
+      }
+    } finally {
+      await release();
     }
   }
 }
@@ -250,27 +287,14 @@ export function saveTrustedFolders(
     fs.mkdirSync(dirPath, { recursive: true });
   }
 
-  const tempPath = `${trustedFoldersFile.path}.tmp.${Math.random().toString(36).slice(2)}`;
-  try {
-    fs.writeFileSync(
-      tempPath,
-      JSON.stringify(trustedFoldersFile.config, null, 2),
-      {
-        encoding: 'utf-8',
-        mode: 0o600,
-      },
-    );
-    fs.renameSync(tempPath, trustedFoldersFile.path);
-  } catch (error) {
-    if (fs.existsSync(tempPath)) {
-      try {
-        fs.unlinkSync(tempPath);
-      } catch {
-        // Ignore errors during cleanup
-      }
-    }
-    throw error;
-  }
+  fs.writeFileSync(
+    trustedFoldersFile.path,
+    JSON.stringify(trustedFoldersFile.config, null, 2),
+    {
+      encoding: 'utf-8',
+      mode: 0o600,
+    },
+  );
 }
 
 /** Is folder trust feature enabled per the current applied settings */
