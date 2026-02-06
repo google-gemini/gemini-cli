@@ -19,7 +19,7 @@ import { ToolOutputMaskingEvent } from '../telemetry/types.js';
 export const DEFAULT_TOOL_PROTECTION_THRESHOLD = 50000;
 export const DEFAULT_MIN_PRUNABLE_TOKENS_THRESHOLD = 30000;
 export const DEFAULT_PROTECT_LATEST_TURN = true;
-export const MASKING_INDICATOR_TAG = '<tool_output_masked';
+export const MASKING_INDICATOR_TAG = 'tool_output_masked';
 
 export const TOOL_OUTPUTS_DIR = 'tool-outputs';
 
@@ -254,7 +254,7 @@ export class ToolOutputMaskingService {
   }
 
   private isAlreadyMasked(content: string): boolean {
-    return content.includes(MASKING_INDICATOR_TAG);
+    return content.includes(`<${MASKING_INDICATOR_TAG}`);
   }
 
   private formatShellPreview(response: Record<string, unknown>): string {
@@ -326,11 +326,11 @@ export class ToolOutputMaskingService {
 
   private formatMaskedSnippet(params: MaskedSnippetParams): string {
     const { filePath, preview } = params;
-    return `${MASKING_INDICATOR_TAG}>
+    return `<${MASKING_INDICATOR_TAG}>
 ${preview}
 
 Output too large. Full output available at: ${filePath}
-</tool_output_masked>`;
+</${MASKING_INDICATOR_TAG}>`;
   }
 }
 

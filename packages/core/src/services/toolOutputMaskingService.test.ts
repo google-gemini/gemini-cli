@@ -5,7 +5,10 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ToolOutputMaskingService } from './toolOutputMaskingService.js';
+import {
+  ToolOutputMaskingService,
+  MASKING_INDICATOR_TAG,
+} from './toolOutputMaskingService.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
 import type { Config } from '../config/config.js';
@@ -121,7 +124,7 @@ describe('ToolOutputMaskingService', () => {
         unknown
       >;
       const content = (resp?.['output'] as string) ?? JSON.stringify(resp);
-      if (content.includes('<tool_output_masked')) return 100;
+      if (content.includes(`<${MASKING_INDICATOR_TAG}`)) return 100;
 
       if (toolName === 't1') return 60000;
       if (toolName === 't2') return 20000;
@@ -137,7 +140,7 @@ describe('ToolOutputMaskingService', () => {
 
     expect(result.maskedCount).toBe(1);
     expect(getToolResponse(result.newHistory[0].parts?.[0])).toContain(
-      '<tool_output_masked',
+      `<${MASKING_INDICATOR_TAG}`,
     );
     expect(getToolResponse(result.newHistory[1].parts?.[0])).toEqual(
       'B'.repeat(20000),
@@ -178,7 +181,7 @@ describe('ToolOutputMaskingService', () => {
         typeof resp === 'string'
           ? resp
           : resp?.output || resp?.result || JSON.stringify(resp);
-      if (content?.includes('<tool_output_masked_guidance')) return 100;
+      if (content?.includes(`<${MASKING_INDICATOR_TAG}`)) return 100;
       return content?.length || 0;
     });
 
@@ -230,7 +233,7 @@ describe('ToolOutputMaskingService', () => {
         unknown
       >;
       const content = (resp?.['output'] as string) ?? JSON.stringify(resp);
-      if (content.includes('<tool_output_masked')) return 100;
+      if (content.includes(`<${MASKING_INDICATOR_TAG}`)) return 100;
 
       if (name === SHELL_TOOL_NAME) return 100000;
       if (name === 'p') return 60000;
@@ -254,7 +257,7 @@ describe('ToolOutputMaskingService', () => {
             functionResponse: {
               name: 'tool1',
               response: {
-                output: '<tool_output_masked>...</tool_output_masked>',
+                output: `<${MASKING_INDICATOR_TAG}>...</${MASKING_INDICATOR_TAG}>`,
               },
             },
           },
@@ -314,7 +317,7 @@ describe('ToolOutputMaskingService', () => {
         (resp?.['output'] as string) ??
         (resp?.['result'] as string) ??
         JSON.stringify(resp);
-      if (content.includes('<tool_output_masked')) return 100;
+      if (content.includes(`<${MASKING_INDICATOR_TAG}`)) return 100;
       return 60000;
     });
 
@@ -366,7 +369,7 @@ describe('ToolOutputMaskingService', () => {
         unknown
       >;
       const content = (resp?.['output'] as string) ?? JSON.stringify(resp);
-      if (content.includes('<tool_output_masked')) return 100;
+      if (content.includes(`<${MASKING_INDICATOR_TAG}`)) return 100;
 
       if (parts[0].functionResponse?.name === 't1') return 60000;
       if (parts[0].functionResponse?.name === 'p') return 60000;
@@ -385,7 +388,7 @@ describe('ToolOutputMaskingService', () => {
           unknown
         >
       )['output'],
-    ).toContain('<tool_output_masked');
+    ).toContain(`<${MASKING_INDICATOR_TAG}`);
     expect(result.newHistory[0].parts?.[1].inlineData).toEqual({
       data: 'base64data',
       mimeType: 'image/png',
@@ -429,7 +432,7 @@ describe('ToolOutputMaskingService', () => {
         unknown
       >;
       const content = (resp?.['output'] as string) ?? JSON.stringify(resp);
-      if (content.includes('<tool_output_masked')) return 100;
+      if (content.includes(`<${MASKING_INDICATOR_TAG}`)) return 100;
 
       if (parts[0].functionResponse?.name === SHELL_TOOL_NAME) return 1000;
       if (parts[0].functionResponse?.name === 'padding') return 60000;
