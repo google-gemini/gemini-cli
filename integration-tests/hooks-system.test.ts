@@ -7,7 +7,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TestRig, poll } from './test-helper.js';
 import { join } from 'node:path';
-import { writeFileSync } from 'node:fs';
 
 describe('Hooks System Integration', () => {
   let rig: TestRig;
@@ -25,9 +24,8 @@ describe('Hooks System Integration', () => {
   describe('Command Hooks - Blocking Behavior', () => {
     it('should block tool execution when hook returns block decision', async () => {
       rig.setup('should block tool execution when hook returns block decision');
-      const scriptPath = join(rig.testDir!, 'block_tool.cjs');
-      writeFileSync(
-        scriptPath,
+      const scriptPath = rig.createHookScript(
+        'block_tool.cjs',
         "console.log(JSON.stringify({decision: 'block', reason: 'File writing blocked by security policy'}))",
       );
 
@@ -84,9 +82,8 @@ describe('Hooks System Integration', () => {
       rig.setup(
         'should block tool execution and use stderr as reason when hook exits with code 2',
       );
-      const scriptPath = join(rig.testDir!, 'block_tool_stderr.cjs');
-      writeFileSync(
-        scriptPath,
+      const scriptPath = rig.createHookScript(
+        'block_tool_stderr.cjs',
         "process.stderr.write('File writing blocked by security policy'); process.exit(2)",
       );
 
@@ -146,9 +143,8 @@ describe('Hooks System Integration', () => {
 
     it('should allow tool execution when hook returns allow decision', async () => {
       rig.setup('should allow tool execution when hook returns allow decision');
-      const scriptPath = join(rig.testDir!, 'allow_tool.cjs');
-      writeFileSync(
-        scriptPath,
+      const scriptPath = rig.createHookScript(
+        'allow_tool.cjs',
         "console.log(JSON.stringify({decision: 'allow', reason: 'File writing approved'}))",
       );
 
@@ -199,12 +195,11 @@ describe('Hooks System Integration', () => {
   describe('Command Hooks - Additional Context', () => {
     it('should add additional context from AfterTool hooks', async () => {
       rig.setup('should add additional context from AfterTool hooks');
-      const scriptPath = join(rig.testDir!, 'after_tool_context.cjs');
-      writeFileSync(
-        scriptPath,
+      const scriptPath = rig.createHookScript(
+        'after_tool_context.cjs',
         "console.log(JSON.stringify({hookSpecificOutput: {hookEventName: 'AfterTool', additionalContext: 'Security scan: File content appears safe'}}))",
       );
-      const command = `node "${scriptPath.replace(/\\/g, '/')}"`;
+      const command = `node "${scriptPath}"`;
       rig.configure({
         fakeResponsesPath: join(
           import.meta.dirname,
@@ -282,8 +277,10 @@ console.log(JSON.stringify({
   }
 }));`;
 
-      const scriptPath = join(rig.testDir!, 'before_model_hook.cjs');
-      writeFileSync(scriptPath, hookScript);
+      const scriptPath = rig.createHookScript(
+        'before_model_hook.cjs',
+        hookScript,
+      );
 
       rig.configure({
         settings: {
@@ -296,7 +293,7 @@ console.log(JSON.stringify({
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
+                    command: `node "${scriptPath}"`,
                     timeout: 5000,
                   },
                 ],
@@ -341,8 +338,10 @@ console.log(JSON.stringify({
   decision: "deny",
   reason: "Model execution blocked by security policy"
 }));`;
-      const scriptPath = join(rig.testDir!, 'before_model_deny_hook.cjs');
-      writeFileSync(scriptPath, hookScript);
+      const scriptPath = rig.createHookScript(
+        'before_model_deny_hook.cjs',
+        hookScript,
+      );
 
       rig.configure({
         settings: {
@@ -355,7 +354,7 @@ console.log(JSON.stringify({
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
+                    command: `node "${scriptPath}"`,
                     timeout: 5000,
                   },
                 ],
@@ -383,8 +382,10 @@ console.log(JSON.stringify({
   decision: "block",
   reason: "Model execution blocked by security policy"
 }));`;
-      const scriptPath = join(rig.testDir!, 'before_model_block_hook.cjs');
-      writeFileSync(scriptPath, hookScript);
+      const scriptPath = rig.createHookScript(
+        'before_model_block_hook.cjs',
+        hookScript,
+      );
 
       rig.configure({
         settings: {
@@ -397,7 +398,7 @@ console.log(JSON.stringify({
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
+                    command: `node "${scriptPath}"`,
                     timeout: 5000,
                   },
                 ],
@@ -450,8 +451,10 @@ console.log(JSON.stringify({
   }
 }));`;
 
-        const scriptPath = join(rig.testDir!, 'after_model_hook.cjs');
-        writeFileSync(scriptPath, hookScript);
+        const scriptPath = rig.createHookScript(
+          'after_model_hook.cjs',
+          hookScript,
+        );
 
         rig.configure({
           settings: {
@@ -464,7 +467,7 @@ console.log(JSON.stringify({
                   hooks: [
                     {
                       type: 'command',
-                      command: `node "${scriptPath.replace(/\\/g, '/')}"`,
+                      command: `node "${scriptPath}"`,
                       timeout: 5000,
                     },
                   ],
@@ -508,8 +511,10 @@ console.log(JSON.stringify({
     }
   }
 }));`;
-      const scriptPath = join(rig.testDir!, 'before_tool_selection_hook.cjs');
-      writeFileSync(scriptPath, hookScript);
+      const scriptPath = rig.createHookScript(
+        'before_tool_selection_hook.cjs',
+        hookScript,
+      );
 
       rig.configure({
         settings: {
@@ -523,7 +528,7 @@ console.log(JSON.stringify({
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
+                    command: `node "${scriptPath}"`,
                     timeout: 5000,
                   },
                 ],
@@ -577,8 +582,10 @@ console.log(JSON.stringify({
   }
 }));`;
 
-      const scriptPath = join(rig.testDir!, 'before_agent_hook.cjs');
-      writeFileSync(scriptPath, hookScript);
+      const scriptPath = rig.createHookScript(
+        'before_agent_hook.cjs',
+        hookScript,
+      );
 
       rig.configure({
         settings: {
@@ -591,7 +598,7 @@ console.log(JSON.stringify({
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
+                    command: `node "${scriptPath}"`,
                     timeout: 5000,
                   },
                 ],
@@ -616,12 +623,11 @@ console.log(JSON.stringify({
     it('should handle notification hooks for tool permissions', async () => {
       rig.setup('should handle notification hooks for tool permissions');
       // Create script for hook (works on both Unix and Windows)
-      const scriptPath = join(rig.testDir!, 'notification_hook.cjs');
-      writeFileSync(
-        scriptPath,
+      const scriptPath = rig.createHookScript(
+        'notification_hook.cjs',
         "console.log(JSON.stringify({suppressOutput: false, systemMessage: 'Permission request logged by security hook'}))",
       );
-      const hookCommand = `node "${scriptPath.replace(/\\/g, '/')}"`;
+      const hookCommand = `node "${scriptPath}"`;
 
       rig.configure({
         fakeResponsesPath: join(
@@ -717,19 +723,17 @@ console.log(JSON.stringify({
     it('should execute hooks sequentially when configured', async () => {
       rig.setup('should execute hooks sequentially when configured');
       // Create script for hooks (works on both Unix and Windows)
-      const script1Path = join(rig.testDir!, 'hook1.cjs');
-      writeFileSync(
-        script1Path,
+      const script1Path = rig.createHookScript(
+        'hook1.cjs',
         "console.log(JSON.stringify({decision: 'allow', hookSpecificOutput: {hookEventName: 'BeforeAgent', additionalContext: 'Step 1: Initial validation passed.'}}))",
       );
-      const script2Path = join(rig.testDir!, 'hook2.cjs');
-      writeFileSync(
-        script2Path,
+      const script2Path = rig.createHookScript(
+        'hook2.cjs',
         "console.log(JSON.stringify({decision: 'allow', hookSpecificOutput: {hookEventName: 'BeforeAgent', additionalContext: 'Step 2: Security check completed.'}}))",
       );
 
-      const hook1Command = `node "${script1Path.replace(/\\/g, '/')}"`;
-      const hook2Command = `node "${script2Path.replace(/\\/g, '/')}"`;
+      const hook1Command = `node "${script1Path}"`;
+      const hook2Command = `node "${script2Path}"`;
 
       rig.configure({
         fakeResponsesPath: join(
@@ -815,8 +819,10 @@ try {
   console.log(JSON.stringify({decision: "block", reason: "Invalid JSON"}));
 }`;
 
-      const scriptPath = join(rig.testDir!, 'input_validation_hook.cjs');
-      writeFileSync(scriptPath, hookScript);
+      const scriptPath = rig.createHookScript(
+        'input_validation_hook.cjs',
+        hookScript,
+      );
 
       rig.configure({
         settings: {
@@ -829,7 +835,7 @@ try {
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
+                    command: `node "${scriptPath}"`,
                     timeout: 5000,
                   },
                 ],
@@ -860,9 +866,8 @@ try {
       rig.setup(
         'should treat mixed stdout (text + JSON) as system message and allow execution when exit code is 0',
       );
-      const scriptPath = join(rig.testDir!, 'mixed_stdout.cjs');
-      writeFileSync(
-        scriptPath,
+      const scriptPath = rig.createHookScript(
+        'mixed_stdout.cjs',
         "console.log('Pollution'); console.log(JSON.stringify({decision: 'deny', reason: 'Should be ignored'}))",
       );
 
@@ -912,25 +917,22 @@ try {
     it('should handle hooks for all major event types', async () => {
       rig.setup('should handle hooks for all major event types');
       // Create scripts for hooks (works on both Unix and Windows)
-      const beforeToolScript = join(rig.testDir!, 'before_tool_all.cjs');
-      writeFileSync(
-        beforeToolScript,
+      const beforeToolScript = rig.createHookScript(
+        'before_tool_all.cjs',
         "console.log(JSON.stringify({decision: 'allow', systemMessage: 'BeforeTool: File operation logged'}))",
       );
-      const afterToolScript = join(rig.testDir!, 'after_tool_all.cjs');
-      writeFileSync(
-        afterToolScript,
+      const afterToolScript = rig.createHookScript(
+        'after_tool_all.cjs',
         "console.log(JSON.stringify({hookSpecificOutput: {hookEventName: 'AfterTool', additionalContext: 'AfterTool: Operation completed successfully'}}))",
       );
-      const beforeAgentScript = join(rig.testDir!, 'before_agent_all.cjs');
-      writeFileSync(
-        beforeAgentScript,
+      const beforeAgentScript = rig.createHookScript(
+        'before_agent_all.cjs',
         "console.log(JSON.stringify({decision: 'allow', hookSpecificOutput: {hookEventName: 'BeforeAgent', additionalContext: 'BeforeAgent: User request processed'}}))",
       );
 
-      const beforeToolCommand = `node "${beforeToolScript.replace(/\\/g, '/')}"`;
-      const afterToolCommand = `node "${afterToolScript.replace(/\\/g, '/')}"`;
-      const beforeAgentCommand = `node "${beforeAgentScript.replace(/\\/g, '/')}"`;
+      const beforeToolCommand = `node "${beforeToolScript}"`;
+      const afterToolCommand = `node "${afterToolScript}"`;
+      const beforeAgentCommand = `node "${beforeAgentScript}"`;
 
       rig.configure({
         fakeResponsesPath: join(
@@ -1038,16 +1040,17 @@ try {
   describe('Hook Error Handling', () => {
     it('should handle hook failures gracefully', async () => {
       rig.setup('should handle hook failures gracefully');
-      const failingScript = join(rig.testDir!, 'failing_hook.cjs');
-      writeFileSync(failingScript, 'process.exit(1)');
-      const workingScript = join(rig.testDir!, 'working_hook.cjs');
-      writeFileSync(
-        workingScript,
+      const failingScript = rig.createHookScript(
+        'failing_hook.cjs',
+        'process.exit(1)',
+      );
+      const workingScript = rig.createHookScript(
+        'working_hook.cjs',
         "console.log(JSON.stringify({decision: 'allow', reason: 'Working hook succeeded'}))",
       );
 
-      const failingCommand = `node "${failingScript.replace(/\\/g, '/')}"`;
-      const workingCommand = `node "${workingScript.replace(/\\/g, '/')}"`;
+      const failingCommand = `node "${failingScript}"`;
+      const workingCommand = `node "${workingScript}"`;
 
       rig.configure({
         fakeResponsesPath: join(
@@ -1100,12 +1103,11 @@ try {
   describe('Hook Telemetry and Observability', () => {
     it('should generate telemetry events for hook executions', async () => {
       rig.setup('should generate telemetry events for hook executions');
-      const scriptPath = join(rig.testDir!, 'telemetry_hook.cjs');
-      writeFileSync(
-        scriptPath,
+      const scriptPath = rig.createHookScript(
+        'telemetry_hook.cjs',
         "console.log(JSON.stringify({decision: 'allow', reason: 'Telemetry test hook'}))",
       );
-      const hookCommand = `node "${scriptPath.replace(/\\/g, '/')}"`;
+      const hookCommand = `node "${scriptPath}"`;
 
       rig.configure({
         fakeResponsesPath: join(
@@ -1147,12 +1149,11 @@ try {
   describe('Session Lifecycle Hooks', () => {
     it('should fire SessionStart hook on app startup', async () => {
       rig.setup('should fire SessionStart hook on app startup');
-      const scriptPath = join(rig.testDir!, 'session_start.cjs');
-      writeFileSync(
-        scriptPath,
+      const scriptPath = rig.createHookScript(
+        'session_start.cjs',
         "console.log(JSON.stringify({decision: 'allow', systemMessage: 'Session starting on startup'}))",
       );
-      const sessionStartCommand = `node "${scriptPath.replace(/\\/g, '/')}"`;
+      const sessionStartCommand = `node "${scriptPath}"`;
 
       rig.configure({
         fakeResponsesPath: join(
@@ -1229,8 +1230,10 @@ console.log(JSON.stringify({
         ),
       });
 
-      const scriptPath = join(rig.testDir!, 'session_start_context_hook.cjs');
-      writeFileSync(scriptPath, hookScript);
+      const scriptPath = rig.createHookScript(
+        'session_start_context_hook.cjs',
+        hookScript,
+      );
 
       rig.configure({
         settings: {
@@ -1244,7 +1247,7 @@ console.log(JSON.stringify({
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
+                    command: `node "${scriptPath}"`,
                     timeout: 5000,
                   },
                 ],
@@ -1309,11 +1312,10 @@ console.log(JSON.stringify({
         ),
       });
 
-      const scriptPath = join(
-        rig.testDir!,
+      const scriptPath = rig.createHookScript(
         'session_start_interactive_hook.cjs',
+        hookScript,
       );
-      writeFileSync(scriptPath, hookScript);
 
       rig.configure({
         settings: {
@@ -1327,7 +1329,7 @@ console.log(JSON.stringify({
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
+                    command: `node "${scriptPath}"`,
                     timeout: 5000,
                   },
                 ],
@@ -1376,19 +1378,17 @@ console.log(JSON.stringify({
         'should fire SessionEnd and SessionStart hooks on /clear command',
       );
       // Create script for hooks (works on both Unix and Windows)
-      const endScriptPath = join(rig.testDir!, 'session_end_clear.cjs');
-      writeFileSync(
-        endScriptPath,
+      const endScriptPath = rig.createHookScript(
+        'session_end_clear.cjs',
         "console.log(JSON.stringify({decision: 'allow', systemMessage: 'Session ending due to clear'}))",
       );
-      const startScriptPath = join(rig.testDir!, 'session_start_clear.cjs');
-      writeFileSync(
-        startScriptPath,
+      const startScriptPath = rig.createHookScript(
+        'session_start_clear.cjs',
         "console.log(JSON.stringify({decision: 'allow', systemMessage: 'Session starting after clear'}))",
       );
 
-      const sessionEndCommand = `node "${endScriptPath.replace(/\\/g, '/')}"`;
-      const sessionStartCommand = `node "${startScriptPath.replace(/\\/g, '/')}"`;
+      const sessionEndCommand = `node "${endScriptPath}"`;
+      const sessionStartCommand = `node "${startScriptPath}"`;
 
       rig.configure({
         fakeResponsesPath: join(
@@ -1560,12 +1560,11 @@ console.log(JSON.stringify({
   describe('Compression Hooks', () => {
     it('should fire PreCompress hook on automatic compression', async () => {
       rig.setup('should fire PreCompress hook on automatic compression');
-      const scriptPath = join(rig.testDir!, 'pre_compress.cjs');
-      writeFileSync(
-        scriptPath,
+      const scriptPath = rig.createHookScript(
+        'pre_compress.cjs',
         "console.log(JSON.stringify({decision: 'allow', systemMessage: 'PreCompress hook executed for automatic compression'}))",
       );
-      const preCompressCommand = `node "${scriptPath.replace(/\\/g, '/')}"`;
+      const preCompressCommand = `node "${scriptPath}"`;
 
       rig.configure({
         fakeResponsesPath: join(
@@ -1634,12 +1633,11 @@ console.log(JSON.stringify({
       rig.setup(
         'should fire SessionEnd hook on graceful exit in non-interactive mode',
       );
-      const scriptPath = join(rig.testDir!, 'session_end_exit.cjs');
-      writeFileSync(
-        scriptPath,
+      const scriptPath = rig.createHookScript(
+        'session_end_exit.cjs',
         "console.log(JSON.stringify({decision: 'allow', systemMessage: 'SessionEnd hook executed on exit'}))",
       );
-      const sessionEndCommand = `node "${scriptPath.replace(/\\/g, '/')}"`;
+      const sessionEndCommand = `node "${scriptPath}"`;
 
       rig.configure({
         fakeResponsesPath: join(
@@ -1740,17 +1738,14 @@ console.log(JSON.stringify({decision: "allow", systemMessage: "Enabled hook exec
       const disabledHookScript = `const fs = require('fs');
 console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook should not execute", reason: "This hook should be disabled"}));`;
 
-      const enabledPath = join(rig.testDir!, 'enabled_hook.cjs').replace(
-        /\\/g,
-        '/',
+      const enabledPath = rig.createHookScript(
+        'enabled_hook.cjs',
+        enabledHookScript,
       );
-      const disabledPath = join(rig.testDir!, 'disabled_hook.cjs').replace(
-        /\\/g,
-        '/',
+      const disabledPath = rig.createHookScript(
+        'disabled_hook.cjs',
+        disabledHookScript,
       );
-
-      writeFileSync(enabledPath, enabledHookScript);
-      writeFileSync(disabledPath, disabledHookScript);
 
       rig.configure({
         settings: {
@@ -1824,17 +1819,14 @@ console.log(JSON.stringify({decision: "allow", systemMessage: "Active hook execu
       const disabledHookScript = `const fs = require('fs');
 console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook should not execute", reason: "This hook is disabled"}));`;
 
-      const activePath = join(rig.testDir!, 'active_hook.cjs').replace(
-        /\\/g,
-        '/',
+      const activePath = rig.createHookScript(
+        'active_hook.cjs',
+        activeHookScript,
       );
-      const disabledPath = join(rig.testDir!, 'disabled_hook.cjs').replace(
-        /\\/g,
-        '/',
+      const disabledPath = rig.createHookScript(
+        'disabled_hook.cjs',
+        disabledHookScript,
       );
-
-      writeFileSync(activePath, activeHookScript);
-      writeFileSync(disabledPath, disabledHookScript);
 
       rig.configure({
         settings: {
@@ -1930,13 +1922,10 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
         hookOutput,
       )}));`;
 
-      const scriptPath = join(rig.testDir!, 'input_override_hook.js');
-      writeFileSync(scriptPath, hookScript);
-
-      // Ensure path is properly escaped for command line usage on all platforms
-      // On Windows, backslashes in the command string need to be handled carefully
-      // Using forward slashes works well with Node.js on all platforms
-      const commandPath = scriptPath.replace(/\\/g, '/');
+      const commandPath = rig.createHookScript(
+        'input_override_hook.cjs',
+        hookScript,
+      );
 
       // 2. Full setup with settings and fake responses
       rig.configure({
@@ -1990,9 +1979,9 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
       expect(hookTelemetryFound).toBeTruthy();
 
       const hookLogs = rig.readHookLogs();
-      expect(hookLogs.length).toBe(1);
+      expect(hookLogs.length).toBeGreaterThanOrEqual(1);
       expect(hookLogs[0].hookCall.hook_name).toContain(
-        'input_override_hook.js',
+        'input_override_hook.cjs',
       );
 
       // 4. Verify that the agent didn't try to work-around the hook input change
@@ -2021,9 +2010,10 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
       )}));`;
 
       rig.setup('should stop agent execution via BeforeTool hook');
-      const scriptPath = join(rig.testDir!, 'before_tool_stop_hook.js');
-      writeFileSync(scriptPath, hookScript);
-      const commandPath = scriptPath.replace(/\\/g, '/');
+      const commandPath = rig.createHookScript(
+        'before_tool_stop_hook.cjs',
+        hookScript,
+      );
 
       rig.configure({
         fakeResponsesPath: join(

@@ -387,6 +387,19 @@ export class TestRig {
     this._createSettingsFile(options.settings);
   }
 
+  /**
+   * Creates a hook script file and returns a normalized path suitable for cross-platform execution.
+   */
+  createHookScript(fileName: string, content: string): string {
+    if (!this.testDir) {
+      throw new Error('TestRig must be setup before calling createHookScript');
+    }
+    const scriptPath = join(this.testDir, fileName);
+    writeFileSync(scriptPath, content);
+    // Return a path normalized for use in shell commands across platforms.
+    return scriptPath.replace(/\\/g, '/');
+  }
+
   private _createSettingsFile(overrideSettings?: Record<string, unknown>) {
     const projectGeminiDir = join(this.testDir!, GEMINI_DIR);
     mkdirSync(projectGeminiDir, { recursive: true });

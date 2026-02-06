@@ -7,7 +7,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TestRig } from './test-helper.js';
 import { join } from 'node:path';
-import { writeFileSync } from 'node:fs';
 
 describe('Hooks Agent Flow', () => {
   let rig: TestRig;
@@ -49,11 +48,10 @@ describe('Hooks Agent Flow', () => {
       console.error('DEBUG: BeforeAgent hook executed');
       `;
 
-      const scriptPath = join(rig.testDir!, 'before_agent_context.cjs').replace(
-        /\\/g,
-        '/',
+      const scriptPath = rig.createHookScript(
+        'before_agent_context.cjs',
+        hookScript,
       );
-      writeFileSync(scriptPath, hookScript);
 
       await rig.configure({
         settings: {
@@ -118,11 +116,10 @@ describe('Hooks Agent Flow', () => {
       }
       `;
 
-      const scriptPath = join(rig.testDir!, 'after_agent_verify.cjs').replace(
-        /\\/g,
-        '/',
+      const scriptPath = rig.createHookScript(
+        'after_agent_verify.cjs',
+        hookScript,
       );
-      writeFileSync(scriptPath, hookScript);
 
       await rig.configure({
         settings: {
@@ -182,11 +179,10 @@ describe('Hooks Agent Flow', () => {
         fs.writeFileSync('${messageCountFile}', JSON.stringify(counts));
         console.log(JSON.stringify({ decision: 'allow' }));
       `;
-      const beforeModelScriptPath = join(
-        rig.testDir!,
+      const beforeModelScriptPath = rig.createHookScript(
         'before_model_counter.cjs',
-      ).replace(/\\/g, '/');
-      writeFileSync(beforeModelScriptPath, beforeModelScript);
+        beforeModelScript,
+      );
 
       const afterAgentScript = `
         console.log(JSON.stringify({
@@ -198,11 +194,10 @@ describe('Hooks Agent Flow', () => {
           }
         }));
       `;
-      const afterAgentScriptPath = join(
-        rig.testDir!,
+      const afterAgentScriptPath = rig.createHookScript(
         'after_agent_clear.cjs',
-      ).replace(/\\/g, '/');
-      writeFileSync(afterAgentScriptPath, afterAgentScript);
+        afterAgentScript,
+      );
 
       await rig.configure({
         fakeResponsesPath: join(
@@ -270,18 +265,16 @@ describe('Hooks Agent Flow', () => {
       );
 
       const beforeAgentScript = "console.log('BeforeAgent Fired')";
-      const beforeAgentScriptPath = join(
-        rig.testDir!,
+      const beforeAgentScriptPath = rig.createHookScript(
         'before_agent_loop.cjs',
-      ).replace(/\\/g, '/');
-      writeFileSync(beforeAgentScriptPath, beforeAgentScript);
+        beforeAgentScript,
+      );
 
       const afterAgentScript = "console.log('AfterAgent Fired')";
-      const afterAgentScriptPath = join(
-        rig.testDir!,
+      const afterAgentScriptPath = rig.createHookScript(
         'after_agent_loop.cjs',
-      ).replace(/\\/g, '/');
-      writeFileSync(afterAgentScriptPath, afterAgentScript);
+        afterAgentScript,
+      );
 
       await rig.configure({
         fakeResponsesPath: join(
