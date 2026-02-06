@@ -121,13 +121,28 @@ export function isPreviewModel(model: string): boolean {
 }
 
 /**
+ * Checks if the model is a Gemini 3 model.
+ *
+ * @param model The model name to check.
+ * @returns True if the model is a Gemini 3 model.
+ */
+export function isGemini3Model(model: string): boolean {
+  return (
+    /^gemini-3(\.|-|$)/.test(model) ||
+    model === PREVIEW_GEMINI_MODEL_AUTO ||
+    model === GEMINI_MODEL_ALIAS_PRO ||
+    model === GEMINI_MODEL_ALIAS_AUTO
+  );
+}
+
+/**
  * Checks if the model is a Gemini 2.x model.
  *
  * @param model The model name to check.
  * @returns True if the model is a Gemini-2.x model.
  */
 export function isGemini2Model(model: string): boolean {
-  return /^gemini-2(\.|$)/.test(model);
+  return /^gemini-2(\.|-|$)/.test(model) || model === DEFAULT_GEMINI_MODEL_AUTO;
 }
 
 /**

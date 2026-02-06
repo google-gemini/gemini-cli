@@ -10,8 +10,9 @@ import type { RoutingContext } from '../routingStrategy.js';
 import type { Config } from '../../config/config.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import {
-  DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_MODEL,
+  PREVIEW_GEMINI_FLASH_MODEL,
+  PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL_AUTO,
 } from '../../config/models.js';
 import { promptIdContext } from '../../utils/promptIdContext.js';
@@ -46,7 +47,7 @@ describe('NumericalClassifierStrategy', () => {
       modelConfigService: {
         getResolvedConfig: vi.fn().mockReturnValue(mockResolvedConfig),
       },
-      getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
+      getModel: vi.fn().mockReturnValue(PREVIEW_GEMINI_MODEL_AUTO),
       getSessionId: vi.fn().mockReturnValue('control-group-id'), // Default to Control Group (Hash 71 >= 50)
       getNumericalRoutingEnabled: vi.fn().mockResolvedValue(true),
       getClassifierThreshold: vi.fn().mockResolvedValue(undefined),
@@ -64,6 +65,19 @@ describe('NumericalClassifierStrategy', () => {
 
   it('should return null if numerical routing is disabled', async () => {
     vi.mocked(mockConfig.getNumericalRoutingEnabled).mockResolvedValue(false);
+
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+    );
+
+    expect(decision).toBeNull();
+    expect(mockBaseLlmClient.generateJson).not.toHaveBeenCalled();
+  });
+
+  it('should return null if the model is not a Gemini 3 model', async () => {
+    vi.mocked(mockConfig.getModel).mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO);
 
     const decision = await strategy.route(
       mockContext,
@@ -119,7 +133,7 @@ describe('NumericalClassifierStrategy', () => {
       );
 
       expect(decision).toEqual({
-        model: DEFAULT_GEMINI_FLASH_MODEL,
+        model: PREVIEW_GEMINI_FLASH_MODEL,
         metadata: {
           source: 'NumericalClassifier (Control)',
           latencyMs: expect.any(Number),
@@ -145,7 +159,7 @@ describe('NumericalClassifierStrategy', () => {
       );
 
       expect(decision).toEqual({
-        model: DEFAULT_GEMINI_MODEL,
+        model: PREVIEW_GEMINI_MODEL,
         metadata: {
           source: 'NumericalClassifier (Control)',
           latencyMs: expect.any(Number),
@@ -171,7 +185,7 @@ describe('NumericalClassifierStrategy', () => {
       );
 
       expect(decision).toEqual({
-        model: DEFAULT_GEMINI_FLASH_MODEL, // Routed to Flash because 60 < 80
+        model: PREVIEW_GEMINI_FLASH_MODEL, // Routed to Flash because 60 < 80
         metadata: {
           source: 'NumericalClassifier (Strict)',
           latencyMs: expect.any(Number),
@@ -197,7 +211,7 @@ describe('NumericalClassifierStrategy', () => {
       );
 
       expect(decision).toEqual({
-        model: DEFAULT_GEMINI_MODEL,
+        model: PREVIEW_GEMINI_MODEL,
         metadata: {
           source: 'NumericalClassifier (Strict)',
           latencyMs: expect.any(Number),
@@ -225,7 +239,7 @@ describe('NumericalClassifierStrategy', () => {
       );
 
       expect(decision).toEqual({
-        model: DEFAULT_GEMINI_FLASH_MODEL, // Score 60 < Threshold 70
+        model: PREVIEW_GEMINI_FLASH_MODEL, // Score 60 < Threshold 70
         metadata: {
           source: 'NumericalClassifier (Remote)',
           latencyMs: expect.any(Number),
@@ -251,7 +265,7 @@ describe('NumericalClassifierStrategy', () => {
       );
 
       expect(decision).toEqual({
-        model: DEFAULT_GEMINI_FLASH_MODEL, // Score 40 < Threshold 45.5
+        model: PREVIEW_GEMINI_FLASH_MODEL, // Score 40 < Threshold 45.5
         metadata: {
           source: 'NumericalClassifier (Remote)',
           latencyMs: expect.any(Number),
@@ -277,7 +291,7 @@ describe('NumericalClassifierStrategy', () => {
       );
 
       expect(decision).toEqual({
-        model: DEFAULT_GEMINI_MODEL, // Score 35 >= Threshold 30
+        model: PREVIEW_GEMINI_MODEL, // Score 35 >= Threshold 30
         metadata: {
           source: 'NumericalClassifier (Remote)',
           latencyMs: expect.any(Number),
@@ -305,7 +319,7 @@ describe('NumericalClassifierStrategy', () => {
       );
 
       expect(decision).toEqual({
-        model: DEFAULT_GEMINI_FLASH_MODEL, // Score 40 < Default A/B Threshold 50
+        model: PREVIEW_GEMINI_FLASH_MODEL, // Score 40 < Default A/B Threshold 50
         metadata: {
           source: 'NumericalClassifier (Control)',
           latencyMs: expect.any(Number),
@@ -332,7 +346,7 @@ describe('NumericalClassifierStrategy', () => {
       );
 
       expect(decision).toEqual({
-        model: DEFAULT_GEMINI_FLASH_MODEL,
+        model: PREVIEW_GEMINI_FLASH_MODEL,
         metadata: {
           source: 'NumericalClassifier (Control)',
           latencyMs: expect.any(Number),
@@ -359,7 +373,7 @@ describe('NumericalClassifierStrategy', () => {
       );
 
       expect(decision).toEqual({
-        model: DEFAULT_GEMINI_MODEL,
+        model: PREVIEW_GEMINI_MODEL,
         metadata: {
           source: 'NumericalClassifier (Control)',
           latencyMs: expect.any(Number),
