@@ -167,7 +167,15 @@ describe('deferred', () => {
 
       // Now manually run it to verify it captured correctly
       await runDeferredCommand(createMockSettings().merged);
-      expect(originalHandler).toHaveBeenCalledWith(argv);
+      expect(originalHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          settings: expect.objectContaining({
+            admin: expect.objectContaining({
+              extensions: expect.objectContaining({ enabled: true }),
+            }),
+          }),
+        }),
+      );
       expect(mockExit).toHaveBeenCalledWith(ExitCodes.SUCCESS);
     });
 
