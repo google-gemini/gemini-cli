@@ -54,6 +54,7 @@ export * from './code_assist/admin/admin_controls.js';
 export * from './core/apiKeyCredentialStorage.js';
 
 // Export utilities
+export * from './utils/fetch.js';
 export { homedir, tmpdir } from './utils/paths.js';
 export * from './utils/paths.js';
 export * from './utils/checks.js';

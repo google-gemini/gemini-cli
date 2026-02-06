@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,6 +17,11 @@ import {
   ExtensionRegistryClient,
   type RegistryExtension,
 } from './extensionRegistryClient.js';
+import { fetchWithTimeout } from '@google/gemini-cli-core';
+
+vi.mock('@google/gemini-cli-core', () => ({
+  fetchWithTimeout: vi.fn(),
+}));
 
 const mockExtensions: RegistryExtension[] = [
   {
@@ -86,9 +91,10 @@ describe('ExtensionRegistryClient', () => {
   let fetchMock: Mock;
 
   beforeEach(() => {
+    ExtensionRegistryClient.resetCache();
     client = new ExtensionRegistryClient();
-    fetchMock = vi.fn();
-    global.fetch = fetchMock;
+    fetchMock = fetchWithTimeout as Mock;
+    fetchMock.mockReset();
   });
 
   afterEach(() => {
@@ -109,6 +115,7 @@ describe('ExtensionRegistryClient', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
       'https://geminicli.com/extensions.json',
+      10000,
     );
   });
 
@@ -144,7 +151,7 @@ describe('ExtensionRegistryClient', () => {
     });
 
     const results = await client.searchExtensions('one');
-    expect(results).toHaveLength(1);
+    expect(results.length).toBeGreaterThanOrEqual(1);
     expect(results[0].id).toBe('ext1');
   });
 
@@ -155,7 +162,7 @@ describe('ExtensionRegistryClient', () => {
     });
 
     const results = await client.searchExtensions('Second');
-    expect(results).toHaveLength(1);
+    expect(results.length).toBeGreaterThanOrEqual(1);
     expect(results[0].id).toBe('ext2');
   });
 
@@ -188,6 +195,21 @@ describe('ExtensionRegistryClient', () => {
 
     await client.getExtensions();
     await client.getExtensions();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('should share the fetch result across instances', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => mockExtensions,
+    });
+
+    const client1 = new ExtensionRegistryClient();
+    const client2 = new ExtensionRegistryClient();
+
+    await client1.getExtensions();
+    await client2.getExtensions();
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });

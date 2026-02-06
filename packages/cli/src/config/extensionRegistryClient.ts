@@ -1,8 +1,11 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+
+import { fetchWithTimeout } from '@google/gemini-cli-core';
+import { AsyncFzf } from 'fzf';
 
 export interface RegistryExtension {
   id: string;
@@ -28,7 +31,14 @@ export interface RegistryExtension {
 export class ExtensionRegistryClient {
   private static readonly REGISTRY_URL =
     'https://geminicli.com/extensions.json';
-  private cache: RegistryExtension[] | null = null;
+  private static readonly FETCH_TIMEOUT_MS = 10000; // 10 seconds
+
+  private static fetchPromise: Promise<RegistryExtension[]> | null = null;
+
+  /** @internal */
+  static resetCache() {
+    ExtensionRegistryClient.fetchPromise = null;
+  }
 
   async getExtensions(
     page: number = 1,
@@ -46,8 +56,10 @@ export class ExtensionRegistryClient {
           a.extensionName.localeCompare(b.extensionName),
         );
         break;
-      default:
-        break;
+      default: {
+        const _exhaustiveCheck: never = orderBy;
+        throw new Error(`Unhandled orderBy: ${_exhaustiveCheck}`);
+      }
     }
 
     const startIndex = (page - 1) * limit;
@@ -60,13 +72,17 @@ export class ExtensionRegistryClient {
 
   async searchExtensions(query: string): Promise<RegistryExtension[]> {
     const allExtensions = await this.fetchAllExtensions();
-    const lowerQuery = query.toLowerCase();
-    return allExtensions.filter(
-      (ext) =>
-        ext.extensionName.toLowerCase().includes(lowerQuery) ||
-        ext.extensionDescription.toLowerCase().includes(lowerQuery) ||
-        ext.fullName.toLowerCase().includes(lowerQuery),
-    );
+    if (!query.trim()) {
+      return allExtensions;
+    }
+
+    const fzf = new AsyncFzf(allExtensions, {
+      selector: (ext: RegistryExtension) =>
+        `${ext.extensionName} ${ext.extensionDescription} ${ext.fullName}`,
+      fuzzy: 'v2',
+    });
+    const results = await fzf.find(query);
+    return results.map((r: { item: RegistryExtension }) => r.item);
   }
 
   async getExtension(id: string): Promise<RegistryExtension | undefined> {
@@ -75,16 +91,28 @@ export class ExtensionRegistryClient {
   }
 
   private async fetchAllExtensions(): Promise<RegistryExtension[]> {
-    if (this.cache) {
-      return this.cache;
+    if (ExtensionRegistryClient.fetchPromise) {
+      return ExtensionRegistryClient.fetchPromise;
     }
 
-    const response = await fetch(ExtensionRegistryClient.REGISTRY_URL);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch extensions: ${response.statusText}`);
-    }
+    ExtensionRegistryClient.fetchPromise = (async () => {
+      try {
+        const response = await fetchWithTimeout(
+          ExtensionRegistryClient.REGISTRY_URL,
+          ExtensionRegistryClient.FETCH_TIMEOUT_MS,
+        );
+        if (!response.ok) {
+          throw new Error(`Failed to fetch extensions: ${response.statusText}`);
+        }
 
-    this.cache = (await response.json()) as RegistryExtension[];
-    return this.cache;
+        return (await response.json()) as RegistryExtension[];
+      } catch (error) {
+        // Clear the promise on failure so that subsequent calls can try again
+        ExtensionRegistryClient.fetchPromise = null;
+        throw error;
+      }
+    })();
+
+    return ExtensionRegistryClient.fetchPromise;
   }
 }
