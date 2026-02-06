@@ -151,7 +151,6 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getAllowedMcpServers: vi.fn().mockReturnValue([]),
     getBlockedMcpServers: vi.fn().mockReturnValue([]),
     getExperiments: vi.fn().mockReturnValue(undefined),
-    getPreviewFeatures: vi.fn().mockReturnValue(false),
     getHasAccessToPreviewModel: vi.fn().mockReturnValue(false),
     ...overrides,
   }) as unknown as Config;
