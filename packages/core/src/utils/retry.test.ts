@@ -409,6 +409,87 @@ describe('retryWithBackoff', () => {
       await vi.runAllTimersAsync();
       await expect(promise).resolves.toBe('success');
     });
+
+    it('should retry on SSL error code (ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC)', async () => {
+      const error = new Error('SSL error');
+      (error as any).code = 'ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC';
+      const mockFn = vi
+        .fn()
+        .mockRejectedValueOnce(error)
+        .mockResolvedValue('success');
+
+      const promise = retryWithBackoff(mockFn, {
+        initialDelayMs: 1,
+        maxDelayMs: 1,
+      });
+      await vi.runAllTimersAsync();
+      await expect(promise).resolves.toBe('success');
+      expect(mockFn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should retry on SSL error code in deeply nested cause chain', async () => {
+      const deepCause = new Error('OpenSSL error');
+      (deepCause as any).code = 'ERR_SSL_BAD_RECORD_MAC';
+
+      const middleCause = new Error('TLS handshake failed');
+      (middleCause as any).cause = deepCause;
+
+      const outerError = new Error('fetch failed');
+      (outerError as any).cause = middleCause;
+
+      const mockFn = vi
+        .fn()
+        .mockRejectedValueOnce(outerError)
+        .mockResolvedValue('success');
+
+      const promise = retryWithBackoff(mockFn, {
+        initialDelayMs: 1,
+        maxDelayMs: 1,
+      });
+      await vi.runAllTimersAsync();
+      await expect(promise).resolves.toBe('success');
+      expect(mockFn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should retry on EPROTO error (generic protocol/SSL error)', async () => {
+      const error = new Error('Protocol error');
+      (error as any).code = 'EPROTO';
+      const mockFn = vi
+        .fn()
+        .mockRejectedValueOnce(error)
+        .mockResolvedValue('success');
+
+      const promise = retryWithBackoff(mockFn, {
+        initialDelayMs: 1,
+        maxDelayMs: 1,
+      });
+      await vi.runAllTimersAsync();
+      await expect(promise).resolves.toBe('success');
+      expect(mockFn).toHaveBeenCalledTimes(2);
+    });
+
+    it('should retry on gaxios-style SSL error with code property', async () => {
+      // This matches the exact structure from issue #17318
+      const error = new Error(
+        'request to https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent failed',
+      );
+      (error as any).type = 'system';
+      (error as any).errno = 'ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC';
+      (error as any).code = 'ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC';
+
+      const mockFn = vi
+        .fn()
+        .mockRejectedValueOnce(error)
+        .mockResolvedValue('success');
+
+      const promise = retryWithBackoff(mockFn, {
+        initialDelayMs: 1,
+        maxDelayMs: 1,
+      });
+      await vi.runAllTimersAsync();
+      await expect(promise).resolves.toBe('success');
+      expect(mockFn).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('Flash model fallback for OAuth users', () => {

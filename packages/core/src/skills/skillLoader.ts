@@ -121,10 +121,12 @@ export async function loadSkillsFromDir(
       return [];
     }
 
-    const skillFiles = await glob(['SKILL.md', '*/SKILL.md'], {
+    const pattern = ['SKILL.md', '*/SKILL.md'];
+    const skillFiles = await glob(pattern, {
       cwd: absoluteSearchPath,
       absolute: true,
       nodir: true,
+      ignore: ['**/node_modules/**', '**/.git/**'],
     });
 
     for (const skillFile of skillFiles) {
@@ -171,8 +173,11 @@ export async function loadSkillFromFile(
       return null;
     }
 
+    // Sanitize name for use as a filename/directory name (e.g. replace ':' with '-')
+    const sanitizedName = frontmatter.name.replace(/[:\\/<>*?"|]/g, '-');
+
     return {
-      name: frontmatter.name,
+      name: sanitizedName,
       description: frontmatter.description,
       location: filePath,
       body: match[2]?.trim() ?? '',
