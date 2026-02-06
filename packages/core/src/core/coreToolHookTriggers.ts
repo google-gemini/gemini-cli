@@ -72,6 +72,7 @@ export async function executeToolWithHooks(
   shellExecutionConfig?: ShellExecutionConfig,
   setPidCallback?: (pid: number) => void,
   config?: Config,
+  originalRequestName?: string,
 ): Promise<ToolResult> {
   const toolInput = (invocation.params || {}) as Record<string, unknown>;
   let inputWasModified = false;
@@ -86,6 +87,7 @@ export async function executeToolWithHooks(
       toolName,
       toolInput,
       mcpContext,
+      originalRequestName,
     );
 
     // Check if hook requested to stop entire agent execution
@@ -192,6 +194,7 @@ export async function executeToolWithHooks(
         error: toolResult.error,
       },
       mcpContext,
+      originalRequestName,
     );
 
     // Check if hook requested to stop entire agent execution
@@ -237,6 +240,12 @@ export async function executeToolWithHooks(
       } else {
         toolResult.llmContent = wrappedContext;
       }
+    }
+
+    // Check if the hook requested a tail tool call
+    const tailToolCallRequest = afterOutput?.getTailToolCallRequest();
+    if (tailToolCallRequest) {
+      toolResult.tailToolCallRequest = tailToolCallRequest;
     }
   }
 

@@ -98,6 +98,7 @@ export class ToolExecutor {
               shellExecutionConfig,
               setPidCallback,
               this.config,
+              request.originalRequestName,
             );
           } else {
             promise = executeToolWithHooks(
@@ -109,6 +110,7 @@ export class ToolExecutor {
               shellExecutionConfig,
               undefined,
               this.config,
+              request.originalRequestName,
             );
           }
 
@@ -132,6 +134,7 @@ export class ToolExecutor {
               new Error(toolResult.error.message),
               toolResult.error.type,
               displayText,
+              toolResult.tailToolCallRequest,
             );
           }
         } catch (executionError: unknown) {
@@ -201,7 +204,7 @@ export class ToolExecutor {
   ): Promise<SuccessfulToolCall> {
     let content = toolResult.llmContent;
     let outputFile: string | undefined;
-    const toolName = call.request.name;
+    const toolName = call.request.originalRequestName || call.request.name;
     const callId = call.request.callId;
 
     if (
@@ -263,7 +266,7 @@ export class ToolExecutor {
       throw new Error('Successful tool call missing tool or invocation');
     }
 
-    return {
+    const result: SuccessfulToolCall = {
       status: 'success',
       request: call.request,
       tool: call.tool,
@@ -271,7 +274,10 @@ export class ToolExecutor {
       invocation: call.invocation,
       durationMs: startTime ? Date.now() - startTime : undefined,
       outcome: call.outcome,
+      tailToolCallRequest: toolResult.tailToolCallRequest,
     };
+
+    return result;
   }
 
   private createErrorResult(
@@ -279,6 +285,7 @@ export class ToolExecutor {
     error: Error,
     errorType?: ToolErrorType,
     returnDisplay?: string,
+    tailToolCallRequest?: { name: string; args: Record<string, unknown> },
   ): ErroredToolCall {
     const response = this.createErrorResponse(
       call.request,
@@ -292,9 +299,10 @@ export class ToolExecutor {
       status: 'error',
       request: call.request,
       response,
-      tool: call.tool,
+      tool: 'tool' in call ? call.tool : undefined,
       durationMs: startTime ? Date.now() - startTime : undefined,
       outcome: call.outcome,
+      tailToolCallRequest,
     };
   }
 
@@ -312,7 +320,7 @@ export class ToolExecutor {
         {
           functionResponse: {
             id: request.callId,
-            name: request.name,
+            name: request.originalRequestName || request.name,
             response: { error: error.message },
           },
         },

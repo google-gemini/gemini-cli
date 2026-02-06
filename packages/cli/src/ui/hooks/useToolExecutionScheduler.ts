@@ -217,6 +217,23 @@ function adaptToolCalls(
     const prev = prevMap.get(coreCall.request.callId);
     const responseSubmittedToGemini = prev?.responseSubmittedToGemini ?? false;
 
+    // --- TAIL CALL MASKING ---
+    // If the tool is theoretically "success" but includes a tailToolCallRequest,
+    // the Core scheduler is about to swap it out for the tail call.
+    // We mask this state as 'executing' in the UI so the spinner keeps spinning
+    // and we don't prematurely submit the result to Gemini.
+    if (
+      coreCall.status === 'success' &&
+      'tailToolCallRequest' in coreCall &&
+      coreCall.tailToolCallRequest
+    ) {
+      return {
+        ...coreCall,
+        status: 'executing',
+        responseSubmittedToGemini,
+      };
+    }
+
     // Inject onConfirm adapter for tools awaiting approval.
     // The Core provides data-only (serializable) confirmationDetails. We must
     // inject the legacy callback function that proxies responses back to the

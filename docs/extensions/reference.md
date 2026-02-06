@@ -137,7 +137,9 @@ The file has the following structure:
   "description": "My awesome extension",
   "mcpServers": {
     "my-server": {
-      "command": "node my-server.js"
+      "command": "node",
+      "args": ["${extensionPath}/my-server.js"],
+      "cwd": "${extensionPath}"
     }
   },
   "contextFileName": "GEMINI.md",
@@ -156,12 +158,16 @@ The file has the following structure:
   [geminicli.com/extensions](https://geminicli.com/extensions).
 - `mcpServers`: A map of MCP servers to settings. The key is the name of the
   server, and the value is the server configuration. These servers will be
-  loaded on startup just like MCP servers settingsd in a
+  loaded on startup just like MCP servers defined in a
   [`settings.json` file](../get-started/configuration.md). If both an extension
-  and a `settings.json` file settings an MCP server with the same name, the
-  server defined in the `settings.json` file takes precedence.
+  and a `settings.json` file define an MCP server with the same name, the server
+  defined in the `settings.json` file takes precedence.
   - Note that all MCP server configuration options are supported except for
     `trust`.
+  - For portability, you should use `${extensionPath}` to refer to files within
+    your extension directory.
+  - Separate your executable and its arguments using `command` and `args`
+    instead of putting them both in `command`.
 - `contextFileName`: The name of the file that contains the context for the
   extension. This will be used to load the context from the extension directory.
   If this property is not used but a `GEMINI.md` file is present in your

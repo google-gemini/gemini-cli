@@ -126,6 +126,10 @@ hiding sensitive output from the agent.
     back to the model.
   - `hookSpecificOutput.additionalContext`: Text that is **appended** to the
     tool result for the agent.
+  - `hookSpecificOutput.tailToolCallRequest`: (`{ name: string, args: object }`)
+    A request to execute another tool immediately after this one. The result of
+    this "tail call" will replace the original tool's response. Ideal for
+    programmatic tool routing.
   - `continue`: Set to `false` to **kill the entire agent loop** immediately.
 - **Exit Code 2 (Block Result)**: Hides the tool result. Uses `stderr` as the
   replacement content sent to the agent. **The turn continues.**
