@@ -331,11 +331,16 @@ export async function calculateReplacement(
   // or simple off-by-one errors.
   const startLinesToTry = [start_line];
   if (start_line && start_line > 1) {
-    // Iterate backwards up to 20 lines to find the closest match.
-    // This avoids skipping over intended matches if we jump back too far.
-    const limit = Math.max(1, start_line - 20);
-    for (let i = start_line - 1; i >= limit; i--) {
-      startLinesToTry.push(i);
+    // Iterate up to 20 lines in both directions (lookback and lookahead).
+    // This attempts to find the closest match if the provided start_line is slightly off.
+    for (let i = 1; i <= 20; i++) {
+      const lookback = start_line - i;
+      const lookahead = start_line + i;
+
+      if (lookback > 0) {
+        startLinesToTry.push(lookback);
+      }
+      startLinesToTry.push(lookahead);
     }
   }
 
