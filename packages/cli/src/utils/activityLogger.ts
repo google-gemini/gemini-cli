@@ -22,22 +22,26 @@ const ACTIVITY_ID_HEADER = 'x-activity-request-id';
 const MAX_BUFFER_SIZE = 100;
 
 /**
- * Parse a host:port string into its components
+ * Parse a host:port string into its components.
+ * Uses the URL constructor for robust handling of IPv4, IPv6, and hostnames.
+ * Returns null for file paths or values without a valid port.
  */
 function parseHostPort(value: string): { host: string; port: number } | null {
-  // Must contain exactly one colon and not start with /
   if (value.startsWith('/') || value.startsWith('.')) return null;
 
-  const colonIndex = value.lastIndexOf(':');
-  if (colonIndex === -1) return null;
+  try {
+    const url = new URL(`ws://${value}`);
+    if (!url.port) return null;
 
-  const host = value.substring(0, colonIndex);
-  const portStr = value.substring(colonIndex + 1);
-  const port = parseInt(portStr, 10);
+    const port = parseInt(url.port, 10);
+    if (url.hostname && !isNaN(port) && port > 0 && port <= 65535) {
+      return { host: url.hostname, port };
+    }
+  } catch {
+    // Not a valid host:port
+  }
 
-  if (!host || isNaN(port) || port < 1 || port > 65535) return null;
-
-  return { host, port };
+  return null;
 }
 
 export interface NetworkLog {
