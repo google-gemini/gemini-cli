@@ -448,10 +448,14 @@ function setupFileLogging(
 ) {
   const logFile =
     customPath ||
-    path.join(
-      config.storage!.getProjectTempLogsDir(),
-      `session-${config.getSessionId()}.jsonl`,
-    );
+    (config.storage
+      ? path.join(
+          config.storage.getProjectTempLogsDir(),
+          `session-${config.getSessionId()}.jsonl`,
+        )
+      : null);
+
+  if (!logFile) return;
 
   const logsDir = path.dirname(logFile);
   if (!fs.existsSync(logsDir)) {
@@ -656,26 +660,29 @@ function setupNetworkLogging(
  * @param config The CLI configuration
  */
 export function registerActivityLogger(config: Config) {
-  if (config.storage) {
-    const capture = ActivityLogger.getInstance();
-    capture.enable();
+  const target = process.env['GEMINI_CLI_ACTIVITY_LOG_TARGET'];
+  const hostPort = target ? parseHostPort(target) : null;
 
-    const target = process.env['GEMINI_CLI_ACTIVITY_LOG_TARGET'];
-    const hostPort = target ? parseHostPort(target) : null;
-
-    if (hostPort) {
-      // Network mode: send logs via HTTP POST
-      setupNetworkLogging(capture, hostPort.host, hostPort.port, config);
-      // Auto-enable network logging when target is explicitly configured
-      capture.enableNetworkLogging();
-    } else {
-      // File mode: write to JSONL file
-      setupFileLogging(capture, config, target);
-    }
-
-    // Bridge CoreEvents to local capture
-    coreEvents.on(CoreEvent.ConsoleLog, (payload) => {
-      capture.logConsole(payload);
-    });
+  // Network mode doesn't need storage; file mode does
+  if (!hostPort && !config.storage) {
+    return;
   }
+
+  const capture = ActivityLogger.getInstance();
+  capture.enable();
+
+  if (hostPort) {
+    // Network mode: send logs via WebSocket
+    setupNetworkLogging(capture, hostPort.host, hostPort.port, config);
+    // Auto-enable network logging when target is explicitly configured
+    capture.enableNetworkLogging();
+  } else {
+    // File mode: write to JSONL file
+    setupFileLogging(capture, config, target);
+  }
+
+  // Bridge CoreEvents to local capture
+  coreEvents.on(CoreEvent.ConsoleLog, (payload) => {
+    capture.logConsole(payload);
+  });
 }
