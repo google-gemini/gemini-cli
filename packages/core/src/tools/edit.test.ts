@@ -737,17 +737,18 @@ describe('EditTool', () => {
       filePath = path.join(rootDir, testFile);
     });
 
-    it('should skip occurrences before start_line and replace the first one after', async () => {
+    it('should skip occurrences before start_line and replace all after', async () => {
       const content = 'match\nmatch\nmatch\nmatch';
       fs.writeFileSync(filePath, content, 'utf8');
 
-      // Target the 3rd match (line 3)
+      // Target the 3rd match (line 3). There is also a match on line 4.
       const params: EditToolParams = {
         file_path: filePath,
-        instruction: 'Replace the 3rd match',
+        instruction: 'Replace the matches starting from line 3',
         old_string: 'match',
         new_string: 'replacement',
         start_line: 3,
+        expected_replacements: 2,
       };
 
       const invocation = tool.build(params);
@@ -755,27 +756,72 @@ describe('EditTool', () => {
 
       expect(result.error).toBeUndefined();
       const finalContent = fs.readFileSync(filePath, 'utf8');
-      expect(finalContent).toBe('match\nmatch\nreplacement\nmatch');
-      expect(result.llmContent).toContain('(1 replacements)');
+      expect(finalContent).toBe('match\nmatch\nreplacement\nreplacement');
+      expect(result.llmContent).toContain('(2 replacements)');
     });
 
     it('should return error if no match found after start_line', async () => {
       const content = 'match\nmatch\nmatch\nmatch';
       fs.writeFileSync(filePath, content, 'utf8');
 
-      // Target match after line 5 (doesn't exist)
+      // Target match after line 20 (doesn't exist and is far enough to avoid lookback)
       const params: EditToolParams = {
         file_path: filePath,
-        instruction: 'Replace match after line 5',
+        instruction: 'Replace match after line 20',
         old_string: 'match',
         new_string: 'replacement',
-        start_line: 5,
+        start_line: 20,
       };
 
       const invocation = tool.build(params);
       const result = await invocation.execute(new AbortController().signal);
 
       expect(result.error?.type).toBe(ToolErrorType.EDIT_NO_OCCURRENCE_FOUND);
+    });
+
+    it('should succeed with multiple context lines via lookback', async () => {
+      const content = 'ctx1\nctx2\nctx3\ntarget\nother';
+      fs.writeFileSync(filePath, content, 'utf8');
+
+      // old_string includes 3 lines of context.
+      // start_line points to target (line 4).
+      // Lookback needs to go back at least 3 lines.
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace target',
+        old_string: 'ctx1\nctx2\nctx3\ntarget',
+        new_string: 'ctx1\nctx2\nctx3\nreplacement',
+        start_line: 4,
+      };
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error).toBeUndefined();
+      const finalContent = fs.readFileSync(filePath, 'utf8');
+      expect(finalContent).toBe('ctx1\nctx2\nctx3\nreplacement\nother');
+    });
+
+    it('should succeed if old_string has context line and start_line skips that context (via lookback)', async () => {
+      const content = 'context\ntarget\nother';
+      fs.writeFileSync(filePath, content, 'utf8');
+
+      // old_string includes context from line 1.
+      // start_line points to target (line 2).
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace target',
+        old_string: 'context\ntarget',
+        new_string: 'context\nreplacement',
+        start_line: 2,
+      };
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error).toBeUndefined();
+      const finalContent = fs.readFileSync(filePath, 'utf8');
+      expect(finalContent).toBe('context\nreplacement\nother');
     });
   });
 
