@@ -4028,6 +4028,78 @@ describe('InputPrompt', () => {
       });
     });
   });
+
+  describe('shortcuts help visibility', () => {
+    it('should close shortcuts help when a terminal paste event occurs', async () => {
+      const setShortcutsHelpVisible = vi.fn();
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiState: { shortcutsHelpVisible: true },
+          uiActions: { setShortcutsHelpVisible },
+        },
+      );
+
+      await act(async () => {
+        // Simulate terminal paste event
+        stdin.write('\x1b[200~pasted text\x1b[201~');
+      });
+
+      await waitFor(() => {
+        expect(setShortcutsHelpVisible).toHaveBeenCalledWith(false);
+      });
+      unmount();
+    });
+
+    it('should close shortcuts help when Ctrl+V (PASTE_CLIPBOARD) is pressed', async () => {
+      const setShortcutsHelpVisible = vi.fn();
+      vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
+      vi.mocked(clipboardy.read).mockResolvedValue('clipboard text');
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiState: { shortcutsHelpVisible: true },
+          uiActions: { setShortcutsHelpVisible },
+        },
+      );
+
+      await act(async () => {
+        // Send Ctrl+V (\x16)
+        stdin.write('\x16');
+      });
+
+      await waitFor(() => {
+        expect(setShortcutsHelpVisible).toHaveBeenCalledWith(false);
+      });
+      unmount();
+    });
+
+    it('should close shortcuts help when mouse right-click paste occurs', async () => {
+      const setShortcutsHelpVisible = vi.fn();
+      vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
+      vi.mocked(clipboardy.read).mockResolvedValue('clipboard text');
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiState: { shortcutsHelpVisible: true },
+          uiActions: { setShortcutsHelpVisible },
+          mouseEventsEnabled: true,
+        },
+      );
+
+      await act(async () => {
+        // Simulate right-click release (SGR format: \x1b[<2;col;row m)
+        stdin.write('\x1b[<2;1;1m');
+      });
+
+      await waitFor(() => {
+        expect(setShortcutsHelpVisible).toHaveBeenCalledWith(false);
+      });
+      unmount();
+    });
+  });
 });
 
 function clean(str: string | undefined): string {

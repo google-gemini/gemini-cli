@@ -1,0 +1,21 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ShortcutsHelp > renders correctly in narrow mode 1`] = `
+"── Shortcuts (for more, see /help) ─────
+ ! shell mode
+ Shift+Tab cycle mode
+ Ctrl+V paste images
+ @ select file or folder
+ Ctrl+Y YOLO mode
+ Ctrl+R reverse-search history
+ Esc Esc clear prompt / rewind
+ Option+M raw markdown mode
+ Ctrl+X open external editor"
+`;
+
+exports[`ShortcutsHelp > renders correctly in wide mode 1`] = `
+"── Shortcuts (for more, see /help) ─────────────────────────────────────────────────────────────────
+ ! shell mode                    Shift+Tab cycle mode            Ctrl+V paste images
+ @ select file or folder         Ctrl+Y YOLO mode                Ctrl+R reverse-search history
+ Esc Esc clear prompt / rewind   Option+M raw markdown mode      Ctrl+X open external editor"
+`;

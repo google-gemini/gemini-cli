@@ -359,6 +359,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   // Handle clipboard image pasting with Ctrl+V
   const handleClipboardPaste = useCallback(async () => {
+    if (shortcutsHelpVisible) {
+      setShortcutsHelpVisible(false);
+    }
     try {
       if (await clipboardHasImage()) {
         const imagePath = await saveClipboardImage(config.getTargetDir());
@@ -403,7 +406,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     } catch (error) {
       debugLogger.error('Error handling paste:', error);
     }
-  }, [buffer, config, stdout, settings]);
+  }, [
+    buffer,
+    config,
+    stdout,
+    settings,
+    shortcutsHelpVisible,
+    setShortcutsHelpVisible,
+  ]);
 
   useMouseClick(
     innerBoxRef,
@@ -553,6 +563,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (key.name === 'paste') {
+        if (shortcutsHelpVisible) {
+          setShortcutsHelpVisible(false);
+        }
         // Record paste time to prevent accidental auto-submission
         if (!isTerminalPasteTrusted(kittyProtocol.enabled)) {
           setRecentUnsafePasteTime(Date.now());
