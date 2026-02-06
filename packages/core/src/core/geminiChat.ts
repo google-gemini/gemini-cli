@@ -240,6 +240,7 @@ export class GeminiChat {
   private sendPromise: Promise<void> = Promise.resolve();
   private readonly chatRecordingService: ChatRecordingService;
   private lastPromptTokenCount: number;
+  private lastUsedModel?: string;
 
   constructor(
     private readonly config: Config,
@@ -581,6 +582,10 @@ export class GeminiChat {
       }
 
       // Track final request parameters for AfterModel hooks
+      if (modelToUse !== this.lastUsedModel) {
+        await this.config.getGeminiClient().setTools(modelToUse);
+        this.lastUsedModel = modelToUse;
+      }
       lastModelToUse = modelToUse;
       lastConfig = config;
       lastContentsToUse = contentsToUse;

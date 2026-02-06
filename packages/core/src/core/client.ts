@@ -256,7 +256,14 @@ export class GeminiClient {
     this.forceFullIdeContext = true;
   }
 
+  private lastUsedModelId?: string;
+
   async setTools(modelId?: string): Promise<void> {
+    if (modelId && modelId === this.lastUsedModelId) {
+      return;
+    }
+    this.lastUsedModelId = modelId;
+
     const toolRegistry = this.config.getToolRegistry();
     const toolDeclarations = toolRegistry.getFunctionDeclarations(modelId);
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
