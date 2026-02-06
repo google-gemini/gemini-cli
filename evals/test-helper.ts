@@ -40,6 +40,7 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
     const rig = new TestRig();
     const { logDir, sanitizedName } = await prepareLogDir(evalCase.name);
     const activityLogFile = path.join(logDir, `${sanitizedName}.jsonl`);
+    rig.setActivityLogFile(activityLogFile);
     const logFile = path.join(logDir, `${sanitizedName}.log`);
     let isSuccess = false;
     try {
@@ -61,6 +62,9 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
           const fullPath = path.join(rig.testDir!, filePath);
           fs.mkdirSync(path.dirname(fullPath), { recursive: true });
           fs.writeFileSync(fullPath, content);
+          if (filePath.startsWith('bin/')) {
+            fs.chmodSync(fullPath, 0o755);
+          }
 
           // If it's an agent file, calculate hash for acknowledgement
           if (
@@ -126,6 +130,8 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
         timeout: evalCase.timeout,
         env: {
           GEMINI_CLI_ACTIVITY_LOG_FILE: activityLogFile,
+          PATH: `${path.join(rig.testDir!, 'bin')}${path.delimiter}${process.env.PATH}`,
+          ...evalCase.env,
         },
       });
 
@@ -160,9 +166,9 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
   };
 
   if (policy === 'USUALLY_PASSES' && !process.env['RUN_EVALS']) {
-    it.skip(evalCase.name, fn);
+    it.skip(evalCase.name, fn, evalCase.timeout);
   } else {
-    it(evalCase.name, fn);
+    it(evalCase.name, fn, evalCase.timeout);
   }
 }
 
@@ -176,8 +182,9 @@ async function prepareLogDir(name: string) {
 export interface EvalCase {
   name: string;
   params?: Record<string, any>;
-  prompt: string;
+  prompt: string | string[];
   timeout?: number;
+  env?: Record<string, string>;
   files?: Record<string, string>;
   approvalMode?: 'default' | 'auto_edit' | 'yolo' | 'plan';
   assert: (rig: TestRig, result: string) => Promise<void>;

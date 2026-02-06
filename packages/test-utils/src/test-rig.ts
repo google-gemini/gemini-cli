@@ -343,8 +343,13 @@ export class TestRig {
   fakeResponsesPath?: string;
   // Original fake responses file path for rewriting goldens in record mode.
   originalFakeResponsesPath?: string;
+  private _activityLogFile?: string;
   private _interactiveRuns: InteractiveRun[] = [];
   private _spawnedProcesses: ChildProcess[] = [];
+
+  setActivityLogFile(path: string) {
+    this._activityLogFile = path;
+  }
 
   setup(
     testName: string,
@@ -382,7 +387,8 @@ export class TestRig {
 
     // In sandbox mode, use an absolute path for telemetry inside the container
     // The container mounts the test directory at the same path as the host
-    const telemetryPath = join(this.homeDir!, 'telemetry.log'); // Always use home directory for telemetry
+    const telemetryPath =
+      this._activityLogFile || join(this.homeDir!, 'telemetry.log');
 
     const settings = deepMerge(
       {
@@ -853,7 +859,8 @@ export class TestRig {
 
   async waitForTelemetryReady() {
     // Telemetry is always written to the test directory
-    const logFilePath = join(this.homeDir!, 'telemetry.log');
+    const logFilePath =
+      this._activityLogFile || join(this.homeDir!, 'telemetry.log');
 
     if (!logFilePath) return;
 
@@ -1103,7 +1110,8 @@ export class TestRig {
 
   private _readAndParseTelemetryLog(): ParsedLog[] {
     // Telemetry is always written to the test directory
-    const logFilePath = join(this.homeDir!, 'telemetry.log');
+    const logFilePath =
+      this._activityLogFile || join(this.homeDir!, 'telemetry.log');
 
     if (!logFilePath || !fs.existsSync(logFilePath)) {
       return [];
@@ -1145,7 +1153,8 @@ export class TestRig {
     // If not, fall back to parsing from stdout
     if (env['GEMINI_SANDBOX'] === 'podman') {
       // Try reading from file first
-      const logFilePath = join(this.homeDir!, 'telemetry.log');
+      const logFilePath =
+        this._activityLogFile || join(this.homeDir!, 'telemetry.log');
 
       if (fs.existsSync(logFilePath)) {
         try {

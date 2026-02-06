@@ -38,6 +38,9 @@ function getModelFromPath(reportPath) {
   const artifactDir = parts.find((p) => p.startsWith('eval-logs-'));
   if (!artifactDir) return 'unknown';
 
+  const matchWorkflow = artifactDir.match(/^eval-logs-workflows-(.+)$/);
+  if (matchWorkflow) return `${matchWorkflow[1]} (Workflow)`;
+
   const matchNew = artifactDir.match(/^eval-logs-(.+)-(\d+)$/);
   if (matchNew) return matchNew[1];
 
@@ -68,12 +71,14 @@ function getStats(reports) {
           if (!testStats[name]) {
             testStats[name] = { passed: 0, failed: 0, total: 0 };
           }
-          testStats[name].total++;
           if (assertion.status === 'passed') {
             testStats[name].passed++;
-          } else {
+            testStats[name].total++;
+          } else if (assertion.status === 'failed') {
             testStats[name].failed++;
+            testStats[name].total++;
           }
+          // Ignore skipped/pending tests
         }
       }
     } catch (error) {
