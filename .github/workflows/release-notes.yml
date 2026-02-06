@@ -5,6 +5,16 @@ name: 'Generate Release Notes'
 on:
   release:
     types: ['created']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'New version (e.g., v1.2.3)'
+        required: true
+        type: 'string'
+      body:
+        description: 'Release notes body'
+        required: true
+        type: 'string'
 
 jobs:
   generate-release-notes:
@@ -27,11 +37,14 @@ jobs:
       - name: 'Get release information'
         id: 'release_info'
         run: |
-          echo "VERSION=${{ github.event.release.tag_name }}" >> "$GITHUB_OUTPUT"
+          VERSION="${{ github.event.inputs.version || github.event.release.tag_name }}"
+          BODY="${{ github.event.inputs.body || github.event.release.body }}"
+
+          echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
 
           # Use a heredoc to preserve multiline release body
           echo 'RAW_CHANGELOG<<EOF' >> "$GITHUB_OUTPUT"
-          echo "${{ github.event.release.body }}" >> "$GITHUB_OUTPUT"
+          echo "${BODY}" >> "$GITHUB_OUTPUT"
           echo 'EOF' >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
