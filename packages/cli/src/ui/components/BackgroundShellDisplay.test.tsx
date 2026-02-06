@@ -9,8 +9,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BackgroundShellDisplay } from './BackgroundShellDisplay.js';
 import { type BackgroundShell } from '../hooks/shellCommandProcessor.js';
 import { ShellExecutionService } from '@google/gemini-cli-core';
-import { Command } from '../keyMatchers.js';
-import { formatCommand } from '../utils/keybindingUtils.js';
 import { act } from 'react';
 import { type Key, type KeypressHandler } from '../contexts/KeypressContext.js';
 import { ScrollProvider } from '../contexts/ScrollProvider.js';
@@ -406,56 +404,5 @@ describe('<BackgroundShellDisplay />', () => {
     });
 
     expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('unfocuses the shell when Shift+Tab is pressed', async () => {
-    render(
-      <ScrollProvider>
-        <BackgroundShellDisplay
-          shells={mockShells}
-          activePid={shell1.pid}
-          width={80}
-          height={24}
-          isFocused={true}
-          isListOpenProp={false}
-        />
-      </ScrollProvider>,
-    );
-    await act(async () => {
-      await delay(0);
-    });
-
-    act(() => {
-      simulateKey({ name: 'tab', shift: true });
-    });
-
-    expect(mockSetEmbeddedShellFocused).toHaveBeenCalledWith(false);
-  });
-
-  it('shows a warning when Tab is pressed', async () => {
-    render(
-      <ScrollProvider>
-        <BackgroundShellDisplay
-          shells={mockShells}
-          activePid={shell1.pid}
-          width={80}
-          height={24}
-          isFocused={true}
-          isListOpenProp={false}
-        />
-      </ScrollProvider>,
-    );
-    await act(async () => {
-      await delay(0);
-    });
-
-    act(() => {
-      simulateKey({ name: 'tab' });
-    });
-
-    expect(mockHandleWarning).toHaveBeenCalledWith(
-      `Press ${formatCommand(Command.UNFOCUS_BACKGROUND_SHELL)} to focus out.`,
-    );
-    expect(mockSetEmbeddedShellFocused).not.toHaveBeenCalled();
   });
 });

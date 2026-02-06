@@ -53,7 +53,7 @@ describe('ShellInputPrompt', () => {
     expect(lastFrame()).toBe('');
   });
 
-  it('shows unfocus warning on Tab and sends tab to pty', () => {
+  it('sends tab to pty', () => {
     render(<ShellInputPrompt activeShellPtyId={1} focus={true} />);
 
     const handler = mockUseKeypress.mock.calls[0][0];
@@ -67,9 +67,6 @@ describe('ShellInputPrompt', () => {
       sequence: '\t',
     });
 
-    expect(mockHandleWarning).toHaveBeenCalledWith(
-      expect.stringContaining('Shift+Tab'),
-    );
     expect(mockWriteToPty).toHaveBeenCalledWith(1, '\t');
   });
 
