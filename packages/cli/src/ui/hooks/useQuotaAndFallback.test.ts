@@ -5,34 +5,34 @@
  */
 
 import {
-  vi,
-  describe,
-  it,
-  expect,
-  beforeEach,
+  AuthType,
+  DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL,
+  ModelNotFoundError,
+  PREVIEW_GEMINI_MODEL,
+  RetryableQuotaError,
+  TerminalQuotaError,
+  UserTierId,
+  makeFakeConfig,
+  type Config,
+  type FallbackIntent,
+  type FallbackModelHandler,
+  type GoogleApiError,
+} from '@google/gemini-cli-core';
+import { act } from 'react';
+import {
   afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
   type Mock,
 } from 'vitest';
-import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
-import {
-  type Config,
-  type FallbackModelHandler,
-  type FallbackIntent,
-  UserTierId,
-  AuthType,
-  TerminalQuotaError,
-  makeFakeConfig,
-  type GoogleApiError,
-  RetryableQuotaError,
-  PREVIEW_GEMINI_MODEL,
-  ModelNotFoundError,
-  DEFAULT_GEMINI_MODEL,
-  DEFAULT_GEMINI_FLASH_MODEL,
-} from '@google/gemini-cli-core';
-import { useQuotaAndFallback } from './useQuotaAndFallback.js';
-import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { MessageType } from '../types.js';
+import type { UseHistoryManagerReturn } from './useHistoryManager.js';
+import { useQuotaAndFallback } from './useQuotaAndFallback.js';
 
 // Use a type alias for SpyInstance as it's not directly exported
 type SpyInstance = ReturnType<typeof vi.spyOn>;
@@ -156,7 +156,7 @@ describe('useQuotaAndFallback', () => {
 
         const message = request!.message;
         expect(message).toContain('Usage limit reached for gemini-pro.');
-        expect(message).toContain('Access resets at'); // From getResetTimeMessage
+        expect(message).toContain('Access resets on'); // From getResetTimeMessage
         expect(message).toContain('/stats for usage details');
         expect(message).toContain('/auth to switch to API key.');
 

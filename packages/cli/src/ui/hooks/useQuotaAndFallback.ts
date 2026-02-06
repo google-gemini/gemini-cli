@@ -6,25 +6,25 @@
 
 import {
   AuthType,
+  DEFAULT_GEMINI_MODEL,
+  ModelNotFoundError,
+  PREVIEW_GEMINI_MODEL,
+  TerminalQuotaError,
+  VALID_GEMINI_MODELS,
   type Config,
-  type FallbackModelHandler,
   type FallbackIntent,
+  type FallbackModelHandler,
+  type UserTierId,
   type ValidationHandler,
   type ValidationIntent,
-  TerminalQuotaError,
-  ModelNotFoundError,
-  type UserTierId,
-  PREVIEW_GEMINI_MODEL,
-  DEFAULT_GEMINI_MODEL,
-  VALID_GEMINI_MODELS,
 } from '@google/gemini-cli-core';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { type UseHistoryManagerReturn } from './useHistoryManager.js';
-import { MessageType } from '../types.js';
 import {
   type ProQuotaDialogRequest,
   type ValidationDialogRequest,
 } from '../contexts/UIStateContext.js';
+import { MessageType } from '../types.js';
+import { type UseHistoryManagerReturn } from './useHistoryManager.js';
 
 interface UseQuotaAndFallbackArgs {
   config: Config;
@@ -218,10 +218,13 @@ function getResetTimeMessage(delayMs: number): string {
   const resetDate = new Date(Date.now() + delayMs);
 
   const timeFormatter = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
     timeZoneName: 'short',
   });
 
-  return `Access resets at ${timeFormatter.format(resetDate)}.`;
+  return `Access resets on ${timeFormatter.format(resetDate)}.`;
 }
