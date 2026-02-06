@@ -33,7 +33,7 @@ export function stripTrailingPunctuation(url: string): {
   // Count parentheses once upfront to avoid O(N²) complexity
   const allParens = url.match(PARENS_REGEX) || [];
   const openParens = allParens.filter((c) => c === '(' || c === '（').length;
-  let closeParens = allParens.filter((c) => c === ')' || c === '）').length;
+  let closeParens = allParens.length - openParens;
 
   let i = url.length - 1;
   while (i >= 0) {
