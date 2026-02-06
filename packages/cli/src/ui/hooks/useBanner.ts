@@ -9,7 +9,6 @@ import { persistentState } from '../../utils/persistentState.js';
 import crypto from 'node:crypto';
 
 const DEFAULT_MAX_BANNER_SHOWN_COUNT = 5;
-const SHOW_DEFAULT_BANNER = false;
 
 interface BannerData {
   defaultText: string;
@@ -31,9 +30,7 @@ export function useBanner(bannerData: BannerData) {
   const currentBannerCount = bannerCounts[hashedText] || 0;
 
   const showDefaultBanner =
-    SHOW_DEFAULT_BANNER &&
-    warningText === '' &&
-    currentBannerCount < DEFAULT_MAX_BANNER_SHOWN_COUNT;
+    warningText === '' && currentBannerCount < DEFAULT_MAX_BANNER_SHOWN_COUNT;
 
   const rawBannerText = showDefaultBanner ? defaultText : warningText;
   const bannerText = rawBannerText.replace(/\\n/g, '\n');
