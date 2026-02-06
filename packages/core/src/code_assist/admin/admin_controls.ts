@@ -238,3 +238,25 @@ export function getAdminErrorMessage(
   const projectParam = projectId ? `?project=${projectId}` : '';
   return `${featureName} is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli${projectParam}`;
 }
+
+/**
+ * Returns a standardized error message for MCP servers blocked by the admin allowlist.
+ *
+ * @param blockedServers List of blocked server names
+ * @param config The application config
+ * @returns The formatted error message
+ */
+export function getAdminBlockedMcpServersMessage(
+  blockedServers: string[],
+  config: Config | undefined,
+): string {
+  const server = config ? getCodeAssistServer(config) : undefined;
+  const projectId = server?.projectId;
+  const projectParam = projectId ? `?project=${projectId}` : '';
+  const count = blockedServers.length;
+  const serverText = count === 1 ? 'server is' : 'servers are';
+
+  return `${count} MCP ${serverText} not allowlisted by your administrator. To enable ${
+    count === 1 ? 'it' : 'them'
+  }, please request an update to the settings at: https://goo.gle/manage-gemini-cli${projectParam}`;
+}

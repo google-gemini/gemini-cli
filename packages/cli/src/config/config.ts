@@ -36,9 +36,10 @@ import {
   GEMINI_MODEL_ALIAS_AUTO,
   getAdminErrorMessage,
   Config,
+  applyAdminAllowlist,
+  getAdminBlockedMcpServersMessage,
 } from '@google/gemini-cli-core';
 import type {
-  MCPServerConfig,
   HookDefinition,
   HookEventName,
   OutputFormat,
@@ -692,38 +693,17 @@ export async function loadCliConfig(
   let mcpServers = mcpEnabled ? settings.mcpServers : {};
 
   if (mcpEnabled && adminAllowlist && Object.keys(adminAllowlist).length > 0) {
-    const filteredMcpServers: Record<string, MCPServerConfig> = {};
-    for (const [serverId, localConfig] of Object.entries(mcpServers)) {
-      const adminConfig = adminAllowlist[serverId];
-      if (adminConfig) {
-        const mergedConfig = {
-          ...localConfig,
-          url: adminConfig.url,
-          type: adminConfig.type,
-          trust: adminConfig.trust,
-        };
-
-        // Remove local connection details
-        delete mergedConfig.command;
-        delete mergedConfig.args;
-        delete mergedConfig.env;
-        delete mergedConfig.cwd;
-        delete mergedConfig.httpUrl;
-        delete mergedConfig.tcp;
-
-        if (
-          (adminConfig.includeTools && adminConfig.includeTools.length > 0) ||
-          (adminConfig.excludeTools && adminConfig.excludeTools.length > 0)
-        ) {
-          mergedConfig.includeTools = adminConfig.includeTools;
-          mergedConfig.excludeTools = adminConfig.excludeTools;
-        }
-
-        filteredMcpServers[serverId] = mergedConfig;
-      }
-    }
-    mcpServers = filteredMcpServers;
+    const result = applyAdminAllowlist(mcpServers, adminAllowlist);
+    mcpServers = result.mcpServers;
     mcpServerCommand = undefined;
+
+    if (result.blockedServerNames && result.blockedServerNames.length > 0) {
+      const message = getAdminBlockedMcpServersMessage(
+        result.blockedServerNames,
+        undefined,
+      );
+      coreEvents.emitConsoleLog('warn', message);
+    }
   }
 
   return new Config({
