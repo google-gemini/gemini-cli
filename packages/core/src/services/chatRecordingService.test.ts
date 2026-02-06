@@ -13,6 +13,7 @@ import type {
   ToolCallRecord,
   MessageRecord,
 } from './chatRecordingService.js';
+import type { Content, Part } from '@google/genai';
 import { ChatRecordingService } from './chatRecordingService.js';
 import type { Config } from '../config/config.js';
 import { getProjectHash } from '../utils/paths.js';
@@ -546,6 +547,201 @@ describe('ChatRecordingService', () => {
       // Recording should NOT be disabled for non-ENOSPC errors (file path still exists)
       expect(chatRecordingService.getConversationFilePath()).not.toBeNull();
       writeFileSyncSpy.mockRestore();
+    });
+  });
+
+  describe('updateMessagesFromHistory', () => {
+    beforeEach(() => {
+      chatRecordingService.initialize();
+    });
+
+    it('should update tool results from API history (masking sync)', () => {
+      // 1. Record an initial message and tool call
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: 'I will list the files.',
+        model: 'gemini-pro',
+      });
+
+      const callId = 'tool-call-123';
+      const originalResult = [{ text: 'a'.repeat(1000) }];
+      chatRecordingService.recordToolCalls('gemini-pro', [
+        {
+          id: callId,
+          name: 'list_files',
+          args: { path: '.' },
+          result: originalResult,
+          status: 'success',
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+
+      // 2. Prepare mock history with masked content
+      const maskedSnippet =
+        '<tool_output_masked>short preview</tool_output_masked>';
+      const history: Content[] = [
+        {
+          role: 'model',
+          parts: [
+            { functionCall: { name: 'list_files', args: { path: '.' } } },
+          ],
+        },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'list_files',
+                id: callId,
+                response: { output: maskedSnippet },
+              },
+            },
+          ],
+        },
+      ];
+
+      // 3. Trigger sync
+      chatRecordingService.updateMessagesFromHistory(history);
+
+      // 4. Verify disk content
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      const conversation = JSON.parse(
+        fs.readFileSync(sessionFile, 'utf8'),
+      ) as ConversationRecord;
+
+      const geminiMsg = conversation.messages[0];
+      if (geminiMsg.type !== 'gemini')
+        throw new Error('Expected gemini message');
+      expect(geminiMsg.toolCalls).toBeDefined();
+      expect(geminiMsg.toolCalls![0].id).toBe(callId);
+      // The implementation stringifies the response object
+      const result = geminiMsg.toolCalls![0].result;
+      if (!Array.isArray(result)) throw new Error('Expected array result');
+      const firstPart = result[0] as Part;
+      expect(firstPart.functionResponse).toBeDefined();
+      expect(firstPart.functionResponse!.id).toBe(callId);
+      expect(firstPart.functionResponse!.response).toEqual({
+        output: maskedSnippet,
+      });
+    });
+    it('should preserve multi-modal sibling parts during sync', () => {
+      chatRecordingService.initialize();
+      const callId = 'multi-modal-call';
+      const originalResult: Part[] = [
+        {
+          functionResponse: {
+            id: callId,
+            name: 'read_file',
+            response: { content: '...' },
+          },
+        },
+        { inlineData: { mimeType: 'image/png', data: 'base64...' } },
+      ];
+
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: '',
+        model: 'gemini-pro',
+      });
+
+      chatRecordingService.recordToolCalls('gemini-pro', [
+        {
+          id: callId,
+          name: 'read_file',
+          args: { path: 'image.png' },
+          result: originalResult,
+          status: 'success',
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+
+      const maskedSnippet = '<masked>';
+      const history: Content[] = [
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'read_file',
+                id: callId,
+                response: { output: maskedSnippet },
+              },
+            },
+            { inlineData: { mimeType: 'image/png', data: 'base64...' } },
+          ],
+        },
+      ];
+
+      chatRecordingService.updateMessagesFromHistory(history);
+
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      const conversation = JSON.parse(
+        fs.readFileSync(sessionFile, 'utf8'),
+      ) as ConversationRecord;
+
+      const lastMsg = conversation.messages[0] as MessageRecord & {
+        type: 'gemini';
+      };
+      const result = lastMsg.toolCalls![0].result as Part[];
+      expect(result).toHaveLength(2);
+      expect(result[0].functionResponse!.response).toEqual({
+        output: maskedSnippet,
+      });
+      expect(result[1].inlineData).toBeDefined();
+      expect(result[1].inlineData!.mimeType).toBe('image/png');
+    });
+
+    it('should handle parts appearing BEFORE the functionResponse in a content block', () => {
+      chatRecordingService.initialize();
+      const callId = 'prefix-part-call';
+
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: '',
+        model: 'gemini-pro',
+      });
+
+      chatRecordingService.recordToolCalls('gemini-pro', [
+        {
+          id: callId,
+          name: 'read_file',
+          args: { path: 'test.txt' },
+          result: [],
+          status: 'success',
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+
+      const history: Content[] = [
+        {
+          role: 'user',
+          parts: [
+            { text: 'Prefix metadata or text' },
+            {
+              functionResponse: {
+                name: 'read_file',
+                id: callId,
+                response: { output: 'file content' },
+              },
+            },
+          ],
+        },
+      ];
+
+      chatRecordingService.updateMessagesFromHistory(history);
+
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      const conversation = JSON.parse(
+        fs.readFileSync(sessionFile, 'utf8'),
+      ) as ConversationRecord;
+
+      const lastMsg = conversation.messages[0] as MessageRecord & {
+        type: 'gemini';
+      };
+      const result = lastMsg.toolCalls![0].result as Part[];
+      expect(result).toHaveLength(2);
+      expect(result[0].text).toBe('Prefix metadata or text');
+      expect(result[1].functionResponse!.id).toBe(callId);
     });
   });
 });
