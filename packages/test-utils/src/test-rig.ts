@@ -390,7 +390,6 @@ export class TestRig {
           // Nightly releases sometimes becomes out of sync with local code and
           // triggers auto-update, which causes tests to fail.
           disableAutoUpdate: true,
-          previewFeatures: false,
         },
         telemetry: {
           enabled: true,

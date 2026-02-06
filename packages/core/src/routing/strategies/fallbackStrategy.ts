@@ -23,10 +23,7 @@ export class FallbackStrategy implements RoutingStrategy {
     _baseLlmClient: BaseLlmClient,
   ): Promise<RoutingDecision | null> {
     const requestedModel = context.requestedModel ?? config.getModel();
-    const resolvedModel = resolveModel(
-      requestedModel,
-      config.getPreviewFeatures(),
-    );
+    const resolvedModel = resolveModel(requestedModel);
     const service = config.getModelAvailabilityService();
     const snapshot = service.snapshot(resolvedModel);
 
