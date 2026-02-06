@@ -1,26 +1,19 @@
 # Gemini CLI documentation
 
-Gemini CLI is an open-source AI agent that brings the power of Gemini models
-directly into your terminal. It provides a lightweight, terminal-first interface
-for code understanding, automation, and system integration.
+Gemini CLI brings the power of Gemini models directly into your terminal. Use it
+to understand code, automate tasks, and build workflows with your local project
+context.
 
-## Gemini CLI overview
+## Install
 
-Gemini CLI enables you to interact with AI using your local project context. By
-connecting the reasoning capabilities of Gemini with your file system and shell
-environment, the CLI helps you explore codebases, automate complex tasks, and
-build AI-powered terminal workflows.
+```bash
+npm install -g @google/gemini-cli
+```
 
-## Navigating the documentation
+## Get started
 
-This documentation is organized into sections to help you get started quickly
-and explore the full range of capabilities.
+Jump in to Gemini CLI.
 
-### Get started
-
-The fastest path to setting up and using Gemini CLI.
-
-- **[Overview](docs):** A high-level introduction to the project.
 - **[Quickstart](./get-started/index.md):** Your first session with Gemini CLI.
 - **[Installation](./get-started/installation.md):** How to install Gemini CLI
   on your system.
@@ -31,7 +24,7 @@ The fastest path to setting up and using Gemini CLI.
 - **[Cheatsheet](./cli/cli-reference.md):** A quick reference for common
   commands and options.
 
-### Use Gemini CLI
+## Use Gemini CLI
 
 User-focused guides and tutorials for daily development workflows.
 
@@ -50,7 +43,7 @@ User-focused guides and tutorials for daily development workflows.
 - **[Get started with skills](./cli/tutorials/skills-getting-started.md):**
   Getting started with specialized expertise.
 
-### Features
+## Features
 
 Technical reference documentation for each capability of Gemini CLI.
 
@@ -105,7 +98,7 @@ Settings and customization options for Gemini CLI.
 - **[Themes](./cli/themes.md):** UI personalization technical guide.
 - **[Trusted folders](./cli/trusted-folders.md):** Security permission logic.
 
-### Reference
+## Reference
 
 Deep technical documentation and API specifications.
 
@@ -118,7 +111,7 @@ Deep technical documentation and API specifications.
 - **[Keyboard shortcuts](./cli/keyboard-shortcuts.md):** Productivity tips.
 - **[Policy engine](./core/policy-engine.md):** Fine-grained execution control.
 
-### Resources
+## Resources
 
 Support, release history, and legal information.
 
