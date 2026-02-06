@@ -8,6 +8,13 @@ import { debugLogger } from '@google/gemini-cli-core';
 import type { SlashCommand } from '../ui/commands/types.js';
 import type { ICommandLoader } from './types.js';
 
+export interface CommandConflict {
+  name: string;
+  winner: SlashCommand;
+  loser: SlashCommand;
+  renamedTo: string;
+}
+
 /**
  * Orchestrates the discovery and loading of all slash commands for the CLI.
  *
@@ -23,8 +30,12 @@ export class CommandService {
   /**
    * Private constructor to enforce the use of the async factory.
    * @param commands A readonly array of the fully loaded and de-duplicated commands.
+   * @param conflicts A readonly array of conflicts that occurred during loading.
    */
-  private constructor(private readonly commands: readonly SlashCommand[]) {}
+  private constructor(
+    private readonly commands: readonly SlashCommand[],
+    private readonly conflicts: readonly CommandConflict[],
+  ) {}
 
   /**
    * Asynchronously creates and initializes a new CommandService instance.
@@ -63,11 +74,14 @@ export class CommandService {
     }
 
     const commandMap = new Map<string, SlashCommand>();
+    const conflicts: CommandConflict[] = [];
+
     for (const cmd of allCommands) {
       let finalName = cmd.name;
 
       // Extension commands get renamed if they conflict with existing commands
       if (cmd.extensionName && commandMap.has(cmd.name)) {
+        const winner = commandMap.get(cmd.name)!;
         let renamedName = `${cmd.extensionName}.${cmd.name}`;
         let suffix = 1;
 
@@ -78,6 +92,13 @@ export class CommandService {
         }
 
         finalName = renamedName;
+
+        conflicts.push({
+          name: cmd.name,
+          winner,
+          loser: cmd,
+          renamedTo: finalName,
+        });
       }
 
       commandMap.set(finalName, {
@@ -87,7 +108,8 @@ export class CommandService {
     }
 
     const finalCommands = Object.freeze(Array.from(commandMap.values()));
-    return new CommandService(finalCommands);
+    const finalConflicts = Object.freeze(conflicts);
+    return new CommandService(finalCommands, finalConflicts);
   }
 
   /**
@@ -100,5 +122,14 @@ export class CommandService {
    */
   getCommands(): readonly SlashCommand[] {
     return this.commands;
+  }
+
+  /**
+   * Retrieves the list of conflicts that occurred during command loading.
+   *
+   * @returns A readonly array of command conflicts.
+   */
+  getConflicts(): readonly CommandConflict[] {
+    return this.conflicts;
   }
 }
