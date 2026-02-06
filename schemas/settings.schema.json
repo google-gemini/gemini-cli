@@ -1445,8 +1445,8 @@
         "extensionConfig": {
           "title": "Extension Configuration",
           "description": "Enable requesting and fetching of extension settings.",
-          "markdownDescription": "Enable requesting and fetching of extension settings.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+          "markdownDescription": "Enable requesting and fetching of extension settings.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "enableEventDrivenScheduler": {

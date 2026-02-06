@@ -866,7 +866,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.extensionConfig`** (boolean):
   - **Description:** Enable requesting and fetching of extension settings.
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`experimental.enableEventDrivenScheduler`** (boolean):
