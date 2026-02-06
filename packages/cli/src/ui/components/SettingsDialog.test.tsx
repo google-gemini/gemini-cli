@@ -1404,7 +1404,6 @@ describe('SettingsDialog', () => {
           },
           tools: {
             truncateToolOutputThreshold: 50000,
-            truncateToolOutputLines: 1000,
           },
           context: {
             discoveryMaxDirs: 500,
@@ -1473,7 +1472,6 @@ describe('SettingsDialog', () => {
             enableInteractiveShell: true,
             useRipgrep: true,
             truncateToolOutputThreshold: 25000,
-            truncateToolOutputLines: 500,
           },
           security: {
             folderTrust: {

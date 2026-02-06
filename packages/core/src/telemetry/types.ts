@@ -1334,7 +1334,6 @@ export class ToolOutputTruncatedEvent implements BaseTelemetryEvent {
   original_content_length: number;
   truncated_content_length: number;
   threshold: number;
-  lines: number;
   prompt_id: string;
 
   constructor(
@@ -1344,7 +1343,6 @@ export class ToolOutputTruncatedEvent implements BaseTelemetryEvent {
       originalContentLength: number;
       truncatedContentLength: number;
       threshold: number;
-      lines: number;
     },
   ) {
     this['event.name'] = this.eventName;
@@ -1353,7 +1351,6 @@ export class ToolOutputTruncatedEvent implements BaseTelemetryEvent {
     this.original_content_length = details.originalContentLength;
     this.truncated_content_length = details.truncatedContentLength;
     this.threshold = details.threshold;
-    this.lines = details.lines;
   }
 
   toOpenTelemetryAttributes(config: Config): LogAttributes {
@@ -1366,7 +1363,6 @@ export class ToolOutputTruncatedEvent implements BaseTelemetryEvent {
       original_content_length: this.original_content_length,
       truncated_content_length: this.truncated_content_length,
       threshold: this.threshold,
-      lines: this.lines,
       prompt_id: this.prompt_id,
     };
   }

@@ -17,6 +17,7 @@ import {
   saveTruncatedToolOutput,
   formatTruncatedToolOutput,
 } from '../utils/fileUtils.js';
+import { DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getInitialChatHistory } from '../utils/environmentContext.js';
 import {
@@ -48,11 +49,6 @@ export const COMPRESSION_PRESERVE_THRESHOLD = 0.3;
  * The budget for function response tokens in the preserved history.
  */
 export const COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET = 50_000;
-
-/**
- * The number of lines to keep when truncating a function response during compression.
- */
-export const COMPRESSION_TRUNCATE_LINES = 30;
 
 /**
  * Returns the index of the oldest item to keep when compressing. May return
@@ -189,11 +185,10 @@ async function truncateHistoryToBudget(
                 config.storage.getProjectTempDir(),
               );
 
-              // Prepare a honest, readable snippet of the tail.
               const truncatedMessage = formatTruncatedToolOutput(
                 contentStr,
                 outputFile,
-                COMPRESSION_TRUNCATE_LINES,
+                DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
               );
 
               newParts.unshift({

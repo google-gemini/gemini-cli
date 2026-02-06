@@ -180,9 +180,7 @@ describe('ToolExecutor', () => {
 
   it('should truncate large shell output', async () => {
     // 1. Setup Config for Truncation
-    vi.spyOn(config, 'getEnableToolOutputTruncation').mockReturnValue(true);
     vi.spyOn(config, 'getTruncateToolOutputThreshold').mockReturnValue(10);
-    vi.spyOn(config, 'getTruncateToolOutputLines').mockReturnValue(5);
 
     const mockTool = new MockTool({ name: SHELL_TOOL_NAME });
     const invocation = mockTool.build({});
@@ -227,7 +225,7 @@ describe('ToolExecutor', () => {
     expect(fileUtils.formatTruncatedToolOutput).toHaveBeenCalledWith(
       longOutput,
       '/tmp/truncated_output.txt',
-      5, // lines
+      10, // threshold (maxChars)
     );
 
     expect(result.status).toBe('success');
