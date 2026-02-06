@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { debugLogger, TOOL_OUTPUT_DIR } from '@google/gemini-cli-core';
+import { debugLogger, TOOL_OUTPUTS_DIR } from '@google/gemini-cli-core';
 import type { Settings } from '../config/settings.js';
 import { cleanupToolOutputFiles } from './sessionCleanup.js';
 
@@ -57,7 +57,7 @@ describe('Tool Output Cleanup', () => {
       expect(result.deleted).toBe(0);
     });
 
-    it('should return early when tool_output directory does not exist', async () => {
+    it('should return early when tool-outputs directory does not exist', async () => {
       const settings: Settings = {
         general: {
           sessionRetention: {
@@ -67,7 +67,7 @@ describe('Tool Output Cleanup', () => {
         },
       };
 
-      // Don't create the tool_output directory
+      // Don't create the tool-outputs directory
       const result = await cleanupToolOutputFiles(settings, false, testTempDir);
 
       expect(result.disabled).toBe(false);
@@ -86,8 +86,8 @@ describe('Tool Output Cleanup', () => {
         },
       };
 
-      // Create tool_output directory and files
-      const toolOutputDir = path.join(testTempDir, TOOL_OUTPUT_DIR);
+      // Create tool-outputs directory and files
+      const toolOutputDir = path.join(testTempDir, TOOL_OUTPUTS_DIR);
       await fs.mkdir(toolOutputDir, { recursive: true });
 
       const now = Date.now();
@@ -128,8 +128,8 @@ describe('Tool Output Cleanup', () => {
         },
       };
 
-      // Create tool_output directory and files
-      const toolOutputDir = path.join(testTempDir, TOOL_OUTPUT_DIR);
+      // Create tool-outputs directory and files
+      const toolOutputDir = path.join(testTempDir, TOOL_OUTPUTS_DIR);
       await fs.mkdir(toolOutputDir, { recursive: true });
 
       const now = Date.now();
@@ -174,8 +174,8 @@ describe('Tool Output Cleanup', () => {
         },
       };
 
-      // Create empty tool_output directory
-      const toolOutputDir = path.join(testTempDir, TOOL_OUTPUT_DIR);
+      // Create empty tool-outputs directory
+      const toolOutputDir = path.join(testTempDir, TOOL_OUTPUTS_DIR);
       await fs.mkdir(toolOutputDir, { recursive: true });
 
       const result = await cleanupToolOutputFiles(settings, false, testTempDir);
@@ -197,8 +197,8 @@ describe('Tool Output Cleanup', () => {
         },
       };
 
-      // Create tool_output directory and files
-      const toolOutputDir = path.join(testTempDir, TOOL_OUTPUT_DIR);
+      // Create tool-outputs directory and files
+      const toolOutputDir = path.join(testTempDir, TOOL_OUTPUTS_DIR);
       await fs.mkdir(toolOutputDir, { recursive: true });
 
       const now = Date.now();
@@ -260,8 +260,8 @@ describe('Tool Output Cleanup', () => {
         },
       };
 
-      // Create tool_output directory and an old file
-      const toolOutputDir = path.join(testTempDir, TOOL_OUTPUT_DIR);
+      // Create tool-outputs directory and an old file
+      const toolOutputDir = path.join(testTempDir, TOOL_OUTPUTS_DIR);
       await fs.mkdir(toolOutputDir, { recursive: true });
 
       const tenDaysAgo = Date.now() - 10 * 24 * 60 * 60 * 1000;
@@ -280,6 +280,41 @@ describe('Tool Output Cleanup', () => {
       );
 
       debugSpy.mockRestore();
+    });
+
+    it('should delete expired session subdirectories', async () => {
+      const settings: Settings = {
+        general: {
+          sessionRetention: {
+            enabled: true,
+            maxAge: '1d',
+          },
+        },
+      };
+
+      const toolOutputDir = path.join(testTempDir, TOOL_OUTPUTS_DIR);
+      await fs.mkdir(toolOutputDir, { recursive: true });
+
+      const now = Date.now();
+      const tenDaysAgo = now - 10 * 24 * 60 * 60 * 1000;
+      const oneHourAgo = now - 1 * 60 * 60 * 1000;
+
+      const oldSessionDir = path.join(toolOutputDir, 'session-old');
+      const recentSessionDir = path.join(toolOutputDir, 'session-recent');
+
+      await fs.mkdir(oldSessionDir);
+      await fs.mkdir(recentSessionDir);
+
+      // Set modification times
+      await fs.utimes(oldSessionDir, tenDaysAgo / 1000, tenDaysAgo / 1000);
+      await fs.utimes(recentSessionDir, oneHourAgo / 1000, oneHourAgo / 1000);
+
+      const result = await cleanupToolOutputFiles(settings, false, testTempDir);
+
+      expect(result.deleted).toBe(1);
+      const remainingDirs = await fs.readdir(toolOutputDir);
+      expect(remainingDirs).toContain('session-recent');
+      expect(remainingDirs).not.toContain('session-old');
     });
   });
 });

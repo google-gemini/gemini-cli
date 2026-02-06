@@ -623,18 +623,23 @@ ${processedLines.join('\n')}`;
 /**
  * Saves tool output to a temporary file for later retrieval.
  */
-export const TOOL_OUTPUT_DIR = 'tool_output';
+export const TOOL_OUTPUTS_DIR = 'tool-outputs';
 
 export async function saveTruncatedToolOutput(
   content: string,
   toolName: string,
   id: string | number, // Accept string (callId) or number (truncationId)
   projectTempDir: string,
+  sessionId?: string,
 ): Promise<{ outputFile: string; totalLines: number }> {
   const safeToolName = sanitizeFilenamePart(toolName).toLowerCase();
   const safeId = sanitizeFilenamePart(id.toString()).toLowerCase();
   const fileName = `${safeToolName}_${safeId}.txt`;
-  const toolOutputDir = path.join(projectTempDir, TOOL_OUTPUT_DIR);
+
+  let toolOutputDir = path.join(projectTempDir, TOOL_OUTPUTS_DIR);
+  if (sessionId) {
+    toolOutputDir = path.join(toolOutputDir, `session-${sessionId}`);
+  }
   const outputFile = path.join(toolOutputDir, fileName);
 
   await fsPromises.mkdir(toolOutputDir, { recursive: true });

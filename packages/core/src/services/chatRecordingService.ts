@@ -540,12 +540,22 @@ export class ChatRecordingService {
    */
   deleteSession(sessionId: string): void {
     try {
-      const chatsDir = path.join(
-        this.config.storage.getProjectTempDir(),
-        'chats',
-      );
+      const tempDir = this.config.storage.getProjectTempDir();
+      const chatsDir = path.join(tempDir, 'chats');
       const sessionPath = path.join(chatsDir, `${sessionId}.json`);
-      fs.unlinkSync(sessionPath);
+      if (fs.existsSync(sessionPath)) {
+        fs.unlinkSync(sessionPath);
+      }
+
+      // Cleanup tool outputs for this session
+      const toolOutputDir = path.join(
+        tempDir,
+        'tool-outputs',
+        `session-${sessionId}`,
+      );
+      if (fs.existsSync(toolOutputDir)) {
+        fs.rmSync(toolOutputDir, { recursive: true, force: true });
+      }
     } catch (error) {
       debugLogger.error('Error deleting session file.', error);
       throw error;
