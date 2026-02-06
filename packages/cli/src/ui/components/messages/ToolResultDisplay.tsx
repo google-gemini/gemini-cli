@@ -81,9 +81,6 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
     [],
   );
 
-  // override hasFocus value to ensure content is always scrollable
-  hasFocus = true;
-
   const truncatedResultDisplay = React.useMemo(() => {
     // Only truncate string output if not in alternate buffer mode to ensure
     // we can scroll through the full output.

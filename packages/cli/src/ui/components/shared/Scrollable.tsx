@@ -17,6 +17,7 @@ import { useKeypress, type Key } from '../../hooks/useKeypress.js';
 import { useScrollable } from '../../contexts/ScrollProvider.js';
 import { useAnimatedScrollbar } from '../../hooks/useAnimatedScrollbar.js';
 import { useBatchedScroll } from '../../hooks/useBatchedScroll.js';
+import { keyMatchers, Command } from '../../keyMatchers.js';
 
 interface ScrollableProps {
   children?: React.ReactNode;
@@ -103,14 +104,23 @@ export const Scrollable: React.FC<ScrollableProps> = ({
 
   useKeypress(
     (key: Key) => {
-      if (key.shift) {
-        if (key.name === 'up') {
-          scrollByWithAnimation(-1);
-        }
-        if (key.name === 'down') {
-          scrollByWithAnimation(1);
-        }
+      if (keyMatchers[Command.SCROLL_UP](key)) {
+        scrollByWithAnimation(-1);
+        return true;
       }
+      if (keyMatchers[Command.SCROLL_DOWN](key)) {
+        scrollByWithAnimation(1);
+        return true;
+      }
+      if (keyMatchers[Command.PAGE_UP](key)) {
+        scrollByWithAnimation(-sizeRef.current.innerHeight);
+        return true;
+      }
+      if (keyMatchers[Command.PAGE_DOWN](key)) {
+        scrollByWithAnimation(sizeRef.current.innerHeight);
+        return true;
+      }
+      return false;
     },
     { isActive: hasFocus },
   );
@@ -137,7 +147,7 @@ export const Scrollable: React.FC<ScrollableProps> = ({
     [getScrollState, scrollByWithAnimation, hasFocusCallback, flashScrollbar],
   );
 
-  useScrollable(scrollableEntry, hasFocus && ref.current !== null);
+  useScrollable(scrollableEntry, true);
 
   return (
     <Box

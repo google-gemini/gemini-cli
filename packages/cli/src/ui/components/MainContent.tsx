@@ -148,7 +148,7 @@ export const MainContent = () => {
     return (
       <ScrollableList
         ref={scrollableListRef}
-        hasFocus={!uiState.isEditorDialogOpen}
+        hasFocus={!uiState.isEditorDialogOpen && !uiState.embeddedShellFocused}
         width={uiState.terminalWidth}
         data={virtualizedData}
         renderItem={renderItem}
