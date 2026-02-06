@@ -231,6 +231,11 @@ async function restartAction(
     (result): result is PromiseRejectedResult => result.status === 'rejected',
   );
 
+  if (failures.length < extensionsToRestart.length) {
+    await context.services.config?.reloadSkills();
+    await context.services.config?.getAgentRegistry()?.reload();
+  }
+
   if (failures.length > 0) {
     const errorMessages = failures
       .map((failure, index) => {

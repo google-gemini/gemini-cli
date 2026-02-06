@@ -148,12 +148,18 @@ describe('extensionsCommand', () => {
 
     mockGetExtensions.mockReturnValue([inactiveExt, activeExt, allExt]);
     vi.mocked(open).mockClear();
+    const mockReloadAgents = vi.fn().mockResolvedValue(undefined);
+
     mockContext = createMockCommandContext({
       services: {
         config: {
           getExtensions: mockGetExtensions,
           getExtensionLoader: vi.fn().mockReturnValue(mockExtensionLoader),
           getWorkingDir: () => '/test/dir',
+          reloadSkills: vi.fn().mockResolvedValue(undefined),
+          getAgentRegistry: vi.fn().mockReturnValue({
+            reload: mockReloadAgents,
+          }),
         },
       },
       ui: {
