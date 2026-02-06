@@ -31,35 +31,32 @@ describe('Hooks System Integration', () => {
         "console.log(JSON.stringify({decision: 'block', reason: 'File writing blocked by security policy'}))",
       );
 
-      rig.setup(
-        'should block tool execution when hook returns block decision',
-        {
-          fakeResponsesPath: join(
-            import.meta.dirname,
-            'hooks-system.block-tool.responses',
-          ),
-          settings: {
-            hooksConfig: {
-              enabled: true,
-            },
-            hooks: {
-              BeforeTool: [
-                {
-                  matcher: 'write_file',
-                  sequential: true,
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: `node "${scriptPath}"`,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
+      rig.configure({
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.block-tool.responses',
+        ),
+        settings: {
+          hooksConfig: {
+            enabled: true,
+          },
+          hooks: {
+            BeforeTool: [
+              {
+                matcher: 'write_file',
+                sequential: true,
+                hooks: [
+                  {
+                    type: 'command',
+                    command: `node "${scriptPath}"`,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
           },
         },
-      );
+      });
 
       const result = await rig.run({
         args: 'Create a file called test.txt with content "Hello World"',
@@ -93,35 +90,32 @@ describe('Hooks System Integration', () => {
         "process.stderr.write('File writing blocked by security policy'); process.exit(2)",
       );
 
-      rig.setup(
-        'should block tool execution and use stderr as reason when hook exits with code 2',
-        {
-          fakeResponsesPath: join(
-            import.meta.dirname,
-            'hooks-system.block-tool.responses',
-          ),
-          settings: {
-            hooksConfig: {
-              enabled: true,
-            },
-            hooks: {
-              BeforeTool: [
-                {
-                  matcher: 'write_file',
-                  hooks: [
-                    {
-                      type: 'command',
-                      // Exit with code 2 and write reason to stderr
-                      command: `node "${scriptPath}"`,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
+      rig.configure({
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.block-tool.responses',
+        ),
+        settings: {
+          hooksConfig: {
+            enabled: true,
+          },
+          hooks: {
+            BeforeTool: [
+              {
+                matcher: 'write_file',
+                hooks: [
+                  {
+                    type: 'command',
+                    // Exit with code 2 and write reason to stderr
+                    command: `node "${scriptPath}"`,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
           },
         },
-      );
+      });
 
       const result = await rig.run({
         args: 'Create a file called test.txt with content "Hello World"',
@@ -158,34 +152,31 @@ describe('Hooks System Integration', () => {
         "console.log(JSON.stringify({decision: 'allow', reason: 'File writing approved'}))",
       );
 
-      rig.setup(
-        'should allow tool execution when hook returns allow decision',
-        {
-          fakeResponsesPath: join(
-            import.meta.dirname,
-            'hooks-system.allow-tool.responses',
-          ),
-          settings: {
-            hooksConfig: {
-              enabled: true,
-            },
-            hooks: {
-              BeforeTool: [
-                {
-                  matcher: 'write_file',
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: `node "${scriptPath}"`,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
+      rig.configure({
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.allow-tool.responses',
+        ),
+        settings: {
+          hooksConfig: {
+            enabled: true,
+          },
+          hooks: {
+            BeforeTool: [
+              {
+                matcher: 'write_file',
+                hooks: [
+                  {
+                    type: 'command',
+                    command: `node "${scriptPath}"`,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
           },
         },
-      );
+      });
 
       await rig.run({
         args: 'Create a file called approved.txt with content "Approved content"',
@@ -214,7 +205,7 @@ describe('Hooks System Integration', () => {
         "console.log(JSON.stringify({hookSpecificOutput: {hookEventName: 'AfterTool', additionalContext: 'Security scan: File content appears safe'}}))",
       );
       const command = `node "${scriptPath}"`;
-      rig.setup('should add additional context from AfterTool hooks', {
+      rig.configure({
         fakeResponsesPath: join(
           import.meta.dirname,
           'hooks-system.after-tool-context.responses',
@@ -634,7 +625,7 @@ console.log(JSON.stringify({
       );
       const hookCommand = `node "${scriptPath.replace(/\\/g, '/')}"`;
 
-      rig.setup('should handle notification hooks for tool permissions', {
+      rig.configure({
         fakeResponsesPath: join(
           import.meta.dirname,
           'hooks-system.notification.responses',
@@ -742,7 +733,7 @@ console.log(JSON.stringify({
       const hook1Command = `node "${script1Path.replace(/\\/g, '/')}"`;
       const hook2Command = `node "${script2Path.replace(/\\/g, '/')}"`;
 
-      rig.setup('should execute hooks sequentially when configured', {
+      rig.configure({
         fakeResponsesPath: join(
           import.meta.dirname,
           'hooks-system.sequential-execution.responses',
@@ -876,36 +867,33 @@ try {
         "console.log('Pollution'); console.log(JSON.stringify({decision: 'deny', reason: 'Should be ignored'}))",
       );
 
-      rig.setup(
-        'should treat mixed stdout (text + JSON) as system message and allow execution when exit code is 0',
-        {
-          fakeResponsesPath: join(
-            import.meta.dirname,
-            'hooks-system.allow-tool.responses',
-          ),
-          settings: {
-            hooksConfig: {
-              enabled: true,
-            },
-            hooks: {
-              BeforeTool: [
-                {
-                  matcher: 'write_file',
-                  hooks: [
-                    {
-                      type: 'command',
-                      // Output plain text then JSON.
-                      // This breaks JSON parsing, so it falls back to 'allow' with the whole stdout as systemMessage.
-                      command: `node "${scriptPath}"`,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
+      rig.configure({
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.allow-tool.responses',
+        ),
+        settings: {
+          hooksConfig: {
+            enabled: true,
+          },
+          hooks: {
+            BeforeTool: [
+              {
+                matcher: 'write_file',
+                hooks: [
+                  {
+                    type: 'command',
+                    // Output plain text then JSON.
+                    // This breaks JSON parsing, so it falls back to 'allow' with the whole stdout as systemMessage.
+                    command: `node "${scriptPath}"`,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
           },
         },
-      );
+      });
 
       const result = await rig.run({
         args: 'Create a file called approved.txt with content "Approved content"',
@@ -945,7 +933,7 @@ try {
       const afterToolCommand = `node "${afterToolScript.replace(/\\/g, '/')}"`;
       const beforeAgentCommand = `node "${beforeAgentScript.replace(/\\/g, '/')}"`;
 
-      rig.setup('should handle hooks for all major event types', {
+      rig.configure({
         fakeResponsesPath: join(
           import.meta.dirname,
           'hooks-system.multiple-events.responses',
@@ -1062,7 +1050,7 @@ try {
       const failingCommand = `node "${failingScript.replace(/\\/g, '/')}"`;
       const workingCommand = `node "${workingScript.replace(/\\/g, '/')}"`;
 
-      rig.setup('should handle hook failures gracefully', {
+      rig.configure({
         fakeResponsesPath: join(
           import.meta.dirname,
           'hooks-system.error-handling.responses',
@@ -1120,7 +1108,7 @@ try {
       );
       const hookCommand = `node "${scriptPath.replace(/\\/g, '/')}"`;
 
-      rig.setup('should generate telemetry events for hook executions', {
+      rig.configure({
         fakeResponsesPath: join(
           import.meta.dirname,
           'hooks-system.telemetry.responses',
@@ -1167,7 +1155,7 @@ try {
       );
       const sessionStartCommand = `node "${scriptPath.replace(/\\/g, '/')}"`;
 
-      rig.setup('should fire SessionStart hook on app startup', {
+      rig.configure({
         fakeResponsesPath: join(
           import.meta.dirname,
           'hooks-system.session-startup.responses',
@@ -1405,46 +1393,43 @@ console.log(JSON.stringify({
       const sessionEndCommand = `node "${endScriptPath.replace(/\\/g, '/')}"`;
       const sessionStartCommand = `node "${startScriptPath.replace(/\\/g, '/')}"`;
 
-      rig.setup(
-        'should fire SessionEnd and SessionStart hooks on /clear command',
-        {
-          fakeResponsesPath: join(
-            import.meta.dirname,
-            'hooks-system.session-clear.responses',
-          ),
-          settings: {
-            hooksConfig: {
-              enabled: true,
-            },
-            hooks: {
-              SessionEnd: [
-                {
-                  matcher: '*',
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: sessionEndCommand,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-              SessionStart: [
-                {
-                  matcher: '*',
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: sessionStartCommand,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
+      rig.configure({
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.session-clear.responses',
+        ),
+        settings: {
+          hooksConfig: {
+            enabled: true,
+          },
+          hooks: {
+            SessionEnd: [
+              {
+                matcher: '*',
+                hooks: [
+                  {
+                    type: 'command',
+                    command: sessionEndCommand,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
+            SessionStart: [
+              {
+                matcher: '*',
+                hooks: [
+                  {
+                    type: 'command',
+                    command: sessionStartCommand,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
           },
         },
-      );
+      });
 
       const run = await rig.runInteractive();
 
@@ -1585,7 +1570,7 @@ console.log(JSON.stringify({
       );
       const preCompressCommand = `node "${scriptPath.replace(/\\/g, '/')}"`;
 
-      rig.setup('should fire PreCompress hook on automatic compression', {
+      rig.configure({
         fakeResponsesPath: join(
           import.meta.dirname,
           'hooks-system.compress-auto.responses',
@@ -1659,7 +1644,7 @@ console.log(JSON.stringify({
       );
       const sessionEndCommand = `node "${scriptPath.replace(/\\/g, '/')}"`;
 
-      rig.setup('should fire SessionEnd hook on graceful exit', {
+      rig.configure({
         fakeResponsesPath: join(
           import.meta.dirname,
           'hooks-system.session-startup.responses',

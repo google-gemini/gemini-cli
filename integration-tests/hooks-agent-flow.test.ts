@@ -163,12 +163,7 @@ describe('Hooks Agent Flow', () => {
     });
 
     it('should process clearContext in AfterAgent hook output', async () => {
-      await rig.setup('should process clearContext in AfterAgent hook output', {
-        fakeResponsesPath: join(
-          import.meta.dirname,
-          'hooks-system.after-agent.responses',
-        ),
-      });
+      await rig.setup('should process clearContext in AfterAgent hook output');
 
       // BeforeModel hook to track message counts across LLM calls
       const messageCountFile = join(
@@ -207,7 +202,11 @@ describe('Hooks Agent Flow', () => {
       ).replace(/\\/g, '/');
       writeFileSync(afterAgentScriptPath, afterAgentScript);
 
-      await rig.setup('should process clearContext in AfterAgent hook output', {
+      await rig.configure({
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.after-agent.responses',
+        ),
         settings: {
           hooksConfig: {
             enabled: true,
@@ -282,44 +281,41 @@ describe('Hooks Agent Flow', () => {
       ).replace(/\\/g, '/');
       writeFileSync(afterAgentScriptPath, afterAgentScript);
 
-      await rig.setup(
-        'should fire BeforeAgent and AfterAgent exactly once per turn despite tool calls',
-        {
-          fakeResponsesPath: join(
-            import.meta.dirname,
-            'hooks-agent-flow-multistep.responses',
-          ),
-          settings: {
-            hooksConfig: {
-              enabled: true,
-            },
-            hooks: {
-              BeforeAgent: [
-                {
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: `node "${beforeAgentScriptPath}"`,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-              AfterAgent: [
-                {
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: `node "${afterAgentScriptPath}"`,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
+      await rig.configure({
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-agent-flow-multistep.responses',
+        ),
+        settings: {
+          hooksConfig: {
+            enabled: true,
+          },
+          hooks: {
+            BeforeAgent: [
+              {
+                hooks: [
+                  {
+                    type: 'command',
+                    command: `node "${beforeAgentScriptPath}"`,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
+            AfterAgent: [
+              {
+                hooks: [
+                  {
+                    type: 'command',
+                    command: `node "${afterAgentScriptPath}"`,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
           },
         },
-      );
+      });
 
       await rig.run({ args: 'Do a multi-step task' });
 

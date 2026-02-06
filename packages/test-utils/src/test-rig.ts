@@ -361,6 +361,20 @@ export class TestRig {
     this.homeDir = join(testFileDir, sanitizedName + '-home');
     mkdirSync(this.testDir, { recursive: true });
     mkdirSync(this.homeDir, { recursive: true });
+
+    if (options.settings || options.fakeResponsesPath) {
+      this.configure(options);
+    }
+  }
+
+  configure(options: {
+    settings?: Record<string, unknown>;
+    fakeResponsesPath?: string;
+  }) {
+    if (!this.testDir || !this.homeDir) {
+      throw new Error('TestRig must be setup before calling configure');
+    }
+
     if (options.fakeResponsesPath) {
       this.fakeResponsesPath = join(this.testDir, 'fake-responses.json');
       this.originalFakeResponsesPath = options.fakeResponsesPath;
