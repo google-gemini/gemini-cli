@@ -10,49 +10,12 @@ import {
   type ShellToolMessageProps,
 } from './ShellToolMessage.js';
 import { StreamingState, ToolCallStatus } from '../../types.js';
-import { Text } from 'ink';
 import type { Config } from '@google/gemini-cli-core';
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { waitFor } from '../../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SHELL_TOOL_NAME } from '@google/gemini-cli-core';
-import { SHELL_COMMAND_NAME } from '../../constants.js';
-import { StreamingContext } from '../../contexts/StreamingContext.js';
-
-vi.mock('../TerminalOutput.js', () => ({
-  TerminalOutput: function MockTerminalOutput({
-    cursor,
-  }: {
-    cursor: { x: number; y: number } | null;
-  }) {
-    return (
-      <Text>
-        MockCursor:({cursor?.x},{cursor?.y})
-      </Text>
-    );
-  },
-}));
-
-// Mock child components or utilities if they are complex or have side effects
-vi.mock('../GeminiRespondingSpinner.js', () => ({
-  GeminiRespondingSpinner: ({
-    nonRespondingDisplay,
-  }: {
-    nonRespondingDisplay?: string;
-  }) => {
-    const streamingState = React.useContext(StreamingContext)!;
-    if (streamingState === StreamingState.Responding) {
-      return <Text>MockRespondingSpinner</Text>;
-    }
-    return nonRespondingDisplay ? <Text>{nonRespondingDisplay}</Text> : null;
-  },
-}));
-
-vi.mock('../../utils/MarkdownDisplay.js', () => ({
-  MarkdownDisplay: function MockMarkdownDisplay({ text }: { text: string }) {
-    return <Text>MockMarkdown:{text}</Text>;
-  },
-}));
+import { SHELL_COMMAND_NAME, ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
 
 describe('<ShellToolMessage />', () => {
   const baseProps: ShellToolMessageProps = {
@@ -173,6 +136,140 @@ describe('<ShellToolMessage />', () => {
       // Should call setEmbeddedShellFocused(false) because isThisShellFocused became false
       await waitFor(() => {
         expect(mockSetEmbeddedShellFocused).toHaveBeenCalledWith(false);
+      });
+    });
+  });
+
+  describe('Snapshots', () => {
+    it('renders in Executing state', async () => {
+      const { lastFrame } = renderWithProviders(
+        <ShellToolMessage {...baseProps} status={ToolCallStatus.Executing} />,
+        { uiActions },
+      );
+      await waitFor(() => {
+        expect(lastFrame()).toMatchSnapshot();
+      });
+    });
+
+    it('renders in Success state (history mode)', async () => {
+      const { lastFrame } = renderWithProviders(
+        <ShellToolMessage {...baseProps} status={ToolCallStatus.Success} />,
+        { uiActions },
+      );
+      await waitFor(() => {
+        expect(lastFrame()).toMatchSnapshot();
+      });
+    });
+
+    it('renders in Error state', async () => {
+      const { lastFrame } = renderWithProviders(
+        <ShellToolMessage
+          {...baseProps}
+          status={ToolCallStatus.Error}
+          resultDisplay="Error output"
+        />,
+        { uiActions },
+      );
+      await waitFor(() => {
+        expect(lastFrame()).toMatchSnapshot();
+      });
+    });
+
+    it('renders in Alternate Buffer mode while focused', async () => {
+      const { lastFrame } = renderWithProviders(
+        <ShellToolMessage
+          {...baseProps}
+          status={ToolCallStatus.Executing}
+          embeddedShellFocused={true}
+          activeShellPtyId={1}
+          ptyId={1}
+        />,
+        { uiActions, useAlternateBuffer: true },
+      );
+      await waitFor(() => {
+        expect(lastFrame()).toMatchSnapshot();
+      });
+    });
+
+    it('renders in Alternate Buffer mode while unfocused', async () => {
+      const { lastFrame } = renderWithProviders(
+        <ShellToolMessage
+          {...baseProps}
+          status={ToolCallStatus.Executing}
+          embeddedShellFocused={false}
+          activeShellPtyId={1}
+          ptyId={1}
+        />,
+        { uiActions, useAlternateBuffer: true },
+      );
+      await waitFor(() => {
+        expect(lastFrame()).toMatchSnapshot();
+      });
+    });
+  });
+
+  describe('Height Constraints', () => {
+    it('respects availableTerminalHeight when it is smaller than ACTIVE_SHELL_MAX_LINES', async () => {
+      const availableTerminalHeight = 10;
+      // We expect fewer lines than ACTIVE_SHELL_MAX_LINES (15).
+      // Logic: Math.min(15, Math.max(1, 10 - 2)) = 8.
+
+      const { lastFrame } = renderWithProviders(
+        <ShellToolMessage
+          {...baseProps}
+          resultDisplay={Array.from(
+            { length: 50 },
+            (_, i) => `Line ${i + 1}`,
+          ).join('\n')}
+          renderOutputAsMarkdown={false}
+          availableTerminalHeight={availableTerminalHeight}
+          activeShellPtyId={1}
+          ptyId={2} // not focused
+          status={ToolCallStatus.Executing}
+        />,
+        {
+          uiActions,
+          useAlternateBuffer: true,
+        },
+      );
+
+      await waitFor(() => {
+        const frame = lastFrame();
+        const matches = frame!.match(/Line \d+/g);
+        // We expect <= 8 lines visible
+        expect(matches?.length).toBeLessThanOrEqual(8);
+        expect(matches?.length).toBeGreaterThan(0);
+        expect(frame).toMatchSnapshot();
+      });
+    });
+
+    it('uses ACTIVE_SHELL_MAX_LINES when availableTerminalHeight is large', async () => {
+      const availableTerminalHeight = 100;
+      const { lastFrame } = renderWithProviders(
+        <ShellToolMessage
+          {...baseProps}
+          resultDisplay={Array.from(
+            { length: 50 },
+            (_, i) => `Line ${i + 1}`,
+          ).join('\n')}
+          renderOutputAsMarkdown={false}
+          availableTerminalHeight={availableTerminalHeight}
+          activeShellPtyId={1}
+          ptyId={2} // not focused
+          status={ToolCallStatus.Executing}
+        />,
+        {
+          uiActions,
+          useAlternateBuffer: true,
+        },
+      );
+
+      await waitFor(() => {
+        const frame = lastFrame();
+        const matches = frame!.match(/Line \d+/g);
+        // Should be limited by ACTIVE_SHELL_MAX_LINES (15).
+        expect(matches?.length).toBe(ACTIVE_SHELL_MAX_LINES);
+        expect(frame).toMatchSnapshot();
       });
     });
   });
