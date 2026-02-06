@@ -338,6 +338,7 @@ describe('Policy Engine Integration Tests', () => {
           const validPaths = [
             '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/my-plan.md',
             '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/feature_auth.md',
+            '/home/user/.gemini/tmp/new-temp_dir_123/plans/plan.md', // new style of temp directory
           ];
 
           for (const file_path of validPaths) {
@@ -364,8 +365,8 @@ describe('Policy Engine Integration Tests', () => {
             '/project/src/file.ts', // Workspace
             '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/script.js', // Wrong extension
             '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/../../../etc/passwd.md', // Path traversal
-            '/home/user/.gemini/tmp/abc123/plans/plan.md', // Invalid hash length
             '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/subdir/plan.md', // Subdirectory
+            '/home/user/.gemini/non-tmp/new-temp_dir_123/plans/plan.md', // outside of temp dir
           ];
 
           for (const file_path of invalidPaths) {
