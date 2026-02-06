@@ -27,7 +27,6 @@ import { useVimMode } from '../contexts/VimModeContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
-import { ApprovalMode } from '@google/gemini-cli-core';
 import { StreamingState, ToolCallStatus } from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
@@ -68,9 +67,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     (!uiState.embeddedShellFocused || uiState.isBackgroundShellVisible) &&
     uiState.streamingState === StreamingState.Responding &&
     !hasPendingActionRequired;
-  const showApprovalIndicator =
-    showApprovalModeIndicator !== ApprovalMode.DEFAULT &&
-    !uiState.shellModeActive;
+  const showApprovalIndicator = !uiState.shellModeActive;
   const showRawMarkdownIndicator = !uiState.renderMarkdown;
   const showEscToCancelHint =
     showLoadingIndicator &&

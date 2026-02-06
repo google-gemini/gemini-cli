@@ -485,16 +485,24 @@ describe('Composer', () => {
       expect(lastFrame()).not.toContain('InputPrompt');
     });
 
-    it('shows ApprovalModeIndicator when approval mode is not default and shell mode is inactive', () => {
-      const uiState = createMockUIState({
-        showApprovalModeIndicator: ApprovalMode.YOLO,
-        shellModeActive: false,
-      });
+    it.each([
+      [ApprovalMode.DEFAULT],
+      [ApprovalMode.AUTO_EDIT],
+      [ApprovalMode.PLAN],
+      [ApprovalMode.YOLO],
+    ])(
+      'shows ApprovalModeIndicator when approval mode is %s and shell mode is inactive',
+      (mode) => {
+        const uiState = createMockUIState({
+          showApprovalModeIndicator: mode,
+          shellModeActive: false,
+        });
 
-      const { lastFrame } = renderComposer(uiState);
+        const { lastFrame } = renderComposer(uiState);
 
-      expect(lastFrame()).toMatch(/ApprovalModeIndic[\s\S]*ator/);
-    });
+        expect(lastFrame()).toMatch(/ApprovalModeIndic[\s\S]*ator/);
+      },
+    );
 
     it('shows ShellModeIndicator when shell mode is active', () => {
       const uiState = createMockUIState({
