@@ -5,9 +5,10 @@
  */
 
 import Spinner from 'ink-spinner';
-import { type ComponentProps, useEffect } from 'react';
+import { type ComponentProps, useEffect, useMemo } from 'react';
 import { debugState } from '../debug.js';
 import { useSettings } from '../contexts/SettingsContext.js';
+import { isAndroid } from '../utils/terminalUtils.js';
 
 export type SpinnerProps = ComponentProps<typeof Spinner>;
 
@@ -25,9 +26,22 @@ export const CliSpinner = (props: SpinnerProps) => {
     return undefined;
   }, [shouldShow]);
 
+  const optimizedProps = useMemo(() => {
+    if (isAndroid()) {
+      // Align with 60Hz refresh rate multiples (16.67ms * 8 = ~133ms)
+      const interval = (props).interval || 133;
+      return {
+        ...props,
+        type: props.type || 'dots',
+        interval,
+      };
+    }
+    return props;
+  }, [props]);
+
   if (!shouldShow) {
     return null;
   }
 
-  return <Spinner {...props} />;
+  return <Spinner {...optimizedProps} />;
 };

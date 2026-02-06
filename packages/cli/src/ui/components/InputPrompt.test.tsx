@@ -58,6 +58,10 @@ vi.mock('../utils/terminalUtils.js', () => ({
   isLowColorDepth: vi.fn(() => false),
 }));
 
+vi.mock('systeminformation', () => ({
+  default: {},
+}));
+
 // Mock ink BEFORE importing components that use it to intercept terminalCursorPosition
 vi.mock('ink', async (importOriginal) => {
   const actual = await importOriginal<typeof import('ink')>();
@@ -2467,6 +2471,25 @@ describe('InputPrompt', () => {
 
         vi.advanceTimersByTime(100);
         expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
+      });
+      unmount();
+    });
+
+    it('should call onSubmit("/cancel") when ESC is pressed during streaming', async () => {
+      props.streamingState = StreamingState.Responding;
+      props.onSubmit = vi.fn();
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+
+      await act(async () => {
+        stdin.write('\x1B');
+        vi.advanceTimersByTime(100);
+      });
+
+      await waitFor(() => {
+        expect(props.onSubmit).toHaveBeenCalledWith('/cancel');
       });
       unmount();
     });

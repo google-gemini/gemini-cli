@@ -535,14 +535,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return false;
       }
 
-      if (
-        key.name === 'escape' &&
-        (streamingState === StreamingState.Responding ||
-          streamingState === StreamingState.WaitingForConfirmation)
-      ) {
-        return false;
-      }
-
       if (key.name === 'paste') {
         // Record paste time to prevent accidental auto-submission
         if (!isTerminalPasteTrusted(kittyProtocol.enabled)) {
@@ -634,6 +626,18 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         if (completion.showSuggestions) {
           completion.resetCompletionState();
           setExpandedSuggestionIndex(-1);
+          resetEscapeState();
+          return true;
+        }
+
+        // If we are currently responding or awaiting confirmation, ESC should act as a cancel first.
+        // We reset the escape state here to ensure that this ESC press doesn't contribute
+        // to a double-ESC clearing of the input.
+        if (
+          streamingState === StreamingState.Responding ||
+          streamingState === StreamingState.WaitingForConfirmation
+        ) {
+          onSubmit('/cancel');
           resetEscapeState();
           return true;
         }
