@@ -155,6 +155,14 @@ export interface ToolOutputMaskingConfig {
   protectLatestTurn: boolean;
 }
 
+export interface GemmaModelRouterSettings {
+  enabled?: boolean;
+  classifier?: {
+    host?: string;
+    model?: string;
+  };
+}
+
 export interface ExtensionSetting {
   name: string;
   description: string;
@@ -448,6 +456,7 @@ export interface ConfigParameters {
   useWriteTodos?: boolean;
   policyEngineConfig?: PolicyEngineConfig;
   output?: OutputSettings;
+  gemmaModelRouter?: GemmaModelRouterSettings;
   disableModelRouterForAuth?: AuthType[];
   continueOnFailedApiCall?: boolean;
   retryFetchErrors?: boolean;
@@ -597,6 +606,9 @@ export class Config {
   private readonly messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
   private readonly outputSettings: OutputSettings;
+
+  private readonly gemmaModelRouter: GemmaModelRouterSettings;
+
   private readonly continueOnFailedApiCall: boolean;
   private readonly retryFetchErrors: boolean;
   private readonly enableShellOutputEfficiency: boolean;
@@ -813,6 +825,15 @@ export class Config {
     this.skillManager = new SkillManager();
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
+    };
+    this.gemmaModelRouter = {
+      enabled: params.gemmaModelRouter?.enabled ?? false,
+      classifier: {
+        host:
+          params.gemmaModelRouter?.classifier?.host ?? 'http://localhost:9379',
+        model:
+          params.gemmaModelRouter?.classifier?.model ?? 'gemma3-1b-gpu-custom',
+      },
     };
     this.retryFetchErrors = params.retryFetchErrors ?? false;
     this.disableYoloMode = params.disableYoloMode ?? false;
@@ -2120,6 +2141,14 @@ export class Config {
 
   getEnableHooksUI(): boolean {
     return this.enableHooksUI;
+  }
+
+  getGemmaModelRouterEnabled(): boolean {
+    return this.gemmaModelRouter.enabled ?? false;
+  }
+
+  getGemmaModelRouterSettings(): GemmaModelRouterSettings {
+    return this.gemmaModelRouter;
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
