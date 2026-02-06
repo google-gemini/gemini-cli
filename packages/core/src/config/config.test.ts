@@ -39,7 +39,7 @@ import { ToolRegistry } from '../tools/tool-registry.js';
 import { ACTIVATE_SKILL_TOOL_NAME } from '../tools/tool-names.js';
 import type { SkillDefinition } from '../skills/skillLoader.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
-import { DEFAULT_GEMINI_MODEL, PREVIEW_GEMINI_MODEL } from './models.js';
+import { DEFAULT_GEMINI_MODEL } from './models.js';
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
