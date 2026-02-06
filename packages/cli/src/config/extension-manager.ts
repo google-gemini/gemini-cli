@@ -48,6 +48,8 @@ import {
   type HookEventName,
   type ResolvedExtensionSetting,
   coreEvents,
+  applyAdminAllowlist,
+  getAdminBlockedMcpServersMessage,
 } from '@google/gemini-cli-core';
 import { maybeRequestConsentOrFail } from './extensions/consent.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
@@ -70,6 +72,7 @@ import {
 } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
 import { themeManager } from '../ui/themes/theme-manager.js';
+import { getFormattedSettingValue } from '../commands/extensions/utils.js';
 
 interface ExtensionManagerParams {
   enabledExtensionOverrides?: string[];
@@ -648,12 +651,7 @@ Would you like to attempt to install via "git clone" instead?`,
           resolvedSettings.push({
             name: setting.name,
             envVar: setting.envVar,
-            value:
-              value === undefined
-                ? '[not set]'
-                : setting.sensitive
-                  ? '***'
-                  : value,
+            value,
             sensitive: setting.sensitive ?? false,
             scope,
             source,
@@ -665,12 +663,33 @@ Would you like to attempt to install via "git clone" instead?`,
         if (this.settings.admin.mcp.enabled === false) {
           config.mcpServers = undefined;
         } else {
-          config.mcpServers = Object.fromEntries(
-            Object.entries(config.mcpServers).map(([key, value]) => [
-              key,
-              filterMcpConfig(value),
-            ]),
-          );
+          // Apply admin allowlist if configured
+          const adminAllowlist = this.settings.admin.mcp.config;
+          if (adminAllowlist && Object.keys(adminAllowlist).length > 0) {
+            const result = applyAdminAllowlist(
+              config.mcpServers,
+              adminAllowlist,
+            );
+            config.mcpServers = result.mcpServers;
+
+            if (result.blockedServerNames.length > 0) {
+              const message = getAdminBlockedMcpServersMessage(
+                result.blockedServerNames,
+                undefined,
+              );
+              coreEvents.emitConsoleLog('warn', message);
+            }
+          }
+
+          // Then apply local filtering/sanitization
+          if (config.mcpServers) {
+            config.mcpServers = Object.fromEntries(
+              Object.entries(config.mcpServers).map(([key, value]) => [
+                key,
+                filterMcpConfig(value),
+              ]),
+            );
+          }
         }
       }
 
@@ -941,7 +960,7 @@ Would you like to attempt to install via "git clone" instead?`,
           }
           scope += ')';
         }
-        output += `\n  ${setting.name}: ${setting.value} ${scope}`;
+        output += `\n  ${setting.name}: ${getFormattedSettingValue(setting)} ${scope}`;
       });
     }
     return output;

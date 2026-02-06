@@ -162,15 +162,6 @@ const SETTINGS_SCHEMA = {
     description: 'General application settings.',
     showInDialog: false,
     properties: {
-      previewFeatures: {
-        type: 'boolean',
-        label: 'Preview Features (e.g., models)',
-        category: 'General',
-        requiresRestart: false,
-        default: false,
-        description: 'Enable preview features (e.g., preview models).',
-        showInDialog: true,
-      },
       preferredEditor: {
         type: 'string',
         label: 'Preferred Editor',
@@ -1312,7 +1303,7 @@ const SETTINGS_SCHEMA = {
             label: 'Folder Trust',
             category: 'Security',
             requiresRestart: true,
-            default: false,
+            default: true,
             description: 'Setting to track whether Folder trust is enabled.',
             showInDialog: true,
           },
@@ -1462,6 +1453,58 @@ const SETTINGS_SCHEMA = {
     description: 'Setting to enable experimental features',
     showInDialog: false,
     properties: {
+      toolOutputMasking: {
+        type: 'object',
+        label: 'Tool Output Masking',
+        category: 'Experimental',
+        requiresRestart: true,
+        ignoreInDocs: true,
+        default: {},
+        description:
+          'Advanced settings for tool output masking to manage context window efficiency.',
+        showInDialog: false,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Tool Output Masking',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: false,
+            description: 'Enables tool output masking to save tokens.',
+            showInDialog: false,
+          },
+          toolProtectionThreshold: {
+            type: 'number',
+            label: 'Tool Protection Threshold',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: 50000,
+            description:
+              'Minimum number of tokens to protect from masking (most recent tool outputs).',
+            showInDialog: false,
+          },
+          minPrunableTokensThreshold: {
+            type: 'number',
+            label: 'Min Prunable Tokens Threshold',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: 30000,
+            description:
+              'Minimum prunable tokens required to trigger a masking pass.',
+            showInDialog: false,
+          },
+          protectLatestTurn: {
+            type: 'boolean',
+            label: 'Protect Latest Turn',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: true,
+            description:
+              'Ensures the absolute latest turn is never masked, regardless of token count.',
+            showInDialog: false,
+          },
+        },
+      },
       enableAgents: {
         type: 'boolean',
         label: 'Enable Agents',
@@ -1486,7 +1529,7 @@ const SETTINGS_SCHEMA = {
         label: 'Extension Configuration',
         category: 'Experimental',
         requiresRestart: true,
-        default: false,
+        default: true,
         description: 'Enable requesting and fetching of extension settings.',
         showInDialog: false,
       },
@@ -1866,6 +1909,20 @@ const SETTINGS_SCHEMA = {
             description: 'If false, disallows MCP servers from being used.',
             showInDialog: false,
             mergeStrategy: MergeStrategy.REPLACE,
+          },
+          config: {
+            type: 'object',
+            label: 'MCP Config',
+            category: 'Admin',
+            requiresRestart: false,
+            default: {} as Record<string, MCPServerConfig>,
+            description: 'Admin-configured MCP servers.',
+            showInDialog: false,
+            mergeStrategy: MergeStrategy.REPLACE,
+            additionalProperties: {
+              type: 'object',
+              ref: 'MCPServerConfig',
+            },
           },
         },
       },

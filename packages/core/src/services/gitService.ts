@@ -33,6 +33,7 @@ export class GitService {
         'Checkpointing is enabled, but Git is not installed. Please install Git or disable checkpointing to continue.',
       );
     }
+    await this.storage.initialize();
     try {
       await this.setupShadowGitRepository();
     } catch (error) {

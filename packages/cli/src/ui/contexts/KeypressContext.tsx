@@ -130,6 +130,8 @@ const MAC_ALT_KEY_CHARACTER_MAP: Record<string, string> = {
   '\u222B': 'b', // "∫" back one word
   '\u0192': 'f', // "ƒ" forward one word
   '\u00B5': 'm', // "µ" toggle markup view
+  '\u03A9': 'z', // "Ω" Option+z
+  '\u00B8': 'Z', // "¸" Option+Shift+z
 };
 
 function nonKeyboardEventFilter(
@@ -305,6 +307,10 @@ function createDataListener(keypressHandler: KeypressHandler) {
 function* emitKeys(
   keypressHandler: KeypressHandler,
 ): Generator<void, void, string> {
+  const lang = process.env['LANG'] || '';
+  const lcAll = process.env['LC_ALL'] || '';
+  const isGreek = lang.startsWith('el') || lcAll.startsWith('el');
+
   while (true) {
     let ch = yield;
     let sequence = ch;
@@ -574,8 +580,15 @@ function* emitKeys(
     } else if (MAC_ALT_KEY_CHARACTER_MAP[ch]) {
       // Note: we do this even if we are not on Mac, because mac users may
       // remotely connect to non-Mac systems.
-      name = MAC_ALT_KEY_CHARACTER_MAP[ch];
-      alt = true;
+      // We skip this mapping for Greek users to avoid blocking the Omega character.
+      if (isGreek && ch === '\u03A9') {
+        insertable = true;
+      } else {
+        const mapped = MAC_ALT_KEY_CHARACTER_MAP[ch];
+        name = mapped.toLowerCase();
+        shift = mapped !== name;
+        alt = true;
+      }
     } else if (sequence === `${ESC}${ESC}`) {
       // Double escape
       name = 'escape';

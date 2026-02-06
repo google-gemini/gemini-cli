@@ -98,10 +98,6 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `general`
 
-- **`general.previewFeatures`** (boolean):
-  - **Description:** Enable preview features (e.g., preview models).
-  - **Default:** `false`
-
 - **`general.preferredEditor`** (string):
   - **Description:** The preferred editor to open files in.
   - **Default:** `undefined`
@@ -792,7 +788,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`security.folderTrust.enabled`** (boolean):
   - **Description:** Setting to track whether Folder trust is enabled.
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`security.environmentVariableRedaction.allowed`** (array):
@@ -866,7 +862,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.extensionConfig`** (boolean):
   - **Description:** Enable requesting and fetching of extension settings.
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`experimental.enableEventDrivenScheduler`** (boolean):
@@ -994,6 +990,10 @@ their corresponding top-level category object in your `settings.json` file.
 - **`admin.mcp.enabled`** (boolean):
   - **Description:** If false, disallows MCP servers from being used.
   - **Default:** `true`
+
+- **`admin.mcp.config`** (object):
+  - **Description:** Admin-configured MCP servers.
+  - **Default:** `{}`
 
 - **`admin.skills.enabled`** (boolean):
   - **Description:** If false, disallows agent skills from being used.

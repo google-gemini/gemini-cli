@@ -17,6 +17,27 @@ import {
   type MergedSettings,
 } from '../../config/settings.js';
 
+vi.mock('../../utils/skillUtils.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../utils/skillUtils.js')>();
+  return {
+    ...actual,
+    linkSkill: vi.fn(),
+  };
+});
+
+vi.mock('../../config/extensions/consent.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../config/extensions/consent.js')>();
+  return {
+    ...actual,
+    requestConsentInteractive: vi.fn().mockResolvedValue(true),
+    skillsConsentString: vi.fn().mockResolvedValue('Mock Consent'),
+  };
+});
+
+import { linkSkill } from '../../utils/skillUtils.js';
+
 vi.mock('../../config/settings.js', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('../../config/settings.js')>();
@@ -183,6 +204,80 @@ describe('skillsCommand', () => {
       .mocked(context.ui.addItem)
       .mock.calls.at(-1)![0] as HistoryItemSkillsList;
     expect(lastCall.skills).toHaveLength(2);
+  });
+
+  describe('link', () => {
+    it('should link a skill successfully', async () => {
+      const linkCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'link',
+      )!;
+      vi.mocked(linkSkill).mockResolvedValue([
+        { name: 'test-skill', location: '/path' },
+      ]);
+
+      await linkCmd.action!(context, '/some/path');
+
+      expect(linkSkill).toHaveBeenCalledWith(
+        '/some/path',
+        'user',
+        expect.any(Function),
+        expect.any(Function),
+      );
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: 'Successfully linked skills from "/some/path" (user).',
+        }),
+      );
+    });
+
+    it('should link a skill with workspace scope', async () => {
+      const linkCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'link',
+      )!;
+      vi.mocked(linkSkill).mockResolvedValue([
+        { name: 'test-skill', location: '/path' },
+      ]);
+
+      await linkCmd.action!(context, '/some/path --scope workspace');
+
+      expect(linkSkill).toHaveBeenCalledWith(
+        '/some/path',
+        'workspace',
+        expect.any(Function),
+        expect.any(Function),
+      );
+    });
+
+    it('should show error if link fails', async () => {
+      const linkCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'link',
+      )!;
+      vi.mocked(linkSkill).mockRejectedValue(new Error('Link failed'));
+
+      await linkCmd.action!(context, '/some/path');
+
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'Failed to link skills: Link failed',
+        }),
+      );
+    });
+
+    it('should show error if path is missing', async () => {
+      const linkCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'link',
+      )!;
+      await linkCmd.action!(context, '');
+
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'Usage: /skills link <path> [--scope user|workspace]',
+        }),
+      );
+    });
   });
 
   describe('disable/enable', () => {

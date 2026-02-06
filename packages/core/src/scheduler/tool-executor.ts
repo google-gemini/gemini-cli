@@ -221,6 +221,7 @@ export class ToolExecutor {
           toolName,
           callId,
           this.config.storage.getProjectTempDir(),
+          this.config.getSessionId(),
         );
         outputFile = savedPath;
         content = formatTruncatedToolOutput(content, outputFile, lines);

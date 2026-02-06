@@ -22,14 +22,13 @@ they appear in the UI.
 
 ### General
 
-| UI Label                        | Setting                            | Description                                                   | Default |
-| ------------------------------- | ---------------------------------- | ------------------------------------------------------------- | ------- |
-| Preview Features (e.g., models) | `general.previewFeatures`          | Enable preview features (e.g., preview models).               | `false` |
-| Vim Mode                        | `general.vimMode`                  | Enable Vim keybindings                                        | `false` |
-| Enable Auto Update              | `general.enableAutoUpdate`         | Enable automatic updates.                                     | `true`  |
-| Enable Prompt Completion        | `general.enablePromptCompletion`   | Enable AI-powered prompt completion suggestions while typing. | `false` |
-| Debug Keystroke Logging         | `general.debugKeystrokeLogging`    | Enable debug logging of keystrokes to the console.            | `false` |
-| Enable Session Cleanup          | `general.sessionRetention.enabled` | Enable automatic session cleanup                              | `false` |
+| UI Label                 | Setting                            | Description                                                   | Default |
+| ------------------------ | ---------------------------------- | ------------------------------------------------------------- | ------- |
+| Vim Mode                 | `general.vimMode`                  | Enable Vim keybindings                                        | `false` |
+| Enable Auto Update       | `general.enableAutoUpdate`         | Enable automatic updates.                                     | `true`  |
+| Enable Prompt Completion | `general.enablePromptCompletion`   | Enable AI-powered prompt completion suggestions while typing. | `false` |
+| Debug Keystroke Logging  | `general.debugKeystrokeLogging`    | Enable debug logging of keystrokes to the console.            | `false` |
+| Enable Session Cleanup   | `general.sessionRetention.enabled` | Enable automatic session cleanup                              | `false` |
 
 ### Output
 
@@ -115,7 +114,7 @@ they appear in the UI.
 | Allow Permanent Tool Approval         | `security.enablePermanentToolApproval`          | Enable the "Allow for all future sessions" option in tool confirmation dialogs.                                                                                         | `false` |
 | Blocks extensions from Git            | `security.blockGitExtensions`                   | Blocks installing and loading extensions from Git.                                                                                                                      | `false` |
 | Extension Source Regex Allowlist      | `security.allowedExtensions`                    | List of Regex patterns for allowed extensions. If nonempty, only extensions that match the patterns in this list are allowed. Overrides the blockGitExtensions setting. | `[]`    |
-| Folder Trust                          | `security.folderTrust.enabled`                  | Setting to track whether Folder trust is enabled.                                                                                                                       | `false` |
+| Folder Trust                          | `security.folderTrust.enabled`                  | Setting to track whether Folder trust is enabled.                                                                                                                       | `true`  |
 | Enable Environment Variable Redaction | `security.environmentVariableRedaction.enabled` | Enable redaction of environment variables that may contain secrets.                                                                                                     | `false` |
 
 ### Experimental
