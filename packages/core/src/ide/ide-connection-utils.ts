@@ -224,8 +224,7 @@ export async function createProxyAwareFetch(ideServerHost: string) {
         headers: [...response.headers.entries()],
       });
     } catch (error) {
-      const urlString =
-        typeof url === 'string' ? url : url instanceof URL ? url.href : url.url;
+      const urlString = typeof url === 'string' ? url : url.href;
       logger.error(`IDE fetch failed for ${urlString}`, error);
       throw error;
     }
