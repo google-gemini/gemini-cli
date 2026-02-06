@@ -279,6 +279,6 @@ export interface CheckResult {
 
 /**
  * Priority for subagent tools (registered dynamically).
- * Resulting transformed priority: 1.050
+ * Effective priority matching Tier 1 (Default) read-only tools.
  */
 export const PRIORITY_SUBAGENT_TOOL = 1.05;
