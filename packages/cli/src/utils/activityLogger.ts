@@ -83,9 +83,7 @@ export class ActivityLogger extends EventEmitter {
     return ActivityLogger.instance;
   }
 
-  enableNetworkLogging(_host?: string, _port?: number) {
-    // Note: host and port parameters are for potential future use
-    // Currently not stored as the actual target is configured via env var
+  enableNetworkLogging() {
     this.networkLoggingEnabled = true;
     this.emit('network-logging-enabled');
   }
