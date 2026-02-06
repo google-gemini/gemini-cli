@@ -134,11 +134,12 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
   ): Promise<RoutingDecision | null> {
     const startTime = Date.now();
     try {
+      const model = context.requestedModel ?? config.getModel();
       if (!(await config.getNumericalRoutingEnabled())) {
         return null;
       }
 
-      if (!isGemini3Model(config.getModel())) {
+      if (!isGemini3Model(model)) {
         return null;
       }
 
@@ -181,7 +182,7 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
         );
 
       const selectedModel = resolveClassifierModel(
-        config.getModel(),
+        context.requestedModel ?? config.getModel(),
         modelAlias,
       );
 
