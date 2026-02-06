@@ -7,25 +7,7 @@
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { ToolResultDisplay } from './ToolResultDisplay.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { Box, Text } from 'ink';
 import type { AnsiOutput } from '@google/gemini-cli-core';
-
-// Mock child components to simplify testing
-vi.mock('./DiffRenderer.js', () => ({
-  DiffRenderer: ({
-    diffContent,
-    filename,
-  }: {
-    diffContent: string;
-    filename: string;
-  }) => (
-    <Box>
-      <Text>
-        DiffRenderer: {filename} - {diffContent}
-      </Text>
-    </Box>
-  ),
-}));
 
 // Mock UIStateContext partially
 const mockUseUIState = vi.fn();
@@ -43,41 +25,6 @@ const mockUseAlternateBuffer = vi.fn();
 vi.mock('../../hooks/useAlternateBuffer.js', () => ({
   useAlternateBuffer: () => mockUseAlternateBuffer(),
 }));
-
-// Mock SettingsContext partially
-vi.mock('../../contexts/SettingsContext.js', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('../../contexts/SettingsContext.js')>();
-  return {
-    ...actual,
-    useSettings: () => ({
-      merged: {
-        ui: {
-          useAlternateBuffer: false,
-        },
-      },
-    }),
-  };
-});
-
-// Mock OverflowContext partially
-vi.mock('../../contexts/OverflowContext.js', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('../../contexts/OverflowContext.js')>();
-  return {
-    ...actual,
-    useOverflowActions: () => ({
-      addOverflowingId: vi.fn(),
-      removeOverflowingId: vi.fn(),
-    }),
-    useOverflowState: () => ({
-      overflowingIds: new Set(),
-    }),
-  };
-});
-
-// NOTE: Scrollable, ScrollableList, and AnsiOutput mocks have been removed
-// to use the real implementations.
 
 describe('ToolResultDisplay', () => {
   beforeEach(() => {
