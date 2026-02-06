@@ -79,7 +79,7 @@ Technical reference documentation for each capability of Gemini CLI.
 - **[Web search (tool)](./tools/web-search.md):** Google Search integration
   technicals.
 
-### Configuration
+## Configuration
 
 Settings and customization options for Gemini CLI.
 
