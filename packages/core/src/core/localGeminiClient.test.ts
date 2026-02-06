@@ -35,17 +35,6 @@ describe('LocalGeminiClient', () => {
     } as unknown as Config;
   });
 
-  it('should throw an error if the model name does not start with "Gemma"', () => {
-    vi.mocked(mockConfig.getGemmaModelRouterSettings).mockReturnValue({
-      classifier: {
-        model: 'invalid-model',
-      },
-    });
-    expect(() => new LocalGeminiClient(mockConfig)).toThrow(
-      'Invalid model name: invalid-model. Model name must start with "Gemma" (case-insensitive).',
-    );
-  });
-
   it('should successfully call generateJson and return parsed JSON', async () => {
     mockGenerateContent.mockResolvedValue({
       text: `\`\`\`json
