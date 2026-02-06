@@ -195,6 +195,7 @@ import { uiTelemetryService } from '../telemetry/index.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import { getExperiments } from '../code_assist/experiments/experiments.js';
 import type { CodeAssistServer } from '../code_assist/server.js';
+import { type ModelConfigServiceConfig } from '../services/modelConfigService.js';
 import { ContextManager } from '../services/contextManager.js';
 import { UserTierId } from 'src/code_assist/types.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
@@ -1105,8 +1106,8 @@ describe('Server Config (config.ts)', () => {
         1000,
       );
       // 4 * (32000 - 1000) = 4 * 31000 = 124000
-      // default is 4_000_000
-      expect(config.getTruncateToolOutputThreshold()).toBe(124000);
+      // default is 40_000, so min(124000, 40000) = 40000
+      expect(config.getTruncateToolOutputThreshold()).toBe(40_000);
     });
 
     it('should return the default threshold when the calculated value is larger', () => {
@@ -1116,8 +1117,8 @@ describe('Server Config (config.ts)', () => {
         500_000,
       );
       // 4 * (2_000_000 - 500_000) = 4 * 1_500_000 = 6_000_000
-      // default is 4_000_000
-      expect(config.getTruncateToolOutputThreshold()).toBe(4_000_000);
+      // default is 40_000
+      expect(config.getTruncateToolOutputThreshold()).toBe(40_000);
     });
 
     it('should use a custom truncateToolOutputThreshold if provided', () => {
@@ -1514,8 +1515,11 @@ describe('Generation Config Merging (HACK)', () => {
     };
 
     const config = new Config(params);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const serviceConfig = (config.modelConfigService as any).config;
+    const serviceConfig = (
+      config.modelConfigService as unknown as {
+        config: ModelConfigServiceConfig;
+      }
+    ).config;
 
     // Assert that the default aliases are present
     expect(serviceConfig.aliases).toEqual(DEFAULT_MODEL_CONFIGS.aliases);
@@ -1538,8 +1542,11 @@ describe('Generation Config Merging (HACK)', () => {
     };
 
     const config = new Config(params);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const serviceConfig = (config.modelConfigService as any).config;
+    const serviceConfig = (
+      config.modelConfigService as unknown as {
+        config: ModelConfigServiceConfig;
+      }
+    ).config;
 
     // Assert that the user's aliases are present
     expect(serviceConfig.aliases).toEqual(userAliases);
@@ -1562,8 +1569,11 @@ describe('Generation Config Merging (HACK)', () => {
     };
 
     const config = new Config(params);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const serviceConfig = (config.modelConfigService as any).config;
+    const serviceConfig = (
+      config.modelConfigService as unknown as {
+        config: ModelConfigServiceConfig;
+      }
+    ).config;
 
     // Assert that the user's aliases are used, not the defaults
     expect(serviceConfig.aliases).toEqual(userAliases);
@@ -1573,8 +1583,11 @@ describe('Generation Config Merging (HACK)', () => {
     const params: ConfigParameters = { ...baseParams };
 
     const config = new Config(params);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const serviceConfig = (config.modelConfigService as any).config;
+    const serviceConfig = (
+      config.modelConfigService as unknown as {
+        config: ModelConfigServiceConfig;
+      }
+    ).config;
 
     // Assert that the full default config is used
     expect(serviceConfig).toEqual(DEFAULT_MODEL_CONFIGS);
@@ -1930,8 +1943,10 @@ describe('Hooks configuration', () => {
 
 describe('Config Quota & Preview Model Access', () => {
   let config: Config;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let mockCodeAssistServer: any;
+  let mockCodeAssistServer: {
+    projectId: string;
+    retrieveUserQuota: Mock;
+  };
 
   const baseParams: ConfigParameters = {
     cwd: '/tmp',
@@ -1953,7 +1968,9 @@ describe('Config Quota & Preview Model Access', () => {
       projectId: 'test-project',
       retrieveUserQuota: vi.fn(),
     };
-    vi.mocked(getCodeAssistServer).mockReturnValue(mockCodeAssistServer);
+    vi.mocked(getCodeAssistServer).mockReturnValue(
+      mockCodeAssistServer as unknown as CodeAssistServer,
+    );
     config = new Config(baseParams);
   });
 
@@ -2007,8 +2024,15 @@ describe('Config Quota & Preview Model Access', () => {
       config.setModel('auto-gemini-2.5');
       await config.refreshUserQuota();
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const pooled = (config as any).getPooledQuota();
+      const pooled = (
+        config as unknown as {
+          getPooledQuota: () => {
+            remaining?: number;
+            limit?: number;
+            resetTime?: string;
+          };
+        }
+      ).getPooledQuota();
       // Pro: 10 / 0.2 = 50 total.
       // Flash: 80 / 0.8 = 100 total.
       // Pooled: (10 + 80) / (50 + 100) = 90 / 150 = 0.6
@@ -2031,8 +2055,17 @@ describe('Config Quota & Preview Model Access', () => {
       config.setModel('gemini-2.5-pro');
       await config.refreshUserQuota();
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      expect((config as any).getPooledQuota()).toEqual({});
+      expect(
+        (
+          config as unknown as {
+            getPooledQuota: () => {
+              remaining?: number;
+              limit?: number;
+              resetTime?: string;
+            };
+          }
+        ).getPooledQuota(),
+      ).toEqual({});
     });
 
     it('should update hasAccessToPreviewModel to false if buckets are undefined', async () => {
@@ -2057,6 +2090,57 @@ describe('Config Quota & Preview Model Access', () => {
       expect(result).toBeUndefined();
       // Should remain default (false)
       expect(config.getHasAccessToPreviewModel()).toBe(false);
+    });
+  });
+
+  describe('refreshUserQuotaIfStale', () => {
+    it('should refresh quota if stale', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
+        buckets: [],
+      });
+
+      // First call to initialize lastQuotaFetchTime
+      await config.refreshUserQuota();
+      expect(mockCodeAssistServer.retrieveUserQuota).toHaveBeenCalledTimes(1);
+
+      // Advance time by 31 seconds (default TTL is 30s)
+      vi.setSystemTime(Date.now() + 31_000);
+
+      await config.refreshUserQuotaIfStale();
+      expect(mockCodeAssistServer.retrieveUserQuota).toHaveBeenCalledTimes(2);
+    });
+
+    it('should not refresh quota if fresh', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
+        buckets: [],
+      });
+
+      // First call
+      await config.refreshUserQuota();
+      expect(mockCodeAssistServer.retrieveUserQuota).toHaveBeenCalledTimes(1);
+
+      // Advance time by only 10 seconds
+      vi.setSystemTime(Date.now() + 10_000);
+
+      await config.refreshUserQuotaIfStale();
+      expect(mockCodeAssistServer.retrieveUserQuota).toHaveBeenCalledTimes(1);
+    });
+
+    it('should respect custom staleMs', async () => {
+      mockCodeAssistServer.retrieveUserQuota.mockResolvedValue({
+        buckets: [],
+      });
+
+      // First call
+      await config.refreshUserQuota();
+      expect(mockCodeAssistServer.retrieveUserQuota).toHaveBeenCalledTimes(1);
+
+      // Advance time by 5 seconds
+      vi.setSystemTime(Date.now() + 5_000);
+
+      // Call with 2s TTL - should refresh
+      await config.refreshUserQuotaIfStale(2_000);
+      expect(mockCodeAssistServer.retrieveUserQuota).toHaveBeenCalledTimes(2);
     });
   });
 

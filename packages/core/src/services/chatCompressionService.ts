@@ -50,11 +50,6 @@ export const COMPRESSION_PRESERVE_THRESHOLD = 0.3;
 export const COMPRESSION_FUNCTION_RESPONSE_TOKEN_BUDGET = 50_000;
 
 /**
- * The number of lines to keep when truncating a function response during compression.
- */
-export const COMPRESSION_TRUNCATE_LINES = 30;
-
-/**
  * Returns the index of the oldest item to keep when compressing. May return
  * contents.length which indicates that everything should be compressed.
  *
@@ -189,11 +184,10 @@ async function truncateHistoryToBudget(
                 config.storage.getProjectTempDir(),
               );
 
-              // Prepare a honest, readable snippet of the tail.
               const truncatedMessage = formatTruncatedToolOutput(
                 contentStr,
                 outputFile,
-                COMPRESSION_TRUNCATE_LINES,
+                config.getTruncateToolOutputThreshold(),
               );
 
               newParts.unshift({

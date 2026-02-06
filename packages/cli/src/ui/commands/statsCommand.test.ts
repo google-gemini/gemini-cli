@@ -88,9 +88,11 @@ describe('statsCommand', () => {
         quotas: mockQuota,
         tier: 'Basic',
         currentModel: 'gemini-pro',
-        pooledRemaining: 85,
-        pooledLimit: 100,
-        pooledResetTime: '2025-01-01T12:00:00Z',
+        quotaStats: {
+          remaining: 85,
+          limit: 100,
+          resetTime: '2025-01-01T12:00:00Z',
+        },
       }),
     );
   });
@@ -110,8 +112,11 @@ describe('statsCommand', () => {
       tier: undefined,
       userEmail: 'mock@example.com',
       currentModel: undefined,
-      pooledRemaining: undefined,
-      pooledLimit: undefined,
+      quotaStats: {
+        remaining: undefined,
+        limit: undefined,
+        resetTime: undefined,
+      },
     });
   });
 

@@ -493,8 +493,11 @@ describe('<StatsDisplay />', () => {
           duration="1s"
           quotas={quotas}
           currentModel="auto"
-          pooledRemaining={710}
-          pooledLimit={1100}
+          quotaStats={{
+            remaining: 710,
+            limit: 1100,
+            resetTime: undefined,
+          }}
         />,
         { width: 100 },
       );

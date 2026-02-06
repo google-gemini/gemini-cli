@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,12 +17,14 @@ interface QuotaDisplayProps {
   remaining: number | undefined;
   limit: number | undefined;
   resetTime?: string;
+  terse?: boolean;
 }
 
 export const QuotaDisplay: React.FC<QuotaDisplayProps> = ({
   remaining,
   limit,
   resetTime,
+  terse,
 }) => {
   if (remaining === undefined || limit === undefined || limit === 0) {
     return null;
@@ -35,9 +37,17 @@ export const QuotaDisplay: React.FC<QuotaDisplayProps> = ({
   }
 
   const color = getStatusColor(percentage, {
-    green: QUOTA_THRESHOLD_HIGH,
+    green: QUOTA_THRESHOLD_HIGH + 0.01, // 20% should be yellow, not green
     yellow: QUOTA_THRESHOLD_MEDIUM,
   });
+
+  if (terse) {
+    return (
+      <Text color={color}>
+        {percentage === 0 ? '0%' : `${percentage.toFixed(0)}%`}
+      </Text>
+    );
+  }
 
   const resetInfo = resetTime ? `, ${formatResetTime(resetTime)}` : '';
 

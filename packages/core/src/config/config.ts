@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -308,8 +308,7 @@ export {
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
 };
 
-export const DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD = 4_000_000;
-export const DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES = 1000;
+export const DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD = 40_000;
 
 export class MCPServerConfig {
   constructor(
@@ -447,8 +446,6 @@ export interface ConfigParameters {
   extensionManagement?: boolean;
   enablePromptCompletion?: boolean;
   truncateToolOutputThreshold?: number;
-  truncateToolOutputLines?: number;
-  enableToolOutputTruncation?: boolean;
   eventEmitter?: EventEmitter;
   useWriteTodos?: boolean;
   policyEngineConfig?: PolicyEngineConfig;
@@ -577,6 +574,25 @@ export class Config {
   > = new Map();
   private lastRetrievedQuota?: RetrieveUserQuotaResponse;
   private lastQuotaFetchTime = 0;
+  private lastEmittedQuotaRemaining: number | undefined;
+  private lastEmittedQuotaLimit: number | undefined;
+
+  private emitQuotaChangedEvent(): void {
+    const pooled = this.getPooledQuota();
+    if (
+      this.lastEmittedQuotaRemaining !== pooled.remaining ||
+      this.lastEmittedQuotaLimit !== pooled.limit
+    ) {
+      this.lastEmittedQuotaRemaining = pooled.remaining;
+      this.lastEmittedQuotaLimit = pooled.limit;
+      coreEvents.emitQuotaChanged(
+        pooled.remaining,
+        pooled.limit,
+        pooled.resetTime,
+      );
+    }
+  }
+
   private readonly summarizeToolOutput:
     | Record<string, SummarizeToolOutputSettings>
     | undefined;
@@ -597,9 +613,7 @@ export class Config {
   private readonly extensionManagement: boolean = true;
   private readonly enablePromptCompletion: boolean = false;
   private readonly truncateToolOutputThreshold: number;
-  private readonly truncateToolOutputLines: number;
   private compressionTruncationCounter = 0;
-  private readonly enableToolOutputTruncation: boolean;
   private initialized: boolean = false;
   readonly storage: Storage;
   private readonly fileExclusions: FileExclusions;
@@ -789,9 +803,6 @@ export class Config {
     this.truncateToolOutputThreshold =
       params.truncateToolOutputThreshold ??
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD;
-    this.truncateToolOutputLines =
-      params.truncateToolOutputLines ?? DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES;
-    this.enableToolOutputTruncation = params.enableToolOutputTruncation ?? true;
     // // TODO(joshualitt): Re-evaluate the todo tool for 3 family.
     this.useWriteTodos = isPreviewModel(this.model)
       ? false
@@ -1238,12 +1249,7 @@ export class Config {
         current.limit !== limit
       ) {
         this.modelQuotas.set(activeModel, { remaining, limit });
-        const pooled = this.getPooledQuota();
-        coreEvents.emitQuotaChanged(
-          pooled.remaining,
-          pooled.limit,
-          pooled.resetTime,
-        );
+        this.emitQuotaChangedEvent();
       }
     }
   }
@@ -1418,12 +1424,7 @@ export class Config {
             }
           }
         }
-        const pooled = this.getPooledQuota();
-        coreEvents.emitQuotaChanged(
-          pooled.remaining,
-          pooled.limit,
-          pooled.resetTime,
-        );
+        this.emitQuotaChangedEvent();
       }
 
       const hasAccess =
@@ -2232,10 +2233,6 @@ export class Config {
     return this.enablePromptCompletion;
   }
 
-  getEnableToolOutputTruncation(): boolean {
-    return this.enableToolOutputTruncation;
-  }
-
   getTruncateToolOutputThreshold(): number {
     return Math.min(
       // Estimate remaining context window in characters (1 token ~= 4 chars).
@@ -2243,10 +2240,6 @@ export class Config {
         (tokenLimit(this.model) - uiTelemetryService.getLastPromptTokenCount()),
       this.truncateToolOutputThreshold,
     );
-  }
-
-  getTruncateToolOutputLines(): number {
-    return this.truncateToolOutputLines;
   }
 
   getNextCompressionTruncationId(): number {

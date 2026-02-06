@@ -136,11 +136,14 @@ describe('<Footer />', () => {
       width: 120,
       uiState: {
         sessionStats: mockSessionStats,
-        quotaRemaining: 15,
-        quotaLimit: 100,
+        quotaStats: {
+          remaining: 15,
+          limit: 100,
+          resetTime: undefined,
+        },
       },
     });
-    expect(lastFrame()).toContain('/stats 15% usage remaining');
+    expect(lastFrame()).toContain('15%');
   });
 
   it('hides the usage indicator when usage is not near limit', () => {
@@ -148,8 +151,11 @@ describe('<Footer />', () => {
       width: 120,
       uiState: {
         sessionStats: mockSessionStats,
-        quotaRemaining: 85,
-        quotaLimit: 100,
+        quotaStats: {
+          remaining: 85,
+          limit: 100,
+          resetTime: undefined,
+        },
       },
     });
     expect(lastFrame()).not.toContain('Usage remaining');

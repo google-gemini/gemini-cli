@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -19,17 +19,16 @@ import {
   USER_AGREEMENT_RATE_MEDIUM,
   CACHE_EFFICIENCY_HIGH,
   CACHE_EFFICIENCY_MEDIUM,
-  QUOTA_THRESHOLD_HIGH,
-  QUOTA_THRESHOLD_MEDIUM,
 } from '../utils/displayUtils.js';
 import { computeSessionStats } from '../utils/computeStats.js';
 import {
   type RetrieveUserQuotaResponse,
   VALID_GEMINI_MODELS,
   getDisplayString,
-  isAutoModel,
 } from '@google/gemini-cli-core';
 import { useSettings } from '../contexts/SettingsContext.js';
+import { type QuotaStats } from '../types.js';
+import { PooledQuotaInfo } from './PooledQuotaInfo.js';
 
 // A more flexible and powerful StatRow component
 interface StatRowProps {
@@ -132,19 +131,18 @@ const ModelUsageTable: React.FC<{
   cacheEfficiency: number;
   totalCachedTokens: number;
   currentModel?: string;
-  pooledRemaining?: number;
-  pooledLimit?: number;
-  pooledResetTime?: string;
+  quotaStats?: QuotaStats;
 }> = ({
   models,
   quotas,
   cacheEfficiency,
   totalCachedTokens,
   currentModel,
-  pooledRemaining,
-  pooledLimit,
-  pooledResetTime,
+  quotaStats,
 }) => {
+  const pooledRemaining = quotaStats?.remaining;
+  const pooledLimit = quotaStats?.limit;
+  const pooledResetTime = quotaStats?.resetTime;
   const rows = buildModelRows(models, quotas);
 
   if (rows.length === 0) {
@@ -172,13 +170,12 @@ const ModelUsageTable: React.FC<{
       ? usageLimitWidth
       : uncachedWidth + cachedWidth + outputTokensWidth);
 
-  const isAuto = currentModel && isAutoModel(currentModel);
-  const modelUsageTitle = isAuto
+  const modelUsageTitle = currentModel
     ? `${getDisplayString(currentModel)} Usage`
     : `Model Usage`;
 
   return (
-    <Box flexDirection="column" marginTop={1}>
+    <Box flexDirection="column">
       {/* Header */}
       <Box alignItems="flex-end">
         <Box width={nameWidth}>
@@ -188,42 +185,16 @@ const ModelUsageTable: React.FC<{
         </Box>
       </Box>
 
-      {isAuto &&
-        showQuotaColumn &&
+      {showQuotaColumn &&
         pooledRemaining !== undefined &&
-        pooledLimit !== undefined &&
-        pooledLimit > 0 && (
-          <Box flexDirection="column" marginTop={0} marginBottom={1}>
-            <Text
-              color={getStatusColor((pooledRemaining / pooledLimit) * 100, {
-                green: QUOTA_THRESHOLD_HIGH,
-                yellow: QUOTA_THRESHOLD_MEDIUM,
-              })}
-            >
-              {pooledRemaining === 0
-                ? `Limit reached`
-                : `${((pooledRemaining / pooledLimit) * 100).toFixed(0)}% usage remaining`}
-              {pooledResetTime && `, ${formatResetTime(pooledResetTime)}`}
-            </Text>
-            <Text color={theme.text.primary}>
-              Usage limit: {pooledLimit.toLocaleString()}
-            </Text>
-            <Text color={theme.text.primary}>
-              Usage limits span all sessions and reset daily.
-            </Text>
-            {pooledRemaining === 0 ? (
-              <Text color={theme.text.primary}>
-                Please /auth to upgrade or switch to an API key to continue.
-              </Text>
-            ) : (
-              <Text color={theme.text.primary}>
-                /auth to upgrade or switch to API key.
-              </Text>
-            )}
-            <Text color={theme.text.primary}>
-              For a full token breakdown, run `/stats model`.
-            </Text>
-          </Box>
+        pooledLimit !== undefined && (
+          <PooledQuotaInfo
+            remaining={pooledRemaining}
+            limit={pooledLimit}
+            resetTime={pooledResetTime}
+            showBreakdownNotice={true}
+            marginBottom={1}
+          />
         )}
 
       <Box alignItems="flex-end">
@@ -404,9 +375,7 @@ interface StatsDisplayProps {
   userEmail?: string;
   tier?: string;
   currentModel?: string;
-  pooledRemaining?: number;
-  pooledLimit?: number;
-  pooledResetTime?: string;
+  quotaStats?: QuotaStats;
 }
 
 export const StatsDisplay: React.FC<StatsDisplayProps> = ({
@@ -417,9 +386,7 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
   userEmail,
   tier,
   currentModel,
-  pooledRemaining,
-  pooledLimit,
-  pooledResetTime,
+  quotaStats,
 }) => {
   const { stats } = useSessionStats();
   const { metrics } = stats;
@@ -552,9 +519,7 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
         cacheEfficiency={computed.cacheEfficiency}
         totalCachedTokens={computed.totalCachedTokens}
         currentModel={currentModel}
-        pooledRemaining={pooledRemaining}
-        pooledLimit={pooledLimit}
-        pooledResetTime={pooledResetTime}
+        quotaStats={quotaStats}
       />
     </Box>
   );

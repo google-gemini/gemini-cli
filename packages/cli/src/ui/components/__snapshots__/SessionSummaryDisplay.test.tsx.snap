@@ -17,7 +17,6 @@ exports[`<SessionSummaryDisplay /> > renders the summary display with a title 1`
 │    » API Time:               50.2s (100.0%)                                                      │
 │    » Tool Time:              0s (0.0%)                                                           │
 │                                                                                                  │
-│                                                                                                  │
 │  Model Usage                                                                                     │
 │  Model                       Reqs   Input Tokens   Cache Reads  Output Tokens                    │
 │  ────────────────────────────────────────────────────────────────────────────                    │

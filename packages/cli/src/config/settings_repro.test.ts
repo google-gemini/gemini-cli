@@ -149,7 +149,6 @@ describe('Settings Repro', () => {
           showColor: true,
           enableInteractiveShell: true,
         },
-        truncateToolOutputLines: 100,
       },
       experimental: {
         useModelRouter: false,

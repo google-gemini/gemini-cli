@@ -59,9 +59,11 @@ async function defaultSessionView(context: CommandContext) {
     const quota = await context.services.config.refreshUserQuota();
     if (quota) {
       statsItem.quotas = quota;
-      statsItem.pooledRemaining = context.services.config.getQuotaRemaining();
-      statsItem.pooledLimit = context.services.config.getQuotaLimit();
-      statsItem.pooledResetTime = context.services.config.getQuotaResetTime();
+      statsItem.quotaStats = {
+        remaining: context.services.config.getQuotaRemaining(),
+        limit: context.services.config.getQuotaLimit(),
+        resetTime: context.services.config.getQuotaResetTime(),
+      };
     }
   }
 
@@ -95,18 +97,17 @@ export const statsCommand: SlashCommand = {
       action: (context: CommandContext) => {
         const { selectedAuthType, userEmail, tier } = getUserIdentity(context);
         const currentModel = context.services.config?.getModel();
-        const pooledRemaining = context.services.config?.getQuotaRemaining();
-        const pooledLimit = context.services.config?.getQuotaLimit();
-        const pooledResetTime = context.services.config?.getQuotaResetTime();
         context.ui.addItem({
           type: MessageType.MODEL_STATS,
           selectedAuthType,
           userEmail,
           tier,
           currentModel,
-          pooledRemaining,
-          pooledLimit,
-          pooledResetTime,
+          quotaStats: {
+            remaining: context.services.config?.getQuotaRemaining(),
+            limit: context.services.config?.getQuotaLimit(),
+            resetTime: context.services.config?.getQuotaResetTime(),
+          },
         } as HistoryItemModelStats);
       },
     },

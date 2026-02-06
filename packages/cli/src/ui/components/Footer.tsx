@@ -44,9 +44,7 @@ export const Footer: React.FC = () => {
     nightly,
     isTrustedFolder,
     terminalWidth,
-    quotaRemaining,
-    quotaLimit,
-    quotaResetTime,
+    quotaStats,
   } = {
     model: uiState.currentModel,
     targetDir: config.getTargetDir(),
@@ -60,9 +58,7 @@ export const Footer: React.FC = () => {
     nightly: uiState.nightly,
     isTrustedFolder: uiState.isTrustedFolder,
     terminalWidth: uiState.terminalWidth,
-    quotaRemaining: uiState.quotaRemaining,
-    quotaLimit: uiState.quotaLimit,
-    quotaResetTime: uiState.quotaResetTime,
+    quotaStats: uiState.quotaStats,
   };
 
   const showMemoryUsage =
@@ -166,14 +162,15 @@ export const Footer: React.FC = () => {
                   />
                 </>
               )}
-              {quotaRemaining !== undefined && quotaLimit !== undefined && (
+              {quotaStats && (
                 <>
                   {' '}
                   <QuotaDisplay
-                    remaining={quotaRemaining}
-                    limit={quotaLimit}
-                    resetTime={quotaResetTime}
-                  />
+                    remaining={quotaStats.remaining}
+                    limit={quotaStats.limit}
+                    resetTime={quotaStats.resetTime}
+                    terse={true}
+                  />{' '}
                 </>
               )}
             </Text>

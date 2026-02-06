@@ -1,13 +1,13 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
-import { formatDuration, formatResetTime } from '../utils/formatters.js';
+import { formatDuration } from '../utils/formatters.js';
 import {
   calculateAverageLatency,
   calculateCacheHitRate,
@@ -16,12 +16,9 @@ import {
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { Table, type Column } from './Table.js';
 import { useSettings } from '../contexts/SettingsContext.js';
-import { getDisplayString, isAutoModel } from '@google/gemini-cli-core';
-import {
-  getStatusColor,
-  QUOTA_THRESHOLD_HIGH,
-  QUOTA_THRESHOLD_MEDIUM,
-} from '../utils/displayUtils.js';
+import { getDisplayString } from '@google/gemini-cli-core';
+import { type QuotaStats } from '../types.js';
+import { PooledQuotaInfo } from './PooledQuotaInfo.js';
 
 interface StatRowData {
   metric: string;
@@ -36,9 +33,7 @@ interface ModelStatsDisplayProps {
   userEmail?: string;
   tier?: string;
   currentModel?: string;
-  pooledRemaining?: number;
-  pooledLimit?: number;
-  pooledResetTime?: string;
+  quotaStats?: QuotaStats;
 }
 
 export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
@@ -46,9 +41,7 @@ export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
   userEmail,
   tier,
   currentModel,
-  pooledRemaining,
-  pooledLimit,
-  pooledResetTime,
+  quotaStats,
 }) => {
   const { stats } = useSessionStats();
   const { models } = stats.metrics;
@@ -57,6 +50,10 @@ export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
   const activeModels = Object.entries(models).filter(
     ([, metrics]) => metrics.api.totalRequests > 0,
   );
+
+  const pooledRemaining = quotaStats?.remaining;
+  const pooledLimit = quotaStats?.limit;
+  const pooledResetTime = quotaStats?.resetTime;
 
   if (activeModels.length === 0) {
     return (
@@ -237,10 +234,15 @@ export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
     })),
   ];
 
-  const isAuto = currentModel && isAutoModel(currentModel);
-  const statsTitle = isAuto
+  const statsTitle = currentModel
     ? `${getDisplayString(currentModel)} Stats For Nerds`
     : 'Model Stats For Nerds';
+
+  const showIdentity = showUserIdentity && (!!selectedAuthType || !!tier);
+  const showQuota =
+    pooledRemaining !== undefined &&
+    pooledLimit !== undefined &&
+    pooledLimit > 0;
 
   return (
     <Box
@@ -277,40 +279,16 @@ export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
           <Text color={theme.text.primary}>{tier}</Text>
         </Box>
       )}
-      {isAuto &&
-        pooledRemaining !== undefined &&
-        pooledLimit !== undefined &&
-        pooledLimit > 0 && (
-          <Box flexDirection="column" marginTop={0} marginBottom={0}>
-            <Text
-              color={getStatusColor((pooledRemaining / pooledLimit) * 100, {
-                green: QUOTA_THRESHOLD_HIGH,
-                yellow: QUOTA_THRESHOLD_MEDIUM,
-              })}
-            >
-              {pooledRemaining === 0
-                ? `Limit reached`
-                : `${((pooledRemaining / pooledLimit) * 100).toFixed(0)}% usage remaining`}
-              {pooledResetTime && `, ${formatResetTime(pooledResetTime)}`}
-            </Text>
-            <Text color={theme.text.primary}>
-              Usage limit: {pooledLimit.toLocaleString()}
-            </Text>
-            <Text color={theme.text.primary}>
-              Usage limits span all sessions and reset daily.
-            </Text>
-            {pooledRemaining === 0 ? (
-              <Text color={theme.text.primary}>
-                Please /auth to upgrade or switch to an API key to continue.
-              </Text>
-            ) : (
-              <Text color={theme.text.primary}>
-                /auth to upgrade or switch to API key.
-              </Text>
-            )}
-          </Box>
-        )}
-      {(showUserIdentity || isAuto) && <Box height={1} />}
+      {showQuota && (
+        <PooledQuotaInfo
+          remaining={pooledRemaining}
+          limit={pooledLimit}
+          resetTime={pooledResetTime}
+          showBreakdownNotice={false}
+          marginBottom={0}
+        />
+      )}
+      {(showIdentity || showQuota) && <Box height={1} />}
 
       <Table data={rows} columns={columns} />
     </Box>
