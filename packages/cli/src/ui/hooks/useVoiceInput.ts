@@ -307,7 +307,7 @@ export function useVoiceInput(config?: {
           // but let's assume it's an executable or wrapper script for now.
           await runWhisper(
             config.whisperPath,
-            `"${audioFile}" --model tiny --language English --output_format txt --output_dir "${tempDirRef.current}" `,
+            `"${audioFile}" --model tiny --output_format txt --output_dir "${tempDirRef.current}" `,
           );
           // Read the transcript file
           const transcriptFile = audioFile.replace('.wav', '.txt');
@@ -317,7 +317,7 @@ export function useVoiceInput(config?: {
           try {
             await execAsync('which whisper-faster || which faster-whisper');
             await execAsync(
-              `whisper-faster "${audioFile}" --model tiny --language en --output_format txt --output_dir "${tempDirRef.current}"`,
+              `whisper-faster "${audioFile}" --model tiny --output_format txt --output_dir "${tempDirRef.current}"`,
             );
             // Read the transcript file
             const transcriptFile = audioFile.replace('.wav', '.txt');
@@ -327,7 +327,7 @@ export function useVoiceInput(config?: {
             try {
               await execAsync('which whisper');
               await execAsync(
-                `whisper "${audioFile}" --model tiny --language English --output_format txt --output_dir "${tempDirRef.current}"`,
+                `whisper "${audioFile}" --model tiny --output_format txt --output_dir "${tempDirRef.current}"`,
               );
               const transcriptFile = audioFile.replace('.wav', '.txt');
               transcript = await readFile(transcriptFile, 'utf-8');
