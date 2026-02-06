@@ -323,116 +323,64 @@ describe('Policy Engine Integration Tests', () => {
       ).toBe(PolicyDecision.DENY);
     });
 
-    it('should allow write_file to plans directory in Plan mode', async () => {
-      const settings: Settings = {};
+    describe.each(['write_file', 'replace'])(
+      'Plan Mode policy for %s',
+      (toolName) => {
+        it(`should allow ${toolName} to plans directory`, async () => {
+          const settings: Settings = {};
+          const config = await createPolicyEngineConfig(
+            settings,
+            ApprovalMode.PLAN,
+          );
+          const engine = new PolicyEngine(config);
 
-      const config = await createPolicyEngineConfig(
-        settings,
-        ApprovalMode.PLAN,
-      );
-      const engine = new PolicyEngine(config);
+          // Valid plan file paths
+          const validPaths = [
+            '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/my-plan.md',
+            '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/feature_auth.md',
+          ];
 
-      // Valid plan file path (64-char hex hash, .md extension, safe filename)
-      const validPlanPath =
-        '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/my-plan.md';
-      expect(
-        (
-          await engine.check(
-            { name: 'write_file', args: { file_path: validPlanPath } },
-            undefined,
-          )
-        ).decision,
-      ).toBe(PolicyDecision.ALLOW);
+          for (const file_path of validPaths) {
+            expect(
+              (
+                await engine.check(
+                  { name: toolName, args: { file_path } },
+                  undefined,
+                )
+              ).decision,
+            ).toBe(PolicyDecision.ALLOW);
+          }
+        });
 
-      // Valid plan with underscore in filename
-      const validPlanPath2 =
-        '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/feature_auth.md';
-      expect(
-        (
-          await engine.check(
-            { name: 'write_file', args: { file_path: validPlanPath2 } },
-            undefined,
-          )
-        ).decision,
-      ).toBe(PolicyDecision.ALLOW);
-    });
+        it(`should deny ${toolName} outside plans directory`, async () => {
+          const settings: Settings = {};
+          const config = await createPolicyEngineConfig(
+            settings,
+            ApprovalMode.PLAN,
+          );
+          const engine = new PolicyEngine(config);
 
-    it('should deny write_file outside plans directory in Plan mode', async () => {
-      const settings: Settings = {};
+          const invalidPaths = [
+            '/project/src/file.ts', // Workspace
+            '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/script.js', // Wrong extension
+            '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/../../../etc/passwd.md', // Path traversal
+            '/home/user/.gemini/tmp/abc123/plans/plan.md', // Invalid hash length
+            '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/subdir/plan.md', // Subdirectory
+          ];
 
-      const config = await createPolicyEngineConfig(
-        settings,
-        ApprovalMode.PLAN,
-      );
-      const engine = new PolicyEngine(config);
-
-      // Write to workspace (not plans dir) should be denied
-      expect(
-        (
-          await engine.check(
-            { name: 'write_file', args: { file_path: '/project/src/file.ts' } },
-            undefined,
-          )
-        ).decision,
-      ).toBe(PolicyDecision.DENY);
-
-      // Write to plans dir but wrong extension should be denied
-      const wrongExtPath =
-        '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/script.js';
-      expect(
-        (
-          await engine.check(
-            { name: 'write_file', args: { file_path: wrongExtPath } },
-            undefined,
-          )
-        ).decision,
-      ).toBe(PolicyDecision.DENY);
-
-      // Path traversal attempt should be denied (filename contains /)
-      const traversalPath =
-        '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/../../../etc/passwd.md';
-      expect(
-        (
-          await engine.check(
-            { name: 'write_file', args: { file_path: traversalPath } },
-            undefined,
-          )
-        ).decision,
-      ).toBe(PolicyDecision.DENY);
-
-      // Invalid hash length should be denied
-      const shortHashPath = '/home/user/.gemini/tmp/abc123/plans/plan.md';
-      expect(
-        (
-          await engine.check(
-            { name: 'write_file', args: { file_path: shortHashPath } },
-            undefined,
-          )
-        ).decision,
-      ).toBe(PolicyDecision.DENY);
-    });
-
-    it('should deny write_file to subdirectories in Plan mode', async () => {
-      const settings: Settings = {};
-
-      const config = await createPolicyEngineConfig(
-        settings,
-        ApprovalMode.PLAN,
-      );
-      const engine = new PolicyEngine(config);
-
-      // Write to subdirectory should be denied
-      const subdirPath =
-        '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/subdir/plan.md';
-      expect(
-        (
-          await engine.check(
-            { name: 'write_file', args: { file_path: subdirPath } },
-            undefined,
-          )
-        ).decision,
-      ).toBe(PolicyDecision.DENY);
-    });
+          for (const file_path of invalidPaths) {
+            expect(
+              (
+                await engine.check(
+                  { name: toolName, args: { file_path } },
+                  undefined,
+                )
+              ).decision,
+            ).toBe(PolicyDecision.DENY);
+          }
+        });
+      },
+    );
 
     it('should verify priority ordering works correctly in practice', async () => {
       const settings: Settings = {
