@@ -2,8 +2,7 @@
 name: docs-writer
 description:
   Always use this skill when the task involves writing, reviewing, or editing 
-  documentation, specifically for any files in the `/docs` directory or any 
-  `.md` files in the repository.
+  files in the `/docs` directory or any `.md` files in the repository.
 ---
 
 # `docs-writer` skill instructions

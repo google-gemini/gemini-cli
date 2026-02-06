@@ -102,6 +102,7 @@ async function drainStdin() {
 
 export async function cleanupCheckpoints() {
   const storage = new Storage(process.cwd());
+  await storage.initialize();
   const tempDir = storage.getProjectTempDir();
   const checkpointsDir = join(tempDir, 'checkpoints');
   try {

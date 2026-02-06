@@ -77,10 +77,10 @@ decision = "ask_user"
 priority = 50
 modes = ["plan"]
 
-# Allow write_file for .md files in plans directory
+# Allow write_file and replace for .md files in plans directory
 [[rule]]
-toolName = "write_file"
+toolName = ["write_file", "replace"]
 decision = "allow"
 priority = 50
 modes = ["plan"]
-argsPattern = "\"file_path\":\"[^\"]+/\\.gemini/tmp/[a-f0-9]{64}/plans/[a-zA-Z0-9_-]+\\.md\""
+argsPattern = "\"file_path\":\"[^\"]+/\\.gemini/tmp/[a-zA-Z0-9_-]+/plans/[a-zA-Z0-9_-]+\\.md\""

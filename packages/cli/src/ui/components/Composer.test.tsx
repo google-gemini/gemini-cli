@@ -15,6 +15,7 @@ import {
 } from '../contexts/UIActionsContext.js';
 import { ConfigContext } from '../contexts/ConfigContext.js';
 import { SettingsContext } from '../contexts/SettingsContext.js';
+import { createMockSettings } from '../../test-utils/settings.js';
 // Mock VimModeContext hook
 vi.mock('../contexts/VimModeContext.js', () => ({
   useVimMode: vi.fn(() => ({
@@ -23,8 +24,7 @@ vi.mock('../contexts/VimModeContext.js', () => ({
   })),
 }));
 import { ApprovalMode } from '@google/gemini-cli-core';
-import { StreamingState } from '../types.js';
-import { mergeSettings } from '../../config/settings.js';
+import { StreamingState, ToolCallStatus } from '../types.js';
 
 // Mock child components
 vi.mock('./LoadingIndicator.js', () => ({
@@ -47,6 +47,14 @@ vi.mock('./ApprovalModeIndicator.js', () => ({
 
 vi.mock('./ShellModeIndicator.js', () => ({
   ShellModeIndicator: () => <Text>ShellModeIndicator</Text>,
+}));
+
+vi.mock('./ShortcutsHint.js', () => ({
+  ShortcutsHint: () => <Text>ShortcutsHint</Text>,
+}));
+
+vi.mock('./ShortcutsHelp.js', () => ({
+  ShortcutsHelp: () => <Text>ShortcutsHelp</Text>,
 }));
 
 vi.mock('./DetailedMessagesDisplay.js', () => ({
@@ -95,7 +103,8 @@ vi.mock('../contexts/OverflowContext.js', () => ({
 // Create mock context providers
 const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
   ({
-    streamingState: null,
+    streamingState: StreamingState.Idle,
+    isConfigInitialized: true,
     contextFileNames: [],
     showApprovalModeIndicator: ApprovalMode.DEFAULT,
     messageQueue: [],
@@ -116,6 +125,7 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     ctrlCPressedOnce: false,
     ctrlDPressedOnce: false,
     showEscapePrompt: false,
+    shortcutsHelpVisible: false,
     ideContextState: null,
     geminiMdFileCount: 0,
     renderMarkdown: true,
@@ -168,21 +178,6 @@ const createMockConfig = (overrides = {}) => ({
   ...overrides,
 });
 
-const createMockSettings = (merged = {}) => {
-  const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
-  return {
-    merged: {
-      ...defaultMergedSettings,
-      ui: {
-        ...defaultMergedSettings.ui,
-        hideFooter: false,
-        showMemoryUsage: false,
-        ...merged,
-      },
-    },
-  };
-};
-
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const renderComposer = (
   uiState: UIState,
@@ -207,7 +202,7 @@ describe('Composer', () => {
   describe('Footer Display Settings', () => {
     it('renders Footer by default when hideFooter is false', () => {
       const uiState = createMockUIState();
-      const settings = createMockSettings({ hideFooter: false });
+      const settings = createMockSettings({ ui: { hideFooter: false } });
 
       const { lastFrame } = renderComposer(uiState, settings);
 
@@ -216,7 +211,7 @@ describe('Composer', () => {
 
     it('does NOT render Footer when hideFooter is true', () => {
       const uiState = createMockUIState();
-      const settings = createMockSettings({ hideFooter: true });
+      const settings = createMockSettings({ ui: { hideFooter: true } });
 
       const { lastFrame } = renderComposer(uiState, settings);
 
@@ -245,8 +240,10 @@ describe('Composer', () => {
         getDebugMode: vi.fn(() => true),
       });
       const settings = createMockSettings({
-        hideFooter: false,
-        showMemoryUsage: true,
+        ui: {
+          hideFooter: false,
+          showMemoryUsage: true,
+        },
       });
       // Mock vim mode for this test
       const { useVimMode } = await import('../contexts/VimModeContext.js');
@@ -281,6 +278,19 @@ describe('Composer', () => {
       expect(output).toContain('LoadingIndicator');
     });
 
+    it('keeps shortcuts hint visible while loading', () => {
+      const uiState = createMockUIState({
+        streamingState: StreamingState.Responding,
+        elapsedTime: 1,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      const output = lastFrame();
+      expect(output).toContain('LoadingIndicator');
+      expect(output).toContain('ShortcutsHint');
+    });
+
     it('renders LoadingIndicator without thought when accessibility disables loading phrases', () => {
       const uiState = createMockUIState({
         streamingState: StreamingState.Responding,
@@ -297,7 +307,7 @@ describe('Composer', () => {
       expect(output).not.toContain('Should not show');
     });
 
-    it('suppresses thought when waiting for confirmation', () => {
+    it('does not render LoadingIndicator when waiting for confirmation', () => {
       const uiState = createMockUIState({
         streamingState: StreamingState.WaitingForConfirmation,
         thought: {
@@ -309,8 +319,34 @@ describe('Composer', () => {
       const { lastFrame } = renderComposer(uiState);
 
       const output = lastFrame();
-      expect(output).toContain('LoadingIndicator');
-      expect(output).not.toContain('Should not show during confirmation');
+      expect(output).not.toContain('LoadingIndicator');
+    });
+
+    it('does not render LoadingIndicator when a tool confirmation is pending', () => {
+      const uiState = createMockUIState({
+        streamingState: StreamingState.Responding,
+        pendingHistoryItems: [
+          {
+            type: 'tool_group',
+            tools: [
+              {
+                callId: 'call-1',
+                name: 'edit',
+                description: 'edit file',
+                status: ToolCallStatus.Confirming,
+                resultDisplay: undefined,
+                confirmationDetails: undefined,
+              },
+            ],
+          },
+        ],
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      const output = lastFrame();
+      expect(output).not.toContain('LoadingIndicator');
+      expect(output).not.toContain('esc to cancel');
     });
 
     it('renders LoadingIndicator when embedded shell is focused but background shell is visible', () => {
@@ -457,7 +493,7 @@ describe('Composer', () => {
 
       const { lastFrame } = renderComposer(uiState);
 
-      expect(lastFrame()).toContain('ApprovalModeIndicator');
+      expect(lastFrame()).toMatch(/ApprovalModeIndic[\s\S]*ator/);
     });
 
     it('shows ShellModeIndicator when shell mode is active', () => {
@@ -467,7 +503,7 @@ describe('Composer', () => {
 
       const { lastFrame } = renderComposer(uiState);
 
-      expect(lastFrame()).toContain('ShellModeIndicator');
+      expect(lastFrame()).toMatch(/ShellModeIndic[\s\S]*tor/);
     });
 
     it('shows RawMarkdownIndicator when renderMarkdown is false', () => {

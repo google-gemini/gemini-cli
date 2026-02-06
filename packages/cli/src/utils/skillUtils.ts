@@ -187,6 +187,75 @@ export async function installSkill(
 }
 
 /**
+ * Central logic for linking a skill from a local path via symlink.
+ */
+export async function linkSkill(
+  source: string,
+  scope: 'user' | 'workspace',
+  onLog: (msg: string) => void,
+  requestConsent: (
+    skills: SkillDefinition[],
+    targetDir: string,
+  ) => Promise<boolean> = () => Promise.resolve(true),
+): Promise<Array<{ name: string; location: string }>> {
+  const sourcePath = path.resolve(source);
+
+  onLog(`Searching for skills in ${sourcePath}...`);
+  const skills = await loadSkillsFromDir(sourcePath);
+
+  if (skills.length === 0) {
+    throw new Error(
+      `No valid skills found in "${sourcePath}". Ensure a SKILL.md file exists with valid frontmatter.`,
+    );
+  }
+
+  // Check for internal name collisions
+  const seenNames = new Map<string, string>();
+  for (const skill of skills) {
+    if (seenNames.has(skill.name)) {
+      throw new Error(
+        `Duplicate skill name "${skill.name}" found at multiple locations:\n  - ${seenNames.get(skill.name)}\n  - ${skill.location}`,
+      );
+    }
+    seenNames.set(skill.name, skill.location);
+  }
+
+  const workspaceDir = process.cwd();
+  const storage = new Storage(workspaceDir);
+  const targetDir =
+    scope === 'workspace'
+      ? storage.getProjectSkillsDir()
+      : Storage.getUserSkillsDir();
+
+  if (!(await requestConsent(skills, targetDir))) {
+    throw new Error('Skill linking cancelled by user.');
+  }
+
+  await fs.mkdir(targetDir, { recursive: true });
+
+  const linkedSkills: Array<{ name: string; location: string }> = [];
+
+  for (const skill of skills) {
+    const skillName = skill.name;
+    const skillSourceDir = path.dirname(skill.location);
+    const destPath = path.join(targetDir, skillName);
+
+    const exists = await fs.lstat(destPath).catch(() => null);
+    if (exists) {
+      onLog(
+        `Skill "${skillName}" already exists at destination. Overwriting...`,
+      );
+      await fs.rm(destPath, { recursive: true, force: true });
+    }
+
+    await fs.symlink(skillSourceDir, destPath, 'dir');
+    linkedSkills.push({ name: skillName, location: destPath });
+  }
+
+  return linkedSkills;
+}
+
+/**
  * Central logic for uninstalling a skill by name.
  */
 export async function uninstallSkill(
