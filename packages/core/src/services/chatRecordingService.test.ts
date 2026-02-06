@@ -8,7 +8,6 @@ import { expect, it, describe, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-// import { randomUUID } from 'node:crypto'; // Removed as it's mocked factory-style
 import type {
   ConversationRecord,
   ToolCallRecord,

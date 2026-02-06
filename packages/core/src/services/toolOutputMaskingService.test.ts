@@ -463,13 +463,13 @@ describe('ToolOutputMaskingService', () => {
 
     // We replace the random part of the filename for deterministic snapshots
     // and normalize path separators for cross-platform compatibility
-    const deterministicResponse = response
+    const normalizedResponse = response.replace(/\\/g, '/');
+    const deterministicResponse = normalizedResponse
       .replace(new RegExp(testTempDir.replace(/\\/g, '/'), 'g'), '/mock/temp')
       .replace(
         new RegExp(`${SHELL_TOOL_NAME}_[^\\s"]+\\.txt`, 'g'),
         `${SHELL_TOOL_NAME}_deterministic.txt`,
-      )
-      .replace(/\\/g, '/');
+      );
 
     expect(deterministicResponse).toMatchSnapshot();
   });
