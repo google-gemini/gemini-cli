@@ -246,7 +246,7 @@ export const AppContainer = (props: AppContainerProps) => {
     [defaultBannerText, warningBannerText],
   );
 
-  const { bannerText } = useBanner(bannerData, config);
+  const { bannerText } = useBanner(bannerData);
 
   const extensionManager = config.getExtensionLoader() as ExtensionManager;
   // We are in the interactive CLI, update how we request consent and settings.

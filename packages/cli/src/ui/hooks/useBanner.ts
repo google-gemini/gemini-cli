@@ -6,17 +6,17 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { persistentState } from '../../utils/persistentState.js';
-import type { Config } from '@google/gemini-cli-core';
 import crypto from 'node:crypto';
 
 const DEFAULT_MAX_BANNER_SHOWN_COUNT = 5;
+const SHOW_DEFAULT_BANNER = false;
 
 interface BannerData {
   defaultText: string;
   warningText: string;
 }
 
-export function useBanner(bannerData: BannerData, _config: Config) {
+export function useBanner(bannerData: BannerData) {
   const { defaultText, warningText } = bannerData;
 
   const [bannerCounts] = useState(
@@ -31,7 +31,9 @@ export function useBanner(bannerData: BannerData, _config: Config) {
   const currentBannerCount = bannerCounts[hashedText] || 0;
 
   const showDefaultBanner =
-    warningText === '' && currentBannerCount < DEFAULT_MAX_BANNER_SHOWN_COUNT;
+    SHOW_DEFAULT_BANNER &&
+    warningText === '' &&
+    currentBannerCount < DEFAULT_MAX_BANNER_SHOWN_COUNT;
 
   const rawBannerText = showDefaultBanner ? defaultText : warningText;
   const bannerText = rawBannerText.replace(/\\n/g, '\n');
