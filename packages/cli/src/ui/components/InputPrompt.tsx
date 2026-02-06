@@ -982,15 +982,19 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
+      if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL](key)) {
+        return false;
+      }
+
       if (keyMatchers[Command.FOCUS_SHELL_INPUT](key)) {
-        // If we got here, Autocomplete didn't handle the key (e.g. no suggestions).
         if (
           activePtyId ||
           (backgroundShells.size > 0 && backgroundShellHeight > 0)
         ) {
           setEmbeddedShellFocused(true);
+          return true;
         }
-        return true;
+        return false;
       }
 
       // Fall back to the text buffer's default input handling for all other keys
