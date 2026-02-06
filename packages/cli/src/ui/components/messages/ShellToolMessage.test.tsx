@@ -15,7 +15,7 @@ import { renderWithProviders } from '../../../test-utils/render.js';
 import { waitFor } from '../../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SHELL_TOOL_NAME } from '@google/gemini-cli-core';
-import { SHELL_COMMAND_NAME } from '../../constants.js';
+import { SHELL_COMMAND_NAME, ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
 
 describe('<ShellToolMessage />', () => {
   const baseProps: ShellToolMessageProps = {
@@ -204,6 +204,72 @@ describe('<ShellToolMessage />', () => {
       );
       await waitFor(() => {
         expect(lastFrame()).toMatchSnapshot();
+      });
+    });
+  });
+
+  describe('Height Constraints', () => {
+    it('respects availableTerminalHeight when it is smaller than ACTIVE_SHELL_MAX_LINES', async () => {
+      const availableTerminalHeight = 10;
+      // We expect fewer lines than ACTIVE_SHELL_MAX_LINES (15).
+      // Logic: Math.min(15, Math.max(1, 10 - 2)) = 8.
+
+      const { lastFrame } = renderWithProviders(
+        <ShellToolMessage
+          {...baseProps}
+          resultDisplay={Array.from(
+            { length: 50 },
+            (_, i) => `Line ${i + 1}`,
+          ).join('\n')}
+          renderOutputAsMarkdown={false}
+          availableTerminalHeight={availableTerminalHeight}
+          activeShellPtyId={1}
+          ptyId={2} // not focused
+          status={ToolCallStatus.Executing}
+        />,
+        {
+          uiActions,
+          useAlternateBuffer: true,
+        },
+      );
+
+      await waitFor(() => {
+        const frame = lastFrame();
+        const matches = frame!.match(/Line \d+/g);
+        // We expect <= 8 lines visible
+        expect(matches?.length).toBeLessThanOrEqual(8);
+        expect(matches?.length).toBeGreaterThan(0);
+        expect(frame).toMatchSnapshot();
+      });
+    });
+
+    it('uses ACTIVE_SHELL_MAX_LINES when availableTerminalHeight is large', async () => {
+      const availableTerminalHeight = 100;
+      const { lastFrame } = renderWithProviders(
+        <ShellToolMessage
+          {...baseProps}
+          resultDisplay={Array.from(
+            { length: 50 },
+            (_, i) => `Line ${i + 1}`,
+          ).join('\n')}
+          renderOutputAsMarkdown={false}
+          availableTerminalHeight={availableTerminalHeight}
+          activeShellPtyId={1}
+          ptyId={2} // not focused
+          status={ToolCallStatus.Executing}
+        />,
+        {
+          uiActions,
+          useAlternateBuffer: true,
+        },
+      );
+
+      await waitFor(() => {
+        const frame = lastFrame();
+        const matches = frame!.match(/Line \d+/g);
+        // Should be limited by ACTIVE_SHELL_MAX_LINES (15).
+        expect(matches?.length).toBe(ACTIVE_SHELL_MAX_LINES);
+        expect(frame).toMatchSnapshot();
       });
     });
   });

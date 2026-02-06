@@ -212,5 +212,6 @@ function getShellMaxLines(
     return undefined;
   }
 
-  return ACTIVE_SHELL_MAX_LINES;
+  const maxLinesBasedOnHeight = Math.max(1, availableTerminalHeight - 2);
+  return Math.min(maxLinesBasedOnHeight, ACTIVE_SHELL_MAX_LINES);
 }

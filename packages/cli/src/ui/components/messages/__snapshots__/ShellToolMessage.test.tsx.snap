@@ -1,5 +1,40 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`<ShellToolMessage /> > Height Constraints > respects availableTerminalHeight when it is smaller than ACTIVE_SHELL_MAX_LINES 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ⊷  Shell Command A shell command                                             │
+│                                                                              │
+│ Line 43                                                                      │
+│ Line 44                                                                      │
+│ Line 45                                                                      │
+│ Line 46                                                                      │
+│ Line 47                                                                      │
+│ Line 48                                                                      │
+│ Line 49                                                                    ▄ │
+│ Line 50                                                                    █ │"
+`;
+
+exports[`<ShellToolMessage /> > Height Constraints > uses ACTIVE_SHELL_MAX_LINES when availableTerminalHeight is large 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ⊷  Shell Command A shell command                                             │
+│                                                                              │
+│ Line 36                                                                      │
+│ Line 37                                                                      │
+│ Line 38                                                                      │
+│ Line 39                                                                      │
+│ Line 40                                                                      │
+│ Line 41                                                                      │
+│ Line 42                                                                      │
+│ Line 43                                                                      │
+│ Line 44                                                                      │
+│ Line 45                                                                      │
+│ Line 46                                                                    ▄ │
+│ Line 47                                                                    █ │
+│ Line 48                                                                    █ │
+│ Line 49                                                                    █ │
+│ Line 50                                                                    █ │"
+`;
+
 exports[`<ShellToolMessage /> > Snapshots > renders in Alternate Buffer mode while focused 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ⊷  Shell Command A shell command                                   (Focused) │
