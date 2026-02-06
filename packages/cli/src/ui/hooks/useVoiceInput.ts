@@ -67,6 +67,8 @@ export function useVoiceInput(config?: {
   const tempDirRef = useRef<string | null>(null);
   const audioFileRef = useRef<string | null>(null);
   const sanitizedPathLoggedRef = useRef(false);
+  // Guard against overlapping toggleRecording calls (race condition fix)
+  const isTogglingRef = useRef(false);
 
   // Cleanup on unmount
   useEffect(
@@ -85,6 +87,13 @@ export function useVoiceInput(config?: {
   );
 
   const startRecording = useCallback(async () => {
+    // Prevent starting if already recording
+    if (recordingProcessRef.current) {
+      debugLogger.log(
+        'useVoiceInput: startRecording ignored - already recording',
+      );
+      return;
+    }
     try {
       setState({ isRecording: true, isTranscribing: false, error: null });
 
@@ -186,6 +195,11 @@ export function useVoiceInput(config?: {
   }, []);
 
   const stopRecording = useCallback(async () => {
+    // Prevent stopping if not recording
+    if (!recordingProcessRef.current) {
+      debugLogger.log('useVoiceInput: stopRecording ignored - not recording');
+      return;
+    }
     try {
       // Stop recording
       const processToKill = recordingProcessRef.current;
@@ -377,10 +391,22 @@ export function useVoiceInput(config?: {
   }, [config?.whisperPath]);
 
   const toggleRecording = useCallback(async () => {
-    if (state.isRecording) {
-      await stopRecording();
-    } else {
-      await startRecording();
+    // Prevent overlapping calls (race condition protection)
+    if (isTogglingRef.current) {
+      debugLogger.log(
+        'useVoiceInput: toggleRecording ignored - already in progress',
+      );
+      return;
+    }
+    isTogglingRef.current = true;
+    try {
+      if (state.isRecording) {
+        await stopRecording();
+      } else {
+        await startRecording();
+      }
+    } finally {
+      isTogglingRef.current = false;
     }
   }, [state.isRecording, startRecording, stopRecording]);
 

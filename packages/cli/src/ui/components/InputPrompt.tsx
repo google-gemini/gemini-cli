@@ -253,8 +253,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   // Handle voice transcript via event listener (not context) to avoid re-renders
   useEffect(() => {
     const handleTranscript = (transcript: string) => {
-      // Insert transcribed text at cursor position
-      buffer.insert(transcript);
+      // Insert transcribed text at cursor position with trailing space for next input
+      buffer.insert(transcript + ' ');
     };
 
     const unsubscribe = onVoiceTranscript(handleTranscript);
@@ -1295,6 +1295,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               '*'
             ) : voiceState.isRecording ? (
               '🎤'
+            ) : voiceState.isTranscribing ? (
+              '⏳'
             ) : (
               '>'
             )}{' '}
