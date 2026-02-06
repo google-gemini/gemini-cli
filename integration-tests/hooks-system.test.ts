@@ -46,7 +46,7 @@ describe('Hooks System Integration', () => {
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
+                    command: `node "${scriptPath}"`,
                     timeout: 5000,
                   },
                 ],
@@ -104,7 +104,7 @@ describe('Hooks System Integration', () => {
                   {
                     type: 'command',
                     // Exit with code 2 and write reason to stderr
-                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
+                    command: `node "${scriptPath}"`,
                     timeout: 5000,
                   },
                 ],
@@ -164,7 +164,7 @@ describe('Hooks System Integration', () => {
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
+                    command: `node "${scriptPath}"`,
                     timeout: 5000,
                   },
                 ],
@@ -889,7 +889,7 @@ try {
                     type: 'command',
                     // Output plain text then JSON.
                     // This breaks JSON parsing, so it falls back to 'allow' with the whole stdout as systemMessage.
-                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
+                    command: `node "${scriptPath}"`,
                     timeout: 5000,
                   },
                 ],
