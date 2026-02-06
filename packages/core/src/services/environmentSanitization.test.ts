@@ -292,6 +292,54 @@ describe('sanitizeEnvironment', () => {
     });
   });
 
+  it('should redact ALWAYS_ALLOWED variables when value contains secrets', () => {
+    const env = {
+      HOME: 'ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      PATH: '/usr/bin:AIzaSyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx:/opt/bin',
+      USER: 'eyJhbGciOiJIUzI1NiJ9.e30.ZRrHA157xAA_7962-a_3rA',
+      SHELL: '-----BEGIN RSA PRIVATE KEY-----...',
+      LANG: 'https://user:password@example.com',
+      // Safe values should still pass through
+      TMPDIR: '/tmp',
+      LOGNAME: 'testuser',
+    };
+    const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
+    expect(sanitized).toEqual({
+      TMPDIR: '/tmp',
+      LOGNAME: 'testuser',
+    });
+  });
+
+  it('should redact GEMINI_CLI_ prefixed variables when value contains secrets', () => {
+    const env = {
+      GEMINI_CLI_TOKEN: 'ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      GEMINI_CLI_CONFIG: 'sk_live_xxxxxxxxxxxxxxxxxxxxxxxx',
+      GEMINI_CLI_DATA: 'AIzaSyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      // Safe values should still pass through
+      GEMINI_CLI_VERSION: '1.2.3',
+      GEMINI_CLI_DEBUG: 'true',
+    };
+    const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);
+    expect(sanitized).toEqual({
+      GEMINI_CLI_VERSION: '1.2.3',
+      GEMINI_CLI_DEBUG: 'true',
+    });
+  });
+
+  it('should still allow user-specified allowlist variables even with secret values', () => {
+    const env = {
+      MY_SAFE_VAR: 'ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+    };
+    const sanitized = sanitizeEnvironment(env, {
+      allowedEnvironmentVariables: ['MY_SAFE_VAR'],
+      blockedEnvironmentVariables: [],
+      enableEnvironmentVariableRedaction: true,
+    });
+    expect(sanitized).toEqual({
+      MY_SAFE_VAR: 'ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+    });
+  });
+
   it('should not perform any redaction if enableEnvironmentVariableRedaction is false', () => {
     const env = {
       MY_API_TOKEN: 'token-value',
