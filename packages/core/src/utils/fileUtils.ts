@@ -573,6 +573,14 @@ const MAX_TRUNCATED_LINE_WIDTH = 1000;
 const MAX_TRUNCATED_CHARS = 4000;
 
 /**
+ * Sanitizes a string for use as a filename part by removing path traversal
+ * characters and other non-alphanumeric characters.
+ */
+export function sanitizeFilenamePart(part: string): string {
+  return part.replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+/**
  * Formats a truncated message for tool output, handling multi-line and single-line (elephant) cases.
  */
 export function formatTruncatedToolOutput(
@@ -615,21 +623,24 @@ ${processedLines.join('\n')}`;
 /**
  * Saves tool output to a temporary file for later retrieval.
  */
-export const TOOL_OUTPUT_DIR = 'tool_output';
+export const TOOL_OUTPUTS_DIR = 'tool-outputs';
 
 export async function saveTruncatedToolOutput(
   content: string,
   toolName: string,
   id: string | number, // Accept string (callId) or number (truncationId)
   projectTempDir: string,
+  sessionId?: string,
 ): Promise<{ outputFile: string; totalLines: number }> {
-  const safeToolName = toolName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-  const safeId = id
-    .toString()
-    .replace(/[^a-z0-9]/gi, '_')
-    .toLowerCase();
+  const safeToolName = sanitizeFilenamePart(toolName).toLowerCase();
+  const safeId = sanitizeFilenamePart(id.toString()).toLowerCase();
   const fileName = `${safeToolName}_${safeId}.txt`;
-  const toolOutputDir = path.join(projectTempDir, TOOL_OUTPUT_DIR);
+
+  let toolOutputDir = path.join(projectTempDir, TOOL_OUTPUTS_DIR);
+  if (sessionId) {
+    const safeSessionId = sanitizeFilenamePart(sessionId);
+    toolOutputDir = path.join(toolOutputDir, `session-${safeSessionId}`);
+  }
   const outputFile = path.join(toolOutputDir, fileName);
 
   await fsPromises.mkdir(toolOutputDir, { recursive: true });

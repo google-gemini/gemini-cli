@@ -1121,7 +1121,7 @@ describe('fileUtils', () => {
 
       const expectedOutputFile = path.join(
         tempRootDir,
-        'tool_output',
+        'tool-outputs',
         'shell_123.txt',
       );
       expect(result.outputFile).toBe(expectedOutputFile);
@@ -1149,7 +1149,7 @@ describe('fileUtils', () => {
       // ../../dangerous/tool -> ______dangerous_tool
       const expectedOutputFile = path.join(
         tempRootDir,
-        'tool_output',
+        'tool-outputs',
         '______dangerous_tool_1.txt',
       );
       expect(result.outputFile).toBe(expectedOutputFile);
@@ -1170,8 +1170,32 @@ describe('fileUtils', () => {
       // ../../etc/passwd -> ______etc_passwd
       const expectedOutputFile = path.join(
         tempRootDir,
-        'tool_output',
+        'tool-outputs',
         'shell_______etc_passwd.txt',
+      );
+      expect(result.outputFile).toBe(expectedOutputFile);
+    });
+
+    it('should sanitize sessionId in filename/path', async () => {
+      const content = 'content';
+      const toolName = 'shell';
+      const id = '1';
+      const sessionId = '../../etc/passwd';
+
+      const result = await saveTruncatedToolOutput(
+        content,
+        toolName,
+        id,
+        tempRootDir,
+        sessionId,
+      );
+
+      // ../../etc/passwd -> ______etc_passwd
+      const expectedOutputFile = path.join(
+        tempRootDir,
+        'tool-outputs',
+        'session-______etc_passwd',
+        'shell_1.txt',
       );
       expect(result.outputFile).toBe(expectedOutputFile);
     });

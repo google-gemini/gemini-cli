@@ -821,5 +821,74 @@ describe('extensionSettings', () => {
       );
       // Should complete without error
     });
+
+    it('should throw error if env var name contains invalid characters', async () => {
+      const securityConfig: ExtensionConfig = {
+        name: 'test-ext',
+        version: '1.0.0',
+        settings: [{ name: 's2', description: 'd2', envVar: 'VAR-BAD' }],
+      };
+      mockRequestSetting.mockResolvedValue('value');
+
+      await expect(
+        updateSetting(
+          securityConfig,
+          '12345',
+          'VAR-BAD',
+          mockRequestSetting,
+          ExtensionSettingScope.USER,
+          tempWorkspaceDir,
+        ),
+      ).rejects.toThrow(/Invalid environment variable name/);
+    });
+
+    it('should throw error if env var value contains newlines', async () => {
+      mockRequestSetting.mockResolvedValue('value\nwith\nnewlines');
+
+      await expect(
+        updateSetting(
+          config,
+          '12345',
+          'VAR1',
+          mockRequestSetting,
+          ExtensionSettingScope.USER,
+          tempWorkspaceDir,
+        ),
+      ).rejects.toThrow(/Invalid environment variable value/);
+    });
+
+    it('should quote values with spaces', async () => {
+      mockRequestSetting.mockResolvedValue('value with spaces');
+
+      await updateSetting(
+        config,
+        '12345',
+        'VAR1',
+        mockRequestSetting,
+        ExtensionSettingScope.USER,
+        tempWorkspaceDir,
+      );
+
+      const expectedEnvPath = path.join(extensionDir, '.env');
+      const actualContent = await fsPromises.readFile(expectedEnvPath, 'utf-8');
+      expect(actualContent).toContain('VAR1="value with spaces"');
+    });
+
+    it('should escape quotes in values', async () => {
+      mockRequestSetting.mockResolvedValue('value with "quotes"');
+
+      await updateSetting(
+        config,
+        '12345',
+        'VAR1',
+        mockRequestSetting,
+        ExtensionSettingScope.USER,
+        tempWorkspaceDir,
+      );
+
+      const expectedEnvPath = path.join(extensionDir, '.env');
+      const actualContent = await fsPromises.readFile(expectedEnvPath, 'utf-8');
+      expect(actualContent).toContain('VAR1="value with \\"quotes\\""');
+    });
   });
 });
