@@ -228,7 +228,7 @@ Slash commands provide meta-level control over the CLI itself.
     [settings](../get-started/configuration.md). See
     [Checkpointing documentation](../cli/checkpointing.md) for more details.
 
-- **`/rewind`**
+- [**`/rewind`**](./rewind.md)
   - **Description:** Navigates backward through the conversation history,
     allowing you to review past interactions and potentially revert to a
     previous state. This feature helps in managing complex or branched
@@ -343,11 +343,11 @@ please see the dedicated [Custom Commands documentation](./custom-commands.md).
 These shortcuts apply directly to the input prompt for text manipulation.
 
 - **Undo:**
-  - **Keyboard shortcut:** Press **Cmd+z** or **Alt+z** to undo the last action
+  - **Keyboard shortcut:** Press **Alt+z** or **Cmd+z** to undo the last action
     in the input prompt.
 
 - **Redo:**
-  - **Keyboard shortcut:** Press **Shift+Cmd+Z** or **Shift+Alt+Z** to redo the
+  - **Keyboard shortcut:** Press **Shift+Alt+Z** or **Shift+Cmd+Z** to redo the
     last undone action in the input prompt.
 
 ## At commands (`@`)

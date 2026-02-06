@@ -31,6 +31,7 @@
 decision = "deny"
 priority = 20
 modes = ["plan"]
+deny_message = "You are in Plan Mode - adjust your prompt to only use read and search tools."
 
 # Explicitly Allow Read-Only Tools in Plan mode.
 
@@ -76,9 +77,9 @@ decision = "ask_user"
 priority = 50
 modes = ["plan"]
 
-# Allow write_file for .md files in plans directory
+# Allow write_file and replace for .md files in plans directory
 [[rule]]
-toolName = "write_file"
+toolName = ["write_file", "replace"]
 decision = "allow"
 priority = 50
 modes = ["plan"]

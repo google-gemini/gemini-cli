@@ -22,6 +22,8 @@ import { validatePlanPath, validatePlanContent } from '../utils/planUtils.js';
 import { ApprovalMode } from '../policy/types.js';
 import { checkExhaustive } from '../utils/checks.js';
 import { resolveToRealPath, isSubpath } from '../utils/paths.js';
+import { logPlanExecution } from '../telemetry/loggers.js';
+import { PlanExecutionEvent } from '../telemetry/types.js';
 
 /**
  * Returns a human-readable description for an approval mode.
@@ -53,6 +55,7 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
     private config: Config,
     messageBus: MessageBus,
   ) {
+    const plansDir = config.storage.getProjectTempPlansDir();
     super(
       EXIT_PLAN_MODE_TOOL_NAME,
       'Exit Plan Mode',
@@ -64,8 +67,7 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
         properties: {
           plan_path: {
             type: 'string',
-            description:
-              'The file path to the finalized plan (e.g., "plans/feature-x.md").',
+            description: `The file path to the finalized plan (e.g., "${plansDir}/feature-x.md"). This path MUST be within the designated plans directory: ${plansDir}/`,
           },
         },
       },
@@ -224,6 +226,9 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
     if (payload?.approved) {
       const newMode = payload.approvalMode ?? ApprovalMode.DEFAULT;
       this.config.setApprovalMode(newMode);
+      this.config.setApprovedPlanPath(resolvedPlanPath);
+
+      logPlanExecution(this.config, new PlanExecutionEvent(newMode));
 
       const description = getApprovalModeDescription(newMode);
 

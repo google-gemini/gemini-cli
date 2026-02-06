@@ -386,6 +386,10 @@ class GrepToolInvocation extends BaseToolInvocation<
     }
 
     if (!no_ignore) {
+      if (!this.config.getFileFilteringRespectGitIgnore()) {
+        rgArgs.push('--no-ignore-vcs', '--no-ignore-exclude');
+      }
+
       const fileExclusions = new FileExclusions(this.config);
       const excludes = fileExclusions.getGlobExcludes([
         ...COMMON_DIRECTORY_EXCLUDES,

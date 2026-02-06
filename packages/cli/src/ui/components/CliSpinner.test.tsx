@@ -4,10 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  renderWithProviders,
-  createMockSettings,
-} from '../../test-utils/render.js';
+import { renderWithProviders } from '../../test-utils/render.js';
+import { createMockSettings } from '../../test-utils/settings.js';
 import { CliSpinner } from './CliSpinner.js';
 import { debugState } from '../debug.js';
 import { describe, it, expect, beforeEach } from 'vitest';
