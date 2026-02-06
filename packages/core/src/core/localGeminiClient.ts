@@ -9,7 +9,6 @@ import { jsonrepair } from 'jsonrepair';
 import type { Config } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { Content } from '@google/genai';
-import * as fs from 'node:fs/promises';
 
 /**
  * A client for making single, non-streaming calls to a local Gemini-compatible API
@@ -61,29 +60,6 @@ export class LocalGeminiClient {
     return jsonrepair(cleanedText);
   }
 
-  private async _debugRouterCall(
-    systemInstruction: string,
-    contents: Content[],
-    modelResponse?: string,
-  ) {
-    let routerContent = `system =====\n${systemInstruction}\n\n`;
-    for (const content of contents) {
-      routerContent += `${content.role} =====\n\n`;
-      for (const part of content.parts || []) {
-        if (part.text) {
-          routerContent += `${part.text}\n`;
-        }
-      }
-    }
-
-    if (modelResponse) {
-      routerContent += `model =====\n${modelResponse}`;
-    }
-
-    await fs.writeFile('router.txt', routerContent);
-    debugLogger.log(`[LocalGeminiClient] Wrote router content to router.txt`);
-  }
-
   /**
    * Sends a prompt to the local Gemini model and expects a JSON object in response.
    * @param contents The history and current prompt.
@@ -95,10 +71,6 @@ export class LocalGeminiClient {
     systemInstruction: string,
     reminder?: string,
   ): Promise<object> {
-    debugLogger.log(
-      `[LocalGeminiClient] Sending request to ${this.host} for model ${this.model}`,
-    );
-
     const geminiContents = contents.map((c) => ({
       role: c.role === 'model' ? 'model' : 'user',
       parts: c.parts ? c.parts.map((p) => ({ text: p.text })) : [],
@@ -125,8 +97,6 @@ export class LocalGeminiClient {
         },
       });
 
-      await this._debugRouterCall(systemInstruction, geminiContents);
-
       const text = result.text;
       if (!text) {
         throw new Error(
@@ -134,12 +104,8 @@ export class LocalGeminiClient {
         );
       }
 
-      await this._debugRouterCall(systemInstruction, geminiContents, text);
-
       const cleanedText = this._cleanLlmResponseText(text);
-      debugLogger.log(
-        `[LocalGeminiClient] Cleaned JSON response: ${cleanedText}`,
-      );
+
       return JSON.parse(cleanedText);
     } catch (error) {
       debugLogger.error(

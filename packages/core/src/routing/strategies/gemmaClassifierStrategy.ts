@@ -206,8 +206,6 @@ ${formattedHistory}
       // Take the last N turns from the *cleaned* history.
       const finalHistory = cleanHistory.slice(-HISTORY_TURNS_FOR_CONTEXT);
 
-      debugLogger.log(`[Routing] About to call Gemma classifier.`);
-
       const history = [...finalHistory, createUserContent(context.request)];
       const singleMessageHistory = this.flattenChatHistory(history);
 

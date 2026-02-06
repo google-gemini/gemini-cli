@@ -1,10 +1,5 @@
 /**
  * @license
- * Copyright 2026 Google LLC
- * SPDX-License-Identifier: Apache-2.0
- */
-/**
- * @license
  * Copyright 2025 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -155,8 +150,6 @@ export class ClassifierStrategy implements RoutingStrategy {
 
       // Take the last N turns from the *cleaned* history.
       const finalHistory = cleanHistory.slice(-HISTORY_TURNS_FOR_CONTEXT);
-
-      debugLogger.log(`[Routing] About to call Gemini classifier.`);
 
       const jsonResponse = await baseLlmClient.generateJson({
         modelConfigKey: { model: 'classifier' },
