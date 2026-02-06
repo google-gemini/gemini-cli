@@ -761,22 +761,86 @@ describe('EditTool', () => {
     });
 
     it('should return error if no match found after start_line', async () => {
-      const content = 'match\nmatch\nmatch\nmatch';
+      // Create a file with 60 lines, matches only in the first 10.
+      const content =
+        Array(10).fill('match').join('\n') +
+        '\n' +
+        Array(50).fill('other').join('\n');
       fs.writeFileSync(filePath, content, 'utf8');
 
-      // Target match after line 20 (doesn't exist and is far enough to avoid lookback)
+      // Target match after line 50. Matches are at 1-10.
+      // Lookback 20 from 50 is 30.
+      // Search starts at 30.
+      // No matches after 30.
       const params: EditToolParams = {
         file_path: filePath,
-        instruction: 'Replace match after line 20',
+        instruction: 'Replace match after line 50',
         old_string: 'match',
         new_string: 'replacement',
-        start_line: 20,
+        start_line: 50,
       };
 
       const invocation = tool.build(params);
       const result = await invocation.execute(new AbortController().signal);
 
       expect(result.error?.type).toBe(ToolErrorType.EDIT_NO_OCCURRENCE_FOUND);
+    });
+
+    it('should succeed if old_string is within 20 lines before start_line (via new lookback)', async () => {
+      const content = Array(25).fill('line').join('\n') + '\ntarget\n';
+      fs.writeFileSync(filePath, content, 'utf8');
+
+      // target is at line 26.
+      // start_line is at line 40.
+      // lookback 20 should reach line 20, which is before the target.
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace target',
+        old_string: 'target',
+        new_string: 'replacement',
+        start_line: 40,
+      };
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error).toBeUndefined();
+      const finalContent = fs.readFileSync(filePath, 'utf8');
+      expect(finalContent).toContain('replacement');
+    });
+
+    it('should find the closest match when iterating backwards, avoiding earlier matches', async () => {
+      // Scenario:
+      // Match 1 at line 10
+      // Match 2 at line 20
+      // User specifies start_line: 21 (off by one)
+      // Current logic: Jumps to 1 (21-20), finds Match 1. WRONG.
+      // Desired logic: Steps back to 20, finds Match 2. CORRECT.
+      const lines = Array(30).fill('other');
+      lines[9] = 'match'; // Line 10
+      lines[19] = 'match'; // Line 20
+      const content = lines.join('\n');
+      fs.writeFileSync(filePath, content, 'utf8');
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace the second match',
+        old_string: 'match',
+        new_string: 'replacement',
+        start_line: 21,
+      };
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error).toBeUndefined();
+      const finalContent = fs.readFileSync(filePath, 'utf8');
+      const finalLines = finalContent.split('\n');
+
+      // Match at line 10 should still be there
+      expect(finalLines[9]).toBe('match');
+      // Match at line 20 should be replaced
+      expect(finalLines[19]).toBe('replacement');
     });
 
     it('should succeed with multiple context lines via lookback', async () => {

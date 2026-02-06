@@ -331,10 +331,12 @@ export async function calculateReplacement(
   // or simple off-by-one errors.
   const startLinesToTry = [start_line];
   if (start_line && start_line > 1) {
-    // Look back 5 lines. This covers the standard "3 lines of context" requirement
-    // plus a small buffer for potential user error.
-    const lookback = Math.max(1, start_line - 5);
-    startLinesToTry.push(lookback);
+    // Iterate backwards up to 20 lines to find the closest match.
+    // This avoids skipping over intended matches if we jump back too far.
+    const limit = Math.max(1, start_line - 20);
+    for (let i = start_line - 1; i >= limit; i--) {
+      startLinesToTry.push(i);
+    }
   }
 
   for (const attemptStartLine of startLinesToTry) {
