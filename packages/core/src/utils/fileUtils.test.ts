@@ -674,6 +674,7 @@ describe('fileUtils', () => {
     it.each([
       { type: 'image', file: 'file.png', mime: 'image/png' },
       { type: 'image', file: 'file.jpg', mime: 'image/jpeg' },
+      { type: 'binary', file: 'file.gif', mime: 'image/gif' },
       { type: 'pdf', file: 'file.pdf', mime: 'application/pdf' },
       { type: 'binary', file: 'archive.zip', mime: 'application/zip' },
       { type: 'binary', file: 'app.exe', mime: 'application/octet-stream' },

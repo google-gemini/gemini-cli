@@ -18,6 +18,36 @@ import { debugLogger } from './debugLogger.js';
 
 const requireModule = createModuleRequire(import.meta.url);
 
+const SUPPORTED_IMAGE_MIME_TYPES = [
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+];
+
+const SUPPORTED_AUDIO_MIME_TYPES = [
+  'audio/wav',
+  'audio/mpeg',
+  'audio/mp3',
+  'audio/aiff',
+  'audio/aac',
+  'audio/ogg',
+  'audio/flac',
+];
+
+const SUPPORTED_VIDEO_MIME_TYPES = [
+  'video/mp4',
+  'video/mpeg',
+  'video/mov',
+  'video/avi',
+  'video/x-flv',
+  'video/mpg',
+  'video/webm',
+  'video/wmv',
+  'video/3gpp',
+];
+
 export async function readWasmBinaryFromDisk(
   specifier: string,
 ): Promise<Uint8Array> {
@@ -350,20 +380,16 @@ export async function detectFileType(
     return 'svg';
   }
 
-  const lookedUpMimeType = mime.getType(filePath); // Returns null if not found, or the mime type string
+  const lookedUpMimeType = getSpecificMimeType(filePath);
   if (lookedUpMimeType) {
-    if (lookedUpMimeType.startsWith('image/')) {
+    if (SUPPORTED_IMAGE_MIME_TYPES.includes(lookedUpMimeType)) {
       return 'image';
     }
-    // Verify audio/video with content check to avoid MIME misidentification (#16888)
-    if (
-      lookedUpMimeType.startsWith('audio/') ||
-      lookedUpMimeType.startsWith('video/')
-    ) {
-      if (!(await isBinaryFile(filePath))) {
-        return 'text';
-      }
-      return lookedUpMimeType.startsWith('audio/') ? 'audio' : 'video';
+    if (SUPPORTED_AUDIO_MIME_TYPES.includes(lookedUpMimeType)) {
+      return 'audio';
+    }
+    if (SUPPORTED_VIDEO_MIME_TYPES.includes(lookedUpMimeType)) {
+      return 'video';
     }
     if (lookedUpMimeType === 'application/pdf') {
       return 'pdf';
@@ -373,6 +399,9 @@ export async function detectFileType(
   // Stricter binary check for common non-text extensions before content check
   // These are often not well-covered by mime-types or might be misidentified.
   if (BINARY_EXTENSIONS.includes(ext)) {
+    // GIFs are listed in MEDIA_FILE_PATTERNS which is part of BINARY_EXTENSIONS.
+    // If we are here, it means it's a known binary/media format that is NOT
+    // in our supported list above.
     return 'binary';
   }
 
@@ -530,7 +559,8 @@ export async function processSingleFileContent(
           llmContent: {
             inlineData: {
               data: base64Data,
-              mimeType: mime.getType(filePath) || 'application/octet-stream',
+              mimeType:
+                getSpecificMimeType(filePath) || 'application/octet-stream',
             },
           },
           returnDisplay: `Read ${fileType} file: ${relativePathForDisplay}`,
