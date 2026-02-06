@@ -4028,6 +4028,55 @@ describe('InputPrompt', () => {
       });
     });
   });
+
+  describe('shortcuts help visibility', () => {
+    it.each([
+      {
+        name: 'terminal paste event occurs',
+        input: '\x1b[200~pasted text\x1b[201~',
+      },
+      {
+        name: 'Ctrl+V (PASTE_CLIPBOARD) is pressed',
+        input: '\x16',
+        setupMocks: () => {
+          vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
+          vi.mocked(clipboardy.read).mockResolvedValue('clipboard text');
+        },
+      },
+      {
+        name: 'mouse right-click paste occurs',
+        input: '\x1b[<2;1;1m',
+        mouseEventsEnabled: true,
+        setupMocks: () => {
+          vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
+          vi.mocked(clipboardy.read).mockResolvedValue('clipboard text');
+        },
+      },
+    ])(
+      'should close shortcuts help when a $name',
+      async ({ input, setupMocks, mouseEventsEnabled }) => {
+        setupMocks?.();
+        const setShortcutsHelpVisible = vi.fn();
+        const { stdin, unmount } = renderWithProviders(
+          <InputPrompt {...props} />,
+          {
+            uiState: { shortcutsHelpVisible: true },
+            uiActions: { setShortcutsHelpVisible },
+            mouseEventsEnabled,
+          },
+        );
+
+        await act(async () => {
+          stdin.write(input);
+        });
+
+        await waitFor(() => {
+          expect(setShortcutsHelpVisible).toHaveBeenCalledWith(false);
+        });
+        unmount();
+      },
+    );
+  });
 });
 
 function clean(str: string | undefined): string {
