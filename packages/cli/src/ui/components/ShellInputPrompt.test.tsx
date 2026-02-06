@@ -68,12 +68,12 @@ describe('ShellInputPrompt', () => {
   it.each([
     ['up', -1],
     ['down', 1],
-  ])('handles scroll %s (Command.SHELL_SCROLL_%s)', (key, direction) => {
+  ])('handles scroll %s (Command.SCROLL_%s)', (key, direction) => {
     render(<ShellInputPrompt activeShellPtyId={1} focus={true} />);
 
     const handler = mockUseKeypress.mock.calls[0][0];
 
-    handler({ name: key, shift: true, alt: false, ctrl: true, cmd: false });
+    handler({ name: key, shift: true, alt: false, ctrl: false, cmd: false });
 
     expect(mockScrollPty).toHaveBeenCalledWith(1, direction);
   });
@@ -82,13 +82,13 @@ describe('ShellInputPrompt', () => {
     ['pageup', -15],
     ['pagedown', 15],
   ])(
-    'handles page scroll %s (Command.SHELL_SCROLL_%s) with default size',
+    'handles page scroll %s (Command.PAGE_%s) with default size',
     (key, expectedScroll) => {
       render(<ShellInputPrompt activeShellPtyId={1} focus={true} />);
 
       const handler = mockUseKeypress.mock.calls[0][0];
 
-      handler({ name: key, shift: true, alt: false, ctrl: true, cmd: false });
+      handler({ name: key, shift: false, alt: false, ctrl: false, cmd: false });
 
       expect(mockScrollPty).toHaveBeenCalledWith(1, expectedScroll);
     },
@@ -108,9 +108,9 @@ describe('ShellInputPrompt', () => {
     // PageDown
     handler({
       name: 'pagedown',
-      shift: true,
+      shift: false,
       alt: false,
-      ctrl: true,
+      ctrl: false,
       cmd: false,
     });
     expect(mockScrollPty).toHaveBeenCalledWith(1, 10);
@@ -118,9 +118,9 @@ describe('ShellInputPrompt', () => {
     // PageUp
     handler({
       name: 'pageup',
-      shift: true,
+      shift: false,
       alt: false,
-      ctrl: true,
+      ctrl: false,
       cmd: false,
     });
     expect(mockScrollPty).toHaveBeenCalledWith(1, -10);

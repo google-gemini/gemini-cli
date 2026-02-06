@@ -47,19 +47,19 @@ export const ShellInputPrompt: React.FC<ShellInputPromptProps> = ({
         return false;
       }
 
-      if (keyMatchers[Command.SHELL_SCROLL_UP](key)) {
+      if (keyMatchers[Command.SCROLL_UP](key)) {
         ShellExecutionService.scrollPty(activeShellPtyId, -1);
         return true;
       }
-      if (keyMatchers[Command.SHELL_SCROLL_DOWN](key)) {
+      if (keyMatchers[Command.SCROLL_DOWN](key)) {
         ShellExecutionService.scrollPty(activeShellPtyId, 1);
         return true;
       }
-      if (keyMatchers[Command.SHELL_SCROLL_PAGE_UP](key)) {
+      if (keyMatchers[Command.PAGE_UP](key)) {
         ShellExecutionService.scrollPty(activeShellPtyId, -scrollPageSize);
         return true;
       }
-      if (keyMatchers[Command.SHELL_SCROLL_PAGE_DOWN](key)) {
+      if (keyMatchers[Command.PAGE_DOWN](key)) {
         ShellExecutionService.scrollPty(activeShellPtyId, scrollPageSize);
         return true;
       }

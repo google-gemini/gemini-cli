@@ -96,11 +96,6 @@ export enum Command {
   RESTART_APP = 'app.restart',
   SUSPEND_APP = 'app.suspend',
 
-  // Shell Controls
-  SHELL_SCROLL_UP = 'shell.scrollUp',
-  SHELL_SCROLL_DOWN = 'shell.scrollDown',
-  SHELL_SCROLL_PAGE_UP = 'shell.scrollPageUp',
-  SHELL_SCROLL_PAGE_DOWN = 'shell.scrollPageDown',
   SHELL_LEAVE_FOCUS = 'shell.leaveFocus',
 }
 
@@ -301,12 +296,6 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.SUSPEND_APP]: [{ key: 'z', ctrl: true }],
 
   // Shell Controls
-  [Command.SHELL_SCROLL_UP]: [{ key: 'up', ctrl: true, shift: true }],
-  [Command.SHELL_SCROLL_DOWN]: [{ key: 'down', ctrl: true, shift: true }],
-  [Command.SHELL_SCROLL_PAGE_UP]: [{ key: 'pageup', ctrl: true, shift: true }],
-  [Command.SHELL_SCROLL_PAGE_DOWN]: [
-    { key: 'pagedown', ctrl: true, shift: true },
-  ],
   [Command.SHELL_LEAVE_FOCUS]: [{ key: 'tab', shift: true }],
 };
 
@@ -359,10 +348,6 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.SCROLL_END,
       Command.PAGE_UP,
       Command.PAGE_DOWN,
-      Command.SHELL_SCROLL_UP,
-      Command.SHELL_SCROLL_DOWN,
-      Command.SHELL_SCROLL_PAGE_UP,
-      Command.SHELL_SCROLL_PAGE_DOWN,
     ],
   },
   {
@@ -532,10 +517,5 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.SUSPEND_APP]: 'Suspend the application (not yet implemented).',
 
   // Shell Controls
-  [Command.SHELL_SCROLL_UP]: 'Scroll the embedded shell up.',
-  [Command.SHELL_SCROLL_DOWN]: 'Scroll the embedded shell down.',
-  [Command.SHELL_SCROLL_PAGE_UP]: 'Scroll the embedded shell up by one page.',
-  [Command.SHELL_SCROLL_PAGE_DOWN]:
-    'Scroll the embedded shell down by one page.',
   [Command.SHELL_LEAVE_FOCUS]: 'Move focus out of the embedded shell.',
 };
