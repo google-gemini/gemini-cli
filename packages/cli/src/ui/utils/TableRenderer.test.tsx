@@ -63,14 +63,15 @@ describe('TableRenderer', () => {
   });
 
   it('wraps long cell content correctly', () => {
-    const headers = ['Col 1', 'Col 2'];
+    const headers = ['Col 1', 'Col 2', 'Col 3'];
     const rows = [
       [
         'Short',
         'This is a very long cell content that should wrap to multiple lines',
+        'Short',
       ],
     ];
-    const terminalWidth = 40;
+    const terminalWidth = 50;
 
     const { lastFrame } = renderWithProviders(
       <TableRenderer
@@ -87,14 +88,15 @@ describe('TableRenderer', () => {
   });
 
   it('wraps all long columns correctly', () => {
-    const headers = ['Col 1', 'Col 2'];
+    const headers = ['Col 1', 'Col 2', 'Col 3'];
     const rows = [
       [
         'This is a very long text that needs wrapping in column 1',
         'This is also a very long text that needs wrapping in column 2',
+        'And this is the third long text that needs wrapping in column 3',
       ],
     ];
-    const terminalWidth = 50;
+    const terminalWidth = 60;
 
     const { lastFrame } = renderWithProviders(
       <TableRenderer
@@ -110,14 +112,15 @@ describe('TableRenderer', () => {
   });
 
   it('wraps mixed long and short columns correctly', () => {
-    const headers = ['Short', 'Long'];
+    const headers = ['Short', 'Long', 'Medium'];
     const rows = [
       [
         'Tiny',
         'This is a very long text that definitely needs to wrap to the next line',
+        'Not so long',
       ],
     ];
-    const terminalWidth = 40;
+    const terminalWidth = 50;
 
     const { lastFrame } = renderWithProviders(
       <TableRenderer
@@ -134,11 +137,15 @@ describe('TableRenderer', () => {
   });
 
   it('wraps columns with punctuation correctly', () => {
-    const headers = ['Punctuation'];
+    const headers = ['Punctuation 1', 'Punctuation 2', 'Punctuation 3'];
     const rows = [
-      ['Start. Stop. Comma, separated. Exclamation! Question? hyphen-ated'],
+      [
+        'Start. Stop. Comma, separated. Exclamation! Question? hyphen-ated',
+        'Semi; colon: Pipe| Slash/ Backslash\\',
+        'At@ Hash# Dollar$ Percent% Caret^ Ampersand& Asterisk*',
+      ],
     ];
-    const terminalWidth = 30;
+    const terminalWidth = 60;
 
     const { lastFrame } = renderWithProviders(
       <TableRenderer
@@ -154,9 +161,9 @@ describe('TableRenderer', () => {
   });
 
   it('strips bold markers from headers and renders them correctly', () => {
-    const headers = ['**Bold Header**', 'Normal Header'];
-    const rows = [['Data 1', 'Data 2']];
-    const terminalWidth = 40;
+    const headers = ['**Bold Header**', 'Normal Header', '**Another Bold**'];
+    const rows = [['Data 1', 'Data 2', 'Data 3']];
+    const terminalWidth = 50;
 
     const { lastFrame } = renderWithProviders(
       <TableRenderer
@@ -174,9 +181,13 @@ describe('TableRenderer', () => {
   });
 
   it('handles wrapped bold headers without showing markers', () => {
-    const headers = ['**Very Long Bold Header That Will Wrap**'];
-    const rows = [['Data']];
-    const terminalWidth = 20;
+    const headers = [
+      '**Very Long Bold Header That Will Wrap**',
+      'Short',
+      '**Another Long Header**',
+    ];
+    const rows = [['Data 1', 'Data 2', 'Data 3']];
+    const terminalWidth = 40;
 
     const { lastFrame } = renderWithProviders(
       <TableRenderer

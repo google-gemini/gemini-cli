@@ -2,25 +2,27 @@
 
 exports[`TableRenderer > handles wrapped bold headers without showing markers 1`] = `
 "
-┌────────────────┐
-│ Very Long Bold │
-│ Header That    │
-│ Will Wrap      │
-├────────────────┤
-│ Data           │
-└────────────────┘
+┌──────────────┬───────┬───────────┐
+│ Very Long    │ Short │ Another   │
+│ Bold Header  │       │ Long      │
+│ That Will    │       │ Header    │
+│ Wrap         │       │           │
+├──────────────┼───────┼───────────┤
+│ Data 1       │ Data  │ Data 3    │
+│              │ 2     │           │
+└──────────────┴───────┴───────────┘
 "
 `;
 
 exports[`TableRenderer > renders a 3x3 table correctly 1`] = `
 "
-┌────────────────────────┬────────────────────────┬────────────────────────┐
-│ Header 1               │ Header 2               │ Header 3               │
-├────────────────────────┼────────────────────────┼────────────────────────┤
-│ Row 1, Col 1           │ Row 1, Col 2           │ Row 1, Col 3           │
-│ Row 2, Col 1           │ Row 2, Col 2           │ Row 2, Col 3           │
-│ Row 3, Col 1           │ Row 3, Col 2           │ Row 3, Col 3           │
-└────────────────────────┴────────────────────────┴────────────────────────┘
+┌──────────────┬──────────────┬──────────────┐
+│ Header 1     │ Header 2     │ Header 3     │
+├──────────────┼──────────────┼──────────────┤
+│ Row 1, Col 1 │ Row 1, Col 2 │ Row 1, Col 3 │
+│ Row 2, Col 1 │ Row 2, Col 2 │ Row 2, Col 3 │
+│ Row 3, Col 1 │ Row 3, Col 2 │ Row 3, Col 3 │
+└──────────────┴──────────────┴──────────────┘
 "
 `;
 
@@ -113,59 +115,62 @@ exports[`TableRenderer > renders a table with long headers and 4 columns correct
 
 exports[`TableRenderer > strips bold markers from headers and renders them correctly 1`] = `
 "
-┌───────────────┬───────────────────┐
-│ Bold Header   │ Normal Header     │
-├───────────────┼───────────────────┤
-│ Data 1        │ Data 2            │
-└───────────────┴───────────────────┘
+┌─────────────┬───────────────┬──────────────┐
+│ Bold Header │ Normal Header │ Another Bold │
+├─────────────┼───────────────┼──────────────┤
+│ Data 1      │ Data 2        │ Data 3       │
+└─────────────┴───────────────┴──────────────┘
 "
 `;
 
 exports[`TableRenderer > wraps all long columns correctly 1`] = `
 "
-┌─────────────────────┬───────────────────────┐
-│ Col 1               │ Col 2                 │
-├─────────────────────┼───────────────────────┤
-│ This is a very long │ This is also a very   │
-│ text that needs     │ long text that needs  │
-│ wrapping in column  │ wrapping in column 2  │
-│ 1                   │                       │
-└─────────────────────┴───────────────────────┘
+┌─────────────────┬──────────────────┬──────────────────┐
+│ Col 1           │ Col 2            │ Col 3            │
+├─────────────────┼──────────────────┼──────────────────┤
+│ This is a very  │ This is also a   │ And this is the  │
+│ long text that  │ very long text   │ third long text  │
+│ needs wrapping  │ that needs       │ that needs       │
+│ in column 1     │ wrapping in      │ wrapping in      │
+│                 │ column 2         │ column 3         │
+└─────────────────┴──────────────────┴──────────────────┘
 "
 `;
 
 exports[`TableRenderer > wraps columns with punctuation correctly 1`] = `
 "
-┌──────────────────────────┐
-│ Punctuation              │
-├──────────────────────────┤
-│ Start. Stop. Comma,      │
-│ separated. Exclamation!  │
-│ Question? hyphen-ated    │
-└──────────────────────────┘
+┌────────────────────┬───────────────┬─────────────────┐
+│ Punctuation 1      │ Punctuation 2 │ Punctuation 3   │
+├────────────────────┼───────────────┼─────────────────┤
+│ Start. Stop.       │ Semi; colon:  │ At@ Hash#       │
+│ Comma, separated.  │ Pipe| Slash/  │ Dollar$         │
+│ Exclamation!       │ Backslash\\    │ Percent% Caret^ │
+│ Question?          │               │ Ampersand&      │
+│ hyphen-ated        │               │ Asterisk*       │
+└────────────────────┴───────────────┴─────────────────┘
 "
 `;
 
 exports[`TableRenderer > wraps long cell content correctly 1`] = `
 "
-┌───────┬────────────────────────────┐
-│ Col 1 │ Col 2                      │
-├───────┼────────────────────────────┤
-│ Short │ This is a very long cell   │
-│       │ content that should wrap   │
-│       │ to multiple lines          │
-└───────┴────────────────────────────┘
+┌───────┬──────────────────────────────┬───────┐
+│ Col 1 │ Col 2                        │ Col 3 │
+├───────┼──────────────────────────────┼───────┤
+│ Short │ This is a very long cell     │ Short │
+│       │ content that should wrap to  │       │
+│       │ multiple lines               │       │
+└───────┴──────────────────────────────┴───────┘
 "
 `;
 
 exports[`TableRenderer > wraps mixed long and short columns correctly 1`] = `
 "
-┌───────┬────────────────────────────┐
-│ Short │ Long                       │
-├───────┼────────────────────────────┤
-│ Tiny  │ This is a very long text   │
-│       │ that definitely needs to   │
-│       │ wrap to the next line      │
-└───────┴────────────────────────────┘
+┌───────┬───────────────────────────┬─────────┐
+│ Short │ Long                      │ Medium  │
+├───────┼───────────────────────────┼─────────┤
+│ Tiny  │ This is a very long text  │ Not so  │
+│       │ that definitely needs to  │ long    │
+│       │ wrap to the next line     │         │
+└───────┴───────────────────────────┴─────────┘
 "
 `;

@@ -10,7 +10,9 @@ import {
   type StyledChar,
   toStyledCharacters,
   styledCharsToString,
+  styledCharsWidth,
   wrapStyledChars,
+  widestLineFromStyledChars,
 } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { RenderInline, getPlainTextLength } from './InlineMarkdownRenderer.js';
@@ -21,7 +23,36 @@ interface TableRendererProps {
   terminalWidth: number;
 }
 
-const MIN_COLUMN_WIDTH = 10;
+const MIN_COLUMN_WIDTH = 5;
+
+const calculateWidths = (text: string) => {
+  const styledChars = toStyledCharacters(text);
+
+  const words: StyledChar[][] = [];
+  let currentWord: StyledChar[] = [];
+
+  // 1. Tokenize into words exactly like Ink does
+  for (const char of styledChars) {
+    if (char.value === '\n' || char.value === ' ') {
+      if (currentWord.length > 0) {
+        words.push(currentWord);
+      }
+      currentWord = [];
+      // Ink treats the delimiter itself as a "word" for processing
+      words.push([char]);
+    } else {
+      currentWord.push(char);
+    }
+  }
+  if (currentWord.length > 0) {
+    words.push(currentWord);
+  }
+
+  const contentWidth = styledCharsWidth(styledChars);
+  const maxWordWidth = widestLineFromStyledChars(words);
+
+  return { contentWidth, maxWordWidth };
+};
 
 /**
  * Custom table renderer for markdown tables
@@ -40,38 +71,19 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
 
   // --- Step 1: Define Constraints per Column ---
   const constraints = cleanedHeaders.map((header, colIndex) => {
-    const headerWidth = getPlainTextLength(header);
-
-    // Calculate max content width and max word width for this column
-    let maxContentWidth = headerWidth;
-    let maxWordWidth = 0;
-
-    // Consider header words for min width calculation to allow header wrapping
-    const headerWords = header.split(/\s+/);
-    for (const word of headerWords) {
-      const wordWidth = getPlainTextLength(word);
-      maxWordWidth = Math.max(maxWordWidth, wordWidth);
-    }
+    let { contentWidth: maxContentWidth, maxWordWidth } =
+      calculateWidths(header);
 
     rows.forEach((row) => {
       const cell = row[colIndex] || '';
-      const cellWidth = getPlainTextLength(cell);
-      maxContentWidth = Math.max(maxContentWidth, cellWidth);
+      const { contentWidth: cellWidth, maxWordWidth: cellWordWidth } =
+        calculateWidths(cell);
 
-      // Find longest word to ensure it fits without splitting
-      const words = cell.split(/\s+/);
-      for (const word of words) {
-        const wordWidth = getPlainTextLength(word);
-        maxWordWidth = Math.max(maxWordWidth, wordWidth);
-      }
+      maxContentWidth = Math.max(maxContentWidth, cellWidth);
+      maxWordWidth = Math.max(maxWordWidth, cellWordWidth);
     });
 
-    // min: used to guarantee minimum column width and prevent wrapping mid-word
-    // Defaults to max word width (from header or content)
     const minWidth = maxWordWidth;
-
-    // max: used to determine how much the column can grow if space allows
-    // Ensure max is never smaller than min
     const maxWidth = Math.max(minWidth, maxContentWidth);
 
     return { minWidth, maxWidth };
@@ -88,7 +100,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
 
   if (totalMinWidth > availableWidth) {
     // Case A: Not enough space even for minimums.
-    // We must scale all the columns except the ones that are very short(<=10 characters)
+    // We must scale all the columns except the ones that are very short(<=5 characters)
     const shortColumns = constraints.filter(
       (c) => c.maxWidth <= MIN_COLUMN_WIDTH,
     );
@@ -123,10 +135,9 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     } else {
       finalContentWidths = constraints.map((c) => {
         const growthNeed = c.maxWidth - c.minWidth;
-        // Calculate share: (My Need / Total Need) * Surplus
         const share = growthNeed / totalGrowthNeed;
         const extra = Math.floor(surplus * share);
-        return c.minWidth + extra;
+        return Math.min(c.maxWidth, c.minWidth + extra);
       });
     }
   }
@@ -142,8 +153,6 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   ): React.ReactNode => {
     const contentWidth = Math.max(0, width - 2);
     const displayWidth = getPlainTextLength(content);
-
-    // Calculate exact padding needed
     const paddingNeeded = Math.max(0, contentWidth - displayWidth);
 
     return (
@@ -208,7 +217,6 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     isHeader = false,
   ): React.ReactNode => {
     const wrappedCells = row.map((cell, colIndex) => {
-      // Get the calculated width for THIS column
       const colWidth = adjustedWidths[colIndex];
       const contentWidth = Math.max(1, colWidth - 2); // Subtract padding
 
