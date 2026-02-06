@@ -127,6 +127,7 @@ export class HookAggregator {
 
     let hasBlockDecision = false;
     let hasContinueFalse = false;
+    let hasAskUserDecision = false;
 
     for (const output of outputs) {
       // Handle continue flag
@@ -143,6 +144,9 @@ export class HookAggregator {
       if (tempOutput.isBlockingDecision()) {
         hasBlockDecision = true;
         merged.decision = output.decision;
+      } else if (output.decision === 'ask_user' || output.decision === 'ask') {
+        // Track ask_user/ask decisions - they take priority over allow
+        hasAskUserDecision = true;
       }
 
       // Collect messages
@@ -181,9 +185,15 @@ export class HookAggregator {
       this.extractAdditionalContext(output, additionalContexts);
     }
 
-    // Set final decision if no blocking decision was found
+    // Set final decision based on priority: block/deny > ask_user > allow
+    // This ensures safety-critical user confirmations are not bypassed
     if (!hasBlockDecision && !hasContinueFalse) {
-      merged.decision = 'allow';
+      if (hasAskUserDecision) {
+        // Preserve ask_user to ensure user is prompted for confirmation
+        merged.decision = 'ask_user';
+      } else {
+        merged.decision = 'allow';
+      }
     }
 
     // Merge messages
