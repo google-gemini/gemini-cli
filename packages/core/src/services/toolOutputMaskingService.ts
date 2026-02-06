@@ -136,10 +136,15 @@ export class ToolOutputMaskingService {
     // Perform masking and offloading
     const newHistory = [...history]; // Shallow copy of history
     let actualTokensSaved = 0;
-    const toolOutputsDir = path.join(
-      config.storage.getHistoryDir(),
+    let toolOutputsDir = path.join(
+      config.storage.getProjectTempDir(),
       TOOL_OUTPUTS_DIR,
     );
+    const sessionId = config.getSessionId();
+    if (sessionId) {
+      const safeSessionId = sanitizeFilenamePart(sessionId);
+      toolOutputsDir = path.join(toolOutputsDir, `session-${safeSessionId}`);
+    }
     await fsPromises.mkdir(toolOutputsDir, { recursive: true });
 
     for (const item of prunableParts) {

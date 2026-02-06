@@ -45,6 +45,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     },
     Storage: class {
       getProjectTempDir = vi.fn(() => '/tmp/global');
+      initialize = vi.fn(() => Promise.resolve(undefined));
     },
   };
 });

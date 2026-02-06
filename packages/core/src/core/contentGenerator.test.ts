@@ -31,7 +31,6 @@ const mockConfig = {
   getModel: vi.fn().mockReturnValue('gemini-pro'),
   getProxy: vi.fn().mockReturnValue(undefined),
   getUsageStatisticsEnabled: vi.fn().mockReturnValue(true),
-  getPreviewFeatures: vi.fn().mockReturnValue(false),
 } as unknown as Config;
 
 describe('createContentGenerator', () => {
@@ -121,7 +120,6 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => true,
-      getPreviewFeatures: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     // Set a fixed version for testing
@@ -188,7 +186,6 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
-      getPreviewFeatures: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     const mockGenerator = {
@@ -235,7 +232,6 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
-      getPreviewFeatures: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     const mockGenerator = {
@@ -269,7 +265,6 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
-      getPreviewFeatures: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     const mockGenerator = {
@@ -311,7 +306,6 @@ describe('createContentGenerator', () => {
     const mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getUsageStatisticsEnabled: () => false,
-      getPreviewFeatures: vi.fn().mockReturnValue(false),
     } as unknown as Config;
     const mockGenerator = {
       models: {},
@@ -343,7 +337,6 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
-      getPreviewFeatures: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     const mockGenerator = {
@@ -377,7 +370,6 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
-      getPreviewFeatures: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     const mockGenerator = {
@@ -415,7 +407,6 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
-      getPreviewFeatures: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     const mockGenerator = {
@@ -454,7 +445,6 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
-      getPreviewFeatures: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     const mockGenerator = {
