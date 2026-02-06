@@ -43,23 +43,6 @@ export class LocalGeminiClient {
     });
   }
 
-  private _cleanLlmResponseText(response_text: string): string {
-    // 1. Robust Markdown Extraction
-    // Uses regex to find content inside ```...``` blocks, ignoring case and language tags.
-    const match = response_text.match(/```(?:\w+)?\s*([\s\S]*?)```/);
-    let cleanedText = match ? match[1].trim() : response_text.trim();
-
-    // 2. Fix Smart Quotes
-    cleanedText = cleanedText
-      .replace(/“/g, '"')
-      .replace(/”/g, '"')
-      .replace(/‘/g, "'")
-      .replace(/’/g, "'");
-
-    // 3. Repair JSON
-    return jsonrepair(cleanedText);
-  }
-
   /**
    * Sends a prompt to the local Gemini model and expects a JSON object in response.
    * @param contents The history and current prompt.
@@ -104,7 +87,7 @@ export class LocalGeminiClient {
         );
       }
 
-      const cleanedText = this._cleanLlmResponseText(text);
+      const cleanedText = jsonrepair(text);
 
       return JSON.parse(cleanedText);
     } catch (error) {
