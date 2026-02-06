@@ -64,8 +64,6 @@ export const BackgroundShellDisplay = ({
     dismissBackgroundShell,
     setActiveBackgroundShellPid,
     setIsBackgroundShellListOpen,
-    handleWarning,
-    setEmbeddedShellFocused,
   } = useUIActions();
   const activeShell = shells.get(activePid);
   const [output, setOutput] = useState<string | AnsiOutput>(
@@ -138,16 +136,6 @@ export const BackgroundShellDisplay = ({
     (key) => {
       if (!activeShell) return;
 
-      // Handle Shift+Tab or Tab (in list) to focus out
-      if (
-        keyMatchers[Command.UNFOCUS_BACKGROUND_SHELL](key) ||
-        (isListOpenProp &&
-          keyMatchers[Command.UNFOCUS_BACKGROUND_SHELL_LIST](key))
-      ) {
-        setEmbeddedShellFocused(false);
-        return true;
-      }
-
       if (isListOpenProp) {
         // Navigation (Up/Down/Enter) is handled by RadioButtonSelect
         // We only handle special keys not consumed by RadioButtonSelect or overriding them if needed
@@ -174,12 +162,6 @@ export const BackgroundShellDisplay = ({
           return true;
         }
         return false;
-      }
-
-      if (keyMatchers[Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING](key)) {
-        handleWarning(
-          `Press ${formatCommand(Command.UNFOCUS_BACKGROUND_SHELL)} to focus out.`,
-        );
       }
 
       if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL](key)) {

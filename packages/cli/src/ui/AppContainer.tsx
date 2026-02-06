@@ -1276,6 +1276,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   useIncludeDirsTrust(config, isTrustedFolder, historyManager, setCustomDialog);
 
   const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const tabFocusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleWarning = useCallback((message: string) => {
     setWarningMessage(message);
@@ -1288,11 +1289,17 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, []);
 
   // Handle timeout cleanup on unmount
-  useEffect(() => () => {
+  useEffect(
+    () => () => {
       if (warningTimeoutRef.current) {
         clearTimeout(warningTimeoutRef.current);
       }
-    }, []);
+      if (tabFocusTimeoutRef.current) {
+        clearTimeout(tabFocusTimeoutRef.current);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     const handlePasteTimeout = () => {
@@ -1495,33 +1502,41 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setConstrainHeight(false);
         return true;
       } else if (
-        keyMatchers[Command.FOCUS_SHELL_INPUT](key) &&
+        (keyMatchers[Command.FOCUS_SHELL_INPUT](key) ||
+          keyMatchers[Command.UNFOCUS_BACKGROUND_SHELL_LIST](key)) &&
         (activePtyId || (isBackgroundShellVisible && backgroundShells.size > 0))
       ) {
         if (embeddedShellFocused) {
+          const capturedTime = lastOutputTimeRef.current;
+          if (tabFocusTimeoutRef.current)
+            clearTimeout(tabFocusTimeoutRef.current);
+          tabFocusTimeoutRef.current = setTimeout(() => {
+            if (lastOutputTimeRef.current === capturedTime) {
+              setEmbeddedShellFocused(false);
+            } else {
+              handleWarning('Use Shift+Tab to unfocus');
+            }
+          }, 150);
           return false;
         }
 
-        const now = Date.now();
-        // If the shell hasn't produced output in the last 100ms, it's considered idle.
-        const isIdle = now - lastOutputTimeRef.current >= 100;
+        const isIdle = Date.now() - lastOutputTimeRef.current >= 100;
 
         if (isIdle && !activePtyId && !isBackgroundShellVisible) {
+          if (tabFocusTimeoutRef.current)
+            clearTimeout(tabFocusTimeoutRef.current);
           toggleBackgroundShell();
-          // We are about to show it, so focus it
           setEmbeddedShellFocused(true);
-          if (backgroundShells.size > 1) {
-            setIsBackgroundShellListOpen(true);
-          }
+          if (backgroundShells.size > 1) setIsBackgroundShellListOpen(true);
           return true;
         }
 
-        // Not idle, has active PTY, or already visible - just focus it
-        if (!embeddedShellFocused) {
-          setEmbeddedShellFocused(true);
-        }
+        setEmbeddedShellFocused(true);
         return true;
-      } else if (keyMatchers[Command.UNFOCUS_SHELL_INPUT](key)) {
+      } else if (
+        keyMatchers[Command.UNFOCUS_SHELL_INPUT](key) ||
+        keyMatchers[Command.UNFOCUS_BACKGROUND_SHELL](key)
+      ) {
         if (embeddedShellFocused) {
           setEmbeddedShellFocused(false);
           return true;
@@ -1578,11 +1593,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isBackgroundShellVisible,
       setIsBackgroundShellListOpen,
       lastOutputTimeRef,
+      tabFocusTimeoutRef,
       handleWarning,
     ],
   );
 
-  useKeypress(handleGlobalKeypress, { isActive: true });
+  useKeypress(handleGlobalKeypress, { isActive: true, priority: true });
 
   useEffect(() => {
     // Respect hideWindowTitle settings
