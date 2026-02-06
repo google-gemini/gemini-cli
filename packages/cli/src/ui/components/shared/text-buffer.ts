@@ -3440,6 +3440,13 @@ export function useTextBuffer({
     [],
   );
 
+  const addPastedContent = useCallback(
+    (id: string, text: string): void => {
+      dispatch({ type: 'add_pasted_content', payload: { id, text } });
+    },
+    [],
+  );
+
   const getExpandedPasteAtLineCallback = useCallback(
     (lineIndex: number): string | null =>
       getExpandedPasteAtLine(lineIndex, expandedPaste),
@@ -3480,6 +3487,7 @@ export function useTextBuffer({
       getLogicalPositionFromVisual,
       getExpandedPasteAtLine: getExpandedPasteAtLineCallback,
       togglePasteExpansion,
+      addPastedContent,
       expandedPaste,
       deleteWordLeft,
       deleteWordRight,
@@ -3762,6 +3770,10 @@ export interface TextBuffer {
    * If expanded, collapses back to placeholder.
    */
   togglePasteExpansion(id: string, row: number, col: number): void;
+  /**
+   * Add content to pastedContent map
+   */
+  addPastedContent(id: string, text: string): void;
   /**
    * The current expanded paste info (read-only).
    */
