@@ -569,9 +569,6 @@ export async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
-const MAX_TRUNCATED_LINE_WIDTH = 1000;
-const MAX_TRUNCATED_CHARS = 4000;
-
 /**
  * Sanitizes a string for use as a filename part by removing path traversal
  * characters and other non-alphanumeric characters.
@@ -581,43 +578,29 @@ export function sanitizeFilenamePart(part: string): string {
 }
 
 /**
- * Formats a truncated message for tool output, handling multi-line and single-line (elephant) cases.
+ * Formats a truncated message for tool output.
+ * Shows the first 20% and last 80% of the allowed characters with a marker in between.
  */
 export function formatTruncatedToolOutput(
   contentStr: string,
   outputFile: string,
-  truncateLines: number = 30,
+  maxChars: number,
 ): string {
-  const physicalLines = contentStr.split('\n');
-  const totalPhysicalLines = physicalLines.length;
+  if (contentStr.length <= maxChars) return contentStr;
 
-  if (totalPhysicalLines > 1) {
-    // Multi-line case: show last N lines, but protect against "elephant" lines.
-    const lastLines = physicalLines.slice(-truncateLines);
-    let someLinesTruncatedInWidth = false;
-    const processedLines = lastLines.map((line) => {
-      if (line.length > MAX_TRUNCATED_LINE_WIDTH) {
-        someLinesTruncatedInWidth = true;
-        return (
-          line.substring(0, MAX_TRUNCATED_LINE_WIDTH) +
-          '... [LINE WIDTH TRUNCATED]'
-        );
-      }
-      return line;
-    });
+  const headChars = Math.floor(maxChars * 0.2);
+  const tailChars = maxChars - headChars;
 
-    const widthWarning = someLinesTruncatedInWidth
-      ? ' (some long lines truncated)'
-      : '';
-    return `Output too large. Showing the last ${processedLines.length} of ${totalPhysicalLines} lines${widthWarning}. For full output see: ${outputFile}
-...
-${processedLines.join('\n')}`;
-  } else {
-    // Single massive line case: use character-based truncation description.
-    const snippet = contentStr.slice(-MAX_TRUNCATED_CHARS);
-    return `Output too large. Showing the last ${MAX_TRUNCATED_CHARS.toLocaleString()} characters of the output. For full output see: ${outputFile}
-...${snippet}`;
-  }
+  const head = contentStr.slice(0, headChars);
+  const tail = contentStr.slice(-tailChars);
+  const omittedChars = contentStr.length - headChars - tailChars;
+
+  return `Output too large. Showing first ${headChars.toLocaleString()} and last ${tailChars.toLocaleString()} characters. For full output see: ${outputFile}
+${head}
+
+... [${omittedChars.toLocaleString()} characters omitted] ...
+
+${tail}`;
 }
 
 /**
@@ -631,7 +614,7 @@ export async function saveTruncatedToolOutput(
   id: string | number, // Accept string (callId) or number (truncationId)
   projectTempDir: string,
   sessionId?: string,
-): Promise<{ outputFile: string; totalLines: number }> {
+): Promise<{ outputFile: string }> {
   const safeToolName = sanitizeFilenamePart(toolName).toLowerCase();
   const safeId = sanitizeFilenamePart(id.toString()).toLowerCase();
   const fileName = `${safeToolName}_${safeId}.txt`;
@@ -646,9 +629,5 @@ export async function saveTruncatedToolOutput(
   await fsPromises.mkdir(toolOutputDir, { recursive: true });
   await fsPromises.writeFile(outputFile, content);
 
-  const lines = content.split('\n');
-  return {
-    outputFile,
-    totalLines: lines.length,
-  };
+  return { outputFile };
 }
