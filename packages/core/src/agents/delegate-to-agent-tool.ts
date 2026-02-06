@@ -22,6 +22,7 @@ import { SubagentToolWrapper } from './subagent-tool-wrapper.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { type AnySchema } from 'ajv';
 import { debugLogger } from '../utils/debugLogger.js';
+import { ToolErrorType } from '../tools/tool-error.js';
 
 export type DelegateParams = { agent_name: string } & Record<string, unknown>;
 
@@ -191,7 +192,29 @@ class DelegateInvocation extends BaseToolInvocation<
     signal: AbortSignal,
     updateOutput?: (output: string | AnsiOutput) => void,
   ): Promise<ToolResult> {
-    const definition = this.registry.getDefinition(this.params.agent_name);
+    const normalizedAgentName = this.params.agent_name?.trim();
+    const isSentinelAgentName =
+      normalizedAgentName?.toLowerCase() === 'undefined' ||
+      normalizedAgentName?.toLowerCase() === 'null';
+
+    if (!normalizedAgentName || isSentinelAgentName) {
+      const availableAgents = this.registry
+        .getAllDefinitions()
+        .map((def) => `'${def.name}' (${def.description})`)
+        .join(', ');
+      const errorMessage = `Missing required parameter 'agent_name'. Available agents are: ${availableAgents}. Please choose a valid agent_name.`;
+
+      return {
+        llmContent: `Error: ${errorMessage}`,
+        returnDisplay: `Error: ${errorMessage}`,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.INVALID_TOOL_PARAMS,
+        },
+      };
+    }
+
+    const definition = this.registry.getDefinition(normalizedAgentName);
     if (!definition) {
       const availableAgents = this.registry
         .getAllDefinitions()
@@ -199,7 +222,7 @@ class DelegateInvocation extends BaseToolInvocation<
         .join(', ');
 
       throw new Error(
-        `Agent '${this.params.agent_name}' not found. Available agents are: ${availableAgents}. Please choose a valid agent_name.`,
+        `Agent '${normalizedAgentName}' not found. Available agents are: ${availableAgents}. Please choose a valid agent_name.`,
       );
     }
 

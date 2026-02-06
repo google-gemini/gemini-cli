@@ -121,6 +121,31 @@ describe('DelegateToAgentTool', () => {
     );
   });
 
+  it('should return INVALID_TOOL_PARAMS when agent_name is missing', async () => {
+    const invocation = tool.build({} as DelegateParams);
+
+    const result = await invocation.execute(new AbortController().signal);
+    expect(result.error?.type).toBe('invalid_tool_params');
+    expect(result.error?.message).toContain(
+      "Missing required parameter 'agent_name'",
+    );
+  });
+
+  it.each(['undefined', 'UNDEFINED', 'null', 'NULL'])(
+    'should return INVALID_TOOL_PARAMS when agent_name is sentinel %s',
+    async (agentName) => {
+      const invocation = tool.build({
+        agent_name: agentName,
+      } as DelegateParams);
+
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.error?.type).toBe('invalid_tool_params');
+      expect(result.error?.message).toContain(
+        "Missing required parameter 'agent_name'",
+      );
+    },
+  );
+
   it('should throw helpful error when agent_name does not exist', async () => {
     // We allow validation to pass now, checking happens in execute.
     const invocation = tool.build({
