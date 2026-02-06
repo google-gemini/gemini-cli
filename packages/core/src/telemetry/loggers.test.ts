@@ -1494,6 +1494,7 @@ describe('loggers', () => {
         false,
         undefined,
         undefined,
+        undefined,
         'test-extension',
         'test-extension-id',
       );

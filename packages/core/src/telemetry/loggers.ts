@@ -55,6 +55,7 @@ import type {
   HookCallEvent,
   StartupStatsEvent,
   LlmLoopCheckEvent,
+  PlanExecutionEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -73,6 +74,7 @@ import {
   recordRecoveryAttemptMetrics,
   recordLinesChanged,
   recordHookCallMetrics,
+  recordPlanExecution,
 } from './metrics.js';
 import { bufferTelemetryEvent } from './sdk.js';
 import type { UiEvent } from './uiTelemetry.js';
@@ -715,6 +717,20 @@ export function logApprovalModeDuration(
     logs.getLogger(SERVICE_NAME).emit({
       body: event.toLogBody(),
       attributes: event.toOpenTelemetryAttributes(config),
+    });
+  });
+}
+
+export function logPlanExecution(config: Config, event: PlanExecutionEvent) {
+  ClearcutLogger.getInstance(config)?.logPlanExecutionEvent(event);
+  bufferTelemetryEvent(() => {
+    logs.getLogger(SERVICE_NAME).emit({
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    });
+
+    recordPlanExecution(config, {
+      approval_mode: event.approval_mode,
     });
   });
 }
