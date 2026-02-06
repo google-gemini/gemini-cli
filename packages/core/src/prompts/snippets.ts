@@ -144,7 +144,6 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
 
 - **Context Efficiency:**
   - Avoid wasting context window by scoping your ${GREP_TOOL_NAME} searches to just enough information to definitively answer the question.
-  - Extra tool calls can negate any benefits of limits, so balance frugality with the cost of having to iterate.
   - Some examples:
     - Use total_max_matches to limit the ${GREP_TOOL_NAME} response size when you know that you only need a limited number. e.g.: "find me an example usage of path.resolve()" can use limit=5 to get 5 lines with locations to look instead of spending hundreds of tokens of context.
     - Use max_matches_per_file when searching broadly to limit the impact of each matching file. e.g.: "which files use NodeJS worker threads" only requires one match per file to answer.
