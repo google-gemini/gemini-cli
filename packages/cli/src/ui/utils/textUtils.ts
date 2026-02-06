@@ -104,7 +104,7 @@ export function cpSlice(str: string, start: number, end?: number): string {
  * Characters stripped:
  * - ANSI escape sequences (via strip-ansi)
  * - VT control sequences (via Node.js util.stripVTControlCharacters)
- * - C0 control chars (0x00-0x1F) except CR/LF which are handled elsewhere
+ * - C0 control chars (0x00-0x1F) except TAB(0x09), LF(0x0A), CR(0x0D)
  * - C1 control chars (0x80-0x9F) that can cause display issues
  *
  * Characters preserved:
@@ -117,28 +117,11 @@ export function stripUnsafeCharacters(str: string): string {
   const strippedAnsi = stripAnsi(str);
   const strippedVT = stripVTControlCharacters(strippedAnsi);
 
-  return toCodePoints(strippedVT)
-    .filter((char) => {
-      const code = char.codePointAt(0);
-      if (code === undefined) return false;
-
-      // Preserve CR/LF/TAB for line handling
-      if (code === 0x0a || code === 0x0d || code === 0x09) return true;
-
-      // Remove C0 control chars (except CR/LF) that can break display
-      // Examples: BELL(0x07) makes noise, BS(0x08) moves cursor, VT(0x0B), FF(0x0C)
-      if (code >= 0x00 && code <= 0x1f) return false;
-
-      // Remove C1 control chars (0x80-0x9f) - legacy 8-bit control codes
-      if (code >= 0x80 && code <= 0x9f) return false;
-
-      // Preserve DEL (0x7f) - it's handled functionally by applyOperations as backspace
-      // and doesn't cause rendering issues when displayed
-
-      // Preserve all other characters including Unicode/emojis
-      return true;
-    })
-    .join('');
+  // Use a regex to strip remaining unsafe control characters
+  // C0: 0x00-0x1F except 0x09 (TAB), 0x0A (LF), 0x0D (CR)
+  // C1: 0x80-0x9F
+  // eslint-disable-next-line no-control-regex
+  return strippedVT.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x80-\x9F]/g, '');
 }
 
 /**

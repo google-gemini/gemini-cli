@@ -35,6 +35,7 @@ import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { AskUserTool } from '../tools/ask-user.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
+import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { HookDefinition, HookEventName } from '../hooks/types.js';
@@ -55,7 +56,6 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   isPreviewModel,
   PREVIEW_GEMINI_MODEL,
-  PREVIEW_GEMINI_MODEL_AUTO,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
@@ -146,6 +146,13 @@ export interface TelemetrySettings {
 
 export interface OutputSettings {
   format?: OutputFormat;
+}
+
+export interface ToolOutputMaskingConfig {
+  enabled: boolean;
+  toolProtectionThreshold: number;
+  minPrunableTokensThreshold: number;
+  protectLatestTurn: boolean;
 }
 
 export interface ExtensionSetting {
@@ -272,6 +279,11 @@ import {
   DEFAULT_FILE_FILTERING_OPTIONS,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
 } from './constants.js';
+import {
+  DEFAULT_TOOL_PROTECTION_THRESHOLD,
+  DEFAULT_MIN_PRUNABLE_TOKENS_THRESHOLD,
+  DEFAULT_PROTECT_LATEST_TURN,
+} from '../services/toolOutputMaskingService.js';
 
 import {
   type ExtensionLoader,
@@ -280,6 +292,10 @@ import {
 import { McpClientManager } from '../tools/mcp-client-manager.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
 import { getErrorMessage } from '../utils/errors.js';
+import {
+  ENTER_PLAN_MODE_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
+} from '../tools/tool-names.js';
 
 export type { FileFilteringOptions };
 export {
@@ -450,13 +466,13 @@ export interface ConfigParameters {
   hooks?: { [K in HookEventName]?: HookDefinition[] };
   disabledHooks?: string[];
   projectHooks?: { [K in HookEventName]?: HookDefinition[] };
-  previewFeatures?: boolean;
   enableAgents?: boolean;
   enableEventDrivenScheduler?: boolean;
   skillsSupport?: boolean;
   disabledSkills?: string[];
   adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
+  toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
   plan?: boolean;
   onModelChange?: (model: string) => void;
@@ -534,7 +550,6 @@ export class Config {
   private readonly bugCommand: BugCommandSettings | undefined;
   private model: string;
   private readonly disableLoopDetection: boolean;
-  private previewFeatures: boolean | undefined;
   private hasAccessToPreviewModel: boolean = false;
   private readonly noBrowser: boolean;
   private readonly folderTrust: boolean;
@@ -594,6 +609,7 @@ export class Config {
   private pendingIncludeDirectories: string[];
   private readonly enableHooks: boolean;
   private readonly enableHooksUI: boolean;
+  private readonly toolOutputMasking: ToolOutputMaskingConfig;
   private hooks: { [K in HookEventName]?: HookDefinition[] } | undefined;
   private projectHooks:
     | ({ [K in HookEventName]?: HookDefinition[] } & { disabled?: string[] })
@@ -714,8 +730,19 @@ export class Config {
     this.disabledSkills = params.disabledSkills ?? [];
     this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
     this.modelAvailabilityService = new ModelAvailabilityService();
-    this.previewFeatures = params.previewFeatures ?? undefined;
     this.experimentalJitContext = params.experimentalJitContext ?? false;
+    this.toolOutputMasking = {
+      enabled: params.toolOutputMasking?.enabled ?? false,
+      toolProtectionThreshold:
+        params.toolOutputMasking?.toolProtectionThreshold ??
+        DEFAULT_TOOL_PROTECTION_THRESHOLD,
+      minPrunableTokensThreshold:
+        params.toolOutputMasking?.minPrunableTokensThreshold ??
+        DEFAULT_MIN_PRUNABLE_TOKENS_THRESHOLD,
+      protectLatestTurn:
+        params.toolOutputMasking?.protectLatestTurn ??
+        DEFAULT_PROTECT_LATEST_TURN,
+    };
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
     this.experimentalZedIntegration =
       params.experimentalZedIntegration ?? false;
@@ -864,6 +891,8 @@ export class Config {
     }
     this.initialized = true;
 
+    await this.storage.initialize();
+
     // Add pending directories to workspace context
     for (const dir of this.pendingIncludeDirectories) {
       this.workspaceContext.addDirectory(dir);
@@ -947,6 +976,7 @@ export class Config {
     }
 
     await this.geminiClient.initialize();
+    this.syncPlanModeTools();
   }
 
   getContentGenerator(): ContentGenerator {
@@ -993,15 +1023,6 @@ export class Config {
     this.experimentsPromise = getExperiments(codeAssistServer)
       .then((experiments) => {
         this.setExperiments(experiments);
-
-        // If preview features have not been set and the user authenticated through Google, we enable preview based on remote config only if it's true
-        if (this.getPreviewFeatures() === undefined) {
-          const remotePreviewFeatures =
-            experiments.flags[ExperimentFlags.ENABLE_PREVIEW]?.boolValue;
-          if (remotePreviewFeatures === true) {
-            this.setPreviewFeatures(remotePreviewFeatures);
-          }
-        }
       })
       .catch((e) => {
         debugLogger.error('Failed to fetch experiments', e);
@@ -1254,29 +1275,6 @@ export class Config {
     return this.question;
   }
 
-  getPreviewFeatures(): boolean | undefined {
-    return this.previewFeatures;
-  }
-
-  setPreviewFeatures(previewFeatures: boolean) {
-    // No change in state, no action needed
-    if (this.previewFeatures === previewFeatures) {
-      return;
-    }
-    this.previewFeatures = previewFeatures;
-    const currentModel = this.getModel();
-
-    // Case 1: Disabling preview features while on a preview model
-    if (!previewFeatures && isPreviewModel(currentModel)) {
-      this.setModel(DEFAULT_GEMINI_MODEL_AUTO);
-    }
-
-    // Case 2: Enabling preview features while on the default auto model
-    else if (previewFeatures && currentModel === DEFAULT_GEMINI_MODEL_AUTO) {
-      this.setModel(PREVIEW_GEMINI_MODEL_AUTO);
-    }
-  }
-
   getHasAccessToPreviewModel(): boolean {
     return this.hasAccessToPreviewModel;
   }
@@ -1439,6 +1437,14 @@ export class Config {
     return this.experimentalJitContext;
   }
 
+  getToolOutputMaskingEnabled(): boolean {
+    return this.toolOutputMasking.enabled;
+  }
+
+  getToolOutputMaskingConfig(): ToolOutputMaskingConfig {
+    return this.toolOutputMasking;
+  }
+
   getGeminiMdFileCount(): number {
     if (this.experimentalJitContext && this.contextManager) {
       return this.contextManager.getLoadedPaths().size;
@@ -1488,7 +1494,38 @@ export class Config {
       currentMode !== mode &&
       (currentMode === ApprovalMode.PLAN || mode === ApprovalMode.PLAN);
     if (isPlanModeTransition) {
+      this.syncPlanModeTools();
       this.updateSystemInstructionIfInitialized();
+    }
+  }
+
+  /**
+   * Synchronizes enter/exit plan mode tools based on current mode.
+   */
+  syncPlanModeTools(): void {
+    const isPlanMode = this.getApprovalMode() === ApprovalMode.PLAN;
+    const registry = this.getToolRegistry();
+
+    if (isPlanMode) {
+      if (registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
+        registry.unregisterTool(ENTER_PLAN_MODE_TOOL_NAME);
+      }
+      if (!registry.getTool(EXIT_PLAN_MODE_TOOL_NAME)) {
+        registry.registerTool(new ExitPlanModeTool(this, this.messageBus));
+      }
+    } else {
+      if (registry.getTool(EXIT_PLAN_MODE_TOOL_NAME)) {
+        registry.unregisterTool(EXIT_PLAN_MODE_TOOL_NAME);
+      }
+      if (!registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
+        registry.registerTool(new EnterPlanModeTool(this, this.messageBus));
+      }
+    }
+
+    if (this.geminiClient?.isInitialized()) {
+      this.geminiClient.setTools().catch((err) => {
+        debugLogger.error('Failed to update tools', err);
+      });
     }
   }
 
@@ -1787,10 +1824,6 @@ export class Config {
    * @returns true if the path is allowed, false otherwise.
    */
   isPathAllowed(absolutePath: string): boolean {
-    if (this.interactive && path.isAbsolute(absolutePath)) {
-      return true;
-    }
-
     const realpath = (p: string) => {
       let resolved: string;
       try {
@@ -2155,6 +2188,7 @@ export class Config {
     }
     if (this.isPlanEnabled()) {
       registerCoreTool(ExitPlanModeTool, this);
+      registerCoreTool(EnterPlanModeTool, this);
     }
 
     // Register Subagents as Tools
