@@ -6,13 +6,16 @@
 
 import type { CommandActionReturn } from './types.js';
 
-export function performInit(doesGeminiMdExist: boolean): CommandActionReturn {
-  if (doesGeminiMdExist) {
+export function performInit(
+  doesGeminiMdExist: boolean,
+  replace = false,
+): CommandActionReturn {
+  if (doesGeminiMdExist && !replace) {
     return {
       type: 'message',
       messageType: 'info',
       content:
-        'A GEMINI.md file already exists in this directory. No changes were made.',
+        'A GEMINI.md file already exists in this directory. No changes were made. Use "init replace" to overwrite it.',
     };
   }
 

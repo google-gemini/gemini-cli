@@ -26,4 +26,13 @@ describe('performInit', () => {
       expect(result.content).toContain('You are an AI agent');
     }
   });
+
+  it('returns submit_prompt if GEMINI.md exists but replace is true', () => {
+    const result = performInit(true, true);
+    expect(result.type).toBe('submit_prompt');
+
+    if (result.type === 'submit_prompt') {
+      expect(result.content).toContain('You are an AI agent');
+    }
+  });
 });

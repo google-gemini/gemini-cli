@@ -55,7 +55,7 @@ describe('initCommand', () => {
       type: 'message',
       messageType: 'info',
       content:
-        'A GEMINI.md file already exists in this directory. No changes were made.',
+        'A GEMINI.md file already exists in this directory. No changes were made. Use "init replace" to overwrite it.',
     });
     // Assert: Ensure no file was written
     expect(fs.writeFileSync).not.toHaveBeenCalled();
