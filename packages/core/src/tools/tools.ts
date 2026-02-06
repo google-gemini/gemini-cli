@@ -317,6 +317,12 @@ export interface ToolBuilder<
   getSchema(modelId?: string): FunctionDeclaration;
 
   /**
+   * Function declaration schema for the default model.
+   * @deprecated Use getSchema(modelId) for model-specific schemas.
+   */
+  readonly schema: FunctionDeclaration;
+
+  /**
    * Whether the tool's output should be rendered as markdown.
    */
   isOutputMarkdown: boolean;
@@ -362,6 +368,10 @@ export abstract class DeclarativeTool<
       description: this.description,
       parametersJsonSchema: this.parameterSchema,
     };
+  }
+
+  get schema(): FunctionDeclaration {
+    return this.getSchema();
   }
 
   /**
@@ -487,7 +497,7 @@ export abstract class BaseDeclarativeTool<
 
   override validateToolParams(params: TParams): string | null {
     const errors = SchemaValidator.validate(
-      this.getSchema().parametersJsonSchema,
+      this.schema.parametersJsonSchema,
       params,
     );
 

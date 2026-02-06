@@ -24,7 +24,6 @@ import { FileOperationEvent } from '../telemetry/types.js';
 import { READ_FILE_TOOL_NAME } from './tool-names.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { READ_FILE_DEFINITION } from './definitions/coreTools.js';
-import { resolveToolDeclaration } from './definitions/resolver.js';
 
 /**
  * Parameters for the ReadFile tool
@@ -236,10 +235,9 @@ export class ReadFileTool extends BaseDeclarativeTool<
     );
   }
 
-  override getSchema(modelId?: string) {
-    if (!modelId) {
-      return super.getSchema();
-    }
-    return resolveToolDeclaration(READ_FILE_DEFINITION, modelId);
+  override getSchema(_modelId?: string) {
+    // Pure refactor: maintain existing behavior.
+    // getSchema(modelId) is now available for future model-specific overrides.
+    return super.getSchema();
   }
 }
