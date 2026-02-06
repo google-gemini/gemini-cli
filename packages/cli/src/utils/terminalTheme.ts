@@ -63,7 +63,7 @@ export async function setupTerminalAndTheme(
       if (backgroundType && currentTheme.type !== backgroundType) {
         coreEvents.emitFeedback(
           'warning',
-          `Theme '${currentTheme.name}' (${currentTheme.type}) might look incorrect on your ${backgroundType} terminal background. Type /theme to change theme.`,
+          `Theme '${currentTheme.name}' (${currentTheme.type}) might look incorrect on your ${backgroundType} terminal background. Type /theme to change theme.\nThis message is not visible if the color palette is wrong.`,
         );
       }
     }
