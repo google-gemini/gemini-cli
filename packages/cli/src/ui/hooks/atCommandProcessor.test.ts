@@ -15,6 +15,7 @@ import {
   StandardFileSystemService,
   ToolRegistry,
   COMMON_IGNORE_PATTERNS,
+  GEMINI_IGNORE_FILE_NAME,
   // DEFAULT_FILE_EXCLUDES,
 } from '@google/gemini-cli-core';
 import * as core from '@google/gemini-cli-core';
@@ -44,6 +45,7 @@ describe('handleAtCommand', () => {
   }
 
   beforeEach(async () => {
+    vi.restoreAllMocks();
     vi.resetAllMocks();
 
     testRootDir = await fsPromises.mkdtemp(
@@ -628,7 +630,7 @@ describe('handleAtCommand', () => {
   describe('gemini-ignore filtering', () => {
     it('should skip gemini-ignored files in @ commands', async () => {
       await createTestFile(
-        path.join(testRootDir, '.geminiignore'),
+        path.join(testRootDir, GEMINI_IGNORE_FILE_NAME),
         'build/output.js',
       );
       const geminiIgnoredFile = await createTestFile(
@@ -659,7 +661,7 @@ describe('handleAtCommand', () => {
   });
   it('should process non-ignored files when .geminiignore is present', async () => {
     await createTestFile(
-      path.join(testRootDir, '.geminiignore'),
+      path.join(testRootDir, GEMINI_IGNORE_FILE_NAME),
       'build/output.js',
     );
     const validFile = await createTestFile(
@@ -690,7 +692,7 @@ describe('handleAtCommand', () => {
 
   it('should handle mixed gemini-ignored and valid files', async () => {
     await createTestFile(
-      path.join(testRootDir, '.geminiignore'),
+      path.join(testRootDir, GEMINI_IGNORE_FILE_NAME),
       'dist/bundle.js',
     );
     const validFile = await createTestFile(
@@ -1400,6 +1402,34 @@ describe('handleAtCommand', () => {
         tools: [expect.objectContaining({ status: ToolCallStatus.Error })],
       }),
       134,
+    );
+  });
+
+  it('should include agent nudge when agents are found', async () => {
+    const agentName = 'my-agent';
+    const otherAgent = 'other-agent';
+
+    // Mock getAgentRegistry on the config
+    mockConfig.getAgentRegistry = vi.fn().mockReturnValue({
+      getDefinition: (name: string) =>
+        name === agentName || name === otherAgent ? { name } : undefined,
+    });
+
+    const query = `@${agentName} @${otherAgent}`;
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 600,
+      signal: abortController.signal,
+    });
+
+    const expectedNudge = `\n<system_note>\nThe user has explicitly selected the following agent(s): ${agentName}, ${otherAgent}. Please use the following tool(s) to delegate the task: '${agentName}', '${otherAgent}'.\n</system_note>\n`;
+
+    expect(result.processedQuery).toContainEqual(
+      expect.objectContaining({ text: expectedNudge }),
     );
   });
 });

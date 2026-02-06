@@ -8,7 +8,7 @@ import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { SchedulerStateManager } from './state-manager.js';
 import { resolveConfirmation } from './confirmation.js';
-import { checkPolicy, updatePolicy } from './policy.js';
+import { checkPolicy, updatePolicy, getPolicyDenialError } from './policy.js';
 import { ToolExecutor } from './tool-executor.js';
 import { ToolModificationHandler } from './tool-modifier.js';
 import {
@@ -404,16 +404,21 @@ export class Scheduler {
     const callId = toolCall.request.callId;
 
     // Policy & Security
-    const decision = await checkPolicy(toolCall, this.config);
+    const { decision, rule } = await checkPolicy(toolCall, this.config);
 
     if (decision === PolicyDecision.DENY) {
+      const { errorMessage, errorType } = getPolicyDenialError(
+        this.config,
+        rule,
+      );
+
       this.state.updateStatus(
         callId,
         'error',
         createErrorResponse(
           toolCall.request,
-          new Error('Tool execution denied by policy.'),
-          ToolErrorType.POLICY_VIOLATION,
+          new Error(errorMessage),
+          errorType,
         ),
       );
       this.state.finalizeCall(callId);

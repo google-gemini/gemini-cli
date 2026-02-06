@@ -8,6 +8,8 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { FileSearchFactory, AbortError, filter } from './fileSearch.js';
 import { createTmpDir, cleanupTmpDir } from '@google/gemini-cli-test-utils';
 import * as crawler from './crawler.js';
+import { GEMINI_IGNORE_FILE_NAME } from '../../config/constants.js';
+import { FileDiscoveryService } from '../../services/fileDiscoveryService.js';
 
 describe('FileSearch', () => {
   let tmpDir: string;
@@ -20,41 +22,17 @@ describe('FileSearch', () => {
 
   it('should use .geminiignore rules', async () => {
     tmpDir = await createTmpDir({
-      '.geminiignore': 'dist/',
+      [GEMINI_IGNORE_FILE_NAME]: 'dist/',
       dist: ['ignored.js'],
       src: ['not-ignored.js'],
     });
 
     const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
-      useGitignore: false,
-      useGeminiignore: true,
-      ignoreDirs: [],
-      cache: false,
-      cacheTtl: 0,
-      enableRecursiveFileSearch: true,
-      enableFuzzySearch: true,
-    });
-
-    await fileSearch.initialize();
-    const results = await fileSearch.search('');
-
-    expect(results).toEqual(['src/', '.geminiignore', 'src/not-ignored.js']);
-  });
-
-  it('should combine .gitignore and .geminiignore rules', async () => {
-    tmpDir = await createTmpDir({
-      '.gitignore': 'dist/',
-      '.geminiignore': 'build/',
-      dist: ['ignored-by-git.js'],
-      build: ['ignored-by-gemini.js'],
-      src: ['not-ignored.js'],
-    });
-
-    const fileSearch = FileSearchFactory.create({
-      projectRoot: tmpDir,
-      useGitignore: true,
-      useGeminiignore: true,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: false,
+        respectGeminiIgnore: true,
+      }),
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
@@ -67,7 +45,40 @@ describe('FileSearch', () => {
 
     expect(results).toEqual([
       'src/',
-      '.geminiignore',
+      GEMINI_IGNORE_FILE_NAME,
+      'src/not-ignored.js',
+    ]);
+  });
+
+  it('should combine .gitignore and .geminiignore rules', async () => {
+    tmpDir = await createTmpDir({
+      '.git': {},
+      '.gitignore': 'dist/',
+      [GEMINI_IGNORE_FILE_NAME]: 'build/',
+      dist: ['ignored-by-git.js'],
+      build: ['ignored-by-gemini.js'],
+      src: ['not-ignored.js'],
+    });
+
+    const fileSearch = FileSearchFactory.create({
+      projectRoot: tmpDir,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: true,
+        respectGeminiIgnore: true,
+      }),
+      ignoreDirs: [],
+      cache: false,
+      cacheTtl: 0,
+      enableRecursiveFileSearch: true,
+      enableFuzzySearch: true,
+    });
+
+    await fileSearch.initialize();
+    const results = await fileSearch.search('');
+
+    expect(results).toEqual([
+      'src/',
+      GEMINI_IGNORE_FILE_NAME,
       '.gitignore',
       'src/not-ignored.js',
     ]);
@@ -81,8 +92,10 @@ describe('FileSearch', () => {
 
     const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
-      useGitignore: false,
-      useGeminiignore: false,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+      }),
       ignoreDirs: ['logs'],
       cache: false,
       cacheTtl: 0,
@@ -98,6 +111,7 @@ describe('FileSearch', () => {
 
   it('should handle negated directories', async () => {
     tmpDir = await createTmpDir({
+      '.git': {},
       '.gitignore': ['build/**', '!build/public', '!build/public/**'].join(
         '\n',
       ),
@@ -110,8 +124,10 @@ describe('FileSearch', () => {
 
     const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
-      useGitignore: true,
-      useGeminiignore: false,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: true,
+        respectGeminiIgnore: false,
+      }),
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
@@ -143,8 +159,10 @@ describe('FileSearch', () => {
 
     const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
-      useGitignore: false,
-      useGeminiignore: false,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+      }),
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
@@ -160,6 +178,7 @@ describe('FileSearch', () => {
 
   it('should handle root-level file negation', async () => {
     tmpDir = await createTmpDir({
+      '.git': {},
       '.gitignore': ['*.mk', '!Foo.mk'].join('\n'),
       'bar.mk': '',
       'Foo.mk': '',
@@ -167,8 +186,10 @@ describe('FileSearch', () => {
 
     const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
-      useGitignore: true,
-      useGeminiignore: false,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: true,
+        respectGeminiIgnore: false,
+      }),
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
@@ -184,6 +205,7 @@ describe('FileSearch', () => {
 
   it('should handle directory negation with glob', async () => {
     tmpDir = await createTmpDir({
+      '.git': {},
       '.gitignore': [
         'third_party/**',
         '!third_party/foo',
@@ -202,8 +224,10 @@ describe('FileSearch', () => {
 
     const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
-      useGitignore: true,
-      useGeminiignore: false,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: true,
+        respectGeminiIgnore: false,
+      }),
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
@@ -225,6 +249,7 @@ describe('FileSearch', () => {
 
   it('should correctly handle negated patterns in .gitignore', async () => {
     tmpDir = await createTmpDir({
+      '.git': {},
       '.gitignore': ['dist/**', '!dist/keep.js'].join('\n'),
       dist: ['ignore.js', 'keep.js'],
       src: ['main.js'],
@@ -232,8 +257,10 @@ describe('FileSearch', () => {
 
     const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
-      useGitignore: true,
-      useGeminiignore: false,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: true,
+        respectGeminiIgnore: false,
+      }),
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
@@ -262,8 +289,10 @@ describe('FileSearch', () => {
 
     const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
-      useGitignore: true,
-      useGeminiignore: true,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: true,
+        respectGeminiIgnore: true,
+      }),
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
@@ -289,8 +318,10 @@ describe('FileSearch', () => {
 
     const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
-      useGitignore: false,
-      useGeminiignore: false,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+      }),
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
@@ -315,8 +346,10 @@ describe('FileSearch', () => {
 
     const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
-      useGitignore: false,
-      useGeminiignore: false,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+      }),
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
@@ -341,8 +374,10 @@ describe('FileSearch', () => {
 
     const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
-      useGitignore: false,
-      useGeminiignore: false,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+      }),
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
@@ -367,8 +402,10 @@ describe('FileSearch', () => {
 
     const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
-      useGitignore: false,
-      useGeminiignore: false,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+      }),
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
@@ -391,8 +428,10 @@ describe('FileSearch', () => {
 
     const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
-      useGitignore: false,
-      useGeminiignore: false,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+      }),
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
@@ -422,8 +461,10 @@ describe('FileSearch', () => {
     tmpDir = await createTmpDir({});
     const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
-      useGitignore: false,
-      useGeminiignore: false,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+      }),
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
@@ -438,14 +479,17 @@ describe('FileSearch', () => {
 
   it('should handle empty or commented-only ignore files', async () => {
     tmpDir = await createTmpDir({
+      '.git': {},
       '.gitignore': '# This is a comment\n\n   \n',
       src: ['main.js'],
     });
 
     const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
-      useGitignore: true,
-      useGeminiignore: false,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: true,
+        respectGeminiIgnore: false,
+      }),
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
@@ -467,8 +511,10 @@ describe('FileSearch', () => {
 
     const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
-      useGitignore: false, // Explicitly disable .gitignore to isolate this rule
-      useGeminiignore: false,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: false, // Explicitly disable .gitignore to isolate this rule
+        respectGeminiIgnore: false,
+      }),
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
@@ -491,8 +537,10 @@ describe('FileSearch', () => {
 
     const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
-      useGitignore: false,
-      useGeminiignore: false,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+      }),
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
@@ -518,8 +566,10 @@ describe('FileSearch', () => {
 
     const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
-      useGitignore: false,
-      useGeminiignore: false,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+      }),
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
@@ -555,8 +605,10 @@ describe('FileSearch', () => {
 
     const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
-      useGitignore: false,
-      useGeminiignore: false,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+      }),
       ignoreDirs: [],
       cache: true, // Enable caching for this test
       cacheTtl: 0,
@@ -595,8 +647,10 @@ describe('FileSearch', () => {
 
     const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
-      useGitignore: false,
-      useGeminiignore: false,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+      }),
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
@@ -639,8 +693,10 @@ describe('FileSearch', () => {
 
     const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
-      useGitignore: false,
-      useGeminiignore: false,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+      }),
       ignoreDirs: [],
       cache: true, // Ensure caching is enabled
       cacheTtl: 10000,
@@ -677,8 +733,10 @@ describe('FileSearch', () => {
 
     const fileSearch = FileSearchFactory.create({
       projectRoot: tmpDir,
-      useGitignore: false,
-      useGeminiignore: false,
+      fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+        respectGitIgnore: false,
+        respectGeminiIgnore: false,
+      }),
       ignoreDirs: [],
       cache: false,
       cacheTtl: 0,
@@ -707,8 +765,10 @@ describe('FileSearch', () => {
 
       const fileSearch = FileSearchFactory.create({
         projectRoot: tmpDir,
-        useGitignore: false,
-        useGeminiignore: false,
+        fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+          respectGitIgnore: false,
+          respectGeminiIgnore: false,
+        }),
         ignoreDirs: [],
         cache: false,
         cacheTtl: 0,
@@ -732,8 +792,10 @@ describe('FileSearch', () => {
 
       const fileSearch = FileSearchFactory.create({
         projectRoot: tmpDir,
-        useGitignore: false,
-        useGeminiignore: false,
+        fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+          respectGitIgnore: false,
+          respectGeminiIgnore: false,
+        }),
         ignoreDirs: [],
         cache: false,
         cacheTtl: 0,
@@ -757,8 +819,10 @@ describe('FileSearch', () => {
 
       const fileSearch = FileSearchFactory.create({
         projectRoot: tmpDir,
-        useGitignore: false,
-        useGeminiignore: false,
+        fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+          respectGitIgnore: false,
+          respectGeminiIgnore: false,
+        }),
         ignoreDirs: [],
         cache: false,
         cacheTtl: 0,
@@ -773,6 +837,7 @@ describe('FileSearch', () => {
 
     it('should respect ignore rules', async () => {
       tmpDir = await createTmpDir({
+        '.git': {},
         '.gitignore': '*.js',
         'file1.js': '',
         'file2.ts': '',
@@ -780,8 +845,10 @@ describe('FileSearch', () => {
 
       const fileSearch = FileSearchFactory.create({
         projectRoot: tmpDir,
-        useGitignore: true,
-        useGeminiignore: false,
+        fileDiscoveryService: new FileDiscoveryService(tmpDir, {
+          respectGitIgnore: true,
+          respectGeminiIgnore: false,
+        }),
         ignoreDirs: [],
         cache: false,
         cacheTtl: 0,

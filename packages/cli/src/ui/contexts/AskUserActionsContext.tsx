@@ -24,9 +24,8 @@ interface AskUserActionsContextValue {
   cancel: () => void;
 }
 
-const AskUserActionsContext = createContext<AskUserActionsContextValue | null>(
-  null,
-);
+export const AskUserActionsContext =
+  createContext<AskUserActionsContextValue | null>(null);
 
 export const useAskUserActions = () => {
   const context = useContext(AskUserActionsContext);

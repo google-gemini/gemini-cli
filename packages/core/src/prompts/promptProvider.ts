@@ -23,8 +23,10 @@ import {
   PLAN_MODE_TOOLS,
   WRITE_TODOS_TOOL_NAME,
   READ_FILE_TOOL_NAME,
+  ENTER_PLAN_MODE_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { resolveModel, isPreviewModel } from '../config/models.js';
+import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 
 /**
  * Orchestrates prompt generation by gathering context and building options.
@@ -47,6 +49,8 @@ export class PromptProvider {
     const isPlanMode = approvalMode === ApprovalMode.PLAN;
     const skills = config.getSkillManager().getSkills();
     const toolNames = config.getToolRegistry().getAllToolNames();
+    const enabledToolNames = new Set(toolNames);
+    const approvedPlanPath = config.getApprovedPlanPath();
 
     const desiredModel = resolveModel(
       config.getActiveModel(),
@@ -55,16 +59,26 @@ export class PromptProvider {
     const isGemini3 = isPreviewModel(desiredModel);
 
     // --- Context Gathering ---
-    const planOptions: snippets.ApprovalModePlanOptions | undefined = isPlanMode
-      ? {
-          planModeToolsList: PLAN_MODE_TOOLS.filter((t) =>
-            new Set(toolNames).has(t),
-          )
-            .map((t) => `- \`${t}\``)
-            .join('\n'),
-          plansDir: config.storage.getProjectTempPlansDir(),
-        }
-      : undefined;
+    let planModeToolsList = PLAN_MODE_TOOLS.filter((t) =>
+      enabledToolNames.has(t),
+    )
+      .map((t) => `- \`${t}\``)
+      .join('\n');
+
+    // Add read-only MCP tools to the list
+    if (isPlanMode) {
+      const allTools = config.getToolRegistry().getAllTools();
+      const readOnlyMcpTools = allTools.filter(
+        (t): t is DiscoveredMCPTool =>
+          t instanceof DiscoveredMCPTool && !!t.isReadOnly,
+      );
+      if (readOnlyMcpTools.length > 0) {
+        const mcpToolsList = readOnlyMcpTools
+          .map((t) => `- \`${t.name}\` (${t.serverName})`)
+          .join('\n');
+        planModeToolsList += `\n${mcpToolsList}`;
+      }
+    }
 
     let basePrompt: string;
 
@@ -115,12 +129,27 @@ export class PromptProvider {
           'primaryWorkflows',
           () => ({
             interactive: interactiveMode,
-            enableCodebaseInvestigator: toolNames.includes(
+            enableCodebaseInvestigator: enabledToolNames.has(
               CodebaseInvestigatorAgent.name,
             ),
-            enableWriteTodosTool: toolNames.includes(WRITE_TODOS_TOOL_NAME),
+            enableWriteTodosTool: enabledToolNames.has(WRITE_TODOS_TOOL_NAME),
+            enableEnterPlanModeTool: enabledToolNames.has(
+              ENTER_PLAN_MODE_TOOL_NAME,
+            ),
+            approvedPlan: approvedPlanPath
+              ? { path: approvedPlanPath }
+              : undefined,
           }),
           !isPlanMode,
+        ),
+        planningWorkflow: this.withSection(
+          'planningWorkflow',
+          () => ({
+            planModeToolsList,
+            plansDir: config.storage.getProjectTempPlansDir(),
+            approvedPlanPath: config.getApprovedPlanPath(),
+          }),
+          isPlanMode,
         ),
         operationalGuidelines: this.withSection(
           'operationalGuidelines',
@@ -145,11 +174,7 @@ export class PromptProvider {
     }
 
     // --- Finalization (Shell) ---
-    const finalPrompt = snippets.renderFinalShell(
-      basePrompt,
-      userMemory,
-      planOptions,
-    );
+    const finalPrompt = snippets.renderFinalShell(basePrompt, userMemory);
 
     // Sanitize erratic newlines from composition
     const sanitizedPrompt = finalPrompt.replace(/\n{3,}/g, '\n\n');

@@ -107,6 +107,14 @@ describe('SettingsSchema', () => {
         getSettingsSchema().context.properties.fileFiltering.properties
           ?.enableRecursiveFileSearch,
       ).toBeDefined();
+      expect(
+        getSettingsSchema().context.properties.fileFiltering.properties
+          ?.customIgnoreFilePaths,
+      ).toBeDefined();
+      expect(
+        getSettingsSchema().context.properties.fileFiltering.properties
+          ?.customIgnoreFilePaths.type,
+      ).toBe('array');
     });
 
     it('should have unique categories', () => {
@@ -286,7 +294,7 @@ describe('SettingsSchema', () => {
       expect(
         getSettingsSchema().security.properties.folderTrust.properties.enabled
           .default,
-      ).toBe(false);
+      ).toBe(true);
       expect(
         getSettingsSchema().security.properties.folderTrust.properties.enabled
           .showInDialog,

@@ -18,6 +18,7 @@ import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
 import type { RetryAvailabilityContext } from '../availability/modelPolicy.js';
 
 export type { RetryAvailabilityContext };
+export const DEFAULT_MAX_ATTEMPTS = 3;
 
 export interface RetryOptions {
   maxAttempts: number;
@@ -40,7 +41,7 @@ export interface RetryOptions {
 }
 
 const DEFAULT_RETRY_OPTIONS: RetryOptions = {
-  maxAttempts: 10,
+  maxAttempts: DEFAULT_MAX_ATTEMPTS,
   initialDelayMs: 5000,
   maxDelayMs: 30000, // 30 seconds
   shouldRetryOnError: isRetryableError,
@@ -53,6 +54,12 @@ const RETRYABLE_NETWORK_CODES = [
   'ENOTFOUND',
   'EAI_AGAIN',
   'ECONNREFUSED',
+  // SSL/TLS transient errors
+  'ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC',
+  'ERR_SSL_WRONG_VERSION_NUMBER',
+  'ERR_SSL_DECRYPTION_FAILED_OR_BAD_RECORD_MAC',
+  'ERR_SSL_BAD_RECORD_MAC',
+  'EPROTO', // Generic protocol error (often SSL-related)
 ];
 
 function getNetworkErrorCode(error: unknown): string | undefined {
@@ -71,8 +78,22 @@ function getNetworkErrorCode(error: unknown): string | undefined {
     return directCode;
   }
 
-  if (typeof error === 'object' && error !== null && 'cause' in error) {
-    return getCode((error as { cause: unknown }).cause);
+  // Traverse the cause chain to find error codes (SSL errors are often nested)
+  let current: unknown = error;
+  const maxDepth = 5; // Prevent infinite loops in case of circular references
+  for (let depth = 0; depth < maxDepth; depth++) {
+    if (
+      typeof current !== 'object' ||
+      current === null ||
+      !('cause' in current)
+    ) {
+      break;
+    }
+    current = (current as { cause: unknown }).cause;
+    const code = getCode(current);
+    if (code) {
+      return code;
+    }
   }
 
   return undefined;

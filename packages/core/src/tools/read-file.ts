@@ -22,6 +22,7 @@ import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
 import { logFileOperation } from '../telemetry/loggers.js';
 import { FileOperationEvent } from '../telemetry/types.js';
 import { READ_FILE_TOOL_NAME } from './tool-names.js';
+import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 
 /**
  * Parameters for the ReadFile tool
@@ -171,6 +172,7 @@ export class ReadFileTool extends BaseDeclarativeTool<
   ToolResult
 > {
   static readonly Name = READ_FILE_TOOL_NAME;
+  private readonly fileDiscoveryService: FileDiscoveryService;
 
   constructor(
     private config: Config,
@@ -205,6 +207,10 @@ export class ReadFileTool extends BaseDeclarativeTool<
       true,
       false,
     );
+    this.fileDiscoveryService = new FileDiscoveryService(
+      config.getTargetDir(),
+      config.getFileFilteringOptions(),
+    );
   }
 
   protected override validateToolParamValues(
@@ -231,9 +237,13 @@ export class ReadFileTool extends BaseDeclarativeTool<
       return 'Limit must be a positive number';
     }
 
-    const fileService = this.config.getFileService();
     const fileFilteringOptions = this.config.getFileFilteringOptions();
-    if (fileService.shouldIgnoreFile(resolvedPath, fileFilteringOptions)) {
+    if (
+      this.fileDiscoveryService.shouldIgnoreFile(
+        resolvedPath,
+        fileFilteringOptions,
+      )
+    ) {
       return `File path '${resolvedPath}' is ignored by configured ignore patterns.`;
     }
 

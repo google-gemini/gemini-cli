@@ -8,6 +8,7 @@ import { type Config } from '../config/config.js';
 import { type Status } from '../core/coreToolScheduler.js';
 import { type ThoughtSummary } from '../utils/thoughtUtils.js';
 import { getProjectHash } from '../utils/paths.js';
+import { sanitizeFilenamePart } from '../utils/fileUtils.js';
 import path from 'node:path';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
@@ -47,6 +48,7 @@ export interface BaseMessageRecord {
   id: string;
   timestamp: string;
   content: PartListUnion;
+  displayContent?: PartListUnion;
 }
 
 /**
@@ -96,6 +98,8 @@ export interface ConversationRecord {
   lastUpdated: string;
   messages: MessageRecord[];
   summary?: string;
+  /** Workspace directories added during the session via /dir add */
+  directories?: string[];
 }
 
 /**
@@ -205,12 +209,14 @@ export class ChatRecordingService {
   private newMessage(
     type: ConversationRecordExtra['type'],
     content: PartListUnion,
+    displayContent?: PartListUnion,
   ): MessageRecord {
     return {
       id: randomUUID(),
       timestamp: new Date().toISOString(),
       type,
       content,
+      displayContent,
     };
   }
 
@@ -221,12 +227,17 @@ export class ChatRecordingService {
     model: string | undefined;
     type: ConversationRecordExtra['type'];
     content: PartListUnion;
+    displayContent?: PartListUnion;
   }): void {
     if (!this.conversationFile) return;
 
     try {
       this.updateConversation((conversation) => {
-        const msg = this.newMessage(message.type, message.content);
+        const msg = this.newMessage(
+          message.type,
+          message.content,
+          message.displayContent,
+        );
         if (msg.type === 'gemini') {
           // If it's a new Gemini message then incorporate any queued thoughts.
           conversation.messages.push({
@@ -487,6 +498,23 @@ export class ChatRecordingService {
   }
 
   /**
+   * Records workspace directories to the session file.
+   * Called when directories are added via /dir add.
+   */
+  recordDirectories(directories: readonly string[]): void {
+    if (!this.conversationFile) return;
+
+    try {
+      this.updateConversation((conversation) => {
+        conversation.directories = [...directories];
+      });
+    } catch (error) {
+      debugLogger.error('Error saving directories to chat history.', error);
+      // Don't throw - we want graceful degradation
+    }
+  }
+
+  /**
    * Gets the current conversation data (for summary generation).
    */
   getConversation(): ConversationRecord | null {
@@ -513,12 +541,29 @@ export class ChatRecordingService {
    */
   deleteSession(sessionId: string): void {
     try {
-      const chatsDir = path.join(
-        this.config.storage.getProjectTempDir(),
-        'chats',
-      );
+      const tempDir = this.config.storage.getProjectTempDir();
+      const chatsDir = path.join(tempDir, 'chats');
       const sessionPath = path.join(chatsDir, `${sessionId}.json`);
-      fs.unlinkSync(sessionPath);
+      if (fs.existsSync(sessionPath)) {
+        fs.unlinkSync(sessionPath);
+      }
+
+      // Cleanup tool outputs for this session
+      const safeSessionId = sanitizeFilenamePart(sessionId);
+      const toolOutputDir = path.join(
+        tempDir,
+        'tool-outputs',
+        `session-${safeSessionId}`,
+      );
+
+      // Robustness: Ensure the path is strictly within the tool-outputs base
+      const toolOutputsBase = path.join(tempDir, 'tool-outputs');
+      if (
+        fs.existsSync(toolOutputDir) &&
+        toolOutputDir.startsWith(toolOutputsBase)
+      ) {
+        fs.rmSync(toolOutputDir, { recursive: true, force: true });
+      }
     } catch (error) {
       debugLogger.error('Error deleting session file.', error);
       throw error;

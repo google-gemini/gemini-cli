@@ -7,7 +7,8 @@
       { "label": "Installation", "slug": "docs/get-started/installation" },
       { "label": "Authentication", "slug": "docs/get-started/authentication" },
       { "label": "Examples", "slug": "docs/get-started/examples" },
-      { "label": "Gemini 3 (preview)", "slug": "docs/get-started/gemini-3" }
+      { "label": "Gemini 3 (preview)", "slug": "docs/get-started/gemini-3" },
+      { "label": "CLI Reference", "slug": "docs/cli/cli-reference" }
     ]
   },
   {
@@ -79,6 +80,10 @@
     "items": [
       { "label": "Agent skills", "slug": "docs/cli/skills" },
       {
+        "label": "Creating Agent skills",
+        "slug": "docs/cli/creating-skills"
+      },
+      {
         "label": "Sub-agents (experimental)",
         "slug": "docs/core/subagents"
       },
@@ -86,7 +91,7 @@
         "label": "Remote subagents (experimental)",
         "slug": "docs/core/remote-agents"
       },
-      { "label": "Hooks (experimental)", "slug": "docs/hooks" },
+      { "label": "Hooks", "slug": "docs/hooks" },
       { "label": "IDE integration", "slug": "docs/ide-integration" },
       { "label": "MCP servers", "slug": "docs/tools/mcp-server" }
     ]
@@ -118,7 +123,6 @@
     "items": [
       { "label": "FAQ", "slug": "docs/faq" },
       { "label": "Quota and pricing", "slug": "docs/quota-and-pricing" },
-      { "label": "Release notes", "slug": "docs/changelogs/" },
       { "label": "Terms and privacy", "slug": "docs/tos-privacy" },
       { "label": "Troubleshooting", "slug": "docs/troubleshooting" },
       { "label": "Uninstall", "slug": "docs/cli/uninstall" }
@@ -135,6 +139,14 @@
       },
       { "label": "Local development", "slug": "docs/local-development" },
       { "label": "NPM package structure", "slug": "docs/npm" }
+    ]
+  },
+  {
+    "label": "Releases",
+    "items": [
+      { "label": "Release notes", "slug": "docs/changelogs/" },
+      { "label": "Stable release", "slug": "docs/changelogs/latest" },
+      { "label": "Preview release", "slug": "docs/changelogs/preview" }
     ]
   }
 ]

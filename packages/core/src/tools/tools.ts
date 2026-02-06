@@ -16,7 +16,9 @@ import {
   MessageBusType,
   type ToolConfirmationRequest,
   type ToolConfirmationResponse,
+  type Question,
 } from '../confirmation-bus/types.js';
+import { type ApprovalMode } from '../policy/types.js';
 
 /**
  * Represents a validated and ready-to-execute tool call.
@@ -550,6 +552,11 @@ export interface ToolResult {
     message: string; // raw error message
     type?: ToolErrorType; // An optional machine-readable error type (e.g., 'FILE_NOT_FOUND').
   };
+
+  /**
+   * Optional data payload for passing structured information back to the caller.
+   */
+  data?: Record<string, unknown>;
 }
 
 /**
@@ -687,11 +694,27 @@ export interface ToolEditConfirmationDetails {
   ideConfirmation?: Promise<DiffUpdateResult>;
 }
 
-export interface ToolConfirmationPayload {
-  // used to override `modifiedProposedContent` for modifiable tools in the
-  // inline modify flow
+export interface ToolEditConfirmationPayload {
   newContent: string;
 }
+
+export interface ToolAskUserConfirmationPayload {
+  answers: { [questionIndex: string]: string };
+}
+
+export interface ToolExitPlanModeConfirmationPayload {
+  /** Whether the user approved the plan */
+  approved: boolean;
+  /** If approved, the approval mode to use for implementation */
+  approvalMode?: ApprovalMode;
+  /** If rejected, the user's feedback */
+  feedback?: string;
+}
+
+export type ToolConfirmationPayload =
+  | ToolEditConfirmationPayload
+  | ToolAskUserConfirmationPayload
+  | ToolExitPlanModeConfirmationPayload;
 
 export interface ToolExecuteConfirmationDetails {
   type: 'exec';
@@ -720,11 +743,33 @@ export interface ToolInfoConfirmationDetails {
   urls?: string[];
 }
 
+export interface ToolAskUserConfirmationDetails {
+  type: 'ask_user';
+  title: string;
+  questions: Question[];
+  onConfirm: (
+    outcome: ToolConfirmationOutcome,
+    payload?: ToolConfirmationPayload,
+  ) => Promise<void>;
+}
+
+export interface ToolExitPlanModeConfirmationDetails {
+  type: 'exit_plan_mode';
+  title: string;
+  planPath: string;
+  onConfirm: (
+    outcome: ToolConfirmationOutcome,
+    payload?: ToolConfirmationPayload,
+  ) => Promise<void>;
+}
+
 export type ToolCallConfirmationDetails =
   | ToolEditConfirmationDetails
   | ToolExecuteConfirmationDetails
   | ToolMcpConfirmationDetails
-  | ToolInfoConfirmationDetails;
+  | ToolInfoConfirmationDetails
+  | ToolAskUserConfirmationDetails
+  | ToolExitPlanModeConfirmationDetails;
 
 export enum ToolConfirmationOutcome {
   ProceedOnce = 'proceed_once',
@@ -746,6 +791,7 @@ export enum Kind {
   Think = 'think',
   Fetch = 'fetch',
   Communicate = 'communicate',
+  Plan = 'plan',
   Other = 'other',
 }
 

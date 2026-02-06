@@ -30,6 +30,18 @@ export const getAsciiArtWidth = (asciiArt: string): number => {
  *  code units so that surrogate‑pair emoji count as one "column".)
  * ---------------------------------------------------------------------- */
 
+/**
+ * Checks if a string contains only ASCII characters (0-127).
+ */
+export function isAscii(str: string): boolean {
+  for (let i = 0; i < str.length; i++) {
+    if (str.charCodeAt(i) > 127) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // Cache for code points
 const MAX_STRING_LENGTH_TO_CACHE = 1000;
 const codePointsCache = new LRUCache<string, string[]>(
@@ -37,15 +49,8 @@ const codePointsCache = new LRUCache<string, string[]>(
 );
 
 export function toCodePoints(str: string): string[] {
-  // ASCII fast path - check if all chars are ASCII (0-127)
-  let isAscii = true;
-  for (let i = 0; i < str.length; i++) {
-    if (str.charCodeAt(i) > 127) {
-      isAscii = false;
-      break;
-    }
-  }
-  if (isAscii) {
+  // ASCII fast path
+  if (isAscii(str)) {
     return str.split('');
   }
 
@@ -68,6 +73,9 @@ export function toCodePoints(str: string): string[] {
 }
 
 export function cpLen(str: string): number {
+  if (isAscii(str)) {
+    return str.length;
+  }
   return toCodePoints(str).length;
 }
 
@@ -79,6 +87,9 @@ export function cpIndexToOffset(str: string, cpIndex: number): number {
 }
 
 export function cpSlice(str: string, start: number, end?: number): string {
+  if (isAscii(str)) {
+    return str.slice(start, end);
+  }
   // Slice by code‑point indices and re‑join.
   const arr = toCodePoints(str).slice(start, end);
   return arr.join('');
@@ -93,7 +104,7 @@ export function cpSlice(str: string, start: number, end?: number): string {
  * Characters stripped:
  * - ANSI escape sequences (via strip-ansi)
  * - VT control sequences (via Node.js util.stripVTControlCharacters)
- * - C0 control chars (0x00-0x1F) except CR/LF which are handled elsewhere
+ * - C0 control chars (0x00-0x1F) except TAB(0x09), LF(0x0A), CR(0x0D)
  * - C1 control chars (0x80-0x9F) that can cause display issues
  *
  * Characters preserved:
@@ -106,28 +117,11 @@ export function stripUnsafeCharacters(str: string): string {
   const strippedAnsi = stripAnsi(str);
   const strippedVT = stripVTControlCharacters(strippedAnsi);
 
-  return toCodePoints(strippedVT)
-    .filter((char) => {
-      const code = char.codePointAt(0);
-      if (code === undefined) return false;
-
-      // Preserve CR/LF/TAB for line handling
-      if (code === 0x0a || code === 0x0d || code === 0x09) return true;
-
-      // Remove C0 control chars (except CR/LF) that can break display
-      // Examples: BELL(0x07) makes noise, BS(0x08) moves cursor, VT(0x0B), FF(0x0C)
-      if (code >= 0x00 && code <= 0x1f) return false;
-
-      // Remove C1 control chars (0x80-0x9f) - legacy 8-bit control codes
-      if (code >= 0x80 && code <= 0x9f) return false;
-
-      // Preserve DEL (0x7f) - it's handled functionally by applyOperations as backspace
-      // and doesn't cause rendering issues when displayed
-
-      // Preserve all other characters including Unicode/emojis
-      return true;
-    })
-    .join('');
+  // Use a regex to strip remaining unsafe control characters
+  // C0: 0x00-0x1F except 0x09 (TAB), 0x0A (LF), 0x0D (CR)
+  // C1: 0x80-0x9F
+  // eslint-disable-next-line no-control-regex
+  return strippedVT.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x80-\x9F]/g, '');
 }
 
 /**

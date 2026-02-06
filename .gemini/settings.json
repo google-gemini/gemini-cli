@@ -1,5 +1,7 @@
 {
   "experimental": {
-    "skills": true
+    "toolOutputMasking": {
+      "enabled": true
+    }
   }
 }

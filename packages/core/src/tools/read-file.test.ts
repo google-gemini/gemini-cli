@@ -19,6 +19,7 @@ import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 
 vi.mock('../telemetry/loggers.js', () => ({
   logFileOperation: vi.fn(),
@@ -460,7 +461,7 @@ ${tempFileContent}`);
     describe('with .geminiignore', () => {
       beforeEach(async () => {
         await fsp.writeFile(
-          path.join(tempRootDir, '.geminiignore'),
+          path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME),
           ['foo.*', 'ignored/'].join('\n'),
         );
         const mockConfigInstance = {
@@ -529,6 +530,57 @@ ${tempFileContent}`);
           file_path: allowedFilePath,
         };
         const invocation = tool.build(params);
+        expect(typeof invocation).not.toBe('string');
+      });
+
+      it('should allow reading ignored files if respectGeminiIgnore is false', async () => {
+        const ignoredFilePath = path.join(tempRootDir, 'foo.bar');
+        await fsp.writeFile(ignoredFilePath, 'content', 'utf-8');
+
+        const configNoIgnore = {
+          getFileService: () => new FileDiscoveryService(tempRootDir),
+          getFileSystemService: () => new StandardFileSystemService(),
+          getTargetDir: () => tempRootDir,
+          getWorkspaceContext: () => new WorkspaceContext(tempRootDir),
+          getFileFilteringOptions: () => ({
+            respectGitIgnore: true,
+            respectGeminiIgnore: false,
+          }),
+          storage: {
+            getProjectTempDir: () => path.join(tempRootDir, '.temp'),
+          },
+          isInteractive: () => false,
+          isPathAllowed(this: Config, absolutePath: string): boolean {
+            const workspaceContext = this.getWorkspaceContext();
+            if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+              return true;
+            }
+
+            const projectTempDir = this.storage.getProjectTempDir();
+            return isSubpath(path.resolve(projectTempDir), absolutePath);
+          },
+          validatePathAccess(
+            this: Config,
+            absolutePath: string,
+          ): string | null {
+            if (this.isPathAllowed(absolutePath)) {
+              return null;
+            }
+
+            const workspaceDirs = this.getWorkspaceContext().getDirectories();
+            const projectTempDir = this.storage.getProjectTempDir();
+            return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+          },
+        } as unknown as Config;
+
+        const toolNoIgnore = new ReadFileTool(
+          configNoIgnore,
+          createMockMessageBus(),
+        );
+        const params: ReadFileToolParams = {
+          file_path: ignoredFilePath,
+        };
+        const invocation = toolNoIgnore.build(params);
         expect(typeof invocation).not.toBe('string');
       });
     });

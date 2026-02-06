@@ -229,6 +229,55 @@ export function isWithinRoot(
 }
 
 /**
+ * Safely resolves a path to its real path if it exists, otherwise returns the absolute resolved path.
+ */
+export function getRealPath(filePath: string): string {
+  try {
+    return fs.realpathSync(filePath);
+  } catch {
+    return path.resolve(filePath);
+  }
+}
+
+/**
+ * Checks if a file's content is empty or contains only whitespace.
+ * Efficiently checks file size first, and only samples the beginning of the file.
+ * Honors Unicode BOM encodings.
+ */
+export async function isEmpty(filePath: string): Promise<boolean> {
+  try {
+    const stats = await fsPromises.stat(filePath);
+    if (stats.size === 0) return true;
+
+    // Sample up to 1KB to check for non-whitespace content.
+    // If a file is larger than 1KB and contains only whitespace,
+    // it's an extreme edge case we can afford to read slightly more of if needed,
+    // but for most valid plans/files, this is sufficient.
+    const fd = await fsPromises.open(filePath, 'r');
+    try {
+      const { buffer } = await fd.read({
+        buffer: Buffer.alloc(Math.min(1024, stats.size)),
+        offset: 0,
+        length: Math.min(1024, stats.size),
+        position: 0,
+      });
+
+      const bom = detectBOM(buffer);
+      const content = bom
+        ? buffer.subarray(bom.bomLength).toString('utf8')
+        : buffer.toString('utf8');
+
+      return content.trim().length === 0;
+    } finally {
+      await fd.close();
+    }
+  } catch {
+    // If file is unreadable, we treat it as empty/invalid for validation purposes
+    return true;
+  }
+}
+
+/**
  * Heuristic: determine if a file is likely binary.
  * Now BOM-aware: if a Unicode BOM is detected, we treat it as text.
  * For non-BOM files, retain the existing null-byte and non-printable ratio checks.
@@ -306,11 +355,15 @@ export async function detectFileType(
     if (lookedUpMimeType.startsWith('image/')) {
       return 'image';
     }
-    if (lookedUpMimeType.startsWith('audio/')) {
-      return 'audio';
-    }
-    if (lookedUpMimeType.startsWith('video/')) {
-      return 'video';
+    // Verify audio/video with content check to avoid MIME misidentification (#16888)
+    if (
+      lookedUpMimeType.startsWith('audio/') ||
+      lookedUpMimeType.startsWith('video/')
+    ) {
+      if (!(await isBinaryFile(filePath))) {
+        return 'text';
+      }
+      return lookedUpMimeType.startsWith('audio/') ? 'audio' : 'video';
     }
     if (lookedUpMimeType === 'application/pdf') {
       return 'pdf';
@@ -520,6 +573,14 @@ const MAX_TRUNCATED_LINE_WIDTH = 1000;
 const MAX_TRUNCATED_CHARS = 4000;
 
 /**
+ * Sanitizes a string for use as a filename part by removing path traversal
+ * characters and other non-alphanumeric characters.
+ */
+export function sanitizeFilenamePart(part: string): string {
+  return part.replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+/**
  * Formats a truncated message for tool output, handling multi-line and single-line (elephant) cases.
  */
 export function formatTruncatedToolOutput(
@@ -562,20 +623,27 @@ ${processedLines.join('\n')}`;
 /**
  * Saves tool output to a temporary file for later retrieval.
  */
+export const TOOL_OUTPUTS_DIR = 'tool-outputs';
+
 export async function saveTruncatedToolOutput(
   content: string,
   toolName: string,
   id: string | number, // Accept string (callId) or number (truncationId)
   projectTempDir: string,
+  sessionId?: string,
 ): Promise<{ outputFile: string; totalLines: number }> {
-  const safeToolName = toolName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-  const safeId = id
-    .toString()
-    .replace(/[^a-z0-9]/gi, '_')
-    .toLowerCase();
+  const safeToolName = sanitizeFilenamePart(toolName).toLowerCase();
+  const safeId = sanitizeFilenamePart(id.toString()).toLowerCase();
   const fileName = `${safeToolName}_${safeId}.txt`;
-  const outputFile = path.join(projectTempDir, fileName);
 
+  let toolOutputDir = path.join(projectTempDir, TOOL_OUTPUTS_DIR);
+  if (sessionId) {
+    const safeSessionId = sanitizeFilenamePart(sessionId);
+    toolOutputDir = path.join(toolOutputDir, `session-${safeSessionId}`);
+  }
+  const outputFile = path.join(toolOutputDir, fileName);
+
+  await fsPromises.mkdir(toolOutputDir, { recursive: true });
   await fsPromises.writeFile(outputFile, content);
 
   const lines = content.split('\n');

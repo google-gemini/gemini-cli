@@ -146,6 +146,12 @@ vi.mock('./components/shared/text-buffer.js');
 vi.mock('./hooks/useLogger.js');
 vi.mock('./hooks/useInputHistoryStore.js');
 vi.mock('./hooks/useHookDisplayState.js');
+vi.mock('./hooks/useTerminalTheme.js', () => ({
+  useTerminalTheme: vi.fn(),
+}));
+
+import { useHookDisplayState } from './hooks/useHookDisplayState.js';
+import { useTerminalTheme } from './hooks/useTerminalTheme.js';
 
 // Mock external utilities
 vi.mock('../utils/events.js');
@@ -174,7 +180,6 @@ import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
-import { useHookDisplayState } from './hooks/useHookDisplayState.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { measureElement } from 'ink';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
@@ -185,6 +190,7 @@ import {
   disableMouseEvents,
 } from '@google/gemini-cli-core';
 import { type ExtensionManager } from '../config/extension-manager.js';
+import { WARNING_PROMPT_DURATION_MS } from './constants.js';
 
 describe('AppContainer State Management', () => {
   let mockConfig: Config;
@@ -248,6 +254,26 @@ describe('AppContainer State Management', () => {
   const mockedUseKeypress = useKeypress as Mock;
   const mockedUseInputHistoryStore = useInputHistoryStore as Mock;
   const mockedUseHookDisplayState = useHookDisplayState as Mock;
+  const mockedUseTerminalTheme = useTerminalTheme as Mock;
+
+  const DEFAULT_GEMINI_STREAM_MOCK = {
+    streamingState: 'idle',
+    submitQuery: vi.fn(),
+    initError: null,
+    pendingHistoryItems: [],
+    thought: null,
+    cancelOngoingRequest: vi.fn(),
+    handleApprovalModeChange: vi.fn(),
+    activePtyId: null,
+    loopDetectionConfirmationRequest: null,
+    backgroundShellCount: 0,
+    isBackgroundShellVisible: false,
+    toggleBackgroundShell: vi.fn(),
+    backgroundCurrentShell: vi.fn(),
+    backgroundShells: new Map(),
+    registerBackgroundShell: vi.fn(),
+    dismissBackgroundShell: vi.fn(),
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -313,14 +339,7 @@ describe('AppContainer State Management', () => {
       handleNewMessage: vi.fn(),
       clearConsoleMessages: vi.fn(),
     });
-    mockedUseGeminiStream.mockReturnValue({
-      streamingState: 'idle',
-      submitQuery: vi.fn(),
-      initError: null,
-      pendingHistoryItems: [],
-      thought: null,
-      cancelOngoingRequest: vi.fn(),
-    });
+    mockedUseGeminiStream.mockReturnValue(DEFAULT_GEMINI_STREAM_MOCK);
     mockedUseVim.mockReturnValue({ handleInput: vi.fn() });
     mockedUseFolderTrust.mockReturnValue({
       isFolderTrustDialogOpen: false,
@@ -347,7 +366,9 @@ describe('AppContainer State Management', () => {
     mockedUseTextBuffer.mockReturnValue({
       text: '',
       setText: vi.fn(),
-      // Add other properties if AppContainer uses them
+      lines: [''],
+      cursor: [0, 0],
+      handleInput: vi.fn().mockReturnValue(false),
     });
     mockedUseLogger.mockReturnValue({
       getPreviousUserMessages: vi.fn().mockResolvedValue([]),
@@ -362,6 +383,7 @@ describe('AppContainer State Management', () => {
       currentLoadingPhrase: '',
     });
     mockedUseHookDisplayState.mockReturnValue([]);
+    mockedUseTerminalTheme.mockReturnValue(undefined);
 
     // Mock Config
     mockConfig = makeFakeConfig();
@@ -1015,12 +1037,9 @@ describe('AppContainer State Management', () => {
 
       // Mock the streaming state as Active
       mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
         streamingState: 'responding',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
         thought: { subject: 'Some thought' },
-        cancelOngoingRequest: vi.fn(),
       });
 
       // Act: Render the container
@@ -1056,12 +1075,9 @@ describe('AppContainer State Management', () => {
 
       // Mock the streaming state
       mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
         streamingState: 'responding',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
         thought: { subject: 'Some thought' },
-        cancelOngoingRequest: vi.fn(),
       });
 
       // Act: Render the container
@@ -1128,12 +1144,9 @@ describe('AppContainer State Management', () => {
       // Mock the streaming state and thought
       const thoughtSubject = 'Processing request';
       mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
         streamingState: 'responding',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
         thought: { subject: thoughtSubject },
-        cancelOngoingRequest: vi.fn(),
       });
 
       // Act: Render the container
@@ -1169,14 +1182,7 @@ describe('AppContainer State Management', () => {
       } as unknown as LoadedSettings;
 
       // Mock the streaming state as Idle with no thought
-      mockedUseGeminiStream.mockReturnValue({
-        streamingState: 'idle',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
-        thought: null,
-        cancelOngoingRequest: vi.fn(),
-      });
+      mockedUseGeminiStream.mockReturnValue(DEFAULT_GEMINI_STREAM_MOCK);
 
       // Act: Render the container
       const { unmount } = renderAppContainer({
@@ -1213,12 +1219,9 @@ describe('AppContainer State Management', () => {
       // Mock the streaming state and thought
       const thoughtSubject = 'Confirm tool execution';
       mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
         streamingState: 'waiting_for_confirmation',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
         thought: { subject: thoughtSubject },
-        cancelOngoingRequest: vi.fn(),
       });
 
       // Act: Render the container
@@ -1270,16 +1273,11 @@ describe('AppContainer State Management', () => {
 
         // Mock an active shell pty but not focused
         mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
           streamingState: 'responding',
-          submitQuery: vi.fn(),
-          initError: null,
-          pendingHistoryItems: [],
           thought: { subject: 'Executing shell command' },
-          cancelOngoingRequest: vi.fn(),
           pendingToolCalls: [],
-          handleApprovalModeChange: vi.fn(),
           activePtyId: 'pty-1',
-          loopDetectionConfirmationRequest: null,
           lastOutputTime: startTime + 100, // Trigger aggressive delay
           retryStatus: null,
         });
@@ -1334,12 +1332,9 @@ describe('AppContainer State Management', () => {
 
         // Mock an active shell pty with redirection active
         mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
           streamingState: 'responding',
-          submitQuery: vi.fn(),
-          initError: null,
-          pendingHistoryItems: [],
           thought: { subject: 'Executing shell command' },
-          cancelOngoingRequest: vi.fn(),
           pendingToolCalls: [
             {
               request: {
@@ -1349,9 +1344,7 @@ describe('AppContainer State Management', () => {
               status: 'executing',
             } as unknown as TrackedToolCall,
           ],
-          handleApprovalModeChange: vi.fn(),
           activePtyId: 'pty-1',
-          loopDetectionConfirmationRequest: null,
           lastOutputTime: startTime,
           retryStatus: null,
         });
@@ -1409,16 +1402,11 @@ describe('AppContainer State Management', () => {
 
         // Mock an active shell pty with NO output since operation started (silent)
         mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
           streamingState: 'responding',
-          submitQuery: vi.fn(),
-          initError: null,
-          pendingHistoryItems: [],
           thought: { subject: 'Executing shell command' },
-          cancelOngoingRequest: vi.fn(),
           pendingToolCalls: [],
-          handleApprovalModeChange: vi.fn(),
           activePtyId: 'pty-1',
-          loopDetectionConfirmationRequest: null,
           lastOutputTime: startTime, // lastOutputTime <= operationStartTime
           retryStatus: null,
         });
@@ -1465,12 +1453,9 @@ describe('AppContainer State Management', () => {
         // Mock an active shell pty but not focused
         let lastOutputTime = startTime + 1000;
         mockedUseGeminiStream.mockImplementation(() => ({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
           streamingState: 'responding',
-          submitQuery: vi.fn(),
-          initError: null,
-          pendingHistoryItems: [],
           thought: { subject: 'Executing shell command' },
-          cancelOngoingRequest: vi.fn(),
           activePtyId: 'pty-1',
           lastOutputTime,
         }));
@@ -1491,12 +1476,9 @@ describe('AppContainer State Management', () => {
         // Update lastOutputTime to simulate new output
         lastOutputTime = startTime + 21000;
         mockedUseGeminiStream.mockImplementation(() => ({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
           streamingState: 'responding',
-          submitQuery: vi.fn(),
-          initError: null,
-          pendingHistoryItems: [],
           thought: { subject: 'Executing shell command' },
-          cancelOngoingRequest: vi.fn(),
           activePtyId: 'pty-1',
           lastOutputTime,
         }));
@@ -1556,12 +1538,9 @@ describe('AppContainer State Management', () => {
       // Mock the streaming state and thought with a short subject
       const shortTitle = 'Short';
       mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
         streamingState: 'responding',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
         thought: { subject: shortTitle },
-        cancelOngoingRequest: vi.fn(),
       });
 
       // Act: Render the container
@@ -1600,12 +1579,9 @@ describe('AppContainer State Management', () => {
       // Mock the streaming state and thought
       const title = 'Test Title';
       mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
         streamingState: 'responding',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
         thought: { subject: title },
-        cancelOngoingRequest: vi.fn(),
       });
 
       // Act: Render the container
@@ -1643,12 +1619,8 @@ describe('AppContainer State Management', () => {
 
       // Mock the streaming state
       mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
         streamingState: 'responding',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
-        thought: null,
-        cancelOngoingRequest: vi.fn(),
       });
 
       // Act: Render the container
@@ -1750,12 +1722,7 @@ describe('AppContainer State Management', () => {
       mockedMeasureElement.mockReturnValue({ width: 80, height: 10 }); // Footer is taller than the screen
 
       mockedUseGeminiStream.mockReturnValue({
-        streamingState: 'idle',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
-        thought: null,
-        cancelOngoingRequest: vi.fn(),
+        ...DEFAULT_GEMINI_STREAM_MOCK,
         activePtyId: 'some-id',
       });
 
@@ -1774,7 +1741,7 @@ describe('AppContainer State Management', () => {
   });
 
   describe('Keyboard Input Handling (CTRL+C / CTRL+D)', () => {
-    let handleGlobalKeypress: (key: Key) => void;
+    let handleGlobalKeypress: (key: Key) => boolean;
     let mockHandleSlashCommand: Mock;
     let mockCancelOngoingRequest: Mock;
     let rerender: () => void;
@@ -1809,9 +1776,11 @@ describe('AppContainer State Management', () => {
 
     beforeEach(() => {
       // Capture the keypress handler from the AppContainer
-      mockedUseKeypress.mockImplementation((callback: (key: Key) => void) => {
-        handleGlobalKeypress = callback;
-      });
+      mockedUseKeypress.mockImplementation(
+        (callback: (key: Key) => boolean) => {
+          handleGlobalKeypress = callback;
+        },
+      );
 
       // Mock slash command handler
       mockHandleSlashCommand = vi.fn();
@@ -1827,11 +1796,7 @@ describe('AppContainer State Management', () => {
       // Mock request cancellation
       mockCancelOngoingRequest = vi.fn();
       mockedUseGeminiStream.mockReturnValue({
-        streamingState: 'idle',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
-        thought: null,
+        ...DEFAULT_GEMINI_STREAM_MOCK,
         cancelOngoingRequest: mockCancelOngoingRequest,
       });
 
@@ -1839,6 +1804,9 @@ describe('AppContainer State Management', () => {
       mockedUseTextBuffer.mockReturnValue({
         text: '',
         setText: vi.fn(),
+        lines: [''],
+        cursor: [0, 0],
+        handleInput: vi.fn().mockReturnValue(false),
       });
 
       vi.useFakeTimers();
@@ -1852,11 +1820,8 @@ describe('AppContainer State Management', () => {
     describe('CTRL+C', () => {
       it('should cancel ongoing request on first press', async () => {
         mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
           streamingState: 'responding',
-          submitQuery: vi.fn(),
-          initError: null,
-          pendingHistoryItems: [],
-          thought: null,
           cancelOngoingRequest: mockCancelOngoingRequest,
         });
         await setupKeypressTest();
@@ -1891,7 +1856,7 @@ describe('AppContainer State Management', () => {
 
         // Advance timer past the reset threshold
         act(() => {
-          vi.advanceTimersByTime(1001);
+          vi.advanceTimersByTime(WARNING_PROMPT_DURATION_MS + 1);
         });
 
         pressKey({ name: 'c', ctrl: true });
@@ -1901,24 +1866,55 @@ describe('AppContainer State Management', () => {
     });
 
     describe('CTRL+D', () => {
-      it('should do nothing if text buffer is not empty', async () => {
-        mockedUseTextBuffer.mockReturnValue({
-          text: 'some text',
-          setText: vi.fn(),
-        });
-        await setupKeypressTest();
-
-        pressKey({ name: 'd', ctrl: true }, 2);
-
-        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
-        unmount();
-      });
-
       it('should quit on second press if buffer is empty', async () => {
         await setupKeypressTest();
 
         pressKey({ name: 'd', ctrl: true }, 2);
 
+        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
+          '/quit',
+          undefined,
+          undefined,
+          false,
+        );
+        unmount();
+      });
+
+      it('should NOT quit if buffer is not empty (bubbles from InputPrompt)', async () => {
+        mockedUseTextBuffer.mockReturnValue({
+          text: 'some text',
+          setText: vi.fn(),
+          lines: ['some text'],
+          cursor: [0, 9], // At the end
+          handleInput: vi.fn().mockReturnValue(false),
+        });
+        await setupKeypressTest();
+
+        // Capture return value
+        let result = true;
+        const originalPressKey = (key: Partial<Key>) => {
+          act(() => {
+            result = handleGlobalKeypress({
+              name: 'd',
+              shift: false,
+              alt: false,
+              ctrl: true,
+              cmd: false,
+              ...key,
+            } as Key);
+          });
+          rerender();
+        };
+
+        originalPressKey({ name: 'd', ctrl: true });
+
+        // AppContainer's handler should return true if it reaches it
+        expect(result).toBe(true);
+        // But it should only be called once, so count is 1, not quitting yet.
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+
+        originalPressKey({ name: 'd', ctrl: true });
+        // Now count is 2, it should quit.
         expect(mockHandleSlashCommand).toHaveBeenCalledWith(
           '/quit',
           undefined,
@@ -1936,7 +1932,7 @@ describe('AppContainer State Management', () => {
 
         // Advance timer past the reset threshold
         act(() => {
-          vi.advanceTimersByTime(1001);
+          vi.advanceTimersByTime(WARNING_PROMPT_DURATION_MS + 1);
         });
 
         pressKey({ name: 'd', ctrl: true });
@@ -1947,7 +1943,7 @@ describe('AppContainer State Management', () => {
   });
 
   describe('Copy Mode (CTRL+S)', () => {
-    let handleGlobalKeypress: (key: Key) => void;
+    let handleGlobalKeypress: (key: Key) => boolean;
     let rerender: () => void;
     let unmount: () => void;
 
@@ -1977,9 +1973,11 @@ describe('AppContainer State Management', () => {
 
     beforeEach(() => {
       mocks.mockStdout.write.mockClear();
-      mockedUseKeypress.mockImplementation((callback: (key: Key) => void) => {
-        handleGlobalKeypress = callback;
-      });
+      mockedUseKeypress.mockImplementation(
+        (callback: (key: Key) => boolean) => {
+          handleGlobalKeypress = callback;
+        },
+      );
       vi.useFakeTimers();
     });
 
@@ -2332,6 +2330,59 @@ describe('AppContainer State Management', () => {
       expect(capturedUIState.activeHooks).toEqual(mockHooks);
       unmount!();
     });
+
+    it('handles consent request events', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      const handler = mockCoreEvents.on.mock.calls.find(
+        (call: unknown[]) => call[0] === CoreEvent.ConsentRequest,
+      )?.[1];
+      expect(handler).toBeDefined();
+
+      const onConfirm = vi.fn();
+      const payload = {
+        prompt: 'Do you consent?',
+        onConfirm,
+      };
+
+      act(() => {
+        handler(payload);
+      });
+
+      expect(capturedUIState.authConsentRequest).toBeDefined();
+      expect(capturedUIState.authConsentRequest?.prompt).toBe(
+        'Do you consent?',
+      );
+
+      act(() => {
+        capturedUIState.authConsentRequest?.onConfirm(true);
+      });
+
+      expect(onConfirm).toHaveBeenCalledWith(true);
+      expect(capturedUIState.authConsentRequest).toBeNull();
+      unmount!();
+    });
+
+    it('unsubscribes from ConsentRequest on unmount', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      unmount!();
+
+      expect(mockCoreEvents.off).toHaveBeenCalledWith(
+        CoreEvent.ConsentRequest,
+        expect.any(Function),
+      );
+    });
   });
 
   describe('Shell Interaction', () => {
@@ -2343,12 +2394,7 @@ describe('AppContainer State Management', () => {
         });
 
       mockedUseGeminiStream.mockReturnValue({
-        streamingState: 'idle',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
-        thought: null,
-        cancelOngoingRequest: vi.fn(),
+        ...DEFAULT_GEMINI_STREAM_MOCK,
         activePtyId: 'some-pty-id', // Make sure activePtyId is set
       });
 

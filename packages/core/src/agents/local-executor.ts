@@ -41,7 +41,12 @@ import type {
   OutputObject,
   SubagentActivityEvent,
 } from './types.js';
-import { AgentTerminateMode, DEFAULT_QUERY_STRING } from './types.js';
+import {
+  AgentTerminateMode,
+  DEFAULT_QUERY_STRING,
+  DEFAULT_MAX_TURNS,
+  DEFAULT_MAX_TIME_MINUTES,
+} from './types.js';
 import { templateString } from './utils.js';
 import { DEFAULT_GEMINI_MODEL, isAutoModel } from '../config/models.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
@@ -406,7 +411,10 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     let terminateReason: AgentTerminateMode = AgentTerminateMode.ERROR;
     let finalResult: string | null = null;
 
-    const { maxTimeMinutes } = this.definition.runConfig;
+    const maxTimeMinutes =
+      this.definition.runConfig.maxTimeMinutes ?? DEFAULT_MAX_TIME_MINUTES;
+    const maxTurns = this.definition.runConfig.maxTurns ?? DEFAULT_MAX_TURNS;
+
     const timeoutController = new AbortController();
     const timeoutId = setTimeout(
       () => timeoutController.abort(new Error('Agent timed out.')),
@@ -441,7 +449,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
       while (true) {
         // Check for termination conditions like max turns.
-        const reason = this.checkTermination(startTime, turnCounter);
+        const reason = this.checkTermination(turnCounter, maxTurns);
         if (reason) {
           terminateReason = reason;
           break;
@@ -499,13 +507,13 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         } else {
           // Recovery Failed. Set the final error message based on the *original* reason.
           if (terminateReason === AgentTerminateMode.TIMEOUT) {
-            finalResult = `Agent timed out after ${this.definition.runConfig.maxTimeMinutes} minutes.`;
+            finalResult = `Agent timed out after ${maxTimeMinutes} minutes.`;
             this.emitActivity('ERROR', {
               error: finalResult,
               context: 'timeout',
             });
           } else if (terminateReason === AgentTerminateMode.MAX_TURNS) {
-            finalResult = `Agent reached max turns limit (${this.definition.runConfig.maxTurns}).`;
+            finalResult = `Agent reached max turns limit (${maxTurns}).`;
             this.emitActivity('ERROR', {
               error: finalResult,
               context: 'max_turns',
@@ -569,7 +577,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         }
 
         // Recovery failed or wasn't possible
-        finalResult = `Agent timed out after ${this.definition.runConfig.maxTimeMinutes} minutes.`;
+        finalResult = `Agent timed out after ${maxTimeMinutes} minutes.`;
         this.emitActivity('ERROR', {
           error: finalResult,
           context: 'timeout',
@@ -1160,12 +1168,10 @@ Important Rules:
    * @returns The reason for termination, or `null` if execution can continue.
    */
   private checkTermination(
-    startTime: number,
     turnCounter: number,
+    maxTurns: number,
   ): AgentTerminateMode | null {
-    const { runConfig } = this.definition;
-
-    if (runConfig.maxTurns && turnCounter >= runConfig.maxTurns) {
+    if (turnCounter >= maxTurns) {
       return AgentTerminateMode.MAX_TURNS;
     }
 
