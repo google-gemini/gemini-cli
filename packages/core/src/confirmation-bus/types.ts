@@ -21,6 +21,7 @@ export enum MessageBusType {
   TOOL_CALLS_UPDATE = 'tool-calls-update',
   ASK_USER_REQUEST = 'ask-user-request',
   ASK_USER_RESPONSE = 'ask-user-response',
+  ALLOW_SESSION_REDIRECTION = 'allow-session-redirection',
 }
 
 export interface ToolCallsUpdateMessage {
@@ -171,6 +172,10 @@ export interface AskUserResponse {
   cancelled?: boolean;
 }
 
+export interface AllowSessionRedirection {
+  type: MessageBusType.ALLOW_SESSION_REDIRECTION;
+}
+
 export type Message =
   | ToolConfirmationRequest
   | ToolConfirmationResponse
@@ -180,4 +185,5 @@ export type Message =
   | UpdatePolicy
   | AskUserRequest
   | AskUserResponse
-  | ToolCallsUpdateMessage;
+  | ToolCallsUpdateMessage
+  | AllowSessionRedirection;
