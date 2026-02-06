@@ -32,7 +32,7 @@
     "docs:settings": "tsx ./scripts/generate-settings-doc.ts",
     "docs:keybindings": "tsx ./scripts/generate-keybindings-doc.ts",
     "build": "node scripts/build.js",
-    "build-and-start": "npm run build && npm run start",
+    "build-and-start": "npm run build && npm run start --",
     "build:vscode": "node scripts/build_vscode_companion.js",
     "build:all": "npm run build && npm run build:sandbox && npm run build:vscode",
     "build:packages": "npm run build --workspaces",
