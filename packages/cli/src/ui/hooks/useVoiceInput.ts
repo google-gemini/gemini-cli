@@ -4,12 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { debugLogger } from '@google/gemini-cli-core';
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { debugLogger, tmpdir } from '@google/gemini-cli-core';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { spawn, exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { unlink, mkdtemp, stat, access, readFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const execAsync = promisify(exec);
@@ -37,7 +36,9 @@ const CHANNELS = 1;
 /**
  * Hook for voice input using system audio recording and Whisper
  */
-export function useVoiceInput(config?: { whisperPath?: string }): VoiceInputReturn {
+export function useVoiceInput(config?: {
+  whisperPath?: string;
+}): VoiceInputReturn {
   const [state, setState] = useState<VoiceInputState>({
     isRecording: false,
     isTranscribing: false,
@@ -48,6 +49,7 @@ export function useVoiceInput(config?: { whisperPath?: string }): VoiceInputRetu
   const recordingProcessRef = useRef<ReturnType<typeof spawn> | null>(null);
   const tempDirRef = useRef<string | null>(null);
   const audioFileRef = useRef<string | null>(null);
+  const sanitizedPathLoggedRef = useRef(false);
 
   // Cleanup on unmount
   useEffect(
@@ -89,22 +91,20 @@ export function useVoiceInput(config?: { whisperPath?: string }): VoiceInputRetu
       try {
         await execAsync('which sox');
         debugLogger.log('useVoiceInput: sox found');
-        recordProcess = spawn('sox',
-          [
-            '-d', // default input device
-            '-b',
-            '16',
-            '-r',
-            SAMPLE_RATE.toString(),
-            '-c',
-            CHANNELS.toString(),
-            '-e',
-            'signed-integer',
-            '-t',
-            RECORDING_FORMAT,
-            audioFile,
-          ],
-        );
+        recordProcess = spawn('sox', [
+          '-d', // default input device
+          '-b',
+          '16',
+          '-r',
+          SAMPLE_RATE.toString(),
+          '-c',
+          CHANNELS.toString(),
+          '-e',
+          'signed-integer',
+          '-t',
+          RECORDING_FORMAT,
+          audioFile,
+        ]);
 
         recordProcess.stderr?.on('data', (data) => {
           debugLogger.log('useVoiceInput: sox stderr:', data.toString());
@@ -122,19 +122,17 @@ export function useVoiceInput(config?: { whisperPath?: string }): VoiceInputRetu
         try {
           await execAsync('which arecord');
           debugLogger.log('useVoiceInput: arecord found');
-          recordProcess = spawn('arecord',
-            [
-              '-f',
-              'S16_LE',
-              '-r',
-              SAMPLE_RATE.toString(),
-              '-c',
-              CHANNELS.toString(),
-              '-D',
-              'default',
-              audioFile,
-            ],
-          );
+          recordProcess = spawn('arecord', [
+            '-f',
+            'S16_LE',
+            '-r',
+            SAMPLE_RATE.toString(),
+            '-c',
+            CHANNELS.toString(),
+            '-D',
+            'default',
+            audioFile,
+          ]);
         } catch {
           debugLogger.error('useVoiceInput: Neither sox nor arecord found');
           throw new Error(
@@ -194,7 +192,11 @@ export function useVoiceInput(config?: { whisperPath?: string }): VoiceInputRetu
         recordingProcessRef.current = null;
       }
 
-      setState((prev) => ({ ...prev, isRecording: false, isTranscribing: true }));
+      setState((prev) => ({
+        ...prev,
+        isRecording: false,
+        isTranscribing: true,
+      }));
 
       const audioFile = audioFileRef.current;
       if (!audioFile) {
@@ -237,6 +239,26 @@ export function useVoiceInput(config?: { whisperPath?: string }): VoiceInputRetu
         // If it looks like an absolute path, verify existence directly
         // This avoids 'which' issues with PATH
         if (binary.startsWith('/') || binary.startsWith('.')) {
+          // Check for common configuration error: path with incorrect quotes
+          if (binary.includes("'") || binary.includes('"')) {
+            const sanitized = binary.replace(/['"]/g, '');
+            if (sanitized !== binary) {
+              try {
+                await access(sanitized);
+                if (!sanitizedPathLoggedRef.current) {
+                  debugLogger.log(
+                    'useVoiceInput: found sanitized path, using it instead',
+                    sanitized,
+                  );
+                  sanitizedPathLoggedRef.current = true;
+                }
+                binary = sanitized;
+              } catch {
+                // Sanitized path also doesn't exist, proceed with original to let it fail or be logged
+              }
+            }
+          }
+
           try {
             await access(binary);
           } catch {
@@ -319,10 +341,7 @@ export function useVoiceInput(config?: { whisperPath?: string }): VoiceInputRetu
         .split('\n')
         .map((line) =>
           line
-            .replace(
-              /^\[\d{2}:\d{2}\.\d{3} --> \d{2}:\d{2}\.\d{3}\]\s*/,
-              '',
-            )
+            .replace(/^\[\d{2}:\d{2}\.\d{3} --> \d{2}:\d{2}\.\d{3}\]\s*/, '')
             .trim(),
         )
         .filter((line) => line.length > 0)
@@ -362,11 +381,14 @@ export function useVoiceInput(config?: { whisperPath?: string }): VoiceInputRetu
     }
   }, [state.isRecording, startRecording, stopRecording]);
 
-  return {
-    state,
-    startRecording,
-    stopRecording,
-    toggleRecording,
-    clearTranscript,
-  };
+  return useMemo(
+    () => ({
+      state,
+      startRecording,
+      stopRecording,
+      toggleRecording,
+      clearTranscript,
+    }),
+    [state, startRecording, stopRecording, toggleRecording, clearTranscript],
+  );
 }

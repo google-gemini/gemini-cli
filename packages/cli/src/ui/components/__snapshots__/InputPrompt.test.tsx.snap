@@ -71,6 +71,246 @@ exports[`InputPrompt > mouse interaction > should toggle paste expansion on doub
 ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄"
 `;
 
+exports[`InputPrompt > mouse interaction > should toggle paste expansion on double-click 4`] = `
+"
+  ERROR  useVoiceContext must be used within a VoiceContext.Provider
+
+ src/ui/contexts/VoiceContext.tsx:15:11
+
+ 12: export const useVoiceContext = () => {
+ 13:   const context = useContext(VoiceContext);
+ 14:   if (!context) {
+ 15:     throw new Error(
+ 16:       'useVoiceContext must be used within a VoiceContext.Provider',
+ 17:     );
+ 18:   }
+
+ - useVoiceContext (src/ui/contexts/VoiceContext.tsx:15:11)
+ - InputPrompt (src/ui/components/InputPrompt.tsx:249:7)
+ -Object.react-stack-bott
+  m-frame                (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconci
+                         ler.development.js:15859:20)
+ -renderWithHoo
+  s            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.develo
+               pment.js:3221:22)
+ -updateFunctionComp
+  nent              (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.d
+                    evelopment.js:6475:19)
+ -beginWor
+          (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development
+          .js:8009:18)
+ -runWithFiberIn
+  EV            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:1738:13)
+ -performUnitOfW
+  rk            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:12834:22)
+ -workLoopSyn
+             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
+             ent.js:12644:41)
+ -renderRootSy
+  c           (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.develop
+              ment.js:12624:11)
+"
+`;
+
+exports[`InputPrompt > mouse interaction > should toggle paste expansion on double-click 5`] = `
+"
+  ERROR  useVoiceContext must be used within a VoiceContext.Provider
+
+ src/ui/contexts/VoiceContext.tsx:15:11
+
+ 12: export const useVoiceContext = () => {
+ 13:   const context = useContext(VoiceContext);
+ 14:   if (!context) {
+ 15:     throw new Error(
+ 16:       'useVoiceContext must be used within a VoiceContext.Provider',
+ 17:     );
+ 18:   }
+
+ - useVoiceContext (src/ui/contexts/VoiceContext.tsx:15:11)
+ - InputPrompt (src/ui/components/InputPrompt.tsx:249:7)
+ -Object.react-stack-bott
+  m-frame                (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconci
+                         ler.development.js:15859:20)
+ -renderWithHoo
+  s            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.develo
+               pment.js:3221:22)
+ -updateFunctionComp
+  nent              (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.d
+                    evelopment.js:6475:19)
+ -beginWor
+          (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development
+          .js:8009:18)
+ -runWithFiberIn
+  EV            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:1738:13)
+ -performUnitOfW
+  rk            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:12834:22)
+ -workLoopSyn
+             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
+             ent.js:12644:41)
+ -renderRootSy
+  c           (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.develop
+              ment.js:12624:11)
+"
+`;
+
+exports[`InputPrompt > mouse interaction > should toggle paste expansion on double-click 6`] = `
+"
+  ERROR  useVoiceContext must be used within a VoiceContext.Provider
+
+ src/ui/contexts/VoiceContext.tsx:15:11
+
+ 12: export const useVoiceContext = () => {
+ 13:   const context = useContext(VoiceContext);
+ 14:   if (!context) {
+ 15:     throw new Error(
+ 16:       'useVoiceContext must be used within a VoiceContext.Provider',
+ 17:     );
+ 18:   }
+
+ - useVoiceContext (src/ui/contexts/VoiceContext.tsx:15:11)
+ - InputPrompt (src/ui/components/InputPrompt.tsx:249:7)
+ -Object.react-stack-bott
+  m-frame                (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconci
+                         ler.development.js:15859:20)
+ -renderWithHoo
+  s            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.develo
+               pment.js:3221:22)
+ -updateFunctionComp
+  nent              (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.d
+                    evelopment.js:6475:19)
+ -beginWor
+          (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.development
+          .js:8009:18)
+ -runWithFiberIn
+  EV            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:1738:13)
+ -performUnitOfW
+  rk            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:12834:22)
+ -workLoopSyn
+             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
+             ent.js:12644:41)
+ -renderRootSy
+  c           (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.develop
+              ment.js:12624:11)
+"
+`;
+
+exports[`InputPrompt > mouse interaction > should toggle paste expansion on double-click 7`] = `
+"
+  ERROR  Text string "                " must be rendered inside <Text> component
+
+ file:///home/fayerman/gemini-cli/node_modules/ink/src/reconciler.ts:230:10
+
+ - createTextInstance (file:///home/fayerman/gemini-cli/node_modules/ink/src/reconciler.ts:230:10)
+ -completeWor
+             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
+             ent.js:9082:42)
+ -runWithFiberIn
+  EV            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:1738:13)
+ -completeUnitOfW
+  rk             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                 lopment.js:12962:19)
+ -performUnitOfW
+  rk            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:12843:11)
+ -workLoopSyn
+             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
+             ent.js:12644:41)
+ -renderRootSy
+  c           (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.develop
+              ment.js:12624:11)
+ -performWorkOnR
+  ot            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:12135:44)
+ -performSyncWorkOn
+  oot              (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.de
+                   velopment.js:2446:7)
+ -flushSyncWorkAcrossRoo
+  s_impl                (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconcil
+                        er.development.js:2294:21)
+"
+`;
+
+exports[`InputPrompt > mouse interaction > should toggle paste expansion on double-click 8`] = `
+"
+  ERROR  Text string "                " must be rendered inside <Text> component
+
+ file:///home/fayerman/gemini-cli/node_modules/ink/src/reconciler.ts:230:10
+
+ - createTextInstance (file:///home/fayerman/gemini-cli/node_modules/ink/src/reconciler.ts:230:10)
+ -completeWor
+             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
+             ent.js:9082:42)
+ -runWithFiberIn
+  EV            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:1738:13)
+ -completeUnitOfW
+  rk             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                 lopment.js:12962:19)
+ -performUnitOfW
+  rk            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:12843:11)
+ -workLoopSyn
+             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
+             ent.js:12644:41)
+ -renderRootSy
+  c           (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.develop
+              ment.js:12624:11)
+ -performWorkOnR
+  ot            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:12135:44)
+ -performSyncWorkOn
+  oot              (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.de
+                   velopment.js:2446:7)
+ -flushSyncWorkAcrossRoo
+  s_impl                (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconcil
+                        er.development.js:2294:21)
+"
+`;
+
+exports[`InputPrompt > mouse interaction > should toggle paste expansion on double-click 9`] = `
+"
+  ERROR  Text string "                " must be rendered inside <Text> component
+
+ file:///home/fayerman/gemini-cli/node_modules/ink/src/reconciler.ts:230:10
+
+ - createTextInstance (file:///home/fayerman/gemini-cli/node_modules/ink/src/reconciler.ts:230:10)
+ -completeWor
+             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
+             ent.js:9082:42)
+ -runWithFiberIn
+  EV            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:1738:13)
+ -completeUnitOfW
+  rk             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.deve
+                 lopment.js:12962:19)
+ -performUnitOfW
+  rk            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:12843:11)
+ -workLoopSyn
+             (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.developm
+             ent.js:12644:41)
+ -renderRootSy
+  c           (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.develop
+              ment.js:12624:11)
+ -performWorkOnR
+  ot            (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.devel
+                opment.js:12135:44)
+ -performSyncWorkOn
+  oot              (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconciler.de
+                   velopment.js:2446:7)
+ -flushSyncWorkAcrossRoo
+  s_impl                (/home/fayerman/gemini-cli/node_modules/react-reconciler/cjs/react-reconcil
+                        er.development.js:2294:21)
+"
+`;
+
 exports[`InputPrompt > snapshots > should not show inverted cursor when shell is focused 1`] = `
 "▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
  >   Type your message or @path/to/file

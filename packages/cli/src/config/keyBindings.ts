@@ -265,6 +265,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.PASTE_CLIPBOARD]: [
     { key: 'v', ctrl: true },
     { key: 'v', cmd: true },
+    { key: 'v', alt: true },
   ],
 
   // App Controls
@@ -297,7 +298,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
 
   // Voice Input
   [Command.VOICE_INPUT]: [
-    { key: 'v', alt: true }, // Alt+V
+    { key: 'r', alt: true }, // Alt+R
     { key: 'q', ctrl: true }, // Ctrl+Q
   ],
 };
@@ -393,6 +394,10 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.OPEN_EXTERNAL_EDITOR,
       Command.PASTE_CLIPBOARD,
     ],
+  },
+  {
+    title: 'Voice Input',
+    commands: [Command.VOICE_INPUT],
   },
   {
     title: 'App Controls',
@@ -519,5 +524,5 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.SUSPEND_APP]: 'Suspend the application (not yet implemented).',
 
   // Voice Input
-  [Command.VOICE_INPUT]: 'Toggle voice input recording (Alt+V or Ctrl+Q).',
+  [Command.VOICE_INPUT]: 'Toggle voice input recording (Alt+R or Ctrl+Q).',
 };

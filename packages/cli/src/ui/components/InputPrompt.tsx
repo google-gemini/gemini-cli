@@ -248,12 +248,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     clearTranscript,
   } = useVoiceContext();
 
+  const lastProcessedTranscriptRef = useRef<string | null>(null);
+
   // Handle voice transcript
   useEffect(() => {
-    if (voiceState.transcript) {
+    if (
+      voiceState.transcript &&
+      voiceState.transcript !== lastProcessedTranscriptRef.current
+    ) {
       // Insert transcribed text at cursor position
       buffer.insert(voiceState.transcript);
+      lastProcessedTranscriptRef.current = voiceState.transcript;
       clearTranscript();
+    } else if (!voiceState.transcript) {
+      lastProcessedTranscriptRef.current = null;
     }
   }, [voiceState.transcript, buffer, clearTranscript]);
 
@@ -631,7 +639,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           void toggleRecording();
           return true;
         }
-        return false;
       }
 
       if (keyMatchers[Command.CLEAR_SCREEN](key)) {
@@ -1013,6 +1020,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       backgroundShellHeight,
       history,
       toggleRecording,
+      voiceState.isRecording,
     ],
   );
 
@@ -1196,7 +1204,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   // Voice input status
   if (voiceState.isRecording) {
     statusColor = theme.status.error;
-    statusText = '🎤 Recording... (Alt+V or Ctrl+Q to stop)';
+    statusText = '🎤 Recording... (Alt+R or Ctrl+Q to stop)';
   } else if (voiceState.isTranscribing) {
     statusColor = theme.status.warning;
     statusText = '🎤 Transcribing...';
