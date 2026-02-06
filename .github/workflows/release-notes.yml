@@ -15,6 +15,10 @@ on:
         description: 'Release notes body'
         required: true
         type: 'string'
+      time:
+        description: 'Release time'
+        required: true
+        type: 'string'
 
 jobs:
   generate-release-notes:
@@ -39,8 +43,10 @@ jobs:
         run: |
           VERSION="${{ github.event.inputs.version || github.event.release.tag_name }}"
           BODY="${{ github.event.inputs.body || github.event.release.body }}"
+          TIME="${{ github.event.inputs.time || github.event.release.created_at }}"
 
           echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "TIME=${TIME}" >> "$GITHUB_OUTPUT"
 
           # Use a heredoc to preserve multiline release body
           echo 'RAW_CHANGELOG<<EOF' >> "$GITHUB_OUTPUT"
@@ -61,7 +67,7 @@ jobs:
 
             **Release Information:**
             - New Version: $VERSION
-            - Release Date: $(date +%Y-%m-%d)
+            - Release Date: $TIME
             - Raw Changelog Data: $RAW_CHANGELOG
 
             Execute the release notes generation process using the information provided.

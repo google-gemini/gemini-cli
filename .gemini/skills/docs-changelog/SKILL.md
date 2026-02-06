@@ -100,7 +100,7 @@ Write concise summaries including the primary PR and author
 4. Do not add the "New Contributors" section.
 
 5. Update the "Full changelog:" link with the previous version and the new
-vesion, unless it is a patch or a bug fix, in which case simply update the
+version, unless it is a patch or a bug fix, in which case simply update the
 link's new version and keep the previous version the same.
 
 6. Ensure lines are wrapped to 80 characters.
