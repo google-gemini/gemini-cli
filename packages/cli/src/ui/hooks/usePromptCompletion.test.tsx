@@ -121,7 +121,11 @@ describe('usePromptCompletion', () => {
     const mockConfig = {
       getEnablePromptCompletion: vi.fn().mockReturnValue(true),
       getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
-      refreshUserQuota: vi.fn().mockResolvedValue({}),
+      refreshUserQuota: vi.fn().mockResolvedValue({
+        buckets: [
+          { modelId: 'gemini-2.5-flash-lite', remainingFraction: 0.15 },
+        ],
+      }),
       getCachedQuota: vi.fn().mockReturnValue({
         buckets: [
           { modelId: 'gemini-2.5-flash-lite', remainingFraction: 0.15 },
