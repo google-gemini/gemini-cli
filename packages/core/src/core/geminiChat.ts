@@ -92,6 +92,12 @@ const INVALID_CONTENT_RETRY_OPTIONS: ContentRetryOptions = {
 export const SYNTHETIC_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
 
 /**
+ * Timeout for API calls in milliseconds.
+ * Defaulting to 60 seconds (configurable in future).
+ */
+const TIMEOUT_MS = 60000;
+
+/**
  * Returns true if the response is valid, false otherwise.
  */
 function isValidResponse(response: GenerateContentResponse): boolean {
@@ -258,6 +264,11 @@ export class GeminiChat {
 
   setSystemInstruction(sysInstr: string) {
     this.systemInstruction = sysInstr;
+  }
+
+  /** A promise that resolves when the current message processing is complete. */
+  get processing(): Promise<void> {
+    return this.sendPromise;
   }
 
   /**
@@ -516,13 +527,30 @@ export class GeminiChat {
       }
 
       lastModelToUse = modelToUse;
+
+      const timeoutController = new AbortController();
+      const timeoutIdRef: { id?: NodeJS.Timeout } = {};
+
+      const resetInactivityTimeout = () => {
+        if (timeoutIdRef.id) clearTimeout(timeoutIdRef.id);
+        timeoutIdRef.id = setTimeout(() => {
+          timeoutController.abort();
+        }, TIMEOUT_MS);
+      };
+
+      resetInactivityTimeout();
+      const combinedSignal = AbortSignal.any([
+        abortSignal,
+        timeoutController.signal,
+      ]);
+
       const config: GenerateContentConfig = {
         ...currentGenerateContentConfig,
         // TODO(12622): Ensure we don't overrwrite these when they are
         // passed via config.
         systemInstruction: this.systemInstruction,
         tools: this.tools,
-        abortSignal,
+        abortSignal: combinedSignal,
       };
 
       let contentsToUse = isPreviewModel(modelToUse)
@@ -591,14 +619,34 @@ export class GeminiChat {
       lastConfig = config;
       lastContentsToUse = contentsToUse;
 
-      return this.config.getContentGenerator().generateContentStream(
-        {
-          model: modelToUse,
-          contents: contentsToUse,
-          config,
-        },
-        prompt_id,
-      );
+      try {
+        const stream = await this.config
+          .getContentGenerator()
+          .generateContentStream(
+            {
+              model: modelToUse,
+              contents: contentsToUse,
+              config,
+            },
+            prompt_id,
+          );
+        return {
+          stream,
+          timeoutController,
+          timeoutIdRef,
+          resetInactivityTimeout,
+        };
+      } catch (error) {
+        if (timeoutIdRef.id) clearTimeout(timeoutIdRef.id);
+        if (timeoutController.signal.aborted) {
+          const timeoutError = new Error(
+            `Request timed out after ${TIMEOUT_MS}ms of inactivity`,
+          );
+          (timeoutError as unknown as { code: string }).code = 'ETIMEDOUT';
+          throw timeoutError;
+        }
+        throw error;
+      }
     };
 
     const onPersistent429Callback = async (
@@ -621,7 +669,12 @@ export class GeminiChat {
       );
     };
 
-    const streamResponse = await retryWithBackoff(apiCall, {
+    const {
+      stream: streamResponse,
+      timeoutController,
+      timeoutIdRef,
+      resetInactivityTimeout,
+    } = await retryWithBackoff(apiCall, {
       onPersistent429: onPersistent429Callback,
       onValidationRequired: onValidationRequiredCallback,
       authType: this.config.getContentGeneratorConfig()?.authType,
@@ -651,6 +704,9 @@ export class GeminiChat {
       lastModelToUse,
       streamResponse,
       originalRequest,
+      timeoutController,
+      timeoutIdRef,
+      resetInactivityTimeout,
     );
   }
 
@@ -809,69 +865,86 @@ export class GeminiChat {
     model: string,
     streamResponse: AsyncGenerator<GenerateContentResponse>,
     originalRequest: GenerateContentParameters,
+    timeoutController: AbortController,
+    timeoutIdRef: { id?: NodeJS.Timeout },
+    resetInactivityTimeout: () => void,
   ): AsyncGenerator<GenerateContentResponse> {
     const modelResponseParts: Part[] = [];
 
     let hasToolCall = false;
     let finishReason: FinishReason | undefined;
 
-    for await (const chunk of streamResponse) {
-      const candidateWithReason = chunk?.candidates?.find(
-        (candidate) => candidate.finishReason,
-      );
-      if (candidateWithReason) {
-        finishReason = candidateWithReason.finishReason as FinishReason;
-      }
-
-      if (isValidResponse(chunk)) {
-        const content = chunk.candidates?.[0]?.content;
-        if (content?.parts) {
-          if (content.parts.some((part) => part.thought)) {
-            // Record thoughts
-            this.recordThoughtFromContent(content);
-          }
-          if (content.parts.some((part) => part.functionCall)) {
-            hasToolCall = true;
-          }
-
-          modelResponseParts.push(
-            ...content.parts.filter((part) => !part.thought),
-          );
-        }
-      }
-
-      // Record token usage if this chunk has usageMetadata
-      if (chunk.usageMetadata) {
-        this.chatRecordingService.recordMessageTokens(chunk.usageMetadata);
-        if (chunk.usageMetadata.promptTokenCount !== undefined) {
-          this.lastPromptTokenCount = chunk.usageMetadata.promptTokenCount;
-        }
-      }
-
-      const hookSystem = this.config.getHookSystem();
-      if (originalRequest && chunk && hookSystem) {
-        const hookResult = await hookSystem.fireAfterModelEvent(
-          originalRequest,
-          chunk,
+    try {
+      for await (const chunk of streamResponse) {
+        resetInactivityTimeout();
+        const candidateWithReason = chunk?.candidates?.find(
+          (candidate) => candidate.finishReason,
         );
-
-        if (hookResult.stopped) {
-          throw new AgentExecutionStoppedError(
-            hookResult.reason || 'Agent execution stopped by hook',
-          );
+        if (candidateWithReason) {
+          finishReason = candidateWithReason.finishReason as FinishReason;
         }
 
-        if (hookResult.blocked) {
-          throw new AgentExecutionBlockedError(
-            hookResult.reason || 'Agent execution blocked by hook',
-            hookResult.response,
-          );
+        if (isValidResponse(chunk)) {
+          const content = chunk.candidates?.[0]?.content;
+          if (content?.parts) {
+            if (content.parts.some((part) => part.thought)) {
+              // Record thoughts
+              this.recordThoughtFromContent(content);
+            }
+            if (content.parts.some((part) => part.functionCall)) {
+              hasToolCall = true;
+            }
+
+            modelResponseParts.push(
+              ...content.parts.filter((part) => !part.thought),
+            );
+          }
         }
 
-        yield hookResult.response;
-      } else {
-        yield chunk;
+        // Record token usage if this chunk has usageMetadata
+        if (chunk.usageMetadata) {
+          this.chatRecordingService.recordMessageTokens(chunk.usageMetadata);
+          if (chunk.usageMetadata.promptTokenCount !== undefined) {
+            this.lastPromptTokenCount = chunk.usageMetadata.promptTokenCount;
+          }
+        }
+
+        const hookSystem = this.config.getHookSystem();
+        if (originalRequest && chunk && hookSystem) {
+          const hookResult = await hookSystem.fireAfterModelEvent(
+            originalRequest,
+            chunk,
+          );
+
+          if (hookResult.stopped) {
+            throw new AgentExecutionStoppedError(
+              hookResult.reason || 'Agent execution stopped by hook',
+            );
+          }
+
+          if (hookResult.blocked) {
+            throw new AgentExecutionBlockedError(
+              hookResult.reason || 'Agent execution blocked by hook',
+              hookResult.response,
+            );
+          }
+
+          yield hookResult.response;
+        } else {
+          yield chunk;
+        }
       }
+    } catch (error) {
+      if (timeoutController.signal.aborted) {
+        const timeoutError = new Error(
+          `Request timed out after ${TIMEOUT_MS}ms of inactivity`,
+        );
+        (timeoutError as unknown as { code: string }).code = 'ETIMEDOUT';
+        throw timeoutError;
+      }
+      throw error;
+    } finally {
+      if (timeoutIdRef.id) clearTimeout(timeoutIdRef.id);
     }
 
     // String thoughts and consolidate text parts.
