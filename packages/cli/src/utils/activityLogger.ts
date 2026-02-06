@@ -656,7 +656,7 @@ function setupNetworkLogging(
  * @param config The CLI configuration
  */
 export function registerActivityLogger(config: Config) {
-  if (config.isInteractive() && config.storage && config.getDebugMode()) {
+  if (config.storage) {
     const capture = ActivityLogger.getInstance();
     capture.enable();
 
