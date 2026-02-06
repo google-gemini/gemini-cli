@@ -266,12 +266,25 @@ export const ConfigExtensionDialog: React.FC<ConfigExtensionDialogProps> = ({
         </Text>
         <Text color={theme.text.secondary}>
           {state.setting.description || state.setting.envVar}
+          {state.setting.defaultValue !== undefined && (
+            <Text color={theme.text.secondary}>
+              {' '}
+              [default:{' '}
+              {state.setting.sensitive ? '******' : state.setting.defaultValue}]
+            </Text>
+          )}
         </Text>
         <Box flexDirection="row" marginTop={1}>
           <Text color={theme.text.accent}>{'> '}</Text>
           <TextInput
             buffer={settingBuffer}
-            onSubmit={handleSettingSubmit}
+            onSubmit={(val) => {
+              if (val === '' && state.setting.defaultValue !== undefined) {
+                handleSettingSubmit(state.setting.defaultValue);
+              } else {
+                handleSettingSubmit(val);
+              }
+            }}
             focus={true}
             placeholder={`Enter value for ${state.setting.name}`}
           />
