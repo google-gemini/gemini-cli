@@ -310,6 +310,10 @@ export async function main() {
     coreEvents.emitFeedback('warning', error.message);
   });
 
+  const parseArgsHandle = startupProfiler.start('parse_arguments');
+  const argv = await parseArguments(settings.merged);
+  parseArgsHandle?.end();
+
   const trustedFolders = loadTrustedFolders();
   trustedFolders.errors.forEach((error: TrustedFoldersError) => {
     coreEvents.emitFeedback(
@@ -319,10 +323,6 @@ export async function main() {
   });
 
   await cleanupCheckpoints();
-
-  const parseArgsHandle = startupProfiler.start('parse_arguments');
-  const argv = await parseArguments(settings.merged);
-  parseArgsHandle?.end();
 
   // Check for invalid input combinations early to prevent crashes
   if (argv.promptInteractive && !process.stdin.isTTY) {

@@ -7,36 +7,14 @@
 import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
-import { mcpCommand } from '../commands/mcp.js';
-import { extensionsCommand } from '../commands/extensions.js';
-import { skillsCommand } from '../commands/skills.js';
-import { hooksCommand } from '../commands/hooks.js';
 import {
-  Config,
-  setGeminiMdFilename as setServerGeminiMdFilename,
-  getCurrentGeminiMdFilename,
-  ApprovalMode,
-  DEFAULT_GEMINI_MODEL_AUTO,
-  DEFAULT_GEMINI_EMBEDDING_MODEL,
-  DEFAULT_FILE_FILTERING_OPTIONS,
-  DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
-  FileDiscoveryService,
-  WRITE_FILE_TOOL_NAME,
-  SHELL_TOOL_NAMES,
-  SHELL_TOOL_NAME,
-  resolveTelemetrySettings,
-  FatalConfigError,
-  getPty,
-  EDIT_TOOL_NAME,
   debugLogger,
-  loadServerHierarchicalMemory,
-  WEB_FETCH_TOOL_NAME,
   getVersion,
-  PREVIEW_GEMINI_MODEL_AUTO,
+  type ApprovalMode,
+  type Config,
   type HookDefinition,
   type HookEventName,
   type OutputFormat,
-  GEMINI_MODEL_ALIAS_AUTO,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -45,17 +23,8 @@ import {
   loadSettings,
 } from './settings.js';
 
-import { loadSandboxConfig } from './sandboxConfig.js';
-import { resolvePath } from '../utils/resolvePath.js';
-import { appEvents } from '../utils/events.js';
 import { RESUME_LATEST } from '../utils/sessionUtils.js';
-
-import { isWorkspaceTrusted } from './trustedFolders.js';
-import { createPolicyEngineConfig } from './policy.js';
-import { ExtensionManager } from './extension-manager.js';
 import type { ExtensionEvents } from '@google/gemini-cli-core/src/utils/extensionLoader.js';
-import { requestConsentNonInteractive } from './extensions/consent.js';
-import { promptForSetting } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
 import { runExitCleanup } from '../utils/cleanup.js';
 
@@ -88,10 +57,21 @@ export interface CliArgs {
   isCommand: boolean | undefined;
 }
 
+const HELP_FLAGS = new Set(['--help', '-h']);
+
+function shouldRegisterCommand(
+  rawArgv: string[],
+  aliases: readonly string[],
+  loadAllCommands: boolean,
+): boolean {
+  return loadAllCommands || rawArgv.some((arg) => aliases.includes(arg));
+}
+
 export async function parseArguments(
   settings: MergedSettings,
 ): Promise<CliArgs> {
   const rawArgv = hideBin(process.argv);
+  const loadAllCommands = rawArgv.some((arg) => HELP_FLAGS.has(arg));
   const yargsInstance = yargs(rawArgv)
     .locale('en')
     .scriptName('gemini')
@@ -261,8 +241,6 @@ export async function parseArguments(
           description: 'Suppress the security warning when using --raw-output.',
         }),
     )
-    // Register MCP subcommands
-    .command(mcpCommand)
     // Ensure validation flows through .fail() for clean UX
     .fail((msg, err) => {
       if (err) throw err;
@@ -296,15 +274,32 @@ export async function parseArguments(
       return true;
     });
 
-  if (settings.experimental?.extensionManagement) {
+  if (shouldRegisterCommand(rawArgv, ['mcp'], loadAllCommands)) {
+    const { mcpCommand } = await import('../commands/mcp.js');
+    yargsInstance.command(mcpCommand);
+  }
+
+  if (
+    settings.experimental?.extensionManagement &&
+    shouldRegisterCommand(rawArgv, ['extensions', 'extension'], loadAllCommands)
+  ) {
+    const { extensionsCommand } = await import('../commands/extensions.js');
     yargsInstance.command(extensionsCommand);
   }
 
-  if (settings.experimental?.skills || (settings.skills?.enabled ?? true)) {
+  if (
+    (settings.experimental?.skills || (settings.skills?.enabled ?? true)) &&
+    shouldRegisterCommand(rawArgv, ['skills', 'skill'], loadAllCommands)
+  ) {
+    const { skillsCommand } = await import('../commands/skills.js');
     yargsInstance.command(skillsCommand);
   }
   // Register hooks command if hooks are enabled
-  if (settings.tools?.enableHooks) {
+  if (
+    settings.tools?.enableHooks &&
+    shouldRegisterCommand(rawArgv, ['hooks', 'hook'], loadAllCommands)
+  ) {
+    const { hooksCommand } = await import('../commands/hooks.js');
     yargsInstance.command(hooksCommand);
   }
 
@@ -378,12 +373,14 @@ export async function parseArguments(
 function createToolExclusionFilter(
   allowedTools: string[],
   allowedToolsSet: Set<string>,
+  shellToolName: string,
+  shellToolNames: readonly string[],
 ) {
   return (tool: string): boolean => {
-    if (tool === SHELL_TOOL_NAME) {
+    if (tool === shellToolName) {
       // If any of the allowed tools is ShellTool (even with subcommands), don't exclude it.
       return !allowedTools.some((allowed) =>
-        SHELL_TOOL_NAMES.some((shellName) => allowed.startsWith(shellName)),
+        shellToolNames.some((shellName) => allowed.startsWith(shellName)),
       );
     }
     return !allowedToolsSet.has(tool);
@@ -414,6 +411,48 @@ export async function loadCliConfig(
 ): Promise<Config> {
   const { cwd = process.cwd(), projectHooks } = options;
   const debugMode = isDebugMode(argv);
+  const core = await import('@google/gemini-cli-core');
+  const {
+    Config: CoreConfig,
+    setGeminiMdFilename: setServerGeminiMdFilename,
+    getCurrentGeminiMdFilename,
+    ApprovalMode,
+    DEFAULT_GEMINI_MODEL_AUTO,
+    DEFAULT_GEMINI_EMBEDDING_MODEL,
+    DEFAULT_FILE_FILTERING_OPTIONS,
+    DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
+    FileDiscoveryService,
+    WRITE_FILE_TOOL_NAME,
+    SHELL_TOOL_NAMES,
+    SHELL_TOOL_NAME,
+    resolveTelemetrySettings,
+    FatalConfigError,
+    getPty,
+    EDIT_TOOL_NAME,
+    loadServerHierarchicalMemory,
+    WEB_FETCH_TOOL_NAME,
+    PREVIEW_GEMINI_MODEL_AUTO,
+    GEMINI_MODEL_ALIAS_AUTO,
+  } = core;
+  const [
+    { loadSandboxConfig },
+    { resolvePath },
+    { appEvents },
+    { isWorkspaceTrusted },
+    { createPolicyEngineConfig },
+    { ExtensionManager },
+    { requestConsentNonInteractive },
+    { promptForSetting },
+  ] = await Promise.all([
+    import('./sandboxConfig.js'),
+    import('../utils/resolvePath.js'),
+    import('../utils/events.js'),
+    import('./trustedFolders.js'),
+    import('./policy.js'),
+    import('./extension-manager.js'),
+    import('./extensions/consent.js'),
+    import('./extensions/extensionSettings.js'),
+  ]);
 
   const loadedSettings = loadSettings(cwd);
 
@@ -596,6 +635,8 @@ export async function loadCliConfig(
     const toolExclusionFilter = createToolExclusionFilter(
       allowedTools,
       allowedToolsSet,
+      SHELL_TOOL_NAME,
+      SHELL_TOOL_NAMES,
     );
 
     switch (approvalMode) {
@@ -665,7 +706,7 @@ export async function loadCliConfig(
   const extensionsEnabled = settings.admin?.extensions?.enabled ?? true;
   const adminSkillsEnabled = settings.admin?.skills?.enabled ?? true;
 
-  return new Config({
+  return new CoreConfig({
     sessionId,
     clientVersion: await getVersion(),
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
