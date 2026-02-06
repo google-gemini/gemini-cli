@@ -813,6 +813,7 @@ export class GeminiChat {
     const modelResponseParts: Part[] = [];
 
     let hasToolCall = false;
+    let hasThoughts = false;
     let finishReason: FinishReason | undefined;
 
     for await (const chunk of streamResponse) {
@@ -828,6 +829,7 @@ export class GeminiChat {
         if (content?.parts) {
           if (content.parts.some((part) => part.thought)) {
             // Record thoughts
+            hasThoughts = true;
             this.recordThoughtFromContent(content);
           }
           if (content.parts.some((part) => part.functionCall)) {
@@ -896,7 +898,7 @@ export class GeminiChat {
       .trim();
 
     // Record model response text from the collected parts
-    if (responseText) {
+    if (responseText || hasThoughts) {
       this.chatRecordingService.recordMessage({
         model,
         type: 'gemini',
