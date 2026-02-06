@@ -31,7 +31,6 @@ type VirtualizedListProps<T> = {
   initialScrollIndex?: number;
   initialScrollOffsetInIndex?: number;
   scrollbarThumbColor?: string;
-  copyModeEnabled?: boolean;
 };
 
 export type VirtualizedListRef<T> = {

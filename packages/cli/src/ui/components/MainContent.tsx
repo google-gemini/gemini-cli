@@ -161,7 +161,6 @@ export const MainContent = () => {
         }}
         initialScrollIndex={SCROLL_TO_ITEM_END}
         initialScrollOffsetInIndex={SCROLL_TO_ITEM_END}
-        copyModeEnabled={uiState.copyModeEnabled}
       />
     );
   }
