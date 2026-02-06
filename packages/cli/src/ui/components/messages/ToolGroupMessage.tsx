@@ -145,7 +145,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       )
     : undefined;
 
-  const contentWidth = terminalWidth - TOOL_MESSAGE_HORIZONTAL_MARGIN * 2;
+  const contentWidth = terminalWidth - TOOL_MESSAGE_HORIZONTAL_MARGIN;
 
   return (
     // This box doesn't have a border even though it conceptually does because
@@ -160,7 +160,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         cause tearing.
       */
       width={terminalWidth}
-      paddingX={TOOL_MESSAGE_HORIZONTAL_MARGIN}
+      paddingRight={TOOL_MESSAGE_HORIZONTAL_MARGIN}
     >
       {visibleToolCalls.map((tool, index) => {
         const isConfirming = toolAwaitingApproval?.callId === tool.callId;
