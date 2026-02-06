@@ -46,6 +46,7 @@ import type {
   ApprovalModeSwitchEvent,
   ApprovalModeDurationEvent,
   PlanExecutionEvent,
+  ToolOutputMaskingEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
@@ -108,6 +109,7 @@ export enum EventNames {
   APPROVAL_MODE_SWITCH = 'approval_mode_switch',
   APPROVAL_MODE_DURATION = 'approval_mode_duration',
   PLAN_EXECUTION = 'plan_execution',
+  TOOL_OUTPUT_MASKING = 'tool_output_masking',
 }
 
 export interface LogResponse {
@@ -1217,8 +1219,40 @@ export class ClearcutLogger {
       },
     ];
 
+    const logEvent = this.createLogEvent(
+      EventNames.TOOL_OUTPUT_TRUNCATED,
+      data,
+    );
+    this.enqueueLogEvent(logEvent);
+    this.flushIfNeeded();
+  }
+
+  logToolOutputMaskingEvent(event: ToolOutputMaskingEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_MASKING_TOKENS_BEFORE,
+        value: event.tokens_before.toString(),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_MASKING_TOKENS_AFTER,
+        value: event.tokens_after.toString(),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_MASKING_MASKED_COUNT,
+        value: event.masked_count.toString(),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_MASKING_TOTAL_PRUNABLE_TOKENS,
+        value: event.total_prunable_tokens.toString(),
+      },
+    ];
+
     this.enqueueLogEvent(
-      this.createLogEvent(EventNames.TOOL_OUTPUT_TRUNCATED, data),
+      this.createLogEvent(EventNames.TOOL_OUTPUT_MASKING, data),
     );
     this.flushIfNeeded();
   }

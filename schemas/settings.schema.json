@@ -1436,6 +1436,44 @@
       "default": {},
       "type": "object",
       "properties": {
+        "toolOutputMasking": {
+          "title": "Tool Output Masking",
+          "description": "Advanced settings for tool output masking to manage context window efficiency.",
+          "markdownDescription": "Advanced settings for tool output masking to manage context window efficiency.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "Enable Tool Output Masking",
+              "description": "Enables tool output masking to save tokens.",
+              "markdownDescription": "Enables tool output masking to save tokens.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "toolProtectionThreshold": {
+              "title": "Tool Protection Threshold",
+              "description": "Minimum number of tokens to protect from masking (most recent tool outputs).",
+              "markdownDescription": "Minimum number of tokens to protect from masking (most recent tool outputs).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `50000`",
+              "default": 50000,
+              "type": "number"
+            },
+            "minPrunableTokensThreshold": {
+              "title": "Min Prunable Tokens Threshold",
+              "description": "Minimum prunable tokens required to trigger a masking pass.",
+              "markdownDescription": "Minimum prunable tokens required to trigger a masking pass.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `30000`",
+              "default": 30000,
+              "type": "number"
+            },
+            "protectLatestTurn": {
+              "title": "Protect Latest Turn",
+              "description": "Ensures the absolute latest turn is never masked, regardless of token count.",
+              "markdownDescription": "Ensures the absolute latest turn is never masked, regardless of token count.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
         "enableAgents": {
           "title": "Enable Agents",
           "description": "Enable local and remote subagents. Warning: Experimental feature, uses YOLO mode for subagents",

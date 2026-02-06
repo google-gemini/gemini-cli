@@ -573,6 +573,14 @@ const MAX_TRUNCATED_LINE_WIDTH = 1000;
 const MAX_TRUNCATED_CHARS = 4000;
 
 /**
+ * Sanitizes a string for use as a filename part by removing path traversal
+ * characters and other non-alphanumeric characters.
+ */
+export function sanitizeFilenamePart(part: string): string {
+  return part.replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+/**
  * Formats a truncated message for tool output, handling multi-line and single-line (elephant) cases.
  */
 export function formatTruncatedToolOutput(
@@ -623,11 +631,8 @@ export async function saveTruncatedToolOutput(
   id: string | number, // Accept string (callId) or number (truncationId)
   projectTempDir: string,
 ): Promise<{ outputFile: string; totalLines: number }> {
-  const safeToolName = toolName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-  const safeId = id
-    .toString()
-    .replace(/[^a-z0-9]/gi, '_')
-    .toLowerCase();
+  const safeToolName = sanitizeFilenamePart(toolName).toLowerCase();
+  const safeId = sanitizeFilenamePart(id.toString()).toLowerCase();
   const fileName = `${safeToolName}_${safeId}.txt`;
   const toolOutputDir = path.join(projectTempDir, TOOL_OUTPUT_DIR);
   const outputFile = path.join(toolOutputDir, fileName);
