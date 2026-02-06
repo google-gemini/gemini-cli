@@ -1780,15 +1780,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setDefaultBannerText(defaultBanner);
         setWarningBannerText(warningBanner);
         setBannerVisible(true);
-        const authType = config.getContentGeneratorConfig()?.authType;
-        if (
-          authType === AuthType.USE_GEMINI ||
-          authType === AuthType.USE_VERTEX_AI
-        ) {
-          setDefaultBannerText(
-            'Gemini 3 Flash and Pro are now available. \nEnable "Preview features" in /settings. \nLearn more at https://goo.gle/enable-preview-features',
-          );
-        }
       }
     };
     // eslint-disable-next-line @typescript-eslint/no-floating-promises

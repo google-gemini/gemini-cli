@@ -40,9 +40,7 @@ vi.mock('../colors.js', () => ({
 }));
 
 // Define the shape of the config methods used by this hook
-interface MockConfigShape {
-  getPreviewFeatures: MockedFunction<() => boolean>;
-}
+type MockConfigShape = object;
 
 describe('useBanner', () => {
   let mockConfig: MockConfigShape;
@@ -62,9 +60,7 @@ describe('useBanner', () => {
     vi.resetAllMocks();
 
     // Initialize the mock config with default behavior
-    mockConfig = {
-      getPreviewFeatures: vi.fn().mockReturnValue(false),
-    };
+    mockConfig = {};
 
     // Default persistentState behavior: return empty object (no counts)
     mockedPersistentStateGet.mockReturnValue({});
@@ -78,18 +74,6 @@ describe('useBanner', () => {
     );
 
     expect(result.current.bannerText).toBe('Critical Error');
-  });
-
-  it('should NOT show default banner if preview features are enabled in config', () => {
-    // Simulate Preview Features Enabled
-    mockConfig.getPreviewFeatures.mockReturnValue(true);
-
-    const { result } = renderHook(() =>
-      useBanner(defaultBannerData, mockConfig as unknown as Config),
-    );
-
-    // Should fall back to warningText (which is empty)
-    expect(result.current.bannerText).toBe('');
   });
 
   it('should hide banner if show count exceeds max limit (Legacy format)', () => {
