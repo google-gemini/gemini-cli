@@ -6,9 +6,32 @@
 
 import { useSettings } from '../contexts/SettingsContext.js';
 import type { LoadedSettings } from '../../config/settings.js';
+import { isCloudShell } from '@google/gemini-cli-core';
 
-export const isAlternateBufferEnabled = (settings: LoadedSettings): boolean =>
-  settings.merged.ui.useAlternateBuffer === true;
+/**
+ * Determines if the alternate buffer should be used.
+ *
+ * Web-based terminals (Cloud Shell) suffer from visible flickering because
+ * without the alternate buffer, Ink clears and redraws the entire screen on
+ * every frame. The alternate buffer enables incremental rendering which only
+ * redraws changed lines, eliminating the flicker.
+ *
+ * See: https://github.com/google-gemini/gemini-cli/issues/18079
+ */
+export const isAlternateBufferEnabled = (settings: LoadedSettings): boolean => {
+  if (settings.merged.ui.useAlternateBuffer === true) {
+    return true;
+  }
+
+  // Auto-enable alternate buffer for Cloud Shell to prevent flickering.
+  // Cloud Shell is a web-based terminal that redraws slowly, making
+  // full-screen repaints visually jarring.
+  if (isCloudShell()) {
+    return true;
+  }
+
+  return false;
+};
 
 export const useAlternateBuffer = (): boolean => {
   const settings = useSettings();
