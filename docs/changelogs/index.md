@@ -18,6 +18,12 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: $VERSION - $TIME
+
+- **Placeholder Highlight 1:** A concise summary of important features.
+- **Placeholder Highlight 2:** A concise summary of UI/UX improvements.
+- **Placeholder Highlight 3:** A concise summary of bug fixes.
+
 ## Announcements: v0.27.0 - 2026-02-03
 
 - **Event-Driven Architecture:** The CLI now uses a new event-driven scheduler
@@ -725,7 +731,7 @@ on GitHub.
   [@scidomino](https://github.com/scidomino))
 - **Pro Quota Dialog:** Handle daily Pro model usage limits with an interactive
   dialog that lets you immediately switch auth or fallback.
-  ([pr](https://github.com/google-gemini/gemini-cli/pull/7094) by
+  ([pr](httpshttps://github.com/google-gemini/gemini-cli/pull/7094) by
   [@JayadityaGit](https://github.com/JayadityaGit))
 - **Custom commands @:** Embed local file or directory content directly into
   your custom command prompts using `@{path}` syntax
