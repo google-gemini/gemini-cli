@@ -120,7 +120,7 @@ jobs:
       - name: 'Checkout'
         uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
       - name: 'Link Checker'
-        uses: 'lycheeverse/lychee-action@885c65f3dc543b57c898c8099f4e08c8afd178a2' # ratchet: lycheeverse/lychee-action@v2.6.1
+        uses: 'lycheeverse/lychee-action@a8c4c7cb88f0c7386610c35eb25108e448569cb0' # ratchet: lycheeverse/lychee-action@v2.7.0
         with:
           args: '--verbose --accept 200,503 ./**/*.md'
           fail: true
@@ -196,7 +196,7 @@ jobs:
       - name: 'Publish Test Report (for non-forks)'
         if: |-
           ${{ always() && (github.event.pull_request.head.repo.full_name == github.repository) }}
-        uses: 'dorny/test-reporter@dc3a92680fcc15842eef52e8c4606ea7ce6bd3f3' # ratchet:dorny/test-reporter@v2
+        uses: 'dorny/test-reporter@b082adf0eced0765477756c2a610396589b8c637' # ratchet:dorny/test-reporter@v2
         with:
           name: 'Test Results (Node ${{ runner.os }}, ${{ matrix.node-version }}, ${{ matrix.shard }})'
           path: 'packages/*/junit.xml'
@@ -284,7 +284,7 @@ jobs:
       - name: 'Publish Test Report (for non-forks)'
         if: |-
           ${{ always() && (github.event.pull_request.head.repo.full_name == github.repository) }}
-        uses: 'dorny/test-reporter@dc3a92680fcc15842eef52e8c4606ea7ce6bd3f3' # ratchet:dorny/test-reporter@v2
+        uses: 'dorny/test-reporter@b082adf0eced0765477756c2a610396589b8c637' # ratchet:dorny/test-reporter@v2
         with:
           name: 'Test Results (Node ${{ runner.os }}, ${{ matrix.node-version }}, ${{ matrix.shard }})'
           path: 'packages/*/junit.xml'
@@ -347,7 +347,7 @@ jobs:
           ref: '${{ github.event.inputs.branch_ref || github.ref }}'
           fetch-depth: 1
 
-      - uses: 'preactjs/compressed-size-action@946a292cd35bd1088e0d7eb92b69d1a8d5b5d76a'
+      - uses: 'preactjs/compressed-size-action@8518045ed95e94e971b83333085e1cb99aa18aa8'
         with:
           repo-token: '${{ secrets.GITHUB_TOKEN }}'
           pattern: './bundle/**/*.{js,sb}'
