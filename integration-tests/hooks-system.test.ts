@@ -48,7 +48,7 @@ describe('Hooks System Integration', () => {
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${scriptPath}"`,
+                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
                     timeout: 5000,
                   },
                 ],
@@ -107,7 +107,7 @@ describe('Hooks System Integration', () => {
                   {
                     type: 'command',
                     // Exit with code 2 and write reason to stderr
-                    command: `node "${scriptPath}"`,
+                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
                     timeout: 5000,
                   },
                 ],
@@ -168,7 +168,7 @@ describe('Hooks System Integration', () => {
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${scriptPath}"`,
+                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
                     timeout: 5000,
                   },
                 ],
@@ -204,7 +204,7 @@ describe('Hooks System Integration', () => {
         scriptPath,
         "console.log(JSON.stringify({hookSpecificOutput: {hookEventName: 'AfterTool', additionalContext: 'Security scan: File content appears safe'}}))",
       );
-      const command = `node "${scriptPath}"`;
+      const command = `node "${scriptPath.replace(/\\/g, '/')}"`;
       rig.configure({
         fakeResponsesPath: join(
           import.meta.dirname,
@@ -259,7 +259,8 @@ describe('Hooks System Integration', () => {
     it('should modify LLM requests with BeforeModel hooks', async () => {
       // Create a hook script that replaces the LLM request with a modified version
       // Note: Providing messages in the hook output REPLACES the entire conversation
-      rig.setup('should modify LLM requests with BeforeModel hooks', {
+      rig.setup('should modify LLM requests with BeforeModel hooks');
+      rig.configure({
         fakeResponsesPath: join(
           import.meta.dirname,
           'hooks-system.before-model.responses',
@@ -284,7 +285,7 @@ console.log(JSON.stringify({
       const scriptPath = join(rig.testDir!, 'before_model_hook.cjs');
       writeFileSync(scriptPath, hookScript);
 
-      rig.setup('should modify LLM requests with BeforeModel hooks', {
+      rig.configure({
         settings: {
           hooksConfig: {
             enabled: true,
@@ -343,29 +344,26 @@ console.log(JSON.stringify({
       const scriptPath = join(rig.testDir!, 'before_model_deny_hook.cjs');
       writeFileSync(scriptPath, hookScript);
 
-      rig.setup(
-        'should block model execution when BeforeModel hook returns deny decision',
-        {
-          settings: {
-            hooksConfig: {
-              enabled: true,
-            },
-            hooks: {
-              BeforeModel: [
-                {
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: `node "${scriptPath}"`,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
+      rig.configure({
+        settings: {
+          hooksConfig: {
+            enabled: true,
+          },
+          hooks: {
+            BeforeModel: [
+              {
+                hooks: [
+                  {
+                    type: 'command',
+                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
           },
         },
-      );
+      });
 
       const result = await rig.run({ args: 'Hello' });
 
@@ -388,29 +386,26 @@ console.log(JSON.stringify({
       const scriptPath = join(rig.testDir!, 'before_model_block_hook.cjs');
       writeFileSync(scriptPath, hookScript);
 
-      rig.setup(
-        'should block model execution when BeforeModel hook returns block decision',
-        {
-          settings: {
-            hooksConfig: {
-              enabled: true,
-            },
-            hooks: {
-              BeforeModel: [
-                {
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: `node "${scriptPath}"`,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
+      rig.configure({
+        settings: {
+          hooksConfig: {
+            enabled: true,
+          },
+          hooks: {
+            BeforeModel: [
+              {
+                hooks: [
+                  {
+                    type: 'command',
+                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
           },
         },
-      );
+      });
 
       const result = await rig.run({ args: 'Hello' });
 
@@ -427,7 +422,8 @@ console.log(JSON.stringify({
     it.skipIf(process.platform === 'win32')(
       'should modify LLM responses with AfterModel hooks',
       async () => {
-        rig.setup('should modify LLM responses with AfterModel hooks', {
+        rig.setup('should modify LLM responses with AfterModel hooks');
+        rig.configure({
           fakeResponsesPath: join(
             import.meta.dirname,
             'hooks-system.after-model.responses',
@@ -457,7 +453,7 @@ console.log(JSON.stringify({
         const scriptPath = join(rig.testDir!, 'after_model_hook.cjs');
         writeFileSync(scriptPath, hookScript);
 
-        rig.setup('should modify LLM responses with AfterModel hooks', {
+        rig.configure({
           settings: {
             hooksConfig: {
               enabled: true,
@@ -468,7 +464,7 @@ console.log(JSON.stringify({
                   hooks: [
                     {
                       type: 'command',
-                      command: `node "${scriptPath}"`,
+                      command: `node "${scriptPath.replace(/\\/g, '/')}"`,
                       timeout: 5000,
                     },
                   ],
@@ -494,7 +490,8 @@ console.log(JSON.stringify({
 
   describe('BeforeToolSelection Hooks - Tool Configuration', () => {
     it('should modify tool selection with BeforeToolSelection hooks', async () => {
-      rig.setup('should modify tool selection with BeforeToolSelection hooks', {
+      rig.setup('should modify tool selection with BeforeToolSelection hooks');
+      rig.configure({
         fakeResponsesPath: join(
           import.meta.dirname,
           'hooks-system.before-tool-selection.responses',
@@ -514,7 +511,7 @@ console.log(JSON.stringify({
       const scriptPath = join(rig.testDir!, 'before_tool_selection_hook.cjs');
       writeFileSync(scriptPath, hookScript);
 
-      rig.setup('should modify tool selection with BeforeToolSelection hooks', {
+      rig.configure({
         settings: {
           debugMode: true,
           hooksConfig: {
@@ -563,7 +560,8 @@ console.log(JSON.stringify({
 
   describe('BeforeAgent Hooks - Prompt Augmentation', () => {
     it('should augment prompts with BeforeAgent hooks', async () => {
-      rig.setup('should augment prompts with BeforeAgent hooks', {
+      rig.setup('should augment prompts with BeforeAgent hooks');
+      rig.configure({
         fakeResponsesPath: join(
           import.meta.dirname,
           'hooks-system.before-agent.responses',
@@ -582,7 +580,7 @@ console.log(JSON.stringify({
       const scriptPath = join(rig.testDir!, 'before_agent_hook.cjs');
       writeFileSync(scriptPath, hookScript);
 
-      rig.setup('should augment prompts with BeforeAgent hooks', {
+      rig.configure({
         settings: {
           hooksConfig: {
             enabled: true,
@@ -795,7 +793,8 @@ console.log(JSON.stringify({
 
   describe('Hook Input/Output Validation', () => {
     it('should provide correct input format to hooks', async () => {
-      rig.setup('should provide correct input format to hooks', {
+      rig.setup('should provide correct input format to hooks');
+      rig.configure({
         fakeResponsesPath: join(
           import.meta.dirname,
           'hooks-system.input-validation.responses',
@@ -819,7 +818,7 @@ try {
       const scriptPath = join(rig.testDir!, 'input_validation_hook.cjs');
       writeFileSync(scriptPath, hookScript);
 
-      rig.setup('should provide correct input format to hooks', {
+      rig.configure({
         settings: {
           hooksConfig: {
             enabled: true,
@@ -885,7 +884,7 @@ try {
                     type: 'command',
                     // Output plain text then JSON.
                     // This breaks JSON parsing, so it falls back to 'allow' with the whole stdout as systemMessage.
-                    command: `node "${scriptPath}"`,
+                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
                     timeout: 5000,
                   },
                 ],
@@ -1222,7 +1221,8 @@ console.log(JSON.stringify({
   }
 }));`;
 
-      rig.setup('should fire SessionStart hook and inject context', {
+      rig.setup('should fire SessionStart hook and inject context');
+      rig.configure({
         fakeResponsesPath: join(
           import.meta.dirname,
           'hooks-system.session-startup.responses',
@@ -1232,7 +1232,7 @@ console.log(JSON.stringify({
       const scriptPath = join(rig.testDir!, 'session_start_context_hook.cjs');
       writeFileSync(scriptPath, hookScript);
 
-      rig.setup('should fire SessionStart hook and inject context', {
+      rig.configure({
         settings: {
           hooksConfig: {
             enabled: true,
@@ -1301,13 +1301,13 @@ console.log(JSON.stringify({
 
       rig.setup(
         'should fire SessionStart hook and display systemMessage in interactive mode',
-        {
-          fakeResponsesPath: join(
-            import.meta.dirname,
-            'hooks-system.session-startup.responses',
-          ),
-        },
       );
+      rig.configure({
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.session-startup.responses',
+        ),
+      });
 
       const scriptPath = join(
         rig.testDir!,
@@ -1315,30 +1315,27 @@ console.log(JSON.stringify({
       );
       writeFileSync(scriptPath, hookScript);
 
-      rig.setup(
-        'should fire SessionStart hook and display systemMessage in interactive mode',
-        {
-          settings: {
-            hooksConfig: {
-              enabled: true,
-            },
-            hooks: {
-              SessionStart: [
-                {
-                  matcher: 'startup',
-                  hooks: [
-                    {
-                      type: 'command',
-                      command: `node "${scriptPath}"`,
-                      timeout: 5000,
-                    },
-                  ],
-                },
-              ],
-            },
+      rig.configure({
+        settings: {
+          hooksConfig: {
+            enabled: true,
+          },
+          hooks: {
+            SessionStart: [
+              {
+                matcher: 'startup',
+                hooks: [
+                  {
+                    type: 'command',
+                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
+                    timeout: 5000,
+                  },
+                ],
+              },
+            ],
           },
         },
-      );
+      });
 
       const run = await rig.runInteractive();
 
@@ -1728,7 +1725,8 @@ console.log(JSON.stringify({
 
   describe('Hook Disabling', () => {
     it('should not execute hooks disabled in settings file', async () => {
-      rig.setup('should not execute hooks disabled in settings file', {
+      rig.setup('should not execute hooks disabled in settings file');
+      rig.configure({
         fakeResponsesPath: join(
           import.meta.dirname,
           'hooks-system.disabled-via-settings.responses',
@@ -1742,13 +1740,19 @@ console.log(JSON.stringify({decision: "allow", systemMessage: "Enabled hook exec
       const disabledHookScript = `const fs = require('fs');
 console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook should not execute", reason: "This hook should be disabled"}));`;
 
-      const enabledPath = join(rig.testDir!, 'enabled_hook.cjs');
-      const disabledPath = join(rig.testDir!, 'disabled_hook.cjs');
+      const enabledPath = join(rig.testDir!, 'enabled_hook.cjs').replace(
+        /\\/g,
+        '/',
+      );
+      const disabledPath = join(rig.testDir!, 'disabled_hook.cjs').replace(
+        /\\/g,
+        '/',
+      );
 
       writeFileSync(enabledPath, enabledHookScript);
       writeFileSync(disabledPath, disabledHookScript);
 
-      rig.setup('should not execute hooks disabled in settings file', {
+      rig.configure({
         settings: {
           hooksConfig: {
             enabled: true,
@@ -1805,7 +1809,8 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
     });
 
     it('should respect disabled hooks across multiple operations', async () => {
-      rig.setup('should respect disabled hooks across multiple operations', {
+      rig.setup('should respect disabled hooks across multiple operations');
+      rig.configure({
         fakeResponsesPath: join(
           import.meta.dirname,
           'hooks-system.disabled-via-command.responses',
@@ -1819,13 +1824,19 @@ console.log(JSON.stringify({decision: "allow", systemMessage: "Active hook execu
       const disabledHookScript = `const fs = require('fs');
 console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook should not execute", reason: "This hook is disabled"}));`;
 
-      const activePath = join(rig.testDir!, 'active_hook.cjs');
-      const disabledPath = join(rig.testDir!, 'disabled_hook.cjs');
+      const activePath = join(rig.testDir!, 'active_hook.cjs').replace(
+        /\\/g,
+        '/',
+      );
+      const disabledPath = join(rig.testDir!, 'disabled_hook.cjs').replace(
+        /\\/g,
+        '/',
+      );
 
       writeFileSync(activePath, activeHookScript);
       writeFileSync(disabledPath, disabledHookScript);
 
-      rig.setup('should respect disabled hooks across multiple operations', {
+      rig.configure({
         settings: {
           hooksConfig: {
             enabled: true,
@@ -1928,7 +1939,7 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
       const commandPath = scriptPath.replace(/\\/g, '/');
 
       // 2. Full setup with settings and fake responses
-      rig.setup('should override tool input parameters via BeforeTool hook', {
+      rig.configure({
         fakeResponsesPath: join(
           import.meta.dirname,
           'hooks-system.input-modification.responses',
@@ -2014,7 +2025,7 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
       writeFileSync(scriptPath, hookScript);
       const commandPath = scriptPath.replace(/\\/g, '/');
 
-      rig.setup('should stop agent execution via BeforeTool hook', {
+      rig.configure({
         fakeResponsesPath: join(
           import.meta.dirname,
           'hooks-system.before-tool-stop.responses',

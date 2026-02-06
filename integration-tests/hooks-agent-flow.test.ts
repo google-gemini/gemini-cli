@@ -24,7 +24,8 @@ describe('Hooks Agent Flow', () => {
 
   describe('BeforeAgent Hooks', () => {
     it('should inject additional context via BeforeAgent hook', async () => {
-      await rig.setup('should inject additional context via BeforeAgent hook', {
+      await rig.setup('should inject additional context via BeforeAgent hook');
+      await rig.configure({
         fakeResponsesPath: join(
           import.meta.dirname,
           'hooks-agent-flow.responses',
@@ -54,7 +55,7 @@ describe('Hooks Agent Flow', () => {
       );
       writeFileSync(scriptPath, hookScript);
 
-      await rig.setup('should inject additional context via BeforeAgent hook', {
+      await rig.configure({
         settings: {
           hooksConfig: {
             enabled: true,
@@ -97,7 +98,8 @@ describe('Hooks Agent Flow', () => {
 
   describe('AfterAgent Hooks', () => {
     it('should receive prompt and response in AfterAgent hook', async () => {
-      await rig.setup('should receive prompt and response in AfterAgent hook', {
+      await rig.setup('should receive prompt and response in AfterAgent hook');
+      await rig.configure({
         fakeResponsesPath: join(
           import.meta.dirname,
           'hooks-agent-flow.responses',
@@ -122,7 +124,7 @@ describe('Hooks Agent Flow', () => {
       );
       writeFileSync(scriptPath, hookScript);
 
-      await rig.setup('should receive prompt and response in AfterAgent hook', {
+      await rig.configure({
         settings: {
           hooksConfig: {
             enabled: true,
