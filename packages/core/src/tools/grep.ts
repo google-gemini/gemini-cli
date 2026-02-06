@@ -46,6 +46,16 @@ export interface GrepToolParams {
    * File pattern to include in the search (e.g. "*.js", "*.{ts,tsx}")
    */
   include?: string;
+
+  /**
+   * Optional: Maximum number of matches to return per file.
+   */
+  max_matches_per_file?: number;
+
+  /**
+   * Optional: Maximum number of total matches to return.
+   */
+  total_max_matches?: number;
 }
 
 /**
@@ -184,7 +194,8 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       // Collect matches from all search directories
       let allMatches: GrepMatch[] = [];
-      const totalMaxMatches = DEFAULT_TOTAL_MAX_MATCHES;
+      const totalMaxMatches =
+        this.params.total_max_matches ?? DEFAULT_TOTAL_MAX_MATCHES;
 
       // Create a timeout controller to prevent indefinitely hanging searches
       const timeoutController = new AbortController();
@@ -210,6 +221,7 @@ class GrepToolInvocation extends BaseToolInvocation<
             path: searchDir,
             include: this.params.include,
             maxMatches: remainingLimit,
+            maxMatchesPerFile: this.params.max_matches_per_file,
             signal: timeoutController.signal,
           });
 
@@ -338,9 +350,16 @@ class GrepToolInvocation extends BaseToolInvocation<
     path: string; // Expects absolute path
     include?: string;
     maxMatches: number;
+    maxMatchesPerFile?: number;
     signal: AbortSignal;
   }): Promise<GrepMatch[]> {
-    const { pattern, path: absolutePath, include, maxMatches } = options;
+    const {
+      pattern,
+      path: absolutePath,
+      include,
+      maxMatches,
+      maxMatchesPerFile,
+    } = options;
     let strategyUsed = 'none';
 
     try {
@@ -363,6 +382,7 @@ class GrepToolInvocation extends BaseToolInvocation<
         }
 
         try {
+          // Normal execution without filter
           const generator = execStreaming('git', gitArgs, {
             cwd: absolutePath,
             signal: options.signal,
@@ -370,9 +390,19 @@ class GrepToolInvocation extends BaseToolInvocation<
           });
 
           const results: GrepMatch[] = [];
+          const matchesPerFile = new Map<string, number>();
+
           for await (const line of generator) {
             const match = this.parseGrepLine(line, absolutePath);
             if (match) {
+              if (maxMatchesPerFile) {
+                const count = matchesPerFile.get(match.filePath) || 0;
+                if (count >= maxMatchesPerFile) {
+                  continue;
+                }
+                matchesPerFile.set(match.filePath, count + 1);
+              }
+
               results.push(match);
               if (results.length >= maxMatches) {
                 break;
@@ -420,9 +450,16 @@ class GrepToolInvocation extends BaseToolInvocation<
           })
           .filter((dir): dir is string => !!dir);
         commonExcludes.forEach((dir) => grepArgs.push(`--exclude-dir=${dir}`));
+
+        // Normal system grep execution
         if (include) {
           grepArgs.push(`--include=${include}`);
         }
+
+        if (maxMatchesPerFile) {
+          grepArgs.push(`-m`, maxMatchesPerFile.toString());
+        }
+
         grepArgs.push(pattern);
         grepArgs.push('.');
 
@@ -493,7 +530,9 @@ class GrepToolInvocation extends BaseToolInvocation<
 
         try {
           const content = await fsPromises.readFile(fileAbsolutePath, 'utf8');
+
           const lines = content.split(/\r?\n/);
+          let fileMatchCount = 0;
           for (let index = 0; index < lines.length; index++) {
             const line = lines[index];
             if (regex.test(line)) {
@@ -504,7 +543,10 @@ class GrepToolInvocation extends BaseToolInvocation<
                 lineNumber: index + 1,
                 line,
               });
+              fileMatchCount++;
               if (allMatches.length >= maxMatches) break;
+              if (maxMatchesPerFile && fileMatchCount >= maxMatchesPerFile)
+                break;
             }
           }
         } catch (readError: unknown) {
@@ -576,7 +618,7 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
     super(
       GrepTool.Name,
       'SearchText',
-      'Searches for a regular expression pattern within file contents. Max 100 matches.',
+      'Searches for a regular expression pattern within file contents.',
       Kind.Search,
       {
         properties: {
@@ -592,6 +634,18 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
           include: {
             description: `Optional: A glob pattern to filter which files are searched (e.g., '*.js', '*.{ts,tsx}', 'src/**'). If omitted, searches all files (respecting potential global ignores).`,
             type: 'string',
+          },
+          max_matches_per_file: {
+            description:
+              'Optional: Maximum number of matches to return per file. Use this to prevent being overwhelmed by repetitive matches in large files.',
+            type: 'integer',
+            minimum: 1,
+          },
+          total_max_matches: {
+            description:
+              'Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 100 if omitted.',
+            type: 'integer',
+            minimum: 1,
           },
         },
         required: ['pattern'],

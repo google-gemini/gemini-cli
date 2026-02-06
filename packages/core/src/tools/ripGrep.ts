@@ -131,6 +131,16 @@ export interface RipGrepToolParams {
    * If true, does not respect .gitignore or default ignores (like build/dist).
    */
   no_ignore?: boolean;
+
+  /**
+   * Optional: Maximum number of matches to return per file.
+   */
+  max_matches_per_file?: number;
+
+  /**
+   * Optional: Maximum number of total matches to return.
+   */
+  total_max_matches?: number;
 }
 
 /**
@@ -204,7 +214,8 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       const searchDirDisplay = pathParam;
 
-      const totalMaxMatches = DEFAULT_TOTAL_MAX_MATCHES;
+      const totalMaxMatches =
+        this.params.total_max_matches ?? DEFAULT_TOTAL_MAX_MATCHES;
       if (this.config.getDebugMode()) {
         debugLogger.log(`[GrepTool] Total result limit: ${totalMaxMatches}`);
       }
@@ -236,6 +247,7 @@ class GrepToolInvocation extends BaseToolInvocation<
           before: this.params.before,
           no_ignore: this.params.no_ignore,
           maxMatches: totalMaxMatches,
+          maxMatchesPerFile: this.params.max_matches_per_file,
           signal: timeoutController.signal,
         });
       } finally {
@@ -320,6 +332,7 @@ class GrepToolInvocation extends BaseToolInvocation<
     before?: number;
     no_ignore?: boolean;
     maxMatches: number;
+    maxMatchesPerFile?: number;
     signal: AbortSignal;
   }): Promise<GrepMatch[]> {
     const {
@@ -333,7 +346,10 @@ class GrepToolInvocation extends BaseToolInvocation<
       before,
       no_ignore,
       maxMatches,
+      maxMatchesPerFile,
     } = options;
+
+    const rgPath = await ensureRgPath();
 
     const rgArgs = ['--json'];
 
@@ -361,6 +377,10 @@ class GrepToolInvocation extends BaseToolInvocation<
       rgArgs.push('--no-ignore');
     }
 
+    if (maxMatchesPerFile) {
+      rgArgs.push('--max-count', maxMatchesPerFile.toString());
+    }
+
     if (include) {
       rgArgs.push('--glob', include);
     }
@@ -380,20 +400,18 @@ class GrepToolInvocation extends BaseToolInvocation<
         rgArgs.push('--glob', `!${exclude}`);
       });
 
-      // Add .geminiignore and custom ignore files support (if provided/mandated)
-      // (ripgrep natively handles .gitignore)
       const geminiIgnorePaths = this.fileDiscoveryService.getIgnoreFilePaths();
       for (const ignorePath of geminiIgnorePaths) {
         rgArgs.push('--ignore-file', ignorePath);
       }
     }
-
-    rgArgs.push('--threads', '4');
     rgArgs.push(absolutePath);
+
+    // Add threads
+    rgArgs.push('--threads', '4');
 
     const results: GrepMatch[] = [];
     try {
-      const rgPath = await ensureRgPath();
       const generator = execStreaming(rgPath, rgArgs, {
         signal: options.signal,
         allowedExitCodes: [0, 1],
@@ -422,7 +440,7 @@ class GrepToolInvocation extends BaseToolInvocation<
   ): GrepMatch | null {
     try {
       const json = JSON.parse(line);
-      if (json.type === 'match') {
+      if (json.type === 'match' || json.type === 'context') {
         const match = json.data;
         // Defensive check: ensure text properties exist (skips binary/invalid encoding)
         if (match.path?.text && match.lines?.text) {
@@ -499,7 +517,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
     super(
       RipGrepTool.Name,
       'SearchText',
-      'Searches for a regular expression pattern within file contents. Max 100 matches.',
+      'Searches for a regular expression pattern within file contents. Utilize parameters like max_matches_per_file to avoid one file providing excessive results. Defaults to 100 matches.',
       Kind.Search,
       {
         properties: {
@@ -547,6 +565,18 @@ export class RipGrepTool extends BaseDeclarativeTool<
             description:
               'If true, searches all files including those usually ignored (like in .gitignore, build/, dist/, etc). Defaults to false if omitted.',
             type: 'boolean',
+          },
+          max_matches_per_file: {
+            description:
+              'Optional: Maximum number of matches to return per file. Use this to prevent being overwhelmed by repetitive matches in large files.',
+            type: 'integer',
+            minimum: 1,
+          },
+          total_max_matches: {
+            description:
+              'Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 2000 if omitted.',
+            type: 'integer',
+            minimum: 1,
           },
         },
         required: ['pattern'],
