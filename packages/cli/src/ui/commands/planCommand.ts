@@ -37,10 +37,6 @@ export const planCommand: SlashCommand = {
     const approvedPlanPath = config.getApprovedPlanPath();
 
     if (!approvedPlanPath) {
-      coreEvents.emitFeedback(
-        'error',
-        'No approved plan found. Please create and approve a plan first.',
-      );
       return;
     }
 

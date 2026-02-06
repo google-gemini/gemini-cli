@@ -12,7 +12,6 @@ import { extensionsCommand } from '../commands/extensions.js';
 import { skillsCommand } from '../commands/skills.js';
 import { hooksCommand } from '../commands/hooks.js';
 import {
-  Config,
   setGeminiMdFilename as setServerGeminiMdFilename,
   getCurrentGeminiMdFilename,
   ApprovalMode,
@@ -34,12 +33,16 @@ import {
   ASK_USER_TOOL_NAME,
   getVersion,
   PREVIEW_GEMINI_MODEL_AUTO,
-  type HookDefinition,
-  type HookEventName,
-  type OutputFormat,
   coreEvents,
   GEMINI_MODEL_ALIAS_AUTO,
   getAdminErrorMessage,
+  Config,
+} from '@google/gemini-cli-core';
+import type {
+  MCPServerConfig,
+  HookDefinition,
+  HookEventName,
+  OutputFormat,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -687,6 +690,45 @@ export async function loadCliConfig(
     ? mcpEnablementManager.getEnablementCallbacks()
     : undefined;
 
+  const adminAllowlist = settings.admin?.mcp?.config;
+  let mcpServerCommand = mcpEnabled ? settings.mcp?.serverCommand : undefined;
+  let mcpServers = mcpEnabled ? settings.mcpServers : {};
+
+  if (mcpEnabled && adminAllowlist && Object.keys(adminAllowlist).length > 0) {
+    const filteredMcpServers: Record<string, MCPServerConfig> = {};
+    for (const [serverId, localConfig] of Object.entries(mcpServers)) {
+      const adminConfig = adminAllowlist[serverId];
+      if (adminConfig) {
+        const mergedConfig = {
+          ...localConfig,
+          url: adminConfig.url,
+          type: adminConfig.type,
+          trust: adminConfig.trust,
+        };
+
+        // Remove local connection details
+        delete mergedConfig.command;
+        delete mergedConfig.args;
+        delete mergedConfig.env;
+        delete mergedConfig.cwd;
+        delete mergedConfig.httpUrl;
+        delete mergedConfig.tcp;
+
+        if (
+          (adminConfig.includeTools && adminConfig.includeTools.length > 0) ||
+          (adminConfig.excludeTools && adminConfig.excludeTools.length > 0)
+        ) {
+          mergedConfig.includeTools = adminConfig.includeTools;
+          mergedConfig.excludeTools = adminConfig.excludeTools;
+        }
+
+        filteredMcpServers[serverId] = mergedConfig;
+      }
+    }
+    mcpServers = filteredMcpServers;
+    mcpServerCommand = undefined;
+  }
+
   return new Config({
     sessionId,
     clientVersion: await getVersion(),
@@ -706,8 +748,8 @@ export async function loadCliConfig(
     excludeTools,
     toolDiscoveryCommand: settings.tools?.discoveryCommand,
     toolCallCommand: settings.tools?.callCommand,
-    mcpServerCommand: mcpEnabled ? settings.mcp?.serverCommand : undefined,
-    mcpServers: mcpEnabled ? settings.mcpServers : {},
+    mcpServerCommand,
+    mcpServers,
     mcpEnablementCallbacks,
     mcpEnabled,
     extensionsEnabled,
@@ -764,6 +806,7 @@ export async function loadCliConfig(
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
+    toolOutputMasking: settings.experimental?.toolOutputMasking,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,
