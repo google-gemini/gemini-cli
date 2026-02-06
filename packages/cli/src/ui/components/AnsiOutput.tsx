@@ -25,14 +25,10 @@ export const AnsiOutputText: React.FC<AnsiOutputProps> = ({
   maxLines,
   disableTruncation,
 }) => {
-  const effectiveHeight =
+  const limit =
     availableTerminalHeight && availableTerminalHeight > 0
-      ? availableTerminalHeight
+      ? Math.min(availableTerminalHeight, maxLines ?? Infinity)
       : (maxLines ?? DEFAULT_HEIGHT);
-
-  const limit = maxLines
-    ? Math.min(effectiveHeight, maxLines)
-    : effectiveHeight;
 
   const lastLines = disableTruncation ? data : data.slice(-limit);
   return (

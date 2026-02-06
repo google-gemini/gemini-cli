@@ -25,7 +25,7 @@ import type { ToolMessageProps } from './ToolMessage.js';
 import { ToolCallStatus } from '../../types.js';
 import {
   ACTIVE_SHELL_MAX_LINES,
-  SHELL_HISTORY_MAX_LINES,
+  COMPLETED_SHELL_MAX_LINES,
 } from '../../constants.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 import type { Config } from '@google/gemini-cli-core';
@@ -201,7 +201,7 @@ function getShellMaxLines(
     status === ToolCallStatus.Error ||
     status === ToolCallStatus.Canceled
   ) {
-    return SHELL_HISTORY_MAX_LINES;
+    return COMPLETED_SHELL_MAX_LINES;
   }
 
   if (

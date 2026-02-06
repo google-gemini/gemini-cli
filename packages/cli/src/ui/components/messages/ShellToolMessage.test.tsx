@@ -10,55 +10,12 @@ import {
   type ShellToolMessageProps,
 } from './ShellToolMessage.js';
 import { StreamingState, ToolCallStatus } from '../../types.js';
-import { Text } from 'ink';
 import type { Config } from '@google/gemini-cli-core';
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { waitFor } from '../../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SHELL_TOOL_NAME } from '@google/gemini-cli-core';
 import { SHELL_COMMAND_NAME } from '../../constants.js';
-import { StreamingContext } from '../../contexts/StreamingContext.js';
-
-vi.mock('../TerminalOutput.js', () => ({
-  TerminalOutput: function MockTerminalOutput({
-    cursor,
-  }: {
-    cursor: { x: number; y: number } | null;
-  }) {
-    return (
-      <Text>
-        MockCursor:({cursor?.x},{cursor?.y})
-      </Text>
-    );
-  },
-}));
-
-// Mock child components or utilities if they are complex or have side effects
-vi.mock('../GeminiRespondingSpinner.js', () => ({
-  GeminiRespondingSpinner: ({
-    nonRespondingDisplay,
-  }: {
-    nonRespondingDisplay?: string;
-  }) => {
-    const streamingState = React.useContext(StreamingContext)!;
-    if (streamingState === StreamingState.Responding) {
-      return <Text>MockRespondingSpinner</Text>;
-    }
-    return nonRespondingDisplay ? <Text>{nonRespondingDisplay}</Text> : null;
-  },
-}));
-
-vi.mock('../../utils/MarkdownDisplay.js', () => ({
-  MarkdownDisplay: function MockMarkdownDisplay({ text }: { text: string }) {
-    return <Text>MockMarkdown:{text}</Text>;
-  },
-}));
-
-vi.mock('./ToolResultDisplay.js', () => ({
-  ToolResultDisplay: vi.fn(({ maxLines }) => (
-    <Text>MockToolResultDisplay:maxLines={String(maxLines)}</Text>
-  )),
-}));
 
 describe('<ShellToolMessage />', () => {
   const baseProps: ShellToolMessageProps = {
@@ -183,157 +140,70 @@ describe('<ShellToolMessage />', () => {
     });
   });
 
-  describe('maxLines logic (constrained vs unconstrained)', () => {
-    it('passes maxLines as undefined when availableTerminalHeight is undefined', async () => {
-      const { ToolResultDisplay: MockToolResultDisplay } = await import(
-        './ToolResultDisplay.js'
+  describe('Snapshots', () => {
+    it('renders in Executing state', async () => {
+      const { lastFrame } = renderWithProviders(
+        <ShellToolMessage {...baseProps} status={ToolCallStatus.Executing} />,
+        { uiActions },
       );
-
-      const props: ShellToolMessageProps = {
-        ...baseProps,
-        availableTerminalHeight: undefined, // Unconstrained
-      };
-
-      renderWithProviders(<ShellToolMessage {...props} />, { uiActions });
-
       await waitFor(() => {
-        // Verify the props of the last call
-        const lastCallProps = vi
-          .mocked(MockToolResultDisplay)
-          .mock.calls.at(-1)?.[0];
-        expect(lastCallProps).toMatchObject({
-          maxLines: undefined,
-        });
+        expect(lastFrame()).toMatchSnapshot();
       });
     });
 
-    it('passes ACTIVE_SHELL_MAX_LINES when availableTerminalHeight is defined', async () => {
-      const { ToolResultDisplay: MockToolResultDisplay } = await import(
-        './ToolResultDisplay.js'
+    it('renders in Success state (history mode)', async () => {
+      const { lastFrame } = renderWithProviders(
+        <ShellToolMessage {...baseProps} status={ToolCallStatus.Success} />,
+        { uiActions },
       );
-      const { ACTIVE_SHELL_MAX_LINES } = await import('../../constants.js');
-
-      const props: ShellToolMessageProps = {
-        ...baseProps,
-        availableTerminalHeight: 20, // Constrained
-      };
-
-      renderWithProviders(<ShellToolMessage {...props} />, { uiActions });
-
       await waitFor(() => {
-        const lastCallProps = vi
-          .mocked(MockToolResultDisplay)
-          .mock.calls.at(-1)?.[0];
-        expect(lastCallProps).toMatchObject({
-          maxLines: ACTIVE_SHELL_MAX_LINES,
-        });
+        expect(lastFrame()).toMatchSnapshot();
       });
     });
 
-    it('passes SHELL_HISTORY_MAX_LINES when status is Success', async () => {
-      const { ToolResultDisplay: MockToolResultDisplay } = await import(
-        './ToolResultDisplay.js'
+    it('renders in Error state', async () => {
+      const { lastFrame } = renderWithProviders(
+        <ShellToolMessage
+          {...baseProps}
+          status={ToolCallStatus.Error}
+          resultDisplay="Error output"
+        />,
+        { uiActions },
       );
-      const { SHELL_HISTORY_MAX_LINES } = await import('../../constants.js');
-
-      const props: ShellToolMessageProps = {
-        ...baseProps,
-        status: ToolCallStatus.Success,
-        availableTerminalHeight: 20, // Constrained
-      };
-
-      renderWithProviders(<ShellToolMessage {...props} />, { uiActions });
-
       await waitFor(() => {
-        const lastCallProps = vi
-          .mocked(MockToolResultDisplay)
-          .mock.calls.at(-1)?.[0];
-        expect(lastCallProps).toMatchObject({
-          maxLines: SHELL_HISTORY_MAX_LINES,
-        });
+        expect(lastFrame()).toMatchSnapshot();
       });
     });
 
-    it('passes SHELL_HISTORY_MAX_LINES when status is Success even if availableTerminalHeight is undefined', async () => {
-      const { ToolResultDisplay: MockToolResultDisplay } = await import(
-        './ToolResultDisplay.js'
+    it('renders in Alternate Buffer mode while focused', async () => {
+      const { lastFrame } = renderWithProviders(
+        <ShellToolMessage
+          {...baseProps}
+          status={ToolCallStatus.Executing}
+          embeddedShellFocused={true}
+          activeShellPtyId={1}
+          ptyId={1}
+        />,
+        { uiActions, useAlternateBuffer: true },
       );
-      const { SHELL_HISTORY_MAX_LINES } = await import('../../constants.js');
-
-      const props: ShellToolMessageProps = {
-        ...baseProps,
-        status: ToolCallStatus.Success,
-        availableTerminalHeight: undefined,
-      };
-
-      renderWithProviders(<ShellToolMessage {...props} />, { uiActions });
-
       await waitFor(() => {
-        const lastCallProps = vi
-          .mocked(MockToolResultDisplay)
-          .mock.calls.at(-1)?.[0];
-        expect(lastCallProps).toMatchObject({
-          maxLines: SHELL_HISTORY_MAX_LINES,
-        });
+        expect(lastFrame()).toMatchSnapshot();
       });
     });
 
-    it('passes undefined when in alternate buffer and focused while executing', async () => {
-      const { ToolResultDisplay: MockToolResultDisplay } = await import(
-        './ToolResultDisplay.js'
+    it('renders in Alternate Buffer mode while unfocused', async () => {
+      const { lastFrame } = renderWithProviders(
+        <ShellToolMessage
+          {...baseProps}
+          status={ToolCallStatus.Executing}
+          embeddedShellFocused={false}
+          activeShellPtyId={1}
+          ptyId={1}
+        />,
+        { uiActions, useAlternateBuffer: true },
       );
-
-      const props: ShellToolMessageProps = {
-        ...baseProps,
-        status: ToolCallStatus.Executing,
-        availableTerminalHeight: 20,
-        ptyId: 1,
-        activeShellPtyId: 1,
-        embeddedShellFocused: true,
-      };
-
-      renderWithProviders(<ShellToolMessage {...props} />, {
-        uiActions,
-        useAlternateBuffer: true,
-      });
-
       await waitFor(() => {
-        const lastCallProps = vi
-          .mocked(MockToolResultDisplay)
-          .mock.calls.at(-1)?.[0];
-        expect(lastCallProps).toMatchObject({
-          maxLines: undefined,
-        });
-      });
-    });
-
-    it('passes SHELL_HISTORY_MAX_LINES when finished even if previously in alternate buffer and focused', async () => {
-      const { ToolResultDisplay: MockToolResultDisplay } = await import(
-        './ToolResultDisplay.js'
-      );
-      const { SHELL_HISTORY_MAX_LINES } = await import('../../constants.js');
-
-      const props: ShellToolMessageProps = {
-        ...baseProps,
-        status: ToolCallStatus.Success,
-        availableTerminalHeight: 20,
-        ptyId: 1,
-        activeShellPtyId: 1,
-        embeddedShellFocused: true,
-      };
-
-      renderWithProviders(<ShellToolMessage {...props} />, {
-        uiActions,
-        useAlternateBuffer: true,
-      });
-
-      await waitFor(() => {
-        const lastCallProps = vi
-          .mocked(MockToolResultDisplay)
-          .mock.calls.at(-1)?.[0];
-        expect(lastCallProps).toMatchObject({
-          maxLines: SHELL_HISTORY_MAX_LINES,
-        });
+        expect(lastFrame()).toMatchSnapshot();
       });
     });
   });

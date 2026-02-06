@@ -79,8 +79,8 @@ describe('ShellInputPrompt', () => {
   });
 
   it.each([
-    ['pageup', -25],
-    ['pagedown', 25],
+    ['pageup', -15],
+    ['pagedown', 15],
   ])(
     'handles page scroll %s (Command.SHELL_SCROLL_%s) with default size',
     (key, expectedScroll) => {

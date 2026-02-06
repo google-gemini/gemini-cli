@@ -1,0 +1,37 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<ShellToolMessage /> > Snapshots > renders in Alternate Buffer mode while focused 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ⊷  Shell Command A shell command                                   (Focused) │
+│                                                                              │
+│ Test result                                                                  │
+│                                                                              │"
+`;
+
+exports[`<ShellToolMessage /> > Snapshots > renders in Alternate Buffer mode while unfocused 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ⊷  Shell Command A shell command                                             │
+│                                                                              │
+│ Test result                                                                  │"
+`;
+
+exports[`<ShellToolMessage /> > Snapshots > renders in Error state 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ x  Shell Command A shell command                                             │
+│                                                                              │
+│ Error output                                                                 │"
+`;
+
+exports[`<ShellToolMessage /> > Snapshots > renders in Executing state 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ⊷  Shell Command A shell command                                             │
+│                                                                              │
+│ Test result                                                                  │"
+`;
+
+exports[`<ShellToolMessage /> > Snapshots > renders in Success state (history mode) 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ✓  Shell Command A shell command                                             │
+│                                                                              │
+│ Test result                                                                  │"
+`;
