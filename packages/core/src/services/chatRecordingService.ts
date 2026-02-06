@@ -8,6 +8,7 @@ import { type Config } from '../config/config.js';
 import { type Status } from '../core/coreToolScheduler.js';
 import { type ThoughtSummary } from '../utils/thoughtUtils.js';
 import { getProjectHash } from '../utils/paths.js';
+import { sanitizeFilenamePart } from '../utils/fileUtils.js';
 import path from 'node:path';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
@@ -540,12 +541,29 @@ export class ChatRecordingService {
    */
   deleteSession(sessionId: string): void {
     try {
-      const chatsDir = path.join(
-        this.config.storage.getProjectTempDir(),
-        'chats',
-      );
+      const tempDir = this.config.storage.getProjectTempDir();
+      const chatsDir = path.join(tempDir, 'chats');
       const sessionPath = path.join(chatsDir, `${sessionId}.json`);
-      fs.unlinkSync(sessionPath);
+      if (fs.existsSync(sessionPath)) {
+        fs.unlinkSync(sessionPath);
+      }
+
+      // Cleanup tool outputs for this session
+      const safeSessionId = sanitizeFilenamePart(sessionId);
+      const toolOutputDir = path.join(
+        tempDir,
+        'tool-outputs',
+        `session-${safeSessionId}`,
+      );
+
+      // Robustness: Ensure the path is strictly within the tool-outputs base
+      const toolOutputsBase = path.join(tempDir, 'tool-outputs');
+      if (
+        fs.existsSync(toolOutputDir) &&
+        toolOutputDir.startsWith(toolOutputsBase)
+      ) {
+        fs.rmSync(toolOutputDir, { recursive: true, force: true });
+      }
     } catch (error) {
       debugLogger.error('Error deleting session file.', error);
       throw error;

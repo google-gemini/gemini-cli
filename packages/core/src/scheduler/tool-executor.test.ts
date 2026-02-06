@@ -221,6 +221,7 @@ describe('ToolExecutor', () => {
       SHELL_TOOL_NAME,
       'call-trunc',
       expect.any(String), // temp dir
+      'test-session-id', // session id from makeFakeConfig
     );
 
     expect(fileUtils.formatTruncatedToolOutput).toHaveBeenCalledWith(
