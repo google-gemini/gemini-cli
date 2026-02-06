@@ -83,4 +83,4 @@ toolName = ["write_file", "replace"]
 decision = "allow"
 priority = 50
 modes = ["plan"]
-argsPattern = "\"file_path\":\"[^\"]+/\\.gemini/tmp/[a-zA-Z0-9]+/plans/[a-zA-Z0-9_-]+\\.md\""
+argsPattern = "\"file_path\":\"[^\"]+/\\.gemini/tmp/[a-zA-Z0-9_-]+/plans/[a-zA-Z0-9_-]+\\.md\""
