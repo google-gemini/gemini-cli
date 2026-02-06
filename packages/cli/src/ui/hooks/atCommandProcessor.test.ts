@@ -1219,7 +1219,7 @@ describe('handleAtCommand', () => {
       });
 
       expect(mockOnDebugMessage).toHaveBeenCalledWith(
-        `Path ${outsidePath} is not in the workspace and will be skipped.`,
+        `Path ${outsidePath} is not in the workspace (and not allowed for reading) and will be skipped.`,
       );
     });
   });

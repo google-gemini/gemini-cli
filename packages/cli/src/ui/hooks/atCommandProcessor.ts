@@ -152,6 +152,38 @@ function categorizeAtCommands(
   return { agentParts, resourceParts, fileParts };
 }
 
+/**
+ * Checks if the query contains any file paths that require read permission.
+ * Returns an array of such paths.
+ */
+export async function checkPermissions(
+  query: string,
+  config: Config,
+): Promise<string[]> {
+  const commandParts = parseAllAtCommands(query);
+  const { fileParts } = categorizeAtCommands(commandParts, config);
+  const permissionsRequired: string[] = [];
+
+  for (const part of fileParts) {
+    const pathName = part.content.substring(1);
+    if (!pathName) continue;
+
+    const resolvedPathName = path.isAbsolute(pathName)
+      ? pathName
+      : path.resolve(config.getTargetDir(), pathName);
+
+    if (config.validatePathAccess(resolvedPathName, 'read')) {
+      try {
+        await fs.stat(resolvedPathName);
+        permissionsRequired.push(resolvedPathName);
+      } catch {
+        // File doesn't exist, so no permission needed (it will be skipped anyway)
+      }
+    }
+  }
+  return permissionsRequired;
+}
+
 interface ResolvedFile {
   part: AtCommandPart;
   pathSpec: string;
@@ -193,9 +225,10 @@ async function resolveFilePaths(
       ? pathName
       : path.resolve(config.getTargetDir(), pathName);
 
-    if (!config.isPathAllowed(resolvedPathName)) {
+    // Check if we have read access (either workspace or read-only list)
+    if (config.validatePathAccess(resolvedPathName, 'read')) {
       onDebugMessage(
-        `Path ${pathName} is not in the workspace and will be skipped.`,
+        `Path ${pathName} is not in the workspace (and not allowed for reading) and will be skipped.`,
       );
       continue;
     }
