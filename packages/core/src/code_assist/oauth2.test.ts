@@ -1221,7 +1221,8 @@ describe('oauth2', () => {
         let dataHandler: ((data: Buffer) => void) | undefined;
         await vi.waitFor(() => {
           const dataCall = stdinOnSpy.mock.calls.find(
-            (call: [string, ...unknown[]]) => call[0] === 'data',
+            (call: [string | symbol, (...args: any[]) => void]) =>
+              call[0] === 'data',
           );
           dataHandler = dataCall?.[1] as ((data: Buffer) => void) | undefined;
           if (!dataHandler) throw new Error('stdin handler not registered yet');

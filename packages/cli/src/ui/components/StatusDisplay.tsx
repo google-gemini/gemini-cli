@@ -76,9 +76,15 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
         ideContext={uiState.ideContextState}
         geminiMdFileCount={uiState.geminiMdFileCount}
         contextFileNames={uiState.contextFileNames}
-        mcpServers={config.getMcpClientManager()?.getMcpServers() ?? {}}
+        mcpServers={
+          settings.merged.ui.showMCP !== false
+            ? (config.getMcpClientManager()?.getMcpServers() ?? {})
+            : {}
+        }
         blockedMcpServers={
-          config.getMcpClientManager()?.getBlockedMcpServers() ?? []
+          settings.merged.ui.showMCP !== false
+            ? (config.getMcpClientManager()?.getBlockedMcpServers() ?? [])
+            : []
         }
         skillCount={config.getSkillManager().getDisplayableSkills().length}
       />

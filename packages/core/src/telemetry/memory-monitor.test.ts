@@ -89,6 +89,7 @@ const mockHeapStatistics = {
   total_global_handles_size: 8192,
   used_global_handles_size: 4096,
   external_memory: 2097152,
+  total_allocated_bytes: 20000000, // ~20MB
 };
 
 const mockHeapSpaceStatistics = [

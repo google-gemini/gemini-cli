@@ -450,6 +450,11 @@ export class ToolRegistry {
     tool: AnyDeclarativeTool,
     excludeTools?: Set<string>,
   ): boolean {
+    // If showMCP is false, all MCP tools should be inactive
+    if (tool instanceof DiscoveredMCPTool && !this.config.getShowMCP()) {
+      return false;
+    }
+
     excludeTools ??= this.config.getExcludeTools() ?? new Set([]);
     const normalizedClassName = tool.constructor.name.replace(/^_+/, '');
     const possibleNames = [tool.name, normalizedClassName];

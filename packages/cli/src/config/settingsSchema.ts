@@ -534,6 +534,15 @@ const SETTINGS_SCHEMA = {
           "Show the logged-in user's identity (e.g. email) in the UI.",
         showInDialog: true,
       },
+      showMCP: {
+        type: 'boolean',
+        label: 'Show MCP Servers',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description: 'Show MCP servers in the UI and context summary.',
+        showInDialog: true,
+      },
       useAlternateBuffer: {
         type: 'boolean',
         label: 'Use Alternate Screen Buffer',

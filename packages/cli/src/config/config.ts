@@ -778,6 +778,7 @@ export async function loadCliConfig(
     enableToolOutputTruncation: settings.tools?.enableToolOutputTruncation,
     eventEmitter: coreEvents,
     useWriteTodos: argv.useWriteTodos ?? settings.useWriteTodos,
+    showMCP: settings.ui?.showMCP,
     output: {
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },

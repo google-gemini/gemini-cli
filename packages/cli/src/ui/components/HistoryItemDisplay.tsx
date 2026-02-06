@@ -34,6 +34,7 @@ import { McpStatus } from './views/McpStatus.js';
 import { ChatList } from './views/ChatList.js';
 import { HooksList } from './views/HooksList.js';
 import { ModelMessage } from './messages/ModelMessage.js';
+import { useSettings } from '../contexts/SettingsContext.js';
 
 interface HistoryItemDisplayProps {
   item: HistoryItem;
@@ -58,6 +59,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   embeddedShellFocused,
   availableTerminalHeightGemini,
 }) => {
+  const settings = useSettings();
   const itemForDisplay = useMemo(() => escapeAnsiCtrlCodes(item), [item]);
 
   return (
@@ -179,9 +181,10 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           terminalWidth={terminalWidth}
         />
       )}
-      {itemForDisplay.type === 'mcp_status' && (
-        <McpStatus {...itemForDisplay} serverStatus={getMCPServerStatus} />
-      )}
+      {itemForDisplay.type === 'mcp_status' &&
+        settings.merged.ui.showMCP !== false && (
+          <McpStatus {...itemForDisplay} serverStatus={getMCPServerStatus} />
+        )}
       {itemForDisplay.type === 'chat_list' && (
         <ChatList chats={itemForDisplay.chats} />
       )}
