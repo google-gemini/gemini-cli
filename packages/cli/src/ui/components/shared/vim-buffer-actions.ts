@@ -409,11 +409,15 @@ export function handleVimAction(
     case 'vim_delete_to_first_non_whitespace':
     case 'vim_change_to_first_non_whitespace': {
       const currentLine = lines[cursorRow] || '';
-      const firstNonWhitespaceCol = findFirstNonWhitespace(currentLine);
+      let firstNonWhitespaceCol = findFirstNonWhitespace(currentLine);
 
       // If line is all whitespace, firstNonWhitespaceCol equals line length.
-      // This results in deleting/changing from cursor to end of line,
-      // which is consistent with vim's d^ behavior on whitespace-only lines.
+      // In this case, vim's d^ deletes up to the last character (exclusive of end of line, inclusive of start if forward).
+      // Effectively it targets the last character position.
+      if (firstNonWhitespaceCol === cpLen(currentLine)) {
+        firstNonWhitespaceCol = Math.max(0, cpLen(currentLine) - 1);
+      }
+
       const startCol = Math.min(cursorCol, firstNonWhitespaceCol);
       const endCol = Math.max(cursorCol, firstNonWhitespaceCol);
 
