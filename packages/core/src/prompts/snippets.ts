@@ -139,7 +139,8 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
   - Avoid wasting context window by using 'offset' and 'limit to scope ${READ_FILE_TOOL_NAME} results to just enough information to definitively answer the question.
   - Extra tool calls can negate any benefits of limits, so balance frugality with the cost of additional turns or failed tool calls.
   - Perform edits in an order that minimizes risk of failure:
-    - Edit a file from bottom to top, to avoid causing ${EDIT_TOOL_NAME} failures due to shifting line numbers.
+    - Prefer making one edit that spans multiple ranges.
+    - If you need to make multiple edits to a fiel, edit from end to beginning, to avoid causing ${EDIT_TOOL_NAME} failures due to shifting line numbers.
     - Minimize edits that overlap with a previous one.
     - If an edit overlaps with a previous one, it may cause a line number to shift or cause your ${READ_FILE_TOOL_NAME} results to become stale, requiring you to re-read the file to avoid the cost of a tool failure.
   - Some ${READ_FILE_TOOL_NAME} examples:
