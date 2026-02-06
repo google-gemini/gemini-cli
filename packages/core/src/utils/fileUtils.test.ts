@@ -1125,7 +1125,6 @@ describe('fileUtils', () => {
         'shell_123.txt',
       );
       expect(result.outputFile).toBe(expectedOutputFile);
-      expect(result.totalLines).toBe(1);
 
       const savedContent = await fsPromises.readFile(
         expectedOutputFile,

@@ -17,7 +17,6 @@ import {
   saveTruncatedToolOutput,
   formatTruncatedToolOutput,
 } from '../utils/fileUtils.js';
-import { DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getInitialChatHistory } from '../utils/environmentContext.js';
 import {
@@ -188,7 +187,7 @@ async function truncateHistoryToBudget(
               const truncatedMessage = formatTruncatedToolOutput(
                 contentStr,
                 outputFile,
-                DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
+                config.getTruncateToolOutputThreshold(),
               );
 
               newParts.unshift({

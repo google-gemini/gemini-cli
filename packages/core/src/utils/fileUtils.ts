@@ -586,6 +586,8 @@ export function formatTruncatedToolOutput(
   outputFile: string,
   maxChars: number,
 ): string {
+  if (contentStr.length <= maxChars) return contentStr;
+
   const headChars = Math.floor(maxChars * 0.2);
   const tailChars = maxChars - headChars;
 
@@ -612,7 +614,7 @@ export async function saveTruncatedToolOutput(
   id: string | number, // Accept string (callId) or number (truncationId)
   projectTempDir: string,
   sessionId?: string,
-): Promise<{ outputFile: string; totalLines: number }> {
+): Promise<{ outputFile: string }> {
   const safeToolName = sanitizeFilenamePart(toolName).toLowerCase();
   const safeId = sanitizeFilenamePart(id.toString()).toLowerCase();
   const fileName = `${safeToolName}_${safeId}.txt`;
@@ -627,9 +629,5 @@ export async function saveTruncatedToolOutput(
   await fsPromises.mkdir(toolOutputDir, { recursive: true });
   await fsPromises.writeFile(outputFile, content);
 
-  const lines = content.split('\n');
-  return {
-    outputFile,
-    totalLines: lines.length,
-  };
+  return { outputFile };
 }

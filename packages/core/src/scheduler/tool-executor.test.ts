@@ -44,7 +44,6 @@ describe('ToolExecutor', () => {
     // Default mock implementation
     vi.mocked(fileUtils.saveTruncatedToolOutput).mockResolvedValue({
       outputFile: '/tmp/truncated_output.txt',
-      totalLines: 100,
     });
     vi.mocked(fileUtils.formatTruncatedToolOutput).mockReturnValue(
       'TruncatedContent...',
