@@ -603,11 +603,24 @@ export async function main() {
       }
 
       // This cleanup isn't strictly needed but may help in certain situations.
+      // Guard against EIO errors when TTY is disconnected (common on Node 24+)
       process.on('SIGTERM', () => {
-        process.stdin.setRawMode(wasRaw);
+        try {
+          if (process.stdin.isTTY) {
+            process.stdin.setRawMode(wasRaw);
+          }
+        } catch {
+          // TTY may be disconnected, ignore
+        }
       });
       process.on('SIGINT', () => {
-        process.stdin.setRawMode(wasRaw);
+        try {
+          if (process.stdin.isTTY) {
+            process.stdin.setRawMode(wasRaw);
+          }
+        } catch {
+          // TTY may be disconnected, ignore
+        }
       });
     }
 
