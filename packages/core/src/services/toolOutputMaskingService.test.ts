@@ -12,7 +12,11 @@ import {
   ToolOutputMaskingService,
   MASKING_INDICATOR_TAG,
 } from './toolOutputMaskingService.js';
-import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
+import {
+  SHELL_TOOL_NAME,
+  ACTIVATE_SKILL_TOOL_NAME,
+  MEMORY_TOOL_NAME,
+} from '../tools/tool-names.js';
 import { estimateTokenCountSync } from '../utils/tokenCalculation.js';
 import type { Config } from '../config/config.js';
 import type { Content, Part } from '@google/genai';
@@ -510,5 +514,114 @@ describe('ToolOutputMaskingService', () => {
 
     const result = await service.mask(history, mockConfig);
     expect(result.maskedCount).toBe(0); // padding is protected, tiny_tool would increase size
+  });
+
+  it('should never mask exempt tools (like activate_skill) even if they are deep in history', async () => {
+    const history: Content[] = [
+      {
+        role: 'user',
+        parts: [
+          {
+            functionResponse: {
+              name: ACTIVATE_SKILL_TOOL_NAME,
+              response: { output: 'High value instructions for skill' },
+            },
+          },
+        ],
+      },
+      {
+        role: 'user',
+        parts: [
+          {
+            functionResponse: {
+              name: MEMORY_TOOL_NAME,
+              response: { output: 'Important user preference' },
+            },
+          },
+        ],
+      },
+      {
+        role: 'user',
+        parts: [
+          {
+            functionResponse: {
+              name: 'bulky_tool',
+              response: { output: 'A'.repeat(60000) },
+            },
+          },
+        ],
+      },
+      // Protection buffer
+      {
+        role: 'user',
+        parts: [
+          {
+            functionResponse: {
+              name: 'padding',
+              response: { output: 'B'.repeat(60000) },
+            },
+          },
+        ],
+      },
+      { role: 'user', parts: [{ text: 'latest' }] },
+    ];
+
+    mockedEstimateTokenCountSync.mockImplementation((parts: Part[]) => {
+      const resp = parts[0].functionResponse?.response as Record<
+        string,
+        unknown
+      >;
+      const content = (resp?.['output'] as string) ?? JSON.stringify(resp);
+      if (content.includes(`<${MASKING_INDICATOR_TAG}`)) return 100;
+
+      const name = parts[0].functionResponse?.name;
+      if (name === ACTIVATE_SKILL_TOOL_NAME) return 1000;
+      if (name === MEMORY_TOOL_NAME) return 500;
+      if (name === 'bulky_tool') return 60000;
+      if (name === 'padding') return 60000;
+      return 10;
+    });
+
+    const result = await service.mask(history, mockConfig);
+
+    // Both 'bulky_tool' and 'padding' should be masked.
+    // 'padding' (Index 3) crosses the 50k protection boundary immediately.
+    // ACTIVATE_SKILL and MEMORY are exempt.
+    expect(result.maskedCount).toBe(2);
+    expect(result.newHistory[0].parts?.[0].functionResponse?.name).toBe(
+      ACTIVATE_SKILL_TOOL_NAME,
+    );
+    expect(
+      (
+        result.newHistory[0].parts?.[0].functionResponse?.response as Record<
+          string,
+          unknown
+        >
+      )['output'],
+    ).toBe('High value instructions for skill');
+
+    expect(result.newHistory[1].parts?.[0].functionResponse?.name).toBe(
+      MEMORY_TOOL_NAME,
+    );
+    expect(
+      (
+        result.newHistory[1].parts?.[0].functionResponse?.response as Record<
+          string,
+          unknown
+        >
+      )['output'],
+    ).toBe('Important user preference');
+
+    expect(result.newHistory[2].parts?.[0].functionResponse?.name).toBe(
+      'bulky_tool',
+    );
+    expect(
+      (
+        result.newHistory[2].parts?.[0].functionResponse?.response as Record<
+          string,
+          unknown
+        >
+      )['output'],
+    ).toContain(MASKING_INDICATOR_TAG);
   });
 });
