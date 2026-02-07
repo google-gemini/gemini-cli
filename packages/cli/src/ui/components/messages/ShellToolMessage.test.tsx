@@ -55,38 +55,12 @@ describe('<ShellToolMessage />', () => {
   });
 
   describe('interactive shell focus', () => {
-    const shellProps: ShellToolMessageProps = {
-      ...baseProps,
-    };
-
-    it('clicks inside the shell area sets focus to true', async () => {
+    it.each([
+      ['SHELL_COMMAND_NAME', SHELL_COMMAND_NAME],
+      ['SHELL_TOOL_NAME', SHELL_TOOL_NAME],
+    ])('clicks inside the shell area sets focus for %s', async (_, name) => {
       const { stdin, lastFrame, simulateClick } = renderWithProviders(
-        <ShellToolMessage {...shellProps} />,
-        {
-          mouseEventsEnabled: true,
-          uiActions,
-        },
-      );
-
-      await waitFor(() => {
-        expect(lastFrame()).toContain('A shell command'); // Wait for render
-      });
-
-      await simulateClick(stdin, 2, 2); // Click at column 2, row 2 (1-based)
-
-      await waitFor(() => {
-        expect(mockSetEmbeddedShellFocused).toHaveBeenCalledWith(true);
-      });
-    });
-
-    it('handles focus for SHELL_TOOL_NAME (core shell tool)', async () => {
-      const coreShellProps: ShellToolMessageProps = {
-        ...shellProps,
-        name: SHELL_TOOL_NAME,
-      };
-
-      const { stdin, lastFrame, simulateClick } = renderWithProviders(
-        <ShellToolMessage {...coreShellProps} />,
+        <ShellToolMessage {...baseProps} name={name} />,
         {
           mouseEventsEnabled: true,
           uiActions,
@@ -112,7 +86,7 @@ describe('<ShellToolMessage />', () => {
         updateStatus = setStatus;
         return (
           <ShellToolMessage
-            {...shellProps}
+            {...baseProps}
             status={status}
             embeddedShellFocused={true}
             activeShellPtyId={1}
@@ -141,79 +115,70 @@ describe('<ShellToolMessage />', () => {
   });
 
   describe('Snapshots', () => {
-    it('renders in Executing state', async () => {
-      const { lastFrame } = renderWithProviders(
-        <ShellToolMessage {...baseProps} status={ToolCallStatus.Executing} />,
-        { uiActions },
-      );
-      await waitFor(() => {
-        expect(lastFrame()).toMatchSnapshot();
-      });
-    });
-
-    it('renders in Success state (history mode)', async () => {
-      const { lastFrame } = renderWithProviders(
-        <ShellToolMessage {...baseProps} status={ToolCallStatus.Success} />,
-        { uiActions },
-      );
-      await waitFor(() => {
-        expect(lastFrame()).toMatchSnapshot();
-      });
-    });
-
-    it('renders in Error state', async () => {
-      const { lastFrame } = renderWithProviders(
-        <ShellToolMessage
-          {...baseProps}
-          status={ToolCallStatus.Error}
-          resultDisplay="Error output"
-        />,
-        { uiActions },
-      );
-      await waitFor(() => {
-        expect(lastFrame()).toMatchSnapshot();
-      });
-    });
-
-    it('renders in Alternate Buffer mode while focused', async () => {
-      const { lastFrame } = renderWithProviders(
-        <ShellToolMessage
-          {...baseProps}
-          status={ToolCallStatus.Executing}
-          embeddedShellFocused={true}
-          activeShellPtyId={1}
-          ptyId={1}
-        />,
-        { uiActions, useAlternateBuffer: true },
-      );
-      await waitFor(() => {
-        expect(lastFrame()).toMatchSnapshot();
-      });
-    });
-
-    it('renders in Alternate Buffer mode while unfocused', async () => {
-      const { lastFrame } = renderWithProviders(
-        <ShellToolMessage
-          {...baseProps}
-          status={ToolCallStatus.Executing}
-          embeddedShellFocused={false}
-          activeShellPtyId={1}
-          ptyId={1}
-        />,
-        { uiActions, useAlternateBuffer: true },
-      );
-      await waitFor(() => {
-        expect(lastFrame()).toMatchSnapshot();
-      });
-    });
+    it.each([
+      ['renders in Executing state', { status: ToolCallStatus.Executing }],
+      [
+        'renders in Success state (history mode)',
+        { status: ToolCallStatus.Success },
+      ],
+      [
+        'renders in Error state',
+        { status: ToolCallStatus.Error, resultDisplay: 'Error output' },
+      ],
+      [
+        'renders in Alternate Buffer mode while focused',
+        {
+          status: ToolCallStatus.Executing,
+          embeddedShellFocused: true,
+          activeShellPtyId: 1,
+          ptyId: 1,
+          useAlternateBuffer: true,
+        },
+      ],
+      [
+        'renders in Alternate Buffer mode while unfocused',
+        {
+          status: ToolCallStatus.Executing,
+          embeddedShellFocused: false,
+          activeShellPtyId: 1,
+          ptyId: 1,
+          useAlternateBuffer: true,
+        },
+      ],
+    ])(
+      '%s',
+      async (
+        _,
+        props: Partial<ShellToolMessageProps> & {
+          useAlternateBuffer?: boolean;
+        },
+      ) => {
+        const { useAlternateBuffer, ...componentProps } = props;
+        const { lastFrame } = renderWithProviders(
+          <ShellToolMessage {...baseProps} {...componentProps} />,
+          { uiActions, useAlternateBuffer },
+        );
+        await waitFor(() => {
+          expect(lastFrame()).toMatchSnapshot();
+        });
+      },
+    );
   });
 
   describe('Height Constraints', () => {
-    it('respects availableTerminalHeight when it is smaller than ACTIVE_SHELL_MAX_LINES', async () => {
-      const availableTerminalHeight = 10;
-      // We expect fewer lines than ACTIVE_SHELL_MAX_LINES (15).
-      // Logic: Math.min(15, Math.max(1, 10 - 2)) = 8.
-
+    it.each([
+      [
+        'respects availableTerminalHeight when it is smaller than ACTIVE_SHELL_MAX_LINES',
+        { availableTerminalHeight: 10, expectedMaxLines: 8 },
+      ],
+      [
+        'uses ACTIVE_SHELL_MAX_LINES when availableTerminalHeight is large',
+        {
+          availableTerminalHeight: 100,
+          expectedMaxLines: ACTIVE_SHELL_MAX_LINES,
+        },
+      ],
+    ])('%s', async (_, { availableTerminalHeight, expectedMaxLines }) => {
       const { lastFrame } = renderWithProviders(
         <ShellToolMessage
           {...baseProps}
@@ -236,39 +201,12 @@ describe('<ShellToolMessage />', () => {
       await waitFor(() => {
         const frame = lastFrame();
         const matches = frame!.match(/Line \d+/g);
-        // We expect <= 8 lines visible
-        expect(matches?.length).toBeLessThanOrEqual(8);
-        expect(matches?.length).toBeGreaterThan(0);
-        expect(frame).toMatchSnapshot();
-      });
-    });
-
-    it('uses ACTIVE_SHELL_MAX_LINES when availableTerminalHeight is large', async () => {
-      const availableTerminalHeight = 100;
-      const { lastFrame } = renderWithProviders(
-        <ShellToolMessage
-          {...baseProps}
-          resultDisplay={Array.from(
-            { length: 50 },
-            (_, i) => `Line ${i + 1}`,
-          ).join('\n')}
-          renderOutputAsMarkdown={false}
-          availableTerminalHeight={availableTerminalHeight}
-          activeShellPtyId={1}
-          ptyId={2} // not focused
-          status={ToolCallStatus.Executing}
-        />,
-        {
-          uiActions,
-          useAlternateBuffer: true,
-        },
-      );
-
-      await waitFor(() => {
-        const frame = lastFrame();
-        const matches = frame!.match(/Line \d+/g);
-        // Should be limited by ACTIVE_SHELL_MAX_LINES (15).
-        expect(matches?.length).toBe(ACTIVE_SHELL_MAX_LINES);
+        if (availableTerminalHeight < ACTIVE_SHELL_MAX_LINES) {
+          expect(matches?.length).toBeLessThanOrEqual(expectedMaxLines);
+          expect(matches?.length).toBeGreaterThan(0);
+        } else {
+          expect(matches?.length).toBe(expectedMaxLines);
+        }
         expect(frame).toMatchSnapshot();
       });
     });
