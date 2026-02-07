@@ -22,6 +22,8 @@ import {
   type ToolResultDisplay,
 } from '@google/gemini-cli-core';
 import { useInactivityTimer } from '../../hooks/useInactivityTimer.js';
+import { formatCommand } from '../../utils/keybindingUtils.js';
+import { Command } from '../../../config/keyBindings.js';
 
 export const STATUS_INDICATOR_WIDTH = 3;
 
@@ -117,7 +119,9 @@ export const FocusHint: React.FC<{
   return (
     <Box marginLeft={1} flexShrink={0}>
       <Text color={theme.text.accent}>
-        {isThisShellFocused ? '(Focused)' : '(tab to focus)'}
+        {isThisShellFocused
+          ? `(${formatCommand(Command.UNFOCUS_SHELL_INPUT)} to unfocus)`
+          : `(${formatCommand(Command.FOCUS_SHELL_INPUT)} to focus)`}
       </Text>
     </Box>
   );
