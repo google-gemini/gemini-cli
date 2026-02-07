@@ -11,6 +11,8 @@ import type { AgentDefinition, LocalAgentDefinition } from './types.js';
 import { loadAgentsFromDirectory } from './agentLoader.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { CliHelpAgent } from './cli-help-agent.js';
+import { ArchitectAgent } from './architect-agent.js';
+import { ReviewerAgent } from './reviewer-agent.js';
 import { GeneralistAgent } from './generalist-agent.js';
 import { A2AClientManager } from './a2a-client-manager.js';
 import { ADCHandler } from './remote-invocation.js';
@@ -200,6 +202,8 @@ export class AgentRegistry {
   private loadBuiltInAgents(): void {
     this.registerLocalAgent(CodebaseInvestigatorAgent(this.config));
     this.registerLocalAgent(CliHelpAgent(this.config));
+    this.registerLocalAgent(ArchitectAgent(this.config));
+    this.registerLocalAgent(ReviewerAgent(this.config));
     this.registerLocalAgent(GeneralistAgent(this.config));
   }
 

@@ -58,7 +58,11 @@ export * from './core/apiKeyCredentialStorage.js';
 export * from './utils/fetch.js';
 export { homedir, tmpdir } from './utils/paths.js';
 export * from './utils/paths.js';
+export * from './utils/pathReader.js';
 export * from './utils/checks.js';
+export * from './utils/httpErrors.js';
+export { ExperimentFlags } from './code_assist/experiments/flagNames.js';
+export { KeychainTokenStorage } from './mcp/token-storage/keychain-token-storage.js';
 export * from './utils/schemaValidator.js';
 export * from './utils/errors.js';
 export * from './utils/exitCodes.js';
@@ -138,6 +142,7 @@ export * from './prompts/mcp-prompts.js';
 export * from './agents/types.js';
 export * from './agents/agentLoader.js';
 export * from './agents/local-executor.js';
+export * from './workflow/engine.js';
 
 // Export specific tool logic
 export * from './tools/read-file.js';

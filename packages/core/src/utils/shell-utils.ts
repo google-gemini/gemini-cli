@@ -100,8 +100,8 @@ async function loadBashLanguage(): Promise<void> {
         () =>
           // eslint-disable-next-line @typescript-eslint/ban-ts-comment
           // @ts-ignore resolved by esbuild-plugin-wasm during bundling
-          import('web-tree-sitter/tree-sitter.wasm?binary'),
-        'web-tree-sitter/tree-sitter.wasm',
+          import('web-tree-sitter/web-tree-sitter.wasm?binary'),
+        'web-tree-sitter/web-tree-sitter.wasm',
       ),
       loadWasmBinary(
         () =>

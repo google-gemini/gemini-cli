@@ -655,7 +655,16 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     const requestedModel = resolvedConfig.model;
 
     let modelToUse: string;
-    if (isAutoModel(requestedModel)) {
+    if (requestedModel === modelConfigAlias || requestedModel.endsWith('-config')) {
+      debugLogger.warn(
+        `[LocalAgentExecutor] Failed to resolve model alias '${modelConfigAlias}'. Falling back to definition model.`,
+      );
+      modelToUse =
+        this.definition.modelConfig.model &&
+        this.definition.modelConfig.model !== 'inherit'
+          ? this.definition.modelConfig.model
+          : DEFAULT_GEMINI_MODEL;
+    } else if (isAutoModel(requestedModel)) {
       // TODO(joshualitt): This try / catch is inconsistent with the routing
       // behavior for the main agent. Ideally, we would have a universal
       // policy for routing failure. Given routing failure does not necessarily
