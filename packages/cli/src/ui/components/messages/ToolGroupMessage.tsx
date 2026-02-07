@@ -239,7 +239,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
              */
         (visibleToolCalls.length > 0 || borderBottomOverride !== undefined) && (
           <Box
-            height={0}
+            height={1}
             width={terminalWidth}
             borderLeft={true}
             borderRight={true}

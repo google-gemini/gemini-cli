@@ -383,6 +383,21 @@ const SETTINGS_SCHEMA = {
         description: 'Hide the window title bar',
         showInDialog: true,
       },
+      inlineThinkingMode: {
+        type: 'enum',
+        label: 'Inline Thinking',
+        category: 'UI',
+        requiresRestart: false,
+        default: 'off',
+        description:
+          'Display model thinking inline: off, summary (truncated), or full.',
+        showInDialog: true,
+        options: [
+          { value: 'off', label: 'Off' },
+          { value: 'summary', label: 'Summary' },
+          { value: 'full', label: 'Full' },
+        ],
+      },
       showStatusInTitle: {
         type: 'boolean',
         label: 'Show Thoughts in Title',

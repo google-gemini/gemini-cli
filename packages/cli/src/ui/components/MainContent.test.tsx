@@ -12,6 +12,20 @@ import { Box, Text } from 'ink';
 import type React from 'react';
 
 // Mock dependencies
+vi.mock('../contexts/SettingsContext.js', async () => {
+  const actual = await vi.importActual('../contexts/SettingsContext.js');
+  return {
+    ...actual,
+    useSettings: () => ({
+      merged: {
+        ui: {
+          inlineThinkingMode: 'off',
+        },
+      },
+    }),
+  };
+});
+
 vi.mock('../contexts/AppContext.js', async () => {
   const actual = await vi.importActual('../contexts/AppContext.js');
   return {

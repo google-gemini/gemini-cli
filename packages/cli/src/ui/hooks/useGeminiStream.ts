@@ -53,6 +53,7 @@ import type {
   HistoryItem,
   HistoryItemWithoutId,
   HistoryItemToolGroup,
+  HistoryItemThinking,
   IndividualToolCallDisplay,
   SlashCommandProcessorResult,
   HistoryItemModel,
@@ -62,6 +63,7 @@ import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { useShellCommandProcessor } from './shellCommandProcessor.js';
 import { handleAtCommand } from './atCommandProcessor.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
+import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 import { useStateAndRef } from './useStateAndRef.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useLogger } from './useLogger.js';
@@ -80,6 +82,42 @@ import path from 'node:path';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
 import type { LoadedSettings } from '../../config/settings.js';
+
+const MAX_THOUGHT_SUMMARY_LENGTH = 140;
+
+function splitGraphemes(value: string): string[] {
+  if (typeof Intl !== 'undefined' && 'Segmenter' in Intl) {
+    const segmenter = new Intl.Segmenter(undefined, {
+      granularity: 'grapheme',
+    });
+    return Array.from(segmenter.segment(value), (segment) => segment.segment);
+  }
+
+  return Array.from(value);
+}
+
+function summarizeThought(thought: ThoughtSummary): ThoughtSummary {
+  const subject = thought.subject.trim();
+  if (subject) {
+    return { subject, description: '' };
+  }
+
+  const description = thought.description.trim();
+  if (!description) {
+    return { subject: '', description: '' };
+  }
+
+  const descriptionGraphemes = splitGraphemes(description);
+  if (descriptionGraphemes.length <= MAX_THOUGHT_SUMMARY_LENGTH) {
+    return { subject: description, description: '' };
+  }
+
+  const trimmed = descriptionGraphemes
+    .slice(0, MAX_THOUGHT_SUMMARY_LENGTH - 3)
+    .join('')
+    .trimEnd();
+  return { subject: `${trimmed}...`, description: '' };
+}
 
 type ToolResponseWithParts = ToolCallResponseInfo & {
   llmContent?: PartListUnion;
@@ -196,6 +234,7 @@ export const useGeminiStream = (
   const [thought, setThought] = useState<ThoughtSummary | null>(null);
   const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
+
   const [lastGeminiActivityTime, setLastGeminiActivityTime] =
     useState<number>(0);
   const [pushedToolCallIds, pushedToolCallIdsRef, setPushedToolCallIds] =
@@ -754,6 +793,7 @@ export const useGeminiStream = (
         pendingHistoryItemRef.current?.type !== 'gemini' &&
         pendingHistoryItemRef.current?.type !== 'gemini_content'
       ) {
+        // Flush any pending item before starting gemini content
         if (pendingHistoryItemRef.current) {
           addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         }
@@ -795,6 +835,31 @@ export const useGeminiStream = (
       return newGeminiMessageBuffer;
     },
     [addItem, pendingHistoryItemRef, setPendingHistoryItem],
+  );
+
+  const handleThoughtEvent = useCallback(
+    (eventValue: ThoughtSummary, userMessageTimestamp: number) => {
+      setThought(eventValue);
+
+      const inlineThinkingMode = getInlineThinkingMode(settings);
+      if (inlineThinkingMode === 'off') {
+        return;
+      }
+
+      const thoughtForDisplay =
+        inlineThinkingMode === 'summary'
+          ? summarizeThought(eventValue)
+          : eventValue;
+
+      addItem(
+        {
+          type: 'thinking',
+          thought: thoughtForDisplay,
+        } as HistoryItemThinking,
+        userMessageTimestamp,
+      );
+    },
+    [addItem, settings],
   );
 
   const handleUserCancelledEvent = useCallback(
@@ -1069,7 +1134,7 @@ export const useGeminiStream = (
         switch (event.type) {
           case ServerGeminiEventType.Thought:
             setLastGeminiActivityTime(Date.now());
-            setThought(event.value);
+            handleThoughtEvent(event.value, userMessageTimestamp);
             break;
           case ServerGeminiEventType.Content:
             setLastGeminiActivityTime(Date.now());
@@ -1156,6 +1221,7 @@ export const useGeminiStream = (
     },
     [
       handleContentEvent,
+      handleThoughtEvent,
       handleUserCancelledEvent,
       handleErrorEvent,
       scheduleToolCalls,

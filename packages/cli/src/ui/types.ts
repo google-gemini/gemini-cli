@@ -210,6 +210,11 @@ export interface ChatDetail {
   mtime: string;
 }
 
+export type HistoryItemThinking = HistoryItemBase & {
+  type: 'thinking';
+  thought: ThoughtSummary;
+};
+
 export type HistoryItemChatList = HistoryItemBase & {
   type: 'chat_list';
   chats: ChatDetail[];
@@ -333,6 +338,7 @@ export type HistoryItemWithoutId =
   | HistoryItemAgentsList
   | HistoryItemMcpStatus
   | HistoryItemChatList
+  | HistoryItemThinking
   | HistoryItemHooksList;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };
