@@ -412,6 +412,29 @@ describe('Core System Prompt (prompts.ts)', () => {
         expect(prompt).toMatchSnapshot();
       });
     });
+
+    it('should include YOLO mode instructions in interactive mode', () => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.YOLO);
+      vi.mocked(mockConfig.isInteractive).mockReturnValue(true);
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).toContain('# Autonomous Mode (YOLO)');
+      expect(prompt).toContain('Only use the `ask_user` tool if');
+    });
+
+    it('should NOT include YOLO mode instructions in non-interactive mode', () => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.YOLO);
+      vi.mocked(mockConfig.isInteractive).mockReturnValue(false);
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).not.toContain('# Autonomous Mode (YOLO)');
+    });
+
+    it('should NOT include YOLO mode instructions for DEFAULT mode', () => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(
+        ApprovalMode.DEFAULT,
+      );
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).not.toContain('# Autonomous Mode (YOLO)');
+    });
   });
 
   describe('Platform-specific and Background Process instructions', () => {
