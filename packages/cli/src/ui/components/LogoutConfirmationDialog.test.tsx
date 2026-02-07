@@ -52,7 +52,7 @@ describe('LogoutConfirmationDialog', () => {
 
     const mockCall = vi.mocked(RadioButtonSelect).mock.calls[0][0];
     await act(async () => {
-      await mockCall.onSelect(LogoutChoice.LOGIN);
+      mockCall.onSelect(LogoutChoice.LOGIN);
     });
 
     expect(onSelect).toHaveBeenCalledWith(LogoutChoice.LOGIN);
@@ -64,7 +64,7 @@ describe('LogoutConfirmationDialog', () => {
 
     const mockCall = vi.mocked(RadioButtonSelect).mock.calls[0][0];
     await act(async () => {
-      await mockCall.onSelect(LogoutChoice.EXIT);
+      mockCall.onSelect(LogoutChoice.EXIT);
     });
 
     expect(onSelect).toHaveBeenCalledWith(LogoutChoice.EXIT);

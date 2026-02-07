@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as crypto from 'node:crypto';
 import { lock } from 'proper-lockfile';
 import {
   FatalConfigError,
@@ -14,6 +15,7 @@ import {
   ideContextStore,
   GEMINI_DIR,
   homedir,
+  coreEvents,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 import stripJsonComments from 'strip-json-comments';
@@ -69,6 +71,13 @@ export interface TrustResult {
 }
 
 const realPathCache = new Map<string, string>();
+
+/**
+ * Parses the trusted folders JSON content, stripping comments.
+ */
+function parseTrustedFoldersJson(content: string): unknown {
+  return JSON.parse(stripJsonComments(content));
+}
 
 /**
  * FOR TESTING PURPOSES ONLY.
@@ -187,8 +196,13 @@ export class LoadedTrustedFolders {
       const content = await fsPromises.readFile(this.user.path, 'utf-8');
       let config: Record<string, TrustLevel>;
       try {
-        config = JSON.parse(stripJsonComments(content));
-      } catch {
+        config = parseTrustedFoldersJson(content) as Record<string, TrustLevel>;
+      } catch (error) {
+        coreEvents.emitFeedback(
+          'error',
+          `Failed to parse trusted folders file at ${this.user.path}. The file may be corrupted.`,
+          error,
+        );
         config = {};
       }
 
@@ -236,10 +250,7 @@ export function loadTrustedFolders(): LoadedTrustedFolders {
   try {
     if (fs.existsSync(userPath)) {
       const content = fs.readFileSync(userPath, 'utf-8');
-      const parsed = JSON.parse(stripJsonComments(content)) as Record<
-        string,
-        string
-      >;
+      const parsed = parseTrustedFoldersJson(content) as Record<string, string>;
 
       if (
         typeof parsed !== 'object' ||
@@ -287,14 +298,26 @@ export function saveTrustedFolders(
     fs.mkdirSync(dirPath, { recursive: true });
   }
 
-  fs.writeFileSync(
-    trustedFoldersFile.path,
-    JSON.stringify(trustedFoldersFile.config, null, 2),
-    {
+  const content = JSON.stringify(trustedFoldersFile.config, null, 2);
+  const tempPath = `${trustedFoldersFile.path}.tmp.${crypto.randomUUID()}`;
+
+  try {
+    fs.writeFileSync(tempPath, content, {
       encoding: 'utf-8',
       mode: 0o600,
-    },
-  );
+    });
+    fs.renameSync(tempPath, trustedFoldersFile.path);
+  } catch (error) {
+    // Clean up temp file if it was created but rename failed
+    if (fs.existsSync(tempPath)) {
+      try {
+        fs.unlinkSync(tempPath);
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+    throw error;
+  }
 }
 
 /** Is folder trust feature enabled per the current applied settings */

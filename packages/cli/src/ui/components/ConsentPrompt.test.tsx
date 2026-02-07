@@ -79,7 +79,7 @@ describe('ConsentPrompt', () => {
 
     const onSelect = MockedRadioButtonSelect.mock.calls[0][0].onSelect;
     await act(async () => {
-      await onSelect(true);
+      onSelect(true);
     });
 
     expect(onConfirm).toHaveBeenCalledWith(true);
@@ -98,7 +98,7 @@ describe('ConsentPrompt', () => {
 
     const onSelect = MockedRadioButtonSelect.mock.calls[0][0].onSelect;
     await act(async () => {
-      await onSelect(false);
+      onSelect(false);
     });
 
     expect(onConfirm).toHaveBeenCalledWith(false);

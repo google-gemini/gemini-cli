@@ -118,7 +118,7 @@ describe('MultiFolderTrustDialog', () => {
 
     const { onSelect } = mockedRadioButtonSelect.mock.calls[0][0];
     await act(async () => {
-      await onSelect(MultiFolderTrustChoice.NO);
+      onSelect(MultiFolderTrustChoice.NO);
     });
 
     expect(mockFinishAddingDirectories).toHaveBeenCalledWith(
@@ -146,7 +146,7 @@ describe('MultiFolderTrustDialog', () => {
 
     const { onSelect } = mockedRadioButtonSelect.mock.calls[0][0];
     await act(async () => {
-      await onSelect(MultiFolderTrustChoice.YES);
+      onSelect(MultiFolderTrustChoice.YES);
     });
 
     expect(mockAddDirectory).toHaveBeenCalledWith(
@@ -171,7 +171,7 @@ describe('MultiFolderTrustDialog', () => {
 
     const { onSelect } = mockedRadioButtonSelect.mock.calls[0][0];
     await act(async () => {
-      await onSelect(MultiFolderTrustChoice.YES_AND_REMEMBER);
+      onSelect(MultiFolderTrustChoice.YES_AND_REMEMBER);
     });
 
     expect(mockAddDirectory).toHaveBeenCalledWith(
@@ -199,7 +199,7 @@ describe('MultiFolderTrustDialog', () => {
     const { onSelect } = mockedRadioButtonSelect.mock.calls[0][0];
 
     await act(async () => {
-      await onSelect(MultiFolderTrustChoice.NO);
+      onSelect(MultiFolderTrustChoice.NO);
     });
 
     expect(lastFrame()).toContain('Applying trust settings...');
@@ -217,7 +217,7 @@ describe('MultiFolderTrustDialog', () => {
 
     const { onSelect } = mockedRadioButtonSelect.mock.calls[0][0];
     await act(async () => {
-      await onSelect(MultiFolderTrustChoice.YES);
+      onSelect(MultiFolderTrustChoice.YES);
     });
 
     expect(mockAddItem).toHaveBeenCalledWith({
@@ -247,7 +247,7 @@ describe('MultiFolderTrustDialog', () => {
 
     const { onSelect } = mockedRadioButtonSelect.mock.calls[0][0];
     await act(async () => {
-      await onSelect(MultiFolderTrustChoice.YES);
+      onSelect(MultiFolderTrustChoice.YES);
     });
 
     expect(mockAddDirectory).toHaveBeenCalledWith(

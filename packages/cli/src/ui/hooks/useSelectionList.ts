@@ -24,8 +24,8 @@ interface BaseSelectionItem {
 export interface UseSelectionListOptions<T> {
   items: Array<SelectionListItem<T>>;
   initialIndex?: number;
-  onSelect: (value: T) => void | Promise<void>;
-  onHighlight?: (value: T) => void | Promise<void>;
+  onSelect: (value: T) => void;
+  onHighlight?: (value: T) => void;
   isFocused?: boolean;
   showNumbers?: boolean;
   wrapAround?: boolean;
@@ -352,14 +352,14 @@ export function useSelectionList<T>({
     let needsClear = false;
 
     if (state.pendingHighlight && items[state.activeIndex]) {
-      void onHighlight?.(items[state.activeIndex].value);
+      onHighlight?.(items[state.activeIndex].value);
       needsClear = true;
     }
 
     if (state.pendingSelect && items[state.activeIndex]) {
       const currentItem = items[state.activeIndex];
       if (currentItem && !currentItem.disabled) {
-        void onSelect(currentItem.value);
+        onSelect(currentItem.value);
       }
       needsClear = true;
     }
