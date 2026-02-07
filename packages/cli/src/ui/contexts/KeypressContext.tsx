@@ -132,6 +132,7 @@ const MAC_ALT_KEY_CHARACTER_MAP: Record<string, string> = {
   '\u00B5': 'm', // "µ" toggle markup view
   '\u03A9': 'z', // "Ω" Option+z
   '\u00B8': 'Z', // "¸" Option+Shift+z
+  '\u00DB': 'Z', // "Û" redo (common variant)
 };
 
 function nonKeyboardEventFilter(
@@ -584,9 +585,9 @@ function* emitKeys(
       if (isGreek && ch === '\u03A9') {
         insertable = true;
       } else {
-        const mapped = MAC_ALT_KEY_CHARACTER_MAP[ch];
-        name = mapped.toLowerCase();
-        shift = mapped !== name;
+        const mapping = MAC_ALT_KEY_CHARACTER_MAP[ch];
+        name = mapping.toLowerCase();
+        shift = mapping !== name;
         alt = true;
       }
     } else if (sequence === `${ESC}${ESC}`) {

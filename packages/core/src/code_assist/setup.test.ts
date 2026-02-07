@@ -39,6 +39,7 @@ describe('setupUser for existing user', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT_ID', '');
     mockLoad = vi.fn();
     mockOnboardUser = vi.fn().mockResolvedValue({
       done: true,
@@ -119,6 +120,7 @@ describe('setupUser for new user', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT_ID', '');
     vi.useFakeTimers();
     mockLoad = vi.fn();
     mockOnboardUser = vi.fn().mockResolvedValue({
@@ -179,6 +181,7 @@ describe('setupUser for new user', () => {
 
   it('should onboard a new free user when GOOGLE_CLOUD_PROJECT is not set', async () => {
     vi.stubEnv('GOOGLE_CLOUD_PROJECT', '');
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT_ID', '');
     mockLoad.mockResolvedValue({
       allowedTiers: [mockFreeTier],
     });
@@ -345,6 +348,7 @@ describe('setupUser validation', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.stubEnv('GOOGLE_CLOUD_PROJECT_ID', '');
     mockLoad = vi.fn();
     vi.mocked(CodeAssistServer).mockImplementation(
       () =>
