@@ -219,7 +219,7 @@ export async function retryWithBackoff<T>(
         throw error;
       }
 
-      const classifiedError = classifyGoogleError(error);
+      const classifiedError = classifyGoogleError(error, attempt);
 
       const errorCode = getErrorStatus(error);
 
