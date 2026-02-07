@@ -25,8 +25,17 @@
 #   50: Read-only tools (becomes 1.050 in default tier)
 #   999: YOLO mode allow-all (becomes 1.999 in default tier)
 
+# Ask-user tool always requires user interaction, even in YOLO mode.
+# This ensures the model can gather user preferences/decisions when needed.
+[[rule]]
+toolName = "ask_user"
+decision = "ask_user"
+priority = 999
+modes = ["yolo"]
+
+# Allow everything else in YOLO mode
 [[rule]]
 decision = "allow"
-priority = 999
+priority = 998
 modes = ["yolo"]
 allow_redirection = true
