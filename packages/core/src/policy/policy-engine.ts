@@ -530,6 +530,13 @@ export class PolicyEngine {
         continue;
       }
 
+      // Check if rule applies to current approval mode
+      if (rule.modes && rule.modes.length > 0) {
+        if (!rule.modes.includes(this.approvalMode)) {
+          continue;
+        }
+      }
+
       // If we've already processed this tool (found a higher priority rule), skip
       if (processedTools.has(rule.toolName)) {
         continue;
