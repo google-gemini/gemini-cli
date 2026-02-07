@@ -160,7 +160,7 @@ describe('ShellInputPrompt', () => {
     expect(mockWriteToPty).not.toHaveBeenCalled();
   });
 
-  it('ignores Command.SHELL_LEAVE_FOCUS (Shift+Tab) to allow focus navigation', () => {
+  it('ignores Command.UNFOCUS_SHELL (Shift+Tab) to allow focus navigation', () => {
     render(<ShellInputPrompt activeShellPtyId={1} focus={true} />);
 
     const handler = mockUseKeypress.mock.calls[0][0];

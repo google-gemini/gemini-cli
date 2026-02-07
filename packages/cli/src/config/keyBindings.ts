@@ -96,7 +96,7 @@ export enum Command {
   RESTART_APP = 'app.restart',
   SUSPEND_APP = 'app.suspend',
 
-  SHELL_LEAVE_FOCUS = 'shell.leaveFocus',
+  UNFOCUS_SHELL = 'shell.unfocus',
 }
 
 /**
@@ -296,7 +296,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.SUSPEND_APP]: [{ key: 'z', ctrl: true }],
 
   // Shell Controls
-  [Command.SHELL_LEAVE_FOCUS]: [{ key: 'tab', shift: true }],
+  [Command.UNFOCUS_SHELL]: [{ key: 'tab', shift: true }],
 };
 
 interface CommandCategory {
@@ -370,7 +370,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.DIALOG_NAVIGATION_DOWN,
       Command.DIALOG_NEXT,
       Command.DIALOG_PREV,
-      Command.SHELL_LEAVE_FOCUS,
+      Command.UNFOCUS_SHELL,
     ],
   },
   {
@@ -517,5 +517,5 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.SUSPEND_APP]: 'Suspend the application (not yet implemented).',
 
   // Shell Controls
-  [Command.SHELL_LEAVE_FOCUS]: 'Move focus out of the embedded shell.',
+  [Command.UNFOCUS_SHELL]: 'Move focus out of the embedded shell.',
 };
