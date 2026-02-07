@@ -80,4 +80,5 @@ jobs:
 
             Please review and merge.
           branch: 'changelog-${{ steps.release_info.outputs.VERSION }}'
+          team-reviewers: 'gemini-cli-docs, gemini-cli-maintainers'
           delete-branch: true
