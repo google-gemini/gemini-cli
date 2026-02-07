@@ -83,6 +83,7 @@ Environment variables can be used to override the settings in the file.
 | `target`       | `GEMINI_TELEMETRY_TARGET`        | Where to send telemetry data                        | `"gcp"`/`"local"` | `"local"`               |
 | `otlpEndpoint` | `GEMINI_TELEMETRY_OTLP_ENDPOINT` | OTLP collector endpoint                             | URL string        | `http://localhost:4317` |
 | `otlpProtocol` | `GEMINI_TELEMETRY_OTLP_PROTOCOL` | OTLP transport protocol                             | `"grpc"`/`"http"` | `"grpc"`                |
+| `otlpHeaders`  | `GEMINI_TELEMETRY_OTLP_HEADERS`  | Custom headers for OTLP requests (for auth)         | object/string     | -                       |
 | `outfile`      | `GEMINI_TELEMETRY_OUTFILE`       | Save telemetry to file (overrides `otlpEndpoint`)   | file path         | -                       |
 | `logPrompts`   | `GEMINI_TELEMETRY_LOG_PROMPTS`   | Include prompts in telemetry logs                   | `true`/`false`    | `true`                  |
 | `useCollector` | `GEMINI_TELEMETRY_USE_COLLECTOR` | Use external OTLP collector (advanced)              | `true`/`false`    | `false`                 |
@@ -91,6 +92,43 @@ Environment variables can be used to override the settings in the file.
 **Note on boolean environment variables:** For the boolean settings (`enabled`,
 `logPrompts`, `useCollector`), setting the corresponding environment variable to
 `true` or `1` will enable the feature. Any other value will disable it.
+
+### OTLP Headers
+
+The `otlpHeaders` setting allows you to send custom headers with OTLP telemetry
+requests. This is useful for authenticating with secured OTLP collectors that
+require API keys, bearer tokens, or other credentials.
+
+**Configuration precedence:** Headers are merged from multiple sources in the
+following order, with later sources overriding earlier ones for the same header
+key:
+
+1. `settings.json` (lowest precedence)
+2. `GEMINI_TELEMETRY_OTLP_HEADERS` environment variable
+3. `--telemetry-otlp-header` CLI flags (highest precedence)
+
+This allows you to set base headers in settings while overriding specific values
+via environment variables or CLI flags when needed.
+
+**Case-insensitive merging:** HTTP header names are case-insensitive per
+RFC 7230. All header keys are normalized to lowercase during merging to ensure
+correct override behavior. For example, `Authorization`, `authorization`, and
+`AUTHORIZATION` are treated as the same header.
+
+**Format options:**
+
+- **JSON format:** `{"Authorization": "Bearer token", "x-api-key": "abc123"}`
+- **Key=value pairs:** `Authorization=Bearer token,x-api-key=abc123`
+- **Environment variable reference:** Values can reference environment variables
+  using `$VAR_NAME` or `${VAR_NAME}` syntax.
+
+**Token expiry considerations:** OTLP headers are read once when the CLI starts.
+If your authentication tokens expire during a long-running session, you will
+need to restart the CLI to refresh them. For long-running sessions, consider:
+
+- Using non-expiring API keys when possible
+- Using service account credentials instead of short-lived tokens
+- Restarting the CLI periodically to refresh credentials
 
 For detailed information about all configuration options, see the
 [Configuration guide](../get-started/configuration.md).
