@@ -14,6 +14,7 @@ import type {
   HistoryItemWithoutId,
   StreamingState,
   ActiveHook,
+  QuotaStats,
 } from '../types.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
@@ -118,6 +119,7 @@ export interface UIState {
   showApprovalModeIndicator: ApprovalMode;
   // Quota-related state
   userTier: UserTierId | undefined;
+  quotaStats: QuotaStats | undefined;
   proQuotaRequest: ProQuotaDialogRequest | null;
   validationRequest: ValidationDialogRequest | null;
   currentModel: string;

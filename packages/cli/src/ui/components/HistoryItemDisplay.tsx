@@ -125,6 +125,8 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           selectedAuthType={itemForDisplay.selectedAuthType}
           userEmail={itemForDisplay.userEmail}
           tier={itemForDisplay.tier}
+          currentModel={itemForDisplay.currentModel}
+          quotaStats={itemForDisplay.quotaStats}
         />
       )}
       {itemForDisplay.type === 'model_stats' && (
@@ -132,6 +134,8 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           selectedAuthType={itemForDisplay.selectedAuthType}
           userEmail={itemForDisplay.userEmail}
           tier={itemForDisplay.tier}
+          currentModel={itemForDisplay.currentModel}
+          quotaStats={itemForDisplay.quotaStats}
         />
       )}
       {itemForDisplay.type === 'tool_stats' && <ToolStatsDisplay />}

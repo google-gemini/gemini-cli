@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { createMockSettings } from '../../test-utils/settings.js';
 import { Footer } from './Footer.js';
@@ -129,6 +129,36 @@ describe('<Footer />', () => {
     });
     expect(lastFrame()).toContain(defaultProps.model);
     expect(lastFrame()).toMatch(/\(\d+% context left\)/);
+  });
+
+  it('displays the usage indicator when usage is low', () => {
+    const { lastFrame } = renderWithProviders(<Footer />, {
+      width: 120,
+      uiState: {
+        sessionStats: mockSessionStats,
+        quotaStats: {
+          remaining: 15,
+          limit: 100,
+          resetTime: undefined,
+        },
+      },
+    });
+    expect(lastFrame()).toContain('15%');
+  });
+
+  it('hides the usage indicator when usage is not near limit', () => {
+    const { lastFrame } = renderWithProviders(<Footer />, {
+      width: 120,
+      uiState: {
+        sessionStats: mockSessionStats,
+        quotaStats: {
+          remaining: 85,
+          limit: 100,
+          resetTime: undefined,
+        },
+      },
+    });
+    expect(lastFrame()).not.toContain('Usage remaining');
   });
 
   it('displays the model name and abbreviated context percentage', () => {

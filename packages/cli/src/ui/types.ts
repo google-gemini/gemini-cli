@@ -48,6 +48,12 @@ export enum GeminiEventType {
   // Add other event types if the UI hook needs to handle them
 }
 
+export interface QuotaStats {
+  remaining: number | undefined;
+  limit: number | undefined;
+  resetTime: string | undefined;
+}
+
 export enum ToolCallStatus {
   Pending = 'Pending',
   Canceled = 'Canceled',
@@ -153,20 +159,22 @@ export type HistoryItemHelp = HistoryItemBase & {
   timestamp: Date;
 };
 
-export type HistoryItemStats = HistoryItemBase & {
+export interface HistoryItemQuotaBase extends HistoryItemBase {
+  selectedAuthType?: string;
+  userEmail?: string;
+  tier?: string;
+  currentModel?: string;
+  quotaStats?: QuotaStats;
+}
+
+export type HistoryItemStats = HistoryItemQuotaBase & {
   type: 'stats';
   duration: string;
   quotas?: RetrieveUserQuotaResponse;
-  selectedAuthType?: string;
-  userEmail?: string;
-  tier?: string;
 };
 
-export type HistoryItemModelStats = HistoryItemBase & {
+export type HistoryItemModelStats = HistoryItemQuotaBase & {
   type: 'model_stats';
-  selectedAuthType?: string;
-  userEmail?: string;
-  tier?: string;
 };
 
 export type HistoryItemToolStats = HistoryItemBase & {

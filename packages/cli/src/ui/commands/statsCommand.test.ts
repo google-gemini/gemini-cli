@@ -54,6 +54,7 @@ describe('statsCommand', () => {
       selectedAuthType: '',
       tier: undefined,
       userEmail: 'mock@example.com',
+      currentModel: undefined,
     });
   });
 
@@ -63,9 +64,20 @@ describe('statsCommand', () => {
     const mockQuota = { buckets: [] };
     const mockRefreshUserQuota = vi.fn().mockResolvedValue(mockQuota);
     const mockGetUserTierName = vi.fn().mockReturnValue('Basic');
+    const mockGetModel = vi.fn().mockReturnValue('gemini-pro');
+    const mockGetQuotaRemaining = vi.fn().mockReturnValue(85);
+    const mockGetQuotaLimit = vi.fn().mockReturnValue(100);
+    const mockGetQuotaResetTime = vi
+      .fn()
+      .mockReturnValue('2025-01-01T12:00:00Z');
+
     mockContext.services.config = {
       refreshUserQuota: mockRefreshUserQuota,
       getUserTierName: mockGetUserTierName,
+      getModel: mockGetModel,
+      getQuotaRemaining: mockGetQuotaRemaining,
+      getQuotaLimit: mockGetQuotaLimit,
+      getQuotaResetTime: mockGetQuotaResetTime,
     } as unknown as Config;
 
     await statsCommand.action(mockContext, '');
@@ -75,6 +87,12 @@ describe('statsCommand', () => {
       expect.objectContaining({
         quotas: mockQuota,
         tier: 'Basic',
+        currentModel: 'gemini-pro',
+        quotaStats: {
+          remaining: 85,
+          limit: 100,
+          resetTime: '2025-01-01T12:00:00Z',
+        },
       }),
     );
   });
@@ -93,6 +111,12 @@ describe('statsCommand', () => {
       selectedAuthType: '',
       tier: undefined,
       userEmail: 'mock@example.com',
+      currentModel: undefined,
+      quotaStats: {
+        remaining: undefined,
+        limit: undefined,
+        resetTime: undefined,
+      },
     });
   });
 
