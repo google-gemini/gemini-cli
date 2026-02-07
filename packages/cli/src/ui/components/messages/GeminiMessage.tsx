@@ -50,7 +50,7 @@ export const GeminiMessage: React.FC<GeminiMessageProps> = ({
           terminalWidth={terminalWidth}
           renderMarkdown={renderMarkdown}
         />
-        <Box marginBottom={1}>
+        <Box marginBottom={isAlternateBuffer ? 1 : 0}>
           <ShowMoreLines
             constrainHeight={availableTerminalHeight !== undefined}
           />
