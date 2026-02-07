@@ -331,6 +331,9 @@ export function createPolicyUpdater(
   policyEngine: PolicyEngine,
   messageBus: MessageBus,
 ) {
+  // Use a sequential queue for persistence to avoid lost updates from concurrent events.
+  let persistenceQueue = Promise.resolve();
+
   messageBus.subscribe(
     MessageBusType.UPDATE_POLICY,
     async (message: UpdatePolicy) => {
@@ -371,72 +374,77 @@ export function createPolicyUpdater(
       }
 
       if (message.persist) {
-        try {
-          const userPoliciesDir = Storage.getUserPoliciesDir();
-          await fs.mkdir(userPoliciesDir, { recursive: true });
-          const policyFile = path.join(userPoliciesDir, 'auto-saved.toml');
-
-          // Read existing file
-          let existingData: { rule?: TomlRule[] } = {};
+        persistenceQueue = persistenceQueue.then(async () => {
           try {
-            const fileContent = await fs.readFile(policyFile, 'utf-8');
-            existingData = toml.parse(fileContent) as { rule?: TomlRule[] };
-          } catch (error) {
-            if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-              debugLogger.warn(
-                `Failed to parse ${policyFile}, overwriting with new policy.`,
-                error,
-              );
+            const userPoliciesDir = Storage.getUserPoliciesDir();
+            await fs.mkdir(userPoliciesDir, { recursive: true });
+            const policyFile = path.join(userPoliciesDir, 'auto-saved.toml');
+
+            // Read existing file
+            let existingData: { rule?: TomlRule[] } = {};
+            try {
+              const fileContent = await fs.readFile(policyFile, 'utf-8');
+              existingData = toml.parse(fileContent) as { rule?: TomlRule[] };
+            } catch (error) {
+              if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+                debugLogger.warn(
+                  `Failed to parse ${policyFile}, overwriting with new policy.`,
+                  error,
+                );
+              }
             }
+
+            // Initialize rule array if needed
+            if (!existingData.rule) {
+              existingData.rule = [];
+            }
+
+            // Create new rule object
+            const newRule: TomlRule = {};
+
+            if (message.mcpName) {
+              newRule.mcpName = message.mcpName;
+              // Extract simple tool name
+              const simpleToolName = toolName.startsWith(`${message.mcpName}__`)
+                ? toolName.slice(message.mcpName.length + 2)
+                : toolName;
+              newRule.toolName = simpleToolName;
+              newRule.decision = 'allow';
+              newRule.priority = 200;
+            } else {
+              newRule.toolName = toolName;
+              newRule.decision = 'allow';
+              newRule.priority = 100;
+            }
+
+            if (message.commandPrefix) {
+              newRule.commandPrefix = message.commandPrefix;
+            } else if (message.argsPattern) {
+              newRule.argsPattern = message.argsPattern;
+            }
+
+            // Add to rules
+            existingData.rule.push(newRule);
+
+            // Serialize back to TOML
+            // @iarna/toml stringify might not produce beautiful output but it handles escaping correctly
+            const newContent = toml.stringify(existingData as toml.JsonMap);
+
+            // Atomic write: write to a unique tmp file then rename to the target file.
+            // Using a unique suffix avoids race conditions where concurrent processes
+            // overwrite each other's temporary files, leading to ENOENT errors on rename.
+            const tmpSuffix = `${Date.now()}.${Math.random().toString(36).slice(2)}`;
+            const tmpFile = `${policyFile}.${tmpSuffix}.tmp`;
+            await fs.writeFile(tmpFile, newContent, 'utf-8');
+            await fs.rename(tmpFile, policyFile);
+          } catch (error) {
+            coreEvents.emitFeedback(
+              'error',
+              `Failed to persist policy for ${toolName}`,
+              error,
+            );
           }
-
-          // Initialize rule array if needed
-          if (!existingData.rule) {
-            existingData.rule = [];
-          }
-
-          // Create new rule object
-          const newRule: TomlRule = {};
-
-          if (message.mcpName) {
-            newRule.mcpName = message.mcpName;
-            // Extract simple tool name
-            const simpleToolName = toolName.startsWith(`${message.mcpName}__`)
-              ? toolName.slice(message.mcpName.length + 2)
-              : toolName;
-            newRule.toolName = simpleToolName;
-            newRule.decision = 'allow';
-            newRule.priority = 200;
-          } else {
-            newRule.toolName = toolName;
-            newRule.decision = 'allow';
-            newRule.priority = 100;
-          }
-
-          if (message.commandPrefix) {
-            newRule.commandPrefix = message.commandPrefix;
-          } else if (message.argsPattern) {
-            newRule.argsPattern = message.argsPattern;
-          }
-
-          // Add to rules
-          existingData.rule.push(newRule);
-
-          // Serialize back to TOML
-          // @iarna/toml stringify might not produce beautiful output but it handles escaping correctly
-          const newContent = toml.stringify(existingData as toml.JsonMap);
-
-          // Atomic write: write to tmp then rename
-          const tmpFile = `${policyFile}.tmp`;
-          await fs.writeFile(tmpFile, newContent, 'utf-8');
-          await fs.rename(tmpFile, policyFile);
-        } catch (error) {
-          coreEvents.emitFeedback(
-            'error',
-            `Failed to persist policy for ${toolName}`,
-            error,
-          );
-        }
+        });
       }
     },
   );
