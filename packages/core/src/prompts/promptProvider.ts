@@ -58,18 +58,6 @@ export class PromptProvider {
     const activeSnippets = isGemini3 ? snippets : legacySnippets;
 
     // --- Context Gathering ---
-    const planOptions: snippets.ApprovalModePlanOptions | undefined = isPlanMode
-      ? {
-          planModeToolsList: PLAN_MODE_TOOLS.filter((t) =>
-            new Set(toolNames).has(t),
-          )
-            .map((t) => `- \`${t}\``)
-            .join('\n'),
-          plansDir: config.storage.getProjectTempPlansDir(),
-        }
-      : undefined;
-
-    // --- Context Gathering ---
     let planModeToolsList = PLAN_MODE_TOOLS.filter((t) =>
       enabledToolNames.has(t),
     )
@@ -185,11 +173,7 @@ export class PromptProvider {
     }
 
     // --- Finalization (Shell) ---
-    const finalPrompt = activeSnippets.renderFinalShell(
-      basePrompt,
-      userMemory,
-      planOptions,
-    );
+    const finalPrompt = activeSnippets.renderFinalShell(basePrompt, userMemory);
 
     // Sanitize erratic newlines from composition
     const sanitizedPrompt = finalPrompt.replace(/\n{3,}/g, '\n\n');

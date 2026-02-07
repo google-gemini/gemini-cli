@@ -75,11 +75,6 @@ export interface PlanningWorkflowOptions {
   approvedPlanPath?: string;
 }
 
-export interface ApprovalModePlanOptions {
-  planModeToolsList: string;
-  plansDir: string;
-}
-
 export interface AgentSkillOptions {
   name: string;
   description: string;
@@ -125,14 +120,11 @@ ${renderFinalReminder(options.finalReminder)}
 export function renderFinalShell(
   basePrompt: string,
   userMemory?: string,
-  planOptions?: ApprovalModePlanOptions,
 ): string {
   return `
 ${basePrompt.trim()}
 
 ${renderUserMemory(userMemory)}
-
-${renderApprovalModePlan(planOptions)}
 `.trim();
 }
 
@@ -394,57 +386,6 @@ An approved plan is available for this task.
 - **Iterate:** You should default to refining the existing approved plan.
 - **New Plan:** Only create a new plan file if the user explicitly asks for a "new plan" or if the current request is for a completely different feature or bug.
 `;
-}
-
-export function renderApprovalModePlan(
-  options?: ApprovalModePlanOptions,
-): string {
-  if (!options) return '';
-  return `
-# Active Approval Mode: Plan
-
-You are operating in **Plan Mode** - a structured planning workflow for designing implementation strategies before execution.
-
-## Available Tools
-The following read-only tools are available in Plan Mode:
-${options.planModeToolsList}
-- \`${WRITE_FILE_TOOL_NAME}\` - Save plans to the plans directory (see Plan Storage below)
-
-## Plan Storage
-- Save your plans as Markdown (.md) files ONLY within: \`${options.plansDir}/\`
-- You are restricted to writing files within this directory while in Plan Mode.
-- Use descriptive filenames: \`feature-name.md\` or \`bugfix-description.md\`
-
-## Workflow Phases
-
-**IMPORTANT: Complete ONE phase at a time. Do NOT skip ahead or combine phases. Wait for user input before proceeding to the next phase.**
-
-### Phase 1: Requirements Understanding
-- Analyze the user's request to identify core requirements and constraints
-- If critical information is missing or ambiguous, ask clarifying questions using the \`${ASK_USER_TOOL_NAME}\` tool
-- When using \`${ASK_USER_TOOL_NAME}\`, prefer providing multiple-choice options for the user to select from when possible
-- Do NOT explore the project or create a plan yet
-
-### Phase 2: Project Exploration
-- Only begin this phase after requirements are clear
-- Use the available read-only tools to explore the project
-- Identify existing patterns, conventions, and architectural decisions
-
-### Phase 3: Design & Planning
-- Only begin this phase after exploration is complete
-- Create a detailed implementation plan with clear steps
-- Include file paths, function signatures, and code snippets where helpful
-- Save the implementation plan to the designated plans directory
-
-### Phase 4: Review & Approval
-- Present the plan and request approval for the finalized plan using the \`${EXIT_PLAN_MODE_TOOL_NAME}\` tool
-- If plan is approved, you can begin implementation
-- If plan is rejected, address the feedback and iterate on the plan
-
-## Constraints
-- You may ONLY use the read-only tools listed above
-- You MUST NOT modify source code, configs, or any files
-- If asked to modify code, explain you are in Plan Mode and suggest exiting Plan Mode to enable edits`.trim();
 }
 
 // --- Leaf Helpers (Strictly strings or simple calls) ---
