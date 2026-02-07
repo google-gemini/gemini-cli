@@ -52,6 +52,8 @@ export const ReviewerAgent = (
       'list_directory',
       'grep_search',
       'glob',
+      'lsp_find_references',
+      'lsp_go_to_definition',
     ];
     const tools = config
       .getToolRegistry()

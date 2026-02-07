@@ -114,6 +114,7 @@ export * from './services/chatRecordingService.js';
 export * from './services/fileSystemService.js';
 export * from './services/sessionSummaryUtils.js';
 export * from './services/contextManager.js';
+export * from './services/lspService.js';
 export * from './skills/skillManager.js';
 export * from './skills/skillLoader.js';
 
@@ -157,6 +158,8 @@ export * from './tools/memoryTool.js';
 export * from './tools/shell.js';
 export * from './tools/web-search.js';
 export * from './tools/read-many-files.js';
+export * from './tools/lsp-find-references.js';
+export * from './tools/lsp-go-to-definition.js';
 export * from './tools/mcp-client.js';
 export * from './tools/mcp-tool.js';
 export * from './tools/write-todos.js';

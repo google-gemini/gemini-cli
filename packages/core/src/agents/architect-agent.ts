@@ -48,6 +48,8 @@ export const ArchitectAgent = (
       'list_directory',
       'grep_search',
       'glob',
+      'lsp_find_references',
+      'lsp_go_to_definition',
     ];
     const tools = config
       .getToolRegistry()
@@ -64,8 +66,15 @@ Your goal is to analyze the codebase and design a detailed implementation plan f
 
 Your plan MUST follow the PlanProposalSchema:
 1. Provide a clear title and description.
-2. Break the task into small, logical steps.
-3. Each step should be actionable and verifiable.
+2. Provide a list of "steps" as an array of strings.
+3. Each step should be a single actionable sentence.
+
+Example format:
+{
+  "title": "My Feature",
+  "description": "...",
+  "steps": ["Create file X", "Update function Y"]
+}
 
 Use your tools to explore the codebase, understand existing patterns, and identify all necessary changes before finalizing the plan.`,
       query: '${request}',

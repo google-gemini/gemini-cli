@@ -98,6 +98,7 @@ import { MessageBus } from '../confirmation-bus/message-bus.js';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
+import { LspService } from '../services/lspService.js';
 import type { UserTierId } from '../code_assist/types.js';
 import type { RetrieveUserQuotaResponse } from '../code_assist/types.js';
 import type { AdminControlsSettings } from '../code_assist/types.js';
@@ -119,6 +120,8 @@ import {
 } from '../telemetry/loggers.js';
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 import { isSubpath } from '../utils/paths.js';
+import { LspFindReferencesTool } from '../tools/lsp-find-references.js';
+import { LspGoToDefinitionTool } from '../tools/lsp-go-to-definition.js';
 
 export interface AccessibilitySettings {
   enableLoadingPhrases?: boolean;
@@ -493,6 +496,7 @@ export class Config {
   private readonly enableEnvironmentVariableRedaction: boolean;
   private promptRegistry!: PromptRegistry;
   private resourceRegistry!: ResourceRegistry;
+  private lspService!: LspService;
   private agentRegistry!: AgentRegistry;
   private readonly acknowledgedAgentsService: AcknowledgedAgentsService;
   private skillManager!: SkillManager;
@@ -576,9 +580,9 @@ export class Config {
   private readonly ptyInfo: string;
   private readonly trustedFolder: boolean | undefined;
   private readonly useRipgrep: boolean;
+  private readonly useBackgroundColor: boolean;
   private readonly enableInteractiveShell: boolean;
   private readonly skipNextSpeakerCheck: boolean;
-  private readonly useBackgroundColor: boolean;
   private shellExecutionConfig: ShellExecutionConfig;
   private readonly extensionManagement: boolean = true;
   private readonly enablePromptCompletion: boolean = false;
@@ -872,6 +876,7 @@ export class Config {
     this.modelConfigService = new ModelConfigService(
       modelConfigServiceConfig ?? DEFAULT_MODEL_CONFIGS,
     );
+    this.lspService = new LspService(this);
   }
 
   /**
@@ -1238,6 +1243,10 @@ export class Config {
 
   getAgentRegistry(): AgentRegistry {
     return this.agentRegistry;
+  }
+
+  getLspService(): LspService {
+    return this.lspService;
   }
 
   getAcknowledgedAgentsService(): AcknowledgedAgentsService {
@@ -1997,344 +2006,3 @@ export class Config {
   isInteractive(): boolean {
     return this.interactive;
   }
-
-  getUseRipgrep(): boolean {
-    return this.useRipgrep;
-  }
-
-  getUseBackgroundColor(): boolean {
-    return this.useBackgroundColor;
-  }
-
-  getEnableInteractiveShell(): boolean {
-    return this.enableInteractiveShell;
-  }
-
-  getSkipNextSpeakerCheck(): boolean {
-    return this.skipNextSpeakerCheck;
-  }
-
-  getContinueOnFailedApiCall(): boolean {
-    return this.continueOnFailedApiCall;
-  }
-
-  getRetryFetchErrors(): boolean {
-    return this.retryFetchErrors;
-  }
-
-  getEnableShellOutputEfficiency(): boolean {
-    return this.enableShellOutputEfficiency;
-  }
-
-  getShellToolInactivityTimeout(): number {
-    return this.shellToolInactivityTimeout;
-  }
-
-  getShellExecutionConfig(): ShellExecutionConfig {
-    return this.shellExecutionConfig;
-  }
-
-  setShellExecutionConfig(config: ShellExecutionConfig): void {
-    this.shellExecutionConfig = {
-      terminalWidth:
-        config.terminalWidth ?? this.shellExecutionConfig.terminalWidth,
-      terminalHeight:
-        config.terminalHeight ?? this.shellExecutionConfig.terminalHeight,
-      showColor: config.showColor ?? this.shellExecutionConfig.showColor,
-      pager: config.pager ?? this.shellExecutionConfig.pager,
-      sanitizationConfig:
-        config.sanitizationConfig ??
-        this.shellExecutionConfig.sanitizationConfig,
-    };
-  }
-  getScreenReader(): boolean {
-    return this.accessibility.screenReader ?? false;
-  }
-
-  getEnablePromptCompletion(): boolean {
-    return this.enablePromptCompletion;
-  }
-
-  getTruncateToolOutputThreshold(): number {
-    return Math.min(
-      // Estimate remaining context window in characters (1 token ~= 4 chars).
-      4 *
-        (tokenLimit(this.model) - uiTelemetryService.getLastPromptTokenCount()),
-      this.truncateToolOutputThreshold,
-    );
-  }
-
-  getNextCompressionTruncationId(): number {
-    return ++this.compressionTruncationCounter;
-  }
-
-  getUseWriteTodos(): boolean {
-    return this.useWriteTodos;
-  }
-
-  getOutputFormat(): OutputFormat {
-    return this.outputSettings?.format
-      ? this.outputSettings.format
-      : OutputFormat.TEXT;
-  }
-
-  async getGitService(): Promise<GitService> {
-    if (!this.gitService) {
-      this.gitService = new GitService(this.targetDir, this.storage);
-      await this.gitService.initialize();
-    }
-    return this.gitService;
-  }
-
-  getFileExclusions(): FileExclusions {
-    return this.fileExclusions;
-  }
-
-  getMessageBus(): MessageBus {
-    return this.messageBus;
-  }
-
-  getPolicyEngine(): PolicyEngine {
-    return this.policyEngine;
-  }
-
-  getEnableHooks(): boolean {
-    return this.enableHooks;
-  }
-
-  getEnableHooksUI(): boolean {
-    return this.enableHooksUI;
-  }
-
-  async createToolRegistry(): Promise<ToolRegistry> {
-    const registry = new ToolRegistry(this, this.messageBus);
-
-    // helper to create & register core tools that are enabled
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const registerCoreTool = (ToolClass: any, ...args: unknown[]) => {
-      const className = ToolClass.name;
-      const toolName = ToolClass.Name || className;
-      const coreTools = this.getCoreTools();
-      // On some platforms, the className can be minified to _ClassName.
-      const normalizedClassName = className.replace(/^_+/, '');
-
-      let isEnabled = true; // Enabled by default if coreTools is not set.
-      if (coreTools) {
-        isEnabled = coreTools.some(
-          (tool) =>
-            tool === toolName ||
-            tool === normalizedClassName ||
-            tool.startsWith(`${toolName}(`) ||
-            tool.startsWith(`${normalizedClassName}(`),
-        );
-      }
-
-      if (isEnabled) {
-        // Pass message bus to tools (required for policy engine integration)
-        const toolArgs = [...args, this.getMessageBus()];
-
-        registry.registerTool(new ToolClass(...toolArgs));
-      }
-    };
-
-    registerCoreTool(LSTool, this);
-    registerCoreTool(ReadFileTool, this);
-
-    if (this.getUseRipgrep()) {
-      let useRipgrep = false;
-      let errorString: undefined | string = undefined;
-      try {
-        useRipgrep = await canUseRipgrep();
-      } catch (error: unknown) {
-        errorString = String(error);
-      }
-      if (useRipgrep) {
-        registerCoreTool(RipGrepTool, this);
-      } else {
-        logRipgrepFallback(this, new RipgrepFallbackEvent(errorString));
-        registerCoreTool(GrepTool, this);
-      }
-    } else {
-      registerCoreTool(GrepTool, this);
-    }
-
-    registerCoreTool(GlobTool, this);
-    registerCoreTool(ActivateSkillTool, this);
-    registerCoreTool(EditTool, this);
-    registerCoreTool(WriteFileTool, this);
-    registerCoreTool(WebFetchTool, this);
-    registerCoreTool(ShellTool, this);
-    registerCoreTool(MemoryTool);
-    registerCoreTool(WebSearchTool, this);
-    registerCoreTool(AskUserTool);
-    if (this.getUseWriteTodos()) {
-      registerCoreTool(WriteTodosTool);
-    }
-    if (this.isPlanEnabled()) {
-      registerCoreTool(ExitPlanModeTool, this);
-      registerCoreTool(EnterPlanModeTool, this);
-    }
-
-    // Register Subagents as Tools
-    this.registerSubAgentTools(registry);
-
-    await registry.discoverAllTools();
-    registry.sortTools();
-    return registry;
-  }
-
-  /**
-   * Registers SubAgentTools for all available agents.
-   */
-  private registerSubAgentTools(registry: ToolRegistry): void {
-    const agentsOverrides = this.getAgentsSettings().overrides ?? {};
-    if (
-      this.isAgentsEnabled() ||
-      agentsOverrides['codebase_investigator']?.enabled !== false ||
-      agentsOverrides['cli_help']?.enabled !== false
-    ) {
-      const allowedTools = this.getAllowedTools();
-      const definitions = this.agentRegistry.getAllDefinitions();
-
-      for (const definition of definitions) {
-        const isAllowed =
-          !allowedTools || allowedTools.includes(definition.name);
-
-        if (isAllowed) {
-          try {
-            const tool = new SubagentTool(
-              definition,
-              this,
-              this.getMessageBus(),
-            );
-            registry.registerTool(tool);
-          } catch (e: unknown) {
-            debugLogger.warn(
-              `Failed to register tool for agent ${definition.name}: ${getErrorMessage(e)}`,
-            );
-          }
-        }
-      }
-    }
-  }
-
-  /**
-   * Get the hook system instance
-   */
-  getHookSystem(): HookSystem | undefined {
-    return this.hookSystem;
-  }
-
-  /**
-   * Get hooks configuration
-   */
-  getHooks(): { [K in HookEventName]?: HookDefinition[] } | undefined {
-    return this.hooks;
-  }
-
-  /**
-   * Get project-specific hooks configuration
-   */
-  getProjectHooks(): { [K in HookEventName]?: HookDefinition[] } | undefined {
-    return this.projectHooks;
-  }
-
-  /**
-   * Update the list of disabled hooks dynamically.
-   * This is used to keep the running system in sync with settings changes
-   * without risk of loading new hook definitions into memory.
-   */
-  updateDisabledHooks(disabledHooks: string[]): void {
-    this.disabledHooks = disabledHooks;
-  }
-
-  /**
-   * Get disabled hooks list
-   */
-  getDisabledHooks(): string[] {
-    return this.disabledHooks;
-  }
-
-  /**
-   * Get experiments configuration
-   */
-  getExperiments(): Experiments | undefined {
-    return this.experiments;
-  }
-
-  /**
-   * Set experiments configuration
-   */
-  setExperiments(experiments: Experiments): void {
-    this.experiments = experiments;
-    const flagSummaries = Object.entries(experiments.flags ?? {})
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([flagId, flag]) => {
-        const summary: Record<string, unknown> = { flagId };
-        if (flag.boolValue !== undefined) {
-          summary['boolValue'] = flag.boolValue;
-        }
-        if (flag.floatValue !== undefined) {
-          summary['floatValue'] = flag.floatValue;
-        }
-        if (flag.intValue !== undefined) {
-          summary['intValue'] = flag.intValue;
-        }
-        if (flag.stringValue !== undefined) {
-          summary['stringValue'] = flag.stringValue;
-        }
-        const int32Length = flag.int32ListValue?.values?.length ?? 0;
-        if (int32Length > 0) {
-          summary['int32ListLength'] = int32Length;
-        }
-        const stringListLength = flag.stringListValue?.values?.length ?? 0;
-        if (stringListLength > 0) {
-          summary['stringListLength'] = stringListLength;
-        }
-        return summary;
-      });
-    const summary = {
-      experimentIds: experiments.experimentIds ?? [],
-      flags: flagSummaries,
-    };
-    const summaryString = inspect(summary, {
-      depth: null,
-      maxArrayLength: null,
-      maxStringLength: null,
-      breakLength: 80,
-      compact: false,
-    });
-    debugLogger.debug('Experiments loaded', summaryString);
-  }
-
-  private onAgentsRefreshed = async () => {
-    if (this.toolRegistry) {
-      this.registerSubAgentTools(this.toolRegistry);
-    }
-    // Propagate updates to the active chat session
-    const client = this.getGeminiClient();
-    if (client?.isInitialized()) {
-      await client.setTools();
-      client.updateSystemInstruction();
-    } else {
-      debugLogger.debug(
-        '[Config] GeminiClient not initialized; skipping live prompt/tool refresh.',
-      );
-    }
-  };
-
-  /**
-   * Disposes of resources and removes event listeners.
-   */
-  async dispose(): Promise<void> {
-    this.logCurrentModeDuration(this.getApprovalMode());
-    coreEvents.off(CoreEvent.AgentsRefreshed, this.onAgentsRefreshed);
-    this.agentRegistry?.dispose();
-    this.geminiClient?.dispose();
-    if (this.mcpClientManager) {
-      await this.mcpClientManager.stop();
-    }
-  }
-}
-// Export model constants for use in CLI
-export { DEFAULT_GEMINI_FLASH_MODEL };
