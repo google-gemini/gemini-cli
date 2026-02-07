@@ -19,6 +19,9 @@ import {
   type EditorType,
   getEditorCommand,
   isGuiEditor,
+  isEditorAvailableAsync,
+  resolveEditorAsync,
+  NO_EDITOR_AVAILABLE_ERROR,
 } from '@google/gemini-cli-core';
 import {
   toCodePoints,
@@ -3053,6 +3056,41 @@ export function useTextBuffer({
   }, []);
 
   const openInExternalEditor = useCallback(async (): Promise<void> => {
+    let command: string | undefined = undefined;
+    let openedEditor = false;
+    const args: string[] = [];
+
+    const preferredEditorType = getPreferredEditor?.();
+    if (
+      preferredEditorType &&
+      (await isEditorAvailableAsync(preferredEditorType))
+    ) {
+      command = getEditorCommand(preferredEditorType);
+      if (isGuiEditor(preferredEditorType)) {
+        args.push('--wait');
+      }
+    }
+
+    if (!command) {
+      command = process.env['VISUAL'] ?? process.env['EDITOR'];
+    }
+
+    if (!command && process.platform === 'win32') {
+      command = 'notepad';
+    }
+
+    if (!command) {
+      const resolvedEditor = await resolveEditorAsync(preferredEditorType);
+      if (!resolvedEditor) {
+        coreEvents.emitFeedback('error', NO_EDITOR_AVAILABLE_ERROR);
+        return;
+      }
+      command = getEditorCommand(resolvedEditor);
+      if (isGuiEditor(resolvedEditor)) {
+        args.push('--wait');
+      }
+    }
+
     const tmpDir = fs.mkdtempSync(pathMod.join(os.tmpdir(), 'gemini-edit-'));
     const filePath = pathMod.join(tmpDir, 'buffer.txt');
     // Expand paste placeholders so user sees full content in editor
@@ -3061,30 +3099,14 @@ export function useTextBuffer({
       (match) => pastedContent[match] || match,
     );
     fs.writeFileSync(filePath, expandedText, 'utf8');
-
-    let command: string | undefined = undefined;
-    const args = [filePath];
-
-    const preferredEditorType = getPreferredEditor?.();
-    if (!command && preferredEditorType) {
-      command = getEditorCommand(preferredEditorType);
-      if (isGuiEditor(preferredEditorType)) {
-        args.unshift('--wait');
-      }
-    }
-
-    if (!command) {
-      command =
-        process.env['VISUAL'] ??
-        process.env['EDITOR'] ??
-        (process.platform === 'win32' ? 'notepad' : 'vi');
-    }
+    args.push(filePath);
 
     dispatch({ type: 'create_undo_snapshot' });
 
     const wasRaw = stdin?.isRaw ?? false;
     try {
       setRawMode?.(false);
+      openedEditor = true;
       const { status, error } = spawnSync(command, args, {
         stdio: 'inherit',
         shell: process.platform === 'win32',
@@ -3114,8 +3136,10 @@ export function useTextBuffer({
         err,
       );
     } finally {
-      coreEvents.emit(CoreEvent.ExternalEditorClosed);
-      if (wasRaw) setRawMode?.(true);
+      if (openedEditor) {
+        coreEvents.emit(CoreEvent.ExternalEditorClosed);
+        if (wasRaw) setRawMode?.(true);
+      }
       try {
         fs.unlinkSync(filePath);
       } catch {
