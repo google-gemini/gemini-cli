@@ -27,7 +27,6 @@ describe('Fallback Integration', () => {
       getModel: () => PREVIEW_GEMINI_MODEL_AUTO,
       getActiveModel: () => PREVIEW_GEMINI_MODEL_AUTO,
       setActiveModel: vi.fn(),
-      getPreviewFeatures: () => true, // Preview enabled for Gemini 3
       getUserTier: () => undefined,
       getModelAvailabilityService: () => availabilityService,
       modelConfigService: undefined as unknown as ModelConfigService,

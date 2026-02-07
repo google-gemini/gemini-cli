@@ -52,6 +52,7 @@ locations override lower ones: **Workspace > User > Extension**.
 Use the `/skills` slash command to view and manage available expertise:
 
 - `/skills list` (default): Shows all discovered skills and their status.
+- `/skills link <path>`: Links agent skills from a local directory via symlink.
 - `/skills disable <name>`: Prevents a specific skill from being used.
 - `/skills enable <name>`: Re-enables a disabled skill.
 - `/skills reload`: Refreshes the list of discovered skills from all tiers.
@@ -66,6 +67,13 @@ The `gemini skills` command provides management utilities:
 ```bash
 # List all discovered skills
 gemini skills list
+
+# Link agent skills from a local directory via symlink
+# Discovers skills (SKILL.md or */SKILL.md) and creates symlinks in ~/.gemini/skills (user)
+gemini skills link /path/to/my-skills-repo
+
+# Link to the workspace scope (.gemini/skills)
+gemini skills link /path/to/my-skills-repo --scope workspace
 
 # Install a skill from a Git repository, local directory, or zipped skill file (.skill)
 # Uses the user scope by default (~/.gemini/skills)
@@ -89,7 +97,7 @@ gemini skills enable my-expertise
 gemini skills disable my-expertise --scope workspace
 ```
 
-## How it Works (Security & Privacy)
+## How it Works
 
 1.  **Discovery**: At the start of a session, Gemini CLI scans the discovery
     tiers and injects the name and description of all enabled skills into the
@@ -105,6 +113,13 @@ gemini skills disable my-expertise --scope workspace
       it permission to read any bundled assets.
 5.  **Execution**: The model proceeds with the specialized expertise active. It
     is instructed to prioritize the skill's procedural guidance within reason.
+
+### Skill activation
+
+Once a skill is activated (typically by Gemini identifying a task that matches
+the skill's description and your approval), its specialized instructions and
+resources are loaded into the agent's context. A skill remains active and its
+guidance is prioritized for the duration of the session.
 
 ## Creating your own skills
 

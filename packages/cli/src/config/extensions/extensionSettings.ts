@@ -130,7 +130,19 @@ export async function maybePromptForSettings(
 function formatEnvContent(settings: Record<string, string>): string {
   let envContent = '';
   for (const [key, value] of Object.entries(settings)) {
-    const formattedValue = value.includes(' ') ? `"${value}"` : value;
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key)) {
+      throw new Error(
+        `Invalid environment variable name: "${key}". Must contain only alphanumeric characters and underscores.`,
+      );
+    }
+    if (value.includes('\n') || value.includes('\r')) {
+      throw new Error(
+        `Invalid environment variable value for "${key}". Values cannot contain newlines.`,
+      );
+    }
+    const formattedValue = value.includes(' ')
+      ? `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+      : value;
     envContent += `${key}=${formattedValue}\n`;
   }
   return envContent;

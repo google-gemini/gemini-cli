@@ -24,7 +24,7 @@ export const AppHeader = ({ version }: AppHeaderProps) => {
   const config = useConfig();
   const { nightly, terminalWidth, bannerData, bannerVisible } = useUIState();
 
-  const { bannerText } = useBanner(bannerData, config);
+  const { bannerText } = useBanner(bannerData);
   const { showTips } = useTips();
 
   return (

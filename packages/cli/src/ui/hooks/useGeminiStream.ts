@@ -474,12 +474,6 @@ export const useGeminiStream = (
 
   const activePtyId = activeShellPtyId || activeToolPtyId;
 
-  useEffect(() => {
-    if (!activePtyId) {
-      setShellInputFocused(false);
-    }
-  }, [activePtyId, setShellInputFocused]);
-
   const prevActiveShellPtyIdRef = useRef<number | null>(null);
   useEffect(() => {
     if (

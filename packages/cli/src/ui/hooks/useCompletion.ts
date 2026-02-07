@@ -13,7 +13,6 @@ export interface UseCompletionReturn {
   suggestions: Suggestion[];
   activeSuggestionIndex: number;
   visibleStartIndex: number;
-  showSuggestions: boolean;
   isLoadingSuggestions: boolean;
   isPerfectMatch: boolean;
   setSuggestions: React.Dispatch<React.SetStateAction<Suggestion[]>>;
@@ -21,7 +20,6 @@ export interface UseCompletionReturn {
   setVisibleStartIndex: React.Dispatch<React.SetStateAction<number>>;
   setIsLoadingSuggestions: React.Dispatch<React.SetStateAction<boolean>>;
   setIsPerfectMatch: React.Dispatch<React.SetStateAction<boolean>>;
-  setShowSuggestions: React.Dispatch<React.SetStateAction<boolean>>;
   resetCompletionState: () => void;
   navigateUp: () => void;
   navigateDown: () => void;
@@ -32,7 +30,6 @@ export function useCompletion(): UseCompletionReturn {
   const [activeSuggestionIndex, setActiveSuggestionIndex] =
     useState<number>(-1);
   const [visibleStartIndex, setVisibleStartIndex] = useState<number>(0);
-  const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
   const [isLoadingSuggestions, setIsLoadingSuggestions] =
     useState<boolean>(false);
   const [isPerfectMatch, setIsPerfectMatch] = useState<boolean>(false);
@@ -41,7 +38,6 @@ export function useCompletion(): UseCompletionReturn {
     setSuggestions([]);
     setActiveSuggestionIndex(-1);
     setVisibleStartIndex(0);
-    setShowSuggestions(false);
     setIsLoadingSuggestions(false);
     setIsPerfectMatch(false);
   }, []);
@@ -108,12 +104,10 @@ export function useCompletion(): UseCompletionReturn {
     suggestions,
     activeSuggestionIndex,
     visibleStartIndex,
-    showSuggestions,
     isLoadingSuggestions,
     isPerfectMatch,
 
     setSuggestions,
-    setShowSuggestions,
     setActiveSuggestionIndex,
     setVisibleStartIndex,
     setIsLoadingSuggestions,

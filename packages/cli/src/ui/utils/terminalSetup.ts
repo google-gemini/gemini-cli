@@ -204,94 +204,105 @@ async function configureVSCodeStyle(
       // File doesn't exist, will create new one
     }
 
-    const shiftEnterBinding = {
-      key: 'shift+enter',
-      command: 'workbench.action.terminal.sendSequence',
-      when: 'terminalFocus',
-      args: { text: VSCODE_SHIFT_ENTER_SEQUENCE },
-    };
+    const targetBindings = [
+      {
+        key: 'shift+enter',
+        command: 'workbench.action.terminal.sendSequence',
+        when: 'terminalFocus',
+        args: { text: VSCODE_SHIFT_ENTER_SEQUENCE },
+      },
+      {
+        key: 'ctrl+enter',
+        command: 'workbench.action.terminal.sendSequence',
+        when: 'terminalFocus',
+        args: { text: VSCODE_SHIFT_ENTER_SEQUENCE },
+      },
+      {
+        key: 'cmd+z',
+        command: 'workbench.action.terminal.sendSequence',
+        when: 'terminalFocus',
+        args: { text: '\u001b[122;9u' },
+      },
+      {
+        key: 'alt+z',
+        command: 'workbench.action.terminal.sendSequence',
+        when: 'terminalFocus',
+        args: { text: '\u001b[122;3u' },
+      },
+      {
+        key: 'shift+cmd+z',
+        command: 'workbench.action.terminal.sendSequence',
+        when: 'terminalFocus',
+        args: { text: '\u001b[122;10u' },
+      },
+      {
+        key: 'shift+alt+z',
+        command: 'workbench.action.terminal.sendSequence',
+        when: 'terminalFocus',
+        args: { text: '\u001b[122;4u' },
+      },
+    ];
 
-    const ctrlEnterBinding = {
-      key: 'ctrl+enter',
-      command: 'workbench.action.terminal.sendSequence',
-      when: 'terminalFocus',
-      args: { text: VSCODE_SHIFT_ENTER_SEQUENCE },
-    };
+    const results = targetBindings.map((target) => {
+      const hasOurBinding = keybindings.some((kb) => {
+        const binding = kb as {
+          command?: string;
+          args?: { text?: string };
+          key?: string;
+        };
+        return (
+          binding.key === target.key &&
+          binding.command === target.command &&
+          binding.args?.text === target.args.text
+        );
+      });
 
-    // Check if our specific bindings already exist
-    const hasOurShiftEnter = keybindings.some((kb) => {
-      const binding = kb as {
-        command?: string;
-        args?: { text?: string };
-        key?: string;
+      const existingBinding = keybindings.find((kb) => {
+        const binding = kb as { key?: string };
+        return binding.key === target.key;
+      });
+
+      return {
+        target,
+        hasOurBinding,
+        conflict: !!existingBinding && !hasOurBinding,
+        conflictMessage: `- ${target.key.charAt(0).toUpperCase() + target.key.slice(1)} binding already exists`,
       };
-      return (
-        binding.key === 'shift+enter' &&
-        binding.command === 'workbench.action.terminal.sendSequence' &&
-        binding.args?.text === '\\\r\n'
-      );
     });
 
-    const hasOurCtrlEnter = keybindings.some((kb) => {
-      const binding = kb as {
-        command?: string;
-        args?: { text?: string };
-        key?: string;
-      };
-      return (
-        binding.key === 'ctrl+enter' &&
-        binding.command === 'workbench.action.terminal.sendSequence' &&
-        binding.args?.text === '\\\r\n'
-      );
-    });
-
-    if (hasOurShiftEnter && hasOurCtrlEnter) {
+    if (results.every((r) => r.hasOurBinding)) {
       return {
         success: true,
         message: `${terminalName} keybindings already configured.`,
       };
     }
 
-    // Check if ANY shift+enter or ctrl+enter bindings already exist (that are NOT ours)
-    const existingShiftEnter = keybindings.find((kb) => {
-      const binding = kb as { key?: string };
-      return binding.key === 'shift+enter';
-    });
-
-    const existingCtrlEnter = keybindings.find((kb) => {
-      const binding = kb as { key?: string };
-      return binding.key === 'ctrl+enter';
-    });
-
-    if (existingShiftEnter || existingCtrlEnter) {
-      const messages: string[] = [];
-      // Only report conflict if it's not our binding (though we checked above, partial matches might exist)
-      if (existingShiftEnter && !hasOurShiftEnter) {
-        messages.push(`- Shift+Enter binding already exists`);
-      }
-      if (existingCtrlEnter && !hasOurCtrlEnter) {
-        messages.push(`- Ctrl+Enter binding already exists`);
-      }
-
-      if (messages.length > 0) {
-        return {
-          success: false,
-          message:
-            `Existing keybindings detected. Will not modify to avoid conflicts.\n` +
-            messages.join('\n') +
-            '\n' +
-            `Please check and modify manually if needed: ${keybindingsFile}`,
-        };
-      }
+    const conflicts = results.filter((r) => r.conflict);
+    if (conflicts.length > 0) {
+      return {
+        success: false,
+        message:
+          `Existing keybindings detected. Will not modify to avoid conflicts.\n` +
+          conflicts.map((c) => c.conflictMessage).join('\n') +
+          '\n' +
+          `Please check and modify manually if needed: ${keybindingsFile}`,
+      };
     }
 
-    if (!hasOurShiftEnter) keybindings.unshift(shiftEnterBinding);
-    if (!hasOurCtrlEnter) keybindings.unshift(ctrlEnterBinding);
+    for (const { hasOurBinding, target } of results) {
+      if (!hasOurBinding) {
+        keybindings.unshift(target);
+      }
+    }
 
     await fs.writeFile(keybindingsFile, JSON.stringify(keybindings, null, 4));
     return {
       success: true,
-      message: `Added Shift+Enter and Ctrl+Enter keybindings to ${terminalName}.\nModified: ${keybindingsFile}`,
+      message: `Added ${targetBindings
+        .map((b) => b.key.charAt(0).toUpperCase() + b.key.slice(1))
+        .join(
+          ', ',
+        )} keybindings to ${terminalName}.\nModified: ${keybindingsFile}`,
       requiresRestart: true,
     };
   } catch (error) {

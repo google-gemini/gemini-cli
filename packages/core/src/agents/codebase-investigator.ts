@@ -57,6 +57,11 @@ export const CodebaseInvestigatorAgent = (
     ? PREVIEW_GEMINI_FLASH_MODEL
     : DEFAULT_GEMINI_MODEL;
 
+  const listCommand =
+    process.platform === 'win32'
+      ? '`dir /s` (CMD) or `Get-ChildItem -Recurse` (PowerShell)'
+      : '`ls -R`';
+
   return {
     name: 'codebase_investigator',
     kind: 'local',
@@ -164,7 +169,7 @@ When you are finished, you **MUST** call the \`complete_task\` tool. The \`repor
   "ExplorationTrace": [
     "Used \`grep\` to search for \`updateUser\` to locate the primary function.",
     "Read the file \`src/controllers/userController.js\` to understand the function's logic.",
-    "Used \`ls -R\` to look for related files, such as services or database models.",
+    "Used ${listCommand} to look for related files, such as services or database models.",
     "Read \`src/services/userService.js\` and \`src/models/User.js\` to understand the data flow and how state is managed."
   ],
   "RelevantLocations": [

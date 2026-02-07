@@ -166,7 +166,6 @@ export class ClassifierStrategy implements RoutingStrategy {
       const selectedModel = resolveClassifierModel(
         context.requestedModel ?? config.getModel(),
         routerResponse.model_choice,
-        config.getPreviewFeatures(),
       );
 
       return {

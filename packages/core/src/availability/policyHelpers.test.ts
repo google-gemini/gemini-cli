@@ -19,7 +19,6 @@ import {
 
 const createMockConfig = (overrides: Partial<Config> = {}): Config =>
   ({
-    getPreviewFeatures: () => false,
     getUserTier: () => undefined,
     getModel: () => 'gemini-2.5-pro',
     ...overrides,
