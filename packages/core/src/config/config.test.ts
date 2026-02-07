@@ -1104,8 +1104,8 @@ describe('Server Config (config.ts)', () => {
         1000,
       );
       // 4 * (32000 - 1000) = 4 * 31000 = 124000
-      // default is 4_000_000
-      expect(config.getTruncateToolOutputThreshold()).toBe(124000);
+      // default is 40_000, so min(124000, 40000) = 40000
+      expect(config.getTruncateToolOutputThreshold()).toBe(40_000);
     });
 
     it('should return the default threshold when the calculated value is larger', () => {
@@ -1115,8 +1115,8 @@ describe('Server Config (config.ts)', () => {
         500_000,
       );
       // 4 * (2_000_000 - 500_000) = 4 * 1_500_000 = 6_000_000
-      // default is 4_000_000
-      expect(config.getTruncateToolOutputThreshold()).toBe(4_000_000);
+      // default is 40_000
+      expect(config.getTruncateToolOutputThreshold()).toBe(40_000);
     });
 
     it('should use a custom truncateToolOutputThreshold if provided', () => {

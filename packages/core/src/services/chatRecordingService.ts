@@ -13,6 +13,8 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import type {
+  Content,
+  Part,
   PartListUnion,
   GenerateContentResponseUsageMetadata,
 } from '@google/genai';
@@ -593,5 +595,67 @@ export class ChatRecordingService {
     conversation.messages = conversation.messages.slice(0, messageIndex);
     this.writeConversation(conversation, { allowEmpty: true });
     return conversation;
+  }
+
+  /**
+   * Updates the conversation history based on the provided API Content array.
+   * This is used to persist changes made to the history (like masking) back to disk.
+   */
+  updateMessagesFromHistory(history: Content[]): void {
+    if (!this.conversationFile) return;
+
+    try {
+      this.updateConversation((conversation) => {
+        // Create a map of tool results from the API history for quick lookup by call ID.
+        // We store the full list of parts associated with each tool call ID to preserve
+        // multi-modal data and proper trajectory structure.
+        const partsMap = new Map<string, Part[]>();
+        for (const content of history) {
+          if (content.role === 'user' && content.parts) {
+            // Find all unique call IDs in this message
+            const callIds = content.parts
+              .map((p) => p.functionResponse?.id)
+              .filter((id): id is string => !!id);
+
+            if (callIds.length === 0) continue;
+
+            // Use the first ID as a seed to capture any "leading" non-ID parts
+            // in this specific content block.
+            let currentCallId = callIds[0];
+            for (const part of content.parts) {
+              if (part.functionResponse?.id) {
+                currentCallId = part.functionResponse.id;
+              }
+
+              if (!partsMap.has(currentCallId)) {
+                partsMap.set(currentCallId, []);
+              }
+              partsMap.get(currentCallId)!.push(part);
+            }
+          }
+        }
+
+        // Update the conversation records tool results if they've changed.
+        for (const message of conversation.messages) {
+          if (message.type === 'gemini' && message.toolCalls) {
+            for (const toolCall of message.toolCalls) {
+              const newParts = partsMap.get(toolCall.id);
+              if (newParts !== undefined) {
+                // Store the results as proper Parts (including functionResponse)
+                // instead of stringifying them as text parts. This ensures the
+                // tool trajectory is correctly reconstructed upon session resumption.
+                toolCall.result = newParts;
+              }
+            }
+          }
+        }
+      });
+    } catch (error) {
+      debugLogger.error(
+        'Error updating conversation history from memory.',
+        error,
+      );
+      throw error;
+    }
   }
 }
