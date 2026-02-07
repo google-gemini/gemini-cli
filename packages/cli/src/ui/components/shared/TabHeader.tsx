@@ -96,9 +96,10 @@ export function TabHeader({
           )}
           <Text
             color={
-              i === currentIndex ? theme.text.accent : theme.text.secondary
+              i === currentIndex ? theme.status.success : theme.text.secondary
             }
             bold={i === currentIndex}
+            underline={i === currentIndex}
             aria-current={i === currentIndex ? 'step' : undefined}
           >
             {tab.header}
