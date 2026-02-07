@@ -84,7 +84,7 @@ describe('SettingsUtils', () => {
         requiresRestart: true,
         default: {},
         description: 'Advanced settings for power users.',
-        showInDialog: true,
+        showInDialog: false,
         properties: {
           autoConfigureMemory: {
             type: 'boolean',
