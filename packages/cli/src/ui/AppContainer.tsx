@@ -15,6 +15,7 @@ import {
 import { type DOMElement, measureElement } from 'ink';
 import { App } from './App.js';
 import { AppContext } from './contexts/AppContext.js';
+import { VoiceContext } from './contexts/VoiceContext.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
 import {
   UIActionsContext,
@@ -97,6 +98,7 @@ import { useVim } from './hooks/vim.js';
 import { type LoadableSettingScope, SettingScope } from '../config/settings.js';
 import { type InitializationResult } from '../core/initializer.js';
 import { useFocus } from './hooks/useFocus.js';
+import { useVoiceInput } from './hooks/useVoiceInput.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { keyMatchers, Command } from './keyMatchers.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
@@ -187,6 +189,13 @@ const SHELL_HEIGHT_PADDING = 10;
 export const AppContainer = (props: AppContainerProps) => {
   const { config, initializationResult, resumedSessionData } = props;
   const settings = useSettings();
+
+  const voiceConfig = useMemo(
+    () => ({ whisperPath: settings.merged.voice?.whisperPath }),
+    [settings.merged.voice?.whisperPath],
+  );
+  const voice = useVoiceInput(voiceConfig);
+  const { toggleRecording } = voice;
 
   const historyManager = useHistory({
     chatRecordingService: config.getGeminiClient()?.getChatRecordingService(),
@@ -798,6 +807,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       },
       toggleShortcutsHelp: () => setShortcutsHelpVisible((visible) => !visible),
       setText: stableSetText,
+      toggleVoice: toggleRecording,
     }),
     [
       setAuthState,
@@ -817,6 +827,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       toggleDebugProfiler,
       setShortcutsHelpVisible,
       stableSetText,
+      toggleRecording,
     ],
   );
 
@@ -1488,6 +1499,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       } else if (keyMatchers[Command.SHOW_FULL_TODOS](key)) {
         setShowFullTodos((prev) => !prev);
         return true;
+      } else if (keyMatchers[Command.VOICE_INPUT](key)) {
+        void toggleRecording();
+        return true;
       } else if (keyMatchers[Command.TOGGLE_MARKDOWN](key)) {
         setRenderMarkdown((prev) => {
           const newValue = !prev;
@@ -1604,6 +1618,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       lastOutputTimeRef,
       tabFocusTimeoutRef,
       handleWarning,
+      toggleRecording,
     ],
   );
 
@@ -2162,9 +2177,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
             }}
           >
             <ToolActionsProvider config={config} toolCalls={allToolCalls}>
-              <ShellFocusContext.Provider value={isFocused}>
-                <App />
-              </ShellFocusContext.Provider>
+              <VoiceContext.Provider value={voice}>
+                <ShellFocusContext.Provider value={isFocused}>
+                  <App />
+                </ShellFocusContext.Provider>
+              </VoiceContext.Provider>
             </ToolActionsProvider>
           </AppContext.Provider>
         </ConfigContext.Provider>

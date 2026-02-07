@@ -65,6 +65,10 @@ import { useMouseClick } from '../hooks/useMouseClick.js';
 import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+import {
+  useVoiceContext,
+  onVoiceTranscript,
+} from '../contexts/VoiceContext.js';
 
 /**
  * Returns if the terminal can be trusted to handle paste events atomically
@@ -246,6 +250,29 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     },
     [],
   );
+
+  // Voice input hook - MUST be before handleSubmit
+  // NOTE: Transcript is delivered via events, not context, to avoid infinite render loops
+  // See VOICE_INFINITE_LOOP_ANALYSIS.md for details
+  const { state: voiceState, toggleRecording } = useVoiceContext();
+
+  // Override placeholder when voice input is active
+  const activePlaceholder = voiceState.isRecording
+    ? '  Listening... Alt+R or Esc to stop'
+    : voiceState.isTranscribing
+      ? '  Transcribing...'
+      : placeholder;
+
+  // Handle voice transcript via event listener (not context) to avoid re-renders
+  useEffect(() => {
+    const handleTranscript = (transcript: string) => {
+      // Insert transcribed text at cursor position with trailing space for next input
+      buffer.insert(transcript + ' ');
+    };
+
+    const unsubscribe = onVoiceTranscript(handleTranscript);
+    return unsubscribe;
+  }, [buffer]);
 
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {
@@ -561,7 +588,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       ) {
         return false;
       }
-
       if (key.name === 'paste') {
         if (shortcutsHelpVisible) {
           setShortcutsHelpVisible(false);
@@ -643,6 +669,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (keyMatchers[Command.ESCAPE](key)) {
+        if (voiceState.isRecording) {
+          void toggleRecording();
+          return true;
+        }
+
         const cancelSearch = (
           setActive: (active: boolean) => void,
           resetCompletion: () => void,
@@ -714,9 +745,21 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
+      if (keyMatchers[Command.QUIT](key)) {
+        if (voiceState.isRecording) {
+          void toggleRecording();
+          return true;
+        }
+      }
+
       if (keyMatchers[Command.CLEAR_SCREEN](key)) {
         setBannerVisible(false);
         onClearScreen();
+        return true;
+      }
+
+      if (keyMatchers[Command.VOICE_INPUT](key)) {
+        void toggleRecording();
         return true;
       }
 
@@ -1104,6 +1147,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       backgroundShellHeight,
       history,
       streamingState,
+      toggleRecording,
+      voiceState.isRecording,
     ],
   );
 
@@ -1284,6 +1329,18 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     statusText = 'Accepting edits';
   }
 
+  // Voice input status
+  if (voiceState.isRecording) {
+    statusColor = theme.status.error;
+    statusText = '🎤 Recording... (Alt+R or Ctrl+Q to stop)';
+  } else if (voiceState.isTranscribing) {
+    statusColor = theme.status.warning;
+    statusText = '🎤 Transcribing...';
+  } else if (voiceState.error) {
+    statusColor = theme.status.error;
+    statusText = `🎤 Error: ${voiceState.error}`;
+  }
+
   const suggestionsNode = shouldShowSuggestions ? (
     <Box paddingRight={2}>
       <SuggestionsDisplay
@@ -1368,24 +1425,28 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               <Text color={theme.text.accent}>(r:) </Text>
             ) : showYoloStyling ? (
               '*'
+            ) : voiceState.isRecording ? (
+              '🎤'
+            ) : voiceState.isTranscribing ? (
+              '⏳'
             ) : (
               '>'
             )}{' '}
           </Text>
           <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
-            {buffer.text.length === 0 && placeholder ? (
+            {buffer.text.length === 0 && activePlaceholder ? (
               showCursor ? (
                 <Text
                   terminalCursorFocus={showCursor}
                   terminalCursorPosition={0}
                 >
-                  {chalk.inverse(placeholder.slice(0, 1))}
+                  {chalk.inverse(activePlaceholder.slice(0, 1))}
                   <Text color={theme.text.secondary}>
-                    {placeholder.slice(1)}
+                    {activePlaceholder.slice(1)}
                   </Text>
                 </Text>
               ) : (
-                <Text color={theme.text.secondary}>{placeholder}</Text>
+                <Text color={theme.text.secondary}>{activePlaceholder}</Text>
               )
             ) : (
               linesToRender

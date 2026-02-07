@@ -94,6 +94,12 @@ available combinations.
 | Open the current prompt in an external editor. | `Ctrl + X`                                                                                |
 | Paste from the clipboard.                      | `Ctrl + V`<br />`Cmd + V`<br />`Alt + V`                                                  |
 
+#### Voice Input
+
+| Action                                          | Keys                      |
+| ----------------------------------------------- | ------------------------- |
+| Toggle voice input recording (Alt+R or Ctrl+Q). | `Alt + R`<br />`Ctrl + Q` |
+
 #### App Controls
 
 | Action                                                                                                | Keys                       |
