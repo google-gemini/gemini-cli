@@ -13,6 +13,8 @@ import {
   getErrorMessage,
   isNodeError,
   unescapePath,
+  resolveToRealPath,
+  fileExists,
   ReadManyFilesTool,
   REFERENCE_CONTENT_START,
   REFERENCE_CONTENT_END,
@@ -168,16 +170,13 @@ export async function checkPermissions(
     const pathName = part.content.substring(1);
     if (!pathName) continue;
 
-    const resolvedPathName = path.isAbsolute(pathName)
-      ? pathName
-      : path.resolve(config.getTargetDir(), pathName);
+    const resolvedPathName = resolveToRealPath(
+      path.resolve(config.getTargetDir(), pathName),
+    );
 
     if (config.validatePathAccess(resolvedPathName, 'read')) {
-      try {
-        await fs.stat(resolvedPathName);
+      if (await fileExists(resolvedPathName)) {
         permissionsRequired.push(resolvedPathName);
-      } catch {
-        // File doesn't exist, so no permission needed (it will be skipped anyway)
       }
     }
   }
@@ -221,18 +220,6 @@ async function resolveFilePaths(
       continue;
     }
 
-    const resolvedPathName = path.isAbsolute(pathName)
-      ? pathName
-      : path.resolve(config.getTargetDir(), pathName);
-
-    // Check if we have read access (either workspace or read-only list)
-    if (config.validatePathAccess(resolvedPathName, 'read')) {
-      onDebugMessage(
-        `Path ${pathName} is not in the workspace (and not allowed for reading) and will be skipped.`,
-      );
-      continue;
-    }
-
     const gitIgnored =
       respectFileIgnore.respectGitIgnore &&
       fileDiscovery.shouldIgnoreFile(pathName, {
@@ -262,9 +249,7 @@ async function resolveFilePaths(
 
     for (const dir of config.getWorkspaceContext().getDirectories()) {
       try {
-        const absolutePath = path.isAbsolute(pathName)
-          ? pathName
-          : path.resolve(dir, pathName);
+        const absolutePath = path.resolve(dir, pathName);
         const stats = await fs.stat(absolutePath);
 
         const relativePath = path.isAbsolute(pathName)
