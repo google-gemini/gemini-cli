@@ -7,6 +7,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import stripAnsi from 'strip-ansi';
 import { act } from 'react';
+import * as childProcess from 'node:child_process';
+import * as core from '@google/gemini-cli-core';
 import {
   renderHook,
   renderHookWithProviders,
@@ -37,6 +39,27 @@ import {
   getTransformedImagePath,
 } from './text-buffer.js';
 import { cpLen } from '../../utils/textUtils.js';
+
+vi.mock('node:child_process', async () => {
+  const actual =
+    await vi.importActual<typeof import('node:child_process')>(
+      'node:child_process',
+    );
+  return {
+    ...actual,
+    spawnSync: vi.fn(),
+  };
+});
+
+vi.mock('@google/gemini-cli-core', async () => {
+  const actual = await vi.importActual<
+    typeof import('@google/gemini-cli-core')
+  >('@google/gemini-cli-core');
+  return {
+    ...actual,
+    resolveEditorAsync: vi.fn(),
+  };
+});
 
 const defaultVisualLayout: VisualLayout = {
   visualLines: [''],
@@ -1880,6 +1903,127 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
   // - Selection and clipboard (copy/paste) - might need clipboard API mocks or internal state check
   // - openInExternalEditor (heavy mocking of fs, child_process, os)
   // - All edge cases for visual scrolling and wrapping with different viewport sizes and text content.
+
+  describe('openInExternalEditor', () => {
+    const viewport: Viewport = { width: 80, height: 24 };
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('emits an error and aborts when no editor is available', async () => {
+      if (process.platform === 'win32') {
+        return;
+      }
+
+      const prevVisual = process.env['VISUAL'];
+      const prevEditor = process.env['EDITOR'];
+      delete process.env['VISUAL'];
+      delete process.env['EDITOR'];
+
+      try {
+        const resolveEditorAsyncMock = vi.mocked(core.resolveEditorAsync);
+        resolveEditorAsyncMock.mockResolvedValue(undefined);
+        const emitFeedbackSpy = vi
+          .spyOn(core.coreEvents, 'emitFeedback')
+          .mockImplementation(() => {});
+        const spawnSyncMock = vi.mocked(childProcess.spawnSync);
+
+        const { result } = renderHook(() =>
+          useTextBuffer({
+            viewport,
+            isValidPath: () => false,
+            getPreferredEditor: () => undefined,
+          }),
+        );
+
+        await act(async () => {
+          await result.current.openInExternalEditor();
+        });
+
+        expect(resolveEditorAsyncMock).toHaveBeenCalled();
+        expect(emitFeedbackSpy).toHaveBeenCalledWith(
+          'error',
+          core.NO_EDITOR_AVAILABLE_ERROR,
+        );
+        expect(spawnSyncMock).not.toHaveBeenCalled();
+      } finally {
+        if (prevVisual === undefined) {
+          delete process.env['VISUAL'];
+        } else {
+          process.env['VISUAL'] = prevVisual;
+        }
+        if (prevEditor === undefined) {
+          delete process.env['EDITOR'];
+        } else {
+          process.env['EDITOR'] = prevEditor;
+        }
+      }
+    });
+
+    it('uses the preferred editor when available', async () => {
+      const prevVisual = process.env['VISUAL'];
+      const prevEditor = process.env['EDITOR'];
+      delete process.env['VISUAL'];
+      delete process.env['EDITOR'];
+
+      try {
+        const resolveEditorAsyncMock = vi.mocked(core.resolveEditorAsync);
+        resolveEditorAsyncMock.mockResolvedValue(undefined);
+        const isEditorAvailableAsyncSpy = vi
+          .spyOn(core, 'isEditorAvailableAsync')
+          .mockResolvedValue(true);
+        const getEditorCommandSpy = vi
+          .spyOn(core, 'getEditorCommand')
+          .mockReturnValue('mocked-editor');
+        const emitFeedbackSpy = vi
+          .spyOn(core.coreEvents, 'emitFeedback')
+          .mockImplementation(() => {});
+        const spawnSyncMock = vi.mocked(childProcess.spawnSync);
+        spawnSyncMock.mockReturnValue({ status: 0 } as never);
+
+        const { result } = renderHook(() =>
+          useTextBuffer({
+            viewport,
+            isValidPath: () => false,
+            getPreferredEditor: () => 'vscode',
+          }),
+        );
+
+        await act(async () => {
+          await result.current.openInExternalEditor();
+        });
+
+        expect(isEditorAvailableAsyncSpy).toHaveBeenCalledWith('vscode');
+        expect(resolveEditorAsyncMock).not.toHaveBeenCalled();
+        expect(getEditorCommandSpy).toHaveBeenCalledWith('vscode');
+        expect(spawnSyncMock).toHaveBeenCalledTimes(1);
+        const call = spawnSyncMock.mock.calls[0];
+        expect(call).toBeDefined();
+        if (!call) {
+          throw new Error('Expected spawnSync to be called once.');
+        }
+        const command = call[0];
+        const args = call[1] ?? [];
+        expect(command).toBe('mocked-editor');
+        expect(args.length).toBeGreaterThanOrEqual(2);
+        expect(args[0]).toBe('--wait');
+        expect(args[1]).toEqual(expect.stringContaining('gemini-edit-'));
+        expect(emitFeedbackSpy).not.toHaveBeenCalled();
+      } finally {
+        if (prevVisual === undefined) {
+          delete process.env['VISUAL'];
+        } else {
+          process.env['VISUAL'] = prevVisual;
+        }
+        if (prevEditor === undefined) {
+          delete process.env['EDITOR'];
+        } else {
+          process.env['EDITOR'] = prevEditor;
+        }
+      }
+    });
+  });
 
   describe('replaceRange', () => {
     it('should replace a single-line range with single-line text', () => {
