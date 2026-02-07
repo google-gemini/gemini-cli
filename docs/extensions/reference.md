@@ -8,9 +8,9 @@ This guide covers the `gemini extensions` commands and the structure of the
 We offer a suite of extension management tools using `gemini extensions`
 commands.
 
-Note that these commands (e.g. `gemini extensions install`) are not supported
-from within the CLI's **interactive mode**, although you can list installed
-extensions using the `/extensions list` slash command.
+Note that these commands (for example, `gemini extensions install`) are not
+supported from within the CLI's **interactive mode**, although you can list
+installed extensions using the `/extensions list` slash command.
 
 Note that all of these management operations (including updates to slash
 commands) will only be reflected in active CLI sessions on **restart**.
@@ -52,7 +52,7 @@ gemini extensions uninstall gemini-cli-security gemini-cli-another-extension
 ### Disabling an extension
 
 Extensions are, by default, enabled across all workspaces. You can disable an
-extension entirely or for specific workspace.
+extension entirely or for a specific workspace.
 
 ```
 gemini extensions disable <name> [--scope <scope>]
@@ -88,8 +88,9 @@ gemini extensions update --all
 
 ### Create a boilerplate extension
 
-We offer several example extensions `context`, `custom-commands`,
-`exclude-tools` and `mcp-server`. You can view these examples
+We offer several example extensions. Currently: `custom-commands`,
+`exclude-tools`, `hooks`, `mcp-server`, `skills`, and `themes-example`. You can
+view these examples
 [here](https://github.com/google-gemini/gemini-cli/tree/main/packages/cli/src/commands/extensions/examples).
 
 To copy one of these examples into a development directory using the type of
@@ -137,7 +138,9 @@ The file has the following structure:
   "description": "My awesome extension",
   "mcpServers": {
     "my-server": {
-      "command": "node my-server.js"
+      "command": "node",
+      "args": ["${extensionPath}${/}my-server.js"],
+      "cwd": "${extensionPath}"
     }
   },
   "contextFileName": "GEMINI.md",
@@ -156,16 +159,23 @@ The file has the following structure:
   [geminicli.com/extensions](https://geminicli.com/extensions).
 - `mcpServers`: A map of MCP servers to settings. The key is the name of the
   server, and the value is the server configuration. These servers will be
-  loaded on startup just like MCP servers settingsd in a
+  loaded on startup just like MCP servers defined in a
   [`settings.json` file](../get-started/configuration.md). If both an extension
-  and a `settings.json` file settings an MCP server with the same name, the
-  server defined in the `settings.json` file takes precedence.
+  and a `settings.json` file define an MCP server with the same name, the server
+  defined in the `settings.json` file takes precedence.
   - Note that all MCP server configuration options are supported except for
     `trust`.
-- `contextFileName`: The name of the file that contains the context for the
-  extension. This will be used to load the context from the extension directory.
-  If this property is not used but a `GEMINI.md` file is present in your
-  extension directory, then that file will be loaded.
+  - For portability, we recommend using `${extensionPath}` to refer to files
+    within your extension directory.
+  - Separate your executable and its arguments using `command` and `args`
+    instead of putting them both in `command`.
+- `contextFileName`: The name of the file (or a list of file names) that
+  contains the context for the extension. This will be used to load the context
+  from the extension directory. If this property is not used but a `GEMINI.md`
+  file is present in your extension directory, then that file will be loaded.
+- `themes`: An array of custom UI themes contributed by this extension. These
+  themes are registered when the extension is activated and available for you to
+  select.
 - `excludeTools`: An array of tool names to exclude from the model. You can also
   specify command-specific restrictions for tools that support it, like the
   `run_shell_command` tool. For example,
@@ -211,8 +221,8 @@ Each object in the array should have the following properties:
 ```
 
 When a user installs this extension, they will be prompted to enter their API
-key. The value will be saved to a `.env` file in the extension's directory
-(e.g., `<home>/.gemini/extensions/my-api-extension/.env`).
+key. The value will be saved to a `.env` file in the extension's directory (for
+example, `<home>/.gemini/extensions/my-api-extension/.env`).
 
 You can view a list of an extension's settings by running:
 
@@ -322,9 +332,10 @@ For example, if both a user and the `gcp` extension define a `deploy` command:
 
 ## Variables
 
-Gemini CLI extensions allow variable substitution in both
-`gemini-extension.json` and `hooks/hooks.json`. This can be useful if e.g., you
-need the current directory to run an MCP server using an argument like
+Gemini CLI extensions let you substitute variables in `gemini-extension.json`,
+`hooks/hooks.json`, agent skills (`skills/*.md`), and sub-agents
+(`agents/*.md`). This is useful if, for example, you need the current directory
+to run an MCP server using an argument like
 `"args": ["${extensionPath}${/}dist${/}server.js"]`.
 
 **Supported variables:**
@@ -334,3 +345,4 @@ need the current directory to run an MCP server using an argument like
 | `${extensionPath}`         | The fully-qualified path of the extension in the user's filesystem e.g., '/Users/username/.gemini/extensions/example-extension'. This will not unwrap symlinks. |
 | `${workspacePath}`         | The fully-qualified path of the current workspace.                                                                                                              |
 | `${/} or ${pathSeparator}` | The path separator (differs per OS).                                                                                                                            |
+| `${<setting-env-var>}`     | Any defined extension setting (via its `envVar`) will also be available for substitution.                                                                       |
