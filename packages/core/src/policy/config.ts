@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import * as crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Storage } from '../config/storage.js';
 import {
@@ -17,7 +18,7 @@ import {
 } from './types.js';
 import type { PolicyEngine } from './policy-engine.js';
 import { loadPoliciesFromToml, type PolicyFileError } from './toml-loader.js';
-import { buildArgsPatterns } from './utils.js';
+import { buildArgsPatterns, isSafeRegExp } from './utils.js';
 import toml from '@iarna/toml';
 import {
   MessageBusType,
@@ -344,6 +345,8 @@ export function createPolicyUpdater(
         const patterns = buildArgsPatterns(undefined, message.commandPrefix);
         for (const pattern of patterns) {
           if (pattern) {
+            // Note: patterns from buildArgsPatterns are derived from escapeRegex,
+            // which is safe and won't contain ReDoS patterns.
             policyEngine.addRule({
               toolName,
               decision: PolicyDecision.ALLOW,
@@ -357,6 +360,14 @@ export function createPolicyUpdater(
           }
         }
       } else {
+        if (message.argsPattern && !isSafeRegExp(message.argsPattern)) {
+          coreEvents.emitFeedback(
+            'error',
+            `Invalid or unsafe regular expression for tool ${toolName}: ${message.argsPattern}`,
+          );
+          return;
+        }
+
         const argsPattern = message.argsPattern
           ? new RegExp(message.argsPattern)
           : undefined;
@@ -420,6 +431,7 @@ export function createPolicyUpdater(
             if (message.commandPrefix) {
               newRule.commandPrefix = message.commandPrefix;
             } else if (message.argsPattern) {
+              // message.argsPattern was already validated above
               newRule.argsPattern = message.argsPattern;
             }
 
@@ -433,9 +445,17 @@ export function createPolicyUpdater(
             // Atomic write: write to a unique tmp file then rename to the target file.
             // Using a unique suffix avoids race conditions where concurrent processes
             // overwrite each other's temporary files, leading to ENOENT errors on rename.
-            const tmpSuffix = `${Date.now()}.${Math.random().toString(36).slice(2)}`;
+            const tmpSuffix = crypto.randomBytes(8).toString('hex');
             const tmpFile = `${policyFile}.${tmpSuffix}.tmp`;
-            await fs.writeFile(tmpFile, newContent, 'utf-8');
+
+            let handle: fs.FileHandle | undefined;
+            try {
+              // Use 'wx' to create the file exclusively (fails if exists) for security.
+              handle = await fs.open(tmpFile, 'wx');
+              await handle.writeFile(newContent, 'utf-8');
+            } finally {
+              await handle?.close();
+            }
             await fs.rename(tmpFile, policyFile);
           } catch (error) {
             coreEvents.emitFeedback(
