@@ -77,7 +77,7 @@ describe('Focus Hint', () => {
 
       // Now it SHOULD contain the focus hint
       expect(lastFrame()).toMatchSnapshot('after-delay-no-output');
-      expect(lastFrame()).toContain('(tab to focus)');
+      expect(lastFrame()).toContain('(Tab to focus)');
     });
 
     it('shows focus hint after delay with output', async () => {
@@ -95,7 +95,7 @@ describe('Focus Hint', () => {
       });
 
       expect(lastFrame()).toMatchSnapshot('after-delay-with-output');
-      expect(lastFrame()).toContain('(tab to focus)');
+      expect(lastFrame()).toContain('(Tab to focus)');
     });
   });
 
@@ -116,7 +116,7 @@ describe('Focus Hint', () => {
 
     // The focus hint should be visible
     expect(lastFrame()).toMatchSnapshot('long-description');
-    expect(lastFrame()).toContain('(tab to focus)');
+    expect(lastFrame()).toContain('(Tab to focus)');
     // The name should still be visible
     expect(lastFrame()).toContain(SHELL_COMMAND_NAME);
   });

@@ -9,6 +9,8 @@ import * as os from 'node:os';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import { GEMINI_DIR, homedir } from '../utils/paths.js';
+import { ProjectRegistry } from './projectRegistry.js';
+import { StorageMigration } from './storageMigration.js';
 
 export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
 export const OAUTH_FILE = 'oauth_creds.json';
@@ -18,6 +20,8 @@ const AGENTS_DIR_NAME = '.agents';
 
 export class Storage {
   private readonly targetDir: string;
+  private projectIdentifier: string | undefined;
+  private initPromise: Promise<void> | undefined;
 
   constructor(targetDir: string) {
     this.targetDir = targetDir;
@@ -125,9 +129,9 @@ export class Storage {
   }
 
   getProjectTempDir(): string {
-    const hash = this.getFilePathHash(this.getProjectRoot());
+    const identifier = this.getProjectIdentifier();
     const tempDir = Storage.getGlobalTempDir();
-    return path.join(tempDir, hash);
+    return path.join(tempDir, identifier);
   }
 
   ensureProjectTempDirExists(): void {
@@ -146,10 +150,67 @@ export class Storage {
     return crypto.createHash('sha256').update(filePath).digest('hex');
   }
 
-  getHistoryDir(): string {
-    const hash = this.getFilePathHash(this.getProjectRoot());
+  private getProjectIdentifier(): string {
+    if (!this.projectIdentifier) {
+      throw new Error('Storage must be initialized before use');
+    }
+    return this.projectIdentifier;
+  }
+
+  /**
+   * Initializes storage by setting up the project registry and performing migrations.
+   */
+  async initialize(): Promise<void> {
+    if (this.initPromise) {
+      return this.initPromise;
+    }
+
+    this.initPromise = (async () => {
+      if (this.projectIdentifier) {
+        return;
+      }
+
+      const registryPath = path.join(
+        Storage.getGlobalGeminiDir(),
+        'projects.json',
+      );
+      const registry = new ProjectRegistry(registryPath, [
+        Storage.getGlobalTempDir(),
+        path.join(Storage.getGlobalGeminiDir(), 'history'),
+      ]);
+      await registry.initialize();
+
+      this.projectIdentifier = await registry.getShortId(this.getProjectRoot());
+      await this.performMigration();
+    })();
+
+    return this.initPromise;
+  }
+
+  /**
+   * Performs migration of legacy hash-based directories to the new slug-based format.
+   * This is called internally by initialize().
+   */
+  private async performMigration(): Promise<void> {
+    const shortId = this.getProjectIdentifier();
+    const oldHash = this.getFilePathHash(this.getProjectRoot());
+
+    // Migrate Temp Dir
+    const newTempDir = path.join(Storage.getGlobalTempDir(), shortId);
+    const oldTempDir = path.join(Storage.getGlobalTempDir(), oldHash);
+    await StorageMigration.migrateDirectory(oldTempDir, newTempDir);
+
+    // Migrate History Dir
     const historyDir = path.join(Storage.getGlobalGeminiDir(), 'history');
-    return path.join(historyDir, hash);
+    const newHistoryDir = path.join(historyDir, shortId);
+    const oldHistoryDir = path.join(historyDir, oldHash);
+    await StorageMigration.migrateDirectory(oldHistoryDir, newHistoryDir);
+  }
+
+  getHistoryDir(): string {
+    const identifier = this.getProjectIdentifier();
+    const historyDir = path.join(Storage.getGlobalGeminiDir(), 'history');
+    return path.join(historyDir, identifier);
   }
 
   getWorkspaceSettingsPath(): string {

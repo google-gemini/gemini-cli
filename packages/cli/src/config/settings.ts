@@ -194,6 +194,7 @@ export interface SettingsFile {
   originalSettings: Settings;
   path: string;
   rawJson?: string;
+  readOnly?: boolean;
 }
 
 function setNestedProperty(
@@ -378,25 +379,32 @@ export class LoadedSettings {
     }
   }
 
+  private isPersistable(settingsFile: SettingsFile): boolean {
+    return !settingsFile.readOnly;
+  }
+
   setValue(scope: LoadableSettingScope, key: string, value: unknown): void {
     const settingsFile = this.forScope(scope);
 
-    // Clone value to prevent reference sharing between settings and originalSettings
+    // Clone value to prevent reference sharing
     const valueToSet =
       typeof value === 'object' && value !== null
         ? structuredClone(value)
         : value;
 
     setNestedProperty(settingsFile.settings, key, valueToSet);
-    // Use a fresh clone for originalSettings to ensure total independence
-    setNestedProperty(
-      settingsFile.originalSettings,
-      key,
-      structuredClone(valueToSet),
-    );
+
+    if (this.isPersistable(settingsFile)) {
+      // Use a fresh clone for originalSettings to ensure total independence
+      setNestedProperty(
+        settingsFile.originalSettings,
+        key,
+        structuredClone(valueToSet),
+      );
+      saveSettings(settingsFile);
+    }
 
     this._merged = this.computeMergedSettings();
-    saveSettings(settingsFile);
     coreEvents.emitSettingsChanged();
   }
 
@@ -716,24 +724,28 @@ export function loadSettings(
       settings: systemSettings,
       originalSettings: systemOriginalSettings,
       rawJson: systemResult.rawJson,
+      readOnly: true,
     },
     {
       path: systemDefaultsPath,
       settings: systemDefaultSettings,
       originalSettings: systemDefaultsOriginalSettings,
       rawJson: systemDefaultsResult.rawJson,
+      readOnly: true,
     },
     {
       path: USER_SETTINGS_PATH,
       settings: userSettings,
       originalSettings: userOriginalSettings,
       rawJson: userResult.rawJson,
+      readOnly: false,
     },
     {
       path: workspaceSettingsPath,
       settings: workspaceSettings,
       originalSettings: workspaceOriginalSettings,
       rawJson: workspaceResult.rawJson,
+      readOnly: false,
     },
     isTrusted,
     settingsErrors,
@@ -758,17 +770,26 @@ export function migrateDeprecatedSettings(
   removeDeprecated = false,
 ): boolean {
   let anyModified = false;
+  const systemWarnings: Map<LoadableSettingScope, string[]> = new Map();
 
+  /**
+   * Helper to migrate a boolean setting and track it if it's deprecated.
+   */
   const migrateBoolean = (
     settings: Record<string, unknown>,
     oldKey: string,
     newKey: string,
+    prefix: string,
+    foundDeprecated?: string[],
   ): boolean => {
     let modified = false;
     const oldValue = settings[oldKey];
     const newValue = settings[newKey];
 
     if (typeof oldValue === 'boolean') {
+      if (foundDeprecated) {
+        foundDeprecated.push(prefix ? `${prefix}.${oldKey}` : oldKey);
+      }
       if (typeof newValue === 'boolean') {
         // Both exist, trust the new one
         if (removeDeprecated) {
@@ -788,7 +809,9 @@ export function migrateDeprecatedSettings(
   };
 
   const processScope = (scope: LoadableSettingScope) => {
-    const settings = loadedSettings.forScope(scope).settings;
+    const settingsFile = loadedSettings.forScope(scope);
+    const settings = settingsFile.settings;
+    const foundDeprecated: string[] = [];
 
     // Migrate general settings
     const generalSettings = settings.general as
@@ -799,18 +822,27 @@ export function migrateDeprecatedSettings(
       let modified = false;
 
       modified =
-        migrateBoolean(newGeneral, 'disableAutoUpdate', 'enableAutoUpdate') ||
-        modified;
+        migrateBoolean(
+          newGeneral,
+          'disableAutoUpdate',
+          'enableAutoUpdate',
+          'general',
+          foundDeprecated,
+        ) || modified;
       modified =
         migrateBoolean(
           newGeneral,
           'disableUpdateNag',
           'enableAutoUpdateNotification',
+          'general',
+          foundDeprecated,
         ) || modified;
 
       if (modified) {
         loadedSettings.setValue(scope, 'general', newGeneral);
-        anyModified = true;
+        if (!settingsFile.readOnly) {
+          anyModified = true;
+        }
       }
     }
 
@@ -829,11 +861,15 @@ export function migrateDeprecatedSettings(
             newAccessibility,
             'disableLoadingPhrases',
             'enableLoadingPhrases',
+            'ui.accessibility',
+            foundDeprecated,
           )
         ) {
           newUi['accessibility'] = newAccessibility;
           loadedSettings.setValue(scope, 'ui', newUi);
-          anyModified = true;
+          if (!settingsFile.readOnly) {
+            anyModified = true;
+          }
         }
       }
     }
@@ -855,29 +891,56 @@ export function migrateDeprecatedSettings(
             newFileFiltering,
             'disableFuzzySearch',
             'enableFuzzySearch',
+            'context.fileFiltering',
+            foundDeprecated,
           )
         ) {
           newContext['fileFiltering'] = newFileFiltering;
           loadedSettings.setValue(scope, 'context', newContext);
-          anyModified = true;
+          if (!settingsFile.readOnly) {
+            anyModified = true;
+          }
         }
       }
     }
 
     // Migrate experimental agent settings
-    anyModified =
-      migrateExperimentalSettings(
-        settings,
-        loadedSettings,
-        scope,
-        removeDeprecated,
-      ) || anyModified;
+    const experimentalModified = migrateExperimentalSettings(
+      settings,
+      loadedSettings,
+      scope,
+      removeDeprecated,
+      foundDeprecated,
+    );
+
+    if (experimentalModified) {
+      if (!settingsFile.readOnly) {
+        anyModified = true;
+      }
+    }
+
+    if (settingsFile.readOnly && foundDeprecated.length > 0) {
+      systemWarnings.set(scope, foundDeprecated);
+    }
   };
 
   processScope(SettingScope.User);
   processScope(SettingScope.Workspace);
   processScope(SettingScope.System);
   processScope(SettingScope.SystemDefaults);
+
+  if (systemWarnings.size > 0) {
+    for (const [scope, flags] of systemWarnings) {
+      const scopeName =
+        scope === SettingScope.SystemDefaults
+          ? 'system default'
+          : scope.toLowerCase();
+      coreEvents.emitFeedback(
+        'warning',
+        `The ${scopeName} configuration contains deprecated settings: [${flags.join(', ')}]. These could not be migrated automatically as system settings are read-only. Please update the system configuration manually.`,
+      );
+    }
+  }
 
   return anyModified;
 }
@@ -926,10 +989,12 @@ function migrateExperimentalSettings(
   loadedSettings: LoadedSettings,
   scope: LoadableSettingScope,
   removeDeprecated: boolean,
+  foundDeprecated?: string[],
 ): boolean {
   const experimentalSettings = settings.experimental as
     | Record<string, unknown>
     | undefined;
+
   if (experimentalSettings) {
     const agentsSettings = {
       ...(settings.agents as Record<string, unknown> | undefined),
@@ -939,11 +1004,20 @@ function migrateExperimentalSettings(
     };
     let modified = false;
 
+    const migrateExperimental = (
+      oldKey: string,
+      migrateFn: (oldValue: Record<string, unknown>) => void,
+    ) => {
+      const old = experimentalSettings[oldKey];
+      if (old) {
+        foundDeprecated?.push(`experimental.${oldKey}`);
+        migrateFn(old as Record<string, unknown>);
+        modified = true;
+      }
+    };
+
     // Migrate codebaseInvestigatorSettings -> agents.overrides.codebase_investigator
-    if (experimentalSettings['codebaseInvestigatorSettings']) {
-      const old = experimentalSettings[
-        'codebaseInvestigatorSettings'
-      ] as Record<string, unknown>;
+    migrateExperimental('codebaseInvestigatorSettings', (old) => {
       const override = {
         ...(agentsOverrides['codebase_investigator'] as
           | Record<string, unknown>
@@ -985,22 +1059,16 @@ function migrateExperimentalSettings(
       }
 
       agentsOverrides['codebase_investigator'] = override;
-      modified = true;
-    }
+    });
 
     // Migrate cliHelpAgentSettings -> agents.overrides.cli_help
-    if (experimentalSettings['cliHelpAgentSettings']) {
-      const old = experimentalSettings['cliHelpAgentSettings'] as Record<
-        string,
-        unknown
-      >;
+    migrateExperimental('cliHelpAgentSettings', (old) => {
       const override = {
         ...(agentsOverrides['cli_help'] as Record<string, unknown> | undefined),
       };
       if (old['enabled'] !== undefined) override['enabled'] = old['enabled'];
       agentsOverrides['cli_help'] = override;
-      modified = true;
-    }
+    });
 
     if (modified) {
       agentsSettings['overrides'] = agentsOverrides;
