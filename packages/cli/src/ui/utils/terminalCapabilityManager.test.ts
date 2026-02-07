@@ -7,10 +7,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TerminalCapabilityManager } from './terminalCapabilityManager.js';
 import { EventEmitter } from 'node:events';
-import {
-  enableKittyKeyboardProtocol,
-  enableModifyOtherKeys,
-} from '@google/gemini-cli-core';
 
 // Mock fs
 vi.mock('node:fs', () => ({
@@ -25,8 +21,6 @@ vi.mock('@google/gemini-cli-core', () => ({
   },
   enableKittyKeyboardProtocol: vi.fn(),
   disableKittyKeyboardProtocol: vi.fn(),
-  enableModifyOtherKeys: vi.fn(),
-  disableModifyOtherKeys: vi.fn(),
   enableBracketedPasteMode: vi.fn(),
   disableBracketedPasteMode: vi.fn(),
 }));
@@ -181,113 +175,5 @@ describe('TerminalCapabilityManager', () => {
 
     await promise;
     expect(manager.isKittyProtocolEnabled()).toBe(true);
-  });
-
-  describe('modifyOtherKeys detection', () => {
-    it('should detect modifyOtherKeys support (level 2)', async () => {
-      const manager = TerminalCapabilityManager.getInstance();
-      const promise = manager.detectCapabilities();
-
-      // Simulate modifyOtherKeys level 2 response: \x1b[>4;2m
-      stdin.emit('data', Buffer.from('\x1b[>4;2m'));
-      // Complete detection with DA1
-      stdin.emit('data', Buffer.from('\x1b[?62c'));
-
-      await promise;
-
-      expect(enableModifyOtherKeys).toHaveBeenCalled();
-    });
-
-    it('should not enable modifyOtherKeys for level 0', async () => {
-      const manager = TerminalCapabilityManager.getInstance();
-      const promise = manager.detectCapabilities();
-
-      // Simulate modifyOtherKeys level 0 response: \x1b[>4;0m
-      stdin.emit('data', Buffer.from('\x1b[>4;0m'));
-      // Complete detection with DA1
-      stdin.emit('data', Buffer.from('\x1b[?62c'));
-
-      await promise;
-
-      expect(enableModifyOtherKeys).not.toHaveBeenCalled();
-    });
-
-    it('should prefer Kitty over modifyOtherKeys', async () => {
-      const manager = TerminalCapabilityManager.getInstance();
-      const promise = manager.detectCapabilities();
-
-      // Simulate both Kitty and modifyOtherKeys responses
-      stdin.emit('data', Buffer.from('\x1b[?1u'));
-      stdin.emit('data', Buffer.from('\x1b[>4;2m'));
-      // Complete detection with DA1
-      stdin.emit('data', Buffer.from('\x1b[?62c'));
-
-      await promise;
-      expect(manager.isKittyProtocolEnabled()).toBe(true);
-
-      expect(enableKittyKeyboardProtocol).toHaveBeenCalled();
-      expect(enableModifyOtherKeys).not.toHaveBeenCalled();
-    });
-
-    it('should enable modifyOtherKeys when Kitty not supported', async () => {
-      const manager = TerminalCapabilityManager.getInstance();
-      const promise = manager.detectCapabilities();
-
-      // Simulate only modifyOtherKeys response (no Kitty)
-      stdin.emit('data', Buffer.from('\x1b[>4;2m'));
-      // Complete detection with DA1
-      stdin.emit('data', Buffer.from('\x1b[?62c'));
-
-      await promise;
-
-      expect(manager.isKittyProtocolEnabled()).toBe(false);
-      expect(enableModifyOtherKeys).toHaveBeenCalled();
-    });
-
-    it('should handle split modifyOtherKeys response chunks', async () => {
-      const manager = TerminalCapabilityManager.getInstance();
-      const promise = manager.detectCapabilities();
-
-      // Split response: \x1b[>4;2m
-      stdin.emit('data', Buffer.from('\x1b[>4;'));
-      stdin.emit('data', Buffer.from('2m'));
-      // Complete detection with DA1
-      stdin.emit('data', Buffer.from('\x1b[?62c'));
-
-      await promise;
-
-      expect(enableModifyOtherKeys).toHaveBeenCalled();
-    });
-
-    it('should detect modifyOtherKeys with other capabilities', async () => {
-      const manager = TerminalCapabilityManager.getInstance();
-      const promise = manager.detectCapabilities();
-
-      stdin.emit('data', Buffer.from('\x1b]11;rgb:1a1a/1a1a/1a1a\x1b\\')); // background color
-      stdin.emit('data', Buffer.from('\x1bP>|tmux\x1b\\')); // Terminal name
-      stdin.emit('data', Buffer.from('\x1b[>4;2m')); // modifyOtherKeys
-      // Complete detection with DA1
-      stdin.emit('data', Buffer.from('\x1b[?62c'));
-
-      await promise;
-
-      expect(manager.getTerminalBackgroundColor()).toBe('#1a1a1a');
-      expect(manager.getTerminalName()).toBe('tmux');
-
-      expect(enableModifyOtherKeys).toHaveBeenCalled();
-    });
-
-    it('should not enable modifyOtherKeys without explicit response', async () => {
-      const manager = TerminalCapabilityManager.getInstance();
-      const promise = manager.detectCapabilities();
-
-      // Simulate only DA1 response (no specific MOK or Kitty response)
-      stdin.emit('data', Buffer.from('\x1b[?62c'));
-
-      await promise;
-
-      expect(manager.isKittyProtocolEnabled()).toBe(false);
-      expect(enableModifyOtherKeys).not.toHaveBeenCalled();
-    });
   });
 });
