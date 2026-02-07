@@ -5,21 +5,23 @@
  */
 
 import type React from 'react';
-import { Text } from 'ink';
-import { useTerminalSize } from '../../hooks/useTerminalSize.js';
+import { Box } from 'ink';
 import { theme } from '../../semantic-colors.js';
 
 interface HorizontalLineProps {
-  width?: number;
   color?: string;
 }
 
 export const HorizontalLine: React.FC<HorizontalLineProps> = ({
-  width,
   color = theme.border.default,
-}) => {
-  const { columns } = useTerminalSize();
-  const resolvedWidth = Math.max(1, width ?? columns);
-
-  return <Text color={color}>{'─'.repeat(resolvedWidth)}</Text>;
-};
+}) => (
+  <Box
+    width="100%"
+    borderStyle="single"
+    borderTop
+    borderBottom={false}
+    borderLeft={false}
+    borderRight={false}
+    borderColor={color}
+  />
+);

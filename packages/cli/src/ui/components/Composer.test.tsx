@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { render } from '../../test-utils/render.js';
-import { Text } from 'ink';
+import { Box, Text } from 'ink';
 import { Composer } from './Composer.js';
 import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
 import {
@@ -596,6 +596,31 @@ describe('Composer', () => {
       expect(lastFrame()).toContain(
         "InputPrompt:   Press 'i' for INSERT mode.",
       );
+    });
+  });
+
+  describe('Shortcuts Hint', () => {
+    it('hides shortcuts hint when a action is required (e.g. dialog is open)', () => {
+      const uiState = createMockUIState({
+        customDialog: (
+          <Box>
+            <Text>Test Dialog</Text>
+            <Text>Test Content</Text>
+          </Box>
+        ),
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).not.toContain('ShortcutsHint');
+    });
+
+    it('keeps shortcuts hint visible when no action is required', () => {
+      const uiState = createMockUIState();
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).toContain('ShortcutsHint');
     });
   });
 });

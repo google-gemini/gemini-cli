@@ -1,0 +1,7 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<SectionHeader /> > 'renders correctly in a narrow contain…' 1`] = `"── Narrow Container ─────"`;
+
+exports[`<SectionHeader /> > 'renders correctly when title is trunc…' 1`] = `"── Very Long Hea… ──"`;
+
+exports[`<SectionHeader /> > 'renders correctly with a standard tit…' 1`] = `"── My Header ───────────────────────────"`;
