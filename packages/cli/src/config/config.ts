@@ -754,6 +754,9 @@ export async function loadCliConfig(
       ...settings.ui?.accessibility,
       screenReader,
     },
+    notifications: {
+      enabled: settings.ui?.enableNotifications ?? true,
+    },
     telemetry: telemetrySettings,
     usageStatisticsEnabled: settings.privacy?.usageStatisticsEnabled,
     fileFiltering,

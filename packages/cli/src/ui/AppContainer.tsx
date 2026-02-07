@@ -1168,6 +1168,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
   });
 
   const isFocused = useFocus();
+  useEffect(() => {
+    coreEvents.emitWindowFocusChanged(isFocused);
+  }, [isFocused]);
 
   // Context file names computation
   const contextFileNames = useMemo(() => {

@@ -99,6 +99,10 @@ import { PolicyEngine } from '../policy/policy-engine.js';
 import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
 import type { UserTierId } from '../code_assist/types.js';
+import {
+  NotificationService,
+  type NotificationConfig,
+} from '../services/notification/NotificationService.js';
 import type { RetrieveUserQuotaResponse } from '../code_assist/types.js';
 import type { AdminControlsSettings } from '../code_assist/types.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
@@ -466,6 +470,7 @@ export interface ConfigParameters {
   enableAgents?: boolean;
   enableEventDrivenScheduler?: boolean;
   skillsSupport?: boolean;
+  notifications?: NotificationConfig;
   disabledSkills?: string[];
   adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
@@ -590,6 +595,7 @@ export class Config {
   private readonly eventEmitter?: EventEmitter;
   private readonly useWriteTodos: boolean;
   private readonly messageBus: MessageBus;
+  private readonly notificationService: NotificationService;
   private readonly policyEngine: PolicyEngine;
   private readonly outputSettings: OutputSettings;
   private readonly continueOnFailedApiCall: boolean;
@@ -801,6 +807,10 @@ export class Config {
         params.approvalMode ?? params.policyEngineConfig?.approvalMode,
     });
     this.messageBus = new MessageBus(this.policyEngine, this.debugMode);
+    this.notificationService = new NotificationService(
+      params.notifications ?? { enabled: true },
+    );
+    this.notificationService.subscribeToBus(this.messageBus);
     this.acknowledgedAgentsService = new AcknowledgedAgentsService();
     this.skillManager = new SkillManager();
     this.outputSettings = {
@@ -2092,6 +2102,10 @@ export class Config {
 
   getMessageBus(): MessageBus {
     return this.messageBus;
+  }
+
+  getNotificationService(): NotificationService {
+    return this.notificationService;
   }
 
   getPolicyEngine(): PolicyEngine {
