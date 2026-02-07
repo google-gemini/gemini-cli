@@ -362,6 +362,16 @@ export async function main() {
   parseArgsHandle?.end();
 
   if (
+    (argv.allowedTools && argv.allowedTools.length > 0) ||
+    (settings.merged.tools?.allowed && settings.merged.tools.allowed.length > 0)
+  ) {
+    coreEvents.emitFeedback(
+      'warning',
+      'Warning: --allowed-tools cli argument and tools.allowed in settings.json are deprecated and will be removed in 1.0: Migrate to Policy Engine: https://geminicli.com/docs/core/policy-engine/',
+    );
+  }
+
+  if (
     settings.merged.tools?.exclude &&
     settings.merged.tools.exclude.length > 0
   ) {

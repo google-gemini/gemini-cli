@@ -383,6 +383,7 @@ export interface ConfigParameters {
   question?: string;
 
   coreTools?: string[];
+  /** @deprecated Use Policy Engine instead */
   allowedTools?: string[];
   /** @deprecated Use Policy Engine instead */
   excludeTools?: string[];
@@ -517,6 +518,7 @@ export class Config {
   private readonly question: string | undefined;
 
   private readonly coreTools: string[] | undefined;
+  /** @deprecated Use Policy Engine instead */
   private readonly allowedTools: string[] | undefined;
   /** @deprecated Use Policy Engine instead */
   private readonly excludeTools: string[] | undefined;
