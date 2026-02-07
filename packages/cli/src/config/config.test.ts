@@ -3183,10 +3183,12 @@ describe('Policy Engine Integration in loadCliConfig', () => {
     await loadCliConfig(settings, 'test-session', argv);
 
     // In non-interactive mode, ShellTool, etc. are excluded
+    // But we don't pass them to createPolicyEngineConfig anymore,
+    // as they are aggregated in Config.getExcludeTools()
     expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
       expect.objectContaining({
         tools: expect.objectContaining({
-          exclude: expect.arrayContaining([SHELL_TOOL_NAME]),
+          exclude: [],
         }),
       }),
       expect.anything(),

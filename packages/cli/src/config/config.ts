@@ -660,7 +660,10 @@ export async function loadCliConfig(
     tools: {
       ...settings.tools,
       allowed: allowedTools,
-      exclude: excludeTools,
+      // Exclude is intentionally empty for PolicyEngine configuration to
+      // avoid generating redundant DENY rules. The full set of tool
+      // exclusions is aggregated centrally in Config.getExcludeTools().
+      exclude: [],
     },
     mcp: {
       ...settings.mcp,

@@ -509,6 +509,43 @@ export class PolicyEngine {
     return this.hookCheckers;
   }
 
+  /**
+   * Get tools that are effectively denied by the current rules.
+   * This takes into account:
+   * 1. Global rules (no argsPattern)
+   * 2. Priority order (higher priority wins)
+   * 3. Non-interactive mode (ASK_USER becomes DENY)
+   */
+  getExcludedTools(): Set<string> {
+    const excludedTools = new Set<string>();
+    const processedTools = new Set<string>();
+
+    for (const rule of this.rules) {
+      // We only care about global rules for exclusions
+      if (rule.argsPattern) {
+        continue;
+      }
+
+      if (!rule.toolName) {
+        continue;
+      }
+
+      // If we've already processed this tool (found a higher priority rule), skip
+      if (processedTools.has(rule.toolName)) {
+        continue;
+      }
+
+      processedTools.add(rule.toolName);
+
+      const effectiveDecision = this.applyNonInteractiveMode(rule.decision);
+      if (effectiveDecision === PolicyDecision.DENY) {
+        excludedTools.add(rule.toolName);
+      }
+    }
+
+    return excludedTools;
+  }
+
   private applyNonInteractiveMode(decision: PolicyDecision): PolicyDecision {
     // In non-interactive mode, ASK_USER becomes DENY
     if (this.nonInteractive && decision === PolicyDecision.ASK_USER) {

@@ -2031,6 +2031,73 @@ describe('PolicyEngine', () => {
     });
   });
 
+  describe('getExcludedTools', () => {
+    it('should return empty set when no rules provided', () => {
+      engine = new PolicyEngine({});
+      const excluded = engine.getExcludedTools();
+      expect(excluded.size).toBe(0);
+    });
+
+    it('should include tools with DENY decision', () => {
+      const rules: PolicyRule[] = [
+        { toolName: 'tool1', decision: PolicyDecision.DENY },
+        { toolName: 'tool2', decision: PolicyDecision.ALLOW },
+      ];
+      engine = new PolicyEngine({ rules });
+      const excluded = engine.getExcludedTools();
+      expect(excluded.has('tool1')).toBe(true);
+      expect(excluded.has('tool2')).toBe(false);
+    });
+
+    it('should respect priority and ignore lower priority rules', () => {
+      // Case 1: Higher priority DENY wins
+      const rules: PolicyRule[] = [
+        { toolName: 'tool1', decision: PolicyDecision.DENY, priority: 100 },
+        { toolName: 'tool1', decision: PolicyDecision.ALLOW, priority: 10 },
+      ];
+      engine = new PolicyEngine({ rules });
+      let excluded = engine.getExcludedTools();
+      expect(excluded.has('tool1')).toBe(true);
+
+      // Case 2: Higher priority ALLOW wins
+      const rules2: PolicyRule[] = [
+        { toolName: 'tool1', decision: PolicyDecision.ALLOW, priority: 100 },
+        { toolName: 'tool1', decision: PolicyDecision.DENY, priority: 10 },
+      ];
+      engine = new PolicyEngine({ rules: rules2 });
+      excluded = engine.getExcludedTools();
+      expect(excluded.has('tool1')).toBe(false);
+    });
+
+    it('should include ASK_USER tools in non-interactive mode', () => {
+      const rules: PolicyRule[] = [
+        { toolName: 'tool1', decision: PolicyDecision.ASK_USER },
+      ];
+      // Default (interactive) mode
+      engine = new PolicyEngine({ rules });
+      let excluded = engine.getExcludedTools();
+      expect(excluded.has('tool1')).toBe(false);
+
+      // Non-interactive mode
+      engine = new PolicyEngine({ rules, nonInteractive: true });
+      excluded = engine.getExcludedTools();
+      expect(excluded.has('tool1')).toBe(true);
+    });
+
+    it('should ignore rules with argsPattern', () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'tool1',
+          decision: PolicyDecision.DENY,
+          argsPattern: /something/,
+        },
+      ];
+      engine = new PolicyEngine({ rules });
+      const excluded = engine.getExcludedTools();
+      expect(excluded.has('tool1')).toBe(false);
+    });
+  });
+
   describe('YOLO mode with ask_user tool', () => {
     it('should return ASK_USER for ask_user tool even in YOLO mode', async () => {
       const rules: PolicyRule[] = [
