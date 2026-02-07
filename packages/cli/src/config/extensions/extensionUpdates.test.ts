@@ -54,6 +54,22 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       off: vi.fn(),
     },
     loadSkillsFromDir: vi.fn().mockResolvedValue([]),
+    loadAgentsFromDirectory: vi
+      .fn()
+      .mockResolvedValue({ agents: [], errors: [] }),
+  };
+});
+
+vi.mock('./extensions/consent.js', () => ({
+  maybeRequestConsentOrFail: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('./extensions/extensionSettings.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('./extensions/extensionSettings.js')>();
+  return {
+    ...actual,
+    getEnvContents: vi.fn().mockResolvedValue({}),
   };
 });
 
