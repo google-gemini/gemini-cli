@@ -45,6 +45,7 @@ describe('handleAtCommand', () => {
   }
 
   beforeEach(async () => {
+    vi.restoreAllMocks();
     vi.resetAllMocks();
 
     testRootDir = await fsPromises.mkdtemp(
@@ -178,9 +179,6 @@ describe('handleAtCommand', () => {
     expect(result).toEqual({
       processedQuery: [{ text: queryWithSpaces }],
     });
-    expect(mockOnDebugMessage).toHaveBeenCalledWith(
-      'Lone @ detected, will be treated as text in the modified query.',
-    );
   });
 
   it('should process a valid text file path', async () => {
@@ -439,9 +437,6 @@ describe('handleAtCommand', () => {
     );
     expect(mockOnDebugMessage).toHaveBeenCalledWith(
       `Glob search for '**/*${invalidFile}*' found no files or an error. Path ${invalidFile} will be skipped.`,
-    );
-    expect(mockOnDebugMessage).toHaveBeenCalledWith(
-      'Lone @ detected, will be treated as text in the modified query.',
     );
   });
 
@@ -1401,6 +1396,34 @@ describe('handleAtCommand', () => {
         tools: [expect.objectContaining({ status: ToolCallStatus.Error })],
       }),
       134,
+    );
+  });
+
+  it('should include agent nudge when agents are found', async () => {
+    const agentName = 'my-agent';
+    const otherAgent = 'other-agent';
+
+    // Mock getAgentRegistry on the config
+    mockConfig.getAgentRegistry = vi.fn().mockReturnValue({
+      getDefinition: (name: string) =>
+        name === agentName || name === otherAgent ? { name } : undefined,
+    });
+
+    const query = `@${agentName} @${otherAgent}`;
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 600,
+      signal: abortController.signal,
+    });
+
+    const expectedNudge = `\n<system_note>\nThe user has explicitly selected the following agent(s): ${agentName}, ${otherAgent}. Please use the following tool(s) to delegate the task: '${agentName}', '${otherAgent}'.\n</system_note>\n`;
+
+    expect(result.processedQuery).toContainEqual(
+      expect.objectContaining({ text: expectedNudge }),
     );
   });
 });

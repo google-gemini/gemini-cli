@@ -11,12 +11,19 @@ import { StatusDisplay } from './StatusDisplay.js';
 import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
 import { ConfigContext } from '../contexts/ConfigContext.js';
 import { SettingsContext } from '../contexts/SettingsContext.js';
+import { createMockSettings } from '../../test-utils/settings.js';
 import type { TextBuffer } from './shared/text-buffer.js';
 
 // Mock child components to simplify testing
 vi.mock('./ContextSummaryDisplay.js', () => ({
-  ContextSummaryDisplay: (props: { skillCount: number }) => (
-    <Text>Mock Context Summary Display (Skills: {props.skillCount})</Text>
+  ContextSummaryDisplay: (props: {
+    skillCount: number;
+    backgroundProcessCount: number;
+  }) => (
+    <Text>
+      Mock Context Summary Display (Skills: {props.skillCount}, Shells:{' '}
+      {props.backgroundProcessCount})
+    </Text>
   ),
 }));
 
@@ -36,11 +43,13 @@ const createMockUIState = (overrides: UIStateOverrides = {}): UIState =>
     warningMessage: null,
     ctrlDPressedOnce: false,
     showEscapePrompt: false,
+    shortcutsHelpVisible: false,
     queueErrorMessage: null,
     activeHooks: [],
     ideContextState: null,
     geminiMdFileCount: 0,
     contextFileNames: [],
+    backgroundShellCount: 0,
     buffer: { text: '' },
     history: [{ id: 1, type: 'user', text: 'test' }],
     ...overrides,
@@ -56,14 +65,6 @@ const createMockConfig = (overrides = {}) => ({
     getDisplayableSkills: vi.fn(() => ['skill1', 'skill2']),
   })),
   ...overrides,
-});
-
-const createMockSettings = (merged = {}) => ({
-  merged: {
-    hooksConfig: { notifications: true },
-    ui: { hideContextSummary: false },
-    ...merged,
-  },
 });
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -226,5 +227,16 @@ describe('StatusDisplay', () => {
       settings,
     );
     expect(lastFrame()).toBe('');
+  });
+
+  it('passes backgroundShellCount to ContextSummaryDisplay', () => {
+    const uiState = createMockUIState({
+      backgroundShellCount: 3,
+    });
+    const { lastFrame } = renderStatusDisplay(
+      { hideContextSummary: false },
+      uiState,
+    );
+    expect(lastFrame()).toContain('Shells: 3');
   });
 });

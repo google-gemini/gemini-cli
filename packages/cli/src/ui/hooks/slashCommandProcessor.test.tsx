@@ -213,6 +213,8 @@ describe('useSlashCommandProcessor', () => {
             toggleDebugProfiler: vi.fn(),
             dispatchExtensionStateUpdate: vi.fn(),
             addConfirmUpdateExtensionRequest: vi.fn(),
+            toggleBackgroundShell: vi.fn(),
+            toggleShortcutsHelp: vi.fn(),
             setText: vi.fn(),
           },
           new Map(), // extensionsUpdateState

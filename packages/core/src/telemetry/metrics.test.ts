@@ -96,6 +96,7 @@ describe('Telemetry Metrics', () => {
   let recordAgentRunMetricsModule: typeof import('./metrics.js').recordAgentRunMetrics;
   let recordLinesChangedModule: typeof import('./metrics.js').recordLinesChanged;
   let recordSlowRenderModule: typeof import('./metrics.js').recordSlowRender;
+  let recordPlanExecutionModule: typeof import('./metrics.js').recordPlanExecution;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -140,6 +141,7 @@ describe('Telemetry Metrics', () => {
     recordAgentRunMetricsModule = metricsJsModule.recordAgentRunMetrics;
     recordLinesChangedModule = metricsJsModule.recordLinesChanged;
     recordSlowRenderModule = metricsJsModule.recordSlowRender;
+    recordPlanExecutionModule = metricsJsModule.recordPlanExecution;
 
     const otelApiModule = await import('@opentelemetry/api');
 
@@ -214,6 +216,29 @@ describe('Telemetry Metrics', () => {
         'session.id': 'test-session-id',
         'installation.id': 'test-installation-id',
         'user.email': 'test@example.com',
+      });
+    });
+  });
+
+  describe('recordPlanExecution', () => {
+    it('does not record metrics if not initialized', () => {
+      const config = makeFakeConfig({});
+      recordPlanExecutionModule(config, { approval_mode: 'default' });
+      expect(mockCounterAddFn).not.toHaveBeenCalled();
+    });
+
+    it('records a plan execution event when initialized', () => {
+      const config = makeFakeConfig({});
+      initializeMetricsModule(config);
+      recordPlanExecutionModule(config, { approval_mode: 'autoEdit' });
+
+      // Called for session, then for plan execution
+      expect(mockCounterAddFn).toHaveBeenCalledTimes(2);
+      expect(mockCounterAddFn).toHaveBeenNthCalledWith(2, 1, {
+        'session.id': 'test-session-id',
+        'installation.id': 'test-installation-id',
+        'user.email': 'test@example.com',
+        approval_mode: 'autoEdit',
       });
     });
   });
@@ -489,7 +514,7 @@ describe('Telemetry Metrics', () => {
       initializeMetricsModule(mockConfig);
       const event = new ModelRoutingEvent(
         'gemini-pro',
-        'classifier',
+        'Classifier',
         200,
         'test-reason',
         true,
@@ -502,7 +527,7 @@ describe('Telemetry Metrics', () => {
         'installation.id': 'test-installation-id',
         'user.email': 'test@example.com',
         'routing.decision_model': 'gemini-pro',
-        'routing.decision_source': 'classifier',
+        'routing.decision_source': 'Classifier',
         'routing.failed': true,
         'routing.reasoning': 'test-reason',
       });
@@ -513,7 +538,7 @@ describe('Telemetry Metrics', () => {
         'installation.id': 'test-installation-id',
         'user.email': 'test@example.com',
         'routing.decision_model': 'gemini-pro',
-        'routing.decision_source': 'classifier',
+        'routing.decision_source': 'Classifier',
         'routing.failed': true,
         'routing.reasoning': 'test-reason',
         'routing.error_message': 'test-error',

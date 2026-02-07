@@ -4,10 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  renderWithProviders,
-  createMockSettings,
-} from '../../../test-utils/render.js';
+import { renderWithProviders } from '../../../test-utils/render.js';
+import { createMockSettings } from '../../../test-utils/settings.js';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { ToolGroupMessage } from './ToolGroupMessage.js';
 import type { IndividualToolCallDisplay } from '../../types.js';
@@ -47,7 +45,6 @@ describe('<ToolGroupMessage />', () => {
     folderTrust: false,
     ideMode: false,
     enableInteractiveShell: true,
-    previewFeatures: false,
     enableEventDrivenScheduler: true,
   });
 
@@ -661,6 +658,31 @@ describe('<ToolGroupMessage />', () => {
       expect(output).not.toContain('confirm-tool');
       expect(output).not.toContain('Do you want to proceed?');
       expect(output).toMatchSnapshot();
+      unmount();
+    });
+
+    it('renders nothing when only tool is in-progress AskUser with borderBottom=false', () => {
+      // AskUser tools in progress are rendered by AskUserDialog, not ToolGroupMessage.
+      // When AskUser is the only tool and borderBottom=false (no border to close),
+      // the component should render nothing.
+      const toolCalls = [
+        createToolCall({
+          callId: 'ask-user-tool',
+          name: 'Ask User',
+          status: ToolCallStatus.Executing,
+        }),
+      ];
+
+      const { lastFrame, unmount } = renderWithProviders(
+        <ToolGroupMessage
+          {...baseProps}
+          toolCalls={toolCalls}
+          borderBottom={false}
+        />,
+        { config: baseMockConfig },
+      );
+      // AskUser tools in progress are rendered by AskUserDialog, so we expect nothing.
+      expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
   });

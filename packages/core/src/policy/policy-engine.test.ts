@@ -13,6 +13,7 @@ import {
   type SafetyCheckerRule,
   InProcessCheckerType,
   ApprovalMode,
+  PRIORITY_SUBAGENT_TOOL,
 } from './types.js';
 import type { FunctionCall } from '@google/genai';
 import { SafetyCheckDecision } from '../safety/protocol.js';
@@ -40,6 +41,43 @@ vi.mock('../utils/shell-utils.js', async (importOriginal) => {
         // Simple mock: true if '>' is present, unless it looks like "-> arrow"
         command.includes('>') && !command.includes('-> arrow'),
     ),
+  };
+});
+
+// Mock tool-names to provide a consistent alias for testing
+
+vi.mock('../tools/tool-names.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../tools/tool-names.js')>();
+
+  const mockedAliases: Record<string, string> = {
+    ...actual.TOOL_LEGACY_ALIASES,
+
+    legacy_test_tool: 'current_test_tool',
+
+    another_legacy_test_tool: 'current_test_tool',
+  };
+
+  return {
+    ...actual,
+
+    TOOL_LEGACY_ALIASES: mockedAliases,
+
+    getToolAliases: vi.fn().mockImplementation((name: string) => {
+      const aliases = new Set<string>([name]);
+
+      const canonicalName = mockedAliases[name] ?? name;
+
+      aliases.add(canonicalName);
+
+      for (const [legacyName, currentName] of Object.entries(mockedAliases)) {
+        if (currentName === canonicalName) {
+          aliases.add(legacyName);
+        }
+      }
+
+      return Array.from(aliases);
+    }),
   };
 });
 
@@ -185,6 +223,52 @@ describe('PolicyEngine', () => {
       expect((await engine.check({ name: 'shell' }, undefined)).decision).toBe(
         PolicyDecision.ALLOW,
       );
+    });
+
+    it('should match current tool call against legacy tool name rules', async () => {
+      const legacyName = 'legacy_test_tool';
+      const currentName = 'current_test_tool';
+
+      const rules: PolicyRule[] = [
+        { toolName: legacyName, decision: PolicyDecision.DENY },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // Call using the CURRENT name, should be denied because of legacy rule
+      const { decision } = await engine.check({ name: currentName }, undefined);
+      expect(decision).toBe(PolicyDecision.DENY);
+    });
+
+    it('should match legacy tool call against current tool name rules (for skills support)', async () => {
+      const legacyName = 'legacy_test_tool';
+      const currentName = 'current_test_tool';
+
+      const rules: PolicyRule[] = [
+        { toolName: currentName, decision: PolicyDecision.ALLOW },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // Call using the LEGACY name (from a skill), should be allowed because of current rule
+      const { decision } = await engine.check({ name: legacyName }, undefined);
+      expect(decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should match tool call using one legacy name against policy for another legacy name (same canonical tool)', async () => {
+      const legacyName1 = 'legacy_test_tool';
+      const legacyName2 = 'another_legacy_test_tool';
+
+      const rules: PolicyRule[] = [
+        { toolName: legacyName2, decision: PolicyDecision.DENY },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // Call using legacyName1, should be denied because legacyName2 has a deny rule
+      // and they both point to the same canonical tool.
+      const { decision } = await engine.check({ name: legacyName1 }, undefined);
+      expect(decision).toBe(PolicyDecision.DENY);
     });
 
     it('should apply wildcard rules (no toolName)', async () => {
@@ -1395,6 +1479,131 @@ describe('PolicyEngine', () => {
       );
 
       expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+  });
+
+  describe('Plan Mode vs Subagent Priority (Regression)', () => {
+    it('should DENY subagents in Plan Mode despite dynamic allow rules', async () => {
+      // Plan Mode Deny (1.06) > Subagent Allow (1.05)
+
+      const fixedRules: PolicyRule[] = [
+        {
+          decision: PolicyDecision.DENY,
+          priority: 1.06,
+          modes: [ApprovalMode.PLAN],
+        },
+        {
+          toolName: 'codebase_investigator',
+          decision: PolicyDecision.ALLOW,
+          priority: PRIORITY_SUBAGENT_TOOL,
+        },
+      ];
+
+      const fixedEngine = new PolicyEngine({
+        rules: fixedRules,
+        approvalMode: ApprovalMode.PLAN,
+      });
+
+      const fixedResult = await fixedEngine.check(
+        { name: 'codebase_investigator' },
+        undefined,
+      );
+
+      expect(fixedResult.decision).toBe(PolicyDecision.DENY);
+    });
+  });
+
+  describe('shell command parsing failure', () => {
+    it('should return ALLOW in YOLO mode even if shell command parsing fails', async () => {
+      const { splitCommands } = await import('../utils/shell-utils.js');
+      const rules: PolicyRule[] = [
+        {
+          decision: PolicyDecision.ALLOW,
+          priority: 999,
+          modes: [ApprovalMode.YOLO],
+        },
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ASK_USER,
+          priority: 10,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+      });
+
+      // Simulate parsing failure (splitCommands returning empty array)
+      vi.mocked(splitCommands).mockReturnValueOnce([]);
+
+      const result = await engine.check(
+        { name: 'run_shell_command', args: { command: 'complex command' } },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+      expect(result.rule).toBeDefined();
+      expect(result.rule?.priority).toBe(999);
+    });
+
+    it('should return DENY in YOLO mode if shell command parsing fails and a higher priority rule says DENY', async () => {
+      const { splitCommands } = await import('../utils/shell-utils.js');
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.DENY,
+          priority: 2000, // Very high priority DENY (e.g. Admin)
+        },
+        {
+          decision: PolicyDecision.ALLOW,
+          priority: 999,
+          modes: [ApprovalMode.YOLO],
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+      });
+
+      // Simulate parsing failure
+      vi.mocked(splitCommands).mockReturnValueOnce([]);
+
+      const result = await engine.check(
+        { name: 'run_shell_command', args: { command: 'complex command' } },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.DENY);
+    });
+
+    it('should return ASK_USER in non-YOLO mode if shell command parsing fails', async () => {
+      const { splitCommands } = await import('../utils/shell-utils.js');
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.DEFAULT,
+      });
+
+      // Simulate parsing failure
+      vi.mocked(splitCommands).mockReturnValueOnce([]);
+
+      const result = await engine.check(
+        { name: 'run_shell_command', args: { command: 'complex command' } },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+      expect(result.rule).toBeDefined();
+      expect(result.rule?.priority).toBe(20);
     });
   });
 

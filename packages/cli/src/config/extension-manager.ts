@@ -48,6 +48,8 @@ import {
   type HookEventName,
   type ResolvedExtensionSetting,
   coreEvents,
+  applyAdminAllowlist,
+  getAdminBlockedMcpServersMessage,
 } from '@google/gemini-cli-core';
 import { maybeRequestConsentOrFail } from './extensions/consent.js';
 import { resolveEnvVarsInObject } from '../utils/envVarResolver.js';
@@ -70,6 +72,7 @@ import {
 } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
 import { themeManager } from '../ui/themes/theme-manager.js';
+import { getFormattedSettingValue } from '../commands/extensions/utils.js';
 
 interface ExtensionManagerParams {
   enabledExtensionOverrides?: string[];
@@ -144,6 +147,26 @@ export class ExtensionManager extends ExtensionLoader {
     previousExtensionConfig?: ExtensionConfig,
   ): Promise<GeminiCLIExtension> {
     if (
+      this.settings.security?.allowedExtensions &&
+      this.settings.security?.allowedExtensions.length > 0
+    ) {
+      const extensionAllowed = this.settings.security?.allowedExtensions.some(
+        (pattern) => {
+          try {
+            return new RegExp(pattern).test(installMetadata.source);
+          } catch (e) {
+            throw new Error(
+              `Invalid regex pattern in allowedExtensions setting: "${pattern}. Error: ${getErrorMessage(e)}`,
+            );
+          }
+        },
+      );
+      if (!extensionAllowed) {
+        throw new Error(
+          `Installing extension from source "${installMetadata.source}" is not allowed by the "allowedExtensions" security setting.`,
+        );
+      }
+    } else if (
       (installMetadata.type === 'git' ||
         installMetadata.type === 'github-release') &&
       this.settings.security.blockGitExtensions
@@ -152,6 +175,7 @@ export class ExtensionManager extends ExtensionLoader {
         'Installing extensions from remote sources is disallowed by your current settings.',
       );
     }
+
     const isUpdate = !!previousExtensionConfig;
     let newExtensionConfig: ExtensionConfig | null = null;
     let localSourcePath: string | undefined;
@@ -522,10 +546,39 @@ Would you like to attempt to install via "git clone" instead?`,
     const installMetadata = loadInstallMetadata(extensionDir);
     let effectiveExtensionPath = extensionDir;
     if (
+      this.settings.security?.allowedExtensions &&
+      this.settings.security?.allowedExtensions.length > 0
+    ) {
+      if (!installMetadata?.source) {
+        throw new Error(
+          `Failed to load extension ${extensionDir}. The ${INSTALL_METADATA_FILENAME} file is missing or misconfigured.`,
+        );
+      }
+      const extensionAllowed = this.settings.security?.allowedExtensions.some(
+        (pattern) => {
+          try {
+            return new RegExp(pattern).test(installMetadata?.source);
+          } catch (e) {
+            throw new Error(
+              `Invalid regex pattern in allowedExtensions setting: "${pattern}. Error: ${getErrorMessage(e)}`,
+            );
+          }
+        },
+      );
+      if (!extensionAllowed) {
+        debugLogger.warn(
+          `Failed to load extension ${extensionDir}. This extension is not allowed by the "allowedExtensions" security setting.`,
+        );
+        return null;
+      }
+    } else if (
       (installMetadata?.type === 'git' ||
         installMetadata?.type === 'github-release') &&
       this.settings.security.blockGitExtensions
     ) {
+      debugLogger.warn(
+        `Failed to load extension ${extensionDir}. Extensions from remote sources is disallowed by your current settings.`,
+      );
       return null;
     }
 
@@ -598,12 +651,7 @@ Would you like to attempt to install via "git clone" instead?`,
           resolvedSettings.push({
             name: setting.name,
             envVar: setting.envVar,
-            value:
-              value === undefined
-                ? '[not set]'
-                : setting.sensitive
-                  ? '***'
-                  : value,
+            value,
             sensitive: setting.sensitive ?? false,
             scope,
             source,
@@ -615,12 +663,33 @@ Would you like to attempt to install via "git clone" instead?`,
         if (this.settings.admin.mcp.enabled === false) {
           config.mcpServers = undefined;
         } else {
-          config.mcpServers = Object.fromEntries(
-            Object.entries(config.mcpServers).map(([key, value]) => [
-              key,
-              filterMcpConfig(value),
-            ]),
-          );
+          // Apply admin allowlist if configured
+          const adminAllowlist = this.settings.admin.mcp.config;
+          if (adminAllowlist && Object.keys(adminAllowlist).length > 0) {
+            const result = applyAdminAllowlist(
+              config.mcpServers,
+              adminAllowlist,
+            );
+            config.mcpServers = result.mcpServers;
+
+            if (result.blockedServerNames.length > 0) {
+              const message = getAdminBlockedMcpServersMessage(
+                result.blockedServerNames,
+                undefined,
+              );
+              coreEvents.emitConsoleLog('warn', message);
+            }
+          }
+
+          // Then apply local filtering/sanitization
+          if (config.mcpServers) {
+            config.mcpServers = Object.fromEntries(
+              Object.entries(config.mcpServers).map(([key, value]) => [
+                key,
+                filterMcpConfig(value),
+              ]),
+            );
+          }
         }
       }
 
@@ -639,10 +708,7 @@ Would you like to attempt to install via "git clone" instead?`,
       };
 
       let hooks: { [K in HookEventName]?: HookDefinition[] } | undefined;
-      if (
-        this.settings.tools.enableHooks &&
-        this.settings.hooksConfig.enabled
-      ) {
+      if (this.settings.hooksConfig.enabled) {
         hooks = await this.loadExtensionHooks(
           effectiveExtensionPath,
           hydrationContext,
@@ -894,7 +960,7 @@ Would you like to attempt to install via "git clone" instead?`,
           }
           scope += ')';
         }
-        output += `\n  ${setting.name}: ${setting.value} ${scope}`;
+        output += `\n  ${setting.name}: ${getFormattedSettingValue(setting)} ${scope}`;
       });
     }
     return output;

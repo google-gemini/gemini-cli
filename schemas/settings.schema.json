@@ -29,13 +29,6 @@
       "default": {},
       "type": "object",
       "properties": {
-        "previewFeatures": {
-          "title": "Preview Features (e.g., models)",
-          "description": "Enable preview features (e.g., preview models).",
-          "markdownDescription": "Enable preview features (e.g., preview models).\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
-          "type": "boolean"
-        },
         "preferredEditor": {
           "title": "Preferred Editor",
           "description": "The preferred editor to open files in.",
@@ -169,6 +162,20 @@
           "description": "The color theme for the UI. See the CLI themes guide for available options.",
           "markdownDescription": "The color theme for the UI. See the CLI themes guide for available options.\n\n- Category: `UI`\n- Requires restart: `no`",
           "type": "string"
+        },
+        "autoThemeSwitching": {
+          "title": "Auto Theme Switching",
+          "description": "Automatically switch between default light and dark themes based on terminal background color.",
+          "markdownDescription": "Automatically switch between default light and dark themes based on terminal background color.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "terminalBackgroundPollingInterval": {
+          "title": "Terminal Background Polling Interval",
+          "description": "Interval in seconds to poll the terminal background color.",
+          "markdownDescription": "Interval in seconds to poll the terminal background color.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `60`",
+          "default": 60,
+          "type": "number"
         },
         "customThemes": {
           "title": "Custom Themes",
@@ -456,6 +463,13 @@
           "markdownDescription": "The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `0.5`",
           "default": 0.5,
           "type": "number"
+        },
+        "disableLoopDetection": {
+          "title": "Disable Loop Detection",
+          "description": "Disable automatic detection and prevention of infinite loops.",
+          "markdownDescription": "Disable automatic detection and prevention of infinite loops.\n\n- Category: `Model`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
         },
         "skipNextSpeakerCheck": {
           "title": "Skip Next Speaker Check",
@@ -1112,13 +1126,6 @@
           },
           "additionalProperties": false
         },
-        "autoAccept": {
-          "title": "Auto Accept",
-          "description": "Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).",
-          "markdownDescription": "Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
-          "type": "boolean"
-        },
         "approvalMode": {
           "title": "Approval Mode",
           "description": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet.",
@@ -1173,38 +1180,17 @@
           "default": true,
           "type": "boolean"
         },
-        "enableToolOutputTruncation": {
-          "title": "Enable Tool Output Truncation",
-          "description": "Enable truncation of large tool outputs.",
-          "markdownDescription": "Enable truncation of large tool outputs.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `true`",
-          "default": true,
-          "type": "boolean"
-        },
         "truncateToolOutputThreshold": {
           "title": "Tool Output Truncation Threshold",
-          "description": "Truncate tool output if it is larger than this many characters. Set to -1 to disable.",
-          "markdownDescription": "Truncate tool output if it is larger than this many characters. Set to -1 to disable.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `4000000`",
-          "default": 4000000,
-          "type": "number"
-        },
-        "truncateToolOutputLines": {
-          "title": "Tool Output Truncation Lines",
-          "description": "The number of lines to keep when truncating tool output.",
-          "markdownDescription": "The number of lines to keep when truncating tool output.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `1000`",
-          "default": 1000,
+          "description": "Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.",
+          "markdownDescription": "Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `40000`",
+          "default": 40000,
           "type": "number"
         },
         "disableLLMCorrection": {
           "title": "Disable LLM Correction",
           "description": "Disable LLM-based error correction for edit tools. When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct.",
           "markdownDescription": "Disable LLM-based error correction for edit tools. When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `true`",
-          "default": true,
-          "type": "boolean"
-        },
-        "enableHooks": {
-          "title": "Enable Hooks System (Experimental)",
-          "description": "Enables the hooks system experiment. When disabled, the hooks system is completely deactivated regardless of other settings.",
-          "markdownDescription": "Enables the hooks system experiment. When disabled, the hooks system is completely deactivated regardless of other settings.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         }
@@ -1280,6 +1266,16 @@
           "default": false,
           "type": "boolean"
         },
+        "allowedExtensions": {
+          "title": "Extension Source Regex Allowlist",
+          "description": "List of Regex patterns for allowed extensions. If nonempty, only extensions that match the patterns in this list are allowed. Overrides the blockGitExtensions setting.",
+          "markdownDescription": "List of Regex patterns for allowed extensions. If nonempty, only extensions that match the patterns in this list are allowed. Overrides the blockGitExtensions setting.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `[]`",
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "folderTrust": {
           "title": "Folder Trust",
           "description": "Settings for folder trust.",
@@ -1290,8 +1286,8 @@
             "enabled": {
               "title": "Folder Trust",
               "description": "Setting to track whether Folder trust is enabled.",
-              "markdownDescription": "Setting to track whether Folder trust is enabled.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
-              "default": false,
+              "markdownDescription": "Setting to track whether Folder trust is enabled.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
               "type": "boolean"
             }
           },
@@ -1411,6 +1407,44 @@
       "default": {},
       "type": "object",
       "properties": {
+        "toolOutputMasking": {
+          "title": "Tool Output Masking",
+          "description": "Advanced settings for tool output masking to manage context window efficiency.",
+          "markdownDescription": "Advanced settings for tool output masking to manage context window efficiency.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "Enable Tool Output Masking",
+              "description": "Enables tool output masking to save tokens.",
+              "markdownDescription": "Enables tool output masking to save tokens.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "toolProtectionThreshold": {
+              "title": "Tool Protection Threshold",
+              "description": "Minimum number of tokens to protect from masking (most recent tool outputs).",
+              "markdownDescription": "Minimum number of tokens to protect from masking (most recent tool outputs).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `50000`",
+              "default": 50000,
+              "type": "number"
+            },
+            "minPrunableTokensThreshold": {
+              "title": "Min Prunable Tokens Threshold",
+              "description": "Minimum prunable tokens required to trigger a masking pass.",
+              "markdownDescription": "Minimum prunable tokens required to trigger a masking pass.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `30000`",
+              "default": 30000,
+              "type": "number"
+            },
+            "protectLatestTurn": {
+              "title": "Protect Latest Turn",
+              "description": "Ensures the absolute latest turn is never masked, regardless of token count.",
+              "markdownDescription": "Ensures the absolute latest turn is never masked, regardless of token count.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
         "enableAgents": {
           "title": "Enable Agents",
           "description": "Enable local and remote subagents. Warning: Experimental feature, uses YOLO mode for subagents",
@@ -1428,8 +1462,8 @@
         "extensionConfig": {
           "title": "Extension Configuration",
           "description": "Enable requesting and fetching of extension settings.",
-          "markdownDescription": "Enable requesting and fetching of extension settings.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+          "markdownDescription": "Enable requesting and fetching of extension settings.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "enableEventDrivenScheduler": {
@@ -1537,7 +1571,7 @@
         "enabled": {
           "title": "Enable Hooks",
           "description": "Canonical toggle for the hooks system. When disabled, no hooks will be executed.",
-          "markdownDescription": "Canonical toggle for the hooks system. When disabled, no hooks will be executed.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `true`",
+          "markdownDescription": "Canonical toggle for the hooks system. When disabled, no hooks will be executed.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
@@ -1695,6 +1729,16 @@
               "markdownDescription": "If false, disallows MCP servers from being used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `true`",
               "default": true,
               "type": "boolean"
+            },
+            "config": {
+              "title": "MCP Config",
+              "description": "Admin-configured MCP servers.",
+              "markdownDescription": "Admin-configured MCP servers.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `{}`",
+              "default": {},
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/MCPServerConfig"
+              }
             }
           },
           "additionalProperties": false

@@ -179,7 +179,6 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
       const selectedModel = resolveClassifierModel(
         config.getModel(),
         modelAlias,
-        config.getPreviewFeatures(),
       );
 
       const latencyMs = Date.now() - startTime;
@@ -187,7 +186,7 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
       return {
         model: selectedModel,
         metadata: {
-          source: `Classifier (${groupLabel})`,
+          source: `NumericalClassifier (${groupLabel})`,
           latencyMs,
           reasoning: `[Score: ${score} / Threshold: ${threshold}] ${routerResponse.complexity_reasoning}`,
         },

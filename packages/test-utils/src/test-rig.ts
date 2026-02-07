@@ -105,51 +105,91 @@ export function printDebugInfo(
   return allTools;
 }
 
-// Helper to validate model output and warn about unexpected content
-export function validateModelOutput(
-  result: string,
-  expectedContent: string | (string | RegExp)[] | null = null,
-  testName = '',
-) {
-  // First, check if there's any output at all (this should fail the test if missing)
+// Helper to assert that the model returned some output
+export function assertModelHasOutput(result: string) {
   if (!result || result.trim().length === 0) {
     throw new Error('Expected LLM to return some output');
   }
+}
+
+function contentExists(result: string, content: string | RegExp): boolean {
+  if (typeof content === 'string') {
+    return result.toLowerCase().includes(content.toLowerCase());
+  } else if (content instanceof RegExp) {
+    return content.test(result);
+  }
+  return false;
+}
+
+function findMismatchedContent(
+  result: string,
+  content: string | (string | RegExp)[],
+  shouldExist: boolean,
+): (string | RegExp)[] {
+  const contents = Array.isArray(content) ? content : [content];
+  return contents.filter((c) => contentExists(result, c) !== shouldExist);
+}
+
+function logContentWarning(
+  problematicContent: (string | RegExp)[],
+  isMissing: boolean,
+  originalContent: string | (string | RegExp)[] | null | undefined,
+  result: string,
+) {
+  const message = isMissing
+    ? 'LLM did not include expected content in response'
+    : 'LLM included forbidden content in response';
+
+  console.warn(
+    `Warning: ${message}: ${problematicContent.join(', ')}.`,
+    'This is not ideal but not a test failure.',
+  );
+
+  const label = isMissing ? 'Expected content' : 'Forbidden content';
+  console.warn(`${label}:`, originalContent);
+  console.warn('Actual output:', result);
+}
+
+// Helper to check model output and warn about unexpected content
+export function checkModelOutputContent(
+  result: string,
+  {
+    expectedContent = null,
+    testName = '',
+    forbiddenContent = null,
+  }: {
+    expectedContent?: string | (string | RegExp)[] | null;
+    testName?: string;
+    forbiddenContent?: string | (string | RegExp)[] | null;
+  } = {},
+): boolean {
+  let isValid = true;
 
   // If expectedContent is provided, check for it and warn if missing
   if (expectedContent) {
-    const contents = Array.isArray(expectedContent)
-      ? expectedContent
-      : [expectedContent];
-    const missingContent = contents.filter((content) => {
-      if (typeof content === 'string') {
-        return !result.toLowerCase().includes(content.toLowerCase());
-      } else if (content instanceof RegExp) {
-        return !content.test(result);
-      }
-      return false;
-    });
+    const missingContent = findMismatchedContent(result, expectedContent, true);
 
     if (missingContent.length > 0) {
-      console.warn(
-        `Warning: LLM did not include expected content in response: ${missingContent.join(
-          ', ',
-        )}.`,
-        'This is not ideal but not a test failure.',
-      );
-      console.warn(
-        'The tool was called successfully, which is the main requirement.',
-      );
-      console.warn('Expected content:', expectedContent);
-      console.warn('Actual output:', result);
-      return false;
-    } else if (env['VERBOSE'] === 'true') {
-      console.log(`${testName}: Model output validated successfully.`);
+      logContentWarning(missingContent, true, expectedContent, result);
+      isValid = false;
     }
-    return true;
   }
 
-  return true;
+  // If forbiddenContent is provided, check for it and warn if present
+  if (forbiddenContent) {
+    const foundContent = findMismatchedContent(result, forbiddenContent, false);
+
+    if (foundContent.length > 0) {
+      logContentWarning(foundContent, false, forbiddenContent, result);
+      isValid = false;
+    }
+  }
+
+  if (isValid && env['VERBOSE'] === 'true') {
+    console.log(`${testName}: Model output content checked successfully.`);
+  }
+
+  return isValid;
 }
 
 export interface ParsedLog {
@@ -272,11 +312,33 @@ export class InteractiveRun {
   }
 }
 
+function isObject(item: any): item is Record<string, any> {
+  return !!(item && typeof item === 'object' && !Array.isArray(item));
+}
+
+function deepMerge(target: any, source: any): any {
+  if (!isObject(target) || !isObject(source)) {
+    return source;
+  }
+  const output = { ...target };
+  Object.keys(source).forEach((key) => {
+    const targetValue = target[key];
+    const sourceValue = source[key];
+    if (isObject(targetValue) && isObject(sourceValue)) {
+      output[key] = deepMerge(targetValue, sourceValue);
+    } else {
+      output[key] = sourceValue;
+    }
+  });
+  return output;
+}
+
 export class TestRig {
   testDir: string | null = null;
   homeDir: string | null = null;
   testName?: string;
   _lastRunStdout?: string;
+  _lastRunStderr?: string;
   // Path to the copied fake responses file for this test.
   fakeResponsesPath?: string;
   // Original fake responses file path for rewriting goldens in record mode.
@@ -315,42 +377,53 @@ export class TestRig {
     const projectGeminiDir = join(this.testDir!, GEMINI_DIR);
     mkdirSync(projectGeminiDir, { recursive: true });
 
+    const userGeminiDir = join(this.homeDir!, GEMINI_DIR);
+    mkdirSync(userGeminiDir, { recursive: true });
+
     // In sandbox mode, use an absolute path for telemetry inside the container
     // The container mounts the test directory at the same path as the host
     const telemetryPath = join(this.homeDir!, 'telemetry.log'); // Always use home directory for telemetry
 
-    const settings = {
-      general: {
-        // Nightly releases sometimes becomes out of sync with local code and
-        // triggers auto-update, which causes tests to fail.
-        disableAutoUpdate: true,
-        previewFeatures: false,
-      },
-      telemetry: {
-        enabled: true,
-        target: 'local',
-        otlpEndpoint: '',
-        outfile: telemetryPath,
-      },
-      security: {
-        auth: {
-          selectedType: 'gemini-api-key',
+    const settings = deepMerge(
+      {
+        general: {
+          // Nightly releases sometimes becomes out of sync with local code and
+          // triggers auto-update, which causes tests to fail.
+          disableAutoUpdate: true,
         },
+        telemetry: {
+          enabled: true,
+          target: 'local',
+          otlpEndpoint: '',
+          outfile: telemetryPath,
+        },
+        security: {
+          auth: {
+            selectedType: 'gemini-api-key',
+          },
+          folderTrust: {
+            enabled: false,
+          },
+        },
+        ui: {
+          useAlternateBuffer: true,
+        },
+        model: {
+          name: DEFAULT_GEMINI_MODEL,
+        },
+        sandbox:
+          env['GEMINI_SANDBOX'] !== 'false' ? env['GEMINI_SANDBOX'] : false,
+        // Don't show the IDE connection dialog when running from VsCode
+        ide: { enabled: false, hasSeenNudge: true },
       },
-      ui: {
-        useAlternateBuffer: true,
-      },
-      model: {
-        name: DEFAULT_GEMINI_MODEL,
-      },
-      sandbox:
-        env['GEMINI_SANDBOX'] !== 'false' ? env['GEMINI_SANDBOX'] : false,
-      // Don't show the IDE connection dialog when running from VsCode
-      ide: { enabled: false, hasSeenNudge: true },
-      ...overrideSettings, // Allow tests to override/add settings
-    };
+      overrideSettings ?? {},
+    );
     writeFileSync(
       join(projectGeminiDir, 'settings.json'),
+      JSON.stringify(settings, null, 2),
+    );
+    writeFileSync(
+      join(userGeminiDir, 'settings.json'),
       JSON.stringify(settings, null, 2),
     );
   }
@@ -382,7 +455,8 @@ export class TestRig {
   } {
     const isNpmReleaseTest =
       env['INTEGRATION_TEST_USE_INSTALLED_GEMINI'] === 'true';
-    const command = isNpmReleaseTest ? 'gemini' : 'node';
+    const geminiCommand = os.platform() === 'win32' ? 'gemini.cmd' : 'gemini';
+    const command = isNpmReleaseTest ? geminiCommand : 'node';
     const initialArgs = isNpmReleaseTest
       ? extraInitialArgs
       : [BUNDLE_PATH, ...extraInitialArgs];
@@ -394,6 +468,34 @@ export class TestRig {
       }
     }
     return { command, initialArgs };
+  }
+
+  private _getCleanEnv(
+    extraEnv?: Record<string, string | undefined>,
+  ): Record<string, string | undefined> {
+    const cleanEnv: Record<string, string | undefined> = { ...process.env };
+
+    // Clear all GEMINI_ environment variables that might interfere with tests
+    // except for those we explicitly want to keep or set.
+    for (const key of Object.keys(cleanEnv)) {
+      if (
+        (key.startsWith('GEMINI_') || key.startsWith('GOOGLE_GEMINI_')) &&
+        key !== 'GEMINI_API_KEY' &&
+        key !== 'GOOGLE_API_KEY' &&
+        key !== 'GEMINI_MODEL' &&
+        key !== 'GEMINI_DEBUG' &&
+        key !== 'GEMINI_CLI_TEST_VAR' &&
+        !key.startsWith('GEMINI_CLI_ACTIVITY_LOG')
+      ) {
+        delete cleanEnv[key];
+      }
+    }
+
+    return {
+      ...cleanEnv,
+      GEMINI_CLI_HOME: this.homeDir!,
+      ...extraEnv,
+    };
   }
 
   run(options: {
@@ -433,11 +535,7 @@ export class TestRig {
     const child = spawn(command, commandArgs, {
       cwd: this.testDir!,
       stdio: 'pipe',
-      env: {
-        ...process.env,
-        GEMINI_CLI_HOME: this.homeDir!,
-        ...options.env,
-      },
+      env: this._getCleanEnv(options.env),
     });
     this._spawnedProcesses.push(child);
 
@@ -487,6 +585,7 @@ export class TestRig {
 
       child.on('close', (code: number) => {
         clearTimeout(timer);
+        this._lastRunStderr = stderr;
         if (code === 0) {
           // Store the raw stdout for Podman telemetry parsing
           this._lastRunStdout = stdout;
@@ -555,6 +654,48 @@ export class TestRig {
     return filteredLines.join('\n');
   }
 
+  /**
+   * Runs the CLI and returns stdout and stderr separately.
+   * Useful for tests that need to verify correct stream routing.
+   */
+  runWithStreams(
+    args: string[],
+    options?: { signal?: AbortSignal },
+  ): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
+    return new Promise((resolve, reject) => {
+      const { command, initialArgs } = this._getCommandAndArgs([
+        '--approval-mode=yolo',
+      ]);
+
+      const allArgs = [...initialArgs, ...args];
+
+      const child = spawn(command, allArgs, {
+        cwd: this.testDir!,
+        stdio: 'pipe',
+        env: this._getCleanEnv(),
+        signal: options?.signal,
+      });
+      this._spawnedProcesses.push(child);
+
+      let stdout = '';
+      let stderr = '';
+
+      child.on('error', reject);
+
+      child.stdout!.on('data', (chunk) => {
+        stdout += chunk;
+      });
+      child.stderr!.on('data', (chunk) => {
+        stderr += chunk;
+      });
+
+      child.stdin!.end();
+      child.on('close', (exitCode) => {
+        resolve({ stdout, stderr, exitCode });
+      });
+    });
+  }
+
   runCommand(
     args: string[],
     options: {
@@ -569,11 +710,7 @@ export class TestRig {
     const child = spawn(command, commandArgs, {
       cwd: this.testDir!,
       stdio: 'pipe',
-      env: {
-        ...process.env,
-        GEMINI_CLI_HOME: this.homeDir!,
-        ...options.env,
-      },
+      env: this._getCleanEnv(options.env),
     });
     this._spawnedProcesses.push(child);
 
@@ -619,6 +756,7 @@ export class TestRig {
 
       child.on('close', (code: number) => {
         clearTimeout(timer);
+        this._lastRunStderr = stderr;
         if (code === 0) {
           this._lastRunStdout = stdout;
           const result = this._filterPodmanTelemetry(stdout);
@@ -1137,11 +1275,7 @@ export class TestRig {
     ]);
     const commandArgs = [...initialArgs];
 
-    const envVars = {
-      ...process.env,
-      GEMINI_CLI_HOME: this.homeDir!,
-      ...options?.env,
-    };
+    const envVars = this._getCleanEnv(options?.env);
 
     const ptyOptions: pty.IPtyForkOptions = {
       name: 'xterm-color',
