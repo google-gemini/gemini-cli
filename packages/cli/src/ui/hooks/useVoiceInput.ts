@@ -6,13 +6,10 @@
 
 import { debugLogger, tmpdir } from '@google/gemini-cli-core';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { spawn, exec } from 'node:child_process';
-import { promisify } from 'node:util';
-import { unlink, mkdtemp, stat, access, readFile } from 'node:fs/promises';
+import { spawn, execFile } from 'node:child_process';
+import { unlink, mkdtemp, stat, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { EventEmitter } from 'node:events';
-
-const execAsync = promisify(exec);
 
 // Event-based transcript delivery to avoid context re-renders
 // See VOICE_INFINITE_LOOP_ANALYSIS.md for details
@@ -66,7 +63,6 @@ export function useVoiceInput(config?: {
   const recordingProcessRef = useRef<ReturnType<typeof spawn> | null>(null);
   const tempDirRef = useRef<string | null>(null);
   const audioFileRef = useRef<string | null>(null);
-  const sanitizedPathLoggedRef = useRef(false);
   // Guard against overlapping toggleRecording calls (race condition fix)
   const isTogglingRef = useRef(false);
 
@@ -107,9 +103,19 @@ export function useVoiceInput(config?: {
       // Start recording with sox or arecord
       let recordProcess: ReturnType<typeof spawn>;
 
+      // Helper to check if command exists using execFile (safer than exec)
+      const commandExists = (cmd: string): Promise<boolean> => new Promise((resolve) => {
+          execFile('which', [cmd], (error) => {
+            resolve(!error);
+          });
+        });
+
       // Try sox first, fall back to arecord
       try {
-        await execAsync('which sox');
+        const soxExists = await commandExists('sox');
+        if (!soxExists) {
+          throw new Error('sox not found');
+        }
         debugLogger.log('useVoiceInput: sox found');
         recordProcess = spawn('sox', [
           '-d', // default input device
@@ -140,7 +146,10 @@ export function useVoiceInput(config?: {
       } catch {
         // Fall back to arecord (Linux)
         try {
-          await execAsync('which arecord');
+          const arecordExists = await commandExists('arecord');
+          if (!arecordExists) {
+            throw new Error('arecord not found');
+          }
           debugLogger.log('useVoiceInput: arecord found');
           recordProcess = spawn('arecord', [
             '-f',
@@ -256,93 +265,78 @@ export function useVoiceInput(config?: {
       // Transcribe using whisper-cli or faster-whisper
       let transcript = '';
 
-      const runWhisper = async (binary: string, args: string) => {
-        // If it looks like an absolute path, verify existence directly
-        // This avoids 'which' issues with PATH
-        if (binary.startsWith('/') || binary.startsWith('.')) {
-          // Check for common configuration error: path with incorrect quotes
-          if (binary.includes("'") || binary.includes('"')) {
-            const sanitized = binary.replace(/['"]/g, '');
-            if (sanitized !== binary) {
-              try {
-                await access(sanitized);
-                if (!sanitizedPathLoggedRef.current) {
-                  debugLogger.log(
-                    'useVoiceInput: found sanitized path, using it instead',
-                    sanitized,
-                  );
-                  sanitizedPathLoggedRef.current = true;
-                }
-                binary = sanitized;
-              } catch {
-                // Sanitized path also doesn't exist, proceed with original to let it fail or be logged
-              }
-            }
-          }
-
-          try {
-            await access(binary);
-          } catch {
-            // If access fails, we'll fall through to try executing it (or it might fail there)
-            // but checking 'which' on an absolute path is redundant/incorrect.
-            debugLogger.log(
-              'useVoiceInput: explicit path access check failed, but will try execution',
-              binary,
-            );
-          }
-        } else {
-          // For command names, try to find them first
-          try {
-            await execAsync(`which ${binary}`);
-          } catch {
-            // If which fails, we might still try running it if we suspect it's in the PATH but not found by `sh -c which`
-            // (e.g. some obscure shell setup). But usually `which` failure is authoritative.
-            // However, for user convenience, let's allow proceeding if it's the configured path.
-            if (binary === config?.whisperPath) {
-              debugLogger.log(
-                'useVoiceInput: `which` failed for configured path, but proceeding anyway',
-              );
+      // Helper to execute whisper with proper argument array (prevents command injection)
+      const execFileAsync = (file: string, args: string[]): Promise<void> => new Promise((resolve, reject) => {
+          execFile(file, args, (error) => {
+            if (error) {
+              reject(error);
             } else {
-              throw new Error(`Command not found: ${binary}`);
+              resolve();
             }
-          }
+          });
+        });
+
+      // Validate binary path - reject paths with shell metacharacters
+      const validateBinaryPath = (path: string): string => {
+        // Remove quotes if present (common user error)
+        const sanitized = path.replace(/['"]/g, '');
+
+        // Reject paths with shell metacharacters that could enable injection
+        const dangerousChars = /[;&|`$(){}[\]<>!]/;
+        if (dangerousChars.test(sanitized)) {
+          throw new Error(`Invalid binary path: contains shell metacharacters`);
         }
 
-        await execAsync(`${binary} ${args}`);
+        return sanitized;
       };
 
       try {
         if (config?.whisperPath) {
+          const validatedPath = validateBinaryPath(config.whisperPath);
           debugLogger.log(
             'useVoiceInput: using configured whisper path',
-            config.whisperPath,
+            validatedPath,
           );
-          // If the user pointed to a python script, we might need to invoke it differently,
-          // but let's assume it's an executable or wrapper script for now.
-          await runWhisper(
-            config.whisperPath,
-            `"${audioFile}" --model tiny --output_format txt --output_dir "${tempDirRef.current}" `,
-          );
+          // Execute with argument array (no shell, no injection risk)
+          await execFileAsync(validatedPath, [
+            audioFile,
+            '--model',
+            'tiny',
+            '--output_format',
+            'txt',
+            '--output_dir',
+            tempDirRef.current!,
+          ]);
           // Read the transcript file
           const transcriptFile = audioFile.replace('.wav', '.txt');
           transcript = await readFile(transcriptFile, 'utf-8');
         } else {
           // Try faster-whisper first
           try {
-            await execAsync('which whisper-faster || which faster-whisper');
-            await execAsync(
-              `whisper-faster "${audioFile}" --model tiny --output_format txt --output_dir "${tempDirRef.current}"`,
-            );
+            await execFileAsync('whisper-faster', [
+              audioFile,
+              '--model',
+              'tiny',
+              '--output_format',
+              'txt',
+              '--output_dir',
+              tempDirRef.current!,
+            ]);
             // Read the transcript file
             const transcriptFile = audioFile.replace('.wav', '.txt');
             transcript = await readFile(transcriptFile, 'utf-8');
           } catch {
             // Fall back to whisper (Python package)
             try {
-              await execAsync('which whisper');
-              await execAsync(
-                `whisper "${audioFile}" --model tiny --output_format txt --output_dir "${tempDirRef.current}"`,
-              );
+              await execFileAsync('whisper', [
+                audioFile,
+                '--model',
+                'tiny',
+                '--output_format',
+                'txt',
+                '--output_dir',
+                tempDirRef.current!,
+              ]);
               const transcriptFile = audioFile.replace('.wav', '.txt');
               transcript = await readFile(transcriptFile, 'utf-8');
             } catch {

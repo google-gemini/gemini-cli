@@ -20,7 +20,7 @@ vi.mock('node:child_process', async () => {
   return {
     ...actual,
     spawn: vi.fn(),
-    exec: vi.fn((_cmd, cb) => {
+    execFile: vi.fn((_file, _args, cb) => {
       if (typeof cb === 'function') {
         cb(null, { stdout: '/usr/bin/sox' });
       }
@@ -119,16 +119,17 @@ describe('useVoiceInput', () => {
     vi.mocked(spawn).mockReturnValue(
       new EventEmitter() as unknown as ReturnType<typeof spawn>,
     );
-    vi.mocked(child_process.exec).mockImplementation(((
-      cmd: string,
+    vi.mocked(child_process.execFile).mockImplementation(((
+      file: string,
+      args: string[],
       cb: ExecCallback,
     ) => {
-      if (cmd === 'which sox') {
+      if (file === 'which' && args[0] === 'sox') {
         cb(new Error('not found'));
       } else {
         cb(null, { stdout: '/usr/bin/arecord' });
       }
-    }) as unknown as typeof child_process.exec);
+    }) as unknown as typeof child_process.execFile);
 
     const { result } = renderHook(() => useVoiceInput());
 
@@ -140,12 +141,13 @@ describe('useVoiceInput', () => {
   });
 
   it('should handle errors when neither sox nor arecord is available', async () => {
-    vi.mocked(child_process.exec).mockImplementation(((
-      cmd: string,
+    vi.mocked(child_process.execFile).mockImplementation(((
+      _file: string,
+      _args: string[],
       cb: ExecCallback,
     ) => {
       cb(new Error('not found'));
-    }) as unknown as typeof child_process.exec);
+    }) as unknown as typeof child_process.execFile);
 
     const { result } = renderHook(() => useVoiceInput());
 
