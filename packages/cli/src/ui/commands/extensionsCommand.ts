@@ -231,6 +231,18 @@ async function restartAction(
     (result): result is PromiseRejectedResult => result.status === 'rejected',
   );
 
+  if (failures.length < extensionsToRestart.length) {
+    try {
+      await context.services.config?.reloadSkills();
+      await context.services.config?.getAgentRegistry()?.reload();
+    } catch (error) {
+      context.ui.addItem({
+        type: MessageType.ERROR,
+        text: `Failed to reload skills or agents: ${getErrorMessage(error)}`,
+      });
+    }
+  }
+
   if (failures.length > 0) {
     const errorMessages = failures
       .map((failure, index) => {
