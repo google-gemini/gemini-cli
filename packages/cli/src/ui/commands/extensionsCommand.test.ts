@@ -129,6 +129,8 @@ describe('extensionsCommand', () => {
   let mockContext: CommandContext;
   const mockDispatchExtensionState = vi.fn();
   let mockExtensionLoader: unknown;
+  let mockReloadSkills: MockedFunction<() => Promise<void>>;
+  let mockReloadAgents: MockedFunction<() => Promise<void>>;
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -148,7 +150,8 @@ describe('extensionsCommand', () => {
 
     mockGetExtensions.mockReturnValue([inactiveExt, activeExt, allExt]);
     vi.mocked(open).mockClear();
-    const mockReloadAgents = vi.fn().mockResolvedValue(undefined);
+    mockReloadAgents = vi.fn().mockResolvedValue(undefined);
+    mockReloadSkills = vi.fn().mockResolvedValue(undefined);
 
     mockContext = createMockCommandContext({
       services: {
@@ -156,7 +159,7 @@ describe('extensionsCommand', () => {
           getExtensions: mockGetExtensions,
           getExtensionLoader: vi.fn().mockReturnValue(mockExtensionLoader),
           getWorkingDir: () => '/test/dir',
-          reloadSkills: vi.fn().mockResolvedValue(undefined),
+          reloadSkills: mockReloadSkills,
           getAgentRegistry: vi.fn().mockReturnValue({
             reload: mockReloadAgents,
           }),
@@ -898,6 +901,27 @@ describe('extensionsCommand', () => {
         type: 'RESTARTED',
         payload: { name: 'ext2' },
       });
+      expect(mockReloadSkills).toHaveBeenCalled();
+      expect(mockReloadAgents).toHaveBeenCalled();
+    });
+
+    it('handles errors during skill or agent reload', async () => {
+      const mockExtensions = [
+        { name: 'ext1', isActive: true },
+      ] as GeminiCLIExtension[];
+      mockGetExtensions.mockReturnValue(mockExtensions);
+      mockReloadSkills.mockRejectedValue(new Error('Failed to reload skills'));
+
+      await restartAction!(mockContext, '--all');
+
+      expect(mockRestartExtension).toHaveBeenCalledWith(mockExtensions[0]);
+      expect(mockReloadSkills).toHaveBeenCalled();
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'Failed to reload skills or agents: Failed to reload skills',
+        }),
+      );
     });
 
     it('restarts only specified active extensions', async () => {

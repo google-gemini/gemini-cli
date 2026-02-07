@@ -232,8 +232,15 @@ async function restartAction(
   );
 
   if (failures.length < extensionsToRestart.length) {
-    await context.services.config?.reloadSkills();
-    await context.services.config?.getAgentRegistry()?.reload();
+    try {
+      await context.services.config?.reloadSkills();
+      await context.services.config?.getAgentRegistry()?.reload();
+    } catch (error) {
+      context.ui.addItem({
+        type: MessageType.ERROR,
+        text: `Failed to reload skills or agents: ${getErrorMessage(error)}`,
+      });
+    }
   }
 
   if (failures.length > 0) {
