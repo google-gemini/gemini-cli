@@ -53,6 +53,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       on: vi.fn(),
       off: vi.fn(),
     },
+    loadSkillsFromDir: vi.fn().mockResolvedValue([]),
   };
 });
 
