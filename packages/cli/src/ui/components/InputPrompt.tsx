@@ -256,6 +256,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   // See VOICE_INFINITE_LOOP_ANALYSIS.md for details
   const { state: voiceState, toggleRecording } = useVoiceContext();
 
+  // Override placeholder when voice input is active
+  const activePlaceholder = voiceState.isRecording
+    ? '  Listening... Alt+R or Esc to stop'
+    : voiceState.isTranscribing
+      ? '  Transcribing...'
+      : placeholder;
+
   // Handle voice transcript via event listener (not context) to avoid re-renders
   useEffect(() => {
     const handleTranscript = (transcript: string) => {
@@ -1414,19 +1421,19 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             )}{' '}
           </Text>
           <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
-            {buffer.text.length === 0 && placeholder ? (
+            {buffer.text.length === 0 && activePlaceholder ? (
               showCursor ? (
                 <Text
                   terminalCursorFocus={showCursor}
                   terminalCursorPosition={0}
                 >
-                  {chalk.inverse(placeholder.slice(0, 1))}
+                  {chalk.inverse(activePlaceholder.slice(0, 1))}
                   <Text color={theme.text.secondary}>
-                    {placeholder.slice(1)}
+                    {activePlaceholder.slice(1)}
                   </Text>
                 </Text>
               ) : (
-                <Text color={theme.text.secondary}>{placeholder}</Text>
+                <Text color={theme.text.secondary}>{activePlaceholder}</Text>
               )
             ) : (
               linesToRender

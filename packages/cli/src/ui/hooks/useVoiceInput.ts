@@ -279,15 +279,21 @@ export function useVoiceInput(config?: {
         });
 
       // Validate binary path - reject paths with shell metacharacters
+      // Note: execFile doesn't use a shell, so this is defense-in-depth only.
+      // Forward slashes and dots are safe (required for absolute paths).
       const validateBinaryPath = (path: string): string => {
-        // Reject paths with shell metacharacters that could enable injection
-        const dangerousChars = /[;&|`$(){}[\]<>!'"/]/;
+        const dangerousChars = /[;&|`$(){}[\]<>!'"]/;
         if (dangerousChars.test(path)) {
           throw new Error(`Invalid binary path: contains shell metacharacters`);
         }
 
         return path;
       };
+
+      const outputDir = tempDirRef.current;
+      if (!outputDir) {
+        throw new Error('Temp directory not initialized');
+      }
 
       try {
         if (config?.whisperPath) {
@@ -304,7 +310,7 @@ export function useVoiceInput(config?: {
             '--output_format',
             'txt',
             '--output_dir',
-            tempDirRef.current!,
+            outputDir,
           ]);
           // Read the transcript file
           const transcriptFile = audioFile.replace('.wav', '.txt');
@@ -319,7 +325,7 @@ export function useVoiceInput(config?: {
               '--output_format',
               'txt',
               '--output_dir',
-              tempDirRef.current!,
+              outputDir,
             ]);
             // Read the transcript file
             const transcriptFile = audioFile.replace('.wav', '.txt');
@@ -334,7 +340,7 @@ export function useVoiceInput(config?: {
                 '--output_format',
                 'txt',
                 '--output_dir',
-                tempDirRef.current!,
+                outputDir,
               ]);
               const transcriptFile = audioFile.replace('.wav', '.txt');
               transcript = await readFile(transcriptFile, 'utf-8');

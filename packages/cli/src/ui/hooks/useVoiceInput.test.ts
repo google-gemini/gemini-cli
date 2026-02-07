@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { useVoiceInput, onVoiceTranscript } from './useVoiceInput.js';
 import * as child_process from 'node:child_process';
 import { spawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
+import { mkdtemp, stat, readFile, unlink } from 'node:fs/promises';
 
 vi.mock('node:child_process', async () => {
   const actual =
@@ -50,6 +51,24 @@ type ExecCallback = (
 describe('useVoiceInput', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Re-establish mock implementations after restoreAllMocks
+    vi.mocked(mkdtemp).mockResolvedValue('/tmp/gemini-voice-mock');
+    vi.mocked(stat).mockResolvedValue({ size: 1000 } as Awaited<
+      ReturnType<typeof stat>
+    >);
+    vi.mocked(readFile).mockResolvedValue('Mock transcript');
+    vi.mocked(unlink).mockResolvedValue(undefined);
+    vi.mocked(child_process.execFile).mockImplementation(((
+      _file: string,
+      _args: string[],
+      cb: ExecCallback,
+    ) => {
+      cb(null, { stdout: '/usr/bin/sox' });
+    }) as unknown as typeof child_process.execFile);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('should initialize with default state', () => {

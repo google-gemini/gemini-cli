@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { useVoiceInput } from './useVoiceInput.js';
-import { spawn } from 'node:child_process';
+import { spawn, execFile } from 'node:child_process';
 import { EventEmitter } from 'node:events';
+import { mkdtemp, stat, readFile, unlink } from 'node:fs/promises';
 
 vi.mock('node:child_process', async () => {
   const actual =
@@ -44,6 +45,24 @@ interface MockProcess extends EventEmitter {
 describe('useVoiceInput Stress Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Re-establish mock implementations after restoreAllMocks
+    vi.mocked(mkdtemp).mockResolvedValue('/tmp/gemini-voice-mock');
+    vi.mocked(stat).mockResolvedValue({ size: 1000 } as Awaited<
+      ReturnType<typeof stat>
+    >);
+    vi.mocked(readFile).mockResolvedValue('Mock transcript');
+    vi.mocked(unlink).mockResolvedValue(undefined);
+    vi.mocked(execFile).mockImplementation(((
+      _file: string,
+      _args: string[],
+      cb: (error: Error | null, result?: { stdout: string }) => void,
+    ) => {
+      cb(null, { stdout: '/usr/bin/sox' });
+    }) as unknown as typeof execFile);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('should not cause excessive re-renders when receiving rapid sox progress logs', async () => {

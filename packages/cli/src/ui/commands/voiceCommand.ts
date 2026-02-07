@@ -26,13 +26,17 @@ Commands:
 Keyboard Shortcuts:
   Alt + R          Start/stop voice recording
   Ctrl + Q         Alternative shortcut
+  Esc              Cancel recording (while recording)
 
 Indicators:
   🎤               Recording in progress
   ⏳               Transcribing audio
 
 Voice input uses your microphone to transcribe speech into text.
-The transcribed text is automatically inserted at the cursor position.`,
+The transcribed text is automatically inserted at the cursor position.
+
+Requirements: sox (recording) and whisper or faster-whisper (transcription).
+Configure a custom whisper path in settings: voice.whisperPath`,
         },
         Date.now(),
       );

@@ -4,13 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, useContext, useEffect, useState } from 'react';
 import { renderHook } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { useVoiceInput, onVoiceTranscript } from './useVoiceInput.js';
 import { VoiceContext } from '../contexts/VoiceContext.js';
-import { spawn } from 'node:child_process';
+import { spawn, execFile } from 'node:child_process';
 import { EventEmitter } from 'node:events';
+import { mkdtemp, stat, readFile, unlink } from 'node:fs/promises';
 
 vi.mock('node:child_process', async () => {
   const actual =
@@ -39,6 +41,24 @@ vi.mock('node:fs/promises', async () => ({
 describe('Voice Input Full Cycle Replication', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Re-establish mock implementations after restoreAllMocks
+    vi.mocked(mkdtemp).mockResolvedValue('/tmp/gemini-voice-mock');
+    vi.mocked(stat).mockResolvedValue({ size: 1000 } as Awaited<
+      ReturnType<typeof stat>
+    >);
+    vi.mocked(readFile).mockResolvedValue('this is a test');
+    vi.mocked(unlink).mockResolvedValue(undefined);
+    vi.mocked(execFile).mockImplementation(((
+      _file: string,
+      _args: string[],
+      cb: (error: Error | null, result?: { stdout: string }) => void,
+    ) => {
+      cb(null, { stdout: '/usr/bin/sox' });
+    }) as unknown as typeof execFile);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('should deliver transcript via event without causing re-renders', async () => {
@@ -124,18 +144,15 @@ describe('Voice Input Full Cycle Replication', () => {
       rerenderConsumer();
     });
 
-    // Wait a bit for any cascading renders
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 50));
+    // Wait for transcript to be delivered via event
+    await waitFor(() => {
+      expect(transcriptReceived).toBe('this is a test');
     });
 
     const rendersAfter = consumerRenders;
     const effectRunsAfter = effectRuns;
     const _rendersDuringTranscription = rendersAfter - rendersBefore;
     const effectRunsDuringTranscription = effectRunsAfter - effectRunsBefore;
-
-    // Verify the transcript was received via event
-    expect(transcriptReceived).toBe('this is a test');
 
     // With event-based approach, we should have very few effect runs
     // (effect only runs once for setup, not for each state change)
