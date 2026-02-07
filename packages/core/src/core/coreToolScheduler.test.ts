@@ -10,8 +10,11 @@ import type { CallableTool } from '@google/genai';
 import { CoreToolScheduler } from './coreToolScheduler.js';
 import type {
   ToolCall,
+  ToolCallRequestInfo,
   WaitingToolCall,
   ErroredToolCall,
+  CompletedToolCall,
+  SuccessfulToolCall,
 } from '../scheduler/types.js';
 import type {
   ToolCallConfirmationDetails,
@@ -42,6 +45,7 @@ import {
 import * as modifiableToolModule from '../tools/modifiable-tool.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 import type { PolicyEngine } from '../policy/policy-engine.js';
+
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 
 vi.mock('fs/promises', () => ({
@@ -2260,6 +2264,446 @@ describe('CoreToolScheduler Sequential Execution', () => {
       expect(result.response.error.message).toBe(
         `Tool execution denied by policy. ${customDenyMessage}`,
       );
+    });
+  });
+
+  describe('Tail Tool Calls', () => {
+    it('should execute a tail tool call and replace the original response', async () => {
+      const mockToolA = new MockTool({ name: 'toolA' });
+      const mockToolB = new MockTool({ name: 'toolB' });
+
+      // Mock toolB to return a specific result
+      vi.spyOn(mockToolB, 'execute').mockResolvedValue({
+        llmContent: [{ text: 'Result from Tool B' }],
+        returnDisplay: 'Result from Tool B',
+      });
+
+      const mockToolRegistry = {
+        getTool: (name: string) => (name === 'toolA' ? mockToolA : mockToolB),
+        getAllToolNames: () => ['toolA', 'toolB'],
+      } as unknown as ToolRegistry;
+
+      // Setup a hook system that requests a tail call from toolA to toolB
+      const mockHookSystem = {
+        fireBeforeToolEvent: async () => ({
+          shouldStopExecution: () => false,
+          getBlockingError: () => undefined,
+        }),
+        fireAfterToolEvent: async (toolName: string) => {
+          if (toolName === 'toolA') {
+            return {
+              getBlockingError: () => undefined,
+              shouldStopExecution: () => false,
+              getAdditionalContext: () => undefined,
+              getTailToolCallRequest: () => ({
+                name: 'toolB',
+                args: { foo: 'bar' },
+              }),
+            };
+          }
+          return {
+            getBlockingError: () => undefined,
+            shouldStopExecution: () => false,
+            getAdditionalContext: () => undefined,
+            getTailToolCallRequest: () => undefined,
+          };
+        },
+        fireToolNotificationEvent: async () => {},
+      } as unknown as HookSystem;
+
+      const mockConfig = createMockConfig({
+        getToolRegistry: () => mockToolRegistry,
+        getApprovalMode: () => ApprovalMode.YOLO,
+        getHookSystem: () => mockHookSystem,
+      });
+
+      const onAllToolCallsComplete = vi.fn();
+      const scheduler = new CoreToolScheduler({
+        config: mockConfig,
+        onAllToolCallsComplete,
+        getPreferredEditor: () => 'vscode',
+      });
+
+      const request = {
+        callId: 'call-1',
+        name: 'toolA',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-1',
+      };
+
+      await scheduler.schedule(request, new AbortController().signal);
+
+      expect(onAllToolCallsComplete).toHaveBeenCalledTimes(1);
+      const reportedTools = onAllToolCallsComplete.mock.calls[0][0];
+      expect(reportedTools).toHaveLength(1);
+
+      const result = reportedTools[0];
+      expect(result.status).toBe('success');
+      expect(result.request.callId).toBe('call-1'); // Original call ID
+      expect(result.response.responseParts[0].functionResponse.name).toBe(
+        'toolA',
+      ); // Original tool name
+      expect(
+        result.response.responseParts[0].functionResponse.response.output,
+      ).toBe('Result from Tool B'); // Tail tool result
+    });
+
+    it('should enforce policy checks on the tail tool call', async () => {
+      const mockToolA = new MockTool({ name: 'toolA' });
+      const mockToolB = new MockTool({ name: 'dangerousToolB' });
+
+      const mockToolRegistry = {
+        getTool: (name: string) => {
+          if (name === 'toolA') return mockToolA;
+          if (name === 'dangerousToolB') return mockToolB;
+          return undefined;
+        },
+        getAllToolNames: () => ['toolA', 'dangerousToolB'],
+      } as unknown as ToolRegistry;
+
+      // Policy engine denies dangerousToolB
+      const mockPolicyEngine = {
+        check: async (toolCall: { name: string; args: object }) => {
+          if (toolCall.name === 'dangerousToolB') {
+            return { decision: PolicyDecision.DENY };
+          }
+          return { decision: PolicyDecision.ALLOW };
+        },
+      } as unknown as PolicyEngine;
+
+      // Setup a hook system that requests a tail call from toolA to dangerousToolB
+      const mockHookSystem = {
+        fireBeforeToolEvent: async () => ({
+          shouldStopExecution: () => false,
+          getBlockingError: () => undefined,
+        }),
+        fireAfterToolEvent: async (toolName: string) => {
+          if (toolName === 'toolA') {
+            return {
+              getBlockingError: () => undefined,
+              shouldStopExecution: () => false,
+              getAdditionalContext: () => undefined,
+              getTailToolCallRequest: () => ({
+                name: 'dangerousToolB',
+                args: {},
+              }),
+            };
+          }
+          return {
+            getBlockingError: () => undefined,
+            shouldStopExecution: () => false,
+            getAdditionalContext: () => undefined,
+            getTailToolCallRequest: () => undefined,
+          };
+        },
+        fireToolNotificationEvent: async () => {},
+      } as unknown as HookSystem;
+
+      const mockConfig = createMockConfig({
+        getToolRegistry: () => mockToolRegistry,
+        getApprovalMode: () => ApprovalMode.PLAN, // Plan mode to trigger policy check
+        getPolicyEngine: () => mockPolicyEngine,
+        getHookSystem: () => mockHookSystem,
+      });
+
+      const onAllToolCallsComplete = vi.fn();
+      const scheduler = new CoreToolScheduler({
+        config: mockConfig,
+        onAllToolCallsComplete,
+        getPreferredEditor: () => 'vscode',
+      });
+
+      const request = {
+        callId: 'call-1',
+        name: 'toolA',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-1',
+      };
+
+      await scheduler.schedule(request, new AbortController().signal);
+
+      expect(onAllToolCallsComplete).toHaveBeenCalledTimes(1);
+      const reportedTools = onAllToolCallsComplete.mock.calls[0][0];
+      const result = reportedTools[0];
+
+      expect(result.status).toBe('error');
+      expect(result.request.callId).toBe('call-1');
+      expect(result.response.responseParts[0].functionResponse.name).toBe(
+        'toolA',
+      ); // Should still report under original tool name
+      expect(result.response.errorType).toBe(ToolErrorType.POLICY_VIOLATION);
+      expect(result.response.error.message).toBe(
+        'Tool execution denied by policy.',
+      );
+    });
+
+    it('should return an error if the requested tail tool is not found', async () => {
+      const mockToolA = new MockTool({ name: 'toolA' });
+
+      const mockToolRegistry = {
+        getTool: (name: string) => (name === 'toolA' ? mockToolA : undefined),
+        getAllToolNames: () => ['toolA'],
+      } as unknown as ToolRegistry;
+
+      // Setup a hook system that requests a tail call from toolA to missingTool
+      const mockHookSystem = {
+        fireBeforeToolEvent: async () => ({
+          shouldStopExecution: () => false,
+          getBlockingError: () => undefined,
+        }),
+        fireAfterToolEvent: async (toolName: string) => {
+          if (toolName === 'toolA') {
+            return {
+              getBlockingError: () => undefined,
+              shouldStopExecution: () => false,
+              getAdditionalContext: () => undefined,
+              getTailToolCallRequest: () => ({ name: 'missingTool', args: {} }),
+            };
+          }
+          return {
+            getBlockingError: () => undefined,
+            shouldStopExecution: () => false,
+            getAdditionalContext: () => undefined,
+            getTailToolCallRequest: () => undefined,
+          };
+        },
+        fireToolNotificationEvent: async () => {},
+      } as unknown as HookSystem;
+
+      const mockConfig = createMockConfig({
+        getToolRegistry: () => mockToolRegistry,
+        getApprovalMode: () => ApprovalMode.YOLO,
+        getHookSystem: () => mockHookSystem,
+      });
+
+      const onAllToolCallsComplete = vi.fn();
+      const scheduler = new CoreToolScheduler({
+        config: mockConfig,
+        onAllToolCallsComplete,
+        getPreferredEditor: () => 'vscode',
+      });
+
+      const request = {
+        callId: 'call-1',
+        name: 'toolA',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-1',
+      };
+
+      await scheduler.schedule(request, new AbortController().signal);
+
+      expect(onAllToolCallsComplete).toHaveBeenCalledTimes(1);
+      const reportedTools = onAllToolCallsComplete.mock.calls[0][0];
+      const result = reportedTools[0];
+
+      expect(result.status).toBe('error');
+      expect(result.request.callId).toBe('call-1');
+      expect(result.response.responseParts[0].functionResponse.name).toBe(
+        'toolA',
+      );
+      expect(result.response.errorType).toBe(ToolErrorType.TOOL_NOT_REGISTERED);
+      expect(result.response.error.message).toContain(
+        'Tool "missingTool" not found in registry',
+      );
+    });
+
+    it('should support chaining of tail tool calls', async () => {
+      const mockToolA = new MockTool({ name: 'toolA' });
+      const mockToolB = new MockTool({ name: 'toolB' });
+      const mockToolC = new MockTool({ name: 'toolC' });
+
+      vi.spyOn(mockToolC, 'execute').mockResolvedValue({
+        llmContent: [{ text: 'Result from Tool C' }],
+        returnDisplay: 'Result from Tool C',
+      });
+
+      const mockToolRegistry = {
+        getTool: (name: string) => {
+          if (name === 'toolA') return mockToolA;
+          if (name === 'toolB') return mockToolB;
+          if (name === 'toolC') return mockToolC;
+          return undefined;
+        },
+        getAllToolNames: () => ['toolA', 'toolB', 'toolC'],
+      } as unknown as ToolRegistry;
+
+      // Hook system chains: A -> B -> C
+      const mockHookSystem = {
+        fireBeforeToolEvent: async () => ({
+          shouldStopExecution: () => false,
+          getBlockingError: () => undefined,
+        }),
+        fireAfterToolEvent: async (toolName: string) => {
+          if (toolName === 'toolA') {
+            return {
+              getBlockingError: () => undefined,
+              shouldStopExecution: () => false,
+              getAdditionalContext: () => undefined,
+              getTailToolCallRequest: () => ({ name: 'toolB', args: {} }),
+            };
+          }
+          if (toolName === 'toolB') {
+            return {
+              getBlockingError: () => undefined,
+              shouldStopExecution: () => false,
+              getAdditionalContext: () => undefined,
+              getTailToolCallRequest: () => ({ name: 'toolC', args: {} }),
+            };
+          }
+          return {
+            getBlockingError: () => undefined,
+            shouldStopExecution: () => false,
+            getAdditionalContext: () => undefined,
+            getTailToolCallRequest: () => undefined,
+          };
+        },
+        fireToolNotificationEvent: async () => {},
+      } as unknown as HookSystem;
+
+      const mockConfig = createMockConfig({
+        getToolRegistry: () => mockToolRegistry,
+        getApprovalMode: () => ApprovalMode.YOLO,
+        getHookSystem: () => mockHookSystem,
+      });
+
+      const onAllToolCallsComplete = vi.fn();
+      const scheduler = new CoreToolScheduler({
+        config: mockConfig,
+        onAllToolCallsComplete,
+        getPreferredEditor: () => undefined,
+      });
+
+      const request: ToolCallRequestInfo = {
+        callId: 'call-1',
+        name: 'toolA',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-1',
+      };
+
+      await scheduler.schedule(request, new AbortController().signal);
+
+      expect(onAllToolCallsComplete).toHaveBeenCalledTimes(1);
+      const reportedTools = onAllToolCallsComplete.mock.calls[0][0];
+      const result = reportedTools[0];
+
+      expect(result.status).toBe('success');
+      expect(result.request.callId).toBe('call-1');
+      expect(result.response.responseParts[0].functionResponse.name).toBe(
+        'toolA',
+      ); // Original tool name
+      expect(result.response.resultDisplay).toBe('Result from Tool C');
+    });
+
+    it('should correctly process parallel tool calls where one triggers a tail code', async () => {
+      const mockToolA = new MockTool({ name: 'toolA' });
+      const mockToolB = new MockTool({ name: 'toolB' });
+      const mockToolC = new MockTool({ name: 'toolC' });
+
+      vi.spyOn(mockToolB, 'execute').mockResolvedValue({
+        llmContent: [{ text: 'Result from Tool B' }],
+        returnDisplay: 'Result from Tool B',
+      });
+      vi.spyOn(mockToolC, 'execute').mockResolvedValue({
+        llmContent: [{ text: 'Result from Tool C' }],
+        returnDisplay: 'Result from Tool C',
+      });
+
+      const mockToolRegistry = {
+        getTool: (name: string) => {
+          if (name === 'toolA') return mockToolA;
+          if (name === 'toolB') return mockToolB;
+          if (name === 'toolC') return mockToolC;
+          return undefined;
+        },
+        getAllToolNames: () => ['toolA', 'toolB', 'toolC'],
+      } as unknown as ToolRegistry;
+
+      // Hook system triggers tail call from toolA to toolB
+      // toolC executes normally
+      const mockHookSystem = {
+        fireBeforeToolEvent: async () => ({
+          shouldStopExecution: () => false,
+          getBlockingError: () => undefined,
+        }),
+        fireAfterToolEvent: async (toolName: string) => {
+          if (toolName === 'toolA') {
+            return {
+              getBlockingError: () => undefined,
+              shouldStopExecution: () => false,
+              getAdditionalContext: () => undefined,
+              getTailToolCallRequest: () => ({ name: 'toolB', args: {} }),
+            };
+          }
+          return {
+            getBlockingError: () => undefined,
+            shouldStopExecution: () => false,
+            getAdditionalContext: () => undefined,
+            getTailToolCallRequest: () => undefined,
+          };
+        },
+        fireToolNotificationEvent: async () => {},
+      } as unknown as HookSystem;
+
+      const mockConfig = createMockConfig({
+        getToolRegistry: () => mockToolRegistry,
+        getApprovalMode: () => ApprovalMode.YOLO,
+        getHookSystem: () => mockHookSystem,
+      });
+
+      const onAllToolCallsComplete = vi.fn();
+      const scheduler = new CoreToolScheduler({
+        config: mockConfig,
+        onAllToolCallsComplete,
+        getPreferredEditor: () => undefined,
+      });
+
+      const request1: ToolCallRequestInfo = {
+        callId: 'call-1',
+        name: 'toolA',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-1',
+      };
+
+      const request2: ToolCallRequestInfo = {
+        callId: 'call-2',
+        name: 'toolC',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-1',
+      };
+
+      await scheduler.schedule(
+        [request1, request2],
+        new AbortController().signal,
+      );
+
+      expect(onAllToolCallsComplete).toHaveBeenCalledTimes(1);
+      const reportedTools = onAllToolCallsComplete.mock.calls[0][0];
+      expect(reportedTools).toHaveLength(2);
+
+      const resultA = reportedTools.find(
+        (r: CompletedToolCall) => r.request.callId === 'call-1',
+      ) as SuccessfulToolCall;
+      const resultC = reportedTools.find(
+        (r: CompletedToolCall) => r.request.callId === 'call-2',
+      ) as SuccessfulToolCall;
+
+      expect(resultA.status).toBe('success');
+      expect(resultA.response.responseParts[0].functionResponse?.name).toBe(
+        'toolA',
+      );
+      expect(resultA.response.resultDisplay).toBe('Result from Tool B');
+
+      expect(resultC.status).toBe('success');
+      expect(resultC.response.responseParts[0].functionResponse?.name).toBe(
+        'toolC',
+      );
+      expect(resultC.response.resultDisplay).toBe('Result from Tool C');
     });
   });
 });
