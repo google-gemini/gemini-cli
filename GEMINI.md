@@ -55,6 +55,8 @@ powerful tool for developers.
 - **Contributions:** Follow the process outlined in `CONTRIBUTING.md`. Requires
   signing the Google CLA.
 - **Pull Requests:** Keep PRs small, focused, and linked to an existing issue.
+  Always activate the `pr-creator` skill for PR generation, even when using the
+  `gh` CLI.
 - **Commit Messages:** Follow the
   [Conventional Commits](https://www.conventionalcommits.org/) standard.
 - **Coding Style:** Adhere to existing patterns in `packages/cli` (React/Ink)
