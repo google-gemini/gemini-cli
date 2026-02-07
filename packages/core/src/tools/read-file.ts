@@ -118,8 +118,20 @@ class ReadFileToolInvocation extends BaseToolInvocation<
 IMPORTANT: The file content has been truncated.
 Status: Showing lines ${start}-${end} of ${total} total lines.
 Action: To read more of the file, you can use the 'offset' and 'limit' parameters in a subsequent 'read_file' call. For example, to read the next section of the file, use offset: ${nextOffset}.
-
+${this.params.offset ? 'Remember: pass a start_line when you edit this file.' : ''}
 --- FILE CONTENT (truncated) ---
+${result.llmContent}`;
+    } else if (
+      typeof result.llmContent === 'string' &&
+      result.linesShown &&
+      result.originalLineCount
+    ) {
+      const [start, end] = result.linesShown;
+      const total = result.originalLineCount;
+      llmContent = `
+Status: Showing lines ${start}-${end} of ${total} total lines.
+
+--- FILE CONTENT ---
 ${result.llmContent}`;
     } else {
       llmContent = result.llmContent || '';
@@ -179,12 +191,12 @@ export class ReadFileTool extends BaseDeclarativeTool<
           },
           offset: {
             description:
-              "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
+              "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use with 'limit' to target specific lines.",
             type: 'number',
           },
           limit: {
             description:
-              "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (if feasible, up to a default limit).",
+              "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. Minimize unnecessarily large reads. Set the offset and limit large enough to read the continguous block needed for your task, plus 100 lines of margin, when possible.",
             type: 'number',
           },
         },

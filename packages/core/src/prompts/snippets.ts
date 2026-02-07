@@ -142,6 +142,19 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
   return `
 # Core Mandates
 
+- **Context Efficiency:**
+  - Avoid wasting context window by using 'offset' and 'limit' to scope ${READ_FILE_TOOL_NAME} results to just enough information to definitively answer the question.
+  - Extra tool calls can negate any benefits of limits, so balance frugality with the cost of additional turns or failed tool calls.
+  - Perform edits in an order that minimizes risk of failure:
+    - Prefer making small, atomic, non-overlapping edits to files from the end of the file to the beginning, to avoid causing ${EDIT_TOOL_NAME} failures due to shifting line numbers.
+    - If an edit overlaps with a previous one, it may cause a line number to shift or cause your ${READ_FILE_TOOL_NAME} results to become stale, requiring you to refresh your knowledge of the file with ${READ_FILE_TOOL_NAME} or ${GREP_TOOL_NAME}.
+  - Some ${READ_FILE_TOOL_NAME} examples:
+    - If you need to edit a specific range in a file, use ${READ_FILE_TOOL_NAME} with 'offset' and 'limit' to read the context. Then use ${EDIT_TOOL_NAME} with 'start_line' set to the line number where 'old_string' begins.
+    - Use 'offset' and 'limit' to read a single contiguous range from a file when you only need a range within.
+    - Use 'offset' and 'limit' to read a single contiguous range that covers two ranges that are near each other, rather than using an extra read tool call.
+    - Do not use 'offset' or 'limit' when trying to deeply understand a file.
+    - Do not use 'offset' or 'limit' when you have several ranges of interest that are not near each other and doing so would require more than one tool call.
+
 - **Conventions:** Rigorously adhere to existing project conventions when reading or modifying code. Analyze surrounding code, tests, and configuration first.
 - **Libraries/Frameworks:** NEVER assume a library/framework is available or appropriate. Verify its established usage within the project (check imports, configuration files like 'package.json', 'Cargo.toml', 'requirements.txt', 'build.gradle', etc., or observe neighboring files) before employing it.
 - **Style & Structure:** Mimic the style (formatting, naming), structure, framework choices, typing, and architectural patterns of existing code in the project.

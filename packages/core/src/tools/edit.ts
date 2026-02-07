@@ -114,11 +114,41 @@ async function calculateExactReplacement(
   context: ReplacementContext,
 ): Promise<ReplacementResult | null> {
   const { currentContent, params } = context;
-  const { old_string, new_string } = params;
+  const { old_string, new_string, start_line } = params;
 
   const normalizedCode = currentContent;
   const normalizedSearch = old_string.replace(/\r\n/g, '\n');
   const normalizedReplace = new_string.replace(/\r\n/g, '\n');
+
+  if (start_line) {
+    const lines = normalizedCode.split('\n');
+    const precedingLines = lines.slice(0, start_line - 1);
+    const startIndex = precedingLines.reduce(
+      (acc, line) => acc + line.length + 1,
+      0,
+    );
+
+    const afterStart = normalizedCode.substring(startIndex);
+    if (afterStart.includes(normalizedSearch)) {
+      const beforeStart = normalizedCode.substring(0, startIndex);
+      const replacedAfterStart = safeLiteralReplace(
+        afterStart,
+        normalizedSearch,
+        normalizedReplace,
+      );
+      let modifiedCode = beforeStart + replacedAfterStart;
+      modifiedCode = restoreTrailingNewline(currentContent, modifiedCode);
+      const occurrences = afterStart.split(normalizedSearch).length - 1;
+
+      return {
+        newContent: modifiedCode,
+        occurrences,
+        finalOldString: normalizedSearch,
+        finalNewString: normalizedReplace,
+      };
+    }
+    return null;
+  }
 
   const exactOccurrences = normalizedCode.split(normalizedSearch).length - 1;
   if (exactOccurrences > 0) {
@@ -143,7 +173,7 @@ async function calculateFlexibleReplacement(
   context: ReplacementContext,
 ): Promise<ReplacementResult | null> {
   const { currentContent, params } = context;
-  const { old_string, new_string } = params;
+  const { old_string, new_string, start_line } = params;
 
   const normalizedCode = currentContent;
   const normalizedSearch = old_string.replace(/\r\n/g, '\n');
@@ -156,7 +186,7 @@ async function calculateFlexibleReplacement(
   const replaceLines = normalizedReplace.split('\n');
 
   let flexibleOccurrences = 0;
-  let i = 0;
+  let i = start_line ? start_line - 1 : 0;
   while (i <= sourceLines.length - searchLinesStripped.length) {
     const window = sourceLines.slice(i, i + searchLinesStripped.length);
     const windowStripped = window.map((line: string) => line.trim());
@@ -177,6 +207,7 @@ async function calculateFlexibleReplacement(
         searchLinesStripped.length,
         newBlockWithIndent.join('\n'),
       );
+      // If start_line was provided, we continue searching for more occurrences.
       i += replaceLines.length;
     } else {
       i++;
@@ -201,7 +232,7 @@ async function calculateRegexReplacement(
   context: ReplacementContext,
 ): Promise<ReplacementResult | null> {
   const { currentContent, params } = context;
-  const { old_string, new_string } = params;
+  const { old_string, new_string, start_line } = params;
 
   // Normalize line endings for consistent processing.
   const normalizedSearch = old_string.replace(/\r\n/g, '\n');
@@ -229,31 +260,37 @@ async function calculateRegexReplacement(
 
   // The final pattern captures leading whitespace (indentation) and then matches the token pattern.
   // 'm' flag enables multi-line mode, so '^' matches the start of any line.
+  // 'g' flag enables global replacement for all matches.
   const finalPattern = `^(\\s*)${pattern}`;
-  const flexibleRegex = new RegExp(finalPattern, 'm');
+  const globalRegex = new RegExp(finalPattern, 'mg');
 
-  const match = flexibleRegex.exec(currentContent);
+  let startIndex = 0;
+  if (start_line) {
+    const lines = currentContent.split('\n');
+    const precedingLines = lines.slice(0, start_line - 1);
+    startIndex = precedingLines.reduce((acc, line) => acc + line.length + 1, 0);
+  }
 
-  if (!match) {
+  const searchRegion = currentContent.substring(startIndex);
+  const matches = searchRegion.match(globalRegex);
+
+  if (!matches || matches.length === 0) {
     return null;
   }
 
-  const indentation = match[1] || '';
   const newLines = normalizedReplace.split('\n');
-  const newBlockWithIndent = newLines
-    .map((line) => `${indentation}${line}`)
-    .join('\n');
-
-  // Use replace with the regex to substitute the matched content.
-  // Since the regex doesn't have the 'g' flag, it will only replace the first occurrence.
-  const modifiedCode = currentContent.replace(
-    flexibleRegex,
-    newBlockWithIndent,
+  const replacedRegion = searchRegion.replace(
+    globalRegex,
+    (match: string, indent: string) =>
+      newLines.map((line) => `${indent}${line}`).join('\n'),
   );
+
+  const beforeStart = currentContent.substring(0, startIndex);
+  const modifiedCode = beforeStart + replacedRegion;
 
   return {
     newContent: restoreTrailingNewline(currentContent, modifiedCode),
-    occurrences: 1, // This method is designed to find and replace only the first occurrence.
+    occurrences: matches.length,
     finalOldString: normalizedSearch,
     finalNewString: normalizedReplace,
   };
@@ -264,7 +301,7 @@ export async function calculateReplacement(
   context: ReplacementContext,
 ): Promise<ReplacementResult> {
   const { currentContent, params } = context;
-  const { old_string, new_string } = params;
+  const { old_string, new_string, start_line } = params;
   const normalizedSearch = old_string.replace(/\r\n/g, '\n');
   const normalizedReplace = new_string.replace(/\r\n/g, '\n');
 
@@ -277,25 +314,55 @@ export async function calculateReplacement(
     };
   }
 
-  const exactResult = await calculateExactReplacement(context);
-  if (exactResult) {
-    const event = new EditStrategyEvent('exact');
-    logEditStrategy(config, event);
-    return exactResult;
+  // Strategy: Try with the provided start_line first.
+  // If that fails (and start_line was provided), try looking back a few lines.
+  // This handles cases where old_string includes context lines before the target line
+  // (e.g. user provided start_line of the target, but old_string starts earlier),
+  // or simple off-by-one errors.
+  const startLinesToTry = [start_line];
+  if (start_line && start_line > 1) {
+    // Iterate up to 20 lines in both directions (lookback and lookahead).
+    // This attempts to find the closest match if the provided start_line is slightly off.
+    for (let i = 1; i <= 20; i++) {
+      const lookback = start_line - i;
+      const lookahead = start_line + i;
+
+      if (lookback > 0) {
+        startLinesToTry.push(lookback);
+      }
+      startLinesToTry.push(lookahead);
+    }
   }
 
-  const flexibleResult = await calculateFlexibleReplacement(context);
-  if (flexibleResult) {
-    const event = new EditStrategyEvent('flexible');
-    logEditStrategy(config, event);
-    return flexibleResult;
-  }
+  for (const attemptStartLine of startLinesToTry) {
+    const attemptContext = {
+      ...context,
+      params: {
+        ...context.params,
+        start_line: attemptStartLine,
+      },
+    };
 
-  const regexResult = await calculateRegexReplacement(context);
-  if (regexResult) {
-    const event = new EditStrategyEvent('regex');
-    logEditStrategy(config, event);
-    return regexResult;
+    const exactResult = await calculateExactReplacement(attemptContext);
+    if (exactResult) {
+      const event = new EditStrategyEvent('exact');
+      logEditStrategy(config, event);
+      return exactResult;
+    }
+
+    const flexibleResult = await calculateFlexibleReplacement(attemptContext);
+    if (flexibleResult) {
+      const event = new EditStrategyEvent('flexible');
+      logEditStrategy(config, event);
+      return flexibleResult;
+    }
+
+    const regexResult = await calculateRegexReplacement(attemptContext);
+    if (regexResult) {
+      const event = new EditStrategyEvent('regex');
+      logEditStrategy(config, event);
+      return regexResult;
+    }
   }
 
   return {
@@ -364,6 +431,13 @@ export interface EditToolParams {
    * Use when you want to replace multiple occurrences.
    */
   expected_replacements?: number;
+
+  /**
+   * The line number where the search should start.
+   * Useful when there are multiple occurrences of old_string and you want to target a specific one.
+   * 1-based line number.
+   */
+  start_line?: number;
 
   /**
    * The instruction for what needs to be done.
@@ -906,7 +980,7 @@ export class EditTool
     super(
       EditTool.Name,
       'Edit',
-      `Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when \`expected_replacements\` is specified. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${READ_FILE_TOOL_NAME} tool to examine the file's current content before attempting a text replacement.
+      `Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when \`expected_replacements\` is specified. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${READ_FILE_TOOL_NAME} tool (using 'offset' and 'limit' to get enough lines of context around the match) to examine the file's current content before attempting a text replacement.
       
       The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.
       
@@ -915,8 +989,9 @@ export class EditTool
       2. \`new_string\` MUST be the exact literal text to replace \`old_string\` with (also including all whitespace, indentation, newlines, and surrounding code etc.). Ensure the resulting code is correct and idiomatic and that \`old_string\` and \`new_string\` are different.
       3. \`instruction\` is the detailed instruction of what needs to be changed. It is important to Make it specific and detailed so developers or large language models can understand what needs to be changed and perform the changes on their own if necessary. 
       4. NEVER escape \`old_string\` or \`new_string\`, that would break the exact literal text requirement.
-      **Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for \`old_string\`: Must uniquely identify the single instance to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations, or does not match exactly, the tool will fail.
+      **Important:** If ANY of the above are not satisfied, the tool will fail. CRITICAL for \`old_string\`: Must uniquely identify the single instance to change. Include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string matches multiple locations, or does not match exactly, the tool will fail. The tool also fails if there are multiple matches, unless you provide a \`start_line\`.
       5. Prefer to break down complex and long changes into multiple smaller atomic calls to this tool. Always check the content of the file after changes or not finding a string to match.
+      6. ALWAYS provide a \`start_line\` when you have read the file and know the line number. This is the most reliable way to target an edit.
       **Multiple replacements:** Set \`expected_replacements\` to the number of occurrences you want to replace. The tool will replace ALL occurrences that match \`old_string\` exactly. Ensure the number of replacements matches your expectation.`,
       Kind.Edit,
       {
@@ -945,7 +1020,7 @@ A good instruction should concisely answer:
           },
           old_string: {
             description:
-              'The exact literal text to replace, preferably unescaped. For single replacements (default), include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string is not the exact literal text (i.e. you escaped it) or does not match exactly, the tool will fail.',
+              'The exact literal text to replace, preferably unescaped. For single replacements (default), include at least 3 lines of context BEFORE and AFTER the target text, matching whitespace and indentation precisely. If this string is not the exact literal text (i.e. you escaped it) or does not match exactly, the tool will fail. The tool also fails if there are multiple matches, unless you provide a start_line',
             type: 'string',
           },
           new_string: {
@@ -957,6 +1032,12 @@ A good instruction should concisely answer:
             type: 'number',
             description:
               'Number of replacements expected. Defaults to 1 if not specified. Use when you want to replace multiple occurrences.',
+            minimum: 1,
+          },
+          start_line: {
+            type: 'number',
+            description:
+              'The line number where the search for old_string should start. Providing a start_line improves edit reliability by making it so that multiple matches for old_string is not a failure. Always provide a start_line when editing a file that you did not read fully.',
             minimum: 1,
           },
         },
@@ -1008,7 +1089,7 @@ A good instruction should concisely answer:
     );
   }
 
-  getModifyContext(_: AbortSignal): ModifyContext<EditToolParams> {
+  getModifyContext(signal: AbortSignal): ModifyContext<EditToolParams> {
     return {
       getFilePath: (params: EditToolParams) => params.file_path,
       getCurrentContent: async (params: EditToolParams): Promise<string> => {
@@ -1023,15 +1104,28 @@ A good instruction should concisely answer:
       },
       getProposedContent: async (params: EditToolParams): Promise<string> => {
         try {
-          const currentContent = await this.config
+          let currentContent = await this.config
             .getFileSystemService()
             .readTextFile(params.file_path);
-          return applyReplacement(
+
+          const originalLineEnding = detectLineEnding(currentContent);
+          currentContent = currentContent.replace(/\r\n/g, '\n');
+
+          if (params.old_string === '' && currentContent === '') {
+            return params.new_string;
+          }
+
+          const result = await calculateReplacement(this.config, {
+            params,
             currentContent,
-            params.old_string,
-            params.new_string,
-            params.old_string === '' && currentContent === '',
-          );
+            abortSignal: signal,
+          });
+
+          let finalContent = result.newContent;
+          if (originalLineEnding === '\r\n') {
+            finalContent = finalContent.replace(/\n/g, '\r\n');
+          }
+          return finalContent;
         } catch (err) {
           if (!isNodeError(err) || err.code !== 'ENOENT') throw err;
           return '';
