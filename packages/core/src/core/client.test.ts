@@ -14,7 +14,12 @@ import {
   type Mock,
 } from 'vitest';
 
-import type { Content, GenerateContentResponse, Part } from '@google/genai';
+import type {
+  Content,
+  GenerateContentResponse,
+  Part,
+  Tool,
+} from '@google/genai';
 import { GeminiClient } from './client.js';
 import {
   AuthType,
@@ -272,6 +277,8 @@ describe('Gemini Client (client.ts)', () => {
       getModelAvailabilityService: vi
         .fn()
         .mockReturnValue(createAvailabilityServiceMock()),
+      getJsonSchema: vi.fn().mockReturnValue(undefined),
+      getEnableTools: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
     mockConfig.getHookSystem = vi.fn().mockReturnValue(mockHookSystem);
 
@@ -374,6 +381,45 @@ describe('Gemini Client (client.ts)', () => {
       // The subsequent messages should be the extra history
       expect(history[1]).toEqual(extraHistory[0]);
       expect(history[2]).toEqual(extraHistory[1]);
+    });
+
+    it('should disable tools when jsonSchema is set', async () => {
+      vi.mocked(mockConfig.getJsonSchema).mockReturnValue({
+        type: 'object',
+        properties: { answer: { type: 'string' } },
+      });
+      vi.mocked(mockConfig.getEnableTools).mockReturnValue(undefined);
+
+      const chat = await client.startChat([]);
+      // Access private tools to check
+      const tools = (chat as unknown as { tools: Tool[] }).tools;
+
+      expect(tools).toEqual([]);
+    });
+
+    it('should enable tools when jsonSchema is set and enableTools is true', async () => {
+      vi.mocked(mockConfig.getJsonSchema).mockReturnValue({
+        type: 'object',
+        properties: { answer: { type: 'string' } },
+      });
+      vi.mocked(mockConfig.getEnableTools).mockReturnValue(true);
+
+      const chat = await client.startChat([]);
+      const tools = (chat as unknown as { tools: Tool[] }).tools;
+
+      expect(tools.length).toBeGreaterThan(0);
+      expect(tools[0].functionDeclarations).toBeDefined();
+    });
+
+    it('should enable tools when jsonSchema is not set', async () => {
+      vi.mocked(mockConfig.getJsonSchema).mockReturnValue(undefined);
+      vi.mocked(mockConfig.getEnableTools).mockReturnValue(undefined);
+
+      const chat = await client.startChat([]);
+      const tools = (chat as unknown as { tools: Tool[] }).tools;
+
+      expect(tools.length).toBeGreaterThan(0);
+      expect(tools[0].functionDeclarations).toBeDefined();
     });
   });
 

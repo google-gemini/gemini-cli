@@ -22,6 +22,7 @@ scripting, automation, CI/CD pipelines, and building AI-powered tools.
       - [Example Output](#example-output)
       - [Processing Stream Events](#processing-stream-events)
       - [Real-World Examples](#real-world-examples)
+    - [Custom JSON Schema Output](#custom-json-schema-output)
     - [File Redirection](#file-redirection)
   - [Configuration Options](#configuration-options)
   - [Examples](#examples)
@@ -274,6 +275,70 @@ Each line is a complete JSON event:
 {"type":"result","status":"success","stats":{"total_tokens":250,"input_tokens":50,"output_tokens":200,"duration_ms":3000,"tool_calls":1},"timestamp":"2025-10-10T12:00:05.000Z"}
 ```
 
+### Custom JSON schema output
+
+Use `--schema-file` to define a custom JSON schema for structured output. This
+is ideal for building orchestration systems, automation pipelines, and
+applications that need predictable response formats.
+
+#### Basic usage
+
+Create a JSON schema file (e.g., `schema.json`):
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "next_action": { "type": "string" },
+    "reasoning": { "type": "string" }
+  },
+  "required": ["next_action", "reasoning"]
+}
+```
+
+Run with the schema:
+
+```bash
+gemini --schema-file schema.json -p "What should I do to fix the failing tests?"
+```
+
+Output:
+
+```json
+{
+  "next_action": "Run the test suite with verbose output to identify the failing test",
+  "reasoning": "Need to see the exact error message before determining the fix"
+}
+```
+
+#### Behavior
+
+- **Raw JSON output**: Returns only the model's structured response, without the
+  `session_id`, `stats`, or wrapper metadata that `--output-format json`
+  includes
+- **Implies JSON output**: No need to specify `--output-format json`
+- **Tools disabled by default**: For "tell me what to do" use cases without
+  executing actions
+- **Re-enable tools**: Use `--enable-tools` if you need tool execution with
+  structured output
+
+#### Examples
+
+```bash
+# Basic structured output (no tools)
+gemini --schema-file plan.json -p "How should I refactor this function?"
+
+# Structured output with tools enabled
+gemini --schema-file result.json --enable-tools -p "Analyze the codebase structure"
+```
+
+#### Schema requirements
+
+- Must be valid JSON
+- Must have `type` or `properties` field
+- Maximum file size: 1MB
+- Cannot be used with `--output-format text` or `--output-format stream-json`
+
 ### File redirection
 
 Save output to files or pipe to other commands:
@@ -296,15 +361,17 @@ gemini -p "List programming languages" | grep -i "python"
 
 Key command-line options for headless usage:
 
-| Option                  | Description                        | Example                                            |
-| ----------------------- | ---------------------------------- | -------------------------------------------------- |
-| `--prompt`, `-p`        | Run in headless mode               | `gemini -p "query"`                                |
-| `--output-format`       | Specify output format (text, json) | `gemini -p "query" --output-format json`           |
-| `--model`, `-m`         | Specify the Gemini model           | `gemini -p "query" -m gemini-2.5-flash`            |
-| `--debug`, `-d`         | Enable debug mode                  | `gemini -p "query" --debug`                        |
-| `--include-directories` | Include additional directories     | `gemini -p "query" --include-directories src,docs` |
-| `--yolo`, `-y`          | Auto-approve all actions           | `gemini -p "query" --yolo`                         |
-| `--approval-mode`       | Set approval mode                  | `gemini -p "query" --approval-mode auto_edit`      |
+| Option                  | Description                                                                    | Example                                                 |
+| ----------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------- |
+| `--prompt`, `-p`        | Run in headless mode                                                           | `gemini -p "query"`                                     |
+| `--output-format`       | Specify output format (text, json, stream-json)                                | `gemini -p "query" --output-format json`                |
+| `--schema-file`         | Path to JSON schema for structured output. Implies json output, disables tools | `gemini -p "query" --schema-file schema.json`           |
+| `--enable-tools`        | Re-enable tools when using --schema-file                                       | `gemini -p "query" --schema-file s.json --enable-tools` |
+| `--model`, `-m`         | Specify the Gemini model                                                       | `gemini -p "query" -m gemini-2.5-flash`                 |
+| `--debug`, `-d`         | Enable debug mode                                                              | `gemini -p "query" --debug`                             |
+| `--include-directories` | Include additional directories                                                 | `gemini -p "query" --include-directories src,docs`      |
+| `--yolo`, `-y`          | Auto-approve all actions                                                       | `gemini -p "query" --yolo`                              |
+| `--approval-mode`       | Set approval mode                                                              | `gemini -p "query" --approval-mode auto_edit`           |
 
 For complete details on all available configuration options, settings files, and
 environment variables, see the

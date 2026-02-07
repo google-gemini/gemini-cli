@@ -189,6 +189,7 @@ describe('runNonInteractive', () => {
       isTrustedFolder: vi.fn().mockReturnValue(false),
       getRawOutput: vi.fn().mockReturnValue(false),
       getAcceptRawOutputRisk: vi.fn().mockReturnValue(false),
+      getJsonSchema: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     mockSettings = {
@@ -730,6 +731,41 @@ describe('runNonInteractive', () => {
         2,
       ),
     );
+  });
+
+  it('should write raw JSON output without wrapper when schema-file is used', async () => {
+    const structuredResponse =
+      '{"answer": "42", "explanation": "The meaning of life"}';
+    const events: ServerGeminiStreamEvent[] = [
+      { type: GeminiEventType.Content, value: structuredResponse },
+      {
+        type: GeminiEventType.Finished,
+        value: { reason: undefined, usageMetadata: { totalTokenCount: 10 } },
+      },
+    ];
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents(events),
+    );
+    vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
+    vi.mocked(mockConfig.getJsonSchema).mockReturnValue({
+      type: 'object',
+      properties: {
+        answer: { type: 'string' },
+        explanation: { type: 'string' },
+      },
+    });
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: 'What is the meaning of life?',
+      prompt_id: 'prompt-id-schema',
+    });
+
+    // Should output raw response without session_id/stats wrapper
+    expect(processStdoutSpy).toHaveBeenCalledWith(structuredResponse);
+    // Should also have a trailing newline
+    expect(processStdoutSpy).toHaveBeenCalledWith('\n');
   });
 
   it('should write JSON output with stats for tool-only commands (no text response)', async () => {
