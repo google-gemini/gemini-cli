@@ -9,8 +9,6 @@ import {
   debugLogger,
   enableKittyKeyboardProtocol,
   disableKittyKeyboardProtocol,
-  enableModifyOtherKeys,
-  disableModifyOtherKeys,
   enableBracketedPasteMode,
   disableBracketedPasteMode,
 } from '@google/gemini-cli-core';
@@ -25,7 +23,6 @@ export class TerminalCapabilityManager {
   private static readonly OSC_11_QUERY = '\x1b]11;?\x1b\\';
   private static readonly TERMINAL_NAME_QUERY = '\x1b[>q';
   private static readonly DEVICE_ATTRIBUTES_QUERY = '\x1b[c';
-  private static readonly MODIFY_OTHER_KEYS_QUERY = '\x1b[>4;?m';
 
   // Kitty keyboard flags: CSI ? flags u
   // eslint-disable-next-line no-control-regex
@@ -40,15 +37,11 @@ export class TerminalCapabilityManager {
   static readonly OSC_11_REGEX =
     // eslint-disable-next-line no-control-regex
     /\x1b\]11;rgb:([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})(\x1b\\|\x07)?/;
-  // modifyOtherKeys response: CSI > 4 ; level m
-  // eslint-disable-next-line no-control-regex
-  private static readonly MODIFY_OTHER_KEYS_REGEX = /\x1b\[>4;(\d+)m/;
 
   private detectionComplete = false;
   private terminalBackgroundColor: TerminalBackgroundColor;
   private kittySupported = false;
   private kittyEnabled = false;
-  private modifyOtherKeysSupported = false;
   private terminalName: string | undefined;
 
   private constructor() {}
@@ -81,7 +74,6 @@ export class TerminalCapabilityManager {
       // don't bother catching errors since if one write
       // fails, the other probably will too
       disableKittyKeyboardProtocol();
-      disableModifyOtherKeys();
       disableBracketedPasteMode();
     };
     process.on('exit', cleanupOnExit);
@@ -99,7 +91,6 @@ export class TerminalCapabilityManager {
       let terminalNameReceived = false;
       let deviceAttributesReceived = false;
       let bgReceived = false;
-      let modifyOtherKeysReceived = false;
       // eslint-disable-next-line prefer-const
       let timeoutId: NodeJS.Timeout;
 
@@ -149,21 +140,6 @@ export class TerminalCapabilityManager {
           this.kittySupported = true;
         }
 
-        // check for modifyOtherKeys support
-        if (!modifyOtherKeysReceived) {
-          const match = buffer.match(
-            TerminalCapabilityManager.MODIFY_OTHER_KEYS_REGEX,
-          );
-          if (match) {
-            modifyOtherKeysReceived = true;
-            const level = parseInt(match[1], 10);
-            this.modifyOtherKeysSupported = level >= 2;
-            debugLogger.log(
-              `Detected modifyOtherKeys support: ${this.modifyOtherKeysSupported} (level ${level})`,
-            );
-          }
-        }
-
         // Check for Terminal Name/Version response.
         if (!terminalNameReceived) {
           const match = buffer.match(
@@ -199,7 +175,6 @@ export class TerminalCapabilityManager {
           TerminalCapabilityManager.KITTY_QUERY +
             TerminalCapabilityManager.OSC_11_QUERY +
             TerminalCapabilityManager.TERMINAL_NAME_QUERY +
-            TerminalCapabilityManager.MODIFY_OTHER_KEYS_QUERY +
             TerminalCapabilityManager.DEVICE_ATTRIBUTES_QUERY,
         );
       } catch (e) {
@@ -214,8 +189,6 @@ export class TerminalCapabilityManager {
       if (this.kittySupported) {
         enableKittyKeyboardProtocol();
         this.kittyEnabled = true;
-      } else if (this.modifyOtherKeysSupported) {
-        enableModifyOtherKeys();
       }
       // Always enable bracketed paste since it'll be ignored if unsupported.
       enableBracketedPasteMode();
