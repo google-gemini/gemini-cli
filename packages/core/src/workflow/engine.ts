@@ -7,7 +7,7 @@
 import { Config } from '../config/config.js';
 import { ArchitectAgent } from '../agents/architect-agent.js';
 import { LocalAgentExecutor, type ActivityCallback } from '../agents/local-executor.js';
-import type { PlanProposal } from '../agents/types.js';
+import { PlanProposalSchema, type PlanProposal } from '../agents/types.js';
 
 export type WorkflowStatus = 'idle' | 'running' | 'completed' | 'failed';
 
@@ -43,9 +43,11 @@ export class WorkflowEngine {
     const output = await executor.run({ request }, signal);
     
     try {
-      return JSON.parse(output.result) as PlanProposal;
+      const parsed = JSON.parse(output.result);
+      // Safely parse and validate against the schema.
+      return PlanProposalSchema.parse(parsed);
     } catch (e) {
-      // If result is not JSON, wrap it in a plan object
+      // If result is not JSON or doesn't match schema, wrap it in a plan object
       return {
         title: 'Auto-generated Plan',
         description: output.result,

@@ -57,11 +57,6 @@ export const DEFAULT_MAX_TIME_MINUTES = 5;
 export type AgentInputs = Record<string, unknown>;
 
 /**
- * Simplified input structure for Remote Agents, which consumes a single string query.
- */
-export type RemoteAgentInputs = { query: string };
-
-/**
  * Structured events emitted during subagent execution for user observability.
  */
 export interface SubagentActivityEvent {
@@ -224,7 +219,7 @@ export const ReviewIssueSchema = z.object({
 });
 
 export const ReviewScoreSchema = z.object({
-  agentId: z.string(),
+  agentId: z.string().optional(),
   confidence: z.number().min(0).max(100),
   issues: z.array(ReviewIssueSchema),
 });

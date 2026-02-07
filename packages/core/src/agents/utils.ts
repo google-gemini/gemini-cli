@@ -1,15 +1,32 @@
-import { ReviewScore } from './types';
+import { ReviewScore } from './types.js';
 
 /**
  * Replaces placeholders in a template string with values from an input object.
- * Supports `${variable}` syntax.
+ * Supports `${variable}` syntax. Throws an error if any required variable is missing.
  */
 export function templateString(
   template: string,
   variables: Record<string, unknown>,
 ): string {
-  return template.replace(/\${(\w+)}/g, (match, key) => {
-    return variables[key] !== undefined ? String(variables[key]) : match;
+  const placeholderRegex = /\${(\w+)}/g;
+  const requiredKeys = new Set(
+    Array.from(template.matchAll(placeholderRegex), (match) => match[1]),
+  );
+
+  const missingKeys = Array.from(requiredKeys).filter(
+    (key) => variables[key] === undefined,
+  );
+
+  if (missingKeys.length > 0) {
+    throw new Error(
+      `Template validation failed: Missing required input parameters: ${missingKeys.join(
+        ', ',
+      )}. Available inputs: ${Object.keys(variables).join(', ')}`,
+    );
+  }
+
+  return template.replace(placeholderRegex, (_match, key) => {
+    return String(variables[key]);
   });
 }
 

@@ -57,7 +57,7 @@ export const polarisCommand: SlashCommand = {
            });
         }
       });
-      const result = await engine.run(request, new AbortController().signal);
+      const result = await engine.run(request, context.signal);
 
       return {
         type: "message",

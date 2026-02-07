@@ -44,10 +44,19 @@ export const ReviewerAgent = (
     model: config.getModel(),
   },
   get toolConfig() {
-    // Reviewer uses read-only tools to verify code
-    const tools = config.getToolRegistry().getAllToolNames().filter(t => 
-      t.includes('read') || t.includes('ls') || t.includes('search') || t.includes('test')
-    );
+    // Reviewer primarily uses native read-only tools for codebase exploration.
+    // We explicitly whitelist native tools to avoid any MCP tool conflicts.
+    const whitelist = [
+      'read_file',
+      'read_many_files',
+      'list_directory',
+      'grep_search',
+      'glob',
+    ];
+    const tools = config
+      .getToolRegistry()
+      .getAllToolNames()
+      .filter((t) => whitelist.includes(t));
     return {
       tools,
     };
