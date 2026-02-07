@@ -455,7 +455,7 @@ a few things you can try in order of recommendation:
     ```
 
 - **`loadMemoryFromIncludeDirectories`** (boolean):
-  - **Description:** Controls the behavior of the `/memory refresh` command. If
+  - **Description:** Controls the behavior of the `/memory reload` command. If
     set to `true`, `GEMINI.md` files should be loaded from all directories that
     are added. If set to `false`, `GEMINI.md` should only be loaded from the
     current directory.
@@ -796,8 +796,8 @@ conventions and context.
   other Markdown files using the `@path/to/file.md` syntax. For more details,
   see the [Memory Import Processor documentation](../core/memport.md).
 - **Commands for memory management:**
-  - Use `/memory refresh` to force a re-scan and reload of all context files
-    from all configured locations. This updates the AI's instructional context.
+  - Use `/memory reload` to force a re-scan and reload of all context files from
+    all configured locations. This updates the AI's instructional context.
   - Use `/memory show` to display the combined instructional context currently
     loaded, allowing you to verify the hierarchy and content being used by the
     AI.

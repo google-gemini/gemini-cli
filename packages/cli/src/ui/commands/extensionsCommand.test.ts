@@ -830,17 +830,17 @@ describe('extensionsCommand', () => {
     });
   });
 
-  describe('restart', () => {
-    let restartAction: SlashCommand['action'];
+  describe('reload', () => {
+    let reloadAction: SlashCommand['action'];
     let mockRestartExtension: MockedFunction<
       typeof ExtensionLoader.prototype.restartExtension
     >;
 
     beforeEach(() => {
-      restartAction = extensionsCommand().subCommands?.find(
-        (c) => c.name === 'restart',
+      reloadAction = extensionsCommand().subCommands?.find(
+        (c) => c.name === 'reload',
       )?.action;
-      expect(restartAction).not.toBeNull();
+      expect(reloadAction).not.toBeNull();
 
       mockRestartExtension = vi.fn();
       mockContext.services.config!.getExtensionLoader = vi
@@ -849,7 +849,7 @@ describe('extensionsCommand', () => {
           getExtensions: mockGetExtensions,
           restartExtension: mockRestartExtension,
         }));
-      mockContext.invocation!.name = 'restart';
+      mockContext.invocation!.name = 'reload';
     });
 
     it('should show a message if no extensions are installed', async () => {
@@ -860,7 +860,7 @@ describe('extensionsCommand', () => {
           restartExtension: mockRestartExtension,
         }));
 
-      await restartAction!(mockContext, '--all');
+      await reloadAction!(mockContext, '--all');
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.INFO,
@@ -868,7 +868,7 @@ describe('extensionsCommand', () => {
       });
     });
 
-    it('restarts all active extensions when --all is provided', async () => {
+    it('reloads all active extensions when --all is provided', async () => {
       const mockExtensions = [
         { name: 'ext1', isActive: true },
         { name: 'ext2', isActive: true },
@@ -876,7 +876,7 @@ describe('extensionsCommand', () => {
       ] as GeminiCLIExtension[];
       mockGetExtensions.mockReturnValue(mockExtensions);
 
-      await restartAction!(mockContext, '--all');
+      await reloadAction!(mockContext, '--all');
 
       expect(mockRestartExtension).toHaveBeenCalledTimes(2);
       expect(mockRestartExtension).toHaveBeenCalledWith(mockExtensions[0]);
@@ -884,13 +884,13 @@ describe('extensionsCommand', () => {
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: 'Restarting 2 extensions...',
+          text: 'Reloading 2 extensions...',
         }),
       );
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: '2 extensions restarted successfully.',
+          text: '2 extensions reloaded successfully.',
         }),
       );
       expect(mockContext.ui.dispatchExtensionStateUpdate).toHaveBeenCalledWith({
@@ -924,7 +924,7 @@ describe('extensionsCommand', () => {
       );
     });
 
-    it('restarts only specified active extensions', async () => {
+    it('reloads only specified active extensions', async () => {
       const mockExtensions = [
         { name: 'ext1', isActive: false },
         { name: 'ext2', isActive: true },
@@ -932,7 +932,7 @@ describe('extensionsCommand', () => {
       ] as GeminiCLIExtension[];
       mockGetExtensions.mockReturnValue(mockExtensions);
 
-      await restartAction!(mockContext, 'ext1 ext3');
+      await reloadAction!(mockContext, 'ext1 ext3');
 
       expect(mockRestartExtension).toHaveBeenCalledTimes(1);
       expect(mockRestartExtension).toHaveBeenCalledWith(mockExtensions[2]);
@@ -945,7 +945,7 @@ describe('extensionsCommand', () => {
     it('shows an error if no extension loader is available', async () => {
       mockContext.services.config!.getExtensionLoader = vi.fn();
 
-      await restartAction!(mockContext, '--all');
+      await reloadAction!(mockContext, '--all');
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -957,31 +957,31 @@ describe('extensionsCommand', () => {
     });
 
     it('shows usage error for no arguments', async () => {
-      await restartAction!(mockContext, '');
+      await reloadAction!(mockContext, '');
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.ERROR,
-          text: 'Usage: /extensions restart <extension-names>|--all',
+          text: 'Usage: /extensions reload <extension-names>|--all',
         }),
       );
       expect(mockRestartExtension).not.toHaveBeenCalled();
     });
 
-    it('handles errors during extension restart', async () => {
+    it('handles errors during extension reload', async () => {
       const mockExtensions = [
         { name: 'ext1', isActive: true },
       ] as GeminiCLIExtension[];
       mockGetExtensions.mockReturnValue(mockExtensions);
       mockRestartExtension.mockRejectedValue(new Error('Failed to restart'));
 
-      await restartAction!(mockContext, '--all');
+      await reloadAction!(mockContext, '--all');
 
       expect(mockRestartExtension).toHaveBeenCalledWith(mockExtensions[0]);
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.ERROR,
-          text: 'Failed to restart some extensions:\n  ext1: Failed to restart',
+          text: 'Failed to reload some extensions:\n  ext1: Failed to restart',
         }),
       );
     });
@@ -992,7 +992,7 @@ describe('extensionsCommand', () => {
       ] as GeminiCLIExtension[];
       mockGetExtensions.mockReturnValue(mockExtensions);
 
-      await restartAction!(mockContext, 'ext1 ext2');
+      await reloadAction!(mockContext, 'ext1 ext2');
 
       expect(mockRestartExtension).toHaveBeenCalledTimes(1);
       expect(mockRestartExtension).toHaveBeenCalledWith(mockExtensions[0]);
@@ -1004,13 +1004,13 @@ describe('extensionsCommand', () => {
       );
     });
 
-    it('does not restart any extensions if none are found', async () => {
+    it('does not reload any extensions if none are found', async () => {
       const mockExtensions = [
         { name: 'ext1', isActive: true },
       ] as GeminiCLIExtension[];
       mockGetExtensions.mockReturnValue(mockExtensions);
 
-      await restartAction!(mockContext, 'ext2 ext3');
+      await reloadAction!(mockContext, 'ext2 ext3');
 
       expect(mockRestartExtension).not.toHaveBeenCalled();
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -1021,8 +1021,8 @@ describe('extensionsCommand', () => {
       );
     });
 
-    it('should suggest only enabled extension names for the restart command', async () => {
-      mockContext.invocation!.name = 'restart';
+    it('should suggest only enabled extension names for the reload command', async () => {
+      mockContext.invocation!.name = 'reload';
       const mockExtensions = [
         { name: 'ext1', isActive: true },
         { name: 'ext2', isActive: false },
