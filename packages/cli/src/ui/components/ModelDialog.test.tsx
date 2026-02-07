@@ -159,6 +159,23 @@ describe('<ModelDialog />', () => {
     expect(mockOnClose).toHaveBeenCalled();
   });
 
+  it('handles rapid Tab+Enter key presses correctly (no race condition)', async () => {
+    const { stdin } = renderComponent();
+
+    // Press Tab and Enter rapidly to simulate user behavior that could trigger race condition
+    stdin.write('\t');
+    // Don't wait for update - immediately press Enter
+    stdin.write('\r');
+    await waitForUpdate();
+
+    // Should persist the model even with rapid key presses
+    expect(mockSetModel).toHaveBeenCalledWith(
+      DEFAULT_GEMINI_MODEL_AUTO,
+      false, // Persist enabled even with rapid key press
+    );
+    expect(mockOnClose).toHaveBeenCalled();
+  });
+
   it('closes dialog on escape in "main" view', async () => {
     const { stdin } = renderComponent();
 
