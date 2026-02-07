@@ -18,6 +18,7 @@ import type {
   LoopDetectedEvent,
   NextSpeakerCheckEvent,
   SlashCommandEvent,
+  RewindEvent,
   MalformedJsonResponseEvent,
   IdeConnectionEvent,
   ConversationFinishedEvent,
@@ -44,6 +45,8 @@ import type {
   HookCallEvent,
   ApprovalModeSwitchEvent,
   ApprovalModeDurationEvent,
+  PlanExecutionEvent,
+  ToolOutputMaskingEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
@@ -78,6 +81,7 @@ export enum EventNames {
   LOOP_DETECTION_DISABLED = 'loop_detection_disabled',
   NEXT_SPEAKER_CHECK = 'next_speaker_check',
   SLASH_COMMAND = 'slash_command',
+  REWIND = 'rewind',
   MALFORMED_JSON_RESPONSE = 'malformed_json_response',
   IDE_CONNECTION = 'ide_connection',
   KITTY_SEQUENCE_OVERFLOW = 'kitty_sequence_overflow',
@@ -104,6 +108,8 @@ export enum EventNames {
   HOOK_CALL = 'hook_call',
   APPROVAL_MODE_SWITCH = 'approval_mode_switch',
   APPROVAL_MODE_DURATION = 'approval_mode_duration',
+  PLAN_EXECUTION = 'plan_execution',
+  TOOL_OUTPUT_MASKING = 'tool_output_masking',
 }
 
 export interface LogResponse {
@@ -945,6 +951,18 @@ export class ClearcutLogger {
     this.flushIfNeeded();
   }
 
+  logRewindEvent(event: RewindEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_REWIND_OUTCOME,
+        value: event.outcome,
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.REWIND, data));
+    this.flushIfNeeded();
+  }
+
   logMalformedJsonResponseEvent(event: MalformedJsonResponseEvent): void {
     const data: EventValue[] = [
       {
@@ -1195,14 +1213,42 @@ export class ClearcutLogger {
           EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_THRESHOLD,
         value: JSON.stringify(event.threshold),
       },
+    ];
+
+    const logEvent = this.createLogEvent(
+      EventNames.TOOL_OUTPUT_TRUNCATED,
+      data,
+    );
+    this.enqueueLogEvent(logEvent);
+    this.flushIfNeeded();
+  }
+
+  logToolOutputMaskingEvent(event: ToolOutputMaskingEvent): void {
+    const data: EventValue[] = [
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_LINES,
-        value: JSON.stringify(event.lines),
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_MASKING_TOKENS_BEFORE,
+        value: event.tokens_before.toString(),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_MASKING_TOKENS_AFTER,
+        value: event.tokens_after.toString(),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_MASKING_MASKED_COUNT,
+        value: event.masked_count.toString(),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_MASKING_TOTAL_PRUNABLE_TOKENS,
+        value: event.total_prunable_tokens.toString(),
       },
     ];
 
     this.enqueueLogEvent(
-      this.createLogEvent(EventNames.TOOL_OUTPUT_TRUNCATED, data),
+      this.createLogEvent(EventNames.TOOL_OUTPUT_MASKING, data),
     );
     this.flushIfNeeded();
   }
@@ -1231,6 +1277,28 @@ export class ClearcutLogger {
       data.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_FAILURE_REASON,
         value: event.error_message,
+      });
+    }
+
+    if (event.reasoning && this.config?.getTelemetryLogPromptsEnabled()) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_REASONING,
+        value: event.reasoning,
+      });
+    }
+
+    if (event.enable_numerical_routing !== undefined) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ROUTING_NUMERICAL_ENABLED,
+        value: event.enable_numerical_routing.toString(),
+      });
+    }
+
+    if (event.classifier_threshold) {
+      data.push({
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_ROUTING_CLASSIFIER_THRESHOLD,
+        value: event.classifier_threshold,
       });
     }
 
@@ -1504,6 +1572,18 @@ export class ClearcutLogger {
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.APPROVAL_MODE_DURATION, data),
     );
+    this.flushIfNeeded();
+  }
+
+  logPlanExecutionEvent(event: PlanExecutionEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_APPROVAL_MODE,
+        value: event.approval_mode,
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.PLAN_EXECUTION, data));
     this.flushIfNeeded();
   }
 

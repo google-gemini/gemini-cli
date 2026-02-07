@@ -11,6 +11,7 @@ import { StatusDisplay } from './StatusDisplay.js';
 import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
 import { ConfigContext } from '../contexts/ConfigContext.js';
 import { SettingsContext } from '../contexts/SettingsContext.js';
+import { createMockSettings } from '../../test-utils/settings.js';
 import type { TextBuffer } from './shared/text-buffer.js';
 
 // Mock child components to simplify testing
@@ -42,6 +43,7 @@ const createMockUIState = (overrides: UIStateOverrides = {}): UIState =>
     warningMessage: null,
     ctrlDPressedOnce: false,
     showEscapePrompt: false,
+    shortcutsHelpVisible: false,
     queueErrorMessage: null,
     activeHooks: [],
     ideContextState: null,
@@ -63,14 +65,6 @@ const createMockConfig = (overrides = {}) => ({
     getDisplayableSkills: vi.fn(() => ['skill1', 'skill2']),
   })),
   ...overrides,
-});
-
-const createMockSettings = (merged = {}) => ({
-  merged: {
-    hooksConfig: { notifications: true },
-    ui: { hideContextSummary: false },
-    ...merged,
-  },
 });
 
 /* eslint-disable @typescript-eslint/no-explicit-any */

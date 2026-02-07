@@ -668,6 +668,7 @@ describe('KeypressContext', () => {
       // Reverse tabs
       { sequence: `\x1b[Z`, expected: { name: 'tab', shift: true } },
       { sequence: `\x1b[1;2Z`, expected: { name: 'tab', shift: true } },
+      { sequence: `\x1bOZ`, expected: { name: 'tab', shift: true } },
       // Legacy Arrows
       {
         sequence: `\x1b[A`,
@@ -821,65 +822,72 @@ describe('KeypressContext', () => {
     // Terminals to test
     const terminals = ['iTerm2', 'Ghostty', 'MacTerminal', 'VSCodeTerminal'];
 
-    // Key mappings: letter -> [keycode, accented character]
-    const keys: Record<string, [number, string]> = {
-      b: [98, '\u222B'],
-      f: [102, '\u0192'],
-      m: [109, '\u00B5'],
+    // Key mappings: letter -> [keycode, accented character, shift]
+    const keys: Record<string, [number, string, boolean]> = {
+      b: [98, '\u222B', false],
+      f: [102, '\u0192', false],
+      m: [109, '\u00B5', false],
+      z: [122, '\u03A9', false],
+      Z: [122, '\u00B8', true],
     };
 
     it.each(
       terminals.flatMap((terminal) =>
-        Object.entries(keys).map(([key, [keycode, accentedChar]]) => {
-          if (terminal === 'Ghostty') {
-            // Ghostty uses kitty protocol sequences
-            return {
-              terminal,
-              key,
-              chunk: `\x1b[${keycode};3u`,
-              expected: {
-                name: key,
-                shift: false,
-                alt: true,
-                ctrl: false,
-                cmd: false,
-              },
-            };
-          } else if (terminal === 'MacTerminal') {
-            // Mac Terminal sends ESC + letter
-            return {
-              terminal,
-              key,
-              kitty: false,
-              chunk: `\x1b${key}`,
-              expected: {
-                sequence: `\x1b${key}`,
-                name: key,
-                shift: false,
-                alt: true,
-                ctrl: false,
-                cmd: false,
-              },
-            };
-          } else {
-            // iTerm2 and VSCode send accented characters (å, ø, µ)
-            // Note: µ (mu) is sent with alt:false on iTerm2/VSCode but
-            // gets converted to m with alt:true
-            return {
-              terminal,
-              key,
-              chunk: accentedChar,
-              expected: {
-                name: key,
-                shift: false,
-                alt: true, // Always expect alt:true after conversion
-                ctrl: false,
-                cmd: false,
-                sequence: accentedChar,
-              },
-            };
-          }
-        }),
+        Object.entries(keys).map(
+          ([key, [keycode, accentedChar, shiftValue]]) => {
+            if (terminal === 'Ghostty') {
+              // Ghostty uses kitty protocol sequences
+              // Modifier 3 is Alt, 4 is Shift+Alt
+              const modifier = shiftValue ? 4 : 3;
+              return {
+                terminal,
+                key,
+                chunk: `\x1b[${keycode};${modifier}u`,
+                expected: {
+                  name: key.toLowerCase(),
+                  shift: shiftValue,
+                  alt: true,
+                  ctrl: false,
+                  cmd: false,
+                },
+              };
+            } else if (terminal === 'MacTerminal') {
+              // Mac Terminal sends ESC + letter
+              const chunk = shiftValue
+                ? `\x1b${key.toUpperCase()}`
+                : `\x1b${key.toLowerCase()}`;
+              return {
+                terminal,
+                key,
+                kitty: false,
+                chunk,
+                expected: {
+                  sequence: chunk,
+                  name: key.toLowerCase(),
+                  shift: shiftValue,
+                  alt: true,
+                  ctrl: false,
+                  cmd: false,
+                },
+              };
+            } else {
+              // iTerm2 and VSCode send accented characters (å, ø, µ, Ω, ¸)
+              return {
+                terminal,
+                key,
+                chunk: accentedChar,
+                expected: {
+                  name: key.toLowerCase(),
+                  shift: shiftValue,
+                  alt: true, // Always expect alt:true after conversion
+                  ctrl: false,
+                  cmd: false,
+                  sequence: accentedChar,
+                },
+              };
+            }
+          },
+        ),
       ),
     )(
       'should handle Alt+$key in $terminal',
@@ -1301,5 +1309,58 @@ describe('KeypressContext', () => {
         );
       }
     });
+  });
+
+  describe('Greek support', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it.each([
+      {
+        lang: 'en_US.UTF-8',
+        expected: { name: 'z', alt: true, insertable: false },
+        desc: 'non-Greek locale (Option+z)',
+      },
+      {
+        lang: 'el_GR.UTF-8',
+        expected: { name: '', insertable: true },
+        desc: 'Greek LANG',
+      },
+      {
+        lcAll: 'el_GR.UTF-8',
+        expected: { name: '', insertable: true },
+        desc: 'Greek LC_ALL',
+      },
+      {
+        lang: 'en_US.UTF-8',
+        lcAll: 'el_GR.UTF-8',
+        expected: { name: '', insertable: true },
+        desc: 'LC_ALL overriding non-Greek LANG',
+      },
+      {
+        lang: 'el_GR.UTF-8',
+        char: '\u00B8',
+        expected: { name: 'z', alt: true, shift: true },
+        desc: 'Cedilla (\u00B8) in Greek locale (should be Option+Shift+z)',
+      },
+    ])(
+      'should handle $char correctly in $desc',
+      async ({ lang, lcAll, char = '\u03A9', expected }) => {
+        if (lang) vi.stubEnv('LANG', lang);
+        if (lcAll) vi.stubEnv('LC_ALL', lcAll);
+
+        const { keyHandler } = setupKeypressTest();
+
+        act(() => stdin.write(char));
+
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining({
+            ...expected,
+            sequence: char,
+          }),
+        );
+      },
+    );
   });
 });

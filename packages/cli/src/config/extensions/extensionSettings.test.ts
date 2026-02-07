@@ -786,6 +786,23 @@ describe('extensionSettings', () => {
       expect(await userKeychain.getSecret('VAR2')).toBeNull();
     });
 
+    it('should delete a non-sensitive setting if the new value is empty', async () => {
+      mockRequestSetting.mockResolvedValue('');
+
+      await updateSetting(
+        config,
+        '12345',
+        'VAR1',
+        mockRequestSetting,
+        ExtensionSettingScope.USER,
+        tempWorkspaceDir,
+      );
+
+      const expectedEnvPath = path.join(extensionDir, '.env');
+      const actualContent = await fsPromises.readFile(expectedEnvPath, 'utf-8');
+      expect(actualContent).not.toContain('VAR1=');
+    });
+
     it('should not throw if deleting a non-existent sensitive setting with empty value', async () => {
       mockRequestSetting.mockResolvedValue('');
       // Ensure it doesn't exist first
@@ -803,6 +820,75 @@ describe('extensionSettings', () => {
         tempWorkspaceDir,
       );
       // Should complete without error
+    });
+
+    it('should throw error if env var name contains invalid characters', async () => {
+      const securityConfig: ExtensionConfig = {
+        name: 'test-ext',
+        version: '1.0.0',
+        settings: [{ name: 's2', description: 'd2', envVar: 'VAR-BAD' }],
+      };
+      mockRequestSetting.mockResolvedValue('value');
+
+      await expect(
+        updateSetting(
+          securityConfig,
+          '12345',
+          'VAR-BAD',
+          mockRequestSetting,
+          ExtensionSettingScope.USER,
+          tempWorkspaceDir,
+        ),
+      ).rejects.toThrow(/Invalid environment variable name/);
+    });
+
+    it('should throw error if env var value contains newlines', async () => {
+      mockRequestSetting.mockResolvedValue('value\nwith\nnewlines');
+
+      await expect(
+        updateSetting(
+          config,
+          '12345',
+          'VAR1',
+          mockRequestSetting,
+          ExtensionSettingScope.USER,
+          tempWorkspaceDir,
+        ),
+      ).rejects.toThrow(/Invalid environment variable value/);
+    });
+
+    it('should quote values with spaces', async () => {
+      mockRequestSetting.mockResolvedValue('value with spaces');
+
+      await updateSetting(
+        config,
+        '12345',
+        'VAR1',
+        mockRequestSetting,
+        ExtensionSettingScope.USER,
+        tempWorkspaceDir,
+      );
+
+      const expectedEnvPath = path.join(extensionDir, '.env');
+      const actualContent = await fsPromises.readFile(expectedEnvPath, 'utf-8');
+      expect(actualContent).toContain('VAR1="value with spaces"');
+    });
+
+    it('should escape quotes in values', async () => {
+      mockRequestSetting.mockResolvedValue('value with "quotes"');
+
+      await updateSetting(
+        config,
+        '12345',
+        'VAR1',
+        mockRequestSetting,
+        ExtensionSettingScope.USER,
+        tempWorkspaceDir,
+      );
+
+      const expectedEnvPath = path.join(extensionDir, '.env');
+      const actualContent = await fsPromises.readFile(expectedEnvPath, 'utf-8');
+      expect(actualContent).toContain('VAR1="value with \\"quotes\\""');
     });
   });
 });

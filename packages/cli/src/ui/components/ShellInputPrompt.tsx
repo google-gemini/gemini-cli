@@ -40,6 +40,11 @@ export const ShellInputPrompt: React.FC<ShellInputPromptProps> = ({
         return false;
       }
 
+      // Allow unfocus to bubble up
+      if (keyMatchers[Command.UNFOCUS_SHELL_INPUT](key)) {
+        return false;
+      }
+
       if (key.ctrl && key.shift && key.name === 'up') {
         ShellExecutionService.scrollPty(activeShellPtyId, -1);
         return true;

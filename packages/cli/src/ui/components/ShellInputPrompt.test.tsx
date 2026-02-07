@@ -8,6 +8,12 @@ import { render } from '../../test-utils/render.js';
 import { ShellInputPrompt } from './ShellInputPrompt.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ShellExecutionService } from '@google/gemini-cli-core';
+import { useUIActions, type UIActions } from '../contexts/UIActionsContext.js';
+
+// Mock useUIActions
+vi.mock('../contexts/UIActionsContext.js', () => ({
+  useUIActions: vi.fn(),
+}));
 
 // Mock useKeypress
 const mockUseKeypress = vi.fn();
@@ -31,9 +37,13 @@ vi.mock('@google/gemini-cli-core', async () => {
 describe('ShellInputPrompt', () => {
   const mockWriteToPty = vi.mocked(ShellExecutionService.writeToPty);
   const mockScrollPty = vi.mocked(ShellExecutionService.scrollPty);
+  const mockHandleWarning = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(useUIActions).mockReturnValue({
+      handleWarning: mockHandleWarning,
+    } as Partial<UIActions> as UIActions);
   });
 
   it('renders nothing', () => {
@@ -41,6 +51,23 @@ describe('ShellInputPrompt', () => {
       <ShellInputPrompt activeShellPtyId={1} focus={true} />,
     );
     expect(lastFrame()).toBe('');
+  });
+
+  it('sends tab to pty', () => {
+    render(<ShellInputPrompt activeShellPtyId={1} focus={true} />);
+
+    const handler = mockUseKeypress.mock.calls[0][0];
+
+    handler({
+      name: 'tab',
+      shift: false,
+      alt: false,
+      ctrl: false,
+      cmd: false,
+      sequence: '\t',
+    });
+
+    expect(mockWriteToPty).toHaveBeenCalledWith(1, '\t');
   });
 
   it.each([

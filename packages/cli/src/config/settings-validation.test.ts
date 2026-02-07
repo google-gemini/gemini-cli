@@ -124,7 +124,6 @@ describe('settings-validation', () => {
         },
         tools: {
           sandbox: 'inherit',
-          autoAccept: false,
         },
       };
 

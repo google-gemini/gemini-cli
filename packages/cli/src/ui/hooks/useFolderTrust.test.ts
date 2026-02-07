@@ -114,7 +114,7 @@ describe('useFolderTrust', () => {
     renderHook(() => useFolderTrust(mockSettings, onTrustChange, addItem));
     expect(addItem).toHaveBeenCalledWith(
       {
-        text: 'This folder is not trusted. Some features may be disabled. Use the `/permissions` command to change the trust level.',
+        text: 'This folder is untrusted, project settings, hooks, MCPs, and GEMINI.md files will not be applied for this folder.\nUse the `/permissions` command to change the trust level.',
         type: 'info',
       },
       expect.any(Number),

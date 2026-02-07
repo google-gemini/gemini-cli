@@ -13,7 +13,7 @@ import {
 } from './deferred.js';
 import { ExitCodes } from '@google/gemini-cli-core';
 import type { ArgumentsCamelCase, CommandModule } from 'yargs';
-import type { MergedSettings } from './config/settings.js';
+import { createMockSettings } from './test-utils/settings.js';
 import type { MockInstance } from 'vitest';
 
 const { mockRunExitCleanup, mockCoreEvents } = vi.hoisted(() => ({
@@ -46,14 +46,9 @@ describe('deferred', () => {
     setDeferredCommand(undefined as unknown as DeferredCommand); // Reset deferred command
   });
 
-  const createMockSettings = (adminSettings: unknown = {}): MergedSettings =>
-    ({
-      admin: adminSettings,
-    }) as unknown as MergedSettings;
-
   describe('runDeferredCommand', () => {
     it('should do nothing if no deferred command is set', async () => {
-      await runDeferredCommand(createMockSettings());
+      await runDeferredCommand(createMockSettings().merged);
       expect(mockCoreEvents.emitFeedback).not.toHaveBeenCalled();
       expect(mockExit).not.toHaveBeenCalled();
     });
@@ -66,7 +61,9 @@ describe('deferred', () => {
         commandName: 'mcp',
       });
 
-      const settings = createMockSettings({ mcp: { enabled: true } });
+      const settings = createMockSettings({
+        merged: { admin: { mcp: { enabled: true } } },
+      }).merged;
       await runDeferredCommand(settings);
       expect(mockHandler).toHaveBeenCalled();
       expect(mockRunExitCleanup).toHaveBeenCalled();
@@ -80,7 +77,9 @@ describe('deferred', () => {
         commandName: 'mcp',
       });
 
-      const settings = createMockSettings({ mcp: { enabled: false } });
+      const settings = createMockSettings({
+        merged: { admin: { mcp: { enabled: false } } },
+      }).merged;
       await runDeferredCommand(settings);
 
       expect(mockCoreEvents.emitFeedback).toHaveBeenCalledWith(
@@ -98,7 +97,9 @@ describe('deferred', () => {
         commandName: 'extensions',
       });
 
-      const settings = createMockSettings({ extensions: { enabled: false } });
+      const settings = createMockSettings({
+        merged: { admin: { extensions: { enabled: false } } },
+      }).merged;
       await runDeferredCommand(settings);
 
       expect(mockCoreEvents.emitFeedback).toHaveBeenCalledWith(
@@ -116,7 +117,9 @@ describe('deferred', () => {
         commandName: 'skills',
       });
 
-      const settings = createMockSettings({ skills: { enabled: false } });
+      const settings = createMockSettings({
+        merged: { admin: { skills: { enabled: false } } },
+      }).merged;
       await runDeferredCommand(settings);
 
       expect(mockCoreEvents.emitFeedback).toHaveBeenCalledWith(
@@ -135,7 +138,7 @@ describe('deferred', () => {
         commandName: 'mcp',
       });
 
-      const settings = createMockSettings({}); // No admin settings
+      const settings = createMockSettings({}).merged; // No admin settings
       await runDeferredCommand(settings);
 
       expect(mockHandler).toHaveBeenCalled();
@@ -163,8 +166,16 @@ describe('deferred', () => {
       expect(originalHandler).not.toHaveBeenCalled();
 
       // Now manually run it to verify it captured correctly
-      await runDeferredCommand(createMockSettings());
-      expect(originalHandler).toHaveBeenCalledWith(argv);
+      await runDeferredCommand(createMockSettings().merged);
+      expect(originalHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          settings: expect.objectContaining({
+            admin: expect.objectContaining({
+              extensions: expect.objectContaining({ enabled: true }),
+            }),
+          }),
+        }),
+      );
       expect(mockExit).toHaveBeenCalledWith(ExitCodes.SUCCESS);
     });
 
@@ -181,7 +192,9 @@ describe('deferred', () => {
       const deferredMcp = defer(commandModule, 'mcp');
       await deferredMcp.handler({} as ArgumentsCamelCase);
 
-      const mcpSettings = createMockSettings({ mcp: { enabled: false } });
+      const mcpSettings = createMockSettings({
+        merged: { admin: { mcp: { enabled: false } } },
+      }).merged;
       await runDeferredCommand(mcpSettings);
 
       expect(mockCoreEvents.emitFeedback).toHaveBeenCalledWith(
@@ -205,10 +218,14 @@ describe('deferred', () => {
       // confirming it didn't capture 'mcp', 'extensions', or 'skills'
       // and defaulted to 'unknown' (or something else safe).
       const settings = createMockSettings({
-        mcp: { enabled: false },
-        extensions: { enabled: false },
-        skills: { enabled: false },
-      });
+        merged: {
+          admin: {
+            mcp: { enabled: false },
+            extensions: { enabled: false },
+            skills: { enabled: false },
+          },
+        },
+      }).merged;
 
       await runDeferredCommand(settings);
 

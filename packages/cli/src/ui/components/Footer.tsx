@@ -147,7 +147,7 @@ export const Footer: React.FC = () => {
         <Box alignItems="center" justifyContent="flex-end">
           <Box alignItems="center">
             <Text color={theme.text.accent}>
-              {getDisplayString(model, config.getPreviewFeatures())}
+              {getDisplayString(model)}
               <Text color={theme.text.secondary}> /model</Text>
               {!hideContextPercentage && (
                 <>

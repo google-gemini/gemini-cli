@@ -41,7 +41,7 @@ export class HookRegistry {
     this.entries = [];
     this.processHooksFromConfig();
 
-    debugLogger.log(
+    debugLogger.debug(
       `Hook registry initialized with ${this.entries.length} hook entries`,
     );
   }

@@ -889,6 +889,32 @@ export enum SlashCommandStatus {
   ERROR = 'error',
 }
 
+export const EVENT_REWIND = 'gemini_cli.rewind';
+export class RewindEvent implements BaseTelemetryEvent {
+  'event.name': 'rewind';
+  'event.timestamp': string;
+  outcome: string;
+
+  constructor(outcome: string) {
+    this['event.name'] = 'rewind';
+    this['event.timestamp'] = new Date().toISOString();
+    this.outcome = outcome;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_REWIND,
+      'event.timestamp': this['event.timestamp'],
+      outcome: this.outcome,
+    };
+  }
+
+  toLogBody(): string {
+    return `Rewind performed. Outcome: ${this.outcome}.`;
+  }
+}
+
 export const EVENT_CHAT_COMPRESSION = 'gemini_cli.chat_compression';
 export interface ChatCompressionEvent extends BaseTelemetryEvent {
   'event.name': 'chat_compression';
@@ -1308,7 +1334,6 @@ export class ToolOutputTruncatedEvent implements BaseTelemetryEvent {
   original_content_length: number;
   truncated_content_length: number;
   threshold: number;
-  lines: number;
   prompt_id: string;
 
   constructor(
@@ -1318,7 +1343,6 @@ export class ToolOutputTruncatedEvent implements BaseTelemetryEvent {
       originalContentLength: number;
       truncatedContentLength: number;
       threshold: number;
-      lines: number;
     },
   ) {
     this['event.name'] = this.eventName;
@@ -1327,7 +1351,6 @@ export class ToolOutputTruncatedEvent implements BaseTelemetryEvent {
     this.original_content_length = details.originalContentLength;
     this.truncated_content_length = details.truncatedContentLength;
     this.threshold = details.threshold;
-    this.lines = details.lines;
   }
 
   toOpenTelemetryAttributes(config: Config): LogAttributes {
@@ -1340,13 +1363,55 @@ export class ToolOutputTruncatedEvent implements BaseTelemetryEvent {
       original_content_length: this.original_content_length,
       truncated_content_length: this.truncated_content_length,
       threshold: this.threshold,
-      lines: this.lines,
       prompt_id: this.prompt_id,
     };
   }
 
   toLogBody(): string {
     return `Tool output truncated for ${this.tool_name}.`;
+  }
+}
+
+export const EVENT_TOOL_OUTPUT_MASKING = 'gemini_cli.tool_output_masking';
+
+export class ToolOutputMaskingEvent implements BaseTelemetryEvent {
+  'event.name': 'tool_output_masking';
+  'event.timestamp': string;
+  tokens_before: number;
+  tokens_after: number;
+  masked_count: number;
+  total_prunable_tokens: number;
+
+  constructor(details: {
+    tokens_before: number;
+    tokens_after: number;
+    masked_count: number;
+    total_prunable_tokens: number;
+  }) {
+    this['event.name'] = 'tool_output_masking';
+    this['event.timestamp'] = new Date().toISOString();
+    this.tokens_before = details.tokens_before;
+    this.tokens_after = details.tokens_after;
+    this.masked_count = details.masked_count;
+    this.total_prunable_tokens = details.total_prunable_tokens;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_TOOL_OUTPUT_MASKING,
+      'event.timestamp': this['event.timestamp'],
+      tokens_before: this.tokens_before,
+      tokens_after: this.tokens_after,
+      masked_count: this.masked_count,
+      total_prunable_tokens: this.total_prunable_tokens,
+    };
+  }
+
+  toLogBody(): string {
+    return `Tool output masking (Masked ${this.masked_count} tool outputs. Saved ${
+      this.tokens_before - this.tokens_after
+    } tokens)`;
   }
 }
 
@@ -1576,7 +1641,10 @@ export type TelemetryEvent =
   | LlmLoopCheckEvent
   | StartupStatsEvent
   | WebFetchFallbackAttemptEvent
+  | ToolOutputMaskingEvent
   | EditStrategyEvent
+  | PlanExecutionEvent
+  | RewindEvent
   | EditCorrectionEvent;
 
 export const EVENT_EXTENSION_DISABLE = 'gemini_cli.extension_disable';
@@ -1867,12 +1935,17 @@ export class WebFetchFallbackAttemptEvent implements BaseTelemetryEvent {
 }
 
 export const EVENT_HOOK_CALL = 'gemini_cli.hook_call';
+
+export const EVENT_APPROVAL_MODE_SWITCH =
+  'gemini_cli.plan.approval_mode_switch';
 export class ApprovalModeSwitchEvent implements BaseTelemetryEvent {
   eventName = 'approval_mode_switch';
   from_mode: ApprovalMode;
   to_mode: ApprovalMode;
 
   constructor(fromMode: ApprovalMode, toMode: ApprovalMode) {
+    this['event.name'] = this.eventName;
+    this['event.timestamp'] = new Date().toISOString();
     this.from_mode = fromMode;
     this.to_mode = toMode;
   }
@@ -1882,7 +1955,7 @@ export class ApprovalModeSwitchEvent implements BaseTelemetryEvent {
   toOpenTelemetryAttributes(config: Config): LogAttributes {
     return {
       ...getCommonAttributes(config),
-      event_name: this.eventName,
+      event_name: EVENT_APPROVAL_MODE_SWITCH,
       from_mode: this.from_mode,
       to_mode: this.to_mode,
     };
@@ -1893,12 +1966,16 @@ export class ApprovalModeSwitchEvent implements BaseTelemetryEvent {
   }
 }
 
+export const EVENT_APPROVAL_MODE_DURATION =
+  'gemini_cli.plan.approval_mode_duration';
 export class ApprovalModeDurationEvent implements BaseTelemetryEvent {
   eventName = 'approval_mode_duration';
   mode: ApprovalMode;
   duration_ms: number;
 
   constructor(mode: ApprovalMode, durationMs: number) {
+    this['event.name'] = this.eventName;
+    this['event.timestamp'] = new Date().toISOString();
     this.mode = mode;
     this.duration_ms = durationMs;
   }
@@ -1908,7 +1985,7 @@ export class ApprovalModeDurationEvent implements BaseTelemetryEvent {
   toOpenTelemetryAttributes(config: Config): LogAttributes {
     return {
       ...getCommonAttributes(config),
-      event_name: this.eventName,
+      event_name: EVENT_APPROVAL_MODE_DURATION,
       mode: this.mode,
       duration_ms: this.duration_ms,
     };
@@ -1916,6 +1993,33 @@ export class ApprovalModeDurationEvent implements BaseTelemetryEvent {
 
   toLogBody(): string {
     return `Approval mode ${this.mode} was active for ${this.duration_ms}ms.`;
+  }
+}
+
+export const EVENT_PLAN_EXECUTION = 'gemini_cli.plan.execution';
+export class PlanExecutionEvent implements BaseTelemetryEvent {
+  eventName = 'plan_execution';
+  approval_mode: ApprovalMode;
+
+  constructor(approvalMode: ApprovalMode) {
+    this['event.name'] = this.eventName;
+    this['event.timestamp'] = new Date().toISOString();
+    this.approval_mode = approvalMode;
+  }
+  'event.name': string;
+  'event.timestamp': string;
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_PLAN_EXECUTION,
+      'event.timestamp': this['event.timestamp'],
+      approval_mode: this.approval_mode,
+    };
+  }
+
+  toLogBody(): string {
+    return `Plan executed with approval mode: ${this.approval_mode}`;
   }
 }
 

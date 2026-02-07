@@ -27,7 +27,7 @@ export const useFolderTrust = (
   const [isRestarting, setIsRestarting] = useState(false);
   const startupMessageSent = useRef(false);
 
-  const folderTrust = settings.merged.security.folderTrust.enabled;
+  const folderTrust = settings.merged.security.folderTrust.enabled ?? true;
 
   useEffect(() => {
     const { isTrusted: trusted } = isWorkspaceTrusted(settings.merged);
@@ -39,7 +39,7 @@ export const useFolderTrust = (
       addItem(
         {
           type: MessageType.INFO,
-          text: 'This folder is not trusted. Some features may be disabled. Use the `/permissions` command to change the trust level.',
+          text: 'This folder is untrusted, project settings, hooks, MCPs, and GEMINI.md files will not be applied for this folder.\nUse the `/permissions` command to change the trust level.',
         },
         Date.now(),
       );

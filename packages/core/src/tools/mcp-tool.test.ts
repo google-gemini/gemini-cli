@@ -203,6 +203,7 @@ describe('DiscoveredMCPTool', () => {
           undefined,
           undefined,
           undefined,
+          undefined,
         );
         const params = { param: 'isErrorTrueCase' };
         const functionCall = {
@@ -244,6 +245,7 @@ describe('DiscoveredMCPTool', () => {
         baseDescription,
         inputSchema,
         createMockMessageBus(),
+        undefined,
         undefined,
         undefined,
         undefined,
@@ -293,6 +295,7 @@ describe('DiscoveredMCPTool', () => {
           baseDescription,
           inputSchema,
           createMockMessageBus(),
+          undefined,
           undefined,
           undefined,
           undefined,
@@ -756,6 +759,7 @@ describe('DiscoveredMCPTool', () => {
         createMockMessageBus(),
         true,
         undefined,
+        undefined,
         { isTrustedFolder: () => true } as any,
         undefined,
         undefined,
@@ -900,6 +904,7 @@ describe('DiscoveredMCPTool', () => {
         inputSchema,
         bus,
         trust,
+        undefined,
         undefined,
         mockConfig(isTrusted) as any,
         undefined,

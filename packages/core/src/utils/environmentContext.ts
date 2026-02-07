@@ -30,17 +30,10 @@ export async function getDirectoryContextString(
   );
 
   const folderStructure = folderStructures.join('\n');
+  const dirList = workspaceDirectories.map((dir) => `  - ${dir}`).join('\n');
 
-  let workingDirPreamble: string;
-  if (workspaceDirectories.length === 1) {
-    workingDirPreamble = `I'm currently working in the directory: ${workspaceDirectories[0]}`;
-  } else {
-    const dirList = workspaceDirectories.map((dir) => `  - ${dir}`).join('\n');
-    workingDirPreamble = `I'm currently working in the following directories:\n${dirList}`;
-  }
-
-  return `${workingDirPreamble}
-Here is the folder structure of the current working directories:
+  return `- **Workspace Directories:**\n${dirList}
+- **Directory Structure:**
 
 ${folderStructure}`;
 }
@@ -65,6 +58,7 @@ export async function getEnvironmentContext(config: Config): Promise<Part[]> {
   const environmentMemory = config.getEnvironmentMemory();
 
   const context = `
+<session_context>
 This is the Gemini CLI. We are setting up the context for our chat.
 Today's date is ${today} (formatted according to the user's locale).
 My operating system is: ${platform}
@@ -72,7 +66,7 @@ The project's temporary directory is: ${tempDir}
 ${directoryContext}
 
 ${environmentMemory}
-        `.trim();
+</session_context>`.trim();
 
   const initialParts: Part[] = [{ text: context }];
 
@@ -86,18 +80,10 @@ export async function getInitialChatHistory(
   const envParts = await getEnvironmentContext(config);
   const envContextString = envParts.map((part) => part.text || '').join('\n\n');
 
-  const allSetupText = `
-${envContextString}
-
-Reminder: Do not return an empty response when a tool call is required.
-
-My setup is complete. I will provide my first command in the next turn.
-    `.trim();
-
   return [
     {
       role: 'user',
-      parts: [{ text: allSetupText }],
+      parts: [{ text: envContextString }],
     },
     ...(extraHistory ?? []),
   ];
