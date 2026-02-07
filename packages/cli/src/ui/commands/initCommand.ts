@@ -13,10 +13,13 @@ import type {
 } from './types.js';
 import { CommandKind } from './types.js';
 import { performInit } from '@google/gemini-cli-core';
+import { t } from '../utils/i18n.js';
 
 export const initCommand: SlashCommand = {
   name: 'init',
-  description: 'Analyzes the project and creates a tailored GEMINI.md file',
+  get description() {
+    return t('command.init.description');
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (

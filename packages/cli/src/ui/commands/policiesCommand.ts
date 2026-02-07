@@ -7,6 +7,7 @@
 import { ApprovalMode, type PolicyRule } from '@google/gemini-cli-core';
 import { CommandKind, type SlashCommand } from './types.js';
 import { MessageType } from '../types.js';
+import { t } from '../utils/i18n.js';
 
 interface CategorizedRules {
   normal: PolicyRule[];
@@ -44,7 +45,11 @@ const formatSection = (title: string, rules: PolicyRule[]) =>
 
 const listPoliciesCommand: SlashCommand = {
   name: 'list',
-  description: 'List all active policies grouped by mode',
+  get description() {
+    return t('command.policies.list.description', {
+      default: 'List all active policies grouped by mode',
+    });
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context) => {
@@ -106,7 +111,9 @@ const listPoliciesCommand: SlashCommand = {
 
 export const policiesCommand: SlashCommand = {
   name: 'policies',
-  description: 'Manage policies',
+  get description() {
+    return t('command.policies.description');
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   subCommands: [listPoliciesCommand],

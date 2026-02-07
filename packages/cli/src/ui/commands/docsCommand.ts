@@ -12,10 +12,13 @@ import {
   CommandKind,
 } from './types.js';
 import { MessageType } from '../types.js';
+import { t } from '../utils/i18n.js';
 
 export const docsCommand: SlashCommand = {
   name: 'docs',
-  description: 'Open full Gemini CLI documentation in your browser',
+  get description() {
+    return t('command.docs.description');
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context: CommandContext): Promise<void> => {

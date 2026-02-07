@@ -9,10 +9,13 @@ import {
   CommandKind,
   type SlashCommand,
 } from './types.js';
+import { t } from '../utils/i18n.js';
 
 export const modelCommand: SlashCommand = {
   name: 'model',
-  description: 'Opens a dialog to configure the model',
+  get description() {
+    return t('command.model.description');
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context: CommandContext) => {

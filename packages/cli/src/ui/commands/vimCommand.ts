@@ -6,10 +6,13 @@
 
 import type { SlashCommand } from './types.js';
 import { CommandKind } from './types.js';
+import { t } from '../utils/i18n.js';
 
 export const vimCommand: SlashCommand = {
   name: 'vim',
-  description: 'Toggle vim mode on/off',
+  get description() {
+    return t('command.vim.description');
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context, _args) => {

@@ -31,10 +31,15 @@ import {
   canLoadServer,
 } from '../../config/mcp/mcpServerEnablement.js';
 import { loadSettings } from '../../config/settings.js';
+import { t } from '../utils/i18n.js';
 
 const authCommand: SlashCommand = {
   name: 'auth',
-  description: 'Authenticate with an OAuth-enabled MCP server',
+  get description() {
+    return t('command.mcp.auth.description', {
+      default: 'Authenticate with an OAuth-enabled MCP server',
+    });
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (
@@ -287,7 +292,11 @@ const listAction = async (
 const listCommand: SlashCommand = {
   name: 'list',
   altNames: ['ls', 'nodesc', 'nodescription'],
-  description: 'List configured MCP servers and tools',
+  get description() {
+    return t('command.mcp.list.description', {
+      default: 'List configured MCP servers and tools',
+    });
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: (context) => listAction(context),
@@ -296,7 +305,11 @@ const listCommand: SlashCommand = {
 const descCommand: SlashCommand = {
   name: 'desc',
   altNames: ['description'],
-  description: 'List configured MCP servers and tools with descriptions',
+  get description() {
+    return t('command.mcp.desc.description', {
+      default: 'List configured MCP servers and tools with descriptions',
+    });
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: (context) => listAction(context, true),
@@ -304,8 +317,12 @@ const descCommand: SlashCommand = {
 
 const schemaCommand: SlashCommand = {
   name: 'schema',
-  description:
-    'List configured MCP servers and tools with descriptions and schemas',
+  get description() {
+    return t('command.mcp.schema.description', {
+      default:
+        'List configured MCP servers and tools with descriptions and schemas',
+    });
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: (context) => listAction(context, true, true),
@@ -313,7 +330,11 @@ const schemaCommand: SlashCommand = {
 
 const refreshCommand: SlashCommand = {
   name: 'refresh',
-  description: 'Restarts MCP servers',
+  get description() {
+    return t('command.mcp.refresh.description', {
+      default: 'Restarts MCP servers',
+    });
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (
@@ -478,7 +499,11 @@ async function getEnablementCompletion(
 
 const enableCommand: SlashCommand = {
   name: 'enable',
-  description: 'Enable a disabled MCP server',
+  get description() {
+    return t('command.mcp.enable.description', {
+      default: 'Enable a disabled MCP server',
+    });
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: (ctx, args) => handleEnableDisable(ctx, args, true),
@@ -487,7 +512,11 @@ const enableCommand: SlashCommand = {
 
 const disableCommand: SlashCommand = {
   name: 'disable',
-  description: 'Disable an MCP server',
+  get description() {
+    return t('command.mcp.disable.description', {
+      default: 'Disable an MCP server',
+    });
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: (ctx, args) => handleEnableDisable(ctx, args, false),
@@ -496,7 +525,9 @@ const disableCommand: SlashCommand = {
 
 export const mcpCommand: SlashCommand = {
   name: 'mcp',
-  description: 'Manage configured Model Context Protocol (MCP) servers',
+  get description() {
+    return t('command.mcp.description');
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   subCommands: [

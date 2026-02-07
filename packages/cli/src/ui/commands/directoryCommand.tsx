@@ -12,6 +12,7 @@ import { MultiFolderTrustDialog } from '../components/MultiFolderTrustDialog.js'
 import type { SlashCommand, CommandContext } from './types.js';
 import { CommandKind } from './types.js';
 import { MessageType, type HistoryItem } from '../types.js';
+import { t } from '../utils/i18n.js';
 import { refreshServerHierarchicalMemory } from '@google/gemini-cli-core';
 import {
   expandHomeDir,
@@ -79,13 +80,19 @@ async function finishAddingDirectories(
 export const directoryCommand: SlashCommand = {
   name: 'directory',
   altNames: ['dir'],
-  description: 'Manage workspace directories',
+  get description() {
+    return t('command.directory.description');
+  },
   kind: CommandKind.BUILT_IN,
   subCommands: [
     {
       name: 'add',
-      description:
-        'Add directories to the workspace. Use comma to separate multiple paths',
+      get description() {
+        return t('command.directory.add.description', {
+          default:
+            'Add directories to the workspace. Use comma to separate multiple paths',
+        });
+      },
       kind: CommandKind.BUILT_IN,
       autoExecute: false,
       showCompletionLoading: false,
@@ -264,7 +271,11 @@ export const directoryCommand: SlashCommand = {
     },
     {
       name: 'show',
-      description: 'Show all directories in the workspace',
+      get description() {
+        return t('command.directory.show.description', {
+          default: 'Show all directories in the workspace',
+        });
+      },
       kind: CommandKind.BUILT_IN,
       action: async (context: CommandContext) => {
         const {

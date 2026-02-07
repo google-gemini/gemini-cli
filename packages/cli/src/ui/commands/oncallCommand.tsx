@@ -11,16 +11,23 @@ import {
 } from './types.js';
 import { TriageDuplicates } from '../components/triage/TriageDuplicates.js';
 import { TriageIssues } from '../components/triage/TriageIssues.js';
+import { t } from '../utils/i18n.js';
 
 export const oncallCommand: SlashCommand = {
   name: 'oncall',
-  description: 'Oncall related commands',
+  get description() {
+    return t('command.oncall.description');
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   subCommands: [
     {
       name: 'dedup',
-      description: 'Triage issues labeled as status/possible-duplicate',
+      get description() {
+        return t('command.oncall.dedup.description', {
+          default: 'Triage issues labeled as status/possible-duplicate',
+        });
+      },
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
       action: async (context, args): Promise<OpenCustomDialogActionReturn> => {
@@ -52,7 +59,11 @@ export const oncallCommand: SlashCommand = {
     },
     {
       name: 'audit',
-      description: 'Triage issues labeled as status/need-triage',
+      get description() {
+        return t('command.oncall.audit.description', {
+          default: 'Triage issues labeled as status/need-triage',
+        });
+      },
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
       action: async (context, args): Promise<OpenCustomDialogActionReturn> => {

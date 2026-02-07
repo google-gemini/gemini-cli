@@ -774,6 +774,7 @@ export async function loadCliConfig(
     deleteSession: argv.deleteSession,
     enabledExtensions: argv.extensions,
     extensionLoader: extensionManager,
+    language: settings.general?.language,
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.experimental?.plan,

@@ -142,6 +142,7 @@ import { NewAgentsChoice } from './components/NewAgentsNotification.js';
 import { isSlashCommand } from './utils/commandUtils.js';
 import { useTerminalTheme } from './hooks/useTerminalTheme.js';
 import { isITerm2 } from './utils/terminalUtils.js';
+import { setLanguage, type Language } from './utils/i18n.js';
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
   return pendingHistoryItems.some((item) => {
@@ -452,6 +453,11 @@ export const AppContainer = (props: AppContainerProps) => {
       coreEvents.off(CoreEvent.AgentsDiscovered, handleAgentsDiscovered);
     };
   }, []);
+
+  useEffect(() => {
+    const lang = settings.merged.general.language || 'en';
+    setLanguage(lang as Language);
+  }, [settings.merged.general]);
 
   const { consoleMessages, clearConsoleMessages: clearConsoleMessagesState } =
     useConsoleMessages();

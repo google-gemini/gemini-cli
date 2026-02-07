@@ -21,6 +21,7 @@ import type { SlashCommand, SlashCommandActionReturn } from './types.js';
 import { CommandKind } from './types.js';
 import { getUrlOpenCommand } from '../../ui/utils/commandUtils.js';
 import { debugLogger } from '@google/gemini-cli-core';
+import { t } from '../utils/i18n.js';
 
 export const GITHUB_WORKFLOW_PATHS = [
   'gemini-dispatch/gemini-dispatch.yml',
@@ -201,7 +202,9 @@ async function downloadSetupFiles({
 
 export const setupGithubCommand: SlashCommand = {
   name: 'setup-github',
-  description: 'Set up GitHub Actions',
+  get description() {
+    return t('command.setup-github.description');
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (

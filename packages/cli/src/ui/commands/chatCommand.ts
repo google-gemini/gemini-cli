@@ -28,6 +28,7 @@ import type {
 import { MessageType } from '../types.js';
 import { exportHistoryToFile } from '../utils/historyExportUtils.js';
 import { convertToRestPayload } from '@google/gemini-cli-core';
+import { t } from '../utils/i18n.js';
 
 const getSavedChatTags = async (
   context: CommandContext,
@@ -70,7 +71,9 @@ const getSavedChatTags = async (
 
 const listCommand: SlashCommand = {
   name: 'list',
-  description: 'List saved conversation checkpoints',
+  get description() {
+    return t('command.chat.list.description');
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context): Promise<void> => {
@@ -87,8 +90,9 @@ const listCommand: SlashCommand = {
 
 const saveCommand: SlashCommand = {
   name: 'save',
-  description:
-    'Save the current conversation as a checkpoint. Usage: /chat save <tag>',
+  get description() {
+    return t('command.chat.save.description');
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: async (context, args): Promise<SlashCommandActionReturn | void> => {
@@ -156,8 +160,9 @@ const saveCommand: SlashCommand = {
 const resumeCommand: SlashCommand = {
   name: 'resume',
   altNames: ['load'],
-  description:
-    'Resume a conversation from a checkpoint. Usage: /chat resume <tag>',
+  get description() {
+    return t('command.chat.resume.description');
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context, args) => {
@@ -234,7 +239,9 @@ const resumeCommand: SlashCommand = {
 
 const deleteCommand: SlashCommand = {
   name: 'delete',
-  description: 'Delete a conversation checkpoint. Usage: /chat delete <tag>',
+  get description() {
+    return t('command.chat.delete.description');
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context, args): Promise<MessageActionReturn> => {
@@ -275,8 +282,9 @@ const deleteCommand: SlashCommand = {
 
 const shareCommand: SlashCommand = {
   name: 'share',
-  description:
-    'Share the current conversation to a markdown or json file. Usage: /chat share <file>',
+  get description() {
+    return t('command.chat.share.description');
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: async (context, args): Promise<MessageActionReturn> => {
@@ -377,7 +385,9 @@ export const debugCommand: SlashCommand = {
 
 export const chatCommand: SlashCommand = {
   name: 'chat',
-  description: 'Manage conversation history',
+  get description() {
+    return t('command.chat.description');
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   subCommands: [

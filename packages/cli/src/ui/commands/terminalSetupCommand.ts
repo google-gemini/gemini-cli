@@ -8,6 +8,7 @@ import type { SlashCommand } from './types.js';
 import { CommandKind } from './types.js';
 import { terminalSetup } from '../utils/terminalSetup.js';
 import { type MessageActionReturn } from '@google/gemini-cli-core';
+import { t } from '../utils/i18n.js';
 
 /**
  * Command to configure terminal keybindings for multiline input support.
@@ -17,8 +18,9 @@ import { type MessageActionReturn } from '@google/gemini-cli-core';
  */
 export const terminalSetupCommand: SlashCommand = {
   name: 'terminal-setup',
-  description:
-    'Configure terminal keybindings for multiline input (VS Code, Cursor, Windsurf)',
+  get description() {
+    return t('command.terminal-setup.description');
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (): Promise<MessageActionReturn> => {

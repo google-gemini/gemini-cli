@@ -18,6 +18,7 @@ import type {
 import { getSettingsSchema } from '../config/settingsSchema.js';
 import type { Config } from '@google/gemini-cli-core';
 import { ExperimentFlags } from '@google/gemini-cli-core';
+import { t } from '../ui/utils/i18n.js';
 
 // The schema is now nested, but many parts of the UI and logic work better
 // with a flattened structure and dot-notation keys. This section flattens the
@@ -466,7 +467,9 @@ export function getDisplayValue(
 
   if (definition?.type === 'enum' && definition.options) {
     const option = definition.options?.find((option) => option.value === value);
-    valueString = option?.label ?? `${value}`;
+    valueString = t(`setting.option.${value}`, {
+      default: option?.label ?? `${value}`,
+    });
   }
 
   // Check if value is different from default OR if it's in modified settings OR if there are pending changes

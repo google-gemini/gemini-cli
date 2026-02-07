@@ -9,6 +9,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as childProcess from 'node:child_process';
 import process from 'node:process';
+import { t } from '../ui/utils/i18n.js';
 
 export const isDevelopment = process.env['NODE_ENV'] === 'development';
 
@@ -116,8 +117,8 @@ export function getInstallationInfo(
         isGlobal: true,
         updateCommand,
         updateMessage: isAutoUpdateEnabled
-          ? 'Installed with pnpm. Attempting to automatically update now...'
-          : `Please run ${updateCommand} to update`,
+          ? t('update.attempting', { pm: 'pnpm' })
+          : t('update.manual', { command: updateCommand }),
       };
     }
 
@@ -129,8 +130,8 @@ export function getInstallationInfo(
         isGlobal: true,
         updateCommand,
         updateMessage: isAutoUpdateEnabled
-          ? 'Installed with yarn. Attempting to automatically update now...'
-          : `Please run ${updateCommand} to update`,
+          ? t('update.attempting', { pm: 'yarn' })
+          : t('update.manual', { command: updateCommand }),
       };
     }
 
@@ -149,8 +150,8 @@ export function getInstallationInfo(
         isGlobal: true,
         updateCommand,
         updateMessage: isAutoUpdateEnabled
-          ? 'Installed with bun. Attempting to automatically update now...'
-          : `Please run ${updateCommand} to update`,
+          ? t('update.attempting', { pm: 'bun' })
+          : t('update.manual', { command: updateCommand }),
       };
     }
 
@@ -182,8 +183,8 @@ export function getInstallationInfo(
       isGlobal: true,
       updateCommand,
       updateMessage: isAutoUpdateEnabled
-        ? 'Installed with npm. Attempting to automatically update now...'
-        : `Please run ${updateCommand} to update`,
+        ? t('update.attempting', { pm: 'npm' })
+        : t('update.manual', { command: updateCommand }),
     };
   } catch (error) {
     debugLogger.log(error);

@@ -36,6 +36,7 @@ import { ExtensionSettingScope } from '../../config/extensions/extensionSettings
 import { type ConfigLogger } from '../../commands/extensions/utils.js';
 import { ConfigExtensionDialog } from '../components/ConfigExtensionDialog.js';
 import React from 'react';
+import { t } from '../utils/i18n.js';
 
 function showMessageIfNoExtensions(
   context: CommandContext,
@@ -713,7 +714,11 @@ export function completeExtensionsAndScopes(
 
 const listExtensionsCommand: SlashCommand = {
   name: 'list',
-  description: 'List active extensions',
+  get description() {
+    return t('command.extensions.list.description', {
+      default: 'List active extensions',
+    });
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: listAction,
@@ -721,7 +726,11 @@ const listExtensionsCommand: SlashCommand = {
 
 const updateExtensionsCommand: SlashCommand = {
   name: 'update',
-  description: 'Update extensions. Usage: update <extension-names>|--all',
+  get description() {
+    return t('command.extensions.update.description', {
+      default: 'Update extensions. Usage: update <extension-names>|--all',
+    });
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: updateAction,
@@ -730,7 +739,11 @@ const updateExtensionsCommand: SlashCommand = {
 
 const disableCommand: SlashCommand = {
   name: 'disable',
-  description: 'Disable an extension',
+  get description() {
+    return t('command.extensions.disable.description', {
+      default: 'Disable an extension',
+    });
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: disableAction,
@@ -739,7 +752,11 @@ const disableCommand: SlashCommand = {
 
 const enableCommand: SlashCommand = {
   name: 'enable',
-  description: 'Enable an extension',
+  get description() {
+    return t('command.extensions.enable.description', {
+      default: 'Enable an extension',
+    });
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: enableAction,
@@ -748,7 +765,11 @@ const enableCommand: SlashCommand = {
 
 const installCommand: SlashCommand = {
   name: 'install',
-  description: 'Install an extension from a git repo or local path',
+  get description() {
+    return t('command.extensions.install.description', {
+      default: 'Install an extension from a git repo or local path',
+    });
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: installAction,
@@ -756,7 +777,11 @@ const installCommand: SlashCommand = {
 
 const linkCommand: SlashCommand = {
   name: 'link',
-  description: 'Link an extension from a local path',
+  get description() {
+    return t('command.extensions.link.description', {
+      default: 'Link an extension from a local path',
+    });
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: linkAction,
@@ -764,7 +789,11 @@ const linkCommand: SlashCommand = {
 
 const uninstallCommand: SlashCommand = {
   name: 'uninstall',
-  description: 'Uninstall an extension',
+  get description() {
+    return t('command.extensions.uninstall.description', {
+      default: 'Uninstall an extension',
+    });
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: uninstallAction,
@@ -773,7 +802,11 @@ const uninstallCommand: SlashCommand = {
 
 const exploreExtensionsCommand: SlashCommand = {
   name: 'explore',
-  description: 'Open extensions page in your browser',
+  get description() {
+    return t('command.extensions.explore.description', {
+      default: 'Open extensions page in your browser',
+    });
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: exploreAction,
@@ -781,7 +814,11 @@ const exploreExtensionsCommand: SlashCommand = {
 
 const restartCommand: SlashCommand = {
   name: 'restart',
-  description: 'Restart all extensions',
+  get description() {
+    return t('command.extensions.restart.description', {
+      default: 'Restart all extensions',
+    });
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: restartAction,
@@ -790,7 +827,11 @@ const restartCommand: SlashCommand = {
 
 const configCommand: SlashCommand = {
   name: 'config',
-  description: 'Configure extension settings',
+  get description() {
+    return t('command.extensions.config.description', {
+      default: 'Configure extension settings',
+    });
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: configAction,
@@ -811,7 +852,9 @@ export function extensionsCommand(
     : [];
   return {
     name: 'extensions',
-    description: 'Manage extensions',
+    get description() {
+      return t('command.extensions.description');
+    },
     kind: CommandKind.BUILT_IN,
     autoExecute: false,
     subCommands: [

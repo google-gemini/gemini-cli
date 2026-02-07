@@ -33,6 +33,7 @@ export interface SystemPromptOptions {
   sandbox?: SandboxMode;
   gitRepo?: GitRepoOptions;
   finalReminder?: FinalReminderOptions;
+  language?: string;
 }
 
 export interface PreambleOptions {
@@ -115,8 +116,19 @@ ${renderSandbox(options.sandbox)}
 
 ${renderGitRepo(options.gitRepo)}
 
+${renderLanguageDirective(options.language)}
+
 ${renderFinalReminder(options.finalReminder)}
 `.trim();
+}
+
+export function renderLanguageDirective(lang?: string): string {
+  if (lang === 'zh') {
+    return `
+# Language Preference
+- You MUST interact with the user in Chinese by default.`.trim();
+  }
+  return '';
 }
 
 /**

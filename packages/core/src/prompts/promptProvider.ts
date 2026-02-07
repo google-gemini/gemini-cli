@@ -179,6 +179,7 @@ export class PromptProvider {
         finalReminder: this.withSection('finalReminder', () => ({
           readFileToolName: READ_FILE_TOOL_NAME,
         })),
+        language: config.getLanguage(),
       };
 
       basePrompt = activeSnippets.getCoreSystemPrompt(options);

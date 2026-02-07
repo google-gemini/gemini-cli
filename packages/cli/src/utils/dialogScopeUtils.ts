@@ -10,15 +10,21 @@ import type {
 } from '../config/settings.js';
 import { isLoadableSettingScope, SettingScope } from '../config/settings.js';
 import { settingExistsInScope } from './settingsUtils.js';
+import { t } from '../ui/utils/i18n.js';
 
 /**
  * Shared scope labels for dialog components that need to display setting scopes
  */
-export const SCOPE_LABELS = {
-  [SettingScope.User]: 'User Settings',
-  [SettingScope.Workspace]: 'Workspace Settings',
-  [SettingScope.System]: 'System Settings',
-} as const;
+export const getScopeLabels = () =>
+  ({
+    [SettingScope.User]: t('settings.scope.user', { default: 'User Settings' }),
+    [SettingScope.Workspace]: t('settings.scope.workspace', {
+      default: 'Workspace Settings',
+    }),
+    [SettingScope.System]: t('settings.scope.system', {
+      default: 'System Settings',
+    }),
+  }) as const;
 
 /**
  * Helper function to get scope items for radio button selects
@@ -27,13 +33,14 @@ export function getScopeItems(): Array<{
   label: string;
   value: LoadableSettingScope;
 }> {
+  const labels = getScopeLabels();
   return [
-    { label: SCOPE_LABELS[SettingScope.User], value: SettingScope.User },
+    { label: labels[SettingScope.User], value: SettingScope.User },
     {
-      label: SCOPE_LABELS[SettingScope.Workspace],
+      label: labels[SettingScope.Workspace],
       value: SettingScope.Workspace,
     },
-    { label: SCOPE_LABELS[SettingScope.System], value: SettingScope.System },
+    { label: labels[SettingScope.System], value: SettingScope.System },
   ];
 }
 
@@ -66,6 +73,12 @@ export function getScopeMessageForSetting(
   );
 
   return existsInCurrentScope
-    ? `(Also modified in ${modifiedScopesStr})`
-    : `(Modified in ${modifiedScopesStr})`;
+    ? t('settings.scope.alsoModifiedIn', {
+        default: `(Also modified in ${modifiedScopesStr})`,
+        scopes: modifiedScopesStr,
+      })
+    : t('settings.scope.modifiedIn', {
+        default: `(Modified in ${modifiedScopesStr})`,
+        scopes: modifiedScopesStr,
+      });
 }

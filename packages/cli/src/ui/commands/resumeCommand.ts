@@ -10,10 +10,13 @@ import type {
   SlashCommand,
 } from './types.js';
 import { CommandKind } from './types.js';
+import { t } from '../utils/i18n.js';
 
 export const resumeCommand: SlashCommand = {
   name: 'resume',
-  description: 'Browse and resume auto-saved conversations',
+  get description() {
+    return t('command.resume.description');
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (

@@ -8,10 +8,13 @@ import { debugLogger } from '@google/gemini-cli-core';
 import { copyToClipboard } from '../utils/commandUtils.js';
 import type { SlashCommand, SlashCommandActionReturn } from './types.js';
 import { CommandKind } from './types.js';
+import { t } from '../utils/i18n.js';
 
 export const copyCommand: SlashCommand = {
   name: 'copy',
-  description: 'Copy the last result or code snippet to clipboard',
+  get description() {
+    return t('command.copy.description');
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context, _args): Promise<SlashCommandActionReturn | void> => {

@@ -14,10 +14,13 @@ import type { SlashCommand } from './types.js';
 import { CommandKind } from './types.js';
 import { MessageType } from '../types.js';
 import { randomUUID } from 'node:crypto';
+import { t } from '../utils/i18n.js';
 
 export const clearCommand: SlashCommand = {
   name: 'clear',
-  description: 'Clear the screen and conversation history',
+  get description() {
+    return t('command.clear.description');
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context, _args) => {

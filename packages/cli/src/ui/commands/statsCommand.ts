@@ -17,6 +17,7 @@ import {
   type SlashCommand,
   CommandKind,
 } from './types.js';
+import { t } from '../utils/i18n.js';
 
 function getUserIdentity(context: CommandContext) {
   const selectedAuthType =
@@ -66,7 +67,9 @@ async function defaultSessionView(context: CommandContext) {
 export const statsCommand: SlashCommand = {
   name: 'stats',
   altNames: ['usage'],
-  description: 'Check session stats. Usage: /stats [session|model|tools]',
+  get description() {
+    return t('command.stats.description');
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: async (context: CommandContext) => {
@@ -75,7 +78,11 @@ export const statsCommand: SlashCommand = {
   subCommands: [
     {
       name: 'session',
-      description: 'Show session-specific usage statistics',
+      get description() {
+        return t('command.stats.session.description', {
+          default: 'Show session-specific usage statistics',
+        });
+      },
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
       action: async (context: CommandContext) => {
@@ -84,7 +91,11 @@ export const statsCommand: SlashCommand = {
     },
     {
       name: 'model',
-      description: 'Show model-specific usage statistics',
+      get description() {
+        return t('command.stats.model.description', {
+          default: 'Show model-specific usage statistics',
+        });
+      },
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
       action: (context: CommandContext) => {
@@ -99,7 +110,11 @@ export const statsCommand: SlashCommand = {
     },
     {
       name: 'tools',
-      description: 'Show tool-specific usage statistics',
+      get description() {
+        return t('command.stats.tools.description', {
+          default: 'Show tool-specific usage statistics',
+        });
+      },
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
       action: (context: CommandContext) => {

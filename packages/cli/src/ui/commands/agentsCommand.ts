@@ -14,10 +14,15 @@ import { MessageType, type HistoryItemAgentsList } from '../types.js';
 import { SettingScope } from '../../config/settings.js';
 import { disableAgent, enableAgent } from '../../utils/agentSettings.js';
 import { renderAgentActionFeedback } from '../../utils/agentUtils.js';
+import { t } from '../utils/i18n.js';
 
 const agentsListCommand: SlashCommand = {
   name: 'list',
-  description: 'List available local and remote agents',
+  get description() {
+    return t('command.agents.list.description', {
+      default: 'List available local and remote agents',
+    });
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context: CommandContext) => {
@@ -297,7 +302,11 @@ function completeAllAgents(context: CommandContext, partialArg: string) {
 
 const enableCommand: SlashCommand = {
   name: 'enable',
-  description: 'Enable a disabled agent',
+  get description() {
+    return t('command.agents.enable.description', {
+      default: 'Enable a disabled agent',
+    });
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: enableAction,
@@ -306,7 +315,11 @@ const enableCommand: SlashCommand = {
 
 const disableCommand: SlashCommand = {
   name: 'disable',
-  description: 'Disable an enabled agent',
+  get description() {
+    return t('command.agents.disable.description', {
+      default: 'Disable an enabled agent',
+    });
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: disableAction,
@@ -315,7 +328,11 @@ const disableCommand: SlashCommand = {
 
 const configCommand: SlashCommand = {
   name: 'config',
-  description: 'Configure an agent',
+  get description() {
+    return t('command.agents.config.description', {
+      default: 'Configure an agent',
+    });
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: configAction,
@@ -324,7 +341,11 @@ const configCommand: SlashCommand = {
 
 const agentsRefreshCommand: SlashCommand = {
   name: 'refresh',
-  description: 'Reload the agent registry',
+  get description() {
+    return t('command.agents.refresh.description', {
+      default: 'Reload the agent registry',
+    });
+  },
   kind: CommandKind.BUILT_IN,
   action: async (context: CommandContext) => {
     const { config } = context.services;
@@ -354,7 +375,9 @@ const agentsRefreshCommand: SlashCommand = {
 
 export const agentsCommand: SlashCommand = {
   name: 'agents',
-  description: 'Manage agents',
+  get description() {
+    return t('command.agents.description');
+  },
   kind: CommandKind.BUILT_IN,
   subCommands: [
     agentsListCommand,

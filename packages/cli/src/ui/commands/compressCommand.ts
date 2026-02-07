@@ -8,11 +8,14 @@ import type { HistoryItemCompression } from '../types.js';
 import { MessageType } from '../types.js';
 import type { SlashCommand } from './types.js';
 import { CommandKind } from './types.js';
+import { t } from '../utils/i18n.js';
 
 export const compressCommand: SlashCommand = {
   name: 'compress',
   altNames: ['summarize'],
-  description: 'Compresses the context by replacing it with a summary',
+  get description() {
+    return t('command.compress.description');
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context) => {

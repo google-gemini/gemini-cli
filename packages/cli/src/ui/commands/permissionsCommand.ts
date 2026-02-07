@@ -14,17 +14,24 @@ import * as process from 'node:process';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { expandHomeDir } from '../utils/directoryUtils.js';
+import { t } from '../utils/i18n.js';
 
 export const permissionsCommand: SlashCommand = {
   name: 'permissions',
-  description: 'Manage folder trust settings and other permissions',
+  get description() {
+    return t('command.permissions.description');
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   subCommands: [
     {
       name: 'trust',
-      description:
-        'Manage folder trust settings. Usage: /permissions trust [<directory-path>]',
+      get description() {
+        return t('command.permissions.trust.description', {
+          default:
+            'Manage folder trust settings. Usage: /permissions trust [<directory-path>]',
+        });
+      },
       kind: CommandKind.BUILT_IN,
       autoExecute: false,
       action: (context, input): SlashCommandActionReturn => {

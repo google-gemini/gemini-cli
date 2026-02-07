@@ -5,12 +5,15 @@
  */
 
 import { CommandKind, type SlashCommand } from './types.js';
+import { t } from '../utils/i18n.js';
 
 export const shellsCommand: SlashCommand = {
   name: 'shells',
   altNames: ['bashes'],
   kind: CommandKind.BUILT_IN,
-  description: 'Toggle background shells view',
+  get description() {
+    return t('command.shells.description');
+  },
   autoExecute: true,
   action: async (context) => {
     context.ui.toggleBackgroundShell();
