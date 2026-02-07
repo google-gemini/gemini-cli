@@ -451,6 +451,11 @@ export interface LoopDetectionConfirmationRequest {
   onComplete: (result: { userSelection: 'disable' | 'keep' }) => void;
 }
 
+export interface PermissionConfirmationRequest {
+  files: string[];
+  onComplete: (result: { allowed: boolean }) => void;
+}
+
 export interface ActiveHook {
   name: string;
   eventName: string;
