@@ -338,6 +338,7 @@ describe('Policy Engine Integration Tests', () => {
           const validPaths = [
             '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/my-plan.md',
             '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/feature_auth.md',
+            '/home/user/.gemini/tmp/new-temp_dir_123/plans/plan.md', // new style of temp directory
           ];
 
           for (const file_path of validPaths) {
@@ -364,8 +365,8 @@ describe('Policy Engine Integration Tests', () => {
             '/project/src/file.ts', // Workspace
             '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/script.js', // Wrong extension
             '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/../../../etc/passwd.md', // Path traversal
-            '/home/user/.gemini/tmp/abc123/plans/plan.md', // Invalid hash length
             '/home/user/.gemini/tmp/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2/plans/subdir/plan.md', // Subdirectory
+            '/home/user/.gemini/non-tmp/new-temp_dir_123/plans/plan.md', // outside of temp dir
           ];
 
           for (const file_path of invalidPaths) {
@@ -433,8 +434,8 @@ describe('Policy Engine Integration Tests', () => {
       expect(mcpServerRule?.priority).toBe(2.1); // MCP allowed server
 
       const readOnlyToolRule = rules.find((r) => r.toolName === 'glob');
-      // Priority 50 in default tier → 1.05
-      expect(readOnlyToolRule?.priority).toBeCloseTo(1.05, 5);
+      // Priority 70 in default tier → 1.07 (Overriding Plan Mode Deny)
+      expect(readOnlyToolRule?.priority).toBeCloseTo(1.07, 5);
 
       // Verify the engine applies these priorities correctly
       expect(
@@ -589,8 +590,8 @@ describe('Policy Engine Integration Tests', () => {
       expect(server1Rule?.priority).toBe(2.1); // Allowed servers (user tier)
 
       const globRule = rules.find((r) => r.toolName === 'glob');
-      // Priority 50 in default tier → 1.05
-      expect(globRule?.priority).toBeCloseTo(1.05, 5); // Auto-accept read-only
+      // Priority 70 in default tier → 1.07
+      expect(globRule?.priority).toBeCloseTo(1.07, 5); // Auto-accept read-only
 
       // The PolicyEngine will sort these by priority when it's created
       const engine = new PolicyEngine(config);

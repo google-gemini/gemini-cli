@@ -21,7 +21,7 @@ import {
   type ModelConfig,
   ModelConfigService,
 } from '../services/modelConfigService.js';
-import { PolicyDecision } from '../policy/types.js';
+import { PolicyDecision, PRIORITY_SUBAGENT_TOOL } from '../policy/types.js';
 
 /**
  * Returns the model config alias for a given agent definition.
@@ -297,7 +297,7 @@ export class AgentRegistry {
         definition.kind === 'local'
           ? PolicyDecision.ALLOW
           : PolicyDecision.ASK_USER,
-      priority: 1.05,
+      priority: PRIORITY_SUBAGENT_TOOL,
       source: 'AgentRegistry (Dynamic)',
     });
   }

@@ -246,7 +246,7 @@ export const AppContainer = (props: AppContainerProps) => {
     [defaultBannerText, warningBannerText],
   );
 
-  const { bannerText } = useBanner(bannerData, config);
+  const { bannerText } = useBanner(bannerData);
 
   const extensionManager = config.getExtensionLoader() as ExtensionManager;
   // We are in the interactive CLI, update how we request consent and settings.
@@ -760,6 +760,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const setIsBackgroundShellListOpenRef = useRef<(open: boolean) => void>(
     () => {},
   );
+  const [shortcutsHelpVisible, setShortcutsHelpVisible] = useState(false);
 
   const slashCommandActions = useMemo(
     () => ({
@@ -795,6 +796,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
           }
         }
       },
+      toggleShortcutsHelp: () => setShortcutsHelpVisible((visible) => !visible),
       setText: stableSetText,
     }),
     [
@@ -813,6 +815,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       openPermissionsDialog,
       addConfirmUpdateExtensionRequest,
       toggleDebugProfiler,
+      setShortcutsHelpVisible,
       stableSetText,
     ],
   );
@@ -1291,24 +1294,26 @@ Logging in with Google... Restarting Gemini CLI to continue.
     }, WARNING_PROMPT_DURATION_MS);
   }, []);
 
-  useEffect(() => {
-    const handleSelectionWarning = () => {
-      handleWarning('Press Ctrl-S to enter selection mode to copy text.');
-    };
-    const handlePasteTimeout = () => {
-      handleWarning('Paste Timed out. Possibly due to slow connection.');
-    };
-    appEvents.on(AppEvent.SelectionWarning, handleSelectionWarning);
-    appEvents.on(AppEvent.PasteTimeout, handlePasteTimeout);
-    return () => {
-      appEvents.off(AppEvent.SelectionWarning, handleSelectionWarning);
-      appEvents.off(AppEvent.PasteTimeout, handlePasteTimeout);
+  // Handle timeout cleanup on unmount
+  useEffect(
+    () => () => {
       if (warningTimeoutRef.current) {
         clearTimeout(warningTimeoutRef.current);
       }
       if (tabFocusTimeoutRef.current) {
         clearTimeout(tabFocusTimeoutRef.current);
       }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const handlePasteTimeout = () => {
+      handleWarning('Paste Timed out. Possibly due to slow connection.');
+    };
+    appEvents.on(AppEvent.PasteTimeout, handlePasteTimeout);
+    return () => {
+      appEvents.off(AppEvent.PasteTimeout, handlePasteTimeout);
     };
   }, [handleWarning]);
 
@@ -1506,71 +1511,60 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setConstrainHeight(false);
         return true;
       } else if (
-        keyMatchers[Command.FOCUS_SHELL_INPUT](key) &&
+        (keyMatchers[Command.FOCUS_SHELL_INPUT](key) ||
+          keyMatchers[Command.UNFOCUS_BACKGROUND_SHELL_LIST](key)) &&
         (activePtyId || (isBackgroundShellVisible && backgroundShells.size > 0))
       ) {
-        if (key.name === 'tab' && key.shift) {
-          // Always change focus
+        if (embeddedShellFocused) {
+          const capturedTime = lastOutputTimeRef.current;
+          if (tabFocusTimeoutRef.current)
+            clearTimeout(tabFocusTimeoutRef.current);
+          tabFocusTimeoutRef.current = setTimeout(() => {
+            if (lastOutputTimeRef.current === capturedTime) {
+              setEmbeddedShellFocused(false);
+            } else {
+              handleWarning('Use Shift+Tab to unfocus');
+            }
+          }, 150);
+          return false;
+        }
+
+        const isIdle = Date.now() - lastOutputTimeRef.current >= 100;
+
+        if (isIdle && !activePtyId && !isBackgroundShellVisible) {
+          if (tabFocusTimeoutRef.current)
+            clearTimeout(tabFocusTimeoutRef.current);
+          toggleBackgroundShell();
+          setEmbeddedShellFocused(true);
+          if (backgroundShells.size > 1) setIsBackgroundShellListOpen(true);
+          return true;
+        }
+
+        setEmbeddedShellFocused(true);
+        return true;
+      } else if (
+        keyMatchers[Command.UNFOCUS_SHELL_INPUT](key) ||
+        keyMatchers[Command.UNFOCUS_BACKGROUND_SHELL](key)
+      ) {
+        if (embeddedShellFocused) {
           setEmbeddedShellFocused(false);
           return true;
         }
-
-        if (embeddedShellFocused) {
-          handleWarning('Press Shift+Tab to focus out.');
-          return true;
-        }
-
-        const now = Date.now();
-        // If the shell hasn't produced output in the last 100ms, it's considered idle.
-        const isIdle = now - lastOutputTimeRef.current >= 100;
-        if (isIdle && !activePtyId) {
-          if (tabFocusTimeoutRef.current) {
-            clearTimeout(tabFocusTimeoutRef.current);
-          }
-          toggleBackgroundShell();
-          if (!isBackgroundShellVisible) {
-            // We are about to show it, so focus it
-            setEmbeddedShellFocused(true);
-            if (backgroundShells.size > 1) {
-              setIsBackgroundShellListOpen(true);
-            }
-          } else {
-            // We are about to hide it
-            tabFocusTimeoutRef.current = setTimeout(() => {
-              tabFocusTimeoutRef.current = null;
-              // If the shell produced output since the tab press, we assume it handled the tab
-              // (e.g. autocomplete) so we should not toggle focus.
-              if (lastOutputTimeRef.current > now) {
-                handleWarning('Press Shift+Tab to focus out.');
-                return;
-              }
-              setEmbeddedShellFocused(false);
-            }, 100);
-          }
-          return true;
-        }
-
-        // Not idle, just focus it
-        setEmbeddedShellFocused(true);
-        return true;
+        return false;
       } else if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL](key)) {
         if (activePtyId) {
           backgroundCurrentShell();
           // After backgrounding, we explicitly do NOT show or focus the background UI.
         } else {
-          if (isBackgroundShellVisible && !embeddedShellFocused) {
+          toggleBackgroundShell();
+          // Toggle focus based on intent: if we were hiding, unfocus; if showing, focus.
+          if (!isBackgroundShellVisible && backgroundShells.size > 0) {
             setEmbeddedShellFocused(true);
-          } else {
-            toggleBackgroundShell();
-            // Toggle focus based on intent: if we were hiding, unfocus; if showing, focus.
-            if (!isBackgroundShellVisible && backgroundShells.size > 0) {
-              setEmbeddedShellFocused(true);
-              if (backgroundShells.size > 1) {
-                setIsBackgroundShellListOpen(true);
-              }
-            } else {
-              setEmbeddedShellFocused(false);
+            if (backgroundShells.size > 1) {
+              setIsBackgroundShellListOpen(true);
             }
+          } else {
+            setEmbeddedShellFocused(false);
           }
         }
         return true;
@@ -1613,7 +1607,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     ],
   );
 
-  useKeypress(handleGlobalKeypress, { isActive: true });
+  useKeypress(handleGlobalKeypress, { isActive: true, priority: true });
 
   useEffect(() => {
     // Respect hideWindowTitle settings
@@ -1772,7 +1766,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
     const fetchBannerTexts = async () => {
       const [defaultBanner, warningBanner] = await Promise.all([
-        config.getBannerTextNoCapacityIssues(),
+        // TODO: temporarily disabling the banner, it will be re-added.
+        '',
         config.getBannerTextCapacityIssues(),
       ]);
 
@@ -1780,15 +1775,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setDefaultBannerText(defaultBanner);
         setWarningBannerText(warningBanner);
         setBannerVisible(true);
-        const authType = config.getContentGeneratorConfig()?.authType;
-        if (
-          authType === AuthType.USE_GEMINI ||
-          authType === AuthType.USE_VERTEX_AI
-        ) {
-          setDefaultBannerText(
-            'Gemini 3 Flash and Pro are now available. \nEnable "Preview features" in /settings. \nLearn more at https://goo.gle/enable-preview-features',
-          );
-        }
       }
     };
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -1857,6 +1843,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       ctrlCPressedOnce: ctrlCPressCount >= 1,
       ctrlDPressedOnce: ctrlDPressCount >= 1,
       showEscapePrompt,
+      shortcutsHelpVisible,
       isFocused,
       elapsedTime,
       currentLoadingPhrase,
@@ -1962,6 +1949,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       ctrlCPressCount,
       ctrlDPressCount,
       showEscapePrompt,
+      shortcutsHelpVisible,
       isFocused,
       elapsedTime,
       currentLoadingPhrase,
@@ -2061,6 +2049,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleApiKeySubmit,
       handleApiKeyCancel,
       setBannerVisible,
+      setShortcutsHelpVisible,
       handleWarning,
       setEmbeddedShellFocused,
       dismissBackgroundShell,
@@ -2137,6 +2126,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleApiKeySubmit,
       handleApiKeyCancel,
       setBannerVisible,
+      setShortcutsHelpVisible,
       handleWarning,
       setEmbeddedShellFocused,
       dismissBackgroundShell,
