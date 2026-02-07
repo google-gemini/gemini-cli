@@ -1,0 +1,38 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Card > renders a 'confirmation' card with prefix=true 1`] = `
+"╭ ? Shell node -v && which gemini ─────────────────────────────────────────────────────────────────╮
+│ ls /usr/local/bin | grep 'xattr'                                                                 │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`Card > renders a 'error' card with prefix=true 1`] = `
+"╭ x Error 429 You exceeded your current quota ─────────────────────────────────────────────────────╮
+│ Go to https://aistudio.google.com/apikey to upgrade your quota tier, or submit a quota increase  │
+│ request in https://ai.google.dev/gemini-api/docs/rate-limits                                     │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`Card > renders a 'information' card with prefix=true 1`] = `
+"╭ ℹ Delegate to agent Delegating to agent 'cli_help' ──────────────────────────────────────────────╮
+│ 🤖💭 Execution limit reached (ERROR_NO_COMPLETE_TASK_CALL). Attempting one final recovery turn   │
+│ with a grace period.                                                                             │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`Card > renders a 'success' card with prefix=true 1`] = `
+"╭ ✓ ReadFolder /usr/local/bin ─────────────────────────────────────────────────────────────────────╮
+│ Listed 39 item(s).                                                                               │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`Card > renders a 'warning' card with prefix=true 1`] = `
+"╭ ⚠ Gemini CLI update available 0.26.0 → 0.27.0 ───────────────────────────────────────────────────╮
+│ Installed via Homebrew. Please update with "brew upgrade gemini-cli".                            │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+"
+`;
