@@ -146,17 +146,55 @@ export async function createPolicyEngineConfig(
   approvalMode: ApprovalMode,
   defaultPoliciesDir?: string,
 ): Promise<PolicyEngineConfig> {
-  const policyDirs = getPolicyDirectories(defaultPoliciesDir);
+  const policyDirs: string[] = [];
+
+  // 1. Admin Policies (Highest Priority)
+  policyDirs.push(Storage.getSystemPoliciesDir());
+
+  // 2. User Policies (Middle Priority)
+  // If policyPaths are provided via CLI/Settings, use them INSTEAD of the default user directory.
+  if (settings.policyPaths && settings.policyPaths.length > 0) {
+    policyDirs.push(...settings.policyPaths);
+  } else {
+    policyDirs.push(Storage.getUserPoliciesDir());
+  }
+
+  // 3. Default Policies (Lowest Priority)
+  if (defaultPoliciesDir) {
+    policyDirs.push(defaultPoliciesDir);
+  } else {
+    policyDirs.push(DEFAULT_CORE_POLICIES_DIR);
+  }
+
   const securePolicyDirs = await filterSecurePolicyDirectories(policyDirs);
+
+  const normalizedAdminPoliciesDir = path.resolve(
+    Storage.getSystemPoliciesDir(),
+  );
 
   // Load policies from TOML files
   const {
     rules: tomlRules,
     checkers: tomlCheckers,
     errors,
-  } = await loadPoliciesFromToml(securePolicyDirs, (dir) =>
-    getPolicyTier(dir, defaultPoliciesDir),
-  );
+  } = await loadPoliciesFromToml(securePolicyDirs, (p) => {
+    const tier = getPolicyTier(p, defaultPoliciesDir);
+
+    // If it's a user-provided path that isn't already categorized as ADMIN,
+    // treat it as USER tier.
+    if (
+      settings.policyPaths?.some(
+        (userPath) => path.resolve(userPath) === path.resolve(p),
+      )
+    ) {
+      const normalizedPath = path.resolve(p);
+      if (normalizedPath !== normalizedAdminPoliciesDir) {
+        return USER_POLICY_TIER;
+      }
+    }
+
+    return tier;
+  });
 
   // Emit any errors encountered during TOML loading to the UI
   // coreEvents has a buffer that will display these once the UI is ready

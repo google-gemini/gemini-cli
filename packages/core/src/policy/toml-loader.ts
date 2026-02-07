@@ -202,56 +202,66 @@ function transformPriority(priority: number, tier: number): number {
 }
 
 /**
- * Loads and parses policies from TOML files in the specified directories.
+ * Loads and parses policies from TOML files in the specified paths (directories or individual files).
  *
  * This function:
- * 1. Scans directories for .toml files
+ * 1. Scans paths for .toml files (if directory) or processes individual files
  * 2. Parses and validates each file
  * 3. Transforms rules (commandPrefix, arrays, mcpName, priorities)
  * 4. Collects detailed error information for any failures
  *
- * @param policyDirs Array of directory paths to scan for policy files
- * @param getPolicyTier Function to determine tier (1-3) for a directory
+ * @param policyPaths Array of paths (directories or files) to scan for policy files
+ * @param getPolicyTier Function to determine tier (1-3) for a path
  * @returns Object containing successfully parsed rules and any errors encountered
  */
 export async function loadPoliciesFromToml(
-  policyDirs: string[],
-  getPolicyTier: (dir: string) => number,
+  policyPaths: string[],
+  getPolicyTier: (path: string) => number,
 ): Promise<PolicyLoadResult> {
   const rules: PolicyRule[] = [];
   const checkers: SafetyCheckerRule[] = [];
   const errors: PolicyFileError[] = [];
 
-  for (const dir of policyDirs) {
-    const tier = getPolicyTier(dir);
+  for (const p of policyPaths) {
+    const tier = getPolicyTier(p);
     const tierName = getTierName(tier);
 
-    // Scan directory for all .toml files
     let filesToLoad: string[];
+    let baseDir: string;
+
     try {
-      const dirEntries = await fs.readdir(dir, { withFileTypes: true });
-      filesToLoad = dirEntries
-        .filter((entry) => entry.isFile() && entry.name.endsWith('.toml'))
-        .map((entry) => entry.name);
+      const stats = await fs.stat(p);
+      if (stats.isDirectory()) {
+        baseDir = p;
+        const dirEntries = await fs.readdir(p, { withFileTypes: true });
+        filesToLoad = dirEntries
+          .filter((entry) => entry.isFile() && entry.name.endsWith('.toml'))
+          .map((entry) => entry.name);
+      } else if (stats.isFile()) {
+        baseDir = path.dirname(p);
+        filesToLoad = [path.basename(p)];
+      } else {
+        continue;
+      }
     } catch (e) {
       const error = e as NodeJS.ErrnoException;
       if (error.code === 'ENOENT') {
-        // Directory doesn't exist, skip it (not an error)
+        // Path doesn't exist, skip it (not an error)
         continue;
       }
       errors.push({
-        filePath: dir,
-        fileName: path.basename(dir),
+        filePath: p,
+        fileName: path.basename(p),
         tier: tierName,
         errorType: 'file_read',
-        message: `Failed to read policy directory`,
+        message: `Failed to read policy path`,
         details: error.message,
       });
       continue;
     }
 
     for (const file of filesToLoad) {
-      const filePath = path.join(dir, file);
+      const filePath = path.join(baseDir, file);
 
       try {
         // Read file

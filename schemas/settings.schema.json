@@ -22,6 +22,16 @@
         "$ref": "#/$defs/MCPServerConfig"
       }
     },
+    "policyPaths": {
+      "title": "Policy Paths",
+      "description": "Additional policy files or directories to load.",
+      "markdownDescription": "Additional policy files or directories to load.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `[]`",
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "general": {
       "title": "General",
       "description": "General application settings.",

@@ -152,6 +152,18 @@ const SETTINGS_SCHEMA = {
     },
   },
 
+  policyPaths: {
+    type: 'array',
+    label: 'Policy Paths',
+    category: 'Advanced',
+    requiresRestart: true,
+    default: [] as string[],
+    description: 'Additional policy files or directories to load.',
+    showInDialog: false,
+    items: { type: 'string' },
+    mergeStrategy: MergeStrategy.UNION,
+  },
+
   general: {
     type: 'object',
     label: 'General',
