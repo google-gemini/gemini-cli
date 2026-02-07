@@ -12,6 +12,8 @@ import type { PolicySettings } from './types.js';
 import { ApprovalMode, PolicyDecision, InProcessCheckerType } from './types.js';
 import { isDirectorySecure } from '../utils/security.js';
 
+vi.unmock('../config/storage.js');
+
 vi.mock('../utils/security.js', () => ({
   isDirectorySecure: vi.fn().mockResolvedValue({ secure: true }),
 }));
@@ -327,7 +329,10 @@ describe('createPolicyEngineConfig', () => {
       ApprovalMode.AUTO_EDIT,
     );
     const rule = config.rules?.find(
-      (r) => r.toolName === 'replace' && r.decision === PolicyDecision.ALLOW,
+      (r) =>
+        r.toolName === 'replace' &&
+        r.decision === PolicyDecision.ALLOW &&
+        r.modes?.includes(ApprovalMode.AUTO_EDIT),
     );
     expect(rule).toBeDefined();
     // Priority 15 in default tier → 1.015

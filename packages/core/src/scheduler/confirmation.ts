@@ -21,9 +21,14 @@ import type { ValidatingToolCall, WaitingToolCall } from './types.js';
 import type { Config } from '../config/config.js';
 import type { SchedulerStateManager } from './state-manager.js';
 import type { ToolModificationHandler } from './tool-modifier.js';
-import type { EditorType } from '../utils/editor.js';
+import {
+  resolveEditorAsync,
+  type EditorType,
+  NO_EDITOR_AVAILABLE_ERROR,
+} from '../utils/editor.js';
 import type { DiffUpdateResult } from '../ide/ide-client.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { coreEvents } from '../utils/events.js';
 
 export interface ConfirmationResult {
   outcome: ToolConfirmationOutcome;
@@ -155,7 +160,16 @@ export async function resolveConfirmation(
     }
 
     if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
-      await handleExternalModification(deps, toolCall, signal);
+      const modResult = await handleExternalModification(
+        deps,
+        toolCall,
+        signal,
+      );
+      // Editor is not available - emit error feedback and stay in the loop
+      // to return to previous confirmation screen.
+      if (modResult.error) {
+        coreEvents.emitFeedback('error', modResult.error);
+      }
     } else if (response.payload && 'newContent' in response.payload) {
       await handleInlineModification(deps, toolCall, response.payload, signal);
       outcome = ToolConfirmationOutcome.ProceedOnce;
@@ -183,7 +197,17 @@ async function notifyHooks(
 }
 
 /**
+ * Result of attempting external modification.
+ * If error is defined, the modification failed.
+ */
+interface ExternalModificationResult {
+  /** Error message if the modification failed */
+  error?: string;
+}
+
+/**
  * Handles modification via an external editor (e.g. Vim).
+ * Returns a result indicating success or failure with an error message.
  */
 async function handleExternalModification(
   deps: {
@@ -193,10 +217,16 @@ async function handleExternalModification(
   },
   toolCall: ValidatingToolCall,
   signal: AbortSignal,
-): Promise<void> {
+): Promise<ExternalModificationResult> {
   const { state, modifier, getPreferredEditor } = deps;
-  const editor = getPreferredEditor();
-  if (!editor) return;
+
+  const preferredEditor = getPreferredEditor();
+  const editor = await resolveEditorAsync(preferredEditor, signal);
+
+  if (!editor) {
+    // No editor available - return failure with error message
+    return { error: NO_EDITOR_AVAILABLE_ERROR };
+  }
 
   const result = await modifier.handleModifyWithEditor(
     state.firstActiveCall as WaitingToolCall,
@@ -211,6 +241,7 @@ async function handleExternalModification(
       newInvocation,
     );
   }
+  return {};
 }
 
 /**

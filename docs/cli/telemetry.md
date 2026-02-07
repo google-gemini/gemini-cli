@@ -320,6 +320,8 @@ Captures startup configuration and user prompt submissions.
 
 Tracks changes and duration of approval modes.
 
+##### Lifecycle
+
 - `approval_mode_switch`: Approval mode was changed.
   - **Attributes**:
     - `from_mode` (string)
@@ -329,6 +331,15 @@ Tracks changes and duration of approval modes.
   - **Attributes**:
     - `mode` (string)
     - `duration_ms` (int)
+
+##### Execution
+
+These events track the execution of an approval mode, such as Plan Mode.
+
+- `plan_execution`: A plan was executed and the session switched from plan mode
+  to active execution.
+  - **Attributes**:
+    - `approval_mode` (string)
 
 #### Tools
 
@@ -709,6 +720,17 @@ Agent lifecycle metrics: runs, durations, and turns.
 - `gemini_cli.agent.turns` (Histogram, turns): Turns taken per agent run.
   - **Attributes**:
     - `agent_name` (string)
+
+##### Approval Mode
+
+###### Execution
+
+These metrics track the adoption and usage of specific approval workflows, such
+as Plan Mode.
+
+- `gemini_cli.plan.execution.count` (Counter, Int): Counts plan executions.
+  - **Attributes**:
+    - `approval_mode` (string)
 
 ##### UI
 
