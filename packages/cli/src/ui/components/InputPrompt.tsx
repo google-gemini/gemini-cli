@@ -252,7 +252,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   );
 
   // Voice input hook - MUST be before handleSubmit
-  // Voice input hook - MUST be before handleSubmit
   // NOTE: Transcript is delivered via events, not context, to avoid infinite render loops
   // See VOICE_INFINITE_LOOP_ANALYSIS.md for details
   const { state: voiceState, toggleRecording } = useVoiceContext();
@@ -1127,6 +1126,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       backgroundShells.size,
       backgroundShellHeight,
       history,
+      streamingState,
       toggleRecording,
       voiceState.isRecording,
     ],

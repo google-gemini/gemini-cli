@@ -19,7 +19,7 @@ vi.mock('node:child_process', async () => {
   return {
     ...actual,
     spawn: vi.fn(),
-    exec: vi.fn((_cmd, cb) => {
+    execFile: vi.fn((_file, _args, cb) => {
       if (typeof cb === 'function') {
         cb(null, { stdout: '/usr/bin/sox' });
       }

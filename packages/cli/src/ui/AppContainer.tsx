@@ -195,6 +195,7 @@ export const AppContainer = (props: AppContainerProps) => {
     [settings.merged.voice?.whisperPath],
   );
   const voice = useVoiceInput(voiceConfig);
+  const { toggleRecording } = voice;
 
   const historyManager = useHistory({
     chatRecordingService: config.getGeminiClient()?.getChatRecordingService(),
@@ -806,7 +807,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       },
       toggleShortcutsHelp: () => setShortcutsHelpVisible((visible) => !visible),
       setText: stableSetText,
-      toggleVoice: voice.toggleRecording,
+      toggleVoice: toggleRecording,
     }),
     [
       setAuthState,
@@ -826,7 +827,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       toggleDebugProfiler,
       setShortcutsHelpVisible,
       stableSetText,
-      voice,
+      toggleRecording,
     ],
   );
 
@@ -1499,7 +1500,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setShowFullTodos((prev) => !prev);
         return true;
       } else if (keyMatchers[Command.VOICE_INPUT](key)) {
-        void voice.toggleRecording();
+        void toggleRecording();
         return true;
       } else if (keyMatchers[Command.TOGGLE_MARKDOWN](key)) {
         setRenderMarkdown((prev) => {
@@ -1617,7 +1618,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       lastOutputTimeRef,
       tabFocusTimeoutRef,
       handleWarning,
-      voice,
+      toggleRecording,
     ],
   );
 

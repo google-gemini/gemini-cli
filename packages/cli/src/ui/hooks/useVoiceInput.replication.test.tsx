@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act , useContext, useEffect, useState } from 'react';
+import { act, useContext, useEffect, useState } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { useVoiceInput, onVoiceTranscript } from './useVoiceInput.js';
 import { VoiceContext } from '../contexts/VoiceContext.js';
@@ -20,7 +20,7 @@ vi.mock('node:child_process', async () => {
   return {
     ...actual,
     spawn: vi.fn(),
-    exec: vi.fn((_cmd, cb) => {
+    execFile: vi.fn((_file, _args, cb) => {
       if (typeof cb === 'function') {
         cb(null, { stdout: '/usr/bin/sox' });
       }
