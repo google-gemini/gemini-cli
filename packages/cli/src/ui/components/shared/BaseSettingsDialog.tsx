@@ -21,6 +21,7 @@ import {
 } from '../../utils/textUtils.js';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../../keyMatchers.js';
+import { t } from '../../utils/i18n.js';
 
 /**
  * Represents a single item in the settings dialog.
@@ -468,7 +469,9 @@ export function BaseSettingsDialog({
         {/* Items list */}
         {visibleItems.length === 0 ? (
           <Box marginX={1} height={1} flexDirection="column">
-            <Text color={theme.text.secondary}>No matches found.</Text>
+            <Text color={theme.text.secondary}>
+              {t('settings.noMatches', { default: 'No matches found.' })}
+            </Text>
           </Box>
         ) : (
           <>
@@ -590,7 +593,8 @@ export function BaseSettingsDialog({
         {showScopeSelector && (
           <Box marginX={1} flexDirection="column">
             <Text bold={focusSection === 'scope'} wrap="truncate">
-              {focusSection === 'scope' ? '> ' : '  '}Apply To
+              {focusSection === 'scope' ? '> ' : '  '}
+              {t('settings.scope.applyTo', { default: 'Apply To' })}
             </Text>
             <RadioButtonSelect
               items={scopeItems}
@@ -611,8 +615,11 @@ export function BaseSettingsDialog({
         {/* Help text */}
         <Box marginX={1}>
           <Text color={theme.text.secondary}>
-            (Use Enter to select, Ctrl+L to reset
-            {showScopeSelector ? ', Tab to change focus' : ''}, Esc to close)
+            {t('settings.help', {
+              default:
+                '(Use Enter to select, Ctrl+L to reset{tab}, Esc to close)',
+              tab: showScopeSelector ? ', Tab to change focus' : '',
+            })}
           </Text>
         </Box>
 

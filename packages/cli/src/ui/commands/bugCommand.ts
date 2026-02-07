@@ -24,10 +24,13 @@ import {
 import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 import { exportHistoryToFile } from '../utils/historyExportUtils.js';
 import path from 'node:path';
+import { t } from '../utils/i18n.js';
 
 export const bugCommand: SlashCommand = {
   name: 'bug',
-  description: 'Submit a bug report',
+  get description() {
+    return t('command.bug.description');
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: async (context: CommandContext, args?: string): Promise<void> => {

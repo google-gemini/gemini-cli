@@ -13,16 +13,23 @@ import {
 import { MessageType } from '../types.js';
 import type { SlashCommand, SlashCommandActionReturn } from './types.js';
 import { CommandKind } from './types.js';
+import { t } from '../utils/i18n.js';
 
 export const memoryCommand: SlashCommand = {
   name: 'memory',
-  description: 'Commands for interacting with memory',
+  get description() {
+    return t('command.memory.description');
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   subCommands: [
     {
       name: 'show',
-      description: 'Show the current memory contents',
+      get description() {
+        return t('command.memory.show.description', {
+          default: 'Show the current memory contents',
+        });
+      },
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
       action: async (context) => {
@@ -41,7 +48,11 @@ export const memoryCommand: SlashCommand = {
     },
     {
       name: 'add',
-      description: 'Add content to the memory',
+      get description() {
+        return t('command.memory.add.description', {
+          default: 'Add content to the memory',
+        });
+      },
       kind: CommandKind.BUILT_IN,
       autoExecute: false,
       action: (context, args): SlashCommandActionReturn | void => {
@@ -64,7 +75,11 @@ export const memoryCommand: SlashCommand = {
     },
     {
       name: 'refresh',
-      description: 'Refresh the memory from the source',
+      get description() {
+        return t('command.memory.refresh.description', {
+          default: 'Refresh the memory from the source',
+        });
+      },
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
       action: async (context) => {
@@ -102,7 +117,11 @@ export const memoryCommand: SlashCommand = {
     },
     {
       name: 'list',
-      description: 'Lists the paths of the GEMINI.md files in use',
+      get description() {
+        return t('command.memory.list.description', {
+          default: 'Lists the paths of the GEMINI.md files in use',
+        });
+      },
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
       action: async (context) => {

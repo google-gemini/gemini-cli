@@ -10,10 +10,13 @@ import {
   CommandKind,
 } from './types.js';
 import { MessageType, type HistoryItemToolsList } from '../types.js';
+import { t } from '../utils/i18n.js';
 
 export const toolsCommand: SlashCommand = {
   name: 'tools',
-  description: 'List available Gemini CLI tools. Usage: /tools [desc]',
+  get description() {
+    return t('command.tools.description');
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: async (context: CommandContext, args?: string): Promise<void> => {

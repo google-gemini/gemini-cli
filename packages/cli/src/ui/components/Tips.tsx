@@ -8,6 +8,7 @@ import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { type Config } from '@google/gemini-cli-core';
+import { t } from '../utils/i18n.js';
 
 interface TipsProps {
   config: Config;
@@ -17,28 +18,19 @@ export const Tips: React.FC<TipsProps> = ({ config }) => {
   const geminiMdFileCount = config.getGeminiMdFileCount();
   return (
     <Box flexDirection="column">
-      <Text color={theme.text.primary}>Tips for getting started:</Text>
-      <Text color={theme.text.primary}>
-        1. Ask questions, edit files, or run commands.
-      </Text>
-      <Text color={theme.text.primary}>
-        2. Be specific for the best results.
-      </Text>
+      <Text color={theme.text.primary}>{t('tips.header')}</Text>
+      <Text color={theme.text.primary}>{t('tips.step1')}</Text>
+      <Text color={theme.text.primary}>{t('tips.step2')}</Text>
       {geminiMdFileCount === 0 && (
         <Text color={theme.text.primary}>
-          3. Create{' '}
-          <Text bold color={theme.text.accent}>
-            GEMINI.md
-          </Text>{' '}
-          files to customize your interactions with Gemini.
+          {t('tips.step3.custom', { file: 'GEMINI.md' })}
         </Text>
       )}
       <Text color={theme.text.primary}>
-        {geminiMdFileCount === 0 ? '4.' : '3.'}{' '}
-        <Text bold color={theme.text.accent}>
-          /help
-        </Text>{' '}
-        for more information.
+        {t('tips.help', {
+          num: geminiMdFileCount === 0 ? '4.' : '3.',
+          help: '/help',
+        })}
       </Text>
     </Box>
   );

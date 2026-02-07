@@ -6,10 +6,13 @@
 
 import type { OpenDialogActionReturn, SlashCommand } from './types.js';
 import { CommandKind } from './types.js';
+import { t } from '../utils/i18n.js';
 
 export const privacyCommand: SlashCommand = {
   name: 'privacy',
-  description: 'Display the privacy notice',
+  get description() {
+    return t('command.privacy.description');
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: (): OpenDialogActionReturn => ({

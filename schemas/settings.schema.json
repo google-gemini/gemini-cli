@@ -29,6 +29,21 @@
       "default": {},
       "type": "object",
       "properties": {
+        "previewFeatures": {
+          "title": "Preview Features (e.g., models)",
+          "description": "Enable preview features (e.g., preview models).",
+          "markdownDescription": "Enable preview features (e.g., preview models).\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "language": {
+          "title": "Language",
+          "description": "The display language for the CLI.",
+          "markdownDescription": "The display language for the CLI.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `en`",
+          "default": "en",
+          "type": "string",
+          "enum": ["en", "zh"]
+        },
         "preferredEditor": {
           "title": "Preferred Editor",
           "description": "The preferred editor to open files in.",

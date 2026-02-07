@@ -5,10 +5,13 @@
  */
 
 import { CommandKind, type SlashCommand } from './types.js';
+import { t } from '../utils/i18n.js';
 
 export const corgiCommand: SlashCommand = {
   name: 'corgi',
-  description: 'Toggles corgi mode',
+  get description() {
+    return t('command.corgi.description', { default: 'Toggles corgi mode' });
+  },
   hidden: true,
   kind: CommandKind.BUILT_IN,
   autoExecute: true,

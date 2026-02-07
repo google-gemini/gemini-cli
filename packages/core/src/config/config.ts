@@ -472,6 +472,7 @@ export interface ConfigParameters {
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
   plan?: boolean;
+  language?: string;
   onModelChange?: (model: string) => void;
   mcpEnabled?: boolean;
   extensionsEnabled?: boolean;
@@ -632,6 +633,7 @@ export class Config {
   private readonly experimentalJitContext: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
+  private language: string;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
   private remoteAdminSettings: AdminControlsSettings | undefined;
@@ -720,6 +722,7 @@ export class Config {
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? false;
+    this.language = params.language ?? 'en';
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
     this.skillsSupport = params.skillsSupport ?? true;
     this.disabledSkills = params.disabledSkills ?? [];
@@ -1736,6 +1739,14 @@ export class Config {
 
   isPlanEnabled(): boolean {
     return this.planEnabled;
+  }
+
+  getLanguage(): string {
+    return this.language;
+  }
+
+  setLanguage(lang: string): void {
+    this.language = lang;
   }
 
   getApprovedPlanPath(): string | undefined {

@@ -14,10 +14,13 @@ import {
   debugLogger,
   getVersion,
 } from '@google/gemini-cli-core';
+import { t } from '../utils/i18n.js';
 
 export const aboutCommand: SlashCommand = {
   name: 'about',
-  description: 'Show version info',
+  get description() {
+    return t('command.about.description');
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context) => {

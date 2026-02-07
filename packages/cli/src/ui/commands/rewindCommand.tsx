@@ -14,6 +14,7 @@ import { type HistoryItem } from '../types.js';
 import { convertSessionToHistoryFormats } from '../hooks/useSessionBrowser.js';
 import { revertFileChanges } from '../utils/rewindFileOps.js';
 import { RewindOutcome } from '../components/RewindConfirmation.js';
+import { t } from '../utils/i18n.js';
 import type { Content } from '@google/genai';
 import {
   checkExhaustive,
@@ -91,7 +92,11 @@ async function rewindConversation(
 
 export const rewindCommand: SlashCommand = {
   name: 'rewind',
-  description: 'Jump back to a specific message and restart the conversation',
+  get description() {
+    return t('command.rewind.description', {
+      default: 'Jump back to a specific message and restart the conversation',
+    });
+  },
   kind: CommandKind.BUILT_IN,
   action: (context) => {
     const config = context.services.config;

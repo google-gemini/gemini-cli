@@ -45,6 +45,7 @@ import {
   BaseSettingsDialog,
   type SettingsDialogItem,
 } from './shared/BaseSettingsDialog.js';
+import { t } from '../utils/i18n.js';
 
 interface FzfResult {
   item: string;
@@ -93,9 +94,10 @@ export function SettingsDialog({
 
     keys.forEach((key) => {
       const def = getSettingDefinition(key);
-      if (def?.label) {
-        searchItems.push(def.label);
-        map.set(def.label.toLowerCase(), key);
+      const label = t(`setting.${key}.label`, { default: def?.label || key });
+      if (label) {
+        searchItems.push(label);
+        map.set(label.toLowerCase(), key);
       }
     });
 
@@ -258,8 +260,10 @@ export function SettingsDialog({
 
       return {
         key,
-        label: definition?.label || key,
-        description: definition?.description,
+        label: t(`setting.${key}.label`, { default: definition?.label || key }),
+        description: t(`setting.${key}.description`, {
+          default: definition?.description,
+        }),
         type: type as 'boolean' | 'number' | 'string' | 'enum',
         displayValue,
         isGreyedOut,
@@ -681,16 +685,21 @@ export function SettingsDialog({
   // Footer content for restart prompt
   const footerContent = showRestartPrompt ? (
     <Text color={theme.status.warning}>
-      To see changes, Gemini CLI must be restarted. Press r to exit and apply
-      changes now.
+      {t('settings.restart.prompt', {
+        default:
+          'To see changes, Gemini CLI must be restarted. Press r to exit and apply changes now.',
+      })}
     </Text>
   ) : null;
 
   return (
     <BaseSettingsDialog
-      title="Settings"
+      title={t('settings.title', { default: 'Settings' })}
       borderColor={showRestartPrompt ? theme.status.warning : undefined}
       searchEnabled={showSearch}
+      searchPlaceholder={t('settings.search.placeholder', {
+        default: 'Search to filter',
+      })}
       searchBuffer={searchBuffer}
       items={items}
       showScopeSelector={showScopeSelection}

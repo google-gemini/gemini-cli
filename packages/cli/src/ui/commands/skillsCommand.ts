@@ -28,6 +28,7 @@ import {
   requestConsentInteractive,
   skillsConsentString,
 } from '../../config/extensions/consent.js';
+import { t } from '../utils/i18n.js';
 
 async function listAction(
   context: CommandContext,
@@ -360,44 +361,65 @@ function enableCompletion(
 
 export const skillsCommand: SlashCommand = {
   name: 'skills',
-  description:
-    'List, enable, disable, or reload Gemini CLI agent skills. Usage: /skills [list | disable <name> | enable <name> | reload]',
+  get description() {
+    return t('command.skills.description');
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   subCommands: [
     {
       name: 'list',
-      description:
-        'List available agent skills. Usage: /skills list [nodesc] [all]',
+      get description() {
+        return t('command.skills.list.description', {
+          default:
+            'List available agent skills. Usage: /skills list [nodesc] [all]',
+        });
+      },
       kind: CommandKind.BUILT_IN,
       action: listAction,
     },
     {
       name: 'link',
-      description:
-        'Link an agent skill from a local path. Usage: /skills link <path> [--scope user|workspace]',
+      get description() {
+        return t('command.skills.link.description', {
+          default:
+            'Link an agent skill from a local path. Usage: /skills link <path> [--scope user|workspace]',
+        });
+      },
       kind: CommandKind.BUILT_IN,
       action: linkAction,
     },
     {
       name: 'disable',
-      description: 'Disable a skill by name. Usage: /skills disable <name>',
+      get description() {
+        return t('command.skills.disable.description', {
+          default: 'Disable a skill by name. Usage: /skills disable <name>',
+        });
+      },
       kind: CommandKind.BUILT_IN,
       action: disableAction,
       completion: disableCompletion,
     },
     {
       name: 'enable',
-      description:
-        'Enable a disabled skill by name. Usage: /skills enable <name>',
+      get description() {
+        return t('command.skills.enable.description', {
+          default:
+            'Enable a disabled skill by name. Usage: /skills enable <name>',
+        });
+      },
       kind: CommandKind.BUILT_IN,
       action: enableAction,
       completion: enableCompletion,
     },
     {
       name: 'reload',
-      description:
-        'Reload the list of discovered skills. Usage: /skills reload',
+      get description() {
+        return t('command.skills.reload.description', {
+          default:
+            'Reload the list of discovered skills. Usage: /skills reload',
+        });
+      },
       kind: CommandKind.BUILT_IN,
       action: reloadAction,
     },

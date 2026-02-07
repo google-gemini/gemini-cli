@@ -15,6 +15,7 @@ import { getErrorMessage } from '@google/gemini-cli-core';
 import { SettingScope, isLoadableSettingScope } from '../../config/settings.js';
 import { enableHook, disableHook } from '../../utils/hookSettings.js';
 import { renderHookActionFeedback } from '../../utils/hookUtils.js';
+import { t } from '../utils/i18n.js';
 
 /**
  * Display a formatted list of hooks with their status
@@ -341,14 +342,22 @@ async function disableAllAction(
 const panelCommand: SlashCommand = {
   name: 'panel',
   altNames: ['list', 'show'],
-  description: 'Display all registered hooks with their status',
+  get description() {
+    return t('command.hooks.panel.description', {
+      default: 'Display all registered hooks with their status',
+    });
+  },
   kind: CommandKind.BUILT_IN,
   action: panelAction,
 };
 
 const enableCommand: SlashCommand = {
   name: 'enable',
-  description: 'Enable a hook by name',
+  get description() {
+    return t('command.hooks.enable.description', {
+      default: 'Enable a hook by name',
+    });
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: enableAction,
@@ -357,7 +366,11 @@ const enableCommand: SlashCommand = {
 
 const disableCommand: SlashCommand = {
   name: 'disable',
-  description: 'Disable a hook by name',
+  get description() {
+    return t('command.hooks.disable.description', {
+      default: 'Disable a hook by name',
+    });
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: disableAction,
@@ -367,7 +380,11 @@ const disableCommand: SlashCommand = {
 const enableAllCommand: SlashCommand = {
   name: 'enable-all',
   altNames: ['enableall'],
-  description: 'Enable all disabled hooks',
+  get description() {
+    return t('command.hooks.enable-all.description', {
+      default: 'Enable all disabled hooks',
+    });
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: enableAllAction,
@@ -376,7 +393,11 @@ const enableAllCommand: SlashCommand = {
 const disableAllCommand: SlashCommand = {
   name: 'disable-all',
   altNames: ['disableall'],
-  description: 'Disable all enabled hooks',
+  get description() {
+    return t('command.hooks.disable-all.description', {
+      default: 'Disable all enabled hooks',
+    });
+  },
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: disableAllAction,
@@ -384,7 +405,9 @@ const disableAllCommand: SlashCommand = {
 
 export const hooksCommand: SlashCommand = {
   name: 'hooks',
-  description: 'Manage hooks',
+  get description() {
+    return t('command.hooks.description');
+  },
   kind: CommandKind.BUILT_IN,
   subCommands: [
     panelCommand,
