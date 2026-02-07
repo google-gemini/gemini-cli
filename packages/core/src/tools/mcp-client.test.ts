@@ -19,6 +19,7 @@ import { MCPOAuthTokenStorage } from '../mcp/oauth-token-storage.js';
 import { OAuthUtils } from '../mcp/oauth-utils.js';
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
 import { ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
+import { ApprovalMode, PolicyDecision } from '../policy/types.js';
 
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import {
@@ -387,6 +388,157 @@ describe('mcp-client', () => {
       expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
     });
 
+    it('should register tool with readOnlyHint and add policy rule', async () => {
+      const mockedClient = {
+        connect: vi.fn(),
+        discover: vi.fn(),
+        disconnect: vi.fn(),
+        getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        setNotificationHandler: vi.fn(),
+        getServerCapabilities: vi.fn().mockReturnValue({ tools: {} }),
+        listTools: vi.fn().mockResolvedValue({
+          tools: [
+            {
+              name: 'readOnlyTool',
+              description: 'A read-only tool',
+              inputSchema: { type: 'object', properties: {} },
+              annotations: { readOnlyHint: true },
+            },
+          ],
+        }),
+        listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
+        request: vi.fn().mockResolvedValue({}),
+      };
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        mockedClient as unknown as ClientLib.Client,
+      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+
+      const mockPolicyEngine = {
+        addRule: vi.fn(),
+      };
+      const mockConfig = {
+        getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
+      } as unknown as Config;
+
+      const mockedToolRegistry = {
+        registerTool: vi.fn(),
+        sortTools: vi.fn(),
+        getMessageBus: vi.fn().mockReturnValue(undefined),
+        removeMcpToolsByServer: vi.fn(),
+      } as unknown as ToolRegistry;
+      const promptRegistry = {
+        registerPrompt: vi.fn(),
+        removePromptsByServer: vi.fn(),
+      } as unknown as PromptRegistry;
+      const resourceRegistry = {
+        setResourcesForServer: vi.fn(),
+        removeResourcesByServer: vi.fn(),
+      } as unknown as ResourceRegistry;
+
+      const client = new McpClient(
+        'test-server',
+        { command: 'test-command' },
+        mockedToolRegistry,
+        promptRegistry,
+        resourceRegistry,
+        workspaceContext,
+        { sanitizationConfig: EMPTY_CONFIG } as Config,
+        false,
+        '0.0.1',
+      );
+
+      await client.connect();
+      await client.discover(mockConfig);
+
+      // Verify tool registration
+      expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
+
+      // Verify policy rule addition
+      expect(mockPolicyEngine.addRule).toHaveBeenCalledWith({
+        toolName: 'test-server__readOnlyTool',
+        decision: PolicyDecision.ASK_USER,
+        priority: 50,
+        modes: [ApprovalMode.PLAN],
+        source: 'MCP Annotation (readOnlyHint) - test-server',
+      });
+    });
+
+    it('should not add policy rule for tool without readOnlyHint', async () => {
+      const mockedClient = {
+        connect: vi.fn(),
+        discover: vi.fn(),
+        disconnect: vi.fn(),
+        getStatus: vi.fn(),
+        registerCapabilities: vi.fn(),
+        setRequestHandler: vi.fn(),
+        setNotificationHandler: vi.fn(),
+        getServerCapabilities: vi.fn().mockReturnValue({ tools: {} }),
+        listTools: vi.fn().mockResolvedValue({
+          tools: [
+            {
+              name: 'writeTool',
+              description: 'A write tool',
+              inputSchema: { type: 'object', properties: {} },
+              // No annotations or readOnlyHint: false
+            },
+          ],
+        }),
+        listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
+        request: vi.fn().mockResolvedValue({}),
+      };
+      vi.mocked(ClientLib.Client).mockReturnValue(
+        mockedClient as unknown as ClientLib.Client,
+      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
+
+      const mockPolicyEngine = {
+        addRule: vi.fn(),
+      };
+      const mockConfig = {
+        getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
+      } as unknown as Config;
+
+      const mockedToolRegistry = {
+        registerTool: vi.fn(),
+        sortTools: vi.fn(),
+        getMessageBus: vi.fn().mockReturnValue(undefined),
+        removeMcpToolsByServer: vi.fn(),
+      } as unknown as ToolRegistry;
+      const promptRegistry = {
+        registerPrompt: vi.fn(),
+        removePromptsByServer: vi.fn(),
+      } as unknown as PromptRegistry;
+      const resourceRegistry = {
+        setResourcesForServer: vi.fn(),
+        removeResourcesByServer: vi.fn(),
+      } as unknown as ResourceRegistry;
+
+      const client = new McpClient(
+        'test-server',
+        { command: 'test-command' },
+        mockedToolRegistry,
+        promptRegistry,
+        resourceRegistry,
+        workspaceContext,
+        { sanitizationConfig: EMPTY_CONFIG } as Config,
+        false,
+        '0.0.1',
+      );
+
+      await client.connect();
+      await client.discover(mockConfig);
+
+      expect(mockedToolRegistry.registerTool).toHaveBeenCalledOnce();
+      expect(mockPolicyEngine.addRule).not.toHaveBeenCalled();
+    });
+
     it('should discover tools with $defs and $ref in schema', async () => {
       const mockedClient = {
         connect: vi.fn(),
@@ -749,9 +901,9 @@ describe('mcp-client', () => {
       vi.mocked(ClientLib.Client).mockReturnValue(
         mockedClient as unknown as ClientLib.Client,
       );
-      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
-        {} as SdkClientStdioLib.StdioClientTransport,
-      );
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue({
+        close: vi.fn(),
+      } as unknown as SdkClientStdioLib.StdioClientTransport);
       const mockedToolRegistry = {
         registerTool: vi.fn(),
         unregisterTool: vi.fn(),
@@ -1556,6 +1708,41 @@ describe('mcp-client', () => {
       expect(callArgs.env!['GEMINI_CLI_EXT_VAR']).toBe('ext-value');
     });
 
+    it('should exclude extension settings with undefined values from environment', async () => {
+      const mockedTransport = vi
+        .spyOn(SdkClientStdioLib, 'StdioClientTransport')
+        .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
+
+      await createTransport(
+        'test-server',
+        {
+          command: 'test-command',
+          extension: {
+            name: 'test-ext',
+            resolvedSettings: [
+              {
+                envVar: 'GEMINI_CLI_EXT_VAR',
+                value: undefined,
+                sensitive: false,
+                name: 'ext-setting',
+              },
+            ],
+            version: '',
+            isActive: false,
+            path: '',
+            contextFiles: [],
+            id: '',
+          },
+        },
+        false,
+        EMPTY_CONFIG,
+      );
+
+      const callArgs = mockedTransport.mock.calls[0][0];
+      expect(callArgs.env).toBeDefined();
+      expect(callArgs.env!['GEMINI_CLI_EXT_VAR']).toBeUndefined();
+    });
+
     describe('useGoogleCredentialProvider', () => {
       beforeEach(() => {
         // Mock GoogleAuth client
@@ -1853,7 +2040,7 @@ describe('connectToMcpServer with OAuth', () => {
       EMPTY_CONFIG,
     );
 
-    expect(client).toBe(mockedClient);
+    expect(client.client).toBe(mockedClient);
     expect(mockedClient.connect).toHaveBeenCalledTimes(2);
     expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
 
@@ -1899,7 +2086,7 @@ describe('connectToMcpServer with OAuth', () => {
       EMPTY_CONFIG,
     );
 
-    expect(client).toBe(mockedClient);
+    expect(client.client).toBe(mockedClient);
     expect(mockedClient.connect).toHaveBeenCalledTimes(2);
     expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
     expect(OAuthUtils.discoverOAuthConfig).toHaveBeenCalledWith(serverUrl);
@@ -1994,7 +2181,7 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
       EMPTY_CONFIG,
     );
 
-    expect(client).toBe(mockedClient);
+    expect(client.client).toBe(mockedClient);
     // First HTTP attempt fails, second SSE attempt succeeds
     expect(mockedClient.connect).toHaveBeenCalledTimes(2);
   });
@@ -2035,7 +2222,7 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
       EMPTY_CONFIG,
     );
 
-    expect(client).toBe(mockedClient);
+    expect(client.client).toBe(mockedClient);
     expect(mockedClient.connect).toHaveBeenCalledTimes(2);
   });
 });
@@ -2120,7 +2307,7 @@ describe('connectToMcpServer - OAuth with transport fallback', () => {
       EMPTY_CONFIG,
     );
 
-    expect(client).toBe(mockedClient);
+    expect(client.client).toBe(mockedClient);
     expect(mockedClient.connect).toHaveBeenCalledTimes(3);
     expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
   });

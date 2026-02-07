@@ -18,7 +18,6 @@ import {
   supportsMultimodalFunctionResponse,
   GEMINI_MODEL_ALIAS_PRO,
   GEMINI_MODEL_ALIAS_FLASH,
-  GEMINI_MODEL_ALIAS_FLASH_LITE,
   GEMINI_MODEL_ALIAS_AUTO,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
@@ -37,19 +36,11 @@ describe('getDisplayString', () => {
   });
 
   it('should return concrete model name for pro alias', () => {
-    expect(getDisplayString(GEMINI_MODEL_ALIAS_PRO, false)).toBe(
-      DEFAULT_GEMINI_MODEL,
-    );
-    expect(getDisplayString(GEMINI_MODEL_ALIAS_PRO, true)).toBe(
-      PREVIEW_GEMINI_MODEL,
-    );
+    expect(getDisplayString(GEMINI_MODEL_ALIAS_PRO)).toBe(PREVIEW_GEMINI_MODEL);
   });
 
   it('should return concrete model name for flash alias', () => {
-    expect(getDisplayString(GEMINI_MODEL_ALIAS_FLASH, false)).toBe(
-      DEFAULT_GEMINI_FLASH_MODEL,
-    );
-    expect(getDisplayString(GEMINI_MODEL_ALIAS_FLASH, true)).toBe(
+    expect(getDisplayString(GEMINI_MODEL_ALIAS_FLASH)).toBe(
       PREVIEW_GEMINI_FLASH_MODEL,
     );
   });
@@ -81,68 +72,29 @@ describe('supportsMultimodalFunctionResponse', () => {
 describe('resolveModel', () => {
   describe('delegation logic', () => {
     it('should return the Preview Pro model when auto-gemini-3 is requested', () => {
-      const model = resolveModel(PREVIEW_GEMINI_MODEL_AUTO, false);
+      const model = resolveModel(PREVIEW_GEMINI_MODEL_AUTO);
       expect(model).toBe(PREVIEW_GEMINI_MODEL);
     });
 
     it('should return the Default Pro model when auto-gemini-2.5 is requested', () => {
-      const model = resolveModel(DEFAULT_GEMINI_MODEL_AUTO, false);
+      const model = resolveModel(DEFAULT_GEMINI_MODEL_AUTO);
       expect(model).toBe(DEFAULT_GEMINI_MODEL);
     });
 
     it('should return the requested model as-is for explicit specific models', () => {
-      expect(resolveModel(DEFAULT_GEMINI_MODEL, false)).toBe(
-        DEFAULT_GEMINI_MODEL,
-      );
-      expect(resolveModel(DEFAULT_GEMINI_FLASH_MODEL, false)).toBe(
+      expect(resolveModel(DEFAULT_GEMINI_MODEL)).toBe(DEFAULT_GEMINI_MODEL);
+      expect(resolveModel(DEFAULT_GEMINI_FLASH_MODEL)).toBe(
         DEFAULT_GEMINI_FLASH_MODEL,
       );
-      expect(resolveModel(DEFAULT_GEMINI_FLASH_LITE_MODEL, false)).toBe(
+      expect(resolveModel(DEFAULT_GEMINI_FLASH_LITE_MODEL)).toBe(
         DEFAULT_GEMINI_FLASH_LITE_MODEL,
       );
     });
 
     it('should return a custom model name when requested', () => {
       const customModel = 'custom-model-v1';
-      const model = resolveModel(customModel, false);
+      const model = resolveModel(customModel);
       expect(model).toBe(customModel);
-    });
-
-    describe('with preview features', () => {
-      it('should return the preview model when pro alias is requested', () => {
-        const model = resolveModel(GEMINI_MODEL_ALIAS_PRO, true);
-        expect(model).toBe(PREVIEW_GEMINI_MODEL);
-      });
-
-      it('should return the default pro model when pro alias is requested and preview is off', () => {
-        const model = resolveModel(GEMINI_MODEL_ALIAS_PRO, false);
-        expect(model).toBe(DEFAULT_GEMINI_MODEL);
-      });
-
-      it('should return the flash model when flash is requested and preview is on', () => {
-        const model = resolveModel(GEMINI_MODEL_ALIAS_FLASH, true);
-        expect(model).toBe(PREVIEW_GEMINI_FLASH_MODEL);
-      });
-
-      it('should return the flash model when lite is requested and preview is on', () => {
-        const model = resolveModel(GEMINI_MODEL_ALIAS_FLASH_LITE, true);
-        expect(model).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
-      });
-
-      it('should return the flash model when the flash model name is explicitly requested and preview is on', () => {
-        const model = resolveModel(DEFAULT_GEMINI_FLASH_MODEL, true);
-        expect(model).toBe(DEFAULT_GEMINI_FLASH_MODEL);
-      });
-
-      it('should return the lite model when the lite model name is requested and preview is on', () => {
-        const model = resolveModel(DEFAULT_GEMINI_FLASH_LITE_MODEL, true);
-        expect(model).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
-      });
-
-      it('should return the default gemini model when the model is explicitly set and preview is on', () => {
-        const model = resolveModel(DEFAULT_GEMINI_MODEL, true);
-        expect(model).toBe(DEFAULT_GEMINI_MODEL);
-      });
     });
   });
 });
@@ -216,19 +168,5 @@ describe('resolveClassifierModel', () => {
     expect(
       resolveClassifierModel(PREVIEW_GEMINI_MODEL_AUTO, GEMINI_MODEL_ALIAS_PRO),
     ).toBe(PREVIEW_GEMINI_MODEL);
-  });
-
-  it('should handle preview features being enabled', () => {
-    // If preview is enabled, resolving 'flash' without context (fallback) might switch to preview flash,
-    // but here we test explicit auto models which should stick to their families if possible?
-    // Actually our logic forces DEFAULT_GEMINI_FLASH_MODEL for DEFAULT_GEMINI_MODEL_AUTO even if preview is on,
-    // because the USER requested 2.5 explicitly via "auto-gemini-2.5".
-    expect(
-      resolveClassifierModel(
-        DEFAULT_GEMINI_MODEL_AUTO,
-        GEMINI_MODEL_ALIAS_FLASH,
-        true,
-      ),
-    ).toBe(DEFAULT_GEMINI_FLASH_MODEL);
   });
 });

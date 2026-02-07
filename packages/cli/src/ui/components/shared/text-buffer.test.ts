@@ -27,6 +27,9 @@ import {
   textBufferReducer,
   findWordEndInLine,
   findNextWordStartInLine,
+  findNextBigWordStartInLine,
+  findPrevBigWordStartInLine,
+  findBigWordEndInLine,
   isWordCharStrict,
   calculateTransformationsForLine,
   calculateTransformedLine,
@@ -85,6 +88,43 @@ describe('textBufferReducer', () => {
     const state = textBufferReducer(initialState, action);
     expect(state).toHaveOnlyValidCharacters();
     expect(state).toEqual(initialState);
+  });
+
+  describe('Big Word Navigation Helpers', () => {
+    describe('findNextBigWordStartInLine (W)', () => {
+      it('should skip non-whitespace and then whitespace', () => {
+        expect(findNextBigWordStartInLine('hello world', 0)).toBe(6);
+        expect(findNextBigWordStartInLine('hello.world test', 0)).toBe(12);
+        expect(findNextBigWordStartInLine('   test', 0)).toBe(3);
+        expect(findNextBigWordStartInLine('test   ', 0)).toBe(null);
+      });
+    });
+
+    describe('findPrevBigWordStartInLine (B)', () => {
+      it('should skip whitespace backwards then non-whitespace', () => {
+        expect(findPrevBigWordStartInLine('hello world', 6)).toBe(0);
+        expect(findPrevBigWordStartInLine('hello.world test', 12)).toBe(0);
+        expect(findPrevBigWordStartInLine('   test', 3)).toBe(null); // At start of word
+        expect(findPrevBigWordStartInLine('   test', 4)).toBe(3); // Inside word
+        expect(findPrevBigWordStartInLine('test   ', 6)).toBe(0);
+      });
+    });
+
+    describe('findBigWordEndInLine (E)', () => {
+      it('should find end of current big word', () => {
+        expect(findBigWordEndInLine('hello world', 0)).toBe(4);
+        expect(findBigWordEndInLine('hello.world test', 0)).toBe(10);
+        expect(findBigWordEndInLine('hello.world test', 11)).toBe(15);
+      });
+
+      it('should skip whitespace if currently on whitespace', () => {
+        expect(findBigWordEndInLine('hello   world', 5)).toBe(12);
+      });
+
+      it('should find next big word end if at end of current', () => {
+        expect(findBigWordEndInLine('hello world', 4)).toBe(10);
+      });
+    });
   });
 
   describe('set_text action', () => {
@@ -1382,6 +1422,61 @@ describe('useTextBuffer', () => {
       state = getBufferState(result);
       expect(state.cursor).toEqual([0, 1]);
       expect(state.visualCursor).toEqual([0, 1]);
+    });
+
+    it('move: up/down should work on wrapped lines (regression test)', () => {
+      // Line that wraps into two visual lines
+      // Viewport width 10. "0123456789ABCDE" (15 chars)
+      // Visual Line 0: "0123456789"
+      // Visual Line 1: "ABCDE"
+      const { result } = renderHook(() =>
+        useTextBuffer({
+          viewport: { width: 10, height: 5 },
+          isValidPath: () => false,
+        }),
+      );
+
+      act(() => {
+        result.current.setText('0123456789ABCDE');
+      });
+
+      // Cursor should be at the end: logical [0, 15], visual [1, 5]
+      expect(getBufferState(result).cursor).toEqual([0, 15]);
+      expect(getBufferState(result).visualCursor).toEqual([1, 5]);
+
+      // Press Up arrow - should move to first visual line
+      // This currently fails because handleInput returns false if cursorRow === 0
+      let handledUp = false;
+      act(() => {
+        handledUp = result.current.handleInput({
+          name: 'up',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          insertable: false,
+          sequence: '\x1b[A',
+        });
+      });
+      expect(handledUp).toBe(true);
+      expect(getBufferState(result).visualCursor[0]).toBe(0);
+
+      // Press Down arrow - should move back to second visual line
+      // This would also fail if cursorRow is the last logical row
+      let handledDown = false;
+      act(() => {
+        handledDown = result.current.handleInput({
+          name: 'down',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          insertable: false,
+          sequence: '\x1b[B',
+        });
+      });
+      expect(handledDown).toBe(true);
+      expect(getBufferState(result).visualCursor[0]).toBe(1);
     });
 
     it('moveToVisualPosition: should correctly handle wide characters (Chinese)', () => {

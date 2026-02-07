@@ -256,8 +256,11 @@ const saveFileWithXclip = async (tempFilePath: string) => {
  * @param targetDir The root directory of the current project.
  * @returns The absolute path to the images directory.
  */
-function getProjectClipboardImagesDir(targetDir: string): string {
+async function getProjectClipboardImagesDir(
+  targetDir: string,
+): Promise<string> {
   const storage = new Storage(targetDir);
+  await storage.initialize();
   const baseDir = storage.getProjectTempDir();
   return path.join(baseDir, 'images');
 }
@@ -271,7 +274,7 @@ export async function saveClipboardImage(
   targetDir: string,
 ): Promise<string | null> {
   try {
-    const tempDir = getProjectClipboardImagesDir(targetDir);
+    const tempDir = await getProjectClipboardImagesDir(targetDir);
     await fs.mkdir(tempDir, { recursive: true });
 
     // Generate a unique filename with timestamp
@@ -396,7 +399,7 @@ export async function cleanupOldClipboardImages(
   targetDir: string,
 ): Promise<void> {
   try {
-    const tempDir = getProjectClipboardImagesDir(targetDir);
+    const tempDir = await getProjectClipboardImagesDir(targetDir);
     const files = await fs.readdir(tempDir);
     const oneHourAgo = Date.now() - 60 * 60 * 1000;
 

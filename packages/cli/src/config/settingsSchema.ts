@@ -10,7 +10,6 @@
 // --------------------------------------------------------------------------
 
 import {
-  DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   DEFAULT_MODEL_CONFIGS,
   type MCPServerConfig,
@@ -162,15 +161,6 @@ const SETTINGS_SCHEMA = {
     description: 'General application settings.',
     showInDialog: false,
     properties: {
-      previewFeatures: {
-        type: 'boolean',
-        label: 'Preview Features (e.g., models)',
-        category: 'General',
-        requiresRestart: false,
-        default: false,
-        description: 'Enable preview features (e.g., preview models).',
-        showInDialog: true,
-      },
       preferredEditor: {
         type: 'string',
         label: 'Preferred Editor',
@@ -350,6 +340,26 @@ const SETTINGS_SCHEMA = {
         description:
           'The color theme for the UI. See the CLI themes guide for available options.',
         showInDialog: false,
+      },
+      autoThemeSwitching: {
+        type: 'boolean',
+        label: 'Auto Theme Switching',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Automatically switch between default light and dark themes based on terminal background color.',
+        showInDialog: true,
+      },
+      terminalBackgroundPollingInterval: {
+        type: 'number',
+        label: 'Terminal Background Polling Interval',
+        category: 'UI',
+        requiresRestart: false,
+        default: 60,
+        description:
+          'Interval in seconds to poll the terminal background color.',
+        showInDialog: true,
       },
       customThemes: {
         type: 'object',
@@ -760,6 +770,16 @@ const SETTINGS_SCHEMA = {
           'The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).',
         showInDialog: true,
       },
+      disableLoopDetection: {
+        type: 'boolean',
+        label: 'Disable Loop Detection',
+        category: 'Model',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Disable automatic detection and prevention of infinite loops.',
+        showInDialog: true,
+      },
       skipNextSpeakerCheck: {
         type: 'boolean',
         label: 'Skip Next Speaker Check',
@@ -1062,17 +1082,6 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
-      autoAccept: {
-        type: 'boolean',
-        label: 'Auto Accept',
-        category: 'Tools',
-        requiresRestart: false,
-        default: false,
-        description: oneLine`
-          Automatically accept and execute tool calls that are considered safe (e.g., read-only operations).
-        `,
-        showInDialog: true,
-      },
       approvalMode: {
         type: 'enum',
         label: 'Approval Mode',
@@ -1160,15 +1169,6 @@ const SETTINGS_SCHEMA = {
           'Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.',
         showInDialog: true,
       },
-      enableToolOutputTruncation: {
-        type: 'boolean',
-        label: 'Enable Tool Output Truncation',
-        category: 'General',
-        requiresRestart: true,
-        default: true,
-        description: 'Enable truncation of large tool outputs.',
-        showInDialog: true,
-      },
       truncateToolOutputThreshold: {
         type: 'number',
         label: 'Tool Output Truncation Threshold',
@@ -1176,16 +1176,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
         description:
-          'Truncate tool output if it is larger than this many characters. Set to -1 to disable.',
-        showInDialog: true,
-      },
-      truncateToolOutputLines: {
-        type: 'number',
-        label: 'Tool Output Truncation Lines',
-        category: 'General',
-        requiresRestart: true,
-        default: DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
-        description: 'The number of lines to keep when truncating tool output.',
+          'Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.',
         showInDialog: true,
       },
       disableLLMCorrection: {
@@ -1314,7 +1305,7 @@ const SETTINGS_SCHEMA = {
             label: 'Folder Trust',
             category: 'Security',
             requiresRestart: true,
-            default: false,
+            default: true,
             description: 'Setting to track whether Folder trust is enabled.',
             showInDialog: true,
           },
@@ -1464,6 +1455,58 @@ const SETTINGS_SCHEMA = {
     description: 'Setting to enable experimental features',
     showInDialog: false,
     properties: {
+      toolOutputMasking: {
+        type: 'object',
+        label: 'Tool Output Masking',
+        category: 'Experimental',
+        requiresRestart: true,
+        ignoreInDocs: true,
+        default: {},
+        description:
+          'Advanced settings for tool output masking to manage context window efficiency.',
+        showInDialog: false,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Tool Output Masking',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: false,
+            description: 'Enables tool output masking to save tokens.',
+            showInDialog: false,
+          },
+          toolProtectionThreshold: {
+            type: 'number',
+            label: 'Tool Protection Threshold',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: 50000,
+            description:
+              'Minimum number of tokens to protect from masking (most recent tool outputs).',
+            showInDialog: false,
+          },
+          minPrunableTokensThreshold: {
+            type: 'number',
+            label: 'Min Prunable Tokens Threshold',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: 30000,
+            description:
+              'Minimum prunable tokens required to trigger a masking pass.',
+            showInDialog: false,
+          },
+          protectLatestTurn: {
+            type: 'boolean',
+            label: 'Protect Latest Turn',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: true,
+            description:
+              'Ensures the absolute latest turn is never masked, regardless of token count.',
+            showInDialog: false,
+          },
+        },
+      },
       enableAgents: {
         type: 'boolean',
         label: 'Enable Agents',
@@ -1488,7 +1531,7 @@ const SETTINGS_SCHEMA = {
         label: 'Extension Configuration',
         category: 'Experimental',
         requiresRestart: true,
-        default: false,
+        default: true,
         description: 'Enable requesting and fetching of extension settings.',
         showInDialog: false,
       },
@@ -1868,6 +1911,20 @@ const SETTINGS_SCHEMA = {
             description: 'If false, disallows MCP servers from being used.',
             showInDialog: false,
             mergeStrategy: MergeStrategy.REPLACE,
+          },
+          config: {
+            type: 'object',
+            label: 'MCP Config',
+            category: 'Admin',
+            requiresRestart: false,
+            default: {} as Record<string, MCPServerConfig>,
+            description: 'Admin-configured MCP servers.',
+            showInDialog: false,
+            mergeStrategy: MergeStrategy.REPLACE,
+            additionalProperties: {
+              type: 'object',
+              ref: 'MCPServerConfig',
+            },
           },
         },
       },

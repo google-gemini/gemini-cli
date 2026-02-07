@@ -21,17 +21,6 @@ import {
 } from '@google/gemini-cli-core';
 import { ToolCallStatus } from '../types.js';
 
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
-  return {
-    ...actual,
-    debugLogger: {
-      warn: vi.fn(),
-    },
-  };
-});
-
 describe('toolMapping', () => {
   beforeEach(() => {
     vi.clearAllMocks();
