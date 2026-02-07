@@ -518,7 +518,7 @@ export async function main() {
 
     adminControlsListner.setConfig(config);
 
-    if (config.isInteractive() && config.storage && config.getDebugMode()) {
+    if (config.isInteractive() && config.getDebugMode()) {
       const { registerActivityLogger } = await import(
         './utils/activityLogger.js'
       );
