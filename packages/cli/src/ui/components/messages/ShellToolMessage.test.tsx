@@ -35,19 +35,23 @@ describe('<ShellToolMessage />', () => {
     } as unknown as Config,
   };
 
+  const LONG_OUTPUT = Array.from(
+    { length: 50 },
+    (_, i) => `Line ${i + 1}`,
+  ).join('\n');
+
   const mockSetEmbeddedShellFocused = vi.fn();
   const uiActions = {
     setEmbeddedShellFocused: mockSetEmbeddedShellFocused,
   };
 
-  // Helper to render with context
-  const renderWithContext = (
-    ui: React.ReactElement,
-    streamingState: StreamingState,
+  const renderShell = (
+    props: Partial<ShellToolMessageProps> = {},
+    options: Parameters<typeof renderWithProviders>[1] = {},
   ) =>
-    renderWithProviders(ui, {
+    renderWithProviders(<ShellToolMessage {...baseProps} {...props} />, {
       uiActions,
-      uiState: { streamingState },
+      ...options,
     });
 
   beforeEach(() => {
@@ -59,12 +63,9 @@ describe('<ShellToolMessage />', () => {
       ['SHELL_COMMAND_NAME', SHELL_COMMAND_NAME],
       ['SHELL_TOOL_NAME', SHELL_TOOL_NAME],
     ])('clicks inside the shell area sets focus for %s', async (_, name) => {
-      const { stdin, lastFrame, simulateClick } = renderWithProviders(
-        <ShellToolMessage {...baseProps} name={name} />,
-        {
-          mouseEventsEnabled: true,
-          uiActions,
-        },
+      const { stdin, lastFrame, simulateClick } = renderShell(
+        { name },
+        { mouseEventsEnabled: true },
       );
 
       await waitFor(() => {
@@ -95,7 +96,10 @@ describe('<ShellToolMessage />', () => {
         );
       };
 
-      const { lastFrame } = renderWithContext(<Wrapper />, StreamingState.Idle);
+      const { lastFrame } = renderWithProviders(<Wrapper />, {
+        uiActions,
+        uiState: { streamingState: StreamingState.Idle },
+      });
 
       // Verify it is initially focused
       await waitFor(() => {
@@ -132,8 +136,8 @@ describe('<ShellToolMessage />', () => {
           embeddedShellFocused: true,
           activeShellPtyId: 1,
           ptyId: 1,
-          useAlternateBuffer: true,
         },
+        { useAlternateBuffer: true },
       ],
       [
         'renders in Alternate Buffer mode while unfocused',
@@ -142,71 +146,45 @@ describe('<ShellToolMessage />', () => {
           embeddedShellFocused: false,
           activeShellPtyId: 1,
           ptyId: 1,
-          useAlternateBuffer: true,
         },
+        { useAlternateBuffer: true },
       ],
-    ])(
-      '%s',
-      async (
-        _,
-        props: Partial<ShellToolMessageProps> & {
-          useAlternateBuffer?: boolean;
-        },
-      ) => {
-        const { useAlternateBuffer, ...componentProps } = props;
-        const { lastFrame } = renderWithProviders(
-          <ShellToolMessage {...baseProps} {...componentProps} />,
-          { uiActions, useAlternateBuffer },
-        );
-        await waitFor(() => {
-          expect(lastFrame()).toMatchSnapshot();
-        });
-      },
-    );
+    ])('%s', async (_, props, options) => {
+      const { lastFrame } = renderShell(props, options);
+      await waitFor(() => {
+        expect(lastFrame()).toMatchSnapshot();
+      });
+    });
   });
 
   describe('Height Constraints', () => {
     it.each([
       [
         'respects availableTerminalHeight when it is smaller than ACTIVE_SHELL_MAX_LINES',
-        { availableTerminalHeight: 10, expectedMaxLines: 8 },
+        10,
+        8,
       ],
       [
         'uses ACTIVE_SHELL_MAX_LINES when availableTerminalHeight is large',
-        {
-          availableTerminalHeight: 100,
-          expectedMaxLines: ACTIVE_SHELL_MAX_LINES,
-        },
+        100,
+        ACTIVE_SHELL_MAX_LINES,
       ],
-    ])('%s', async (_, { availableTerminalHeight, expectedMaxLines }) => {
-      const { lastFrame } = renderWithProviders(
-        <ShellToolMessage
-          {...baseProps}
-          resultDisplay={Array.from(
-            { length: 50 },
-            (_, i) => `Line ${i + 1}`,
-          ).join('\n')}
-          renderOutputAsMarkdown={false}
-          availableTerminalHeight={availableTerminalHeight}
-          activeShellPtyId={1}
-          ptyId={2} // not focused
-          status={ToolCallStatus.Executing}
-        />,
+    ])('%s', async (_, availableTerminalHeight, expectedMaxLines) => {
+      const { lastFrame } = renderShell(
         {
-          uiActions,
-          useAlternateBuffer: true,
+          resultDisplay: LONG_OUTPUT,
+          renderOutputAsMarkdown: false,
+          availableTerminalHeight,
+          activeShellPtyId: 1,
+          ptyId: 2, // not focused
+          status: ToolCallStatus.Executing,
         },
+        { useAlternateBuffer: true },
       );
 
       await waitFor(() => {
         const frame = lastFrame();
-        const matches = frame!.match(/Line \d+/g);
-        if (availableTerminalHeight < ACTIVE_SHELL_MAX_LINES) {
-          expect(matches?.length).toBeLessThanOrEqual(expectedMaxLines);
-          expect(matches?.length).toBeGreaterThan(0);
-        } else {
-          expect(matches?.length).toBe(expectedMaxLines);
-        }
+        expect(frame!.match(/Line \d+/g)?.length).toBe(expectedMaxLines);
         expect(frame).toMatchSnapshot();
       });
     });
