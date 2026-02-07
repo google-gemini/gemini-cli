@@ -106,7 +106,8 @@ export function useVoiceInput(config?: {
       // Helper to check if command exists using execFile (safer than exec)
       const commandExists = (cmd: string): Promise<boolean> =>
         new Promise((resolve) => {
-          execFile('which', [cmd], (error) => {
+          const checkCmd = process.platform === 'win32' ? 'where' : 'which';
+          execFile(checkCmd, [cmd], (error) => {
             resolve(!error);
           });
         });
@@ -217,12 +218,13 @@ export function useVoiceInput(config?: {
         debugLogger.debug('useVoiceInput: stopping recording');
         processToKill.kill('SIGINT');
 
-        // Wait for process to exit
-        await new Promise<void>((resolve) => {
-          processToKill.on('exit', () => resolve());
-          // Timeout after 2 seconds
-          setTimeout(() => resolve(), 2000);
-        });
+        // Wait for process to exit, with timeout to avoid hanging
+        await Promise.race([
+          new Promise<void>((resolve) =>
+            processToKill.on('exit', () => resolve()),
+          ),
+          new Promise<void>((resolve) => setTimeout(resolve, 2000)),
+        ]);
 
         recordingProcessRef.current = null;
       }
