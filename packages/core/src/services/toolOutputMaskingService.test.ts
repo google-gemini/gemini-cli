@@ -46,7 +46,7 @@ describe('ToolOutputMaskingService', () => {
       getSessionId: () => 'mock-session',
       getUsageStatisticsEnabled: () => false,
       getToolOutputMaskingEnabled: () => true,
-      getToolOutputMaskingConfig: () => ({
+      getToolOutputMaskingConfig: async () => ({
         enabled: true,
         toolProtectionThreshold: 50000,
         minPrunableTokensThreshold: 30000,
@@ -61,6 +61,44 @@ describe('ToolOutputMaskingService', () => {
     if (testTempDir) {
       await fs.promises.rm(testTempDir, { recursive: true, force: true });
     }
+  });
+
+  it('should respect remote configuration overrides', async () => {
+    mockConfig.getToolOutputMaskingConfig = async () => ({
+      enabled: true,
+      toolProtectionThreshold: 100, // Very low threshold
+      minPrunableTokensThreshold: 50,
+      protectLatestTurn: false,
+    });
+
+    const history: Content[] = [
+      {
+        role: 'user',
+        parts: [
+          {
+            functionResponse: {
+              name: 'test_tool',
+              response: { output: 'A'.repeat(200) },
+            },
+          },
+        ],
+      },
+    ];
+
+    mockedEstimateTokenCountSync.mockImplementation((parts) => {
+      const resp = parts[0].functionResponse?.response as Record<
+        string,
+        unknown
+      >;
+      const content = (resp?.['output'] as string) ?? JSON.stringify(resp);
+      return content.includes(MASKING_INDICATOR_TAG) ? 10 : 200;
+    });
+
+    const result = await service.mask(history, mockConfig);
+
+    // With low thresholds and protectLatestTurn=false, it should mask even the latest turn
+    expect(result.maskedCount).toBe(1);
+    expect(result.tokensSaved).toBeGreaterThan(0);
   });
 
   it('should not mask if total tool tokens are below protection threshold', async () => {
