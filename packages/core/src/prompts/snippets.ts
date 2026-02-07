@@ -143,8 +143,12 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
 # Core Mandates
 
 - **Context Efficiency:**
-  - Avoid wasting context window by using 'offset' and 'limit' to scope ${READ_FILE_TOOL_NAME} results to just enough information to definitively answer the question.
-  - Extra tool calls can negate any benefits of limits, so balance frugality with the cost of additional turns or failed tool calls.
+  - Avoid wasting context window by using 'offset' and 'limit' to scope ${READ_FILE_TOOL_NAME} results.
+  - Avoid "scrolling" (multiple sequential ${READ_FILE_TOOL_NAME} calls to find code).
+    - You can **Map-and-Jump:** in files >500 lines by using '${GREP_TOOL_NAME}' to find specific line numbers before reading.
+    - You can save tokens and turns by just reading the entire file if doing so saves you several turns.
+  - Extra tool calls can negate any benefits of limits. Use a sufficient 'limit' (typically 100-300 lines) to ensure you see the full context of a function or class; reading too little
+  often forces expensive extra turns. 
   - Perform edits in an order that minimizes risk of failure:
     - Prefer making small, atomic, non-overlapping edits to files from the end of the file to the beginning, to avoid causing ${EDIT_TOOL_NAME} failures due to shifting line numbers.
     - If an edit overlaps with a previous one, it may cause a line number to shift or cause your ${READ_FILE_TOOL_NAME} results to become stale, requiring you to refresh your knowledge of the file with ${READ_FILE_TOOL_NAME} or ${GREP_TOOL_NAME}.
