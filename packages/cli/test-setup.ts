@@ -7,6 +7,9 @@
 import { vi, beforeEach, afterEach } from 'vitest';
 import { format } from 'node:util';
 
+// Initialize i18n for all tests (top-level await ensures it's ready before tests run)
+import './src/i18n/index.js';
+
 global.IS_REACT_ACT_ENVIRONMENT = true;
 
 // Unset NO_COLOR environment variable to ensure consistent theme behavior between local and CI test runs
