@@ -2096,5 +2096,36 @@ describe('PolicyEngine', () => {
       const excluded = engine.getExcludedTools();
       expect(excluded.has('tool1')).toBe(false);
     });
+
+    it('should respect approval mode', () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'tool1',
+          decision: PolicyDecision.DENY,
+          modes: [ApprovalMode.PLAN],
+        },
+      ];
+
+      // Default mode (not PLAN)
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.DEFAULT,
+      });
+      let excluded = engine.getExcludedTools();
+      expect(excluded.has('tool1')).toBe(false);
+
+      // PLAN mode
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.PLAN,
+      });
+      excluded = engine.getExcludedTools();
+      expect(excluded.has('tool1')).toBe(true);
+
+      // Switch mode dynamically
+      engine.setApprovalMode(ApprovalMode.DEFAULT);
+      excluded = engine.getExcludedTools();
+      expect(excluded.has('tool1')).toBe(false);
+    });
   });
 });
