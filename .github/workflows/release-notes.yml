@@ -53,7 +53,7 @@ jobs:
           echo "${BODY}" >> "$GITHUB_OUTPUT"
           echo 'EOF' >> "$GITHUB_OUTPUT"
         env:
-          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          GH_TOKEN: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
 
       - name: 'Generate Changelog with Gemini'
         uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
@@ -72,7 +72,7 @@ jobs:
       - name: 'Create Pull Request'
         uses: 'peter-evans/create-pull-request@v6'
         with:
-          github-token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
+          token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
           commit-message: 'docs(changelog): update for ${{ steps.release_info.outputs.VERSION }}'
           title: 'Changelog for ${{ steps.release_info.outputs.VERSION }}'
           body: |
