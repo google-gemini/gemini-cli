@@ -716,20 +716,10 @@ their corresponding top-level category object in your `settings.json` file.
     implementation. Provides faster search performance.
   - **Default:** `true`
 
-- **`tools.enableToolOutputTruncation`** (boolean):
-  - **Description:** Enable truncation of large tool outputs.
-  - **Default:** `true`
-  - **Requires restart:** Yes
-
 - **`tools.truncateToolOutputThreshold`** (number):
-  - **Description:** Truncate tool output if it is larger than this many
-    characters. Set to -1 to disable.
-  - **Default:** `4000000`
-  - **Requires restart:** Yes
-
-- **`tools.truncateToolOutputLines`** (number):
-  - **Description:** The number of lines to keep when truncating tool output.
-  - **Default:** `1000`
+  - **Description:** Maximum characters to show when truncating large tool
+    outputs. Set to 0 or negative to disable truncation.
+  - **Default:** `40000`
   - **Requires restart:** Yes
 
 - **`tools.disableLLMCorrection`** (boolean):

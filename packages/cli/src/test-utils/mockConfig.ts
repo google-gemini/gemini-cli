@@ -20,6 +20,7 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     setTerminalBackground: vi.fn(),
     storage: {
       getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
+      initialize: vi.fn().mockResolvedValue(undefined),
     },
     getDebugMode: vi.fn(() => false),
     getProjectRoot: vi.fn(() => '/'),

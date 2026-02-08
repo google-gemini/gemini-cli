@@ -176,6 +176,7 @@ describe('ChatCompressionService', () => {
         generateContent: mockGenerateContent,
       }),
       isInteractive: vi.fn().mockReturnValue(false),
+      getActiveModel: vi.fn().mockReturnValue(mockModel),
       getContentGenerator: vi.fn().mockReturnValue({
         countTokens: vi.fn().mockResolvedValue({ totalTokens: 100 }),
       }),
@@ -183,6 +184,7 @@ describe('ChatCompressionService', () => {
       getMessageBus: vi.fn().mockReturnValue(undefined),
       getHookSystem: () => undefined,
       getNextCompressionTruncationId: vi.fn().mockReturnValue(1),
+      getTruncateToolOutputThreshold: vi.fn().mockReturnValue(40000),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue(testTempDir),
       },
@@ -581,10 +583,10 @@ describe('ChatCompressionService', () => {
       const truncatedPart = shellResponse!.parts![0].functionResponse;
       const content = truncatedPart?.response?.['output'] as string;
 
+      // DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD = 40000 -> head=8000 (20%), tail=32000 (80%)
       expect(content).toContain(
-        'Output too large. Showing the last 4,000 characters of the output.',
+        'Showing first 8,000 and last 32,000 characters',
       );
-      // It's a single line, so NO [LINE WIDTH TRUNCATED]
     });
 
     it('should use character-based truncation for massive single-line raw strings', async () => {
@@ -645,8 +647,9 @@ describe('ChatCompressionService', () => {
       const truncatedPart = rawResponse!.parts![0].functionResponse;
       const content = truncatedPart?.response?.['output'] as string;
 
+      // DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD = 40000 -> head=8000 (20%), tail=32000 (80%)
       expect(content).toContain(
-        'Output too large. Showing the last 4,000 characters of the output.',
+        'Showing first 8,000 and last 32,000 characters',
       );
     });
 
