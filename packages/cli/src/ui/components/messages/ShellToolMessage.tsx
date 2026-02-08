@@ -185,17 +185,18 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
 /**
  * Calculates the maximum number of lines to display for shell output.
  *
- * For completed processes (Success, Error, Canceled), it returns SHELL_HISTORY_MAX_LINES.
- * For active processes, it returns undefined (unlimited) if the terminal is in
- * alternate buffer mode and focused, or if availableTerminalHeight is undefined
- * (signaling unlimited). Otherwise, it returns ACTIVE_SHELL_MAX_LINES.
+ * For completed processes (Success, Error, Canceled), it returns COMPLETED_SHELL_MAX_LINES.
+ * For active processes, it returns the available terminal height if in alternate buffer mode
+ * and focused. Otherwise, it returns ACTIVE_SHELL_MAX_LINES.
+ *
+ * This function ensures a finite number of lines is always returned to prevent performance issues.
  */
 function getShellMaxLines(
   status: ToolCallStatus,
   isAlternateBuffer: boolean,
   isThisShellFocused: boolean,
   availableTerminalHeight: number | undefined,
-): number | undefined {
+): number {
   if (
     status === ToolCallStatus.Success ||
     status === ToolCallStatus.Error ||
@@ -204,14 +205,15 @@ function getShellMaxLines(
     return COMPLETED_SHELL_MAX_LINES;
   }
 
-  if (
-    (isAlternateBuffer && isThisShellFocused) ||
-    availableTerminalHeight === undefined
-  ) {
-    // availableTerminalHeight being undefined means unlimited
-    return undefined;
+  if (availableTerminalHeight === undefined) {
+    return ACTIVE_SHELL_MAX_LINES;
   }
 
   const maxLinesBasedOnHeight = Math.max(1, availableTerminalHeight - 2);
+
+  if (isAlternateBuffer && isThisShellFocused) {
+    return maxLinesBasedOnHeight;
+  }
+
   return Math.min(maxLinesBasedOnHeight, ACTIVE_SHELL_MAX_LINES);
 }

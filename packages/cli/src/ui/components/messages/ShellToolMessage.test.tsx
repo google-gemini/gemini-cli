@@ -36,7 +36,7 @@ describe('<ShellToolMessage />', () => {
   };
 
   const LONG_OUTPUT = Array.from(
-    { length: 50 },
+    { length: 100 },
     (_, i) => `Line ${i + 1}`,
   ).join('\n');
 
@@ -120,14 +120,20 @@ describe('<ShellToolMessage />', () => {
 
   describe('Snapshots', () => {
     it.each([
-      ['renders in Executing state', { status: ToolCallStatus.Executing }],
+      [
+        'renders in Executing state',
+        { status: ToolCallStatus.Executing },
+        undefined,
+      ],
       [
         'renders in Success state (history mode)',
         { status: ToolCallStatus.Success },
+        undefined,
       ],
       [
         'renders in Error state',
         { status: ToolCallStatus.Error, resultDisplay: 'Error output' },
+        undefined,
       ],
       [
         'renders in Alternate Buffer mode while focused',
@@ -163,21 +169,36 @@ describe('<ShellToolMessage />', () => {
         'respects availableTerminalHeight when it is smaller than ACTIVE_SHELL_MAX_LINES',
         10,
         8,
+        false,
       ],
       [
         'uses ACTIVE_SHELL_MAX_LINES when availableTerminalHeight is large',
         100,
         ACTIVE_SHELL_MAX_LINES,
+        false,
       ],
-    ])('%s', async (_, availableTerminalHeight, expectedMaxLines) => {
+      [
+        'uses full availableTerminalHeight when focused in alternate buffer mode',
+        100,
+        98, // 100 - 2
+        true,
+      ],
+      [
+        'defaults to ACTIVE_SHELL_MAX_LINES when availableTerminalHeight is undefined',
+        undefined,
+        ACTIVE_SHELL_MAX_LINES,
+        false,
+      ],
+    ])('%s', async (_, availableTerminalHeight, expectedMaxLines, focused) => {
       const { lastFrame } = renderShell(
         {
           resultDisplay: LONG_OUTPUT,
           renderOutputAsMarkdown: false,
           availableTerminalHeight,
           activeShellPtyId: 1,
-          ptyId: 2, // not focused
+          ptyId: focused ? 1 : 2,
           status: ToolCallStatus.Executing,
+          embeddedShellFocused: focused,
         },
         { useAlternateBuffer: true },
       );
