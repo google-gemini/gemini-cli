@@ -151,7 +151,6 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
   often forces expensive extra turns. 
   - Perform edits in an order that minimizes risk of failure:
     - Prefer making small, atomic, non-overlapping edits to files from the end of the file to the beginning, to avoid causing ${EDIT_TOOL_NAME} failures due to shifting line numbers.
-    - If an edit overlaps with a previous one, it may cause a line number to shift or cause your ${READ_FILE_TOOL_NAME} results to become stale, requiring you to refresh your knowledge of the file with ${READ_FILE_TOOL_NAME} or ${GREP_TOOL_NAME}.
   - Some ${READ_FILE_TOOL_NAME} examples:
     - If you need to edit a specific range in a file, use ${READ_FILE_TOOL_NAME} with 'offset' and 'limit' to read the context. Then use ${EDIT_TOOL_NAME} with 'start_line' set to the line number where 'old_string' begins.
     - Use 'offset' and 'limit' to read a single contiguous range from a file when you only need a range within.
