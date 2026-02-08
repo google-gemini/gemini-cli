@@ -7,6 +7,7 @@
 import { act } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { ToolActionsProvider, useToolActions } from './ToolActionsContext.js';
 import {
   type Config,
@@ -155,7 +156,7 @@ describe('ToolActionsContext', () => {
 
     // Wait for IdeClient initialization in useEffect
     await act(async () => {
-      await vi.waitFor(() => expect(IdeClient.getInstance).toHaveBeenCalled());
+      await waitFor(() => expect(IdeClient.getInstance).toHaveBeenCalled());
       // Give React a chance to update state
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
@@ -195,7 +196,7 @@ describe('ToolActionsContext', () => {
 
     // Wait for initialization
     await act(async () => {
-      await vi.waitFor(() => expect(IdeClient.getInstance).toHaveBeenCalled());
+      await waitFor(() => expect(IdeClient.getInstance).toHaveBeenCalled());
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 

@@ -245,5 +245,34 @@ describe('toolMapping', () => {
       expect(displayTool.status).toBe(ToolCallStatus.Canceled);
       expect(displayTool.resultDisplay).toBe('User cancelled');
     });
+
+    it('propagates borderTop and borderBottom options correctly', () => {
+      const toolCall: ScheduledToolCall = {
+        status: 'scheduled',
+        request: mockRequest,
+        tool: mockTool,
+        invocation: mockInvocation,
+      };
+
+      const result = mapToDisplay(toolCall, {
+        borderTop: true,
+        borderBottom: false,
+      });
+      expect(result.borderTop).toBe(true);
+      expect(result.borderBottom).toBe(false);
+    });
+
+    it('sets resultDisplay to undefined for pre-execution statuses', () => {
+      const toolCall: ScheduledToolCall = {
+        status: 'scheduled',
+        request: mockRequest,
+        tool: mockTool,
+        invocation: mockInvocation,
+      };
+
+      const result = mapToDisplay(toolCall);
+      expect(result.tools[0].resultDisplay).toBeUndefined();
+      expect(result.tools[0].status).toBe(ToolCallStatus.Pending);
+    });
   });
 });

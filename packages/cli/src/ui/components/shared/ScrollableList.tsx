@@ -186,9 +186,11 @@ function ScrollableList<T>(
       if (keyMatchers[Command.SCROLL_UP](key)) {
         stopSmoothScroll();
         scrollByWithAnimation(-1);
+        return true;
       } else if (keyMatchers[Command.SCROLL_DOWN](key)) {
         stopSmoothScroll();
         scrollByWithAnimation(1);
+        return true;
       } else if (
         keyMatchers[Command.PAGE_UP](key) ||
         keyMatchers[Command.PAGE_DOWN](key)
@@ -200,11 +202,15 @@ function ScrollableList<T>(
           : scrollState.scrollTop;
         const innerHeight = scrollState.innerHeight;
         smoothScrollTo(current + direction * innerHeight);
+        return true;
       } else if (keyMatchers[Command.SCROLL_HOME](key)) {
         smoothScrollTo(0);
+        return true;
       } else if (keyMatchers[Command.SCROLL_END](key)) {
         smoothScrollTo(SCROLL_TO_ITEM_END);
+        return true;
       }
+      return false;
     },
     { isActive: hasFocus },
   );
@@ -229,7 +235,7 @@ function ScrollableList<T>(
     ],
   );
 
-  useScrollable(scrollableEntry, hasFocus);
+  useScrollable(scrollableEntry, true);
 
   return (
     <Box
