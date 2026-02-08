@@ -9,6 +9,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from 'react';
 import type { LoadedSettings } from '../../config/settings.js';
@@ -57,12 +58,18 @@ export const VimModeProvider = ({
     return newValue;
   }, [vimEnabled, settings]);
 
-  const value = {
-    vimEnabled,
-    vimMode,
-    toggleVimEnabled,
-    setVimMode,
-  };
+  // Memoize the context value to prevent unnecessary re-renders of consumers
+  // (like useGeminiStream) which could otherwise trigger infinite loop warnings
+  // when re-subscribing to events.
+  const value = useMemo(
+    () => ({
+      vimEnabled,
+      vimMode,
+      toggleVimEnabled,
+      setVimMode,
+    }),
+    [vimEnabled, vimMode, toggleVimEnabled],
+  );
 
   return (
     <VimModeContext.Provider value={value}>{children}</VimModeContext.Provider>

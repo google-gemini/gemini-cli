@@ -1815,6 +1815,45 @@ describe('InputPrompt', () => {
       });
       unmount();
     });
+
+    it('should allow Vim to handle escape key during streaming (to switch modes)', async () => {
+      props.streamingState = StreamingState.Responding;
+      props.vimHandleInput = vi.fn().mockReturnValue(true); // Vim handles it (switches mode)
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+
+      await act(async () => {
+        stdin.write('\x1b'); // Escape
+      });
+
+      await waitFor(() => {
+        expect(props.vimHandleInput).toHaveBeenCalled();
+      });
+      unmount();
+    });
+
+    it('should NOT handle escape key during streaming if Vim DOES NOT handle it (let useGeminiStream handle it)', async () => {
+      props.streamingState = StreamingState.Responding;
+      props.vimHandleInput = vi.fn().mockReturnValue(false); // Vim does NOT handle it
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+
+      await act(async () => {
+        stdin.write('\x1b'); // Escape
+      });
+
+      await waitFor(() => {
+        expect(props.vimHandleInput).toHaveBeenCalled();
+      });
+
+      // The escape prompt should NOT show because handleInput should have returned false early
+      expect(mockBuffer.setText).not.toHaveBeenCalled();
+      unmount();
+    });
   });
 
   describe('unfocused paste', () => {

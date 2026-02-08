@@ -12,6 +12,7 @@ import { renderHookWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { useGeminiStream } from './useGeminiStream.js';
 import { useKeypress } from './useKeypress.js';
+import { useVimMode } from '../contexts/VimModeContext.js';
 import * as atCommandProcessor from './atCommandProcessor.js';
 import type {
   TrackedToolCall,
@@ -113,6 +114,17 @@ vi.mock('./useToolScheduler.js', async (importOriginal) => {
 vi.mock('./useKeypress.js', () => ({
   useKeypress: vi.fn(),
 }));
+
+vi.mock('../contexts/VimModeContext.js', async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    useVimMode: vi.fn(() => ({
+      vimEnabled: false,
+      vimMode: 'INSERT',
+    })),
+  };
+});
 
 vi.mock('./shellCommandProcessor.js', () => ({
   useShellCommandProcessor: vi.fn().mockReturnValue({
@@ -1125,6 +1137,83 @@ describe('useGeminiStream', () => {
 
       // Verify state is reset
       expect(result.current.streamingState).toBe(StreamingState.Idle);
+    });
+
+    it('should NOT cancel an in-progress stream when escape is pressed in Vim INSERT mode', async () => {
+      const mockStream = (async function* () {
+        yield { type: ServerGeminiEventType.Content, value: 'Part 1' };
+        // Keep the stream open
+        await new Promise(() => {});
+      })();
+      mockSendMessageStream.mockReturnValue(mockStream);
+
+      // Enable Vim INSERT mode
+      vi.mocked(useVimMode).mockReturnValue({
+        vimEnabled: true,
+        vimMode: 'INSERT',
+        toggleVimEnabled: vi.fn(),
+        setVimMode: vi.fn(),
+      });
+
+      const { result } = renderTestHook();
+
+      // Start a query. We use 'void' here to explicitly ignore the promise so
+      // that we can test intermediate state (like 'Responding') while the
+      // mock stream remains open.
+      await act(async () => {
+        void result.current.submitQuery('test query');
+      });
+
+      // Wait for the first part of the response
+      await waitFor(() => {
+        expect(result.current.streamingState).toBe(StreamingState.Responding);
+      });
+
+      // Simulate escape key press
+      simulateEscapeKeyPress();
+
+      // Verify cancellation message is NOT added
+      expect(mockAddItem).not.toHaveBeenCalledWith({
+        type: MessageType.INFO,
+        text: 'Request cancelled.',
+      });
+
+      // Verify state is still Responding
+      expect(result.current.streamingState).toBe(StreamingState.Responding);
+
+      // In a real scenario, the first escape would have called vimHandleInput
+      // which would have called setVimMode('NORMAL').
+      // Since we are mocking useVimMode, we simulate this by updating the mock.
+
+      // Now switch to NORMAL mode and verify escape DOES cancel
+      vi.mocked(useVimMode).mockReturnValue({
+        vimEnabled: true,
+        vimMode: 'NORMAL',
+        toggleVimEnabled: vi.fn(),
+        setVimMode: vi.fn(),
+      });
+
+      const { result: resultNormal } = renderTestHook();
+
+      // Start a query. We use 'void' here to explicitly ignore the promise so
+      // that we can test intermediate state (like 'Responding') while the
+      // mock stream remains open.
+      await act(async () => {
+        void resultNormal.current.submitQuery('test query 2');
+      });
+
+      simulateEscapeKeyPress();
+
+      // Verify cancellation message IS added
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith({
+          type: MessageType.INFO,
+          text: 'Request cancelled.',
+        });
+      });
+
+      // Verify state is reset
+      expect(resultNormal.current.streamingState).toBe(StreamingState.Idle);
     });
 
     it('should call onCancelSubmit handler when escape is pressed', async () => {

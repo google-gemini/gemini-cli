@@ -559,6 +559,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         (streamingState === StreamingState.Responding ||
           streamingState === StreamingState.WaitingForConfirmation)
       ) {
+        // If Vim mode is enabled, let it handle the escape key first (e.g., to
+        // switch from INSERT to NORMAL mode). If it handles it, we stop
+        // propagation. Otherwise, we return false to let the cancellation logic
+        // in useGeminiStream handle it.
+        if (vimHandleInput && vimHandleInput(key)) {
+          return true;
+        }
         return false;
       }
 
