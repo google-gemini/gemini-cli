@@ -286,7 +286,10 @@ export class McpClient {
     this.resourceRegistry.setResourcesForServer(this.serverName, resources);
   }
 
-  async readResource(uri: string): Promise<ReadResourceResult> {
+  async readResource(
+    uri: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<ReadResourceResult> {
     this.assertConnected();
     return this.client!.request(
       {
@@ -294,6 +297,7 @@ export class McpClient {
         params: { uri },
       },
       ReadResourceResultSchema,
+      options,
     );
   }
 
