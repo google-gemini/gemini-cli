@@ -1,11 +1,11 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { LocalGeminiClient } from './localGeminiClient.js';
+import { LocalLiteRtLmClient } from './localLiteRtLmClient.js';
 import type { Config } from '../config/config.js';
 const mockGenerateContent = vi.fn();
 
@@ -18,7 +18,7 @@ vi.mock('@google/genai', () => {
   return { GoogleGenAI };
 });
 
-describe('LocalGeminiClient', () => {
+describe('LocalLiteRtLmClient', () => {
   let mockConfig: Config;
 
   beforeEach(() => {
@@ -42,7 +42,7 @@ describe('LocalGeminiClient', () => {
 \`\`\``,
     });
 
-    const client = new LocalGeminiClient(mockConfig);
+    const client = new LocalLiteRtLmClient(mockConfig);
     const result = await client.generateJson([], 'test-instruction');
 
     expect(result).toEqual({ key: 'value' });
@@ -62,7 +62,7 @@ describe('LocalGeminiClient', () => {
       text: null,
     });
 
-    const client = new LocalGeminiClient(mockConfig);
+    const client = new LocalLiteRtLmClient(mockConfig);
     await expect(client.generateJson([], 'test-instruction')).rejects.toThrow(
       'Invalid response from Local Gemini API: No text found',
     );
@@ -75,7 +75,7 @@ describe('LocalGeminiClient', () => {
 }`, // Smart quotes, trailing comma
     });
 
-    const client = new LocalGeminiClient(mockConfig);
+    const client = new LocalLiteRtLmClient(mockConfig);
     const result = await client.generateJson([], 'test-instruction');
 
     expect(result).toEqual({ key: 'value' });
@@ -86,7 +86,7 @@ describe('LocalGeminiClient', () => {
       text: '{"key": "value"}',
     });
 
-    const client = new LocalGeminiClient(mockConfig);
+    const client = new LocalLiteRtLmClient(mockConfig);
     await client.generateJson(
       [{ role: 'user', parts: [{ text: 'initial prompt' }] }],
       'test-instruction',

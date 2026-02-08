@@ -6,10 +6,6 @@
 
 import { z } from 'zod';
 
-// TODO(sid): add tests.
-
-// TODO(sid): remove ollama from npm dependencies.
-
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import type {
   RoutingContext,
@@ -24,7 +20,7 @@ import {
   isFunctionResponse,
 } from '../../utils/messageInspectors.js';
 import { debugLogger } from '../../utils/debugLogger.js';
-import { LocalGeminiClient } from '../../core/localGeminiClient.js';
+import { LocalLiteRtLmClient } from '../../core/localLiteRtLmClient.js';
 
 // The number of recent history turns to provide to the router for context.
 const HISTORY_TURNS_FOR_CONTEXT = 4;
@@ -209,7 +205,7 @@ ${formattedHistory}
       const history = [...finalHistory, createUserContent(context.request)];
       const singleMessageHistory = this.flattenChatHistory(history);
 
-      const client = new LocalGeminiClient(config);
+      const client = new LocalLiteRtLmClient(config);
       const jsonResponse = await client.generateJson(
         singleMessageHistory,
         LITERT_GEMMA_CLASSIFIER_SYSTEM_PROMPT,

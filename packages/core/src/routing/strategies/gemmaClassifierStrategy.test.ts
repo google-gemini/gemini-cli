@@ -16,9 +16,9 @@ import {
 } from '../../config/models.js';
 import type { Content } from '@google/genai';
 import { debugLogger } from '../../utils/debugLogger.js';
-import { LocalGeminiClient } from '../../core/localGeminiClient.js';
+import { LocalLiteRtLmClient } from '../../core/localLiteRtLmClient.js';
 
-vi.mock('../../core/localGeminiClient.js');
+vi.mock('../../core/localLiteRtLmClient.js');
 
 describe('GemmaClassifierStrategy', () => {
   let strategy: GemmaClassifierStrategy;
@@ -46,11 +46,11 @@ describe('GemmaClassifierStrategy', () => {
 
     mockBaseLlmClient = {} as BaseLlmClient;
 
-    vi.mocked(LocalGeminiClient).mockImplementation(
+    vi.mocked(LocalLiteRtLmClient).mockImplementation(
       () =>
         ({
           generateJson: mockGenerateJson,
-        }) as unknown as LocalGeminiClient,
+        }) as unknown as LocalLiteRtLmClient,
     );
   });
 

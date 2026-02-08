@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -14,7 +14,7 @@ import type { Content } from '@google/genai';
  * A client for making single, non-streaming calls to a local Gemini-compatible API
  * and expecting a JSON response.
  */
-export class LocalGeminiClient {
+export class LocalLiteRtLmClient {
   private readonly host: string;
   private readonly model: string;
   private readonly client: GoogleGenAI;
@@ -88,7 +88,7 @@ export class LocalGeminiClient {
       return JSON.parse(cleanedText);
     } catch (error) {
       debugLogger.error(
-        `[LocalGeminiClient] Failed to generate content:`,
+        `[LocalLiteRtLmClient] Failed to generate content:`,
         error,
       );
       throw error;
