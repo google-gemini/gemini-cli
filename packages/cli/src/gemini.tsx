@@ -510,9 +510,15 @@ export async function main() {
       projectHooks: settings.workspace.settings.hooks,
     });
     loadConfigHandle?.end();
+
+    // Initialize storage immediately after loading config to ensure that
+    // storage-related operations (like listing or resuming sessions) have
+    // access to the project identifier.
+    await config.storage.initialize();
+
     adminControlsListner.setConfig(config);
 
-    if (config.isInteractive() && config.storage && config.getDebugMode()) {
+    if (config.isInteractive() && config.getDebugMode()) {
       const { registerActivityLogger } = await import(
         './utils/activityLogger.js'
       );

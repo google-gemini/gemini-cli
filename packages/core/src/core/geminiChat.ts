@@ -699,6 +699,7 @@ export class GeminiChat {
     this.lastPromptTokenCount = estimateTokenCountSync(
       this.history.flatMap((c) => c.parts || []),
     );
+    this.chatRecordingService.updateMessagesFromHistory(history);
   }
 
   stripThoughtsFromHistory(): void {
