@@ -332,6 +332,7 @@ export class GeminiClient {
   ): Promise<GeminiChat> {
     this.forceFullIdeContext = true;
     this.hasFailedCompressionAttempt = false;
+    this.lastUsedModelId = undefined;
 
     const toolRegistry = this.config.getToolRegistry();
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
