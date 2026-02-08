@@ -180,6 +180,31 @@ describe('TextInput', () => {
     expect(frame).not.toContain('Search to filter');
   });
 
+  it('truncates focused placeholder text in narrow terminals', () => {
+    const buffer = {
+      text: '',
+      lines: [''],
+      cursor: [0, 0],
+      visualCursor: [0, 0],
+      viewportVisualLines: [''],
+      handleInput: vi.fn(),
+      setText: vi.fn(),
+    };
+    const { lastFrame } = render(
+      <TextInput
+        buffer={buffer as unknown as TextBuffer}
+        placeholder="Search to filter"
+        focus={true}
+        onSubmit={onSubmit}
+        onCancel={onCancel}
+      />,
+      10,
+    );
+    const frame = lastFrame();
+    expect(frame).toContain('…');
+    expect(frame).not.toContain('Search to filter');
+  });
+
   it('handles character input', () => {
     render(
       <TextInput buffer={mockBuffer} onSubmit={onSubmit} onCancel={onCancel} />,
