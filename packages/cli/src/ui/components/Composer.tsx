@@ -74,7 +74,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const showRawMarkdownIndicator = !uiState.renderMarkdown;
   const showEscToCancelHint =
     isActivelyStreaming &&
-    !uiState.embeddedShellFocused &&
+    (!uiState.embeddedShellFocused || uiState.isBackgroundShellVisible) &&
     !hasPendingActionRequired &&
     uiState.streamingState !== StreamingState.WaitingForConfirmation;
 
