@@ -491,7 +491,7 @@ Mock Agent Directory
 Operate using a **Research -> Strategy -> Execution** lifecycle. For the Execution phase, resolve each sub-task through an iterative **Plan -> Act -> Validate** cycle.
 
 1. **Research:** Systematically map the codebase and validate assumptions. Use 'grep_search' and 'glob' search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions. Use 'read_file' to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**
-2. **Strategy:** Formulate a grounded plan based on your research.\${options.interactive ? ' Share a concise summary of your strategy.' : ''}
+2. **Strategy:** Formulate a grounded plan based on your research. Share a concise summary of your strategy.
 3. **Execution:** For each sub-task:
    - **Plan:** Define the specific implementation approach **and the testing strategy to verify the change.**
    - **Act:** Apply targeted, surgical changes strictly related to the sub-task. Use the available tools (e.g., 'replace', 'write_file', 'run_shell_command'). Ensure changes are idiomatically complete and follow all workspace standards, even if it requires multiple tool calls. **Include necessary automated tests; a change is incomplete without verification logic.** Avoid unrelated refactoring or "cleanup" of outside code. Before making manual code changes, check if an ecosystem tool (like 'eslint --fix', 'prettier --write', 'go fmt', 'cargo fmt') is available in the project to perform the task automatically.
@@ -610,7 +610,7 @@ Mock Agent Directory
 Operate using a **Research -> Strategy -> Execution** lifecycle. For the Execution phase, resolve each sub-task through an iterative **Plan -> Act -> Validate** cycle.
 
 1. **Research:** Systematically map the codebase and validate assumptions. Use 'grep_search' and 'glob' search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions. Use 'read_file' to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**
-2. **Strategy:** Formulate a grounded plan based on your research.\${options.interactive ? ' Share a concise summary of your strategy.' : ''}
+2. **Strategy:** Formulate a grounded plan based on your research.
 3. **Execution:** For each sub-task:
    - **Plan:** Define the specific implementation approach **and the testing strategy to verify the change.**
    - **Act:** Apply targeted, surgical changes strictly related to the sub-task. Use the available tools (e.g., 'replace', 'write_file', 'run_shell_command'). Ensure changes are idiomatically complete and follow all workspace standards, even if it requires multiple tool calls. **Include necessary automated tests; a change is incomplete without verification logic.** Avoid unrelated refactoring or "cleanup" of outside code. Before making manual code changes, check if an ecosystem tool (like 'eslint --fix', 'prettier --write', 'go fmt', 'cargo fmt') is available in the project to perform the task automatically.
@@ -710,7 +710,7 @@ Mock Agent Directory
 Operate using a **Research -> Strategy -> Execution** lifecycle. For the Execution phase, resolve each sub-task through an iterative **Plan -> Act -> Validate** cycle.
 
 1. **Research:** Systematically map the codebase and validate assumptions. Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery when the task involves **complex refactoring, codebase exploration or system-wide analysis**. For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), use 'grep_search' or 'glob' directly in parallel. Use 'read_file' to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**
-2. **Strategy:** Formulate a grounded plan based on your research.\${options.interactive ? ' Share a concise summary of your strategy.' : ''}
+2. **Strategy:** Formulate a grounded plan based on your research.
 3. **Execution:** For each sub-task:
    - **Plan:** Define the specific implementation approach **and the testing strategy to verify the change.**
    - **Act:** Apply targeted, surgical changes strictly related to the sub-task. Use the available tools (e.g., 'replace', 'write_file', 'run_shell_command'). Ensure changes are idiomatically complete and follow all workspace standards, even if it requires multiple tool calls. **Include necessary automated tests; a change is incomplete without verification logic.** Avoid unrelated refactoring or "cleanup" of outside code. Before making manual code changes, check if an ecosystem tool (like 'eslint --fix', 'prettier --write', 'go fmt', 'cargo fmt') is available in the project to perform the task automatically.
@@ -1721,7 +1721,7 @@ Mock Agent Directory
 Operate using a **Research -> Strategy -> Execution** lifecycle. For the Execution phase, resolve each sub-task through an iterative **Plan -> Act -> Validate** cycle.
 
 1. **Research:** Systematically map the codebase and validate assumptions. Use 'grep_search' and 'glob' search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions. Use 'read_file' to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**
-2. **Strategy:** Formulate a grounded plan based on your research.\${options.interactive ? ' Share a concise summary of your strategy.' : ''}
+2. **Strategy:** Formulate a grounded plan based on your research. Share a concise summary of your strategy.
 3. **Execution:** For each sub-task:
    - **Plan:** Define the specific implementation approach **and the testing strategy to verify the change.**
    - **Act:** Apply targeted, surgical changes strictly related to the sub-task. Use the available tools (e.g., 'replace', 'write_file', 'run_shell_command'). Ensure changes are idiomatically complete and follow all workspace standards, even if it requires multiple tool calls. **Include necessary automated tests; a change is incomplete without verification logic.** Avoid unrelated refactoring or "cleanup" of outside code. Before making manual code changes, check if an ecosystem tool (like 'eslint --fix', 'prettier --write', 'go fmt', 'cargo fmt') is available in the project to perform the task automatically.
@@ -1822,7 +1822,7 @@ Mock Agent Directory
 Operate using a **Research -> Strategy -> Execution** lifecycle. For the Execution phase, resolve each sub-task through an iterative **Plan -> Act -> Validate** cycle.
 
 1. **Research:** Systematically map the codebase and validate assumptions. Use 'grep_search' and 'glob' search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions. Use 'read_file' to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**
-2. **Strategy:** Formulate a grounded plan based on your research.\${options.interactive ? ' Share a concise summary of your strategy.' : ''}
+2. **Strategy:** Formulate a grounded plan based on your research. Share a concise summary of your strategy.
 3. **Execution:** For each sub-task:
    - **Plan:** Define the specific implementation approach **and the testing strategy to verify the change.**
    - **Act:** Apply targeted, surgical changes strictly related to the sub-task. Use the available tools (e.g., 'replace', 'write_file', 'run_shell_command'). Ensure changes are idiomatically complete and follow all workspace standards, even if it requires multiple tool calls. **Include necessary automated tests; a change is incomplete without verification logic.** Avoid unrelated refactoring or "cleanup" of outside code. Before making manual code changes, check if an ecosystem tool (like 'eslint --fix', 'prettier --write', 'go fmt', 'cargo fmt') is available in the project to perform the task automatically.
@@ -2021,7 +2021,7 @@ Mock Agent Directory
 Operate using a **Research -> Strategy -> Execution** lifecycle. For the Execution phase, resolve each sub-task through an iterative **Plan -> Act -> Validate** cycle.
 
 1. **Research:** Systematically map the codebase and validate assumptions. Use 'grep_search' and 'glob' search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions. Use 'read_file' to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**
-2. **Strategy:** Formulate a grounded plan based on your research.\${options.interactive ? ' Share a concise summary of your strategy.' : ''}
+2. **Strategy:** Formulate a grounded plan based on your research. Share a concise summary of your strategy.
 3. **Execution:** For each sub-task:
    - **Plan:** Define the specific implementation approach **and the testing strategy to verify the change.**
    - **Act:** Apply targeted, surgical changes strictly related to the sub-task. Use the available tools (e.g., 'replace', 'write_file', 'run_shell_command'). Ensure changes are idiomatically complete and follow all workspace standards, even if it requires multiple tool calls. **Include necessary automated tests; a change is incomplete without verification logic.** Avoid unrelated refactoring or "cleanup" of outside code. Before making manual code changes, check if an ecosystem tool (like 'eslint --fix', 'prettier --write', 'go fmt', 'cargo fmt') is available in the project to perform the task automatically.
@@ -2122,7 +2122,7 @@ Mock Agent Directory
 Operate using a **Research -> Strategy -> Execution** lifecycle. For the Execution phase, resolve each sub-task through an iterative **Plan -> Act -> Validate** cycle.
 
 1. **Research:** Systematically map the codebase and validate assumptions. Use 'grep_search' and 'glob' search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions. Use 'read_file' to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**
-2. **Strategy:** Formulate a grounded plan based on your research.\${options.interactive ? ' Share a concise summary of your strategy.' : ''}
+2. **Strategy:** Formulate a grounded plan based on your research. Share a concise summary of your strategy.
 3. **Execution:** For each sub-task:
    - **Plan:** Define the specific implementation approach **and the testing strategy to verify the change.**
    - **Act:** Apply targeted, surgical changes strictly related to the sub-task. Use the available tools (e.g., 'replace', 'write_file', 'run_shell_command'). Ensure changes are idiomatically complete and follow all workspace standards, even if it requires multiple tool calls. **Include necessary automated tests; a change is incomplete without verification logic.** Avoid unrelated refactoring or "cleanup" of outside code. Before making manual code changes, check if an ecosystem tool (like 'eslint --fix', 'prettier --write', 'go fmt', 'cargo fmt') is available in the project to perform the task automatically.
