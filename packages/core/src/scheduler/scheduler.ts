@@ -51,6 +51,7 @@ export interface SchedulerOptions {
   getPreferredEditor: () => EditorType | undefined;
   schedulerId: string;
   parentCallId?: string;
+  onWaitingForConfirmation?: (waiting: boolean) => void;
 }
 
 const createErrorResponse = (
@@ -90,6 +91,7 @@ export class Scheduler {
   private readonly getPreferredEditor: () => EditorType | undefined;
   private readonly schedulerId: string;
   private readonly parentCallId?: string;
+  private readonly onWaitingForConfirmation?: (waiting: boolean) => void;
 
   private isProcessing = false;
   private isCancelling = false;
@@ -101,6 +103,7 @@ export class Scheduler {
     this.getPreferredEditor = options.getPreferredEditor;
     this.schedulerId = options.schedulerId;
     this.parentCallId = options.parentCallId;
+    this.onWaitingForConfirmation = options.onWaitingForConfirmation;
     this.state = new SchedulerStateManager(
       this.messageBus,
       this.schedulerId,
@@ -437,6 +440,7 @@ export class Scheduler {
         modifier: this.modifier,
         getPreferredEditor: this.getPreferredEditor,
         schedulerId: this.schedulerId,
+        onWaitingForConfirmation: this.onWaitingForConfirmation,
       });
       outcome = result.outcome;
       lastDetails = result.lastDetails;
