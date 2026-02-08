@@ -68,7 +68,8 @@ export interface MaskingResult {
  */
 export class ToolOutputMaskingService {
   async mask(history: Content[], config: Config): Promise<MaskingResult> {
-    if (history.length === 0) {
+    const maskingConfig = await config.getToolOutputMaskingConfig();
+    if (!maskingConfig.enabled || history.length === 0) {
       return { newHistory: history, maskedCount: 0, tokensSaved: 0 };
     }
 
@@ -84,8 +85,6 @@ export class ToolOutputMaskingService {
       content: string;
       originalPart: Part;
     }> = [];
-
-    const maskingConfig = config.getToolOutputMaskingConfig();
 
     // Decide where to start scanning.
     // If PROTECT_LATEST_TURN is true, we skip the most recent message (index history.length - 1).
