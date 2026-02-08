@@ -272,6 +272,7 @@ describe('Gemini Client (client.ts)', () => {
       getModelAvailabilityService: vi
         .fn()
         .mockReturnValue(createAvailabilityServiceMock()),
+      setUseCreditsForNextRequest: vi.fn(),
     } as unknown as Config;
     mockConfig.getHookSystem = vi.fn().mockReturnValue(mockHookSystem);
 

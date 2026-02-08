@@ -39,6 +39,30 @@ export type ClientMetadataPluginType =
   | 'AIPLUGIN_INTELLIJ'
   | 'AIPLUGIN_STUDIO';
 
+/**
+ * Credit types that can be used for API consumption.
+ */
+export type CreditType = 'CREDIT_TYPE_UNSPECIFIED' | 'GOOGLE_ONE_AI';
+
+/**
+ * Represents a credit amount for a specific credit type.
+ * Used in LoadCodeAssistResponse for available credits and
+ * in GenerateContentResponse for consumed/remaining credits.
+ */
+export interface Credits {
+  creditType: CreditType;
+  creditAmount: string; // int64 represented as string in JSON
+}
+
+/** Alias for Credits used in available_credits context */
+export type AvailableCredits = Credits;
+
+/** Alias for Credits used in consumedCredits context */
+export type ConsumedCredits = Credits;
+
+/** Alias for Credits used in remainingCredits context */
+export type RemainingCredits = Credits;
+
 export interface LoadCodeAssistRequest {
   cloudaicompanionProject?: string;
   metadata: ClientMetadata;
@@ -69,6 +93,8 @@ export interface GeminiUserTier {
   privacyNotice?: PrivacyNotice;
   hasAcceptedTos?: boolean;
   hasOnboardedPreviously?: boolean;
+  /** Available AI credits for this tier (e.g., Google One AI credits) */
+  availableCredits?: AvailableCredits[];
 }
 
 /**

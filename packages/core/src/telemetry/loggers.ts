@@ -78,6 +78,7 @@ import { bufferTelemetryEvent } from './sdk.js';
 import type { UiEvent } from './uiTelemetry.js';
 import { uiTelemetryService } from './uiTelemetry.js';
 import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
+import type { BillingTelemetryEvent } from './billingEvents.js';
 
 export function logCliConfiguration(
   config: Config,
@@ -742,6 +743,20 @@ export function logHookCall(config: Config, event: HookCallEvent): void {
 export function logStartupStats(
   config: Config,
   event: StartupStatsEvent,
+): void {
+  bufferTelemetryEvent(() => {
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    };
+    logger.emit(logRecord);
+  });
+}
+
+export function logBillingEvent(
+  config: Config,
+  event: BillingTelemetryEvent,
 ): void {
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);

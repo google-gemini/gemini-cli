@@ -54,6 +54,7 @@ describe('statsCommand', () => {
       selectedAuthType: '',
       tier: undefined,
       userEmail: 'mock@example.com',
+      creditBalance: 0,
     });
   });
 
@@ -66,6 +67,7 @@ describe('statsCommand', () => {
     mockContext.services.config = {
       refreshUserQuota: mockRefreshUserQuota,
       getUserTierName: mockGetUserTierName,
+      getUserPaidTier: vi.fn(),
     } as unknown as Config;
 
     await statsCommand.action(mockContext, '');

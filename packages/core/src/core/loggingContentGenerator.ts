@@ -23,7 +23,7 @@ import {
   ApiErrorEvent,
 } from '../telemetry/types.js';
 import type { Config } from '../config/config.js';
-import type { UserTierId } from '../code_assist/types.js';
+import type { UserTierId, GeminiUserTier } from '../code_assist/types.js';
 import {
   logApiError,
   logApiRequest,
@@ -58,6 +58,10 @@ export class LoggingContentGenerator implements ContentGenerator {
 
   get userTierName(): string | undefined {
     return this.wrapped.userTierName;
+  }
+
+  get paidTier(): GeminiUserTier | undefined {
+    return this.wrapped.paidTier;
   }
 
   private logApiRequest(

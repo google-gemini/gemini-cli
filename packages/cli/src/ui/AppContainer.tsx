@@ -37,6 +37,7 @@ import {
   type IdeInfo,
   type IdeContext,
   type UserTierId,
+  type GeminiUserTier,
   type UserFeedbackPayload,
   type AgentDefinition,
   IdeClient,
@@ -319,6 +320,9 @@ export const AppContainer = (props: AppContainerProps) => {
   const [currentModel, setCurrentModel] = useState(config.getModel());
 
   const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
+  const [paidTier, setPaidTier] = useState<GeminiUserTier | undefined>(
+    undefined,
+  );
 
   const [isConfigInitialized, setConfigInitialized] = useState(false);
 
@@ -584,10 +588,17 @@ export const AppContainer = (props: AppContainerProps) => {
     handleProQuotaChoice,
     validationRequest,
     handleValidationChoice,
+    // G1 AI Credits
+    overageMenuRequest,
+    handleOverageMenuChoice,
+    emptyWalletRequest,
+    handleEmptyWalletChoice,
   } = useQuotaAndFallback({
     config,
     historyManager,
     userTier,
+    paidTier,
+    settings,
     setModelSwitchedFromQuotaError,
     onShowAuthSelection: () => setAuthState(AuthState.Updating),
   });
@@ -700,6 +711,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     // Only sync when not currently authenticating
     if (authState === AuthState.Authenticated) {
       setUserTier(config.getUserTier());
+      setPaidTier(config.getUserPaidTier());
     }
   }, [config, authState]);
 
@@ -1867,6 +1879,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       userTier,
       proQuotaRequest,
       validationRequest,
+      // G1 AI Credits dialog state
+      overageMenuRequest,
+      emptyWalletRequest,
       contextFileNames,
       errorCount,
       availableTerminalHeight,
@@ -1971,6 +1986,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       userTier,
       proQuotaRequest,
       validationRequest,
+      overageMenuRequest,
+      emptyWalletRequest,
       contextFileNames,
       errorCount,
       availableTerminalHeight,
@@ -2050,6 +2067,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleClearScreen,
       handleProQuotaChoice,
       handleValidationChoice,
+      // G1 AI Credits handlers
+      handleOverageMenuChoice,
+      handleEmptyWalletChoice,
       openSessionBrowser,
       closeSessionBrowser,
       handleResumeSession,
@@ -2126,6 +2146,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleClearScreen,
       handleProQuotaChoice,
       handleValidationChoice,
+      handleOverageMenuChoice,
+      handleEmptyWalletChoice,
       openSessionBrowser,
       closeSessionBrowser,
       handleResumeSession,

@@ -16,6 +16,7 @@ export * from './policy/types.js';
 export * from './policy/policy-engine.js';
 export * from './policy/toml-loader.js';
 export * from './policy/config.js';
+export * from './billing/index.js';
 export * from './confirmation-bus/types.js';
 export * from './confirmation-bus/message-bus.js';
 
@@ -90,6 +91,7 @@ export * from './utils/ignorePatterns.js';
 export * from './utils/partUtils.js';
 export * from './utils/promptIdContext.js';
 export * from './utils/thoughtUtils.js';
+export * from './utils/secure-browser-launcher.js';
 export * from './utils/debugLogger.js';
 export * from './utils/events.js';
 export * from './utils/extensionLoader.js';
@@ -170,6 +172,8 @@ export { OAuthUtils } from './mcp/oauth-utils.js';
 
 // Export telemetry functions
 export * from './telemetry/index.js';
+export * from './telemetry/billingEvents.js';
+export { logBillingEvent } from './telemetry/loggers.js';
 export { sessionId } from './utils/session.js';
 export * from './utils/browser.js';
 export { Storage } from './config/storage.js';

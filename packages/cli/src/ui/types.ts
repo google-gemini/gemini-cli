@@ -160,6 +160,8 @@ export type HistoryItemStats = HistoryItemBase & {
   selectedAuthType?: string;
   userEmail?: string;
   tier?: string;
+  /** G1 AI Credits balance, if available */
+  creditBalance?: number;
 };
 
 export type HistoryItemModelStats = HistoryItemBase & {

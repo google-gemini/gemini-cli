@@ -14,7 +14,7 @@ import {
   type Mock,
 } from 'vitest';
 import { act } from 'react';
-import { renderHook } from '../../test-utils/render.js';
+import { renderHook, mockSettings } from '../../test-utils/render.js';
 import {
   type Config,
   type FallbackModelHandler,
@@ -29,6 +29,12 @@ import {
   ModelNotFoundError,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
+  getG1CreditBalance,
+  shouldAutoUseCredits,
+  shouldShowOverageMenu,
+  shouldShowEmptyWalletMenu,
+  logBillingEvent,
+  G1_CREDIT_TYPE,
 } from '@google/gemini-cli-core';
 import { useQuotaAndFallback } from './useQuotaAndFallback.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -36,6 +42,19 @@ import { MessageType } from '../types.js';
 
 // Use a type alias for SpyInstance as it's not directly exported
 type SpyInstance = ReturnType<typeof vi.spyOn>;
+
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    getG1CreditBalance: vi.fn(),
+    shouldAutoUseCredits: vi.fn(),
+    shouldShowOverageMenu: vi.fn(),
+    shouldShowEmptyWalletMenu: vi.fn(),
+    logBillingEvent: vi.fn(),
+  };
+});
 
 describe('useQuotaAndFallback', () => {
   let mockConfig: Config;
@@ -74,6 +93,12 @@ describe('useQuotaAndFallback', () => {
     vi.spyOn(mockConfig, 'setModel');
     vi.spyOn(mockConfig, 'setActiveModel');
     vi.spyOn(mockConfig, 'activateFallbackMode');
+
+    // Mock billing utility functions
+    vi.mocked(getG1CreditBalance).mockReturnValue(0);
+    vi.mocked(shouldAutoUseCredits).mockReturnValue(false);
+    vi.mocked(shouldShowOverageMenu).mockReturnValue(false);
+    vi.mocked(shouldShowEmptyWalletMenu).mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -88,6 +113,8 @@ describe('useQuotaAndFallback', () => {
         userTier: UserTierId.FREE,
         setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
         onShowAuthSelection: mockOnShowAuthSelection,
+        paidTier: null,
+        settings: mockSettings,
       }),
     );
 
@@ -105,6 +132,8 @@ describe('useQuotaAndFallback', () => {
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
           onShowAuthSelection: mockOnShowAuthSelection,
+          paidTier: null,
+          settings: mockSettings,
         }),
       );
       return setFallbackHandlerSpy.mock.calls[0][0] as FallbackModelHandler;
@@ -132,6 +161,8 @@ describe('useQuotaAndFallback', () => {
             userTier: UserTierId.FREE,
             setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
             onShowAuthSelection: mockOnShowAuthSelection,
+            paidTier: null,
+            settings: mockSettings,
           }),
         );
 
@@ -184,6 +215,8 @@ describe('useQuotaAndFallback', () => {
             userTier: UserTierId.FREE,
             setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
             onShowAuthSelection: mockOnShowAuthSelection,
+            paidTier: null,
+            settings: mockSettings,
           }),
         );
 
@@ -250,6 +283,8 @@ describe('useQuotaAndFallback', () => {
               setModelSwitchedFromQuotaError:
                 mockSetModelSwitchedFromQuotaError,
               onShowAuthSelection: mockOnShowAuthSelection,
+              paidTier: null,
+              settings: mockSettings,
             }),
           );
 
@@ -305,6 +340,8 @@ describe('useQuotaAndFallback', () => {
             userTier: UserTierId.FREE,
             setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
             onShowAuthSelection: mockOnShowAuthSelection,
+            paidTier: null,
+            settings: mockSettings,
           }),
         );
 
@@ -345,6 +382,145 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
     });
   });
 
+  describe('G1 AI Credits Flow', () => {
+    const mockPaidTier = {
+      id: UserTierId.STANDARD,
+      userTier: UserTierId.STANDARD,
+      availableCredits: [
+        {
+          creditType: G1_CREDIT_TYPE,
+          creditAmount: '100',
+        },
+      ],
+    };
+
+    beforeEach(() => {
+      // Default to having credits
+      vi.mocked(getG1CreditBalance).mockReturnValue(100);
+    });
+
+    it('should auto-use credits if strategy allows', async () => {
+      vi.mocked(shouldAutoUseCredits).mockReturnValue(true);
+
+      renderHook(() =>
+        useQuotaAndFallback({
+          config: mockConfig,
+          historyManager: mockHistoryManager,
+          userTier: UserTierId.STANDARD,
+          setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          onShowAuthSelection: mockOnShowAuthSelection,
+          paidTier: mockPaidTier,
+          settings: mockSettings,
+        }),
+      );
+
+      const handler = setFallbackHandlerSpy.mock
+        .calls[0][0] as FallbackModelHandler;
+
+      const error = new TerminalQuotaError(
+        'pro quota',
+        mockGoogleApiError,
+        1000 * 60 * 5,
+      );
+
+      const intent = await handler('gemini-pro', 'gemini-flash', error);
+
+      expect(intent).toBe('retry_with_credits');
+      expect(mockHistoryManager.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining('Automatically using AI Credits'),
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should show overage menu if balance > 0 and not auto-using', async () => {
+      vi.mocked(shouldAutoUseCredits).mockReturnValue(false);
+      vi.mocked(shouldShowOverageMenu).mockReturnValue(true);
+
+      const { result } = renderHook(() =>
+        useQuotaAndFallback({
+          config: mockConfig,
+          historyManager: mockHistoryManager,
+          userTier: UserTierId.STANDARD,
+          setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          onShowAuthSelection: mockOnShowAuthSelection,
+          paidTier: mockPaidTier,
+          settings: mockSettings,
+        }),
+      );
+
+      const handler = setFallbackHandlerSpy.mock
+        .calls[0][0] as FallbackModelHandler;
+
+      let promise: Promise<FallbackIntent | null>;
+      act(() => {
+        promise = handler(
+          'gemini-pro',
+          'gemini-flash',
+          new TerminalQuotaError('pro quota', mockGoogleApiError),
+        );
+      });
+
+      expect(result.current.overageMenuRequest).not.toBeNull();
+      expect(result.current.overageMenuRequest?.creditBalance).toBe(100);
+      expect(logBillingEvent).toHaveBeenCalled();
+
+      // Simulate choosing "Use Credits"
+      await act(async () => {
+        result.current.handleOverageMenuChoice('use_credits');
+        await promise!;
+      });
+
+      const intent = await promise!;
+      expect(intent).toBe('retry_with_credits');
+    });
+
+    it('should show empty wallet menu if balance is 0', async () => {
+      vi.mocked(getG1CreditBalance).mockReturnValue(0);
+      vi.mocked(shouldAutoUseCredits).mockReturnValue(false);
+      vi.mocked(shouldShowOverageMenu).mockReturnValue(false);
+      vi.mocked(shouldShowEmptyWalletMenu).mockReturnValue(true);
+
+      const { result } = renderHook(() =>
+        useQuotaAndFallback({
+          config: mockConfig,
+          historyManager: mockHistoryManager,
+          userTier: UserTierId.STANDARD,
+          setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
+          onShowAuthSelection: mockOnShowAuthSelection,
+          paidTier: { ...mockPaidTier, availableCredits: [] },
+          settings: mockSettings,
+        }),
+      );
+
+      const handler = setFallbackHandlerSpy.mock
+        .calls[0][0] as FallbackModelHandler;
+
+      let promise: Promise<FallbackIntent | null>;
+      act(() => {
+        promise = handler(
+          'gemini-pro',
+          'gemini-flash',
+          new TerminalQuotaError('pro quota', mockGoogleApiError),
+        );
+      });
+
+      expect(result.current.emptyWalletRequest).not.toBeNull();
+      expect(logBillingEvent).toHaveBeenCalled();
+
+      // Simulate choosing "Stop"
+      await act(async () => {
+        result.current.handleEmptyWalletChoice('stop');
+        await promise!;
+      });
+
+      const intent = await promise!;
+      expect(intent).toBe('stop');
+    });
+  });
+
   describe('handleProQuotaChoice', () => {
     it('should do nothing if there is no pending pro quota request', () => {
       const { result } = renderHook(() =>
@@ -354,6 +530,8 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
           onShowAuthSelection: mockOnShowAuthSelection,
+          paidTier: null,
+          settings: mockSettings,
         }),
       );
 
@@ -372,6 +550,8 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
           onShowAuthSelection: mockOnShowAuthSelection,
+          paidTier: null,
+          settings: mockSettings,
         }),
       );
 
@@ -403,6 +583,8 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
           onShowAuthSelection: mockOnShowAuthSelection,
+          paidTier: null,
+          settings: mockSettings,
         }),
       );
 
@@ -447,6 +629,8 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
           onShowAuthSelection: mockOnShowAuthSelection,
+          paidTier: null,
+          settings: mockSettings,
         }),
       );
 
@@ -483,6 +667,8 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
           onShowAuthSelection: mockOnShowAuthSelection,
+          paidTier: null,
+          settings: mockSettings,
         }),
       );
 
@@ -527,6 +713,8 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
           onShowAuthSelection: mockOnShowAuthSelection,
+          paidTier: null,
+          settings: mockSettings,
         }),
       );
 
@@ -542,6 +730,8 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
           onShowAuthSelection: mockOnShowAuthSelection,
+          paidTier: null,
+          settings: mockSettings,
         }),
       );
 
@@ -584,6 +774,8 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
           onShowAuthSelection: mockOnShowAuthSelection,
+          paidTier: null,
+          settings: mockSettings,
         }),
       );
 
@@ -626,6 +818,8 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
           onShowAuthSelection: mockOnShowAuthSelection,
+          paidTier: null,
+          settings: mockSettings,
         }),
       );
 
@@ -656,6 +850,8 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
           onShowAuthSelection: mockOnShowAuthSelection,
+          paidTier: null,
+          settings: mockSettings,
         }),
       );
 
@@ -686,6 +882,8 @@ To disable gemini-3-pro-preview, disable "Preview features" in /settings.`,
           userTier: UserTierId.FREE,
           setModelSwitchedFromQuotaError: mockSetModelSwitchedFromQuotaError,
           onShowAuthSelection: mockOnShowAuthSelection,
+          paidTier: null,
+          settings: mockSettings,
         }),
       );
 

@@ -47,6 +47,31 @@ export interface ValidationDialogRequest {
   resolve: (intent: ValidationIntent) => void;
 }
 
+/** Intent for overage menu dialog */
+export type OverageMenuIntent =
+  | 'use_credits'
+  | 'manage'
+  | 'switch_auth'
+  | 'stop';
+
+export interface OverageMenuDialogRequest {
+  failedModel: string;
+  resetTime?: string;
+  creditBalance: number;
+  userEmail?: string;
+  resolve: (intent: OverageMenuIntent) => void;
+}
+
+/** Intent for empty wallet dialog */
+export type EmptyWalletIntent = 'get_credits' | 'switch_auth' | 'stop';
+
+export interface EmptyWalletDialogRequest {
+  failedModel: string;
+  resetTime?: string;
+  userEmail?: string;
+  resolve: (intent: EmptyWalletIntent) => void;
+}
+
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import { type RestartReason } from '../hooks/useIdeTrustListener.js';
 import type { TerminalBackgroundColor } from '../utils/terminalCapabilityManager.js';
@@ -119,6 +144,9 @@ export interface UIState {
   userTier: UserTierId | undefined;
   proQuotaRequest: ProQuotaDialogRequest | null;
   validationRequest: ValidationDialogRequest | null;
+  // G1 AI Credits overage flow
+  overageMenuRequest: OverageMenuDialogRequest | null;
+  emptyWalletRequest: EmptyWalletDialogRequest | null;
   currentModel: string;
   contextFileNames: string[];
   errorCount: number;

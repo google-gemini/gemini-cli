@@ -18,6 +18,8 @@ import { EditorSettingsDialog } from './EditorSettingsDialog.js';
 import { PrivacyNotice } from '../privacy/PrivacyNotice.js';
 import { ProQuotaDialog } from './ProQuotaDialog.js';
 import { ValidationDialog } from './ValidationDialog.js';
+import { OverageMenuDialog } from './OverageMenuDialog.js';
+import { EmptyWalletDialog } from './EmptyWalletDialog.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
 import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
 import { SessionBrowser } from './SessionBrowser.js';
@@ -90,6 +92,25 @@ export const DialogManager = ({
         validationDescription={uiState.validationRequest.validationDescription}
         learnMoreUrl={uiState.validationRequest.learnMoreUrl}
         onChoice={uiActions.handleValidationChoice}
+      />
+    );
+  }
+  if (uiState.overageMenuRequest) {
+    return (
+      <OverageMenuDialog
+        failedModel={uiState.overageMenuRequest.failedModel}
+        resetTime={uiState.overageMenuRequest.resetTime}
+        creditBalance={uiState.overageMenuRequest.creditBalance}
+        onChoice={uiActions.handleOverageMenuChoice}
+      />
+    );
+  }
+  if (uiState.emptyWalletRequest) {
+    return (
+      <EmptyWalletDialog
+        failedModel={uiState.emptyWalletRequest.failedModel}
+        resetTime={uiState.emptyWalletRequest.resetTime}
+        onChoice={uiActions.handleEmptyWalletChoice}
       />
     );
   }
