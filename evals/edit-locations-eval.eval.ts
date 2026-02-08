@@ -65,7 +65,7 @@ test('capitalize capitalizes the first letter', () => {
 });
 `,
     },
-    prompt: 'Fix the bug in src/math.ts.',
+    prompt: 'Fix the bug in src/math.ts. Do not run the code or tests.',
     timeout: 180000,
     assert: async (rig) => {
       const toolLogs = rig.readToolLogs();
