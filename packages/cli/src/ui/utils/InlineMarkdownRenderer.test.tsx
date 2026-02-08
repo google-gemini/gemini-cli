@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -21,6 +21,8 @@ describe('InlineMarkdownRenderer', () => {
       ['compile-time**', 14],
       ['$\\rightarrow$', 1],
       ['Sign Out $\\rightarrow$ Sign In', 18],
+      ['[Google](https://google.com)', 27],
+      ['Preceding [Link](url)', 20],
     ])(
       'should measure markdown text length correctly for "%s"',
       (input, expected) => {
