@@ -515,10 +515,6 @@ export class ShellTool extends BaseDeclarativeTool<
     const definition = getShellDefinition(
       this.config.getEnableInteractiveShell(),
     );
-    if (!modelId) {
-      return super.getSchema();
-    }
-
     return resolveToolDeclaration(definition, modelId);
   }
 }

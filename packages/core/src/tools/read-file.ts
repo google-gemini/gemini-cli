@@ -237,9 +237,6 @@ export class ReadFileTool extends BaseDeclarativeTool<
   }
 
   override getSchema(modelId?: string) {
-    if (!modelId) {
-      return super.getSchema();
-    }
     return resolveToolDeclaration(READ_FILE_DEFINITION, modelId);
   }
 }
