@@ -259,6 +259,10 @@ export class GeminiClient {
   private lastUsedModelId?: string;
 
   async setTools(modelId?: string): Promise<void> {
+    if (!this.chat) {
+      return;
+    }
+
     if (modelId && modelId === this.lastUsedModelId) {
       return;
     }
@@ -346,6 +350,13 @@ export class GeminiClient {
         tools,
         history,
         resumedSessionData,
+        async (modelId: string) => {
+          this.lastUsedModelId = modelId;
+          const toolRegistry = this.config.getToolRegistry();
+          const toolDeclarations =
+            toolRegistry.getFunctionDeclarations(modelId);
+          return [{ functionDeclarations: toolDeclarations }];
+        },
       );
     } catch (error) {
       await reportError(
