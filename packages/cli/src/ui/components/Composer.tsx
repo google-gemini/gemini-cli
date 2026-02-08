@@ -67,6 +67,8 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     uiState.streamingState === StreamingState.Responding;
   const showLoadingIndicator =
     (!uiState.embeddedShellFocused || uiState.isBackgroundShellVisible) &&
+    (uiState.streamingState === StreamingState.Responding ||
+      uiState.streamingState === StreamingState.WaitingForConfirmation) &&
     !hasPendingActionRequired;
   const showApprovalIndicator = !uiState.shellModeActive;
   const showRawMarkdownIndicator = !uiState.renderMarkdown;
