@@ -45,7 +45,6 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     setRemoteAdminSettings: vi.fn(),
     isYoloModeDisabled: vi.fn(() => false),
     isPlanEnabled: vi.fn(() => false),
-    isEventDrivenSchedulerEnabled: vi.fn(() => false),
     getCoreTools: vi.fn(() => []),
     getAllowedTools: vi.fn(() => []),
     getApprovalMode: vi.fn(() => 'default'),
