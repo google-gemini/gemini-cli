@@ -1,0 +1,120 @@
+# Plan Mode <!-- omit in toc -->
+
+Plan Mode is a safe, read-only mode for researching and designing complex
+changes. It prevents modifications while you research, design and plan an
+implementation strategy.
+
+> **Note: Plan Mode is currently an experimental feature.**
+>
+> Experimental features are subject to change. Using Plan Mode requires explicit
+> [enablement](#enabling-plan-mode).
+
+- [Enabling Plan Mode](#enabling-plan-mode)
+- [Starting in Plan Mode](#starting-in-plan-mode)
+- [How to use Plan Mode](#how-to-use-plan-mode)
+  - [Entering Plan Mode](#entering-plan-mode)
+  - [The Planning Workflow](#the-planning-workflow)
+  - [Exiting Plan Mode](#exiting-plan-mode)
+- [Tool Restrictions](#tool-restrictions)
+- [Feedback](#feedback)
+
+## Enabling Plan Mode
+
+Plan Mode is currently an experimental feature. You can enable it using the
+`/settings` command:
+
+1.  Type `/settings` in the CLI.
+2.  Search for `Plan`.
+3.  Set the value to `true`.
+
+Alternatively, you can manually update your `settings.json`:
+
+```json
+{
+  "experimental": {
+    "plan": true
+  }
+}
+```
+
+## Starting in Plan Mode
+
+You can configure Gemini CLI to start directly in Plan Mode by default:
+
+1.  Type `/settings` in the CLI.
+2.  Search for `Approval Mode`.
+3.  Set the value to `Plan`.
+
+Other ways to start in Plan Mode:
+
+- **CLI Flag:** `gemini --approval-mode=plan`
+- **Manual Settings:** Manually update your `settings.json`:
+
+  ```json
+  {
+    "tools": {
+      "approvalMode": "plan"
+    }
+  }
+  ```
+
+## How to use Plan Mode
+
+### Entering Plan Mode
+
+You can enter Plan Mode in three ways:
+
+1.  **Keyboard Shortcut:** Press `Shift+Tab` to cycle through approval modes
+    (`Default` -> `Plan` -> `Auto-Edit`).
+2.  **Command:** Type `/plan` in the input box.
+3.  **Natural Language:** Ask the agent to "start a plan for...".
+
+### The Planning Workflow
+
+1.  **Requirements:** The agent clarifies goals using `ask_user`.
+2.  **Exploration:** The agent uses read-only tools (like [`read_file`]) to map
+    the codebase and validate assumptions.
+3.  **Planning:** A detailed plan is written to a temporary Markdown file.
+4.  **Review:** You review the plan.
+    - **Approve:** Exit Plan Mode and start implementation (switching to
+      Auto-Edit or Default approval mode).
+    - **Iterate:** Provide feedback to refine the plan.
+
+### Exiting Plan Mode
+
+To exit Plan Mode:
+
+1. **Tool:** The agent calls the `exit_plan_mode` tool to present the finalized
+   plan for your approval.
+2. **Keyboard Shortcut:** Press `Shift+Tab` to cycle to the desired mode.
+
+## Tool Restrictions
+
+Plan Mode enforces strict safety policies to prevent accidental changes.
+
+These are the only allowed tools:
+
+- **FileSystem (Read):** [`read_file`], [`list_directory`], [`glob`]
+- **Search:** [`grep_search`], [`google_web_search`]
+- **Interaction:** `ask_user`
+- **MCP Tools (Read):** Read-only [MCP tools] (e.g., `github_read_issue`,
+  `postgres_read_schema`) are allowed.
+- **Planning (Write):** [`write_file`] and [`replace`] ONLY allowed for `.md`
+  files in the `~/.gemini/tmp/<project>/plans/` directory.
+
+## Feedback
+
+Plan Mode is in active development. Your feedback is invaluable as we refine
+this feature. If you have ideas, suggestions, or encounter issues:
+
+- Use the `/bug` command within the CLI to file an issue.
+- [Open an issue](https://github.com/google-gemini/gemini-cli/issues) on GitHub.
+
+[`list_directory`]: ../tools/file-system.md#1-list_directory-readfolder
+[`read_file`]: ../tools/file-system.md#2-read_file-readfile
+[`grep_search`]: ../tools/file-system.md#5-grep_search-searchtext
+[`write_file`]: ../tools/file-system.md#3-write_file-writefile
+[`glob`]: ../tools/file-system.md#4-glob-findfiles
+[`google_web_search`]: ../tools/web-search.md
+[`replace`]: ../tools/file-system.md#6-replace-edit
+[MCP tools]: ../tools/mcp-server.md
