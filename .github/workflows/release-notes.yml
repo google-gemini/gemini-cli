@@ -1,0 +1,84 @@
+# This workflow is triggered on every new release.
+# It uses Gemini to generate release notes and creates a PR with the changes.
+name: 'Generate Release Notes'
+
+on:
+  release:
+    types: ['created']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'New version (e.g., v1.2.3)'
+        required: true
+        type: 'string'
+      body:
+        description: 'Release notes body'
+        required: true
+        type: 'string'
+      time:
+        description: 'Release time'
+        required: true
+        type: 'string'
+
+jobs:
+  generate-release-notes:
+    runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'write'
+      pull-requests: 'write'
+    steps:
+      - name: 'Checkout repository'
+        uses: 'actions/checkout@v4'
+        with:
+          # The user-level skills need to be available to the workflow
+          fetch-depth: 0
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@v4'
+        with:
+          node-version: '20'
+
+      - name: 'Get release information'
+        id: 'release_info'
+        run: |
+          VERSION="${{ github.event.inputs.version || github.event.release.tag_name }}"
+          BODY="${{ github.event.inputs.body || github.event.release.body }}"
+          TIME="${{ github.event.inputs.time || github.event.release.created_at }}"
+
+          echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "TIME=${TIME}" >> "$GITHUB_OUTPUT"
+
+          # Use a heredoc to preserve multiline release body
+          echo 'RAW_CHANGELOG<<EOF' >> "$GITHUB_OUTPUT"
+          echo "${BODY}" >> "$GITHUB_OUTPUT"
+          echo 'EOF' >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
+
+      - name: 'Generate Changelog with Gemini'
+        uses: 'google-github-actions/run-gemini-cli@a3bf79042542528e91937b3a3a6fbc4967ee3c31' # ratchet:google-github-actions/run-gemini-cli@v0
+        with:
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          prompt: |
+            Activate the 'docs-changelog' skill.
+
+            **Release Information:**
+            - New Version: ${{ steps.release_info.outputs.VERSION }}
+            - Release Date: ${{ steps.release_info.outputs.TIME }}
+            - Raw Changelog Data: ${{ steps.release_info.outputs.RAW_CHANGELOG }}
+
+            Execute the release notes generation process using the information provided.
+
+      - name: 'Create Pull Request'
+        uses: 'peter-evans/create-pull-request@v6'
+        with:
+          token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
+          commit-message: 'docs(changelog): update for ${{ steps.release_info.outputs.VERSION }}'
+          title: 'Changelog for ${{ steps.release_info.outputs.VERSION }}'
+          body: |
+            This PR contains the auto-generated changelog for the ${{ steps.release_info.outputs.VERSION }} release.
+
+            Please review and merge.
+          branch: 'changelog-${{ steps.release_info.outputs.VERSION }}'
+          team-reviewers: 'gemini-cli-docs, gemini-cli-maintainers'
+          delete-branch: true

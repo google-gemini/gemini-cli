@@ -125,7 +125,7 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
         approvalMode: evalCase.approvalMode ?? 'yolo',
         timeout: evalCase.timeout,
         env: {
-          GEMINI_CLI_ACTIVITY_LOG_FILE: activityLogFile,
+          GEMINI_CLI_ACTIVITY_LOG_TARGET: activityLogFile,
         },
       });
 

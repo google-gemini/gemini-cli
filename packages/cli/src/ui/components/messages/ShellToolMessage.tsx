@@ -77,6 +77,18 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   );
 
   const { setEmbeddedShellFocused } = useUIActions();
+  const wasFocusedRef = React.useRef(false);
+
+  React.useEffect(() => {
+    if (isThisShellFocused) {
+      wasFocusedRef.current = true;
+    } else if (wasFocusedRef.current) {
+      if (embeddedShellFocused) {
+        setEmbeddedShellFocused(false);
+      }
+      wasFocusedRef.current = false;
+    }
+  }, [isThisShellFocused, embeddedShellFocused, setEmbeddedShellFocused]);
 
   const headerRef = React.useRef<DOMElement>(null);
 
@@ -95,20 +107,6 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   useMouseClick(headerRef, handleFocus, { isActive: !!isThisShellFocusable });
 
   useMouseClick(contentRef, handleFocus, { isActive: !!isThisShellFocusable });
-
-  const wasFocusedRef = React.useRef(false);
-
-  React.useEffect(() => {
-    if (isThisShellFocused) {
-      wasFocusedRef.current = true;
-    } else if (wasFocusedRef.current) {
-      if (embeddedShellFocused) {
-        setEmbeddedShellFocused(false);
-      }
-
-      wasFocusedRef.current = false;
-    }
-  }, [isThisShellFocused, embeddedShellFocused, setEmbeddedShellFocused]);
 
   const { shouldShowFocusHint } = useFocusHint(
     isThisShellFocusable,

@@ -29,13 +29,6 @@
       "default": {},
       "type": "object",
       "properties": {
-        "previewFeatures": {
-          "title": "Preview Features (e.g., models)",
-          "description": "Enable preview features (e.g., preview models).",
-          "markdownDescription": "Enable preview features (e.g., preview models).\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
-          "type": "boolean"
-        },
         "preferredEditor": {
           "title": "Preferred Editor",
           "description": "The preferred editor to open files in.",
@@ -1187,25 +1180,11 @@
           "default": true,
           "type": "boolean"
         },
-        "enableToolOutputTruncation": {
-          "title": "Enable Tool Output Truncation",
-          "description": "Enable truncation of large tool outputs.",
-          "markdownDescription": "Enable truncation of large tool outputs.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `true`",
-          "default": true,
-          "type": "boolean"
-        },
         "truncateToolOutputThreshold": {
           "title": "Tool Output Truncation Threshold",
-          "description": "Truncate tool output if it is larger than this many characters. Set to -1 to disable.",
-          "markdownDescription": "Truncate tool output if it is larger than this many characters. Set to -1 to disable.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `4000000`",
-          "default": 4000000,
-          "type": "number"
-        },
-        "truncateToolOutputLines": {
-          "title": "Tool Output Truncation Lines",
-          "description": "The number of lines to keep when truncating tool output.",
-          "markdownDescription": "The number of lines to keep when truncating tool output.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `1000`",
-          "default": 1000,
+          "description": "Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.",
+          "markdownDescription": "Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `40000`",
+          "default": 40000,
           "type": "number"
         },
         "disableLLMCorrection": {
@@ -1428,6 +1407,44 @@
       "default": {},
       "type": "object",
       "properties": {
+        "toolOutputMasking": {
+          "title": "Tool Output Masking",
+          "description": "Advanced settings for tool output masking to manage context window efficiency.",
+          "markdownDescription": "Advanced settings for tool output masking to manage context window efficiency.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "Enable Tool Output Masking",
+              "description": "Enables tool output masking to save tokens.",
+              "markdownDescription": "Enables tool output masking to save tokens.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "toolProtectionThreshold": {
+              "title": "Tool Protection Threshold",
+              "description": "Minimum number of tokens to protect from masking (most recent tool outputs).",
+              "markdownDescription": "Minimum number of tokens to protect from masking (most recent tool outputs).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `50000`",
+              "default": 50000,
+              "type": "number"
+            },
+            "minPrunableTokensThreshold": {
+              "title": "Min Prunable Tokens Threshold",
+              "description": "Minimum prunable tokens required to trigger a masking pass.",
+              "markdownDescription": "Minimum prunable tokens required to trigger a masking pass.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `30000`",
+              "default": 30000,
+              "type": "number"
+            },
+            "protectLatestTurn": {
+              "title": "Protect Latest Turn",
+              "description": "Ensures the absolute latest turn is never masked, regardless of token count.",
+              "markdownDescription": "Ensures the absolute latest turn is never masked, regardless of token count.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
         "enableAgents": {
           "title": "Enable Agents",
           "description": "Enable local and remote subagents. Warning: Experimental feature, uses YOLO mode for subagents",
@@ -1445,14 +1462,7 @@
         "extensionConfig": {
           "title": "Extension Configuration",
           "description": "Enable requesting and fetching of extension settings.",
-          "markdownDescription": "Enable requesting and fetching of extension settings.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
-          "type": "boolean"
-        },
-        "enableEventDrivenScheduler": {
-          "title": "Event Driven Scheduler",
-          "description": "Enables event-driven scheduler within the CLI session.",
-          "markdownDescription": "Enables event-driven scheduler within the CLI session.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+          "markdownDescription": "Enable requesting and fetching of extension settings.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
@@ -1712,6 +1722,16 @@
               "markdownDescription": "If false, disallows MCP servers from being used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `true`",
               "default": true,
               "type": "boolean"
+            },
+            "config": {
+              "title": "MCP Config",
+              "description": "Admin-configured MCP servers.",
+              "markdownDescription": "Admin-configured MCP servers.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `{}`",
+              "default": {},
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/MCPServerConfig"
+              }
             }
           },
           "additionalProperties": false

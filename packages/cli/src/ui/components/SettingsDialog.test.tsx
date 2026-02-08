@@ -368,20 +368,12 @@ describe('SettingsDialog', () => {
 
       const { stdin, unmount, lastFrame } = renderDialog(settings, onSelect);
 
-      // Wait for initial render and verify we're on Preview Features (first setting)
-      await waitFor(() => {
-        expect(lastFrame()).toContain('Preview Features (e.g., models)');
-      });
-
-      // Navigate to Vim Mode setting and verify we're there
-      act(() => {
-        stdin.write(TerminalKeys.DOWN_ARROW as string);
-      });
+      // Wait for initial render and verify we're on Vim Mode (first setting)
       await waitFor(() => {
         expect(lastFrame()).toContain('Vim Mode');
       });
 
-      // Toggle the setting
+      // Toggle the setting (Vim Mode is the first setting now)
       act(() => {
         stdin.write(TerminalKeys.ENTER as string);
       });
@@ -1404,7 +1396,6 @@ describe('SettingsDialog', () => {
           },
           tools: {
             truncateToolOutputThreshold: 50000,
-            truncateToolOutputLines: 1000,
           },
           context: {
             discoveryMaxDirs: 500,
@@ -1473,7 +1464,6 @@ describe('SettingsDialog', () => {
             enableInteractiveShell: true,
             useRipgrep: true,
             truncateToolOutputThreshold: 25000,
-            truncateToolOutputLines: 500,
           },
           security: {
             folderTrust: {

@@ -32,7 +32,7 @@
     "docs:settings": "tsx ./scripts/generate-settings-doc.ts",
     "docs:keybindings": "tsx ./scripts/generate-keybindings-doc.ts",
     "build": "node scripts/build.js",
-    "build-and-start": "npm run build && npm run start",
+    "build-and-start": "npm run build && npm run start --",
     "build:vscode": "node scripts/build_vscode_companion.js",
     "build:all": "npm run build && npm run build:sandbox && npm run build:vscode",
     "build:packages": "npm run build --workspaces",
@@ -86,6 +86,7 @@
     "@types/minimatch": "^5.1.2",
     "@types/mock-fs": "^4.13.4",
     "@types/prompts": "^2.4.9",
+    "@types/proper-lockfile": "^4.1.4",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@types/shell-quote": "^1.7.5",
@@ -126,6 +127,7 @@
   "dependencies": {
     "ink": "npm:@jrichman/ink@6.4.8",
     "latest-version": "^9.0.0",
+    "proper-lockfile": "^4.1.2",
     "simple-git": "^3.28.0"
   },
   "optionalDependencies": {

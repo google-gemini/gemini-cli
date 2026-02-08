@@ -53,7 +53,6 @@ describe('<ShellToolMessage />', () => {
       uiActions,
       ...options,
     });
-
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -78,7 +77,6 @@ describe('<ShellToolMessage />', () => {
         expect(mockSetEmbeddedShellFocused).toHaveBeenCalledWith(true);
       });
     });
-
     it('resets focus when shell finishes', async () => {
       let updateStatus: (s: ToolCallStatus) => void = () => {};
 
@@ -103,7 +101,7 @@ describe('<ShellToolMessage />', () => {
 
       // Verify it is initially focused
       await waitFor(() => {
-        expect(lastFrame()).toContain('(Focused)');
+        expect(lastFrame()).toContain('(Shift+Tab to unfocus)');
       });
 
       // Now update status to Success
@@ -114,6 +112,7 @@ describe('<ShellToolMessage />', () => {
       // Should call setEmbeddedShellFocused(false) because isThisShellFocused became false
       await waitFor(() => {
         expect(mockSetEmbeddedShellFocused).toHaveBeenCalledWith(false);
+        expect(lastFrame()).not.toContain('(Shift+Tab to unfocus)');
       });
     });
   });

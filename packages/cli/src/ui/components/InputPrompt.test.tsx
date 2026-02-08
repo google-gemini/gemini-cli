@@ -43,6 +43,7 @@ import { StreamingState } from '../types.js';
 import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 import type { UIState } from '../contexts/UIStateContext.js';
 import { isLowColorDepth } from '../utils/terminalUtils.js';
+import { cpLen } from '../utils/textUtils.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import type { Key } from '../hooks/useKeypress.js';
 
@@ -156,14 +157,25 @@ describe('InputPrompt', () => {
       text: '',
       cursor: [0, 0],
       lines: [''],
-      setText: vi.fn((newText: string) => {
-        mockBuffer.text = newText;
-        mockBuffer.lines = [newText];
-        mockBuffer.cursor = [0, newText.length];
-        mockBuffer.viewportVisualLines = [newText];
-        mockBuffer.allVisualLines = [newText];
-        mockBuffer.visualToLogicalMap = [[0, 0]];
-      }),
+      setText: vi.fn(
+        (newText: string, cursorPosition?: 'start' | 'end' | number) => {
+          mockBuffer.text = newText;
+          mockBuffer.lines = [newText];
+          let col = 0;
+          if (typeof cursorPosition === 'number') {
+            col = cursorPosition;
+          } else if (cursorPosition === 'start') {
+            col = 0;
+          } else {
+            col = newText.length;
+          }
+          mockBuffer.cursor = [0, col];
+          mockBuffer.viewportVisualLines = [newText];
+          mockBuffer.allVisualLines = [newText];
+          mockBuffer.visualToLogicalMap = [[0, 0]];
+          mockBuffer.visualCursor = [0, col];
+        },
+      ),
       replaceRangeByOffset: vi.fn(),
       viewportVisualLines: [''],
       allVisualLines: [''],
@@ -179,7 +191,15 @@ describe('InputPrompt', () => {
         }
         return false;
       }),
-      move: vi.fn(),
+      move: vi.fn((dir: string) => {
+        if (dir === 'home') {
+          mockBuffer.visualCursor = [mockBuffer.visualCursor[0], 0];
+        } else if (dir === 'end') {
+          const line =
+            mockBuffer.allVisualLines[mockBuffer.visualCursor[0]] || '';
+          mockBuffer.visualCursor = [mockBuffer.visualCursor[0], cpLen(line)];
+        }
+      }),
       moveToOffset: vi.fn((offset: number) => {
         mockBuffer.cursor = [0, offset];
       }),
@@ -225,7 +245,6 @@ describe('InputPrompt', () => {
       navigateDown: vi.fn(),
       resetCompletionState: vi.fn(),
       setActiveSuggestionIndex: vi.fn(),
-      setShowSuggestions: vi.fn(),
       handleAutocomplete: vi.fn(),
       promptCompletion: {
         text: '',
@@ -381,12 +400,12 @@ describe('InputPrompt', () => {
     });
 
     await act(async () => {
-      stdin.write('\u001B[A'); // Up arrow
+      stdin.write('\u0010'); // Ctrl+P
     });
     await waitFor(() => expect(mockInputHistory.navigateUp).toHaveBeenCalled());
 
     await act(async () => {
-      stdin.write('\u001B[B'); // Down arrow
+      stdin.write('\u000E'); // Ctrl+N
     });
     await waitFor(() =>
       expect(mockInputHistory.navigateDown).toHaveBeenCalled(),
@@ -403,6 +422,100 @@ describe('InputPrompt', () => {
     expect(mockShellHistory.getNextCommand).not.toHaveBeenCalled();
     expect(mockShellHistory.addCommandToHistory).not.toHaveBeenCalled();
     unmount();
+  });
+
+  describe('arrow key navigation', () => {
+    it('should move to start of line on Up arrow if on first line but not at start', async () => {
+      mockBuffer.allVisualLines = ['line 1', 'line 2'];
+      mockBuffer.visualCursor = [0, 5]; // First line, not at start
+      mockBuffer.visualScrollRow = 0;
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\u001B[A'); // Up arrow
+      });
+
+      await waitFor(() => {
+        expect(mockBuffer.move).toHaveBeenCalledWith('home');
+        expect(mockInputHistory.navigateUp).not.toHaveBeenCalled();
+      });
+      unmount();
+    });
+
+    it('should navigate history on Up arrow if on first line and at start', async () => {
+      mockBuffer.allVisualLines = ['line 1', 'line 2'];
+      mockBuffer.visualCursor = [0, 0]; // First line, at start
+      mockBuffer.visualScrollRow = 0;
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\u001B[A'); // Up arrow
+      });
+
+      await waitFor(() => {
+        expect(mockBuffer.move).not.toHaveBeenCalledWith('home');
+        expect(mockInputHistory.navigateUp).toHaveBeenCalled();
+      });
+      unmount();
+    });
+
+    it('should move to end of line on Down arrow if on last line but not at end', async () => {
+      mockBuffer.allVisualLines = ['line 1', 'line 2'];
+      mockBuffer.visualCursor = [1, 0]; // Last line, not at end
+      mockBuffer.visualScrollRow = 0;
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\u001B[B'); // Down arrow
+      });
+
+      await waitFor(() => {
+        expect(mockBuffer.move).toHaveBeenCalledWith('end');
+        expect(mockInputHistory.navigateDown).not.toHaveBeenCalled();
+      });
+      unmount();
+    });
+
+    it('should navigate history on Down arrow if on last line and at end', async () => {
+      mockBuffer.allVisualLines = ['line 1', 'line 2'];
+      mockBuffer.visualCursor = [1, 6]; // Last line, at end ("line 2" is length 6)
+      mockBuffer.visualScrollRow = 0;
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\u001B[B'); // Down arrow
+      });
+
+      await waitFor(() => {
+        expect(mockBuffer.move).not.toHaveBeenCalledWith('end');
+        expect(mockInputHistory.navigateDown).toHaveBeenCalled();
+      });
+      unmount();
+    });
   });
 
   it('should call completion.navigateUp for both up arrow and Ctrl+P when suggestions are showing', async () => {
@@ -485,11 +598,11 @@ describe('InputPrompt', () => {
     });
 
     await act(async () => {
-      stdin.write('\u001B[A'); // Up arrow
+      stdin.write('\u0010'); // Ctrl+P
     });
     await waitFor(() => expect(mockInputHistory.navigateUp).toHaveBeenCalled());
     await act(async () => {
-      stdin.write('\u001B[B'); // Down arrow
+      stdin.write('\u000E'); // Ctrl+N
     });
     await waitFor(() =>
       expect(mockInputHistory.navigateDown).toHaveBeenCalled(),
@@ -931,6 +1044,33 @@ describe('InputPrompt', () => {
       stdin.write('\r');
     });
     await waitFor(() => expect(props.onSubmit).toHaveBeenCalledWith('/clear'));
+    unmount();
+  });
+
+  it('should NOT submit on Enter when an @-path is a perfect match', async () => {
+    mockedUseCommandCompletion.mockReturnValue({
+      ...mockCommandCompletion,
+      showSuggestions: true,
+      suggestions: [{ label: 'file.txt', value: 'file.txt' }],
+      activeSuggestionIndex: 0,
+      isPerfectMatch: true,
+      completionMode: CompletionMode.AT,
+    });
+    props.buffer.text = '@file.txt';
+
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    await act(async () => {
+      stdin.write('\r');
+    });
+
+    await waitFor(() => {
+      // Should handle autocomplete but NOT submit
+      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
+      expect(props.onSubmit).not.toHaveBeenCalled();
+    });
     unmount();
   });
 
@@ -1625,15 +1765,16 @@ describe('InputPrompt', () => {
       });
 
       await waitFor(() => {
-        expect(mockedUseCommandCompletion).toHaveBeenCalledWith(
-          mockBuffer,
-          path.join('test', 'project', 'src'),
-          mockSlashCommands,
-          mockCommandContext,
-          false,
-          false,
-          expect.any(Object),
-        );
+        expect(mockedUseCommandCompletion).toHaveBeenCalledWith({
+          buffer: mockBuffer,
+          cwd: path.join('test', 'project', 'src'),
+          slashCommands: mockSlashCommands,
+          commandContext: mockCommandContext,
+          reverseSearchActive: false,
+          shellModeActive: false,
+          config: expect.any(Object),
+          active: expect.anything(),
+        });
       });
 
       unmount();
@@ -3684,6 +3825,257 @@ describe('InputPrompt', () => {
       expect(stdout.lastFrame()).toMatchSnapshot();
       unmount();
     });
+  });
+  describe('History Navigation and Completion Suppression', () => {
+    beforeEach(() => {
+      props.userMessages = ['first message', 'second message'];
+      // Mock useInputHistory to actually call onChange
+      mockedUseInputHistory.mockImplementation(({ onChange }) => ({
+        navigateUp: () => {
+          onChange('second message', 'start');
+          return true;
+        },
+        navigateDown: () => {
+          onChange('first message', 'end');
+          return true;
+        },
+        handleSubmit: vi.fn(),
+      }));
+    });
+
+    it.each([
+      { name: 'Up arrow', key: '\u001B[A', position: 'start' },
+      { name: 'Ctrl+P', key: '\u0010', position: 'start' },
+    ])(
+      'should move cursor to $position on $name (older history)',
+      async ({ key, position }) => {
+        const { stdin } = renderWithProviders(<InputPrompt {...props} />, {
+          uiActions,
+        });
+
+        await act(async () => {
+          stdin.write(key);
+        });
+
+        await waitFor(() => {
+          expect(mockBuffer.setText).toHaveBeenCalledWith(
+            'second message',
+            position as 'start' | 'end',
+          );
+        });
+      },
+    );
+
+    it.each([
+      { name: 'Down arrow', key: '\u001B[B', position: 'end' },
+      { name: 'Ctrl+N', key: '\u000E', position: 'end' },
+    ])(
+      'should move cursor to $position on $name (newer history)',
+      async ({ key, position }) => {
+        const { stdin } = renderWithProviders(<InputPrompt {...props} />, {
+          uiActions,
+        });
+
+        // First go up
+        await act(async () => {
+          stdin.write('\u001B[A');
+        });
+
+        // Then go down
+        await act(async () => {
+          stdin.write(key);
+          if (key === '\u001B[B') {
+            // Second press to actually navigate history
+            stdin.write(key);
+          }
+        });
+
+        await waitFor(() => {
+          expect(mockBuffer.setText).toHaveBeenCalledWith(
+            'first message',
+            position as 'start' | 'end',
+          );
+        });
+      },
+    );
+
+    it('should suppress completion after history navigation', async () => {
+      const { stdin } = renderWithProviders(<InputPrompt {...props} />, {
+        uiActions,
+      });
+
+      await act(async () => {
+        stdin.write('\u001B[A'); // Up arrow
+      });
+
+      await waitFor(() => {
+        expect(mockedUseCommandCompletion).toHaveBeenLastCalledWith({
+          buffer: mockBuffer,
+          cwd: expect.anything(),
+          slashCommands: expect.anything(),
+          commandContext: expect.anything(),
+          reverseSearchActive: expect.anything(),
+          shellModeActive: expect.anything(),
+          config: expect.anything(),
+          active: false,
+        });
+      });
+    });
+
+    it('should not render suggestions during history navigation', async () => {
+      // 1. Set up a dynamic mock implementation BEFORE rendering
+      mockedUseCommandCompletion.mockImplementation(({ active }) => ({
+        ...mockCommandCompletion,
+        showSuggestions: active,
+        suggestions: active
+          ? [{ value: 'suggestion', label: 'suggestion' }]
+          : [],
+      }));
+
+      const { stdout, stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        { uiActions },
+      );
+
+      // 2. Verify suggestions ARE showing initially because active is true by default
+      await waitFor(() => {
+        expect(stdout.lastFrame()).toContain('suggestion');
+      });
+
+      // 3. Trigger history navigation which should set suppressCompletion to true
+      await act(async () => {
+        stdin.write('\u001B[A');
+      });
+
+      // 4. Verify that suggestions are NOT in the output frame after navigation
+      await waitFor(() => {
+        expect(stdout.lastFrame()).not.toContain('suggestion');
+      });
+
+      expect(stdout.lastFrame()).toMatchSnapshot();
+      unmount();
+    });
+
+    it('should continue to suppress completion after manual cursor movement', async () => {
+      const { stdin } = renderWithProviders(<InputPrompt {...props} />, {
+        uiActions,
+      });
+
+      // Navigate history (suppresses)
+      await act(async () => {
+        stdin.write('\u001B[A');
+      });
+
+      // Wait for it to be suppressed
+      await waitFor(() => {
+        expect(mockedUseCommandCompletion).toHaveBeenLastCalledWith({
+          buffer: mockBuffer,
+          cwd: expect.anything(),
+          slashCommands: expect.anything(),
+          commandContext: expect.anything(),
+          reverseSearchActive: expect.anything(),
+          shellModeActive: expect.anything(),
+          config: expect.anything(),
+          active: false,
+        });
+      });
+
+      // Move cursor manually
+      await act(async () => {
+        stdin.write('\u001B[D'); // Left arrow
+      });
+
+      await waitFor(() => {
+        expect(mockedUseCommandCompletion).toHaveBeenLastCalledWith({
+          buffer: mockBuffer,
+          cwd: expect.anything(),
+          slashCommands: expect.anything(),
+          commandContext: expect.anything(),
+          reverseSearchActive: expect.anything(),
+          shellModeActive: expect.anything(),
+          config: expect.anything(),
+          active: false,
+        });
+      });
+    });
+
+    it('should re-enable completion after typing', async () => {
+      const { stdin } = renderWithProviders(<InputPrompt {...props} />, {
+        uiActions,
+      });
+
+      // Navigate history (suppresses)
+      await act(async () => {
+        stdin.write('\u001B[A');
+      });
+
+      // Wait for it to be suppressed
+      await waitFor(() => {
+        expect(mockedUseCommandCompletion).toHaveBeenLastCalledWith(
+          expect.objectContaining({ active: false }),
+        );
+      });
+
+      // Type a character
+      await act(async () => {
+        stdin.write('a');
+      });
+
+      await waitFor(() => {
+        expect(mockedUseCommandCompletion).toHaveBeenLastCalledWith(
+          expect.objectContaining({ active: true }),
+        );
+      });
+    });
+  });
+
+  describe('shortcuts help visibility', () => {
+    it.each([
+      {
+        name: 'terminal paste event occurs',
+        input: '\x1b[200~pasted text\x1b[201~',
+      },
+      {
+        name: 'Ctrl+V (PASTE_CLIPBOARD) is pressed',
+        input: '\x16',
+        setupMocks: () => {
+          vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
+          vi.mocked(clipboardy.read).mockResolvedValue('clipboard text');
+        },
+      },
+      {
+        name: 'mouse right-click paste occurs',
+        input: '\x1b[<2;1;1m',
+        mouseEventsEnabled: true,
+        setupMocks: () => {
+          vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
+          vi.mocked(clipboardy.read).mockResolvedValue('clipboard text');
+        },
+      },
+    ])(
+      'should close shortcuts help when a $name',
+      async ({ input, setupMocks, mouseEventsEnabled }) => {
+        setupMocks?.();
+        const setShortcutsHelpVisible = vi.fn();
+        const { stdin, unmount } = renderWithProviders(
+          <InputPrompt {...props} />,
+          {
+            uiState: { shortcutsHelpVisible: true },
+            uiActions: { setShortcutsHelpVisible },
+            mouseEventsEnabled,
+          },
+        );
+
+        await act(async () => {
+          stdin.write(input);
+        });
+
+        await waitFor(() => {
+          expect(setShortcutsHelpVisible).toHaveBeenCalledWith(false);
+        });
+        unmount();
+      },
+    );
   });
 });
 

@@ -47,7 +47,6 @@ describe('NumericalClassifierStrategy', () => {
         getResolvedConfig: vi.fn().mockReturnValue(mockResolvedConfig),
       },
       getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
-      getPreviewFeatures: () => false,
       getSessionId: vi.fn().mockReturnValue('control-group-id'), // Default to Control Group (Hash 71 >= 50)
       getNumericalRoutingEnabled: vi.fn().mockResolvedValue(true),
       getClassifierThreshold: vi.fn().mockResolvedValue(undefined),
