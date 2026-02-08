@@ -136,7 +136,8 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             flexDirection="column"
             alignItems={isNarrow ? 'flex-start' : 'flex-end'}
           >
-            {!hasPendingActionRequired && <ShortcutsHint />}
+            {settings.merged.ui.showShortcutsHint &&
+              !hasPendingActionRequired && <ShortcutsHint />}
           </Box>
         </Box>
         {uiState.shortcutsHelpVisible && <ShortcutsHelp />}

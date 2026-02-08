@@ -130,7 +130,8 @@ available combinations.
 - `!` on an empty prompt: Enter or exit shell mode.
 - `?` on an empty prompt: Toggle the shortcuts panel above the input. Press
   `Esc`, `Backspace`, or any printable key to close it. Press `?` again to close
-  the panel and insert a `?` into the prompt.
+  the panel and insert a `?` into the prompt. You can hide only the hint text
+  via `ui.showShortcutsHint`, without changing this keyboard behavior.
 - `\` (at end of a line) + `Enter`: Insert a newline without leaving single-line
   mode.
 - `Esc` pressed twice quickly: Clear the input prompt if it is not empty,

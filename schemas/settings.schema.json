@@ -222,6 +222,13 @@
           "default": false,
           "type": "boolean"
         },
+        "showShortcutsHint": {
+          "title": "Show Shortcuts Hint",
+          "description": "Show the \"? for shortcuts\" hint above the input.",
+          "markdownDescription": "Show the \"? for shortcuts\" hint above the input.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "hideBanner": {
           "title": "Hide Banner",
           "description": "Hide the application banner",
