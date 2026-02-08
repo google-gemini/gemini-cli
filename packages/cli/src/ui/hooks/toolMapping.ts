@@ -7,7 +7,6 @@
 import {
   type ToolCall,
   type Status as CoreStatus,
-  type ToolCallConfirmationDetails,
   type SerializableConfirmationDetails,
   type ToolResultDisplay,
   debugLogger,
@@ -76,10 +75,8 @@ export function mapToDisplay(
     };
 
     let resultDisplay: ToolResultDisplay | undefined = undefined;
-    let confirmationDetails:
-      | ToolCallConfirmationDetails
-      | SerializableConfirmationDetails
-      | undefined = undefined;
+    let confirmationDetails: SerializableConfirmationDetails | undefined =
+      undefined;
     let outputFile: string | undefined = undefined;
     let ptyId: number | undefined = undefined;
     let correlationId: string | undefined = undefined;
