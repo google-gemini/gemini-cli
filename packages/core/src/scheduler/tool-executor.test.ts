@@ -293,4 +293,74 @@ describe('ToolExecutor', () => {
       }),
     );
   });
+
+  describe('setCallId for MCP progress', () => {
+    it('should call setCallId on invocation before execution when method exists', async () => {
+      const mockSetCallId = vi.fn();
+      const mockTool = new MockTool({ name: 'mcp-tool' });
+      const invocation = mockTool.build({});
+      invocation.setCallId = mockSetCallId;
+
+      // Mock executeToolWithHooks to return success
+      vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockResolvedValue({
+        llmContent: 'done',
+        returnDisplay: 'done',
+      } as ToolResult);
+
+      const scheduledCall: ScheduledToolCall = {
+        status: CoreToolCallStatus.Scheduled,
+        request: {
+          callId: 'test-call-123',
+          name: 'mcp-tool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-setcallid-1',
+        },
+        tool: mockTool,
+        invocation,
+        startTime: Date.now(),
+      };
+
+      await executor.execute({
+        call: scheduledCall,
+        signal: new AbortController().signal,
+        onUpdateToolCall: vi.fn(),
+      });
+
+      expect(mockSetCallId).toHaveBeenCalledWith('test-call-123');
+    });
+
+    it('should not fail when invocation lacks setCallId method', async () => {
+      const mockTool = new MockTool({ name: 'shell-tool' });
+      const invocation = mockTool.build({});
+
+      vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockResolvedValue({
+        llmContent: 'done',
+        returnDisplay: 'done',
+      } as ToolResult);
+
+      const scheduledCall: ScheduledToolCall = {
+        status: CoreToolCallStatus.Scheduled,
+        request: {
+          callId: 'test-call-456',
+          name: 'shell-tool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-setcallid-2',
+        },
+        tool: mockTool,
+        invocation,
+        startTime: Date.now(),
+      };
+
+      // Should not throw
+      await expect(
+        executor.execute({
+          call: scheduledCall,
+          signal: new AbortController().signal,
+          onUpdateToolCall: vi.fn(),
+        }),
+      ).resolves.toBeDefined();
+    });
+  });
 });

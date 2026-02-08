@@ -16,6 +16,8 @@ import {
   type ToolCallsUpdateMessage,
 } from '@google/gemini-cli-core';
 import { useCallback, useState, useMemo, useEffect, useRef } from 'react';
+import type { Progress } from '@modelcontextprotocol/sdk/types.js';
+import { useMCPProgress } from './useMCPProgress.js';
 
 // Re-exporting types compatible with hook expectations
 export type ScheduleFn = (
@@ -32,6 +34,7 @@ export type CancelAllFn = (signal: AbortSignal) => void;
  */
 export type TrackedToolCall = ToolCall & {
   responseSubmittedToGemini?: boolean;
+  mcpProgress?: Progress;
 };
 
 // Narrowed types for specific statuses (used by useGeminiStream)
@@ -81,6 +84,8 @@ export function useToolScheduler(
   >({});
   const [lastToolOutputTime, setLastToolOutputTime] = useState<number>(0);
 
+  const { progressState, clearProgress, clearAllProgress } = useMCPProgress();
+
   const messageBus = useMemo(() => config.getMessageBus(), [config]);
 
   const onCompleteRef = useRef(onComplete);
@@ -117,6 +122,12 @@ export function useToolScheduler(
         setLastToolOutputTime(Date.now());
       }
 
+      event.toolCalls.forEach((tc) => {
+        if (['success', 'cancelled', 'error'].includes(tc.status)) {
+          clearProgress(tc.request.callId);
+        }
+      });
+
       setToolCallsMap((prev) => {
         const adapted = internalAdaptToolCalls(
           event.toolCalls,
@@ -134,12 +145,13 @@ export function useToolScheduler(
     return () => {
       messageBus.unsubscribe(MessageBusType.TOOL_CALLS_UPDATE, handler);
     };
-  }, [messageBus, internalAdaptToolCalls]);
+  }, [messageBus, internalAdaptToolCalls, clearProgress]);
 
   const schedule: ScheduleFn = useCallback(
     async (request, signal) => {
       // Clear state for new run
       setToolCallsMap({});
+      clearAllProgress();
 
       // 1. Await Core Scheduler directly
       const results = await scheduler.schedule(request, signal);
@@ -151,7 +163,7 @@ export function useToolScheduler(
 
       return results;
     },
-    [scheduler],
+    [scheduler, clearAllProgress],
   );
 
   const cancelAll: CancelAllFn = useCallback(
@@ -184,6 +196,17 @@ export function useToolScheduler(
     [toolCallsMap],
   );
 
+  const toolCallsWithProgress = useMemo(
+    () =>
+      toolCalls.map((tc): TrackedToolCall => {
+        if (tc.status === 'executing' && progressState[tc.request.callId]) {
+          return { ...tc, mcpProgress: progressState[tc.request.callId] };
+        }
+        return tc;
+      }),
+    [toolCalls, progressState],
+  );
+
   // Provide a setter that maintains compatibility with legacy [].
   const setToolCallsForDisplay = useCallback(
     (action: React.SetStateAction<TrackedToolCall[]>) => {
@@ -214,7 +237,7 @@ export function useToolScheduler(
   );
 
   return [
-    toolCalls,
+    toolCallsWithProgress,
     schedule,
     markToolsAsSubmitted,
     setToolCallsForDisplay,
