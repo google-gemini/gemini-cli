@@ -12,7 +12,6 @@ import type {
 import {
   ApprovalMode,
   DEFAULT_GEMINI_MODEL,
-  DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   GeminiClient,
   HookSystem,
@@ -47,7 +46,6 @@ export function createMockConfig(
     } as Storage,
     getTruncateToolOutputThreshold: () =>
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
-    getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
     getActiveModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL),
     getDebugMode: vi.fn().mockReturnValue(false),
     getContentGeneratorConfig: vi.fn().mockReturnValue({ model: 'gemini-pro' }),

@@ -3087,6 +3087,7 @@ export function useTextBuffer({
       setRawMode?.(false);
       const { status, error } = spawnSync(command, args, {
         stdio: 'inherit',
+        shell: process.platform === 'win32',
       });
       if (error) throw error;
       if (typeof status === 'number' && status !== 0)

@@ -151,7 +151,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const { merged: settings } = useSettings();
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
-  const { setEmbeddedShellFocused } = useUIActions();
+  const { setEmbeddedShellFocused, setShortcutsHelpVisible } = useUIActions();
   const {
     terminalWidth,
     activePtyId,
@@ -159,6 +159,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     terminalBackgroundColor,
     backgroundShells,
     backgroundShellHeight,
+    shortcutsHelpVisible,
   } = useUIState();
   const [suppressCompletion, setSuppressCompletion] = useState(false);
   const escPressCount = useRef(0);
@@ -358,6 +359,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   // Handle clipboard image pasting with Ctrl+V
   const handleClipboardPaste = useCallback(async () => {
+    if (shortcutsHelpVisible) {
+      setShortcutsHelpVisible(false);
+    }
     try {
       if (await clipboardHasImage()) {
         const imagePath = await saveClipboardImage(config.getTargetDir());
@@ -402,7 +406,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     } catch (error) {
       debugLogger.error('Error handling paste:', error);
     }
-  }, [buffer, config, stdout, settings]);
+  }, [
+    buffer,
+    config,
+    stdout,
+    settings,
+    shortcutsHelpVisible,
+    setShortcutsHelpVisible,
+  ]);
 
   useMouseClick(
     innerBoxRef,
@@ -535,6 +546,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return false;
       }
 
+      // Handle escape to close shortcuts panel first, before letting it bubble
+      // up for cancellation. This ensures pressing Escape once closes the panel,
+      // and pressing again cancels the operation.
+      if (shortcutsHelpVisible && key.name === 'escape') {
+        setShortcutsHelpVisible(false);
+        return true;
+      }
+
       if (
         key.name === 'escape' &&
         (streamingState === StreamingState.Responding ||
@@ -544,6 +563,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       }
 
       if (key.name === 'paste') {
+        if (shortcutsHelpVisible) {
+          setShortcutsHelpVisible(false);
+        }
         // Record paste time to prevent accidental auto-submission
         if (!isTerminalPasteTrusted(kittyProtocol.enabled)) {
           setRecentUnsafePasteTime(Date.now());
@@ -569,6 +591,33 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
         // Ensure we never accidentally interpret paste as regular input.
         buffer.handleInput(key);
+        return true;
+      }
+
+      if (shortcutsHelpVisible) {
+        if (key.sequence === '?' && key.insertable) {
+          setShortcutsHelpVisible(false);
+          buffer.handleInput(key);
+          return true;
+        }
+        // Escape is handled earlier to ensure it closes the panel before
+        // potentially cancelling an operation
+        if (key.name === 'backspace' || key.sequence === '\b') {
+          setShortcutsHelpVisible(false);
+          return true;
+        }
+        if (key.insertable) {
+          setShortcutsHelpVisible(false);
+        }
+      }
+
+      if (
+        key.sequence === '?' &&
+        key.insertable &&
+        !shortcutsHelpVisible &&
+        buffer.text.length === 0
+      ) {
+        setShortcutsHelpVisible(true);
         return true;
       }
 
@@ -982,15 +1031,19 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
+      if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL](key)) {
+        return false;
+      }
+
       if (keyMatchers[Command.FOCUS_SHELL_INPUT](key)) {
-        // If we got here, Autocomplete didn't handle the key (e.g. no suggestions).
         if (
           activePtyId ||
           (backgroundShells.size > 0 && backgroundShellHeight > 0)
         ) {
           setEmbeddedShellFocused(true);
+          return true;
         }
-        return true;
+        return false;
       }
 
       // Fall back to the text buffer's default input handling for all other keys
@@ -1040,6 +1093,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       commandSearchActive,
       commandSearchCompletion,
       kittyProtocol.enabled,
+      shortcutsHelpVisible,
+      setShortcutsHelpVisible,
       tryLoadQueuedMessages,
       setBannerVisible,
       onSubmit,

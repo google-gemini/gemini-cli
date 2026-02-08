@@ -34,16 +34,12 @@ export const DEFAULT_THINKING_MODE = 8192;
 
 /**
  * Resolves the requested model alias (e.g., 'auto-gemini-3', 'pro', 'flash', 'flash-lite')
- * to a concrete model name, considering preview features.
+ * to a concrete model name.
  *
  * @param requestedModel The model alias or concrete model name requested by the user.
- * @param previewFeaturesEnabled A boolean indicating if preview features are enabled.
  * @returns The resolved concrete model name.
  */
-export function resolveModel(
-  requestedModel: string,
-  previewFeaturesEnabled: boolean = false,
-): string {
+export function resolveModel(requestedModel: string): string {
   switch (requestedModel) {
     case PREVIEW_GEMINI_MODEL_AUTO: {
       return PREVIEW_GEMINI_MODEL;
@@ -53,14 +49,10 @@ export function resolveModel(
     }
     case GEMINI_MODEL_ALIAS_AUTO:
     case GEMINI_MODEL_ALIAS_PRO: {
-      return previewFeaturesEnabled
-        ? PREVIEW_GEMINI_MODEL
-        : DEFAULT_GEMINI_MODEL;
+      return PREVIEW_GEMINI_MODEL;
     }
     case GEMINI_MODEL_ALIAS_FLASH: {
-      return previewFeaturesEnabled
-        ? PREVIEW_GEMINI_FLASH_MODEL
-        : DEFAULT_GEMINI_FLASH_MODEL;
+      return PREVIEW_GEMINI_FLASH_MODEL;
     }
     case GEMINI_MODEL_ALIAS_FLASH_LITE: {
       return DEFAULT_GEMINI_FLASH_LITE_MODEL;
@@ -76,13 +68,11 @@ export function resolveModel(
  *
  * @param requestedModel The current requested model (e.g. auto-gemini-2.5).
  * @param modelAlias The alias selected by the classifier ('flash' or 'pro').
- * @param previewFeaturesEnabled Whether preview features are enabled.
  * @returns The resolved concrete model name.
  */
 export function resolveClassifierModel(
   requestedModel: string,
   modelAlias: string,
-  previewFeaturesEnabled: boolean = false,
 ): string {
   if (modelAlias === GEMINI_MODEL_ALIAS_FLASH) {
     if (
@@ -97,27 +87,20 @@ export function resolveClassifierModel(
     ) {
       return PREVIEW_GEMINI_FLASH_MODEL;
     }
-    return resolveModel(GEMINI_MODEL_ALIAS_FLASH, previewFeaturesEnabled);
+    return resolveModel(GEMINI_MODEL_ALIAS_FLASH);
   }
-  return resolveModel(requestedModel, previewFeaturesEnabled);
+  return resolveModel(requestedModel);
 }
-export function getDisplayString(
-  model: string,
-  previewFeaturesEnabled: boolean = false,
-) {
+export function getDisplayString(model: string) {
   switch (model) {
     case PREVIEW_GEMINI_MODEL_AUTO:
       return 'Auto (Gemini 3)';
     case DEFAULT_GEMINI_MODEL_AUTO:
       return 'Auto (Gemini 2.5)';
     case GEMINI_MODEL_ALIAS_PRO:
-      return previewFeaturesEnabled
-        ? PREVIEW_GEMINI_MODEL
-        : DEFAULT_GEMINI_MODEL;
+      return PREVIEW_GEMINI_MODEL;
     case GEMINI_MODEL_ALIAS_FLASH:
-      return previewFeaturesEnabled
-        ? PREVIEW_GEMINI_FLASH_MODEL
-        : DEFAULT_GEMINI_FLASH_MODEL;
+      return PREVIEW_GEMINI_FLASH_MODEL;
     default:
       return model;
   }
