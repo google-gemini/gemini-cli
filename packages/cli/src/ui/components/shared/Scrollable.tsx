@@ -104,22 +104,37 @@ export const Scrollable: React.FC<ScrollableProps> = ({
 
   useKeypress(
     (key: Key) => {
-      if (keyMatchers[Command.SCROLL_UP](key)) {
-        scrollByWithAnimation(-1);
-        return true;
+      const { scrollHeight, innerHeight } = sizeRef.current;
+      const scrollTop = getScrollTop();
+      const maxScroll = Math.max(0, scrollHeight - innerHeight);
+
+      // Only capture scroll-up events if there's room;
+      // otherwise allow events to bubble.
+      if (scrollTop > 0) {
+        if (keyMatchers[Command.PAGE_UP](key)) {
+          scrollByWithAnimation(-innerHeight);
+          return true;
+        }
+        if (keyMatchers[Command.SCROLL_UP](key)) {
+          scrollByWithAnimation(-1);
+          return true;
+        }
       }
-      if (keyMatchers[Command.SCROLL_DOWN](key)) {
-        scrollByWithAnimation(1);
-        return true;
+
+      // Only capture scroll-down events if there's room;
+      // otherwise allow events to bubble.
+      if (scrollTop < maxScroll) {
+        if (keyMatchers[Command.PAGE_DOWN](key)) {
+          scrollByWithAnimation(innerHeight);
+          return true;
+        }
+        if (keyMatchers[Command.SCROLL_DOWN](key)) {
+          scrollByWithAnimation(1);
+          return true;
+        }
       }
-      if (keyMatchers[Command.PAGE_UP](key)) {
-        scrollByWithAnimation(-sizeRef.current.innerHeight);
-        return true;
-      }
-      if (keyMatchers[Command.PAGE_DOWN](key)) {
-        scrollByWithAnimation(sizeRef.current.innerHeight);
-        return true;
-      }
+
+      // bubble keypress
       return false;
     },
     { isActive: hasFocus },
