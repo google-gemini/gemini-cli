@@ -55,6 +55,7 @@ describe('statsCommand', () => {
       tier: undefined,
       userEmail: 'mock@example.com',
       currentModel: undefined,
+      creditBalance: 0,
     });
   });
 
@@ -78,6 +79,7 @@ describe('statsCommand', () => {
       getQuotaRemaining: mockGetQuotaRemaining,
       getQuotaLimit: mockGetQuotaLimit,
       getQuotaResetTime: mockGetQuotaResetTime,
+      getUserPaidTier: vi.fn(),
     } as unknown as Config;
 
     await statsCommand.action(mockContext, '');

@@ -199,6 +199,8 @@ export type HistoryItemStats = HistoryItemQuotaBase & {
   type: 'stats';
   duration: string;
   quotas?: RetrieveUserQuotaResponse;
+  /** G1 AI Credits balance, if available */
+  creditBalance?: number;
 };
 
 export type HistoryItemModelStats = HistoryItemQuotaBase & {

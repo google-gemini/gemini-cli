@@ -13,6 +13,7 @@ import type {
   ContentGenerator,
   ContentGeneratorConfig,
 } from '../core/contentGenerator.js';
+import type { OverageStrategy } from '../billing/billing.js';
 import {
   AuthType,
   createContentGenerator,
@@ -103,7 +104,7 @@ import type { EventEmitter } from 'node:events';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
-import type { UserTierId } from '../code_assist/types.js';
+import type { UserTierId, GeminiUserTier } from '../code_assist/types.js';
 import type { RetrieveUserQuotaResponse } from '../code_assist/types.js';
 import type { AdminControlsSettings } from '../code_assist/types.js';
 import type { HierarchicalMemory } from './memory.js';
@@ -492,6 +493,9 @@ export interface ConfigParameters {
     adminSkillsEnabled?: boolean;
     agents?: AgentSettings;
   }>;
+  billing?: {
+    overageStrategy?: OverageStrategy;
+  };
 }
 
 export class Config {
@@ -661,6 +665,17 @@ export class Config {
         agents?: AgentSettings;
       }>)
     | undefined;
+
+  private readonly billing: {
+    overageStrategy: OverageStrategy;
+  };
+
+  /**
+   * Transient state to signal that the next request should use credits.
+   * This is typically set by the retry logic (e.g. from OverageMenuDialog).
+   * It should be reset after the request is made.
+   */
+  private useCreditsForNextRequest: boolean = false;
 
   private readonly enableAgents: boolean;
   private agents: AgentSettings;
@@ -867,6 +882,10 @@ export class Config {
     this.experiments = params.experiments;
     this.onModelChange = params.onModelChange;
     this.onReload = params.onReload;
+
+    this.billing = {
+      overageStrategy: params.billing?.overageStrategy ?? 'ask',
+    };
 
     if (params.contextFileName) {
       setGeminiMdFilename(params.contextFileName);
@@ -1121,6 +1140,10 @@ export class Config {
 
   getUserTierName(): string | undefined {
     return this.contentGenerator?.userTierName;
+  }
+
+  getUserPaidTier(): GeminiUserTier | undefined {
+    return this.contentGenerator?.paidTier;
   }
 
   /**
@@ -1840,6 +1863,18 @@ export class Config {
 
   getTelemetryOutfile(): string | undefined {
     return this.telemetrySettings.outfile;
+  }
+
+  getBillingSettings(): { overageStrategy: OverageStrategy } {
+    return this.billing;
+  }
+
+  setUseCreditsForNextRequest(value: boolean): void {
+    this.useCreditsForNextRequest = value;
+  }
+
+  shouldUseCreditsForNextRequest(): boolean {
+    return this.useCreditsForNextRequest;
   }
 
   getTelemetryUseCollector(): boolean {

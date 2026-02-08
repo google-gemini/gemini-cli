@@ -135,15 +135,16 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           currentModel={itemForDisplay.currentModel}
           quotaStats={
             itemForDisplay.pooledRemaining !== undefined ||
-            itemForDisplay.pooledLimit !== undefined ||
-            itemForDisplay.pooledResetTime !== undefined
+              itemForDisplay.pooledLimit !== undefined ||
+              itemForDisplay.pooledResetTime !== undefined
               ? {
-                  remaining: itemForDisplay.pooledRemaining,
-                  limit: itemForDisplay.pooledLimit,
-                  resetTime: itemForDisplay.pooledResetTime,
-                }
+                remaining: itemForDisplay.pooledRemaining,
+                limit: itemForDisplay.pooledLimit,
+                resetTime: itemForDisplay.pooledResetTime,
+              }
               : undefined
           }
+          creditBalance={itemForDisplay.creditBalance}
         />
       )}
       {itemForDisplay.type === 'model_stats' && (
@@ -154,13 +155,13 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           currentModel={itemForDisplay.currentModel}
           quotaStats={
             itemForDisplay.pooledRemaining !== undefined ||
-            itemForDisplay.pooledLimit !== undefined ||
-            itemForDisplay.pooledResetTime !== undefined
+              itemForDisplay.pooledLimit !== undefined ||
+              itemForDisplay.pooledResetTime !== undefined
               ? {
-                  remaining: itemForDisplay.pooledRemaining,
-                  limit: itemForDisplay.pooledLimit,
-                  resetTime: itemForDisplay.pooledResetTime,
-                }
+                remaining: itemForDisplay.pooledRemaining,
+                limit: itemForDisplay.pooledLimit,
+                resetTime: itemForDisplay.pooledResetTime,
+              }
               : undefined
           }
         />
