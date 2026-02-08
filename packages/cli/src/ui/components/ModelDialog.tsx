@@ -23,7 +23,6 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
 import { DescriptiveRadioButtonSelect } from './shared/DescriptiveRadioButtonSelect.js';
 import { ConfigContext } from '../contexts/ConfigContext.js';
-import { ThemedGradient } from './ThemedGradient.js';
 
 interface ModelDialogProps {
   onClose: () => void;
@@ -37,8 +36,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   // Determine the Preferred Model (read once when the dialog opens).
   const preferredModel = config?.getModel() || DEFAULT_GEMINI_MODEL_AUTO;
 
-  const shouldShowPreviewModels =
-    config?.getPreviewFeatures() && config.getHasAccessToPreviewModel();
+  const shouldShowPreviewModels = config?.getHasAccessToPreviewModel();
 
   const manualModelSelected = useMemo(() => {
     const manualModels = [
@@ -173,24 +171,6 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     [config, onClose, persistMode],
   );
 
-  let header;
-  let subheader;
-
-  // Do not show any header or subheader since it's already showing preview model
-  // options
-  if (shouldShowPreviewModels) {
-    header = undefined;
-    subheader = undefined;
-    // When a user has the access but has not enabled the preview features.
-  } else if (config?.getHasAccessToPreviewModel()) {
-    header = 'Gemini 3 is now available.';
-    subheader =
-      'Enable "Preview features" in /settings.\nLearn more at https://goo.gle/enable-preview-features';
-  } else {
-    header = 'Gemini 3 is coming soon.';
-    subheader = undefined;
-  }
-
   return (
     <Box
       borderStyle="round"
@@ -201,16 +181,6 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     >
       <Text bold>Select Model</Text>
 
-      <Box flexDirection="column">
-        {header && (
-          <Box marginTop={1}>
-            <ThemedGradient>
-              <Text>{header}</Text>
-            </ThemedGradient>
-          </Box>
-        )}
-        {subheader && <Text>{subheader}</Text>}
-      </Box>
       <Box marginTop={1}>
         <DescriptiveRadioButtonSelect
           items={options}

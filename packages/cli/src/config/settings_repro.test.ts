@@ -134,7 +134,6 @@ describe('Settings Repro', () => {
         enablePromptCompletion: false,
         preferredEditor: 'vim',
         vimMode: false,
-        previewFeatures: false,
       },
       security: {
         auth: {
@@ -150,7 +149,6 @@ describe('Settings Repro', () => {
           showColor: true,
           enableInteractiveShell: true,
         },
-        truncateToolOutputLines: 100,
       },
       experimental: {
         useModelRouter: false,

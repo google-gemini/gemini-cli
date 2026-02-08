@@ -12,7 +12,14 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { sanitizeFilenamePart } from '../utils/fileUtils.js';
 import type { Config } from '../config/config.js';
 import { logToolOutputMasking } from '../telemetry/loggers.js';
-import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
+import {
+  SHELL_TOOL_NAME,
+  ACTIVATE_SKILL_TOOL_NAME,
+  MEMORY_TOOL_NAME,
+  ASK_USER_TOOL_NAME,
+  ENTER_PLAN_MODE_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
+} from '../tools/tool-names.js';
 import { ToolOutputMaskingEvent } from '../telemetry/types.js';
 
 // Tool output masking defaults
@@ -22,6 +29,18 @@ export const DEFAULT_PROTECT_LATEST_TURN = true;
 export const MASKING_INDICATOR_TAG = 'tool_output_masked';
 
 export const TOOL_OUTPUTS_DIR = 'tool-outputs';
+
+/**
+ * Tools whose outputs are always high-signal and should never be masked,
+ * regardless of their position in the conversation history.
+ */
+const EXEMPT_TOOLS = new Set([
+  ACTIVATE_SKILL_TOOL_NAME,
+  MEMORY_TOOL_NAME,
+  ASK_USER_TOOL_NAME,
+  ENTER_PLAN_MODE_TOOL_NAME,
+  EXIT_PLAN_MODE_TOOL_NAME,
+]);
 
 export interface MaskingResult {
   newHistory: Content[];
@@ -49,7 +68,8 @@ export interface MaskingResult {
  */
 export class ToolOutputMaskingService {
   async mask(history: Content[], config: Config): Promise<MaskingResult> {
-    if (history.length === 0) {
+    const maskingConfig = await config.getToolOutputMaskingConfig();
+    if (!maskingConfig.enabled || history.length === 0) {
       return { newHistory: history, maskedCount: 0, tokensSaved: 0 };
     }
 
@@ -65,8 +85,6 @@ export class ToolOutputMaskingService {
       content: string;
       originalPart: Part;
     }> = [];
-
-    const maskingConfig = config.getToolOutputMaskingConfig();
 
     // Decide where to start scanning.
     // If PROTECT_LATEST_TURN is true, we skip the most recent message (index history.length - 1).
@@ -88,6 +106,11 @@ export class ToolOutputMaskingService {
         // model reasoning, and multimodal data—because they define the conversation's
         // core intent and logic, which are harder for the model to recover if lost.
         if (!part.functionResponse) continue;
+
+        const toolName = part.functionResponse.name;
+        if (toolName && EXEMPT_TOOLS.has(toolName)) {
+          continue;
+        }
 
         const toolOutputContent = this.getToolOutputContent(part);
         if (!toolOutputContent || this.isAlreadyMasked(toolOutputContent)) {

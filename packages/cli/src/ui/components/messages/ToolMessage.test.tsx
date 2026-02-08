@@ -4,13 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
-import type { ToolMessageProps } from './ToolMessage.js';
+import type React from 'react';
+import { ToolMessage, type ToolMessageProps } from './ToolMessage.js';
 import { describe, it, expect, vi } from 'vitest';
-import { ToolMessage } from './ToolMessage.js';
 import { StreamingState, ToolCallStatus } from '../../types.js';
 import { Text } from 'ink';
-import { StreamingContext } from '../../contexts/StreamingContext.js';
 import type { AnsiOutput } from '@google/gemini-cli-core';
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { tryParseJSON } from '../../../utils/jsonoutput.js';
@@ -26,45 +24,6 @@ vi.mock('../TerminalOutput.js', () => ({
         MockCursor:({cursor?.x},{cursor?.y})
       </Text>
     );
-  },
-}));
-
-vi.mock('../AnsiOutput.js', () => ({
-  AnsiOutputText: function MockAnsiOutputText({ data }: { data: AnsiOutput }) {
-    // Simple serialization for snapshot stability
-    const serialized = data
-      .map((line) => line.map((token) => token.text || '').join(''))
-      .join('\n');
-    return <Text>MockAnsiOutput:{serialized}</Text>;
-  },
-}));
-
-// Mock child components or utilities if they are complex or have side effects
-vi.mock('../GeminiRespondingSpinner.js', () => ({
-  GeminiRespondingSpinner: ({
-    nonRespondingDisplay,
-  }: {
-    nonRespondingDisplay?: string;
-  }) => {
-    const streamingState = React.useContext(StreamingContext)!;
-    if (streamingState === StreamingState.Responding) {
-      return <Text>MockRespondingSpinner</Text>;
-    }
-    return nonRespondingDisplay ? <Text>{nonRespondingDisplay}</Text> : null;
-  },
-}));
-vi.mock('./DiffRenderer.js', () => ({
-  DiffRenderer: function MockDiffRenderer({
-    diffContent,
-  }: {
-    diffContent: string;
-  }) {
-    return <Text>MockDiff:{diffContent}</Text>;
-  },
-}));
-vi.mock('../../utils/MarkdownDisplay.js', () => ({
-  MarkdownDisplay: function MockMarkdownDisplay({ text }: { text: string }) {
-    return <Text>MockMarkdown:{text}</Text>;
   },
 }));
 
@@ -131,7 +90,6 @@ describe('<ToolMessage />', () => {
       expect(output).toContain('"a": 1');
       expect(output).toContain('"b": [');
       // Should not use markdown renderer for JSON
-      expect(output).not.toContain('MockMarkdown:');
     });
 
     it('renders pretty JSON in ink frame', () => {
@@ -143,9 +101,6 @@ describe('<ToolMessage />', () => {
       const frame = lastFrame();
 
       expect(frame).toMatchSnapshot();
-      expect(frame).not.toContain('MockMarkdown:');
-      expect(frame).not.toContain('MockAnsiOutput:');
-      expect(frame).not.toMatch(/MockDiff:/);
     });
 
     it('uses JSON renderer even when renderOutputAsMarkdown=true is true', () => {
@@ -167,7 +122,6 @@ describe('<ToolMessage />', () => {
       expect(output).toContain('"a": 1');
       expect(output).toContain('"b": [');
       // Should not use markdown renderer for JSON even when renderOutputAsMarkdown=true
-      expect(output).not.toContain('MockMarkdown:');
     });
     it('falls back to plain text for malformed JSON', () => {
       const testJSONstring = 'a": 1, "b": [2, 3]}';

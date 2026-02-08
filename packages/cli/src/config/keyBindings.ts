@@ -80,6 +80,7 @@ export enum Command {
   UNFOCUS_BACKGROUND_SHELL = 'backgroundShell.unfocus',
   UNFOCUS_BACKGROUND_SHELL_LIST = 'backgroundShell.listUnfocus',
   SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING = 'backgroundShell.unfocusWarning',
+  SHOW_SHELL_INPUT_UNFOCUS_WARNING = 'shellInput.unfocusWarning',
 
   // App Controls
   SHOW_ERROR_DETAILS = 'app.showErrorDetails',
@@ -281,6 +282,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING]: [
     { key: 'tab', shift: false },
   ],
+  [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING]: [{ key: 'tab', shift: false }],
   [Command.BACKGROUND_SHELL_SELECT]: [{ key: 'return' }],
   [Command.BACKGROUND_SHELL_ESCAPE]: [{ key: 'escape' }],
   [Command.SHOW_MORE_LINES]: [
@@ -288,7 +290,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
     { key: 's', ctrl: true },
   ],
   [Command.FOCUS_SHELL_INPUT]: [{ key: 'tab', shift: false }],
-  [Command.UNFOCUS_SHELL_INPUT]: [{ key: 'tab' }],
+  [Command.UNFOCUS_SHELL_INPUT]: [{ key: 'tab', shift: true }],
   [Command.CLEAR_SCREEN]: [{ key: 'l', ctrl: true }],
   [Command.RESTART_APP]: [{ key: 'r' }],
   [Command.SUSPEND_APP]: [{ key: 'z', ctrl: true }],
@@ -405,6 +407,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.UNFOCUS_BACKGROUND_SHELL,
       Command.UNFOCUS_BACKGROUND_SHELL_LIST,
       Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING,
+      Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING,
       Command.FOCUS_SHELL_INPUT,
       Command.UNFOCUS_SHELL_INPUT,
       Command.CLEAR_SCREEN,
@@ -496,16 +499,23 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
     'Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only).',
   [Command.SHOW_MORE_LINES]:
     'Expand a height-constrained response to show additional lines when not in alternate buffer mode.',
-  [Command.BACKGROUND_SHELL_SELECT]: 'Enter',
-  [Command.BACKGROUND_SHELL_ESCAPE]: 'Esc',
-  [Command.TOGGLE_BACKGROUND_SHELL]: 'Ctrl+B',
-  [Command.TOGGLE_BACKGROUND_SHELL_LIST]: 'Ctrl+L',
-  [Command.KILL_BACKGROUND_SHELL]: 'Ctrl+K',
-  [Command.UNFOCUS_BACKGROUND_SHELL]: 'Shift+Tab',
-  [Command.UNFOCUS_BACKGROUND_SHELL_LIST]: 'Tab',
-  [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING]: 'Tab',
-  [Command.FOCUS_SHELL_INPUT]: 'Focus the shell input from the gemini input.',
-  [Command.UNFOCUS_SHELL_INPUT]: 'Focus the Gemini input from the shell input.',
+  [Command.BACKGROUND_SHELL_SELECT]:
+    'Confirm selection in background shell list.',
+  [Command.BACKGROUND_SHELL_ESCAPE]: 'Dismiss background shell list.',
+  [Command.TOGGLE_BACKGROUND_SHELL]:
+    'Toggle current background shell visibility.',
+  [Command.TOGGLE_BACKGROUND_SHELL_LIST]: 'Toggle background shell list.',
+  [Command.KILL_BACKGROUND_SHELL]: 'Kill the active background shell.',
+  [Command.UNFOCUS_BACKGROUND_SHELL]:
+    'Move focus from background shell to Gemini.',
+  [Command.UNFOCUS_BACKGROUND_SHELL_LIST]:
+    'Move focus from background shell list to Gemini.',
+  [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING]:
+    'Show warning when trying to unfocus background shell via Tab.',
+  [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING]:
+    'Show warning when trying to unfocus shell input via Tab.',
+  [Command.FOCUS_SHELL_INPUT]: 'Move focus from Gemini to the active shell.',
+  [Command.UNFOCUS_SHELL_INPUT]: 'Move focus from the shell back to Gemini.',
   [Command.CLEAR_SCREEN]: 'Clear the terminal screen and redraw the UI.',
   [Command.RESTART_APP]: 'Restart the application.',
   [Command.SUSPEND_APP]: 'Suspend the application (not yet implemented).',

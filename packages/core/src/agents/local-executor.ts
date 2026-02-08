@@ -58,6 +58,7 @@ import { getModelConfigAlias } from './registry.js';
 import { getVersion } from '../utils/version.js';
 import { getToolCallContext } from '../utils/toolCallContext.js';
 import { scheduleAgentTools } from './agent-scheduler.js';
+import { DeadlineTimer } from '../utils/deadlineTimer.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -231,6 +232,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     turnCounter: number,
     combinedSignal: AbortSignal,
     timeoutSignal: AbortSignal, // Pass the timeout controller's signal
+    onWaitingForConfirmation?: (waiting: boolean) => void,
   ): Promise<AgentTurnResult> {
     const promptId = `${this.agentId}#${turnCounter}`;
 
@@ -265,7 +267,12 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     }
 
     const { nextMessage, submittedOutput, taskCompleted } =
-      await this.processFunctionCalls(functionCalls, combinedSignal, promptId);
+      await this.processFunctionCalls(
+        functionCalls,
+        combinedSignal,
+        promptId,
+        onWaitingForConfirmation,
+      );
     if (taskCompleted) {
       const finalResult = submittedOutput ?? 'Task completed successfully.';
       return {
@@ -322,6 +329,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       | AgentTerminateMode.MAX_TURNS
       | AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
     externalSignal: AbortSignal, // The original signal passed to run()
+    onWaitingForConfirmation?: (waiting: boolean) => void,
   ): Promise<string | null> {
     this.emitActivity('THOUGHT_CHUNK', {
       text: `Execution limit reached (${reason}). Attempting one final recovery turn with a grace period.`,
@@ -355,6 +363,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         turnCounter, // This will be the "last" turn number
         combinedSignal,
         graceTimeoutController.signal, // Pass grace signal to identify a *grace* timeout
+        onWaitingForConfirmation,
       );
 
       if (
@@ -415,14 +424,22 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       this.definition.runConfig.maxTimeMinutes ?? DEFAULT_MAX_TIME_MINUTES;
     const maxTurns = this.definition.runConfig.maxTurns ?? DEFAULT_MAX_TURNS;
 
-    const timeoutController = new AbortController();
-    const timeoutId = setTimeout(
-      () => timeoutController.abort(new Error('Agent timed out.')),
+    const deadlineTimer = new DeadlineTimer(
       maxTimeMinutes * 60 * 1000,
+      'Agent timed out.',
     );
 
+    // Track time spent waiting for user confirmation to credit it back to the agent.
+    const onWaitingForConfirmation = (waiting: boolean) => {
+      if (waiting) {
+        deadlineTimer.pause();
+      } else {
+        deadlineTimer.resume();
+      }
+    };
+
     // Combine the external signal with the internal timeout signal.
-    const combinedSignal = AbortSignal.any([signal, timeoutController.signal]);
+    const combinedSignal = AbortSignal.any([signal, deadlineTimer.signal]);
 
     logAgentStart(
       this.runtimeContext,
@@ -458,7 +475,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         // Check for timeout or external abort.
         if (combinedSignal.aborted) {
           // Determine which signal caused the abort.
-          terminateReason = timeoutController.signal.aborted
+          terminateReason = deadlineTimer.signal.aborted
             ? AgentTerminateMode.TIMEOUT
             : AgentTerminateMode.ABORTED;
           break;
@@ -469,7 +486,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           currentMessage,
           turnCounter++,
           combinedSignal,
-          timeoutController.signal,
+          deadlineTimer.signal,
+          onWaitingForConfirmation,
         );
 
         if (turnResult.status === 'stop') {
@@ -498,6 +516,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           turnCounter, // Use current turnCounter for the recovery attempt
           terminateReason,
           signal, // Pass the external signal
+          onWaitingForConfirmation,
         );
 
         if (recoveryResult !== null) {
@@ -551,7 +570,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       if (
         error instanceof Error &&
         error.name === 'AbortError' &&
-        timeoutController.signal.aborted &&
+        deadlineTimer.signal.aborted &&
         !signal.aborted // Ensure the external signal was not the cause
       ) {
         terminateReason = AgentTerminateMode.TIMEOUT;
@@ -563,6 +582,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             turnCounter, // Use current turnCounter
             AgentTerminateMode.TIMEOUT,
             signal,
+            onWaitingForConfirmation,
           );
 
           if (recoveryResult !== null) {
@@ -591,7 +611,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       this.emitActivity('ERROR', { error: String(error) });
       throw error; // Re-throw other errors or external aborts.
     } finally {
-      clearTimeout(timeoutId);
+      deadlineTimer.abort();
       logAgentFinish(
         this.runtimeContext,
         new AgentFinishEvent(
@@ -779,6 +799,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     functionCalls: FunctionCall[],
     signal: AbortSignal,
     promptId: string,
+    onWaitingForConfirmation?: (waiting: boolean) => void,
   ): Promise<{
     nextMessage: Content;
     submittedOutput: string | null;
@@ -979,6 +1000,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           parentCallId: this.parentCallId,
           toolRegistry: this.toolRegistry,
           signal,
+          onWaitingForConfirmation,
         },
       );
 

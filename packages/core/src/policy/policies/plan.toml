@@ -21,66 +21,36 @@
 #
 # TOML policy priorities (before transformation):
 #   10: Write tools default to ASK_USER (becomes 1.010 in default tier)
-#   20: Plan mode catch-all DENY override (becomes 1.020 in default tier)
-#   50: Read-only tools (becomes 1.050 in default tier)
+#   60: Plan mode catch-all DENY override (becomes 1.060 in default tier)
+#   70: Plan mode explicit ALLOW override (becomes 1.070 in default tier)
 #   999: YOLO mode allow-all (becomes 1.999 in default tier)
 
 # Catch-All: Deny everything by default in Plan mode.
 
 [[rule]]
 decision = "deny"
-priority = 20
+priority = 60
 modes = ["plan"]
 deny_message = "You are in Plan Mode - adjust your prompt to only use read and search tools."
 
 # Explicitly Allow Read-Only Tools in Plan mode.
 
 [[rule]]
-toolName = "glob"
+toolName = ["glob", "grep_search", "list_directory", "read_file", "google_web_search"]
 decision = "allow"
-priority = 50
+priority = 70
 modes = ["plan"]
 
 [[rule]]
-toolName = "grep_search"
-decision = "allow"
-priority = 50
-modes = ["plan"]
-
-[[rule]]
-toolName = "list_directory"
-decision = "allow"
-priority = 50
-modes = ["plan"]
-
-[[rule]]
-toolName = "read_file"
-decision = "allow"
-priority = 50
-modes = ["plan"]
-
-[[rule]]
-toolName = "google_web_search"
-decision = "allow"
-priority = 50
-modes = ["plan"]
-
-[[rule]]
-toolName = "ask_user"
+toolName = ["ask_user", "exit_plan_mode"]
 decision = "ask_user"
-priority = 50
-modes = ["plan"]
-
-[[rule]]
-toolName = "exit_plan_mode"
-decision = "ask_user"
-priority = 50
+priority = 70
 modes = ["plan"]
 
 # Allow write_file and replace for .md files in plans directory
 [[rule]]
 toolName = ["write_file", "replace"]
 decision = "allow"
-priority = 50
+priority = 70
 modes = ["plan"]
-argsPattern = "\"file_path\":\"[^\"]+/\\.gemini/tmp/[a-f0-9]{64}/plans/[a-zA-Z0-9_-]+\\.md\""
+argsPattern = "\"file_path\":\"[^\"]+/\\.gemini/tmp/[a-zA-Z0-9_-]+/plans/[a-zA-Z0-9_-]+\\.md\""
