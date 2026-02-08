@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Config } from '../config/config.js';
+import type { AgentDefinition } from '../agents/types.js';
 import { CodebaseInvestigatorAgent } from '../agents/codebase-investigator.js';
 import { GEMINI_DIR } from '../utils/paths.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -101,6 +102,12 @@ describe('Core System Prompt (prompts.ts)', () => {
       getMessageBus: vi.fn(),
       getAgentRegistry: vi.fn().mockReturnValue({
         getDirectoryContext: vi.fn().mockReturnValue('Mock Agent Directory'),
+        getAllDefinitions: vi.fn().mockReturnValue([
+          {
+            name: 'mock-agent',
+            description: 'Mock Agent Description',
+          },
+        ]),
       }),
       getSkillManager: vi.fn().mockReturnValue({
         getSkills: vi.fn().mockReturnValue([]),
@@ -154,6 +161,32 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).not.toContain('activate_skill');
   });
 
+  it('should include sub-agents in XML for preview models', () => {
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
+    const agents = [
+      {
+        name: 'test-agent',
+        displayName: 'Test Agent',
+        description: 'A test agent description',
+      },
+    ];
+    vi.mocked(mockConfig.getAgentRegistry().getAllDefinitions).mockReturnValue(
+      agents as unknown as AgentDefinition[],
+    );
+    const prompt = getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).toContain('# Available Sub-Agents');
+    expect(prompt).toContain('<available_subagents>');
+    expect(prompt).toContain('<subagent>');
+    expect(prompt).toContain('<name>Test Agent</name>');
+    expect(prompt).toContain(
+      '<description>A test agent description</description>',
+    );
+    expect(prompt).toContain('</subagent>');
+    expect(prompt).toContain('</available_subagents>');
+    expect(prompt).toMatchSnapshot();
+  });
+
   it('should use legacy system prompt for non-preview model', () => {
     vi.mocked(mockConfig.getActiveModel).mockReturnValue(
       DEFAULT_GEMINI_FLASH_LITE_MODEL,
@@ -162,6 +195,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).toContain(
       'You are an interactive CLI agent specializing in software engineering tasks.',
     );
+    expect(prompt).not.toContain('No sub-agents are currently available.');
     expect(prompt).toContain('# Core Mandates');
     expect(prompt).toContain('- **Conventions:**');
     expect(prompt).toMatchSnapshot();
@@ -279,6 +313,7 @@ describe('Core System Prompt (prompts.ts)', () => {
         getPreviewFeatures: vi.fn().mockReturnValue(true),
         getAgentRegistry: vi.fn().mockReturnValue({
           getDirectoryContext: vi.fn().mockReturnValue('Mock Agent Directory'),
+          getAllDefinitions: vi.fn().mockReturnValue([]),
         }),
         getSkillManager: vi.fn().mockReturnValue({
           getSkills: vi.fn().mockReturnValue([]),
