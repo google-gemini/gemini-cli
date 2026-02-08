@@ -29,23 +29,15 @@ const HISTORY_SEARCH_WINDOW = 20;
 const FLASH_MODEL = 'flash';
 const PRO_MODEL = 'pro';
 
-const LITERT_GEMMA_CLASSIFIER_SYSTEM_PROMPT = `### Role
-You are the **Lead Orchestrator** for an AI system. You do not talk to users. Your sole responsibility is to analyze the **Chat History** and delegate the **Current Request** to the most appropriate **Model** based on the request's complexity.
-
-### Models
-Choose between \`${FLASH_MODEL}\` (SIMPLE) or \`${PRO_MODEL}\` (COMPLEX).
-1.  \`${FLASH_MODEL}\`: A fast, efficient model for simple, well-defined tasks.
-2.  \`${PRO_MODEL}\`: A powerful, advanced model for complex, open-ended, or multi-step tasks.
-
-### Complexity Rubric
+const COMPLEXITY_RUBRIC = `### Complexity Rubric
 A task is COMPLEX (Choose \`${PRO_MODEL}\`) if it meets ONE OR MORE of the following criteria:
 1.  **High Operational Complexity (Est. 4+ Steps/Tool Calls):** Requires dependent actions, significant planning, or multiple coordinated changes.
 2.  **Strategic Planning & Conceptual Design:** Asking "how" or "why." Requires advice, architecture, or high-level strategy.
 3.  **High Ambiguity or Large Scope (Extensive Investigation):** Broadly defined requests requiring extensive investigation.
 4.  **Deep Debugging & Root Cause Analysis:** Diagnosing unknown or complex problems from symptoms.
-A task is SIMPLE (Choose \`${FLASH_MODEL}\`) if it is highly specific, bounded, and has Low Operational Complexity (Est. 1-3 tool calls). Operational simplicity overrides strategic phrasing.
+A task is SIMPLE (Choose \`${FLASH_MODEL}\`) if it is highly specific, bounded, and has Low Operational Complexity (Est. 1-3 tool calls). Operational simplicity overrides strategic phrasing.`;
 
-### Output Format
+const OUTPUT_FORMAT = `### Output Format
 Respond *only* in JSON format like this:
 {
   "reasoning": Your reasoning...
@@ -67,7 +59,19 @@ And you must follow the following JSON schema:
   "required": ["reasoning", "model_choice"]
 }
 You must ensure that your reasoning is no more than 2 sentences long and directly references the rubric criteria.
-When making your decision, the user's request should be weighted much more heavily than the surrounding context when making your determination.
+When making your decision, the user's request should be weighted much more heavily than the surrounding context when making your determination.`;
+
+const LITERT_GEMMA_CLASSIFIER_SYSTEM_PROMPT = `### Role
+You are the **Lead Orchestrator** for an AI system. You do not talk to users. Your sole responsibility is to analyze the **Chat History** and delegate the **Current Request** to the most appropriate **Model** based on the request's complexity.
+
+### Models
+Choose between \`${FLASH_MODEL}\` (SIMPLE) or \`${PRO_MODEL}\` (COMPLEX).
+1.  \`${FLASH_MODEL}\`: A fast, efficient model for simple, well-defined tasks.
+2.  \`${PRO_MODEL}\`: A powerful, advanced model for complex, open-ended, or multi-step tasks.
+
+${COMPLEXITY_RUBRIC}
+
+${OUTPUT_FORMAT}
 
 ### Examples
 **Example 1 (Strategic Planning):**
@@ -117,36 +121,9 @@ When making your decision, the user's request should be weighted much more heavi
 const LITERT_GEMMA_CLASSIFIER_REMINDER = `### Reminder
 You are a Task Routing AI. Your sole task is to analyze the preceding **Chat History** and **Current Request** and classify its complexity.
 
-### Complexity Rubric
-A task is COMPLEX (Choose \`${PRO_MODEL}\`) if it meets ONE OR MORE of the following criteria:
-1.  High Operational Complexity (Est. 4+ Steps/Tool Calls)
-2.  Strategic Planning & Conceptual Design
-3.  High Ambiguity or Large Scope (Extensive Investigation)
-4.  Deep Debugging & Root Cause Analysis
-A task is SIMPLE (Choose \`${FLASH_MODEL}\`) if it is highly specific, bounded, and has Low Operational Complexity (Est. 1-3 tool calls). Operational simplicity overrides strategic phrasing.
+${COMPLEXITY_RUBRIC}
 
-Respond *only* in JSON format like this:
-{
-  "reasoning": Your reasoning...
-  "model_choice": Either ${FLASH_MODEL} or ${PRO_MODEL}
-}
-And you must follow the following JSON schema:
-{
-  "type": "object",
-  "properties": {
-    "reasoning": {
-      "type": "string",
-      "description": "A brief summary of the user objective, followed by a step-by-step explanation for the model choice, referencing the rubric."
-    },
-    "model_choice": {
-      "type": "string",
-      "enum": ["${FLASH_MODEL}", "${PRO_MODEL}"]
-    }
-  },
-  "required": ["reasoning", "model_choice"]
-}
-You must ensure that your reasoning is no more than 2 sentences long and directly references the rubric criteria.
-When making your decision, the user's request should be weighted much more heavily than the surrounding context when making your determination.
+${OUTPUT_FORMAT}
 `;
 
 const ClassifierResponseSchema = z.object({
