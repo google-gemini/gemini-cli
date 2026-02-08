@@ -1,14 +1,14 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`ToolResultDisplay Overflow > should display "press ctrl-o" hint when content overflows in ToolGroupMessage 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  test-tool a test tool                                                     │
-│                                                                              │
-│ ... first 46 lines hidden ...                                                │
-│ line 47                                                                      │
-│ line 48                                                                      │
-│ line 49                                                                      │
-│ line 50                                                                      │
-╰──────────────────────────────────────────────────────────────────────────────╯
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  test-tool a test tool                                                 │
+│                                                                          │
+│ ... first 46 lines hidden ...                                            │
+│ line 47                                                                  │
+│ line 48                                                                  │
+│ line 49                                                                  │
+│ line 50                                                                  │
+╰──────────────────────────────────────────────────────────────────────────╯
  Press ctrl-o to show more lines"
 `;

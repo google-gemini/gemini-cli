@@ -117,4 +117,91 @@ describe('<Scrollable />', () => {
     });
     expect(capturedEntry.getScrollState().scrollTop).toBe(1);
   });
+
+  describe('keypress handling', () => {
+    it.each([
+      {
+        name: 'scrolls down when overflow exists and not at bottom',
+        initialScrollTop: 0,
+        scrollHeight: 10,
+        keySequence: '\u001B[1;2B', // Shift+Down
+        expectedScrollTop: 1,
+      },
+      {
+        name: 'scrolls up when overflow exists and not at top',
+        initialScrollTop: 2,
+        scrollHeight: 10,
+        keySequence: '\u001B[1;2A', // Shift+Up
+        expectedScrollTop: 1,
+      },
+      {
+        name: 'does not scroll up when at top (allows event to bubble)',
+        initialScrollTop: 0,
+        scrollHeight: 10,
+        keySequence: '\u001B[1;2A', // Shift+Up
+        expectedScrollTop: 0,
+      },
+      {
+        name: 'does not scroll down when at bottom (allows event to bubble)',
+        initialScrollTop: 5, // maxScroll = 10 - 5 = 5
+        scrollHeight: 10,
+        keySequence: '\u001B[1;2B', // Shift+Down
+        expectedScrollTop: 5,
+      },
+      {
+        name: 'does not scroll when content fits (allows event to bubble)',
+        initialScrollTop: 0,
+        scrollHeight: 5, // Same as innerHeight (5)
+        keySequence: '\u001B[1;2B', // Shift+Down
+        expectedScrollTop: 0,
+      },
+    ])(
+      '$name',
+      async ({
+        initialScrollTop,
+        scrollHeight,
+        keySequence,
+        expectedScrollTop,
+      }) => {
+        // Dynamically import ink to mock getScrollHeight
+        const ink = await import('ink');
+        vi.mocked(ink.getScrollHeight).mockReturnValue(scrollHeight);
+
+        let capturedEntry: ScrollProviderModule.ScrollableEntry | undefined;
+        vi.spyOn(ScrollProviderModule, 'useScrollable').mockImplementation(
+          (entry, isActive) => {
+            if (isActive) {
+              capturedEntry = entry as ScrollProviderModule.ScrollableEntry;
+            }
+          },
+        );
+
+        const { stdin } = renderWithProviders(
+          <Scrollable hasFocus={true} height={5}>
+            <Text>Content</Text>
+          </Scrollable>,
+        );
+
+        // Ensure initial state using existing scrollBy method
+        act(() => {
+          // Reset to top first, then scroll to desired start position
+          capturedEntry!.scrollBy(-100);
+          if (initialScrollTop > 0) {
+            capturedEntry!.scrollBy(initialScrollTop);
+          }
+        });
+        expect(capturedEntry!.getScrollState().scrollTop).toBe(
+          initialScrollTop,
+        );
+
+        act(() => {
+          stdin.write(keySequence);
+        });
+
+        expect(capturedEntry!.getScrollState().scrollTop).toBe(
+          expectedScrollTop,
+        );
+      },
+    );
+  });
 });

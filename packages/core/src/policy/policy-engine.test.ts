@@ -13,6 +13,7 @@ import {
   type SafetyCheckerRule,
   InProcessCheckerType,
   ApprovalMode,
+  PRIORITY_SUBAGENT_TOOL,
 } from './types.js';
 import type { FunctionCall } from '@google/genai';
 import { SafetyCheckDecision } from '../safety/protocol.js';
@@ -1478,6 +1479,37 @@ describe('PolicyEngine', () => {
       );
 
       expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+  });
+
+  describe('Plan Mode vs Subagent Priority (Regression)', () => {
+    it('should DENY subagents in Plan Mode despite dynamic allow rules', async () => {
+      // Plan Mode Deny (1.06) > Subagent Allow (1.05)
+
+      const fixedRules: PolicyRule[] = [
+        {
+          decision: PolicyDecision.DENY,
+          priority: 1.06,
+          modes: [ApprovalMode.PLAN],
+        },
+        {
+          toolName: 'codebase_investigator',
+          decision: PolicyDecision.ALLOW,
+          priority: PRIORITY_SUBAGENT_TOOL,
+        },
+      ];
+
+      const fixedEngine = new PolicyEngine({
+        rules: fixedRules,
+        approvalMode: ApprovalMode.PLAN,
+      });
+
+      const fixedResult = await fixedEngine.check(
+        { name: 'codebase_investigator' },
+        undefined,
+      );
+
+      expect(fixedResult.decision).toBe(PolicyDecision.DENY);
     });
   });
 

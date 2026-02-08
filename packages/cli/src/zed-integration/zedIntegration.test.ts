@@ -110,7 +110,6 @@ describe('GeminiAgent', () => {
       getContentGeneratorConfig: vi.fn(),
       getActiveModel: vi.fn().mockReturnValue('gemini-pro'),
       getModel: vi.fn().mockReturnValue('gemini-pro'),
-      getPreviewFeatures: vi.fn().mockReturnValue({}),
       getGeminiClient: vi.fn().mockReturnValue({
         startChat: vi.fn().mockResolvedValue({}),
       }),
@@ -343,7 +342,6 @@ describe('Session', () => {
     mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getActiveModel: vi.fn().mockReturnValue('gemini-pro'),
-      getPreviewFeatures: vi.fn().mockReturnValue({}),
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
       getFileService: vi.fn().mockReturnValue({
         shouldIgnoreFile: vi.fn().mockReturnValue(false),

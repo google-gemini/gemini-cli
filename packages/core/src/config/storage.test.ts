@@ -4,7 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { beforeEach, describe, it, expect, vi, afterEach } from 'vitest';
+
+vi.unmock('./storage.js');
+vi.unmock('./projectRegistry.js');
+vi.unmock('./storageMigration.js');
+
 import * as os from 'node:os';
 import * as path from 'node:path';
 
@@ -18,6 +23,52 @@ vi.mock('fs', async (importOriginal) => {
 
 import { Storage } from './storage.js';
 import { GEMINI_DIR, homedir } from '../utils/paths.js';
+import { ProjectRegistry } from './projectRegistry.js';
+import { StorageMigration } from './storageMigration.js';
+
+const PROJECT_SLUG = 'project-slug';
+
+vi.mock('./projectRegistry.js');
+vi.mock('./storageMigration.js');
+
+describe('Storage – initialize', () => {
+  const projectRoot = '/tmp/project';
+  let storage: Storage;
+
+  beforeEach(() => {
+    ProjectRegistry.prototype.initialize = vi.fn().mockResolvedValue(undefined);
+    ProjectRegistry.prototype.getShortId = vi
+      .fn()
+      .mockReturnValue(PROJECT_SLUG);
+    storage = new Storage(projectRoot);
+    vi.clearAllMocks();
+
+    // Mock StorageMigration.migrateDirectory
+    vi.mocked(StorageMigration.migrateDirectory).mockResolvedValue(undefined);
+  });
+
+  it('sets up the registry and performs migration if `getProjectTempDir` is called', async () => {
+    await storage.initialize();
+    expect(storage.getProjectTempDir()).toBe(
+      path.join(os.homedir(), GEMINI_DIR, 'tmp', PROJECT_SLUG),
+    );
+
+    // Verify registry initialization
+    expect(ProjectRegistry).toHaveBeenCalled();
+    expect(vi.mocked(ProjectRegistry).prototype.initialize).toHaveBeenCalled();
+    expect(
+      vi.mocked(ProjectRegistry).prototype.getShortId,
+    ).toHaveBeenCalledWith(projectRoot);
+
+    // Verify migration calls
+    const shortId = 'project-slug';
+    // We can't easily get the hash here without repeating logic, but we can verify it's called twice
+    expect(StorageMigration.migrateDirectory).toHaveBeenCalledTimes(2);
+
+    // Verify identifier is set by checking a path
+    expect(storage.getProjectTempDir()).toContain(shortId);
+  });
+});
 
 vi.mock('../utils/paths.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../utils/paths.js')>();
@@ -103,7 +154,8 @@ describe('Storage – additional helpers', () => {
     expect(Storage.getGlobalBinDir()).toBe(expected);
   });
 
-  it('getProjectTempPlansDir returns ~/.gemini/tmp/<hash>/plans', () => {
+  it('getProjectTempPlansDir returns ~/.gemini/tmp/<identifier>/plans', async () => {
+    await storage.initialize();
     const tempDir = storage.getProjectTempDir();
     const expected = path.join(tempDir, 'plans');
     expect(storage.getProjectTempPlansDir()).toBe(expected);

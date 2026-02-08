@@ -328,30 +328,6 @@ describe('SettingsSchema', () => {
       ).toBe('Enable debug logging of keystrokes to the console.');
     });
 
-    it('should have previewFeatures setting in schema', () => {
-      expect(
-        getSettingsSchema().general.properties.previewFeatures,
-      ).toBeDefined();
-      expect(getSettingsSchema().general.properties.previewFeatures.type).toBe(
-        'boolean',
-      );
-      expect(
-        getSettingsSchema().general.properties.previewFeatures.category,
-      ).toBe('General');
-      expect(
-        getSettingsSchema().general.properties.previewFeatures.default,
-      ).toBe(false);
-      expect(
-        getSettingsSchema().general.properties.previewFeatures.requiresRestart,
-      ).toBe(false);
-      expect(
-        getSettingsSchema().general.properties.previewFeatures.showInDialog,
-      ).toBe(true);
-      expect(
-        getSettingsSchema().general.properties.previewFeatures.description,
-      ).toBe('Enable preview features (e.g., preview models).');
-    });
-
     it('should have enableAgents setting in schema', () => {
       const setting = getSettingsSchema().experimental.properties.enableAgents;
       expect(setting).toBeDefined();
@@ -386,20 +362,6 @@ describe('SettingsSchema', () => {
       expect(setting.showInDialog).toBe(true);
       expect(setting.description).toBe(
         'Enable planning features (Plan Mode and tools).',
-      );
-    });
-
-    it('should have enableEventDrivenScheduler setting in schema', () => {
-      const setting =
-        getSettingsSchema().experimental.properties.enableEventDrivenScheduler;
-      expect(setting).toBeDefined();
-      expect(setting.type).toBe('boolean');
-      expect(setting.category).toBe('Experimental');
-      expect(setting.default).toBe(true);
-      expect(setting.requiresRestart).toBe(true);
-      expect(setting.showInDialog).toBe(false);
-      expect(setting.description).toBe(
-        'Enables event-driven scheduler within the CLI session.',
       );
     });
 

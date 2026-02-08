@@ -20,6 +20,7 @@ import {
   sanitizeAdminSettings,
   stopAdminControlsPolling,
   getAdminErrorMessage,
+  getAdminBlockedMcpServersMessage,
 } from './admin_controls.js';
 import type { CodeAssistServer } from '../server.js';
 import type { Config } from '../../config/config.js';
@@ -756,6 +757,57 @@ describe('Admin Controls', () => {
 
       expect(message).toBe(
         'Chat is disabled by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
+      );
+    });
+  });
+
+  describe('getAdminBlockedMcpServersMessage', () => {
+    let mockConfig: Config;
+
+    beforeEach(() => {
+      mockConfig = {} as Config;
+    });
+
+    it('should show count for a single blocked server', () => {
+      vi.mocked(getCodeAssistServer).mockReturnValue({
+        projectId: 'test-project-123',
+      } as CodeAssistServer);
+
+      const message = getAdminBlockedMcpServersMessage(
+        ['server-1'],
+        mockConfig,
+      );
+
+      expect(message).toBe(
+        '1 MCP server is not allowlisted by your administrator. To enable it, please request an update to the settings at: https://goo.gle/manage-gemini-cli?project=test-project-123',
+      );
+    });
+
+    it('should show count for multiple blocked servers', () => {
+      vi.mocked(getCodeAssistServer).mockReturnValue({
+        projectId: 'test-project-123',
+      } as CodeAssistServer);
+
+      const message = getAdminBlockedMcpServersMessage(
+        ['server-1', 'server-2', 'server-3'],
+        mockConfig,
+      );
+
+      expect(message).toBe(
+        '3 MCP servers are not allowlisted by your administrator. To enable them, please request an update to the settings at: https://goo.gle/manage-gemini-cli?project=test-project-123',
+      );
+    });
+
+    it('should format message correctly with no project ID', () => {
+      vi.mocked(getCodeAssistServer).mockReturnValue(undefined);
+
+      const message = getAdminBlockedMcpServersMessage(
+        ['server-1', 'server-2'],
+        mockConfig,
+      );
+
+      expect(message).toBe(
+        '2 MCP servers are not allowlisted by your administrator. To enable them, please request an update to the settings at: https://goo.gle/manage-gemini-cli',
       );
     });
   });
