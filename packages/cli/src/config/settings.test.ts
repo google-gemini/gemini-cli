@@ -2078,7 +2078,7 @@ describe('Settings Loading and Merging', () => {
       );
     });
 
-    it('should migrate disableUpdateNag to enableAutoUpdateNotification in system and system defaults settings', () => {
+    it('should migrate disableUpdateNag to enableAutoUpdateNotification in memory but not save for system and system defaults settings', () => {
       const systemSettingsContent = {
         general: {
           disableUpdateNag: true,
@@ -2103,9 +2103,10 @@ describe('Settings Loading and Merging', () => {
         },
       );
 
+      const feedbackSpy = mockCoreEvents.emitFeedback;
       const settings = loadSettings(MOCK_WORKSPACE_DIR);
 
-      // Verify system settings were migrated
+      // Verify system settings were migrated in memory
       expect(settings.system.settings.general).toHaveProperty(
         'enableAutoUpdateNotification',
       );
@@ -2115,7 +2116,7 @@ describe('Settings Loading and Merging', () => {
         ],
       ).toBe(false);
 
-      // Verify system defaults settings were migrated
+      // Verify system defaults settings were migrated in memory
       expect(settings.systemDefaults.settings.general).toHaveProperty(
         'enableAutoUpdateNotification',
       );
@@ -2127,6 +2128,74 @@ describe('Settings Loading and Merging', () => {
 
       // Merged should also reflect it (system overrides defaults, but both are migrated)
       expect(settings.merged.general?.enableAutoUpdateNotification).toBe(false);
+
+      // Verify it was NOT saved back to disk
+      expect(updateSettingsFilePreservingFormat).not.toHaveBeenCalledWith(
+        getSystemSettingsPath(),
+        expect.anything(),
+      );
+      expect(updateSettingsFilePreservingFormat).not.toHaveBeenCalledWith(
+        getSystemDefaultsPath(),
+        expect.anything(),
+      );
+
+      // Verify warnings were shown
+      expect(feedbackSpy).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining(
+          'The system configuration contains deprecated settings',
+        ),
+      );
+      expect(feedbackSpy).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining(
+          'The system default configuration contains deprecated settings',
+        ),
+      );
+    });
+
+    it('should migrate experimental agent settings in system scope in memory but not save', () => {
+      const systemSettingsContent = {
+        experimental: {
+          codebaseInvestigatorSettings: {
+            enabled: true,
+          },
+        },
+      };
+
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === getSystemSettingsPath()) {
+            return JSON.stringify(systemSettingsContent);
+          }
+          return '{}';
+        },
+      );
+
+      const feedbackSpy = mockCoreEvents.emitFeedback;
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      // Verify it was migrated in memory
+      expect(settings.system.settings.agents?.overrides).toMatchObject({
+        codebase_investigator: {
+          enabled: true,
+        },
+      });
+
+      // Verify it was NOT saved back to disk
+      expect(updateSettingsFilePreservingFormat).not.toHaveBeenCalledWith(
+        getSystemSettingsPath(),
+        expect.anything(),
+      );
+
+      // Verify warnings were shown
+      expect(feedbackSpy).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining(
+          'The system configuration contains deprecated settings: [experimental.codebaseInvestigatorSettings]',
+        ),
+      );
     });
 
     it('should migrate experimental agent settings to agents overrides', () => {

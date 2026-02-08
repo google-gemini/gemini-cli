@@ -1,0 +1,7 @@
+{
+  "experimental": {
+    "toolOutputMasking": {
+      "enabled": true
+    }
+  }
+}
