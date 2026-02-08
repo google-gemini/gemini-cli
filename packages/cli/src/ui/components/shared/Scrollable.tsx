@@ -17,6 +17,7 @@ import { useKeypress, type Key } from '../../hooks/useKeypress.js';
 import { useScrollable } from '../../contexts/ScrollProvider.js';
 import { useAnimatedScrollbar } from '../../hooks/useAnimatedScrollbar.js';
 import { useBatchedScroll } from '../../hooks/useBatchedScroll.js';
+import { keyMatchers, Command } from '../../keyMatchers.js';
 
 interface ScrollableProps {
   children?: React.ReactNode;
@@ -103,14 +104,38 @@ export const Scrollable: React.FC<ScrollableProps> = ({
 
   useKeypress(
     (key: Key) => {
-      if (key.shift) {
-        if (key.name === 'up') {
-          scrollByWithAnimation(-1);
+      const { scrollHeight, innerHeight } = sizeRef.current;
+      const scrollTop = getScrollTop();
+      const maxScroll = Math.max(0, scrollHeight - innerHeight);
+
+      // Only capture scroll-up events if there's room;
+      // otherwise allow events to bubble.
+      if (scrollTop > 0) {
+        if (keyMatchers[Command.PAGE_UP](key)) {
+          scrollByWithAnimation(-innerHeight);
+          return true;
         }
-        if (key.name === 'down') {
-          scrollByWithAnimation(1);
+        if (keyMatchers[Command.SCROLL_UP](key)) {
+          scrollByWithAnimation(-1);
+          return true;
         }
       }
+
+      // Only capture scroll-down events if there's room;
+      // otherwise allow events to bubble.
+      if (scrollTop < maxScroll) {
+        if (keyMatchers[Command.PAGE_DOWN](key)) {
+          scrollByWithAnimation(innerHeight);
+          return true;
+        }
+        if (keyMatchers[Command.SCROLL_DOWN](key)) {
+          scrollByWithAnimation(1);
+          return true;
+        }
+      }
+
+      // bubble keypress
+      return false;
     },
     { isActive: hasFocus },
   );
@@ -137,7 +162,7 @@ export const Scrollable: React.FC<ScrollableProps> = ({
     [getScrollState, scrollByWithAnimation, hasFocusCallback, flashScrollbar],
   );
 
-  useScrollable(scrollableEntry, hasFocus && ref.current !== null);
+  useScrollable(scrollableEntry, true);
 
   return (
     <Box

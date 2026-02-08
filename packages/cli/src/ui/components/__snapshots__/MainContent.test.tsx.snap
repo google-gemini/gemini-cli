@@ -1,8 +1,116 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`MainContent > MainContent Tool Output Height Logic > 'ASB mode - Focused shell should expand' 1`] = `
+"ScrollableList
+AppHeader
+╭──────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ⊷  Shell Command Running a long command...                                                   │
+│                                                                                              │
+│ Line 1                                                                                       │
+│ Line 2                                                                                       │
+│ Line 3                                                                                       │
+│ Line 4                                                                                       │
+│ Line 5                                                                                       │
+│ Line 6                                                                                       │
+│ Line 7                                                                                       │
+│ Line 8                                                                                       │
+│ Line 9                                                                                       │
+│ Line 10                                                                                      │
+│ Line 11                                                                                      │
+│ Line 12                                                                                      │
+│ Line 13                                                                                      │
+│ Line 14                                                                                      │
+│ Line 15                                                                                      │
+│ Line 16                                                                                      │
+│ Line 17                                                                                      │
+│ Line 18                                                                                      │
+│ Line 19                                                                                      │
+│ Line 20                                                                                      │
+│                                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────────────────────╯
+ ShowMoreLines"
+`;
+
+exports[`MainContent > MainContent Tool Output Height Logic > 'ASB mode - Unfocused shell' 1`] = `
+"ScrollableList
+AppHeader
+╭──────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ⊷  Shell Command Running a long command...                                                   │
+│                                                                                              │
+│ Line 6                                                                                       │
+│ Line 7                                                                                       │
+│ Line 8                                                                                       │
+│ Line 9                                                                                     ▄ │
+│ Line 10                                                                                    █ │
+│ Line 11                                                                                    █ │
+│ Line 12                                                                                    █ │
+│ Line 13                                                                                    █ │
+│ Line 14                                                                                    █ │
+│ Line 15                                                                                    █ │
+│ Line 16                                                                                    █ │
+│ Line 17                                                                                    █ │
+│ Line 18                                                                                    █ │
+│ Line 19                                                                                    █ │
+│ Line 20                                                                                    █ │
+╰──────────────────────────────────────────────────────────────────────────────────────────────╯
+ ShowMoreLines"
+`;
+
+exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Constrained height' 1`] = `
+"AppHeader
+╭──────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ⊷  Shell Command Running a long command...                                                   │
+│                                                                                              │
+│ Line 6                                                                                       │
+│ Line 7                                                                                       │
+│ Line 8                                                                                       │
+│ Line 9                                                                                       │
+│ Line 10                                                                                      │
+│ Line 11                                                                                      │
+│ Line 12                                                                                      │
+│ Line 13                                                                                      │
+│ Line 14                                                                                      │
+│ Line 15                                                                                      │
+│ Line 16                                                                                      │
+│ Line 17                                                                                      │
+│ Line 18                                                                                      │
+│ Line 19                                                                                      │
+│ Line 20                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────╯
+ ShowMoreLines"
+`;
+
+exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Unconstrained height' 1`] = `
+"AppHeader
+╭──────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ⊷  Shell Command Running a long command...                                                   │
+│                                                                                              │
+│ Line 6                                                                                       │
+│ Line 7                                                                                       │
+│ Line 8                                                                                       │
+│ Line 9                                                                                       │
+│ Line 10                                                                                      │
+│ Line 11                                                                                      │
+│ Line 12                                                                                      │
+│ Line 13                                                                                      │
+│ Line 14                                                                                      │
+│ Line 15                                                                                      │
+│ Line 16                                                                                      │
+│ Line 17                                                                                      │
+│ Line 18                                                                                      │
+│ Line 19                                                                                      │
+│ Line 20                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────╯
+ ShowMoreLines"
+`;
+
 exports[`MainContent > does not constrain height in alternate buffer mode 1`] = `
 "ScrollableList
 AppHeader
-HistoryItem: Hello (height: undefined)
-HistoryItem: Hi there (height: undefined)"
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+ > Hello
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+✦ Hi there
+  ShowMoreLines
+"
 `;

@@ -1,19 +1,19 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`<ToolGroupMessage /> > Ask User Filtering > does NOT filter out ask_user when status is Error 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ x  Ask User                                                                  │
-│                                                                              │
-│ Test result                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ x  Ask User                                                              │
+│                                                                          │
+│ Test result                                                              │
+╰──────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`<ToolGroupMessage /> > Ask User Filtering > does NOT filter out ask_user when status is Success 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  Ask User                                                                  │
-│                                                                              │
-│ Test result                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  Ask User                                                              │
+│                                                                          │
+│ Test result                                                              │
+╰──────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`<ToolGroupMessage /> > Ask User Filtering > filters out ask_user when status is Confirming 1`] = `""`;
@@ -23,89 +23,89 @@ exports[`<ToolGroupMessage /> > Ask User Filtering > filters out ask_user when s
 exports[`<ToolGroupMessage /> > Ask User Filtering > filters out ask_user when status is Pending 1`] = `""`;
 
 exports[`<ToolGroupMessage /> > Ask User Filtering > shows other tools when ask_user is filtered out 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  other-tool A tool for testing                                             │
-│                                                                              │
-│ Test result                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  other-tool A tool for testing                                         │
+│                                                                          │
+│ Test result                                                              │
+╰──────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`<ToolGroupMessage /> > Border Color Logic > uses gray border when all tools are successful and no shell commands 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  test-tool A tool for testing                                              │
-│                                                                              │
-│ Test result                                                                  │
-│                                                                              │
-│ ✓  another-tool A tool for testing                                           │
-│                                                                              │
-│ Test result                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  test-tool A tool for testing                                          │
+│                                                                          │
+│ Test result                                                              │
+│                                                                          │
+│ ✓  another-tool A tool for testing                                       │
+│                                                                          │
+│ Test result                                                              │
+╰──────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`<ToolGroupMessage /> > Border Color Logic > uses yellow border for shell commands even when successful 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  run_shell_command A tool for testing                                      │
-│                                                                              │
-│ Test result                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  run_shell_command A tool for testing                                  │
+│                                                                          │
+│ Test result                                                              │
+╰──────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`<ToolGroupMessage /> > Border Color Logic > uses yellow border when tools are pending 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ o  test-tool A tool for testing                                              │
-│                                                                              │
-│ Test result                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ o  test-tool A tool for testing                                          │
+│                                                                          │
+│ Test result                                                              │
+╰──────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`<ToolGroupMessage /> > Confirmation Handling > renders confirmation with permanent approval disabled 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ?  confirm-tool A tool for testing                                         ← │
-│                                                                              │
-│ Test result                                                                  │
-│ Do you want to proceed?                                                      │
-│ Do you want to proceed?                                                      │
-│                                                                              │
-│ ● 1. Allow once                                                              │
-│   2. Allow for this session                                                  │
-│   3. No, suggest changes (esc)                                               │
-│                                                                              │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ?  confirm-tool A tool for testing                                     ← │
+│                                                                          │
+│ Test result                                                              │
+│ Do you want to proceed?                                                  │
+│ Do you want to proceed?                                                  │
+│                                                                          │
+│ ● 1. Allow once                                                          │
+│   2. Allow for this session                                              │
+│   3. No, suggest changes (esc)                                           │
+│                                                                          │
+╰──────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`<ToolGroupMessage /> > Confirmation Handling > renders confirmation with permanent approval enabled 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ?  confirm-tool A tool for testing                                         ← │
-│                                                                              │
-│ Test result                                                                  │
-│ Do you want to proceed?                                                      │
-│ Do you want to proceed?                                                      │
-│                                                                              │
-│ ● 1. Allow once                                                              │
-│   2. Allow for this session                                                  │
-│   3. Allow for all future sessions                                           │
-│   4. No, suggest changes (esc)                                               │
-│                                                                              │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ?  confirm-tool A tool for testing                                     ← │
+│                                                                          │
+│ Test result                                                              │
+│ Do you want to proceed?                                                  │
+│ Do you want to proceed?                                                  │
+│                                                                          │
+│ ● 1. Allow once                                                          │
+│   2. Allow for this session                                              │
+│   3. Allow for all future sessions                                       │
+│   4. No, suggest changes (esc)                                           │
+│                                                                          │
+╰──────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`<ToolGroupMessage /> > Confirmation Handling > shows confirmation dialog for first confirming tool only 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ?  first-confirm A tool for testing                                        ← │
-│                                                                              │
-│ Test result                                                                  │
-│ Confirm first tool                                                           │
-│ Do you want to proceed?                                                      │
-│                                                                              │
-│ ● 1. Allow once                                                              │
-│   2. Allow for this session                                                  │
-│   3. No, suggest changes (esc)                                               │
-│                                                                              │
-│                                                                              │
-│ ?  second-confirm A tool for testing                                         │
-│                                                                              │
-│ Test result                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ?  first-confirm A tool for testing                                    ← │
+│                                                                          │
+│ Test result                                                              │
+│ Confirm first tool                                                       │
+│ Do you want to proceed?                                                  │
+│                                                                          │
+│ ● 1. Allow once                                                          │
+│   2. Allow for this session                                              │
+│   3. No, suggest changes (esc)                                           │
+│                                                                          │
+│                                                                          │
+│ ?  second-confirm A tool for testing                                     │
+│                                                                          │
+│ Test result                                                              │
+╰──────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`<ToolGroupMessage /> > Event-Driven Scheduler > hides confirming tools when event-driven scheduler is enabled 1`] = `""`;
@@ -113,148 +113,148 @@ exports[`<ToolGroupMessage /> > Event-Driven Scheduler > hides confirming tools 
 exports[`<ToolGroupMessage /> > Event-Driven Scheduler > renders nothing when only tool is in-progress AskUser with borderBottom=false 1`] = `""`;
 
 exports[`<ToolGroupMessage /> > Event-Driven Scheduler > shows only successful tools when mixed with confirming tools 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  success-tool A tool for testing                                           │
-│                                                                              │
-│ Test result                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  success-tool A tool for testing                                       │
+│                                                                          │
+│ Test result                                                              │
+╰──────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders empty tool calls array 1`] = `""`;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders header when scrolled 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  tool-1 Description 1. This is a long description that will need to be tr… │
-│──────────────────────────────────────────────────────────────────────────────│
-│ line5                                                                        │                                       █
-│                                                                              │                                       █
-│ ✓  tool-2 Description 2                                                      │                                       █
-│                                                                              │                                       █
-│ line1                                                                        │                                       █
-│ line2                                                                        │                                       █
-╰──────────────────────────────────────────────────────────────────────────────╯                                       █"
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  tool-1 Description 1. This is a long description that will need to b… │
+│──────────────────────────────────────────────────────────────────────────│
+│ line5                                                                    │                                           █
+│                                                                          │                                           █
+│ ✓  tool-2 Description 2                                                  │                                           █
+│                                                                          │                                           █
+│ line1                                                                    │                                           █
+│ line2                                                                    │                                           █
+╰──────────────────────────────────────────────────────────────────────────╯                                           █"
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders mixed tool calls including shell command 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  read_file Read a file                                                     │
-│                                                                              │
-│ Test result                                                                  │
-│                                                                              │
-│ ⊷  run_shell_command Run command                                             │
-│                                                                              │
-│ Test result                                                                  │
-│                                                                              │
-│ o  write_file Write to file                                                  │
-│                                                                              │
-│ Test result                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  read_file Read a file                                                 │
+│                                                                          │
+│ Test result                                                              │
+│                                                                          │
+│ ⊷  run_shell_command Run command                                         │
+│                                                                          │
+│ Test result                                                              │
+│                                                                          │
+│ o  write_file Write to file                                              │
+│                                                                          │
+│ Test result                                                              │
+╰──────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders multiple tool calls with different statuses 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  successful-tool This tool succeeded                                       │
-│                                                                              │
-│ Test result                                                                  │
-│                                                                              │
-│ o  pending-tool This tool is pending                                         │
-│                                                                              │
-│ Test result                                                                  │
-│                                                                              │
-│ x  error-tool This tool failed                                               │
-│                                                                              │
-│ Test result                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  successful-tool This tool succeeded                                   │
+│                                                                          │
+│ Test result                                                              │
+│                                                                          │
+│ o  pending-tool This tool is pending                                     │
+│                                                                          │
+│ Test result                                                              │
+│                                                                          │
+│ x  error-tool This tool failed                                           │
+│                                                                          │
+│ Test result                                                              │
+╰──────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders shell command with yellow border 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  run_shell_command Execute shell command                                   │
-│                                                                              │
-│ Test result                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  run_shell_command Execute shell command                               │
+│                                                                          │
+│ Test result                                                              │
+╰──────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders single successful tool call 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  test-tool A tool for testing                                              │
-│                                                                              │
-│ Test result                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  test-tool A tool for testing                                          │
+│                                                                          │
+│ Test result                                                              │
+╰──────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders tool call awaiting confirmation 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ?  confirmation-tool This tool needs confirmation                          ← │
-│                                                                              │
-│ Test result                                                                  │
-│ Are you sure you want to proceed?                                            │
-│ Do you want to proceed?                                                      │
-│                                                                              │
-│ ● 1. Allow once                                                              │
-│   2. Allow for this session                                                  │
-│   3. No, suggest changes (esc)                                               │
-│                                                                              │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ?  confirmation-tool This tool needs confirmation                      ← │
+│                                                                          │
+│ Test result                                                              │
+│ Are you sure you want to proceed?                                        │
+│ Do you want to proceed?                                                  │
+│                                                                          │
+│ ● 1. Allow once                                                          │
+│   2. Allow for this session                                              │
+│   3. No, suggest changes (esc)                                           │
+│                                                                          │
+╰──────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders tool call with outputFile 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  tool-with-file Tool that saved output to file                             │
-│                                                                              │
-│ Test result                                                                  │
-│ Output too long and was saved to: /path/to/output.txt                        │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  tool-with-file Tool that saved output to file                         │
+│                                                                          │
+│ Test result                                                              │
+│ Output too long and was saved to: /path/to/output.txt                    │
+╰──────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders two tool groups where only the last line of the previous group is visible 1`] = `
-"╰──────────────────────────────────────────────────────────────────────────────╯
-╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  tool-2 Description 2                                                      │
-│                                                                              │                                       ▄
-│ line1                                                                        │                                       █
-╰──────────────────────────────────────────────────────────────────────────────╯                                       █"
+"╰──────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  tool-2 Description 2                                                  │
+│                                                                          │                                           ▄
+│ line1                                                                    │                                           █
+╰──────────────────────────────────────────────────────────────────────────╯                                           █"
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders when not focused 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  test-tool A tool for testing                                              │
-│                                                                              │
-│ Test result                                                                  │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  test-tool A tool for testing                                          │
+│                                                                          │
+│ Test result                                                              │
+╰──────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders with limited terminal height 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  tool-with-result Tool with output                                         │
-│                                                                              │
-│ This is a long result that might need height constraints                     │
-│                                                                              │
-│ ✓  another-tool Another tool                                                 │
-│                                                                              │
-│ More output here                                                             │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  tool-with-result Tool with output                                     │
+│                                                                          │
+│ This is a long result that might need height constraints                 │
+│                                                                          │
+│ ✓  another-tool Another tool                                             │
+│                                                                          │
+│ More output here                                                         │
+╰──────────────────────────────────────────────────────────────────────────╯"
 `;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders with narrow terminal width 1`] = `
-"╭──────────────────────────────────────╮
-│ ✓  very-long-tool-name-that-might-w… │
-│                                      │
-│ Test result                          │
-╰──────────────────────────────────────╯"
+"╭──────────────────────────────────╮
+│ ✓  very-long-tool-name-that-mig… │
+│                                  │
+│ Test result                      │
+╰──────────────────────────────────╯"
 `;
 
 exports[`<ToolGroupMessage /> > Height Calculation > calculates available height correctly with multiple tools with results 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ✓  test-tool A tool for testing                                              │
-│                                                                              │
-│ Result 1                                                                     │
-│                                                                              │
-│ ✓  test-tool A tool for testing                                              │
-│                                                                              │
-│ Result 2                                                                     │
-│                                                                              │
-│ ✓  test-tool A tool for testing                                              │
-│                                                                              │
-╰──────────────────────────────────────────────────────────────────────────────╯"
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  test-tool A tool for testing                                          │
+│                                                                          │
+│ Result 1                                                                 │
+│                                                                          │
+│ ✓  test-tool A tool for testing                                          │
+│                                                                          │
+│ Result 2                                                                 │
+│                                                                          │
+│ ✓  test-tool A tool for testing                                          │
+│                                                                          │
+╰──────────────────────────────────────────────────────────────────────────╯"
 `;

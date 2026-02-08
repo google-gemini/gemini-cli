@@ -95,14 +95,62 @@ describe('ShellInputPrompt', () => {
   it.each([
     ['up', -1],
     ['down', 1],
-  ])('handles scroll %s (Ctrl+Shift+%s)', (key, direction) => {
+  ])('handles scroll %s (Command.SCROLL_%s)', (key, direction) => {
     render(<ShellInputPrompt activeShellPtyId={1} focus={true} />);
 
     const handler = mockUseKeypress.mock.calls[0][0];
 
-    handler({ name: key, shift: true, alt: false, ctrl: true, cmd: false });
+    handler({ name: key, shift: true, alt: false, ctrl: false, cmd: false });
 
     expect(mockScrollPty).toHaveBeenCalledWith(1, direction);
+  });
+
+  it.each([
+    ['pageup', -15],
+    ['pagedown', 15],
+  ])(
+    'handles page scroll %s (Command.PAGE_%s) with default size',
+    (key, expectedScroll) => {
+      render(<ShellInputPrompt activeShellPtyId={1} focus={true} />);
+
+      const handler = mockUseKeypress.mock.calls[0][0];
+
+      handler({ name: key, shift: false, alt: false, ctrl: false, cmd: false });
+
+      expect(mockScrollPty).toHaveBeenCalledWith(1, expectedScroll);
+    },
+  );
+
+  it('respects scrollPageSize prop', () => {
+    render(
+      <ShellInputPrompt
+        activeShellPtyId={1}
+        focus={true}
+        scrollPageSize={10}
+      />,
+    );
+
+    const handler = mockUseKeypress.mock.calls[0][0];
+
+    // PageDown
+    handler({
+      name: 'pagedown',
+      shift: false,
+      alt: false,
+      ctrl: false,
+      cmd: false,
+    });
+    expect(mockScrollPty).toHaveBeenCalledWith(1, 10);
+
+    // PageUp
+    handler({
+      name: 'pageup',
+      shift: false,
+      alt: false,
+      ctrl: false,
+      cmd: false,
+    });
+    expect(mockScrollPty).toHaveBeenCalledWith(1, -10);
   });
 
   it('does not handle input when not focused', () => {
@@ -136,6 +184,23 @@ describe('ShellInputPrompt', () => {
       sequence: 'a',
     });
 
+    expect(mockWriteToPty).not.toHaveBeenCalled();
+  });
+
+  it('ignores Command.UNFOCUS_SHELL (Shift+Tab) to allow focus navigation', () => {
+    render(<ShellInputPrompt activeShellPtyId={1} focus={true} />);
+
+    const handler = mockUseKeypress.mock.calls[0][0];
+
+    const result = handler({
+      name: 'tab',
+      shift: true,
+      alt: false,
+      ctrl: false,
+      cmd: false,
+    });
+
+    expect(result).toBe(false);
     expect(mockWriteToPty).not.toHaveBeenCalled();
   });
 });
