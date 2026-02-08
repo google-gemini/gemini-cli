@@ -430,9 +430,9 @@ function workflowStepStrategy(options: PrimaryWorkflowsOptions): string {
   }
 
   if (options.enableWriteTodosTool) {
-    return `2. **Strategy:** Formulate a grounded plan based on your research. \${options.interactive ? 'Share a concise summary of your strategy.' : ''} For complex tasks, break them down into smaller, manageable subtasks and use the \`${WRITE_TODOS_TOOL_NAME}\` tool to track your progress.`;
+    return `2. **Strategy:** Formulate a grounded plan based on your research.${options.interactive ? ' Share a concise summary of your strategy.' : ''} For complex tasks, break them down into smaller, manageable subtasks and use the \`${WRITE_TODOS_TOOL_NAME}\` tool to track your progress.`;
   }
-  return `2. **Strategy:** Formulate a grounded plan based on your research.\${options.interactive ? ' Share a concise summary of your strategy.' : ''}`;
+  return `2. **Strategy:** Formulate a grounded plan based on your research.${options.interactive ? ' Share a concise summary of your strategy.' : ''}`;
 }
 
 function workflowVerifyStandardsSuffix(interactive: boolean): string {
