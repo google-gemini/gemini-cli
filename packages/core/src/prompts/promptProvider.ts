@@ -156,6 +156,7 @@ export class PromptProvider {
             interactive: interactiveMode,
             isGemini3,
             enableShellEfficiency: config.getEnableShellOutputEfficiency(),
+            interactiveShellEnabled: config.isInteractiveShellEnabled(),
           }),
         ),
         sandbox: this.withSection('sandbox', () => getSandboxMode()),

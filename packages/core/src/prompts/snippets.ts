@@ -12,6 +12,7 @@ import {
   EXIT_PLAN_MODE_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
+  MEMORY_TOOL_NAME,
   READ_FILE_TOOL_NAME,
   SHELL_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
@@ -56,6 +57,7 @@ export interface OperationalGuidelinesOptions {
   interactive: boolean;
   isGemini3: boolean;
   enableShellEfficiency: boolean;
+  interactiveShellEnabled: boolean;
 }
 
 export type SandboxMode = 'macos-seatbelt' | 'generic' | 'outside';
@@ -247,11 +249,15 @@ ${shellEfficiencyGuidelines(options.enableShellEfficiency)}
 
 ## Tool Usage
 - **Parallelism:** Execute multiple independent tool calls in parallel when feasible (i.e. searching the codebase).
-- **Command Execution:** Use the '${SHELL_TOOL_NAME}' tool for running shell commands, remembering the safety rule to explain modifying commands first.${toolUsageInteractive(options.interactive)}
+- **Command Execution:** Use the '${SHELL_TOOL_NAME}' tool for running shell commands, remembering the safety rule to explain modifying commands first.${toolUsageInteractive(
+    options.interactive,
+    options.interactiveShellEnabled,
+  )}${toolUsageRememberingFacts(options)}
 - **Confirmation Protocol:** If a tool call is declined or cancelled, respect the decision immediately. Do not re-attempt the action or "negotiate" for the same tool call unless the user explicitly directs you to. Offer an alternative technical path if possible.
 
 ## Interaction Details
 - **Help Command:** The user can use '/help' to display help information.
+- **Feedback:** To report a bug or provide feedback, please use the /bug command.
 `.trim();
 }
 
@@ -478,7 +484,7 @@ function newApplicationSteps(options: PrimaryWorkflowsOptions): string {
      - **Mobile:** Compose Multiplatform or Flutter.
      - **Games:** HTML/CSS/JS (Three.js for 3D).
      - **CLIs:** Python or Go.
-3. **Implementation:** Autonomously implement each feature per the approved plan. When starting, scaffold the application using '${SHELL_TOOL_NAME}'. For visual assets, utilize **platform-native primitives** (e.g., stylized shapes, gradients, icons). Never link to external services or assume local paths for assets that have not been created.
+3. Implementation: Autonomously implement each feature per the approved plan. When starting, scaffold the application using '${SHELL_TOOL_NAME}'. For visual assets, utilize **platform-native primitives** (e.g., stylized shapes, gradients, icons). Never link to external services or assume local paths for assets that have not been created.
 4. **Verify:** Review work against the original request. Fix bugs and deviations. **Build the application and ensure there are no compile errors.**`.trim();
 }
 
@@ -506,15 +512,32 @@ function toneAndStyleNoChitchat(isGemini3: boolean): string {
 - **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes..."). Get straight to the action or answer.`;
 }
 
-function toolUsageInteractive(interactive: boolean): string {
+function toolUsageInteractive(
+  interactive: boolean,
+  interactiveShellEnabled: boolean,
+): string {
   if (interactive) {
+    const ctrlF = interactiveShellEnabled
+      ? ' If you choose to execute an interactive command consider letting the user know they can press `ctrl + f` to focus into the shell to provide input.'
+      : '';
     return `
 - **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true. If unsure, ask the user.
-- **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim). If you choose to execute an interactive command consider letting the user know they can press \`ctrl + f\` to focus into the shell to provide input.`;
+- **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim).${ctrlF}`;
   }
   return `
 - **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true.
 - **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim).`;
+}
+
+function toolUsageRememberingFacts(
+  options: OperationalGuidelinesOptions,
+): string {
+  const base = `
+- **Memory Tool:** Use \`${MEMORY_TOOL_NAME}\` only for global user preferences, personal facts, or high-level information that applies across all sessions. Never save workspace-specific context, local file paths, or transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is for persistent user-related information only.`;
+  const suffix = options.interactive
+    ? ' If unsure whether a fact is worth remembering globally, ask the user.'
+    : '';
+  return base + suffix;
 }
 
 function gitRepoKeepUserInformed(interactive: boolean): string {
