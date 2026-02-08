@@ -769,9 +769,6 @@ describe('EditTool', () => {
       fs.writeFileSync(filePath, content, 'utf8');
 
       // Target match after line 50. Matches are at 1-10.
-      // Lookback 20 from 50 is 30.
-      // Search starts at 30.
-      // No matches after 30.
       const params: EditToolParams = {
         file_path: filePath,
         instruction: 'Replace match after line 50',
@@ -784,108 +781,6 @@ describe('EditTool', () => {
       const result = await invocation.execute(new AbortController().signal);
 
       expect(result.error?.type).toBe(ToolErrorType.EDIT_NO_OCCURRENCE_FOUND);
-    });
-
-    it('should succeed if old_string is within 20 lines before start_line (via new lookback)', async () => {
-      const content = Array(25).fill('line').join('\n') + '\ntarget\n';
-      fs.writeFileSync(filePath, content, 'utf8');
-
-      // target is at line 26.
-      // start_line is at line 40.
-      // lookback 20 should reach line 20, which is before the target.
-      const params: EditToolParams = {
-        file_path: filePath,
-        instruction: 'Replace target',
-        old_string: 'target',
-        new_string: 'replacement',
-        start_line: 40,
-      };
-
-      const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
-
-      expect(result.error).toBeUndefined();
-      const finalContent = fs.readFileSync(filePath, 'utf8');
-      expect(finalContent).toContain('replacement');
-    });
-
-    it('should find the closest match when iterating backwards, avoiding earlier matches', async () => {
-      // Scenario:
-      // Match 1 at line 10
-      // Match 2 at line 20
-      // User specifies start_line: 21 (off by one)
-      // Current logic: Jumps to 1 (21-20), finds Match 1. WRONG.
-      // Desired logic: Steps back to 20, finds Match 2. CORRECT.
-      const lines = Array(30).fill('other');
-      lines[9] = 'match'; // Line 10
-      lines[19] = 'match'; // Line 20
-      const content = lines.join('\n');
-      fs.writeFileSync(filePath, content, 'utf8');
-
-      const params: EditToolParams = {
-        file_path: filePath,
-        instruction: 'Replace the second match',
-        old_string: 'match',
-        new_string: 'replacement',
-        start_line: 21,
-      };
-
-      const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
-
-      expect(result.error).toBeUndefined();
-      const finalContent = fs.readFileSync(filePath, 'utf8');
-      const finalLines = finalContent.split('\n');
-
-      // Match at line 10 should still be there
-      expect(finalLines[9]).toBe('match');
-      // Match at line 20 should be replaced
-      expect(finalLines[19]).toBe('replacement');
-    });
-
-    it('should succeed with multiple context lines via lookback', async () => {
-      const content = 'ctx1\nctx2\nctx3\ntarget\nother';
-      fs.writeFileSync(filePath, content, 'utf8');
-
-      // old_string includes 3 lines of context.
-      // start_line points to target (line 4).
-      // Lookback needs to go back at least 3 lines.
-      const params: EditToolParams = {
-        file_path: filePath,
-        instruction: 'Replace target',
-        old_string: 'ctx1\nctx2\nctx3\ntarget',
-        new_string: 'ctx1\nctx2\nctx3\nreplacement',
-        start_line: 4,
-      };
-
-      const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
-
-      expect(result.error).toBeUndefined();
-      const finalContent = fs.readFileSync(filePath, 'utf8');
-      expect(finalContent).toBe('ctx1\nctx2\nctx3\nreplacement\nother');
-    });
-
-    it('should succeed if old_string has context line and start_line skips that context (via lookback)', async () => {
-      const content = 'context\ntarget\nother';
-      fs.writeFileSync(filePath, content, 'utf8');
-
-      // old_string includes context from line 1.
-      // start_line points to target (line 2).
-      const params: EditToolParams = {
-        file_path: filePath,
-        instruction: 'Replace target',
-        old_string: 'context\ntarget',
-        new_string: 'context\nreplacement',
-        start_line: 2,
-      };
-
-      const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
-
-      expect(result.error).toBeUndefined();
-      const finalContent = fs.readFileSync(filePath, 'utf8');
-      expect(finalContent).toBe('context\nreplacement\nother');
     });
   });
 

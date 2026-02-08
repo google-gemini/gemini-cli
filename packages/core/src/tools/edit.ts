@@ -301,7 +301,7 @@ export async function calculateReplacement(
   context: ReplacementContext,
 ): Promise<ReplacementResult> {
   const { currentContent, params } = context;
-  const { old_string, new_string, start_line } = params;
+  const { old_string, new_string } = params;
   const normalizedSearch = old_string.replace(/\r\n/g, '\n');
   const normalizedReplace = new_string.replace(/\r\n/g, '\n');
 
@@ -314,55 +314,25 @@ export async function calculateReplacement(
     };
   }
 
-  // Strategy: Try with the provided start_line first.
-  // If that fails (and start_line was provided), try looking back a few lines.
-  // This handles cases where old_string includes context lines before the target line
-  // (e.g. user provided start_line of the target, but old_string starts earlier),
-  // or simple off-by-one errors.
-  const startLinesToTry = [start_line];
-  if (start_line && start_line > 1) {
-    // Iterate up to 20 lines in both directions (lookback and lookahead).
-    // This attempts to find the closest match if the provided start_line is slightly off.
-    for (let i = 1; i <= 20; i++) {
-      const lookback = start_line - i;
-      const lookahead = start_line + i;
-
-      if (lookback > 0) {
-        startLinesToTry.push(lookback);
-      }
-      startLinesToTry.push(lookahead);
-    }
+  const exactResult = await calculateExactReplacement(context);
+  if (exactResult) {
+    const event = new EditStrategyEvent('exact');
+    logEditStrategy(config, event);
+    return exactResult;
   }
 
-  for (const attemptStartLine of startLinesToTry) {
-    const attemptContext = {
-      ...context,
-      params: {
-        ...context.params,
-        start_line: attemptStartLine,
-      },
-    };
+  const flexibleResult = await calculateFlexibleReplacement(context);
+  if (flexibleResult) {
+    const event = new EditStrategyEvent('flexible');
+    logEditStrategy(config, event);
+    return flexibleResult;
+  }
 
-    const exactResult = await calculateExactReplacement(attemptContext);
-    if (exactResult) {
-      const event = new EditStrategyEvent('exact');
-      logEditStrategy(config, event);
-      return exactResult;
-    }
-
-    const flexibleResult = await calculateFlexibleReplacement(attemptContext);
-    if (flexibleResult) {
-      const event = new EditStrategyEvent('flexible');
-      logEditStrategy(config, event);
-      return flexibleResult;
-    }
-
-    const regexResult = await calculateRegexReplacement(attemptContext);
-    if (regexResult) {
-      const event = new EditStrategyEvent('regex');
-      logEditStrategy(config, event);
-      return regexResult;
-    }
+  const regexResult = await calculateRegexReplacement(context);
+  if (regexResult) {
+    const event = new EditStrategyEvent('regex');
+    logEditStrategy(config, event);
+    return regexResult;
   }
 
   return {
