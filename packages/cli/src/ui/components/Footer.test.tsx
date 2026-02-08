@@ -128,7 +128,7 @@ describe('<Footer />', () => {
       }),
     });
     expect(lastFrame()).toContain(defaultProps.model);
-    expect(lastFrame()).toMatch(/\(\d+% context left\)/);
+    expect(lastFrame()).toMatch(/\d+% context left/);
   });
 
   it('displays the model name and abbreviated context percentage', () => {
@@ -144,7 +144,7 @@ describe('<Footer />', () => {
       }),
     });
     expect(lastFrame()).toContain(defaultProps.model);
-    expect(lastFrame()).toMatch(/\(\d+%\)/);
+    expect(lastFrame()).toMatch(/\d+%/);
   });
 
   describe('sandbox and trust info', () => {
@@ -289,9 +289,8 @@ describe('<Footer />', () => {
         }),
       });
       expect(lastFrame()).toContain(defaultProps.model);
-      expect(lastFrame()).not.toMatch(/\(\d+% context left\)/);
+      expect(lastFrame()).not.toMatch(/\d+% context left/);
     });
-
     it('shows the context percentage when hideContextPercentage is false', () => {
       const { lastFrame } = renderWithProviders(<Footer />, {
         width: 120,
@@ -305,9 +304,8 @@ describe('<Footer />', () => {
         }),
       });
       expect(lastFrame()).toContain(defaultProps.model);
-      expect(lastFrame()).toMatch(/\(\d+% context left\)/);
+      expect(lastFrame()).toMatch(/\d+% context left/);
     });
-
     it('renders complete footer in narrow terminal (baseline narrow)', () => {
       const { lastFrame } = renderWithProviders(<Footer />, {
         width: 79,

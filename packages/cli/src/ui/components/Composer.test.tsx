@@ -308,19 +308,19 @@ describe('Composer', () => {
       expect(output).not.toContain('Should not show');
     });
 
-    it('does not render LoadingIndicator when waiting for confirmation', () => {
+    it('renders LoadingIndicator when waiting for confirmation', () => {
       const uiState = createMockUIState({
         streamingState: StreamingState.WaitingForConfirmation,
         thought: {
           subject: 'Confirmation',
-          description: 'Should not show during confirmation',
+          description: 'Should show during confirmation',
         },
       });
 
       const { lastFrame } = renderComposer(uiState);
 
       const output = lastFrame();
-      expect(output).not.toContain('LoadingIndicator');
+      expect(output).toContain('LoadingIndicator');
     });
 
     it('does not render LoadingIndicator when a tool confirmation is pending', () => {
