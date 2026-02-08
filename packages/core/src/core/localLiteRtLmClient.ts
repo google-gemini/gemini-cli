@@ -21,10 +21,8 @@ export class LocalLiteRtLmClient {
 
   constructor(config: Config) {
     const gemmaModelRouterSettings = config.getGemmaModelRouterSettings();
-    this.host =
-      gemmaModelRouterSettings?.classifier?.host || 'http://localhost:9379';
-    this.model =
-      gemmaModelRouterSettings?.classifier?.model || 'gemma3-1b-gpu-custom';
+    this.host = gemmaModelRouterSettings.classifier!.host!;
+    this.model = gemmaModelRouterSettings.classifier!.model!;
 
     this.client = new GoogleGenAI({
       apiKey: 'no-api-key-needed',
