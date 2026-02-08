@@ -32,11 +32,15 @@ describe('Edits location eval', () => {
       ),
       'src/math.ts': `
 export function add(a: number, b: number): number {
-  return a - b; // Bug: subtraction instead of addition
+  return a + b;
 }
 
 export function subtract(a: number, b: number): number {
   return a - b;
+}
+
+export function multiply(a: number, b: number): number {
+  return a + b;
 }
 `,
       'src/math.test.ts': `
@@ -65,7 +69,7 @@ test('capitalize capitalizes the first letter', () => {
 });
 `,
     },
-    prompt: 'Fix the bug in src/math.ts.',
+    prompt: 'Fix the bug in src/math.ts. Do not run the code.',
     timeout: 180000,
     assert: async (rig) => {
       const toolLogs = rig.readToolLogs();
