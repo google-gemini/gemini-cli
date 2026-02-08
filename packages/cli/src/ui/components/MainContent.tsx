@@ -81,7 +81,8 @@ export const MainContent = () => {
           <HistoryItemDisplay
             key={i}
             availableTerminalHeight={
-              uiState.constrainHeight && !isAlternateBuffer
+              (uiState.constrainHeight && !isAlternateBuffer) ||
+              isAlternateBuffer
                 ? availableTerminalHeight
                 : undefined
             }
@@ -148,7 +149,7 @@ export const MainContent = () => {
     return (
       <ScrollableList
         ref={scrollableListRef}
-        hasFocus={!uiState.isEditorDialogOpen}
+        hasFocus={!uiState.isEditorDialogOpen && !uiState.embeddedShellFocused}
         width={uiState.terminalWidth}
         data={virtualizedData}
         renderItem={renderItem}

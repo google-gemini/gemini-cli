@@ -1523,15 +1523,6 @@ const SETTINGS_SCHEMA = {
         description: 'Enable requesting and fetching of extension settings.',
         showInDialog: false,
       },
-      enableEventDrivenScheduler: {
-        type: 'boolean',
-        label: 'Event Driven Scheduler',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: true,
-        description: 'Enables event-driven scheduler within the CLI session.',
-        showInDialog: false,
-      },
       extensionReloading: {
         type: 'boolean',
         label: 'Extension Reloading',
