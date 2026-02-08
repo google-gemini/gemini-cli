@@ -155,6 +155,31 @@ describe('TextInput', () => {
     expect(lastFrame()).toContain('testing');
   });
 
+  it('truncates placeholder text in narrow terminals', () => {
+    const buffer = {
+      text: '',
+      lines: [''],
+      cursor: [0, 0],
+      visualCursor: [0, 0],
+      viewportVisualLines: [''],
+      handleInput: vi.fn(),
+      setText: vi.fn(),
+    };
+    const { lastFrame } = render(
+      <TextInput
+        buffer={buffer as unknown as TextBuffer}
+        placeholder="Search to filter"
+        focus={false}
+        onSubmit={onSubmit}
+        onCancel={onCancel}
+      />,
+      10,
+    );
+    const frame = lastFrame();
+    expect(frame).toContain('…');
+    expect(frame).not.toContain('Search to filter');
+  });
+
   it('handles character input', () => {
     render(
       <TextInput buffer={mockBuffer} onSubmit={onSubmit} onCancel={onCancel} />,

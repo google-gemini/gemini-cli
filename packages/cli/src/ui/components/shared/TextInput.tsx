@@ -62,14 +62,20 @@ export function TextInput({
 
   if (showPlaceholder) {
     return (
-      <Box>
+      <Box minWidth={0}>
         {focus ? (
-          <Text terminalCursorFocus={focus} terminalCursorPosition={0}>
+          <Text
+            terminalCursorFocus={focus}
+            terminalCursorPosition={0}
+            wrap="truncate-end"
+          >
             {chalk.inverse(placeholder[0] || ' ')}
             <Text color={theme.text.secondary}>{placeholder.slice(1)}</Text>
           </Text>
         ) : (
-          <Text color={theme.text.secondary}>{placeholder}</Text>
+          <Text color={theme.text.secondary} wrap="truncate-end">
+            {placeholder}
+          </Text>
         )}
       </Box>
     );
