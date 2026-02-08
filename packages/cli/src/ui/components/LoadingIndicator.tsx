@@ -37,41 +37,43 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   const { columns: terminalWidth } = useTerminalSize();
   const isNarrow = isNarrowWidth(terminalWidth);
 
-  if (
-    streamingState === StreamingState.Idle &&
-    !currentLoadingPhrase &&
-    !thought
-  ) {
-    return null;
-  }
-
   // Prioritize the interactive shell waiting phrase over the thought subject
   // because it conveys an actionable state for the user (waiting for input).
   const primaryText =
     currentLoadingPhrase === INTERACTIVE_SHELL_WAITING_PHRASE
       ? currentLoadingPhrase
-      : thought?.subject || currentLoadingPhrase;
+      : thought?.subject || currentLoadingPhrase || undefined;
+
+  const textColor =
+    streamingState === StreamingState.Idle
+      ? theme.text.secondary
+      : theme.text.primary;
+
+  const italic = streamingState === StreamingState.Responding;
 
   const cancelAndTimerContent =
     showCancelAndTimer &&
-    streamingState !== StreamingState.WaitingForConfirmation
+    streamingState !== StreamingState.WaitingForConfirmation &&
+    streamingState !== StreamingState.Idle
       ? `(esc to cancel, ${elapsedTime < 60 ? `${elapsedTime}s` : formatDuration(elapsedTime * 1000)})`
       : null;
 
   if (inline) {
     return (
       <Box>
-        <Box marginRight={1}>
-          <GeminiRespondingSpinner
-            nonRespondingDisplay={
-              streamingState === StreamingState.WaitingForConfirmation
-                ? '⠏'
-                : ''
-            }
-          />
-        </Box>
+        {streamingState !== StreamingState.Idle && (
+          <Box marginRight={1}>
+            <GeminiRespondingSpinner
+              nonRespondingDisplay={
+                streamingState === StreamingState.WaitingForConfirmation
+                  ? '⠏'
+                  : ''
+              }
+            />
+          </Box>
+        )}
         {primaryText && (
-          <Text color={theme.text.accent} wrap="truncate-end">
+          <Text color={textColor} italic={italic} wrap="truncate-end">
             {primaryText}
           </Text>
         )}
@@ -94,17 +96,19 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
         alignItems={isNarrow ? 'flex-start' : 'center'}
       >
         <Box>
-          <Box marginRight={1}>
-            <GeminiRespondingSpinner
-              nonRespondingDisplay={
-                streamingState === StreamingState.WaitingForConfirmation
-                  ? '⠏'
-                  : ''
-              }
-            />
-          </Box>
+          {streamingState !== StreamingState.Idle && (
+            <Box marginRight={1}>
+              <GeminiRespondingSpinner
+                nonRespondingDisplay={
+                  streamingState === StreamingState.WaitingForConfirmation
+                    ? '⠏'
+                    : ''
+                }
+              />
+            </Box>
+          )}
           {primaryText && (
-            <Text color={theme.text.accent} wrap="truncate-end">
+            <Text color={textColor} italic={italic} wrap="truncate-end">
               {primaryText}
             </Text>
           )}

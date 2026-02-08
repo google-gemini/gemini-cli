@@ -63,14 +63,17 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     Boolean(uiState.proQuotaRequest) ||
     Boolean(uiState.validationRequest) ||
     Boolean(uiState.customDialog);
+  const isActivelyStreaming =
+    uiState.streamingState === StreamingState.Responding;
   const showLoadingIndicator =
     (!uiState.embeddedShellFocused || uiState.isBackgroundShellVisible) &&
-    uiState.streamingState === StreamingState.Responding &&
     !hasPendingActionRequired;
   const showApprovalIndicator = !uiState.shellModeActive;
   const showRawMarkdownIndicator = !uiState.renderMarkdown;
   const showEscToCancelHint =
-    showLoadingIndicator &&
+    isActivelyStreaming &&
+    !uiState.embeddedShellFocused &&
+    !hasPendingActionRequired &&
     uiState.streamingState !== StreamingState.WaitingForConfirmation;
 
   return (
@@ -158,7 +161,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             alignItems="center"
             flexGrow={1}
           >
-            {!showLoadingIndicator && (
+            {!isActivelyStreaming && (
               <Box
                 flexDirection={isNarrow ? 'column' : 'row'}
                 alignItems={isNarrow ? 'flex-start' : 'center'}
@@ -204,7 +207,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             flexDirection="column"
             alignItems={isNarrow ? 'flex-start' : 'flex-end'}
           >
-            {!showLoadingIndicator && (
+            {!isActivelyStreaming && (
               <StatusDisplay hideContextSummary={hideContextSummary} />
             )}
           </Box>
