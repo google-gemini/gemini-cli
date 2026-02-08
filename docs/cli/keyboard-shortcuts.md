@@ -74,7 +74,6 @@ available combinations.
 | Move down within dialog options.                   | `Down Arrow (no Shift)`<br />`J (no Shift)` |
 | Move to the next item or question in a dialog.     | `Tab (no Shift)`                            |
 | Move to the previous item or question in a dialog. | `Shift + Tab`                               |
-| Move focus out of the embedded shell.              | `Shift + Tab`                               |
 
 #### Suggestions & Completions
 
@@ -116,7 +115,7 @@ available combinations.
 | Tab                                                                                                   | `Tab (no Shift)`           |
 | Tab                                                                                                   | `Tab (no Shift)`           |
 | Focus the shell input from the gemini input.                                                          | `Tab (no Shift)`           |
-| Focus the Gemini input from the shell input.                                                          | `Tab`                      |
+| Focus the Gemini input from the shell input.                                                          | `Shift + Tab`              |
 | Clear the terminal screen and redraw the UI.                                                          | `Ctrl + L`                 |
 | Restart the application.                                                                              | `R`                        |
 | Suspend the application (not yet implemented).                                                        | `Ctrl + Z`                 |

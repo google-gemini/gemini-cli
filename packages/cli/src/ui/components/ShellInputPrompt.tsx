@@ -43,7 +43,7 @@ export const ShellInputPrompt: React.FC<ShellInputPromptProps> = ({
       }
 
       // Allow Shift+Tab to bubble up for focus navigation
-      if (keyMatchers[Command.UNFOCUS_SHELL](key)) {
+      if (keyMatchers[Command.UNFOCUS_SHELL_INPUT](key)) {
         return false;
       }
 
