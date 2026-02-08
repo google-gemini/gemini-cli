@@ -81,7 +81,8 @@ export const MainContent = () => {
           <HistoryItemDisplay
             key={i}
             availableTerminalHeight={
-              uiState.constrainHeight && !isAlternateBuffer
+              (uiState.constrainHeight && !isAlternateBuffer) ||
+              isAlternateBuffer
                 ? availableTerminalHeight
                 : undefined
             }
