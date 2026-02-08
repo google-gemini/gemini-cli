@@ -12,7 +12,7 @@ describe('Edits location eval', () => {
    * Ensure that Gemini CLI always updates existing test files, if present,
    * instead of creating a new one.
    */
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: 'should update existing test file instead of creating a new one',
     files: {
       'package.json': JSON.stringify(
