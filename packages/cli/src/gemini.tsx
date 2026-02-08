@@ -24,7 +24,8 @@ import { loadSettings, SettingScope } from './config/settings.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
-import { runNonInteractive, runRalphWiggum } from './nonInteractiveCli.js';
+import { runNonInteractive } from './nonInteractiveCli.js';
+import { runRalphWiggum } from './ralphWiggum.js';
 import {
   cleanupCheckpoints,
   registerCleanup,
