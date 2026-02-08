@@ -36,7 +36,7 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
   const nodes: React.ReactNode[] = [];
   let lastIndex = 0;
   const inlineRegex =
-    /(\*\*.*?\*\*|\*.*?\*|_.*?_|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>|https?:\/\/\S+)/g;
+    /(\*\*.*?\*\*|\*.*?\*|_.*?_|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>|https?:\/\/\S+|\$\\[a-z]+\$)/g;
   let match;
 
   while ((match = inlineRegex.exec(text)) !== null) {
@@ -143,6 +143,21 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
             {fullMatch}
           </Text>
         );
+      } else if (fullMatch.startsWith('$') && fullMatch.endsWith('$')) {
+        const latexMap: Record<string, string> = {
+          '$\\rightarrow$': '→',
+          '$\\leftarrow$': '←',
+          '$\\uparrow$': '↑',
+          '$\\downarrow$': '↓',
+        };
+        const replacement = latexMap[fullMatch];
+        if (replacement) {
+          renderedNode = (
+            <Text key={key} color={baseColor}>
+              {replacement}
+            </Text>
+          );
+        }
       }
     } catch (e) {
       debugLogger.warn('Error parsing inline markdown part:', fullMatch, e);
@@ -184,6 +199,7 @@ export const getPlainTextLength = (text: string): number => {
     .replace(/~~(.*?)~~/g, '$1')
     .replace(/`(.*?)`/g, '$1')
     .replace(/<u>(.*?)<\/u>/g, '$1')
-    .replace(/.*\[(.*?)\]\(.*\)/g, '$1');
+    .replace(/.*\[(.*?)\]\(.*\)/g, '$1')
+    .replace(/\$\\(rightarrow|leftarrow|uparrow|downarrow)\$/g, '→');
   return stringWidth(cleanText);
 };
