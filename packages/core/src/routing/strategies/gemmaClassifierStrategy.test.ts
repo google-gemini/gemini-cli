@@ -16,7 +16,7 @@ import {
 } from '../../config/models.js';
 import type { Content } from '@google/genai';
 import { debugLogger } from '../../utils/debugLogger.js';
-import { LocalLiteRtLmClient } from '../../core/localLiteRtLmClient.js';
+import type { LocalLiteRtLmClient } from '../../core/localLiteRtLmClient.js';
 
 vi.mock('../../core/localLiteRtLmClient.js');
 
@@ -25,11 +25,18 @@ describe('GemmaClassifierStrategy', () => {
   let mockContext: RoutingContext;
   let mockConfig: Config;
   let mockBaseLlmClient: BaseLlmClient;
+  let mockLocalLiteRtLmClient: LocalLiteRtLmClient;
   let mockGenerateJson: Mock;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockGenerateJson = vi.fn();
+
+    mockConfig = {
+      getGemmaModelRouterSettings: vi.fn().mockReturnValue({ enabled: true }),
+      getModel: () => DEFAULT_GEMINI_MODEL,
+      getPreviewFeatures: () => false,
+    } as unknown as Config;
 
     strategy = new GemmaClassifierStrategy();
     mockContext = {
@@ -38,20 +45,10 @@ describe('GemmaClassifierStrategy', () => {
       signal: new AbortController().signal,
     };
 
-    mockConfig = {
-      getGemmaModelRouterSettings: vi.fn().mockReturnValue({ enabled: true }),
-      getModel: () => DEFAULT_GEMINI_MODEL,
-      getPreviewFeatures: () => false,
-    } as unknown as Config;
-
     mockBaseLlmClient = {} as BaseLlmClient;
-
-    vi.mocked(LocalLiteRtLmClient).mockImplementation(
-      () =>
-        ({
-          generateJson: mockGenerateJson,
-        }) as unknown as LocalLiteRtLmClient,
-    );
+    mockLocalLiteRtLmClient = {
+      generateJson: mockGenerateJson,
+    } as unknown as LocalLiteRtLmClient;
   });
 
   it('should return null if gemma model router is disabled', async () => {
@@ -63,6 +60,7 @@ describe('GemmaClassifierStrategy', () => {
       mockContext,
       mockConfig,
       mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
     );
     expect(decision).toBeNull();
   });
@@ -74,7 +72,12 @@ describe('GemmaClassifierStrategy', () => {
     };
     mockGenerateJson.mockResolvedValue(mockApiResponse);
 
-    await strategy.route(mockContext, mockConfig, mockBaseLlmClient);
+    await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
 
     expect(mockGenerateJson).toHaveBeenCalledWith(
       expect.any(Array),
@@ -94,6 +97,7 @@ describe('GemmaClassifierStrategy', () => {
       mockContext,
       mockConfig,
       mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
     );
 
     expect(mockGenerateJson).toHaveBeenCalledOnce();
@@ -119,6 +123,7 @@ describe('GemmaClassifierStrategy', () => {
       mockContext,
       mockConfig,
       mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
     );
 
     expect(mockGenerateJson).toHaveBeenCalledOnce();
@@ -143,6 +148,7 @@ describe('GemmaClassifierStrategy', () => {
       mockContext,
       mockConfig,
       mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
     );
 
     expect(decision).toBeNull();
@@ -164,6 +170,7 @@ describe('GemmaClassifierStrategy', () => {
       mockContext,
       mockConfig,
       mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
     );
 
     expect(decision).toBeNull();
@@ -192,7 +199,12 @@ describe('GemmaClassifierStrategy', () => {
     };
     mockGenerateJson.mockResolvedValue(mockApiResponse);
 
-    await strategy.route(mockContext, mockConfig, mockBaseLlmClient);
+    await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
 
     // Define a type for the arguments passed to the mock `generateJson`
     type GenerateJsonCall = [Content[], string, string | undefined];
@@ -237,7 +249,12 @@ another user turn
     };
     mockGenerateJson.mockResolvedValue(mockApiResponse);
 
-    await strategy.route(mockContext, mockConfig, mockBaseLlmClient);
+    await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
 
     const generateJsonCall = mockGenerateJson.mock.calls[0][0];
 

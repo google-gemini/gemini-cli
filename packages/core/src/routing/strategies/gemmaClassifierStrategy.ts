@@ -20,7 +20,7 @@ import {
   isFunctionResponse,
 } from '../../utils/messageInspectors.js';
 import { debugLogger } from '../../utils/debugLogger.js';
-import { LocalLiteRtLmClient } from '../../core/localLiteRtLmClient.js';
+import type { LocalLiteRtLmClient } from '../../core/localLiteRtLmClient.js';
 
 // The number of recent history turns to provide to the router for context.
 const HISTORY_TURNS_FOR_CONTEXT = 4;
@@ -184,6 +184,7 @@ ${formattedHistory}
     context: RoutingContext,
     config: Config,
     _baseLlmClient: BaseLlmClient,
+    client: LocalLiteRtLmClient,
   ): Promise<RoutingDecision | null> {
     const startTime = Date.now();
     const gemmaRouterSettings = config.getGemmaModelRouterSettings();
@@ -205,7 +206,6 @@ ${formattedHistory}
       const history = [...finalHistory, createUserContent(context.request)];
       const singleMessageHistory = this.flattenChatHistory(history);
 
-      const client = new LocalLiteRtLmClient(config);
       const jsonResponse = await client.generateJson(
         singleMessageHistory,
         LITERT_GEMMA_CLASSIFIER_SYSTEM_PROMPT,

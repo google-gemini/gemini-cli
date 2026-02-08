@@ -87,6 +87,7 @@ export class ModelRouterService {
         context,
         this.config,
         this.config.getBaseLlmClient(),
+        this.config.getLocalLiteRtLmClient(),
       );
 
       debugLogger.debug(

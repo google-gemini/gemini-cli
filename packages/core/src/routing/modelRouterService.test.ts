@@ -9,6 +9,7 @@ import { ModelRouterService } from './modelRouterService.js';
 import { Config } from '../config/config.js';
 
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
+import type { LocalLiteRtLmClient } from '../core/localLiteRtLmClient.js';
 import type { RoutingContext, RoutingDecision } from './routingStrategy.js';
 import { DefaultStrategy } from './strategies/defaultStrategy.js';
 import { CompositeStrategy } from './strategies/compositeStrategy.js';
@@ -36,6 +37,7 @@ describe('ModelRouterService', () => {
   let service: ModelRouterService;
   let mockConfig: Config;
   let mockBaseLlmClient: BaseLlmClient;
+  let mockLocalLiteRtLmClient: LocalLiteRtLmClient;
   let mockContext: RoutingContext;
   let mockCompositeStrategy: CompositeStrategy;
 
@@ -44,11 +46,19 @@ describe('ModelRouterService', () => {
 
     mockConfig = new Config({} as never);
     mockBaseLlmClient = {} as BaseLlmClient;
+    mockLocalLiteRtLmClient = {} as LocalLiteRtLmClient;
     vi.spyOn(mockConfig, 'getBaseLlmClient').mockReturnValue(mockBaseLlmClient);
+    vi.spyOn(mockConfig, 'getLocalLiteRtLmClient').mockReturnValue(
+      mockLocalLiteRtLmClient,
+    );
     vi.spyOn(mockConfig, 'getNumericalRoutingEnabled').mockResolvedValue(false);
     vi.spyOn(mockConfig, 'getClassifierThreshold').mockResolvedValue(undefined);
     vi.spyOn(mockConfig, 'getGemmaModelRouterSettings').mockReturnValue({
       enabled: false,
+      classifier: {
+        host: 'http://localhost:1234',
+        model: 'gemma3-1b-gpu-custom',
+      },
     });
 
     mockCompositeStrategy = new CompositeStrategy(
@@ -97,6 +107,10 @@ describe('ModelRouterService', () => {
     // Override the default mock for this specific test
     vi.spyOn(mockConfig, 'getGemmaModelRouterSettings').mockReturnValue({
       enabled: true,
+      classifier: {
+        host: 'http://localhost:1234',
+        model: 'gemma3-1b-gpu-custom',
+      },
     });
 
     // Clear previous mock calls from beforeEach
@@ -139,6 +153,7 @@ describe('ModelRouterService', () => {
         mockContext,
         mockConfig,
         mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
       );
       expect(decision).toEqual(strategyDecision);
     });

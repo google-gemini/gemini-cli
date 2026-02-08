@@ -198,8 +198,10 @@ import { ContextManager } from '../services/contextManager.js';
 import { UserTierId } from 'src/code_assist/types.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
+import { LocalLiteRtLmClient } from '../core/localLiteRtLmClient.js';
 
 vi.mock('../core/baseLlmClient.js');
+vi.mock('../core/localLiteRtLmClient.js');
 vi.mock('../core/tokenLimits.js', () => ({
   tokenLimit: vi.fn(),
 }));
@@ -1817,6 +1819,71 @@ describe('Config getHooks', () => {
 
       expect(onModelChange).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('LocalLiteRtLmClient Lifecycle', () => {
+  const MODEL = 'gemini-pro';
+  const SANDBOX: SandboxConfig = {
+    command: 'docker',
+    image: 'gemini-cli-sandbox',
+  };
+  const TARGET_DIR = '/path/to/target';
+  const DEBUG_MODE = false;
+  const QUESTION = 'test question';
+  const USER_MEMORY = 'Test User Memory';
+  const TELEMETRY_SETTINGS = { enabled: false };
+  const EMBEDDING_MODEL = 'gemini-embedding';
+  const SESSION_ID = 'test-session-id';
+  const baseParams: ConfigParameters = {
+    cwd: '/tmp',
+    embeddingModel: EMBEDDING_MODEL,
+    sandbox: SANDBOX,
+    targetDir: TARGET_DIR,
+    debugMode: DEBUG_MODE,
+    question: QUESTION,
+    userMemory: USER_MEMORY,
+    telemetry: TELEMETRY_SETTINGS,
+    sessionId: SESSION_ID,
+    model: MODEL,
+    usageStatisticsEnabled: false,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getExperiments).mockResolvedValue({
+      experimentIds: [],
+      flags: {},
+    });
+  });
+
+  it('should successfully initialize LocalLiteRtLmClient on first call and reuse it', () => {
+    const config = new Config(baseParams);
+    const client1 = config.getLocalLiteRtLmClient();
+    const client2 = config.getLocalLiteRtLmClient();
+
+    expect(client1).toBeDefined();
+    expect(client1).toBe(client2); // Should return the same instance
+  });
+
+  it('should configure LocalLiteRtLmClient with settings from getGemmaModelRouterSettings', () => {
+    const customHost = 'http://my-custom-host:9999';
+    const customModel = 'my-custom-gemma-model';
+    const params: ConfigParameters = {
+      ...baseParams,
+      gemmaModelRouter: {
+        enabled: true,
+        classifier: {
+          host: customHost,
+          model: customModel,
+        },
+      },
+    };
+
+    const config = new Config(params);
+    config.getLocalLiteRtLmClient();
+
+    expect(LocalLiteRtLmClient).toHaveBeenCalledWith(config);
   });
 });
 

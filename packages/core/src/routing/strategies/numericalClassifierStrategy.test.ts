@@ -18,6 +18,7 @@ import { promptIdContext } from '../../utils/promptIdContext.js';
 import type { Content } from '@google/genai';
 import type { ResolvedModelConfig } from '../../services/modelConfigService.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import type { LocalLiteRtLmClient } from '../../core/localLiteRtLmClient.js';
 
 vi.mock('../../core/baseLlmClient.js');
 
@@ -26,6 +27,7 @@ describe('NumericalClassifierStrategy', () => {
   let mockContext: RoutingContext;
   let mockConfig: Config;
   let mockBaseLlmClient: BaseLlmClient;
+  let mockLocalLiteRtLmClient: LocalLiteRtLmClient;
   let mockResolvedConfig: ResolvedModelConfig;
 
   beforeEach(() => {
@@ -54,6 +56,7 @@ describe('NumericalClassifierStrategy', () => {
     mockBaseLlmClient = {
       generateJson: vi.fn(),
     } as unknown as BaseLlmClient;
+    mockLocalLiteRtLmClient = {} as LocalLiteRtLmClient;
 
     vi.spyOn(promptIdContext, 'getStore').mockReturnValue('test-prompt-id');
   });
@@ -69,6 +72,7 @@ describe('NumericalClassifierStrategy', () => {
       mockContext,
       mockConfig,
       mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
     );
 
     expect(decision).toBeNull();
@@ -84,7 +88,12 @@ describe('NumericalClassifierStrategy', () => {
       mockApiResponse,
     );
 
-    await strategy.route(mockContext, mockConfig, mockBaseLlmClient);
+    await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
 
     const generateJsonCall = vi.mocked(mockBaseLlmClient.generateJson).mock
       .calls[0][0];
@@ -116,6 +125,7 @@ describe('NumericalClassifierStrategy', () => {
         mockContext,
         mockConfig,
         mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
       );
 
       expect(decision).toEqual({
@@ -142,6 +152,7 @@ describe('NumericalClassifierStrategy', () => {
         mockContext,
         mockConfig,
         mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
       );
 
       expect(decision).toEqual({
@@ -168,6 +179,7 @@ describe('NumericalClassifierStrategy', () => {
         mockContext,
         mockConfig,
         mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
       );
 
       expect(decision).toEqual({
@@ -194,6 +206,7 @@ describe('NumericalClassifierStrategy', () => {
         mockContext,
         mockConfig,
         mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
       );
 
       expect(decision).toEqual({
@@ -222,6 +235,7 @@ describe('NumericalClassifierStrategy', () => {
         mockContext,
         mockConfig,
         mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
       );
 
       expect(decision).toEqual({
@@ -248,6 +262,7 @@ describe('NumericalClassifierStrategy', () => {
         mockContext,
         mockConfig,
         mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
       );
 
       expect(decision).toEqual({
@@ -274,6 +289,7 @@ describe('NumericalClassifierStrategy', () => {
         mockContext,
         mockConfig,
         mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
       );
 
       expect(decision).toEqual({
@@ -302,6 +318,7 @@ describe('NumericalClassifierStrategy', () => {
         mockContext,
         mockConfig,
         mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
       );
 
       expect(decision).toEqual({
@@ -329,6 +346,7 @@ describe('NumericalClassifierStrategy', () => {
         mockContext,
         mockConfig,
         mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
       );
 
       expect(decision).toEqual({
@@ -356,6 +374,7 @@ describe('NumericalClassifierStrategy', () => {
         mockContext,
         mockConfig,
         mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
       );
 
       expect(decision).toEqual({
@@ -380,6 +399,7 @@ describe('NumericalClassifierStrategy', () => {
       mockContext,
       mockConfig,
       mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
     );
 
     expect(decision).toBeNull();
@@ -402,6 +422,7 @@ describe('NumericalClassifierStrategy', () => {
       mockContext,
       mockConfig,
       mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
     );
 
     expect(decision).toBeNull();
@@ -428,7 +449,12 @@ describe('NumericalClassifierStrategy', () => {
       mockApiResponse,
     );
 
-    await strategy.route(mockContext, mockConfig, mockBaseLlmClient);
+    await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
 
     const generateJsonCall = vi.mocked(mockBaseLlmClient.generateJson).mock
       .calls[0][0];
@@ -460,7 +486,12 @@ describe('NumericalClassifierStrategy', () => {
       mockApiResponse,
     );
 
-    await strategy.route(mockContext, mockConfig, mockBaseLlmClient);
+    await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
 
     const generateJsonCall = vi.mocked(mockBaseLlmClient.generateJson).mock
       .calls[0][0];
@@ -493,7 +524,12 @@ describe('NumericalClassifierStrategy', () => {
       mockApiResponse,
     );
 
-    await strategy.route(mockContext, mockConfig, mockBaseLlmClient);
+    await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
 
     const generateJsonCall = vi.mocked(mockBaseLlmClient.generateJson).mock
       .calls[0][0];
