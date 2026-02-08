@@ -119,10 +119,11 @@ they appear in the UI.
 
 ### Experimental
 
-| UI Label         | Setting                      | Description                                                                         | Default |
-| ---------------- | ---------------------------- | ----------------------------------------------------------------------------------- | ------- |
-| Use OSC 52 Paste | `experimental.useOSC52Paste` | Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions). | `false` |
-| Plan             | `experimental.plan`          | Enable planning features (Plan Mode and tools).                                     | `false` |
+| UI Label                  | Setting                                 | Description                                                                         | Default |
+| ------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------- | ------- |
+| Use OSC 52 Paste          | `experimental.useOSC52Paste`            | Use OSC 52 sequence for pasting instead of clipboardy (useful for remote sessions). | `false` |
+| Plan                      | `experimental.plan`                     | Enable planning features (Plan Mode and tools).                                     | `false` |
+| Enable Gemma Model Router | `experimental.gemmaModelRouter.enabled` | Enable the Gemma Model Router.                                                      | `false` |
 
 ### Skills
 

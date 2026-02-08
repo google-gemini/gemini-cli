@@ -890,6 +890,21 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.gemmaModelRouter.enabled`** (boolean):
+  - **Description:** Enable the Gemma Model Router.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.gemmaModelRouter.classifier.host`** (string):
+  - **Description:** The host of the classifier.
+  - **Default:** `"http://localhost:9379"`
+  - **Requires restart:** Yes
+
+- **`experimental.gemmaModelRouter.classifier.model`** (string):
+  - **Description:** The model to use for the classifier.
+  - **Default:** `"gemma3-1b-gpu-custom"`
+  - **Requires restart:** Yes
+
 #### `skills`
 
 - **`skills.enabled`** (boolean):

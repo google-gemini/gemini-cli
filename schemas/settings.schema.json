@@ -1514,6 +1514,47 @@
           "markdownDescription": "Enable planning features (Plan Mode and tools).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
+        },
+        "gemmaModelRouter": {
+          "title": "Gemma Model Router",
+          "description": "Enable Gemma model router (experimental).",
+          "markdownDescription": "Enable Gemma model router (experimental).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "title": "Enable Gemma Model Router",
+              "description": "Enable the Gemma Model Router.",
+              "markdownDescription": "Enable the Gemma Model Router.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "classifier": {
+              "title": "Classifier",
+              "description": "Classifier configuration.",
+              "markdownDescription": "Classifier configuration.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
+              "default": {},
+              "type": "object",
+              "properties": {
+                "host": {
+                  "title": "Host",
+                  "description": "The host of the classifier.",
+                  "markdownDescription": "The host of the classifier.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `http://localhost:9379`",
+                  "default": "http://localhost:9379",
+                  "type": "string"
+                },
+                "model": {
+                  "title": "Model",
+                  "description": "The model to use for the classifier.",
+                  "markdownDescription": "The model to use for the classifier.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `gemma3-1b-gpu-custom`",
+                  "default": "gemma3-1b-gpu-custom",
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

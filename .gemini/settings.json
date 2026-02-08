@@ -10,6 +10,6 @@
         "host": "http://localhost:9379",
         "model": "gemma3-1b-gpu-custom"
       }
-    }  
+    }
   }
 }
