@@ -581,10 +581,11 @@ export class GeminiChat {
         }
       }
 
-      // Track final request parameters for AfterModel hooks
       if (this.onModelChanged) {
         this.tools = await this.onModelChanged(modelToUse);
       }
+
+      // Track final request parameters for AfterModel hooks
       lastModelToUse = modelToUse;
       lastConfig = config;
       lastContentsToUse = contentsToUse;
