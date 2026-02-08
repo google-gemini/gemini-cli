@@ -18,6 +18,7 @@ import {
   CoreToolCallStatus,
   checkExhaustive,
 } from '@google/gemini-cli-core';
+import type { Progress } from '@modelcontextprotocol/sdk/types.js';
 import type { PartListUnion } from '@google/genai';
 import { type ReactNode } from 'react';
 
@@ -108,6 +109,7 @@ export interface IndividualToolCallDisplay {
   outputFile?: string;
   correlationId?: string;
   approvalMode?: ApprovalMode;
+  mcpProgress?: Progress;
 }
 
 export interface CompressionProps {

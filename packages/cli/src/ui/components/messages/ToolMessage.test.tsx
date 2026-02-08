@@ -6,7 +6,7 @@
 
 import type React from 'react';
 import { ToolMessage, type ToolMessageProps } from './ToolMessage.js';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { StreamingState } from '../../types.js';
 import { Text } from 'ink';
 import { type AnsiOutput, CoreToolCallStatus } from '@google/gemini-cli-core';
@@ -297,6 +297,18 @@ describe('<ToolMessage />', () => {
     // This is harder to assert directly in text output without color checks.
     // We can at least ensure it doesn't have the high emphasis indicator.
     expect(lowEmphasisFrame()).toMatchSnapshot();
+  });
+
+  it('renders MCPProgressIndicator when executing with progress', () => {
+    const { lastFrame } = renderWithContext(
+      <ToolMessage
+        {...baseProps}
+        status={CoreToolCallStatus.Executing}
+        mcpProgress={{ progress: 50, total: 100, message: 'Processing...' }}
+      />,
+      StreamingState.Responding,
+    );
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders AnsiOutputText for AnsiOutput results', () => {

@@ -67,6 +67,11 @@ export interface ToolInvocation<
     updateOutput?: (output: string | AnsiOutput) => void,
     shellExecutionConfig?: ShellExecutionConfig,
   ): Promise<TResult>;
+
+  /**
+   * Sets a correlation ID for progress tracking.
+   */
+  setCallId?(callId: string): void;
 }
 
 /**

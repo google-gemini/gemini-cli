@@ -11,6 +11,7 @@ import {
   debugLogger,
   CoreToolCallStatus,
 } from '@google/gemini-cli-core';
+import type { Progress } from '@modelcontextprotocol/sdk/types.js';
 import {
   type HistoryItemToolGroup,
   type IndividualToolCallDisplay,
@@ -54,6 +55,7 @@ export function mapToDisplay(
     let outputFile: string | undefined = undefined;
     let ptyId: number | undefined = undefined;
     let correlationId: string | undefined = undefined;
+    let mcpProgress: Progress | undefined = undefined;
 
     switch (call.status) {
       case CoreToolCallStatus.Success:
@@ -72,6 +74,7 @@ export function mapToDisplay(
       case CoreToolCallStatus.Executing:
         resultDisplay = call.liveOutput;
         ptyId = call.pid;
+        mcpProgress = call.mcpProgress;
         break;
       case CoreToolCallStatus.Scheduled:
       case CoreToolCallStatus.Validating:
@@ -96,6 +99,7 @@ export function mapToDisplay(
       ptyId,
       correlationId,
       approvalMode: call.approvalMode,
+      mcpProgress,
     };
   });
 

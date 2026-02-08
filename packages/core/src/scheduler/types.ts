@@ -16,6 +16,7 @@ import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import type { ToolErrorType } from '../tools/tool-error.js';
 import type { SerializableConfirmationDetails } from '../confirmation-bus/types.js';
 import { type ApprovalMode } from '../policy/types.js';
+import type { Progress } from '@modelcontextprotocol/sdk/types.js';
 
 export const ROOT_SCHEDULER_ID = 'root';
 
@@ -114,6 +115,7 @@ export type ExecutingToolCall = {
   pid?: number;
   schedulerId?: string;
   approvalMode?: ApprovalMode;
+  mcpProgress?: Progress;
 };
 
 export type CancelledToolCall = {

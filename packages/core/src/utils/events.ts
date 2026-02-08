@@ -13,6 +13,7 @@ import type {
   TokenStorageInitializationEvent,
   KeychainAvailabilityEvent,
 } from '../telemetry/types.js';
+import { debugLogger } from './debugLogger.js';
 
 /**
  * Defines the severity level for user-facing feedback.
@@ -151,6 +152,24 @@ export interface QuotaChangedPayload {
   resetTime?: string;
 }
 
+/**
+ * Payload for the 'mcp-tool-progress' event.
+ */
+export interface MCPToolProgressPayload {
+  /** The unique identifier for this tool call */
+  callId: string;
+  /** The name of the MCP server */
+  serverName: string;
+  /** The name of the tool being executed */
+  toolName: string;
+  /** Current progress value (must be non-negative) */
+  progress: number;
+  /** Total value for percentage calculation (optional) */
+  total?: number;
+  /** Human-readable progress message (optional) */
+  message?: string;
+}
+
 export enum CoreEvent {
   UserFeedback = 'user-feedback',
   ModelChanged = 'model-changed',
@@ -174,6 +193,7 @@ export enum CoreEvent {
   QuotaChanged = 'quota-changed',
   TelemetryKeychainAvailability = 'telemetry-keychain-availability',
   TelemetryTokenStorageType = 'telemetry-token-storage-type',
+  MCPToolProgress = 'mcp-tool-progress',
 }
 
 /**
@@ -206,6 +226,7 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.SlashCommandConflicts]: [SlashCommandConflictsPayload];
   [CoreEvent.TelemetryKeychainAvailability]: [KeychainAvailabilityEvent];
   [CoreEvent.TelemetryTokenStorageType]: [TokenStorageInitializationEvent];
+  [CoreEvent.MCPToolProgress]: [MCPToolProgressPayload];
 }
 
 type EventBacklogItem = {
@@ -358,6 +379,21 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   ): void {
     const payload: QuotaChangedPayload = { remaining, limit, resetTime };
     this.emit(CoreEvent.QuotaChanged, payload);
+  }
+
+  /**
+   * Notifies subscribers of MCP tool progress updates.
+   * Uses direct emit (not _emitOrQueue) because progress events are:
+   * - High-frequency and transient (not worth queuing)
+   * - Disposable if no listener exists (no backlog needed)
+   * - A risk to the shared backlog if queued at high volume
+   */
+  emitMCPToolProgress(payload: MCPToolProgressPayload): void {
+    if (!Number.isFinite(payload.progress) || payload.progress < 0) {
+      debugLogger.log(`Invalid progress value: ${payload.progress}`);
+      return;
+    }
+    this.emit(CoreEvent.MCPToolProgress, payload);
   }
 
   /**

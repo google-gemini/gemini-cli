@@ -19,9 +19,12 @@ import {
   type PolicyUpdateOptions,
 } from './tools.js';
 import type { CallableTool, FunctionCall, Part } from '@google/genai';
+import type { Progress } from '@modelcontextprotocol/sdk/types.js';
 import { ToolErrorType } from './tool-error.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { coreEvents } from '../utils/events.js';
+import type { CallableToolWithProgress } from './mcp-client.js';
 
 /**
  * The separator used to qualify MCP tool names with their server prefix.
@@ -70,6 +73,15 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
   ToolResult
 > {
   private static readonly allowlist: Set<string> = new Set();
+  private _callId?: string;
+
+  setCallId(callId: string): void {
+    this._callId = callId;
+  }
+
+  get callId(): string | undefined {
+    return this._callId;
+  }
 
   constructor(
     private readonly mcpTool: CallableTool,
@@ -174,6 +186,19 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
       },
     ];
 
+    const progressCallback = this._callId
+      ? (progress: Progress) => {
+          coreEvents.emitMCPToolProgress({
+            callId: this._callId!,
+            serverName: this.serverName,
+            toolName: this.serverToolName,
+            progress: progress.progress,
+            total: progress.total,
+            message: progress.message,
+          });
+        }
+      : undefined;
+
     // Race MCP tool call with abort signal to respect cancellation
     const rawResponseParts = await new Promise<Part[]>((resolve, reject) => {
       if (signal.aborted) {
@@ -193,8 +218,16 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
       };
       signal.addEventListener('abort', onAbort, { once: true });
 
-      this.mcpTool
-        .callTool(functionCalls)
+      // Conditionally pass progressCallback to avoid passing undefined as
+      // a second arg (which would change the call signature for existing tests)
+      const callPromise = progressCallback
+        ? (this.mcpTool as CallableToolWithProgress).callTool(
+            functionCalls,
+            progressCallback,
+          )
+        : this.mcpTool.callTool(functionCalls);
+
+      callPromise
         .then((res) => {
           cleanup();
           resolve(res);
