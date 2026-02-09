@@ -116,6 +116,7 @@ export interface UIState {
   messageQueue: string[];
   queueErrorMessage: string | null;
   showApprovalModeIndicator: ApprovalMode;
+  hasPendingActionRequired: boolean;
   // Quota-related state
   userTier: UserTierId | undefined;
   proQuotaRequest: ProQuotaDialogRequest | null;

@@ -148,6 +148,7 @@ const baseMockUiState = {
   activePtyId: undefined,
   backgroundShells: new Map(),
   backgroundShellHeight: 0,
+  hasPendingActionRequired: false,
 };
 
 export const mockAppState: AppState = {

@@ -27,7 +27,7 @@ import { useVimMode } from '../contexts/VimModeContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
-import { StreamingState, ToolCallStatus } from '../types.js';
+import { StreamingState } from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
 import { theme } from '../semantic-colors.js';
@@ -49,30 +49,17 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const suggestionsPosition = isAlternateBuffer ? 'above' : 'below';
   const hideContextSummary =
     suggestionsVisible && suggestionsPosition === 'above';
-  const hasPendingToolConfirmation = (uiState.pendingHistoryItems ?? []).some(
-    (item) =>
-      item.type === 'tool_group' &&
-      item.tools.some((tool) => tool.status === ToolCallStatus.Confirming),
-  );
-  const hasPendingActionRequired =
-    hasPendingToolConfirmation ||
-    Boolean(uiState.commandConfirmationRequest) ||
-    Boolean(uiState.authConsentRequest) ||
-    (uiState.confirmUpdateExtensionRequests?.length ?? 0) > 0 ||
-    Boolean(uiState.loopDetectionConfirmationRequest) ||
-    Boolean(uiState.proQuotaRequest) ||
-    Boolean(uiState.validationRequest) ||
-    Boolean(uiState.customDialog);
   const showShortcutsHelp =
     uiState.shortcutsHelpVisible &&
     uiState.streamingState === StreamingState.Idle &&
-    !hasPendingActionRequired;
+    !uiState.hasPendingActionRequired;
   const showShortcutsHint =
-    uiState.streamingState === StreamingState.Idle && !hasPendingActionRequired;
+    uiState.streamingState === StreamingState.Idle &&
+    !uiState.hasPendingActionRequired;
   const showLoadingIndicator =
     (!uiState.embeddedShellFocused || uiState.isBackgroundShellVisible) &&
     uiState.streamingState === StreamingState.Responding &&
-    !hasPendingActionRequired;
+    !uiState.hasPendingActionRequired;
   const showApprovalIndicator = !uiState.shellModeActive;
   const showRawMarkdownIndicator = !uiState.renderMarkdown;
   const showEscToCancelHint =
