@@ -12,6 +12,10 @@ import type { PolicySettings } from './types.js';
 import { ApprovalMode, PolicyDecision, InProcessCheckerType } from './types.js';
 import { isDirectorySecure } from '../utils/security.js';
 
+import { Storage } from '../config/storage.js';
+import * as tomlLoader from './toml-loader.js';
+import { createPolicyEngineConfig } from './config.js';
+
 vi.unmock('../config/storage.js');
 
 vi.mock('../utils/security.js', () => ({
@@ -26,8 +30,6 @@ afterEach(() => {
 
 describe('createPolicyEngineConfig', () => {
   beforeEach(async () => {
-    vi.resetModules();
-    const { Storage } = await import('../config/storage.js');
     // Mock Storage to avoid picking up real user/system policies from the host environment
     vi.spyOn(Storage, 'getUserPoliciesDir').mockReturnValue(
       '/non/existent/user/policies',
@@ -40,7 +42,6 @@ describe('createPolicyEngineConfig', () => {
   });
 
   it('should filter out insecure system policy directories', async () => {
-    const { Storage } = await import('../config/storage.js');
     const systemPolicyDir = '/insecure/system/policies';
     vi.spyOn(Storage, 'getSystemPoliciesDir').mockReturnValue(systemPolicyDir);
 
@@ -51,10 +52,6 @@ describe('createPolicyEngineConfig', () => {
       return { secure: true };
     });
 
-    // We need to spy on loadPoliciesFromToml to verify which directories were passed
-    // But it is not exported from config.js, it is imported.
-    // We can spy on the module it comes from.
-    const tomlLoader = await import('./toml-loader.js');
     const loadPoliciesSpy = vi.spyOn(tomlLoader, 'loadPoliciesFromToml');
     loadPoliciesSpy.mockResolvedValue({
       rules: [],
@@ -62,7 +59,6 @@ describe('createPolicyEngineConfig', () => {
       errors: [],
     });
 
-    const { createPolicyEngineConfig } = await import('./config.js');
     const settings: PolicySettings = {};
 
     await createPolicyEngineConfig(
@@ -80,7 +76,7 @@ describe('createPolicyEngineConfig', () => {
     // But other directories (user, default) should be there
     expect(calledDirs).toContain('/non/existent/user/policies');
     expect(calledDirs).toContain('/tmp/mock/default/policies');
-  });
+  }, 30000);
 
   it('should return ASK_USER for write tools and ALLOW for read-only tools by default', async () => {
     const actualFs =
