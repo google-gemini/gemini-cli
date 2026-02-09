@@ -31,6 +31,7 @@ function consoleMessagesReducer(
   state: ConsoleMessageItem[],
   action: Action,
 ): ConsoleMessageItem[] {
+  const MAX_CONSOLE_MESSAGES = 1000;
   switch (action.type) {
     case 'ADD_MESSAGES': {
       const newMessages = [...state];
@@ -51,6 +52,12 @@ function consoleMessagesReducer(
           newMessages.push({ ...queuedMessage, count: 1 });
         }
       }
+
+      // Limit the number of messages to prevent memory issues
+      if (newMessages.length > MAX_CONSOLE_MESSAGES) {
+        return newMessages.slice(newMessages.length - MAX_CONSOLE_MESSAGES);
+      }
+
       return newMessages;
     }
     case 'CLEAR':
@@ -102,10 +109,18 @@ export function useConsoleMessages(): UseConsoleMessagesReturn {
       isStderr: boolean;
       chunk: Uint8Array | string;
     }) => {
-      const content =
+      let content =
         typeof payload.chunk === 'string'
           ? payload.chunk
           : new TextDecoder().decode(payload.chunk);
+
+      const MAX_OUTPUT_CHUNK_LENGTH = 10000;
+      if (content.length > MAX_OUTPUT_CHUNK_LENGTH) {
+        content =
+          content.slice(0, MAX_OUTPUT_CHUNK_LENGTH) +
+          `... [Truncated ${content.length - MAX_OUTPUT_CHUNK_LENGTH} characters]`;
+      }
+
       // It would be nice if we could show stderr as 'warn' but unfortunately
       // we log non warning info to stderr before the app starts so that would
       // be misleading.
