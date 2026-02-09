@@ -52,6 +52,13 @@
           "default": false,
           "type": "boolean"
         },
+        "devtools": {
+          "title": "DevTools",
+          "description": "Enable DevTools inspector on launch.",
+          "markdownDescription": "Enable DevTools inspector on launch.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "enableAutoUpdate": {
           "title": "Enable Auto Update",
           "description": "Enable automatic updates.",
