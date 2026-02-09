@@ -59,6 +59,7 @@ afterEach(() => {
   // Clear all listeners from the global coreEvents singleton to prevent leaks
   // between tests and avoid MaxListenersExceededWarning.
   coreEvents.removeAllListeners();
+  vi.unstubAllEnvs();
 
   if (actWarnings.length > 0) {
     const messages = actWarnings
