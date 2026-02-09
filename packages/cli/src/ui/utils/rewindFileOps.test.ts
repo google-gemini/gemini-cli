@@ -41,7 +41,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       debug: vi.fn(),
     },
     getFileDiffFromResultDisplay: vi.fn(),
-    computeAddedAndRemovedLines: vi.fn(),
+    computeModelAddedAndRemovedLines: vi.fn(),
   };
 });
 
@@ -68,7 +68,7 @@ describe('rewindFileOps', () => {
     });
 
     it('calculates stats for single turn correctly', async () => {
-      const { getFileDiffFromResultDisplay, computeAddedAndRemovedLines } =
+      const { getFileDiffFromResultDisplay, computeModelAddedAndRemovedLines } =
         await import('@google/gemini-cli-core');
       vi.mocked(getFileDiffFromResultDisplay).mockReturnValue({
         filePath: 'test.ts',
@@ -88,7 +88,7 @@ describe('rewindFileOps', () => {
         },
         fileDiff: 'diff',
       });
-      vi.mocked(computeAddedAndRemovedLines).mockReturnValue({
+      vi.mocked(computeModelAddedAndRemovedLines).mockReturnValue({
         addedLines: 3,
         removedLines: 3,
       });
@@ -124,7 +124,7 @@ describe('rewindFileOps', () => {
 
   describe('calculateRewindImpact', () => {
     it('calculates cumulative stats across multiple turns', async () => {
-      const { getFileDiffFromResultDisplay, computeAddedAndRemovedLines } =
+      const { getFileDiffFromResultDisplay, computeModelAddedAndRemovedLines } =
         await import('@google/gemini-cli-core');
       vi.mocked(getFileDiffFromResultDisplay)
         .mockReturnValueOnce({
@@ -164,7 +164,7 @@ describe('rewindFileOps', () => {
           fileDiff: 'diff2',
         });
 
-      vi.mocked(computeAddedAndRemovedLines)
+      vi.mocked(computeModelAddedAndRemovedLines)
         .mockReturnValueOnce({ addedLines: 5, removedLines: 3 })
         .mockReturnValueOnce({ addedLines: 4, removedLines: 0 });
 
