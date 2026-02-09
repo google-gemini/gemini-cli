@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { lightTheme, Theme } from './theme.js';
+import { lightTheme, Theme } from '../../theme.js';
 
 export const DefaultLight: Theme = new Theme(
   'Default Light',

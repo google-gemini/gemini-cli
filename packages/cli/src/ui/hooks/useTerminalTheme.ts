@@ -12,7 +12,7 @@ import {
   shouldSwitchTheme,
 } from '../themes/color-utils.js';
 import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
-import { DefaultLight } from '../themes/default-light.js';
+import { DefaultLight } from '../themes/builtin/light/default-light.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import type { Config } from '@google/gemini-cli-core';
 import { useTerminalContext } from '../contexts/TerminalContext.js';

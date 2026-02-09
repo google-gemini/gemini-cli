@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type ColorsTheme, Theme, lightTheme } from './theme.js';
-import { interpolateColor } from './color-utils.js';
+import { type ColorsTheme, Theme, lightTheme } from '../../theme.js';
+import { interpolateColor } from '../../color-utils.js';
 
 const googleCodeColors: ColorsTheme = {
   type: 'light',

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { darkTheme, Theme } from './theme.js';
+import { darkTheme, Theme } from '../../theme.js';
 
 export const DefaultDark: Theme = new Theme(
   'Default',

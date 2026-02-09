@@ -8,7 +8,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { getAsciiArtWidth } from '../utils/textUtils.js';
 import { debugState } from '../debug.js';
 import { themeManager } from '../themes/theme-manager.js';
-import { Holiday } from '../themes/holiday.js';
+import { Holiday } from '../themes/builtin/dark/holiday.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useTerminalSize } from './useTerminalSize.js';
 import { shortAsciiLogo } from '../components/AsciiArt.js';

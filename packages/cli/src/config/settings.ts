@@ -19,8 +19,8 @@ import {
   type AdminControlsSettings,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
-import { DefaultLight } from '../ui/themes/default-light.js';
-import { DefaultDark } from '../ui/themes/default.js';
+import { DefaultLight } from '../ui/themes/builtin/light/default-light.js';
+import { DefaultDark } from '../ui/themes/builtin/dark/default.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import {
   type Settings,

@@ -4,27 +4,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { AyuDark } from './ayu.js';
-import { AyuLight } from './ayu-light.js';
-import { AtomOneDark } from './atom-one-dark.js';
-import { Dracula } from './dracula.js';
-import { GitHubDark } from './github-dark.js';
-import { GitHubLight } from './github-light.js';
-import { GoogleCode } from './googlecode.js';
-import { Holiday } from './holiday.js';
-import { DefaultLight } from './default-light.js';
-import { DefaultDark } from './default.js';
-import { ShadesOfPurple } from './shades-of-purple.js';
-import { XCode } from './xcode.js';
+import { AyuDark } from './builtin/dark/ayu.js';
+import { AyuLight } from './builtin/light/ayu-light.js';
+import { AtomOneDark } from './builtin/dark/atom-one-dark.js';
+import { Dracula } from './builtin/dark/dracula.js';
+import { GitHubDark } from './builtin/dark/github-dark.js';
+import { GitHubLight } from './builtin/light/github-light.js';
+import { GoogleCode } from './builtin/light/googlecode.js';
+import { Holiday } from './builtin/dark/holiday.js';
+import { DefaultLight } from './builtin/light/default-light.js';
+import { DefaultDark } from './builtin/dark/default.js';
+import { ShadesOfPurple } from './builtin/dark/shades-of-purple.js';
+import { XCode } from './builtin/light/xcode.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Theme, ThemeType } from './theme.js';
 import type { CustomTheme } from '@google/gemini-cli-core';
 import { createCustomTheme, validateCustomTheme } from './theme.js';
 import type { SemanticColors } from './semantic-tokens.js';
-import { ANSI } from './ansi.js';
-import { ANSILight } from './ansi-light.js';
-import { NoColorTheme } from './no-color.js';
+import { ANSI } from './builtin/dark/ansi.js';
+import { ANSILight } from './builtin/light/ansi-light.js';
+import { NoColorTheme } from './builtin/dark/no-color.js';
 import process from 'node:process';
 import { debugLogger, homedir } from '@google/gemini-cli-core';
 
