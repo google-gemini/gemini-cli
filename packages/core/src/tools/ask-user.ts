@@ -52,7 +52,7 @@ export class AskUserTool extends BaseDeclarativeTool<
                   type: 'string',
                   maxLength: 16,
                   description:
-                    'MUST be 16 characters or fewer. Very short label displayed as a chip/tag. Use abbreviations: "Auth" not "Authentication", "Config" not "Configuration". Examples: "Auth method", "Library", "Approach", "Database".',
+                    'MUST be 16 characters or fewer or the call will fail. Very short label displayed as a chip/tag. Use abbreviations: "Auth" not "Authentication", "Config" not "Configuration". Examples: "Auth method", "Library", "Approach", "Database".',
                 },
                 type: {
                   type: 'string',
