@@ -108,27 +108,22 @@ describe('ProjectRegistry', () => {
   });
 
   it('preserves path casing on Windows', async () => {
-    // Mock platform to match Windows behavior for this test
-    // Note: The actual code uses os.platform(), but for this unit test
-    // we rely on the implementation of consume/normalize not mutating case.
-    // Since we removed toLowerCase() from the implementation, we expect
-    // case to be preserved regardless of platform mock, but conceptually
-    // this safeguards the regression.
+    // Regression test: Mixed-case paths MUST be preserved in the registry (not lowercased).
     const registry = new ProjectRegistry(registryPath);
     await registry.initialize();
 
     const mixedCasePath = path.join(tempDir, 'MyProject');
     const id = await registry.getShortId(mixedCasePath);
-    // The getShortId method uses slugify() which converts to lowercase.
-    // So the ID should be 'myproject'.
-    // However, we want to ensure that the REGISTRY MAPPING preserves the case of the KEY (project path).
+
+    // IDs are slugified (lowercase), but path keys in registry must remain case-sensitive.
     expect(id).toBe('myproject');
 
-    // Verify the mapping in the registry data uses the original case
+    // Verify raw registry file data preserves path casing
     const data = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
-    // helper normalizePath in this test file just resolves (no lowercase)
-    const normalizedKey = normalizePath(mixedCasePath);
-    expect(data.projects[normalizedKey]).toBe('myproject');
+    const expectedKey = path.resolve(mixedCasePath);
+
+    expect(Object.keys(data.projects)).toContain(expectedKey);
+    expect(data.projects[expectedKey]).toBe('myproject');
   });
 
   it('creates ownership markers in base directories', async () => {
