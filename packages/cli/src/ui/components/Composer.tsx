@@ -63,6 +63,10 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     Boolean(uiState.proQuotaRequest) ||
     Boolean(uiState.validationRequest) ||
     Boolean(uiState.customDialog);
+  const showShortcutsHelp =
+    uiState.shortcutsHelpVisible &&
+    uiState.streamingState === StreamingState.Idle &&
+    !hasPendingActionRequired;
   const showLoadingIndicator =
     (!uiState.embeddedShellFocused || uiState.isBackgroundShellVisible) &&
     uiState.streamingState === StreamingState.Responding &&
@@ -139,7 +143,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             {!hasPendingActionRequired && <ShortcutsHint />}
           </Box>
         </Box>
-        {uiState.shortcutsHelpVisible && <ShortcutsHelp />}
+        {showShortcutsHelp && <ShortcutsHelp />}
         <HorizontalLine />
         <Box
           justifyContent={

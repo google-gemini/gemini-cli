@@ -142,6 +142,7 @@ import { NewAgentsChoice } from './components/NewAgentsNotification.js';
 import { isSlashCommand } from './utils/commandUtils.js';
 import { useTerminalTheme } from './hooks/useTerminalTheme.js';
 import { isITerm2 } from './utils/terminalUtils.js';
+import { shouldDismissShortcutsHelpOnHotkey } from './utils/shortcutsHelp.js';
 
 function isToolExecuting(pendingHistoryItems: HistoryItemWithoutId[]) {
   return pendingHistoryItems.some((item) => {
@@ -1452,6 +1453,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
         debugLogger.log('[DEBUG] Keystroke:', JSON.stringify(key));
       }
 
+      if (shortcutsHelpVisible && shouldDismissShortcutsHelpOnHotkey(key)) {
+        setShortcutsHelpVisible(false);
+      }
+
       if (isAlternateBuffer && keyMatchers[Command.TOGGLE_COPY_MODE](key)) {
         setCopyModeEnabled(true);
         disableMouseEvents();
@@ -1596,6 +1601,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setCopyModeEnabled,
       copyModeEnabled,
       isAlternateBuffer,
+      shortcutsHelpVisible,
       backgroundCurrentShell,
       toggleBackgroundShell,
       backgroundShells,
@@ -1737,6 +1743,36 @@ Logging in with Google... Restarting Gemini CLI to continue.
     () => [...pendingSlashCommandHistoryItems, ...pendingGeminiHistoryItems],
     [pendingSlashCommandHistoryItems, pendingGeminiHistoryItems],
   );
+
+  const hasPendingToolConfirmation = useMemo(
+    () => isToolAwaitingConfirmation(pendingHistoryItems),
+    [pendingHistoryItems],
+  );
+
+  const hasPendingActionRequired =
+    hasPendingToolConfirmation ||
+    !!commandConfirmationRequest ||
+    !!authConsentRequest ||
+    confirmUpdateExtensionRequests.length > 0 ||
+    !!loopDetectionConfirmationRequest ||
+    !!proQuotaRequest ||
+    !!validationRequest ||
+    !!customDialog;
+
+  const isPassiveShortcutsHelpState =
+    isInputActive &&
+    streamingState === StreamingState.Idle &&
+    !hasPendingActionRequired;
+
+  useEffect(() => {
+    if (shortcutsHelpVisible && !isPassiveShortcutsHelpState) {
+      setShortcutsHelpVisible(false);
+    }
+  }, [
+    shortcutsHelpVisible,
+    isPassiveShortcutsHelpState,
+    setShortcutsHelpVisible,
+  ]);
 
   const allToolCalls = useMemo(
     () =>

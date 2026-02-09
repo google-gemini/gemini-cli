@@ -623,4 +623,43 @@ describe('Composer', () => {
       expect(lastFrame()).toContain('ShortcutsHint');
     });
   });
+
+  describe('Shortcuts Help', () => {
+    it('shows shortcuts help in passive state', () => {
+      const uiState = createMockUIState({
+        shortcutsHelpVisible: true,
+        streamingState: StreamingState.Idle,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).toContain('ShortcutsHelp');
+    });
+
+    it('hides shortcuts help while streaming', () => {
+      const uiState = createMockUIState({
+        shortcutsHelpVisible: true,
+        streamingState: StreamingState.Responding,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).not.toContain('ShortcutsHelp');
+    });
+
+    it('hides shortcuts help when action is required', () => {
+      const uiState = createMockUIState({
+        shortcutsHelpVisible: true,
+        customDialog: (
+          <Box>
+            <Text>Dialog content</Text>
+          </Box>
+        ),
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).not.toContain('ShortcutsHelp');
+    });
+  });
 });

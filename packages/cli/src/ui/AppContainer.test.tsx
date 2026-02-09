@@ -2096,6 +2096,121 @@ describe('AppContainer State Management', () => {
     });
   });
 
+  describe('Shortcuts Help Visibility', () => {
+    let handleGlobalKeypress: (key: Key) => boolean;
+    let rerender: () => void;
+    let unmount: () => void;
+
+    const setupShortcutsVisibilityTest = async () => {
+      const renderResult = renderAppContainer();
+      await act(async () => {
+        vi.advanceTimersByTime(0);
+      });
+      rerender = () => renderResult.rerender(getAppContainer());
+      unmount = renderResult.unmount;
+    };
+
+    const pressKey = (key: Partial<Key>) => {
+      act(() => {
+        handleGlobalKeypress({
+          name: 'r',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          insertable: false,
+          sequence: '',
+          ...key,
+        } as Key);
+      });
+      rerender();
+    };
+
+    beforeEach(() => {
+      mockedUseKeypress.mockImplementation(
+        (callback: (key: Key) => boolean) => {
+          handleGlobalKeypress = callback;
+        },
+      );
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    it('dismisses shortcuts help when a registered hotkey is pressed', async () => {
+      await setupShortcutsVisibilityTest();
+
+      act(() => {
+        capturedUIActions.setShortcutsHelpVisible(true);
+      });
+      rerender();
+      expect(capturedUIState.shortcutsHelpVisible).toBe(true);
+
+      pressKey({ name: 'r', ctrl: true, sequence: '\x12' }); // Ctrl+R
+      expect(capturedUIState.shortcutsHelpVisible).toBe(false);
+
+      unmount();
+    });
+
+    it('dismisses shortcuts help when streaming starts', async () => {
+      await setupShortcutsVisibilityTest();
+
+      act(() => {
+        capturedUIActions.setShortcutsHelpVisible(true);
+      });
+      rerender();
+      expect(capturedUIState.shortcutsHelpVisible).toBe(true);
+
+      mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        streamingState: 'responding',
+      });
+
+      await act(async () => {
+        rerender();
+      });
+      await waitFor(() => {
+        expect(capturedUIState.shortcutsHelpVisible).toBe(false);
+      });
+
+      unmount();
+    });
+
+    it('dismisses shortcuts help when action-required confirmation appears', async () => {
+      await setupShortcutsVisibilityTest();
+
+      act(() => {
+        capturedUIActions.setShortcutsHelpVisible(true);
+      });
+      rerender();
+      expect(capturedUIState.shortcutsHelpVisible).toBe(true);
+
+      mockedUseSlashCommandProcessor.mockReturnValue({
+        handleSlashCommand: vi.fn(),
+        slashCommands: [],
+        pendingHistoryItems: [],
+        commandContext: {},
+        shellConfirmationRequest: null,
+        confirmationRequest: {
+          prompt: 'Confirm this action?',
+          onConfirm: vi.fn(),
+        },
+      });
+
+      await act(async () => {
+        rerender();
+      });
+      await waitFor(() => {
+        expect(capturedUIState.shortcutsHelpVisible).toBe(false);
+      });
+
+      unmount();
+    });
+  });
+
   describe('Copy Mode (CTRL+S)', () => {
     let handleGlobalKeypress: (key: Key) => boolean;
     let rerender: () => void;

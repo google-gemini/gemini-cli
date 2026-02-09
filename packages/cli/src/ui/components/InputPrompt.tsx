@@ -65,6 +65,7 @@ import { useMouseClick } from '../hooks/useMouseClick.js';
 import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+import { shouldDismissShortcutsHelpOnHotkey } from '../utils/shortcutsHelp.js';
 
 /**
  * Returns if the terminal can be trusted to handle paste events atomically
@@ -592,6 +593,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         // Ensure we never accidentally interpret paste as regular input.
         buffer.handleInput(key);
         return true;
+      }
+
+      if (shortcutsHelpVisible && shouldDismissShortcutsHelpOnHotkey(key)) {
+        setShortcutsHelpVisible(false);
       }
 
       if (shortcutsHelpVisible) {
