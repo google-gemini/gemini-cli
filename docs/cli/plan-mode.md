@@ -1,4 +1,4 @@
-# Plan Mode <!-- omit in toc -->
+# Plan Mode (experimental) <!-- omit in toc -->
 
 Plan Mode is a safe, read-only mode for researching and designing complex
 changes. It prevents modifications while you research, design and plan an
@@ -6,10 +6,19 @@ implementation strategy.
 
 > **Note: Plan Mode is currently an experimental feature.**
 >
-> Experimental features are subject to change. Using Plan Mode requires explicit
-> [enablement](#enabling-plan-mode).
+> Experimental features are subject to change. To use Plan Mode, enable it via
+> `/settings` (search for `Plan`) or add the following to your `settings.json`:
+>
+> ```json
+> {
+>   "experimental": {
+>     "plan": true
+>   }
+> }
+> ```
+>
+> Your [feedback](#feedback) is invaluable as we refine this feature.
 
-- [Enabling Plan Mode](#enabling-plan-mode)
 - [Starting in Plan Mode](#starting-in-plan-mode)
 - [How to use Plan Mode](#how-to-use-plan-mode)
   - [Entering Plan Mode](#entering-plan-mode)
@@ -17,25 +26,6 @@ implementation strategy.
   - [Exiting Plan Mode](#exiting-plan-mode)
 - [Tool Restrictions](#tool-restrictions)
 - [Feedback](#feedback)
-
-## Enabling Plan Mode
-
-Plan Mode is currently an experimental feature. You can enable it using the
-`/settings` command:
-
-1.  Type `/settings` in the CLI.
-2.  Search for `Plan`.
-3.  Set the value to `true`.
-
-Alternatively, you can manually update your `settings.json`:
-
-```json
-{
-  "experimental": {
-    "plan": true
-  }
-}
-```
 
 ## Starting in Plan Mode
 
@@ -84,9 +74,9 @@ You can enter Plan Mode in three ways:
 
 To exit Plan Mode:
 
+1. **Keyboard Shortcut:** Press `Shift+Tab` to cycle to the desired mode.
 1. **Tool:** The agent calls the `exit_plan_mode` tool to present the finalized
    plan for your approval.
-2. **Keyboard Shortcut:** Press `Shift+Tab` to cycle to the desired mode.
 
 ## Tool Restrictions
 
