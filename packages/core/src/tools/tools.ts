@@ -312,8 +312,15 @@ export interface ToolBuilder<
 
   /**
    * Function declaration schema from @google/genai.
+   * @param modelId Optional model identifier to get a model-specific schema.
    */
-  schema: FunctionDeclaration;
+  getSchema(modelId?: string): FunctionDeclaration;
+
+  /**
+   * Function declaration schema for the default model.
+   * @deprecated Use getSchema(modelId) for model-specific schemas.
+   */
+  readonly schema: FunctionDeclaration;
 
   /**
    * Whether the tool's output should be rendered as markdown.
@@ -355,12 +362,16 @@ export abstract class DeclarativeTool<
     readonly extensionId?: string,
   ) {}
 
-  get schema(): FunctionDeclaration {
+  getSchema(_modelId?: string): FunctionDeclaration {
     return {
       name: this.name,
       description: this.description,
       parametersJsonSchema: this.parameterSchema,
     };
+  }
+
+  get schema(): FunctionDeclaration {
+    return this.getSchema();
   }
 
   /**
