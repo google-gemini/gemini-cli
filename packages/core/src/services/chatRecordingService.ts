@@ -461,9 +461,18 @@ export class ChatRecordingService {
       // when nothing has changed.
       const currentContent = JSON.stringify(conversation, null, 2);
       if (this.cachedLastConvData !== currentContent) {
-        // Only update the timestamp and re-stringify if something actually changed.
-        conversation.lastUpdated = new Date().toISOString();
-        const finalContent = JSON.stringify(conversation, null, 2);
+        // To avoid a second full stringification for a large conversation object,
+        // we can replace just the timestamp in the already stringified content.
+        // This is significantly more performant.
+        const newTimestamp = new Date().toISOString();
+        const finalContent = currentContent.replace(
+          `"lastUpdated": "${conversation.lastUpdated}"`,
+          `"lastUpdated": "${newTimestamp}"`,
+        );
+
+        // Update the in-memory object's timestamp to stay in sync.
+        conversation.lastUpdated = newTimestamp;
+
         this.cachedLastConvData = finalContent;
         fs.writeFileSync(this.conversationFile, finalContent);
       }
