@@ -198,6 +198,8 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).not.toContain('No sub-agents are currently available.');
     expect(prompt).toContain('# Core Mandates');
     expect(prompt).toContain('- **Conventions:**');
+    expect(prompt).toContain('# Outside of Sandbox');
+    expect(prompt).toContain('# Final Reminder');
     expect(prompt).toMatchSnapshot();
   });
 
@@ -255,13 +257,24 @@ describe('Core System Prompt (prompts.ts)', () => {
   it.each([
     ['true', '# Sandbox', ['# macOS Seatbelt', '# Outside of Sandbox']],
     ['sandbox-exec', '# macOS Seatbelt', ['# Sandbox', '# Outside of Sandbox']],
-    [undefined, '# Outside of Sandbox', ['# Sandbox', '# macOS Seatbelt']],
+    [
+      undefined,
+      'You are Gemini CLI, an interactive CLI agent',
+      ['# Sandbox', '# macOS Seatbelt'],
+    ],
   ])(
     'should include correct sandbox instructions for SANDBOX=%s',
     (sandboxValue, expectedContains, expectedNotContains) => {
       vi.stubEnv('SANDBOX', sandboxValue);
+      vi.mocked(mockConfig.getActiveModel).mockReturnValue(
+        PREVIEW_GEMINI_MODEL,
+      );
       const prompt = getCoreSystemPrompt(mockConfig);
       expect(prompt).toContain(expectedContains);
+
+      // modern snippets should NOT contain outside
+      expect(prompt).not.toContain('# Outside of Sandbox');
+
       expectedNotContains.forEach((text) => expect(prompt).not.toContain(text));
       expect(prompt).toMatchSnapshot();
     },
