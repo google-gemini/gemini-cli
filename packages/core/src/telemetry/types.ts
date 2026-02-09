@@ -553,7 +553,7 @@ function toGenerateContentConfigAttributes(
   if (!config) {
     return {};
   }
-  return {
+  const attributes: LogAttributes = {
     'gen_ai.request.temperature': config.temperature,
     'gen_ai.request.top_p': config.topP,
     'gen_ai.request.top_k': config.topK,
@@ -568,6 +568,20 @@ function toGenerateContentConfigAttributes(
       toSystemInstruction(config.systemInstruction),
     ),
   };
+
+  if (config.thinkingConfig) {
+    const thinkingConfig = config.thinkingConfig;
+    if (thinkingConfig.thinkingBudget !== undefined) {
+      attributes['gen_ai.request.thinking_budget'] =
+        thinkingConfig.thinkingBudget;
+    }
+    if (thinkingConfig.thinkingLevel !== undefined) {
+      attributes['gen_ai.request.thinking_level'] =
+        thinkingConfig.thinkingLevel;
+    }
+  }
+
+  return attributes;
 }
 
 export class ApiResponseEvent implements BaseTelemetryEvent {
@@ -632,6 +646,17 @@ export class ApiResponseEvent implements BaseTelemetryEvent {
       status_code: this.status_code,
       finish_reasons: this.finish_reasons,
     };
+
+    if (this.prompt.generate_content_config?.thinkingConfig) {
+      const thinkingConfig = this.prompt.generate_content_config.thinkingConfig;
+      if (thinkingConfig.thinkingBudget !== undefined) {
+        attributes['thinking_budget'] = thinkingConfig.thinkingBudget;
+      }
+      if (thinkingConfig.thinkingLevel !== undefined) {
+        attributes['thinking_level'] = thinkingConfig.thinkingLevel;
+      }
+    }
+
     if (this.response_text) {
       attributes['response_text'] = this.response_text;
     }

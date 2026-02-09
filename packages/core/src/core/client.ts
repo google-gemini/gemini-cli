@@ -658,6 +658,11 @@ export class GeminiClient {
         if (adaptiveConfig) {
           modelConfigKey.thinkingBudget = adaptiveConfig.thinkingBudget;
           modelConfigKey.thinkingLevel = adaptiveConfig.thinkingLevel;
+          this.getChat().recordAdaptiveThinking({
+            complexity: adaptiveConfig.complexity,
+            thinkingBudget: adaptiveConfig.thinkingBudget,
+            thinkingLevel: adaptiveConfig.thinkingLevel,
+          });
         }
       }
     }

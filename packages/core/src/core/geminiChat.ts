@@ -260,6 +260,14 @@ export class GeminiChat {
     this.systemInstruction = sysInstr;
   }
 
+  recordAdaptiveThinking(info: {
+    complexity: number;
+    thinkingBudget?: number;
+    thinkingLevel?: string;
+  }) {
+    this.chatRecordingService.recordAdaptiveThinking(info);
+  }
+
   /**
    * Sends a message to the model and returns the response in chunks.
    *

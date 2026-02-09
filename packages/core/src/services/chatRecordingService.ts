@@ -83,6 +83,11 @@ export type ConversationRecordExtra =
       thoughts?: Array<ThoughtSummary & { timestamp: string }>;
       tokens?: TokensSummary | null;
       model?: string;
+      adaptiveThinking?: {
+        complexity: number;
+        thinkingBudget?: number;
+        thinkingLevel?: string;
+      };
     };
 
 /**
@@ -130,6 +135,11 @@ export class ChatRecordingService {
   private projectHash: string;
   private queuedThoughts: Array<ThoughtSummary & { timestamp: string }> = [];
   private queuedTokens: TokensSummary | null = null;
+  private queuedAdaptiveThinking?: {
+    complexity: number;
+    thinkingBudget?: number;
+    thinkingLevel?: string;
+  };
   private config: Config;
 
   constructor(config: Config) {
@@ -186,6 +196,7 @@ export class ChatRecordingService {
       // Clear any queued data since this is a fresh start
       this.queuedThoughts = [];
       this.queuedTokens = null;
+      this.queuedAdaptiveThinking = undefined;
     } catch (error) {
       // Handle disk full (ENOSPC) gracefully - disable recording but allow CLI to continue
       if (
@@ -230,6 +241,11 @@ export class ChatRecordingService {
     type: ConversationRecordExtra['type'];
     content: PartListUnion;
     displayContent?: PartListUnion;
+    adaptiveThinking?: {
+      complexity: number;
+      thinkingBudget?: number;
+      thinkingLevel?: string;
+    };
   }): void {
     if (!this.conversationFile) return;
 
@@ -247,9 +263,12 @@ export class ChatRecordingService {
             thoughts: this.queuedThoughts,
             tokens: this.queuedTokens,
             model: message.model,
+            adaptiveThinking:
+              message.adaptiveThinking || this.queuedAdaptiveThinking,
           });
           this.queuedThoughts = [];
           this.queuedTokens = null;
+          this.queuedAdaptiveThinking = undefined;
         } else {
           // Or else just add it.
           conversation.messages.push(msg);
@@ -259,6 +278,18 @@ export class ChatRecordingService {
       debugLogger.error('Error saving message to chat history.', error);
       throw error;
     }
+  }
+
+  /**
+   * Queues adaptive thinking info to be recorded with the next Gemini message.
+   */
+  recordAdaptiveThinking(info: {
+    complexity: number;
+    thinkingBudget?: number;
+    thinkingLevel?: string;
+  }): void {
+    if (!this.conversationFile) return;
+    this.queuedAdaptiveThinking = info;
   }
 
   /**
