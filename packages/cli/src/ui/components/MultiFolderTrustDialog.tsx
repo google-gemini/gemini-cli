@@ -125,7 +125,10 @@ export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
         try {
           const expandedPath = path.resolve(expandHomeDir(dir));
           if (choice === MultiFolderTrustChoice.YES_AND_REMEMBER) {
-            trustedFolders.setValue(expandedPath, TrustLevel.TRUST_FOLDER);
+            await trustedFolders.setValue(
+              expandedPath,
+              TrustLevel.TRUST_FOLDER,
+            );
           }
           workspaceContext.addDirectory(expandedPath);
           added.push(dir);
