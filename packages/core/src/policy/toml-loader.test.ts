@@ -5,12 +5,21 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { PolicyDecision } from './types.js';
+import {
+  PolicyDecision,
+  ApprovalMode,
+  PRIORITY_SUBAGENT_TOOL,
+} from './types.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { loadPoliciesFromToml } from './toml-loader.js';
 import type { PolicyLoadResult } from './toml-loader.js';
+import { PolicyEngine } from './policy-engine.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 describe('policy-toml-loader', () => {
   let tempDir: string;
@@ -498,6 +507,62 @@ priority = 100
       const error = result.errors[0];
       expect(error.errorType).toBe('file_read');
       expect(error.message).toContain('Failed to read policy directory');
+    });
+  });
+
+  describe('Built-in Plan Mode Policy', () => {
+    it('should override default subagent rules when in Plan Mode', async () => {
+      const planTomlPath = path.resolve(__dirname, 'policies', 'plan.toml');
+      const fileContent = await fs.readFile(planTomlPath, 'utf-8');
+      const tempPolicyDir = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'plan-policy-test-'),
+      );
+      try {
+        await fs.writeFile(path.join(tempPolicyDir, 'plan.toml'), fileContent);
+        const getPolicyTier = () => 1; // Default tier
+
+        // 1. Load the actual Plan Mode policies
+        const result = await loadPoliciesFromToml(
+          [tempPolicyDir],
+          getPolicyTier,
+        );
+
+        // 2. Initialize Policy Engine with these rules
+        const engine = new PolicyEngine({
+          rules: result.rules,
+          approvalMode: ApprovalMode.PLAN,
+        });
+
+        // 3. Simulate a Subagent being registered (Dynamic Rule)
+        engine.addRule({
+          toolName: 'codebase_investigator',
+          decision: PolicyDecision.ALLOW,
+          priority: PRIORITY_SUBAGENT_TOOL,
+          source: 'AgentRegistry (Dynamic)',
+        });
+
+        // 4. Verify Behavior:
+        // The Plan Mode "Catch-All Deny" (from plan.toml) should override the Subagent Allow
+        const checkResult = await engine.check(
+          { name: 'codebase_investigator' },
+          undefined,
+        );
+
+        expect(
+          checkResult.decision,
+          'Subagent should be DENIED in Plan Mode',
+        ).toBe(PolicyDecision.DENY);
+
+        // 5. Verify Explicit Allows still work
+        // e.g. 'read_file' should be allowed because its priority in plan.toml (70) is higher than the deny (60)
+        const readResult = await engine.check({ name: 'read_file' }, undefined);
+        expect(
+          readResult.decision,
+          'Explicitly allowed tools (read_file) should be ALLOWED in Plan Mode',
+        ).toBe(PolicyDecision.ALLOW);
+      } finally {
+        await fs.rm(tempPolicyDir, { recursive: true, force: true });
+      }
     });
   });
 });

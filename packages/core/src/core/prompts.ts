@@ -34,6 +34,6 @@ export function getCoreSystemPrompt(
 /**
  * Provides the system prompt for the history compression process.
  */
-export function getCompressionPrompt(): string {
-  return new PromptProvider().getCompressionPrompt();
+export function getCompressionPrompt(config: Config): string {
+  return new PromptProvider().getCompressionPrompt(config);
 }

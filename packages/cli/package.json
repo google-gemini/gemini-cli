@@ -65,6 +65,7 @@
     "tinygradient": "^1.1.5",
     "undici": "^7.10.0",
     "wrap-ansi": "9.0.2",
+    "ws": "^8.16.0",
     "yargs": "^17.7.2",
     "zod": "^3.23.8"
   },
@@ -80,6 +81,7 @@
     "@types/semver": "^7.7.0",
     "@types/shell-quote": "^1.7.5",
     "@types/tar": "^6.1.13",
+    "@types/ws": "^8.5.10",
     "@types/yargs": "^17.0.32",
     "archiver": "^7.0.1",
     "ink-testing-library": "^4.0.0",
