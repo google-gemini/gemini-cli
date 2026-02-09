@@ -518,11 +518,11 @@ export async function main() {
 
     adminControlsListner.setConfig(config);
 
-    if (config.isInteractive() && config.getDebugMode()) {
+    if (config.isInteractive() && settings.merged.general.devtools) {
       const { registerActivityLogger } = await import(
-        './utils/activityLogger.js'
+        './utils/devtoolsService.js'
       );
-      registerActivityLogger(config);
+      await registerActivityLogger(config);
     }
 
     // Register config for telemetry shutdown

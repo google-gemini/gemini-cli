@@ -73,9 +73,9 @@ export async function runNonInteractive({
 
     if (process.env['GEMINI_CLI_ACTIVITY_LOG_TARGET']) {
       const { registerActivityLogger } = await import(
-        './utils/activityLogger.js'
+        './utils/devtoolsService.js'
       );
-      registerActivityLogger(config);
+      await registerActivityLogger(config);
     }
 
     const { stdout: workingStdout } = createWorkingStdio();
