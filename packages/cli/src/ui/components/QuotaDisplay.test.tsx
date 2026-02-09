@@ -45,4 +45,35 @@ describe('QuotaDisplay', () => {
     const frame = lastFrame();
     expect(stripAnsi(frame!)).toBe('/stats 4% usage remaining');
   });
+
+  it('should render with reset time when provided', () => {
+    const resetTime = new Date(Date.now() + 3600000).toISOString(); // 1 hour from now
+    const { lastFrame } = render(
+      <QuotaDisplay remaining={15} limit={100} resetTime={resetTime} />,
+    );
+    const frame = lastFrame();
+    expect(stripAnsi(frame!)).toMatch(/\/stats 15% usage remaining, resets in/);
+  });
+
+  it('should NOT render reset time when terse is true', () => {
+    const resetTime = new Date(Date.now() + 3600000).toISOString();
+    const { lastFrame } = render(
+      <QuotaDisplay
+        remaining={15}
+        limit={100}
+        resetTime={resetTime}
+        terse={true}
+      />,
+    );
+    const frame = lastFrame();
+    expect(stripAnsi(frame!)).toBe('15%');
+  });
+
+  it('should render terse limit reached message', () => {
+    const { lastFrame } = render(
+      <QuotaDisplay remaining={0} limit={100} terse={true} />,
+    );
+    const frame = lastFrame();
+    expect(stripAnsi(frame!)).toBe('Limit reached');
+  });
 });

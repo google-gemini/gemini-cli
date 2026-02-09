@@ -169,6 +169,7 @@ export const Footer: React.FC = () => {
                     remaining={quotaStats.remaining}
                     limit={quotaStats.limit}
                     resetTime={quotaStats.resetTime}
+                    terse={true}
                   />
                 </>
               )}

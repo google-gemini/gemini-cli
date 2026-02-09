@@ -148,7 +148,7 @@ describe('<Footer />', () => {
         },
       },
     });
-    expect(lastFrame()).toContain('/stats 15% usage remaining');
+    expect(lastFrame()).toContain('15%');
   });
 
   it('hides the usage indicator when usage is not near limit', () => {

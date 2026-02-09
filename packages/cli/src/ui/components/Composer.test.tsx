@@ -25,11 +25,7 @@ vi.mock('../contexts/VimModeContext.js', () => ({
 }));
 import { ApprovalMode } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
-import {
-  StreamingState,
-  ToolCallStatus,
-  type ConsoleMessageItem,
-} from '../types.js';
+import { StreamingState, ToolCallStatus } from '../types.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import type { SessionMetrics } from '../contexts/SessionContext.js';
 
@@ -240,7 +236,11 @@ describe('Composer', () => {
         sessionStats: {
           sessionId: 'test-session',
           sessionStartTime: new Date(),
-          metrics: {} as unknown as SessionMetrics,
+          metrics: {
+            models: {},
+            tools: {},
+            files: {},
+          } as SessionMetrics,
           lastPromptTokenCount: 150,
           promptCount: 5,
         },
@@ -552,8 +552,12 @@ describe('Composer', () => {
       const uiState = createMockUIState({
         showErrorDetails: true,
         filteredConsoleMessages: [
-          { level: 'error', message: 'Test error', timestamp: new Date() },
-        ] as unknown as ConsoleMessageItem[],
+          {
+            type: 'error',
+            content: 'Test error',
+            count: 1,
+          },
+        ],
       });
 
       const { lastFrame } = renderComposer(uiState);
