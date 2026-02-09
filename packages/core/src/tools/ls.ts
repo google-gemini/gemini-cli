@@ -143,7 +143,10 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
       this.params.dir_path,
     );
 
-    const validationError = this.config.validatePathAccess(resolvedDirPath);
+    const validationError = this.config.validatePathAccess(
+      resolvedDirPath,
+      'read',
+    );
     if (validationError) {
       return {
         llmContent: validationError,
@@ -331,7 +334,7 @@ export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
       this.config.getTargetDir(),
       params.dir_path,
     );
-    return this.config.validatePathAccess(resolvedPath);
+    return this.config.validatePathAccess(resolvedPath, 'read');
   }
 
   protected createInvocation(

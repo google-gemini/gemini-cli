@@ -62,6 +62,7 @@
     "node-notifier": "^10.0.1",
     "open": "^10.1.2",
     "picomatch": "^4.0.1",
+    "proper-lockfile": "^4.1.2",
     "read-package-up": "^11.0.0",
     "shell-quote": "^1.8.3",
     "simple-git": "^3.28.0",

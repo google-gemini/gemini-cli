@@ -39,12 +39,7 @@ import { ToolRegistry } from '../tools/tool-registry.js';
 import { ACTIVATE_SKILL_TOOL_NAME } from '../tools/tool-names.js';
 import type { SkillDefinition } from '../skills/skillLoader.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
-import {
-  DEFAULT_GEMINI_MODEL,
-  DEFAULT_GEMINI_MODEL_AUTO,
-  PREVIEW_GEMINI_MODEL,
-  PREVIEW_GEMINI_MODEL_AUTO,
-} from './models.js';
+import { DEFAULT_GEMINI_MODEL, PREVIEW_GEMINI_MODEL } from './models.js';
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -508,78 +503,6 @@ describe('Server Config (config.ts)', () => {
       expect(
         config.getGeminiClient().stripThoughtsFromHistory,
       ).not.toHaveBeenCalledWith();
-    });
-  });
-
-  describe('Preview Features Logic in refreshAuth', () => {
-    beforeEach(() => {
-      // Set up default mock behavior for these functions before each test
-      vi.mocked(getCodeAssistServer).mockReturnValue(undefined);
-      vi.mocked(getExperiments).mockResolvedValue({
-        flags: {},
-        experimentIds: [],
-      });
-    });
-
-    it('should enable preview features for Google auth when remote flag is true', async () => {
-      // Override the default mock for this specific test
-      vi.mocked(getCodeAssistServer).mockReturnValue({} as CodeAssistServer); // Simulate Google auth by returning a truthy value
-      vi.mocked(getExperiments).mockResolvedValue({
-        flags: {
-          [ExperimentFlags.ENABLE_PREVIEW]: { boolValue: true },
-        },
-        experimentIds: [],
-      });
-      const config = new Config({ ...baseParams, previewFeatures: undefined });
-      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
-      expect(config.getPreviewFeatures()).toBe(true);
-    });
-
-    it('should disable preview features for Google auth when remote flag is false', async () => {
-      // Override the default mock
-      vi.mocked(getCodeAssistServer).mockReturnValue({} as CodeAssistServer);
-      vi.mocked(getExperiments).mockResolvedValue({
-        flags: {
-          [ExperimentFlags.ENABLE_PREVIEW]: { boolValue: false },
-        },
-        experimentIds: [],
-      });
-      const config = new Config({ ...baseParams, previewFeatures: undefined });
-      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
-      expect(config.getPreviewFeatures()).toBe(undefined);
-    });
-
-    it('should disable preview features for Google auth when remote flag is missing', async () => {
-      // Override the default mock for getCodeAssistServer, the getExperiments mock is already correct
-      vi.mocked(getCodeAssistServer).mockReturnValue({} as CodeAssistServer);
-      const config = new Config({ ...baseParams, previewFeatures: undefined });
-      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
-      expect(config.getPreviewFeatures()).toBe(undefined);
-    });
-
-    it('should not change preview features or model if it is already set to true', async () => {
-      const initialModel = 'some-other-model';
-      const config = new Config({
-        ...baseParams,
-        previewFeatures: true,
-        model: initialModel,
-      });
-      // It doesn't matter which auth method we use here, the logic should exit early
-      await config.refreshAuth(AuthType.USE_GEMINI);
-      expect(config.getPreviewFeatures()).toBe(true);
-      expect(config.getModel()).toBe(initialModel);
-    });
-
-    it('should not change preview features or model if it is already set to false', async () => {
-      const initialModel = 'some-other-model';
-      const config = new Config({
-        ...baseParams,
-        previewFeatures: false,
-        model: initialModel,
-      });
-      await config.refreshAuth(AuthType.USE_GEMINI);
-      expect(config.getPreviewFeatures()).toBe(false);
-      expect(config.getModel()).toBe(initialModel);
     });
   });
 
@@ -1181,8 +1104,8 @@ describe('Server Config (config.ts)', () => {
         1000,
       );
       // 4 * (32000 - 1000) = 4 * 31000 = 124000
-      // default is 4_000_000
-      expect(config.getTruncateToolOutputThreshold()).toBe(124000);
+      // default is 40_000, so min(124000, 40000) = 40000
+      expect(config.getTruncateToolOutputThreshold()).toBe(40_000);
     });
 
     it('should return the default threshold when the calculated value is larger', () => {
@@ -1192,8 +1115,8 @@ describe('Server Config (config.ts)', () => {
         500_000,
       );
       // 4 * (2_000_000 - 500_000) = 4 * 1_500_000 = 6_000_000
-      // default is 4_000_000
-      expect(config.getTruncateToolOutputThreshold()).toBe(4_000_000);
+      // default is 40_000
+      expect(config.getTruncateToolOutputThreshold()).toBe(40_000);
     });
 
     it('should use a custom truncateToolOutputThreshold if provided', () => {
@@ -2105,45 +2028,6 @@ describe('Config Quota & Preview Model Access', () => {
     });
   });
 
-  describe('setPreviewFeatures', () => {
-    it('should reset model to default auto if disabling preview features while using a preview model', () => {
-      config.setPreviewFeatures(true);
-      config.setModel(PREVIEW_GEMINI_MODEL);
-
-      config.setPreviewFeatures(false);
-
-      expect(config.getModel()).toBe(DEFAULT_GEMINI_MODEL_AUTO);
-    });
-
-    it('should NOT reset model if disabling preview features while NOT using a preview model', () => {
-      config.setPreviewFeatures(true);
-      const nonPreviewModel = 'gemini-1.5-pro';
-      config.setModel(nonPreviewModel);
-
-      config.setPreviewFeatures(false);
-
-      expect(config.getModel()).toBe(nonPreviewModel);
-    });
-
-    it('should switch to preview auto model if enabling preview features while using default auto model', () => {
-      config.setPreviewFeatures(false);
-      config.setModel(DEFAULT_GEMINI_MODEL_AUTO);
-
-      config.setPreviewFeatures(true);
-
-      expect(config.getModel()).toBe(PREVIEW_GEMINI_MODEL_AUTO);
-    });
-
-    it('should NOT reset model if enabling preview features', () => {
-      config.setPreviewFeatures(false);
-      config.setModel(PREVIEW_GEMINI_MODEL); // Just pretending it was set somehow
-
-      config.setPreviewFeatures(true);
-
-      expect(config.getModel()).toBe(PREVIEW_GEMINI_MODEL);
-    });
-  });
-
   describe('isPlanEnabled', () => {
     it('should return false by default', () => {
       const config = new Config(baseParams);
@@ -2449,10 +2333,11 @@ describe('syncPlanModeTools', () => {
     expect(registeredTool).toBeInstanceOf(ExitPlanModeTool);
   });
 
-  it('should register EnterPlanModeTool and unregister ExitPlanModeTool when NOT in PLAN mode', async () => {
+  it('should register EnterPlanModeTool and unregister ExitPlanModeTool when NOT in PLAN mode and experimental.plan is enabled', async () => {
     const config = new Config({
       ...baseParams,
       approvalMode: ApprovalMode.DEFAULT,
+      plan: true,
     });
     const registry = new ToolRegistry(config, config.getMessageBus());
     vi.spyOn(config, 'getToolRegistry').mockReturnValue(registry);
@@ -2474,6 +2359,27 @@ describe('syncPlanModeTools', () => {
     const registeredTool = registerSpy.mock.calls[0][0];
     const { EnterPlanModeTool } = await import('../tools/enter-plan-mode.js');
     expect(registeredTool).toBeInstanceOf(EnterPlanModeTool);
+  });
+
+  it('should NOT register EnterPlanModeTool when experimental.plan is disabled', async () => {
+    const config = new Config({
+      ...baseParams,
+      approvalMode: ApprovalMode.DEFAULT,
+      plan: false,
+    });
+    const registry = new ToolRegistry(config, config.getMessageBus());
+    vi.spyOn(config, 'getToolRegistry').mockReturnValue(registry);
+
+    const registerSpy = vi.spyOn(registry, 'registerTool');
+    vi.spyOn(registry, 'getTool').mockReturnValue(undefined);
+
+    config.syncPlanModeTools();
+
+    const { EnterPlanModeTool } = await import('../tools/enter-plan-mode.js');
+    const registeredTool = registerSpy.mock.calls.find(
+      (call) => call[0] instanceof EnterPlanModeTool,
+    );
+    expect(registeredTool).toBeUndefined();
   });
 
   it('should call geminiClient.setTools if initialized', async () => {

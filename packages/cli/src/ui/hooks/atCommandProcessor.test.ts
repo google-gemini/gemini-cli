@@ -179,9 +179,6 @@ describe('handleAtCommand', () => {
     expect(result).toEqual({
       processedQuery: [{ text: queryWithSpaces }],
     });
-    expect(mockOnDebugMessage).toHaveBeenCalledWith(
-      'Lone @ detected, will be treated as text in the modified query.',
-    );
   });
 
   it('should process a valid text file path', async () => {
@@ -440,9 +437,6 @@ describe('handleAtCommand', () => {
     );
     expect(mockOnDebugMessage).toHaveBeenCalledWith(
       `Glob search for '**/*${invalidFile}*' found no files or an error. Path ${invalidFile} will be skipped.`,
-    );
-    expect(mockOnDebugMessage).toHaveBeenCalledWith(
-      'Lone @ detected, will be treated as text in the modified query.',
     );
   });
 
@@ -1194,40 +1188,6 @@ describe('handleAtCommand', () => {
         expect.stringContaining(`using glob: ${path.join(subDirPath, '**')}`),
       );
     });
-
-    it('should skip absolute paths outside workspace', async () => {
-      const outsidePath = '/tmp/outside-workspace.txt';
-      const query = `Check @${outsidePath} please.`;
-
-      const mockWorkspaceContext = {
-        isPathWithinWorkspace: vi.fn((path: string) =>
-          path.startsWith(testRootDir),
-        ),
-        getDirectories: () => [testRootDir],
-        addDirectory: vi.fn(),
-        getInitialDirectories: () => [testRootDir],
-        setDirectories: vi.fn(),
-        onDirectoriesChanged: vi.fn(() => () => {}),
-      } as unknown as ReturnType<typeof mockConfig.getWorkspaceContext>;
-      mockConfig.getWorkspaceContext = () => mockWorkspaceContext;
-
-      const result = await handleAtCommand({
-        query,
-        config: mockConfig,
-        addItem: mockAddItem,
-        onDebugMessage: mockOnDebugMessage,
-        messageId: 502,
-        signal: abortController.signal,
-      });
-
-      expect(result).toEqual({
-        processedQuery: [{ text: `Check @${outsidePath} please.` }],
-      });
-
-      expect(mockOnDebugMessage).toHaveBeenCalledWith(
-        `Path ${outsidePath} is not in the workspace and will be skipped.`,
-      );
-    });
   });
 
   it("should not add the user's turn to history, as that is the caller's responsibility", async () => {
@@ -1297,7 +1257,9 @@ describe('handleAtCommand', () => {
         signal: abortController.signal,
       });
 
-      expect(readResource).toHaveBeenCalledWith(resourceUri);
+      expect(readResource).toHaveBeenCalledWith(resourceUri, {
+        signal: abortController.signal,
+      });
       const processedParts = Array.isArray(result.processedQuery)
         ? result.processedQuery
         : [];
