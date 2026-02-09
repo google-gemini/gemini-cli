@@ -15,6 +15,7 @@ import { formatDuration } from '../utils/formatters.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 import { INTERACTIVE_SHELL_WAITING_PHRASE } from '../hooks/usePhraseCycler.js';
+import { shouldUseEmoji } from '../utils/terminalUtils.js';
 
 interface LoadingIndicatorProps {
   currentLoadingPhrase?: string;
@@ -23,6 +24,7 @@ interface LoadingIndicatorProps {
   rightContent?: React.ReactNode;
   thought?: ThoughtSummary | null;
   showCancelAndTimer?: boolean;
+  showThoughtIndicator?: boolean;
 }
 
 export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
@@ -32,6 +34,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   rightContent,
   thought,
   showCancelAndTimer = true,
+  showThoughtIndicator = false,
 }) => {
   const streamingState = useStreamingContext();
   const { columns: terminalWidth } = useTerminalSize();
@@ -51,6 +54,13 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
     currentLoadingPhrase === INTERACTIVE_SHELL_WAITING_PHRASE
       ? currentLoadingPhrase
       : thought?.subject || currentLoadingPhrase;
+  const hasThoughtIndicator =
+    showThoughtIndicator &&
+    currentLoadingPhrase !== INTERACTIVE_SHELL_WAITING_PHRASE &&
+    Boolean(thought?.subject?.trim());
+  const thinkingIndicator = hasThoughtIndicator
+    ? `${shouldUseEmoji() ? '💬' : 'o'} `
+    : '';
 
   const cancelAndTimerContent =
     showCancelAndTimer &&
@@ -72,6 +82,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
         </Box>
         {primaryText && (
           <Text color={theme.text.accent} wrap="truncate-end">
+            {thinkingIndicator}
             {primaryText}
           </Text>
         )}
@@ -105,6 +116,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
           </Box>
           {primaryText && (
             <Text color={theme.text.accent} wrap="truncate-end">
+              {thinkingIndicator}
               {primaryText}
             </Text>
           )}

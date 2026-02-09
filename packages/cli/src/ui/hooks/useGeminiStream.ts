@@ -51,9 +51,9 @@ import type {
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
   HistoryItem,
+  HistoryItemThinking,
   HistoryItemWithoutId,
   HistoryItemToolGroup,
-  HistoryItemThinking,
   IndividualToolCallDisplay,
   SlashCommandProcessorResult,
   HistoryItemModel,
@@ -82,42 +82,6 @@ import path from 'node:path';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
 import type { LoadedSettings } from '../../config/settings.js';
-
-const MAX_THOUGHT_SUMMARY_LENGTH = 140;
-
-function splitGraphemes(value: string): string[] {
-  if (typeof Intl !== 'undefined' && 'Segmenter' in Intl) {
-    const segmenter = new Intl.Segmenter(undefined, {
-      granularity: 'grapheme',
-    });
-    return Array.from(segmenter.segment(value), (segment) => segment.segment);
-  }
-
-  return Array.from(value);
-}
-
-function summarizeThought(thought: ThoughtSummary): ThoughtSummary {
-  const subject = thought.subject.trim();
-  if (subject) {
-    return { subject, description: '' };
-  }
-
-  const description = thought.description.trim();
-  if (!description) {
-    return { subject: '', description: '' };
-  }
-
-  const descriptionGraphemes = splitGraphemes(description);
-  if (descriptionGraphemes.length <= MAX_THOUGHT_SUMMARY_LENGTH) {
-    return { subject: description, description: '' };
-  }
-
-  const trimmed = descriptionGraphemes
-    .slice(0, MAX_THOUGHT_SUMMARY_LENGTH - 3)
-    .join('')
-    .trimEnd();
-  return { subject: `${trimmed}...`, description: '' };
-}
 
 type ToolResponseWithParts = ToolCallResponseInfo & {
   llmContent?: PartListUnion;
@@ -231,7 +195,8 @@ export const useGeminiStream = (
   const turnCancelledRef = useRef(false);
   const activeQueryIdRef = useRef<string | null>(null);
   const [isResponding, setIsResponding] = useState<boolean>(false);
-  const [thought, setThought] = useState<ThoughtSummary | null>(null);
+  const [thought, thoughtRef, setThought] =
+    useStateAndRef<ThoughtSummary | null>(null);
   const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
 
@@ -839,25 +804,17 @@ export const useGeminiStream = (
     (eventValue: ThoughtSummary, userMessageTimestamp: number) => {
       setThought(eventValue);
 
-      const inlineThinkingMode = getInlineThinkingMode(settings);
-      if (inlineThinkingMode === 'off') {
-        return;
+      if (getInlineThinkingMode(settings) === 'full') {
+        addItem(
+          {
+            type: 'thinking',
+            thought: eventValue,
+          } as HistoryItemThinking,
+          userMessageTimestamp,
+        );
       }
-
-      const thoughtForDisplay =
-        inlineThinkingMode === 'summary'
-          ? summarizeThought(eventValue)
-          : eventValue;
-
-      addItem(
-        {
-          type: 'thinking',
-          thought: thoughtForDisplay,
-        } as HistoryItemThinking,
-        userMessageTimestamp,
-      );
     },
-    [addItem, settings],
+    [addItem, settings, setThought],
   );
 
   const handleUserCancelledEvent = useCallback(
@@ -1129,6 +1086,14 @@ export const useGeminiStream = (
       let geminiMessageBuffer = '';
       const toolCallRequests: ToolCallRequestInfo[] = [];
       for await (const event of stream) {
+        if (
+          event.type !== ServerGeminiEventType.Thought &&
+          getInlineThinkingMode(settings) === 'summary' &&
+          thoughtRef.current !== null
+        ) {
+          setThought(null);
+        }
+
         switch (event.type) {
           case ServerGeminiEventType.Thought:
             setLastGeminiActivityTime(Date.now());
@@ -1220,6 +1185,8 @@ export const useGeminiStream = (
     [
       handleContentEvent,
       handleThoughtEvent,
+      thoughtRef,
+      settings,
       handleUserCancelledEvent,
       handleErrorEvent,
       scheduleToolCalls,
@@ -1234,6 +1201,7 @@ export const useGeminiStream = (
       addItem,
       pendingHistoryItemRef,
       setPendingHistoryItem,
+      setThought,
     ],
   );
   const submitQuery = useCallback(
@@ -1414,6 +1382,7 @@ export const useGeminiStream = (
       config,
       startNewPrompt,
       getPromptCount,
+      setThought,
     ],
   );
 

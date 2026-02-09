@@ -128,6 +128,9 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                 }
                 elapsedTime={uiState.elapsedTime}
                 showCancelAndTimer={false}
+                showThoughtIndicator={
+                  settings.merged.ui.inlineThinkingMode !== 'off'
+                }
               />
             )}
           </Box>

@@ -240,7 +240,11 @@ describe('<HistoryItemDisplay />', () => {
         thought: { subject: 'Thinking', description: 'test' },
       };
       const { lastFrame } = renderWithProviders(
-        <HistoryItemDisplay {...baseItem} item={item} inlineEnabled={true} />,
+        <HistoryItemDisplay
+          {...baseItem}
+          item={item}
+          inlineThinkingMode="summary"
+        />,
       );
 
       expect(lastFrame()).toContain('Thinking');
@@ -253,7 +257,11 @@ describe('<HistoryItemDisplay />', () => {
         thought: { subject: 'Thinking', description: 'test' },
       };
       const { lastFrame } = renderWithProviders(
-        <HistoryItemDisplay {...baseItem} item={item} inlineEnabled={false} />,
+        <HistoryItemDisplay
+          {...baseItem}
+          item={item}
+          inlineThinkingMode="off"
+        />,
       );
 
       expect(lastFrame()).toBe('');

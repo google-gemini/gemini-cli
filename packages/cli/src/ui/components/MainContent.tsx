@@ -56,7 +56,7 @@ export const MainContent = () => {
     availableTerminalHeight,
   } = uiState;
 
-  const inlineEnabled = getInlineThinkingMode(settings) !== 'off';
+  const inlineThinkingMode = getInlineThinkingMode(settings);
 
   const historyItems = useMemo(
     () =>
@@ -69,7 +69,7 @@ export const MainContent = () => {
           item={h}
           isPending={false}
           commands={uiState.slashCommands}
-          inlineEnabled={inlineEnabled}
+          inlineThinkingMode={inlineThinkingMode}
         />
       )),
     [
@@ -77,7 +77,7 @@ export const MainContent = () => {
       mainAreaWidth,
       staticAreaMaxItemHeight,
       uiState.slashCommands,
-      inlineEnabled,
+      inlineThinkingMode,
     ],
   );
 
@@ -99,7 +99,7 @@ export const MainContent = () => {
             isFocused={!uiState.isEditorDialogOpen}
             activeShellPtyId={uiState.activePtyId}
             embeddedShellFocused={uiState.embeddedShellFocused}
-            inlineEnabled={inlineEnabled}
+            inlineThinkingMode={inlineThinkingMode}
           />
         ))}
         {showConfirmationQueue && confirmingTool && (
@@ -113,7 +113,7 @@ export const MainContent = () => {
       isAlternateBuffer,
       availableTerminalHeight,
       mainAreaWidth,
-      inlineEnabled,
+      inlineThinkingMode,
       uiState.isEditorDialogOpen,
       uiState.activePtyId,
       uiState.embeddedShellFocused,
@@ -145,7 +145,7 @@ export const MainContent = () => {
             item={item.item}
             isPending={false}
             commands={uiState.slashCommands}
-            inlineEnabled={inlineEnabled}
+            inlineThinkingMode={inlineThinkingMode}
           />
         );
       } else {
@@ -156,7 +156,7 @@ export const MainContent = () => {
       version,
       mainAreaWidth,
       uiState.slashCommands,
-      inlineEnabled,
+      inlineThinkingMode,
       pendingItems,
     ],
   );

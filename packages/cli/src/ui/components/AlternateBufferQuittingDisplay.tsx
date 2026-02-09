@@ -27,7 +27,7 @@ export const AlternateBufferQuittingDisplay = () => {
   const confirmingTool = useConfirmingTool();
   const showPromptedTool =
     config.isEventDrivenSchedulerEnabled() && confirmingTool !== null;
-  const inlineEnabled = getInlineThinkingMode(settings) !== 'off';
+  const inlineThinkingMode = getInlineThinkingMode(settings);
 
   // We render the entire chat history and header here to ensure that the
   // conversation history is visible to the user after the app quits and the
@@ -51,7 +51,7 @@ export const AlternateBufferQuittingDisplay = () => {
           item={h}
           isPending={false}
           commands={uiState.slashCommands}
-          inlineEnabled={inlineEnabled}
+          inlineThinkingMode={inlineThinkingMode}
         />
       ))}
       {uiState.pendingHistoryItems.map((item, i) => (
@@ -64,7 +64,7 @@ export const AlternateBufferQuittingDisplay = () => {
           isFocused={false}
           activeShellPtyId={uiState.activePtyId}
           embeddedShellFocused={uiState.embeddedShellFocused}
-          inlineEnabled={inlineEnabled}
+          inlineThinkingMode={inlineThinkingMode}
         />
       ))}
       {showPromptedTool && (

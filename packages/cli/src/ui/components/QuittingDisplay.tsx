@@ -17,7 +17,7 @@ export const QuittingDisplay = () => {
   const { rows: terminalHeight, columns: terminalWidth } = useTerminalSize();
 
   const availableTerminalHeight = terminalHeight;
-  const inlineEnabled = getInlineThinkingMode(settings) !== 'off';
+  const inlineThinkingMode = getInlineThinkingMode(settings);
 
   if (!uiState.quittingMessages) {
     return null;
@@ -34,7 +34,7 @@ export const QuittingDisplay = () => {
           terminalWidth={terminalWidth}
           item={item}
           isPending={false}
-          inlineEnabled={inlineEnabled}
+          inlineThinkingMode={inlineThinkingMode}
         />
       ))}
     </Box>
