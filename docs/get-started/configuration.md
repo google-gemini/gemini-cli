@@ -106,6 +106,10 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable Vim keybindings
   - **Default:** `false`
 
+- **`general.devtools`** (boolean):
+  - **Description:** Enable DevTools inspector on launch.
+  - **Default:** `false`
+
 - **`general.enableAutoUpdate`** (boolean):
   - **Description:** Enable automatic updates.
   - **Default:** `true`
