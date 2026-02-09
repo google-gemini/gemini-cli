@@ -98,9 +98,17 @@ export function useConsoleMessages(): UseConsoleMessagesReturn {
 
   useEffect(() => {
     const handleConsoleLog = (payload: ConsoleLogPayload) => {
+      let content = payload.content;
+      const MAX_CONSOLE_MSG_LENGTH = 10000;
+      if (content.length > MAX_CONSOLE_MSG_LENGTH) {
+        content =
+          content.slice(0, MAX_CONSOLE_MSG_LENGTH) +
+          `... [Truncated ${content.length - MAX_CONSOLE_MSG_LENGTH} characters]`;
+      }
+
       handleNewMessage({
         type: payload.type,
-        content: payload.content,
+        content,
         count: 1,
       });
     };

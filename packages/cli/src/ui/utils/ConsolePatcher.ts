@@ -44,17 +44,7 @@ export class ConsolePatcher {
     console.info = this.originalConsoleInfo;
   };
 
-  private formatArgs = (args: unknown[]): string => {
-    const formatted = util.format(...args);
-    const MAX_CONSOLE_MSG_LENGTH = 10000;
-    if (formatted.length > MAX_CONSOLE_MSG_LENGTH) {
-      return (
-        formatted.slice(0, MAX_CONSOLE_MSG_LENGTH) +
-        `... [Truncated ${formatted.length - MAX_CONSOLE_MSG_LENGTH} characters]`
-      );
-    }
-    return formatted;
-  };
+  private formatArgs = (args: unknown[]): string => util.format(...args);
 
   private patchConsoleMethod =
     (type: 'log' | 'warn' | 'error' | 'debug' | 'info') =>
