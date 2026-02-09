@@ -136,6 +136,7 @@ describe('TableRenderer', () => {
     expect(output).toMatchSnapshot();
   });
 
+  // The snapshot looks weird but checked on VS Code terminal and it looks fine
   it('wraps columns with punctuation correctly', () => {
     const headers = ['Punctuation 1', 'Punctuation 2', 'Punctuation 3'];
     const rows = [
@@ -280,6 +281,7 @@ describe('TableRenderer', () => {
     expect(output).toMatchSnapshot();
   });
 
+  // The output isn't correct in the VS Code terminal due to ink issues with ❤️
   it('renders a table with only emojis and text correctly', () => {
     const headers = ['Happy 😀', 'Rocket 🚀', 'Heart ❤️'];
     const rows = [

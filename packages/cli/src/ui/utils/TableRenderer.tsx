@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Text, Box } from 'ink';
 import {
   type StyledChar,
@@ -36,6 +36,12 @@ const calculateWidths = (text: string) => {
   return { contentWidth, maxWordWidth };
 };
 
+// Used to reduce redundant parsing and cache the widths for each line
+interface ProcessedLine {
+  text: string;
+  width: number;
+}
+
 /**
  * Custom table renderer for markdown tables
  * We implement our own instead of using ink-table due to module compatibility issues
@@ -47,138 +53,142 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
 }) => {
   // Clean headers: remove bold markers since we already render headers as bold
   // and having them can break wrapping when the markers are split across lines.
-  const cleanedHeaders = headers.map((header) =>
-    header.replace(/\*\*(.*?)\*\*/g, '$1'),
+  const cleanedHeaders = useMemo(
+    () => headers.map((header) => header.replace(/\*\*(.*?)\*\*/g, '$1')),
+    [headers],
   );
 
-  // --- Step 1: Define Constraints per Column ---
-  const constraints = cleanedHeaders.map((header, colIndex) => {
-    let { contentWidth: maxContentWidth, maxWordWidth } =
-      calculateWidths(header);
+  const { wrappedHeaders, wrappedRows, adjustedWidths } = useMemo(() => {
+    // --- Step 1: Define Constraints per Column ---
+    const constraints = cleanedHeaders.map((header, colIndex) => {
+      let { contentWidth: maxContentWidth, maxWordWidth } =
+        calculateWidths(header);
 
-    rows.forEach((row) => {
-      const cell = row[colIndex] || '';
-      const { contentWidth: cellWidth, maxWordWidth: cellWordWidth } =
-        calculateWidths(cell);
+      rows.forEach((row) => {
+        const cell = row[colIndex] || '';
+        const { contentWidth: cellWidth, maxWordWidth: cellWordWidth } =
+          calculateWidths(cell);
 
-      maxContentWidth = Math.max(maxContentWidth, cellWidth);
-      maxWordWidth = Math.max(maxWordWidth, cellWordWidth);
-    });
-
-    const minWidth = maxWordWidth;
-    const maxWidth = Math.max(minWidth, maxContentWidth);
-
-    return { minWidth, maxWidth };
-  });
-
-  // --- Step 2: Calculate Available Space ---
-  // Fixed overhead: borders (n+1) + padding (2n)
-  const fixedOverhead = cleanedHeaders.length + 1 + cleanedHeaders.length * 2;
-  const availableWidth = Math.max(0, terminalWidth - fixedOverhead - 2);
-
-  // --- Step 3: Allocation Algorithm ---
-  const totalMinWidth = constraints.reduce((sum, c) => sum + c.minWidth, 0);
-  let finalContentWidths: number[];
-
-  if (totalMinWidth > availableWidth) {
-    // Case A: Not enough space even for minimums.
-    // We must scale all the columns except the ones that are very short(<=5 characters)
-    const shortColumns = constraints.filter(
-      (c) => c.maxWidth <= MIN_COLUMN_WIDTH,
-    );
-    const totalShortColumnWidth = shortColumns.reduce(
-      (sum, c) => sum + c.minWidth,
-      0,
-    );
-
-    const finalTotalShortColumnWidth =
-      totalShortColumnWidth >= availableWidth ? 0 : totalShortColumnWidth;
-
-    const scale =
-      (availableWidth - finalTotalShortColumnWidth) /
-      (totalMinWidth - finalTotalShortColumnWidth);
-    finalContentWidths = constraints.map((c) => {
-      if (c.maxWidth <= MIN_COLUMN_WIDTH && finalTotalShortColumnWidth > 0) {
-        return c.minWidth;
-      }
-      return Math.floor(c.minWidth * scale);
-    });
-  } else {
-    // Case B: We have space! Distribute the surplus.
-    const surplus = availableWidth - totalMinWidth;
-    const totalGrowthNeed = constraints.reduce(
-      (sum, c) => sum + (c.maxWidth - c.minWidth),
-      0,
-    );
-
-    if (totalGrowthNeed === 0) {
-      // If nobody wants to grow, simply give everyone their min.
-      finalContentWidths = constraints.map((c) => c.minWidth);
-    } else {
-      finalContentWidths = constraints.map((c) => {
-        const growthNeed = c.maxWidth - c.minWidth;
-        const share = growthNeed / totalGrowthNeed;
-        const extra = Math.floor(surplus * share);
-        return Math.min(c.maxWidth, c.minWidth + extra);
+        maxContentWidth = Math.max(maxContentWidth, cellWidth);
+        maxWordWidth = Math.max(maxWordWidth, cellWordWidth);
       });
-    }
-  }
 
-  // --- Step 4: Pre-wrap and Optimize Widths ---
-  const wrappedRows: string[][][] = [];
-  const actualColumnWidths = new Array(cleanedHeaders.length).fill(0);
+      const minWidth = maxWordWidth;
+      const maxWidth = Math.max(minWidth, maxContentWidth);
 
-  const wrapAndProcessRow = (row: string[]) => {
-    const rowResult: string[][] = [];
-    row.forEach((cell, colIndex) => {
-      const allocatedWidth = finalContentWidths[colIndex];
-      const contentWidth = Math.max(1, allocatedWidth);
-
-      const contentStyledChars = toStyledCharacters(cell);
-      const wrappedStyledLines = wrapStyledChars(
-        contentStyledChars,
-        contentWidth,
-      );
-
-      const maxLineWidth = widestLineFromStyledChars(wrappedStyledLines);
-      actualColumnWidths[colIndex] = Math.max(
-        actualColumnWidths[colIndex],
-        maxLineWidth,
-      );
-
-      const lines = wrappedStyledLines.map((line) => styledCharsToString(line));
-      rowResult.push(lines);
+      return { minWidth, maxWidth };
     });
-    return rowResult;
-  };
 
-  const wrappedHeaders = wrapAndProcessRow(cleanedHeaders);
-  rows.forEach((row) => {
-    wrappedRows.push(wrapAndProcessRow(row));
-  });
+    // --- Step 2: Calculate Available Space ---
+    // Fixed overhead: borders (n+1) + padding (2n)
+    const fixedOverhead = cleanedHeaders.length + 1 + cleanedHeaders.length * 2;
+    const availableWidth = Math.max(0, terminalWidth - fixedOverhead - 2);
 
-  // Use the TIGHTEST widths that fit the wrapped content + padding
-  const adjustedWidths = actualColumnWidths.map((w) => w + 2);
+    // --- Step 3: Allocation Algorithm ---
+    const totalMinWidth = constraints.reduce((sum, c) => sum + c.minWidth, 0);
+    let finalContentWidths: number[];
+
+    if (totalMinWidth > availableWidth) {
+      // Case A: Not enough space even for minimums.
+      // We must scale all the columns except the ones that are very short(<=5 characters)
+      const shortColumns = constraints.filter(
+        (c) => c.maxWidth <= MIN_COLUMN_WIDTH,
+      );
+      const totalShortColumnWidth = shortColumns.reduce(
+        (sum, c) => sum + c.minWidth,
+        0,
+      );
+
+      const finalTotalShortColumnWidth =
+        totalShortColumnWidth >= availableWidth ? 0 : totalShortColumnWidth;
+
+      const scale =
+        (availableWidth - finalTotalShortColumnWidth) /
+        (totalMinWidth - finalTotalShortColumnWidth);
+      finalContentWidths = constraints.map((c) => {
+        if (c.maxWidth <= MIN_COLUMN_WIDTH && finalTotalShortColumnWidth > 0) {
+          return c.minWidth;
+        }
+        return Math.floor(c.minWidth * scale);
+      });
+    } else {
+      // Case B: We have space! Distribute the surplus.
+      const surplus = availableWidth - totalMinWidth;
+      const totalGrowthNeed = constraints.reduce(
+        (sum, c) => sum + (c.maxWidth - c.minWidth),
+        0,
+      );
+
+      if (totalGrowthNeed === 0) {
+        finalContentWidths = constraints.map((c) => c.minWidth);
+      } else {
+        finalContentWidths = constraints.map((c) => {
+          const growthNeed = c.maxWidth - c.minWidth;
+          const share = growthNeed / totalGrowthNeed;
+          const extra = Math.floor(surplus * share);
+          return Math.min(c.maxWidth, c.minWidth + extra);
+        });
+      }
+    }
+
+    // --- Step 4: Pre-wrap and Optimize Widths ---
+    const actualColumnWidths = new Array(cleanedHeaders.length).fill(0);
+
+    const wrapAndProcessRow = (row: string[]) => {
+      const rowResult: ProcessedLine[][] = [];
+      row.forEach((cell, colIndex) => {
+        const allocatedWidth = finalContentWidths[colIndex];
+        const contentWidth = Math.max(1, allocatedWidth);
+
+        const contentStyledChars = toStyledCharacters(cell);
+        const wrappedStyledLines = wrapStyledChars(
+          contentStyledChars,
+          contentWidth,
+        );
+
+        const maxLineWidth = widestLineFromStyledChars(wrappedStyledLines);
+        actualColumnWidths[colIndex] = Math.max(
+          actualColumnWidths[colIndex],
+          maxLineWidth,
+        );
+
+        const lines = wrappedStyledLines.map((line) => ({
+          text: styledCharsToString(line),
+          width: styledCharsWidth(line),
+        }));
+        rowResult.push(lines);
+      });
+      return rowResult;
+    };
+
+    const wrappedHeaders = wrapAndProcessRow(cleanedHeaders);
+    const wrappedRows = rows.map((row) => wrapAndProcessRow(row));
+
+    // Use the TIGHTEST widths that fit the wrapped content + padding
+    const adjustedWidths = actualColumnWidths.map((w) => w + 2);
+
+    return { wrappedHeaders, wrappedRows, adjustedWidths };
+  }, [cleanedHeaders, rows, terminalWidth]);
 
   // Helper function to render a cell with proper width
   const renderCell = (
-    content: string,
+    content: ProcessedLine,
     width: number,
     isHeader = false,
   ): React.ReactNode => {
     const contentWidth = Math.max(0, width - 2);
-    const styledChars = toStyledCharacters(content);
-    const displayWidth = styledCharsWidth(styledChars);
+    // Use pre-calculated width to avoid re-parsing
+    const displayWidth = content.width;
     const paddingNeeded = Math.max(0, contentWidth - displayWidth);
 
     return (
       <Text>
         {isHeader ? (
           <Text bold color={theme.text.link}>
-            <RenderInline text={content} />
+            <RenderInline text={content.text} />
           </Text>
         ) : (
-          <RenderInline text={content} />
+          <RenderInline text={content.text} />
         )}
         {' '.repeat(paddingNeeded)}
       </Text>
@@ -202,12 +212,12 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
 
   // Helper function to render a single visual line of a row
   const renderVisualRow = (
-    cells: string[],
+    cells: ProcessedLine[],
     isHeader = false,
   ): React.ReactNode => {
     const renderedCells = cells.map((cell, index) => {
       const width = adjustedWidths[index] || 0;
-      return renderCell(cell || '', width, isHeader);
+      return renderCell(cell, width, isHeader);
     });
 
     return (
@@ -228,7 +238,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
 
   // Handles the wrapping logic for a logical data row
   const renderDataRow = (
-    wrappedCells: string[][],
+    wrappedCells: ProcessedLine[][],
     rowIndex: number,
     isHeader = false,
   ): React.ReactNode => {
@@ -236,7 +246,9 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
 
     const visualRows: React.ReactNode[] = [];
     for (let i = 0; i < maxHeight; i++) {
-      const visualRowCells = wrappedCells.map((lines) => lines[i] || '');
+      const visualRowCells = wrappedCells.map(
+        (lines) => lines[i] || { text: '', width: 0 },
+      );
       visualRows.push(
         <React.Fragment key={`${rowIndex}-${i}`}>
           {renderVisualRow(visualRowCells, isHeader)}
