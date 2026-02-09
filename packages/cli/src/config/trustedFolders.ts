@@ -15,6 +15,7 @@ import {
   ideContextStore,
   GEMINI_DIR,
   homedir,
+  isHeadlessMode,
   coreEvents,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
@@ -354,6 +355,10 @@ export function isWorkspaceTrusted(
   workspaceDir: string = process.cwd(),
   trustConfig?: Record<string, TrustLevel>,
 ): TrustResult {
+  if (isHeadlessMode()) {
+    return { isTrusted: true, source: undefined };
+  }
+
   if (!isFolderTrustEnabled(settings)) {
     return { isTrusted: true, source: undefined };
   }
