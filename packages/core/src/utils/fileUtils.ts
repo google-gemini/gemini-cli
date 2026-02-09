@@ -610,14 +610,12 @@ export const TOOL_OUTPUTS_DIR = 'tool-outputs';
 
 export async function saveTruncatedToolOutput(
   content: string,
-  toolName: string,
   id: string | number, // Accept string (callId) or number (truncationId)
   projectTempDir: string,
   sessionId?: string,
 ): Promise<{ outputFile: string }> {
-  const safeToolName = sanitizeFilenamePart(toolName).toLowerCase();
   const safeId = sanitizeFilenamePart(id.toString()).toLowerCase();
-  const fileName = `${safeToolName}_${safeId}.txt`;
+  const fileName = `${safeId}.txt`;
 
   let toolOutputDir = path.join(projectTempDir, TOOL_OUTPUTS_DIR);
   if (sessionId) {

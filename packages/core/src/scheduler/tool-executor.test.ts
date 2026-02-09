@@ -215,7 +215,6 @@ describe('ToolExecutor', () => {
     // 4. Verify Truncation Logic
     expect(fileUtils.saveTruncatedToolOutput).toHaveBeenCalledWith(
       longOutput,
-      SHELL_TOOL_NAME,
       'call-trunc',
       expect.any(String), // temp dir
       'test-session-id', // session id from makeFakeConfig
