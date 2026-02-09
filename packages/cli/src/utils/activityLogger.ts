@@ -21,29 +21,6 @@ import WebSocket from 'ws';
 const ACTIVITY_ID_HEADER = 'x-activity-request-id';
 const MAX_BUFFER_SIZE = 100;
 
-/**
- * Parse a host:port string into its components.
- * Uses the URL constructor for robust handling of IPv4, IPv6, and hostnames.
- * Returns null for file paths or values without a valid port.
- */
-function parseHostPort(value: string): { host: string; port: number } | null {
-  if (value.startsWith('/') || value.startsWith('.')) return null;
-
-  try {
-    const url = new URL(`ws://${value}`);
-    if (!url.port) return null;
-
-    const port = parseInt(url.port, 10);
-    if (url.hostname && !isNaN(port) && port > 0 && port <= 65535) {
-      return { host: url.hostname, port };
-    }
-  } catch {
-    // Not a valid host:port
-  }
-
-  return null;
-}
-
 export interface NetworkLog {
   id: string;
   timestamp: number;
@@ -497,12 +474,15 @@ function setupNetworkLogging(
   host: string,
   port: number,
   config: Config,
+  onReconnectFailed?: () => void,
 ) {
   const buffer: Array<Record<string, unknown>> = [];
   let ws: WebSocket | null = null;
   let reconnectTimer: NodeJS.Timeout | null = null;
   let sessionId: string | null = null;
   let pingInterval: NodeJS.Timeout | null = null;
+  let reconnectAttempts = 0;
+  const MAX_RECONNECT_ATTEMPTS = 2;
 
   const connect = () => {
     try {
@@ -510,6 +490,7 @@ function setupNetworkLogging(
 
       ws.on('open', () => {
         debugLogger.debug(`WebSocket connected to ${host}:${port}`);
+        reconnectAttempts = 0;
         // Register with CLI's session ID
         sendMessage({
           type: 'register',
@@ -623,11 +604,20 @@ function setupNetworkLogging(
   const scheduleReconnect = () => {
     if (reconnectTimer) return;
 
+    reconnectAttempts++;
+    if (reconnectAttempts > MAX_RECONNECT_ATTEMPTS && onReconnectFailed) {
+      debugLogger.debug(
+        `WebSocket reconnect failed after ${MAX_RECONNECT_ATTEMPTS} attempts, promoting to server...`,
+      );
+      onReconnectFailed();
+      return;
+    }
+
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null;
       debugLogger.debug('Reconnecting WebSocket...');
       connect();
-    }, 5000);
+    }, 1000);
   };
 
   // Initial connection
@@ -648,41 +638,65 @@ function setupNetworkLogging(
   });
 }
 
+let bridgeAttached = false;
+
 /**
- * Registers the activity logger if debug mode and interactive session are enabled.
- * Captures network and console logs to a session-specific JSONL file or sends to network.
- *
- * Environment variable GEMINI_CLI_ACTIVITY_LOG_TARGET controls the output:
- * - host:port format (e.g., "localhost:25417") → network mode (auto-enabled)
- * - file path (e.g., "/tmp/logs.jsonl") → file mode (immediate)
- * - not set → uses default file location in project temp logs dir
- *
- * @param config The CLI configuration
+ * Bridge coreEvents to the ActivityLogger singleton (guarded — only once).
  */
-export function registerActivityLogger(config: Config) {
-  const target = process.env['GEMINI_CLI_ACTIVITY_LOG_TARGET'];
-  const hostPort = target ? parseHostPort(target) : null;
-
-  // Network mode doesn't need storage; file mode does
-  if (!hostPort && !config.storage) {
-    return;
-  }
-
-  const capture = ActivityLogger.getInstance();
-  capture.enable();
-
-  if (hostPort) {
-    // Network mode: send logs via WebSocket
-    setupNetworkLogging(capture, hostPort.host, hostPort.port, config);
-    // Auto-enable network logging when target is explicitly configured
-    capture.enableNetworkLogging();
-  } else {
-    // File mode: write to JSONL file
-    setupFileLogging(capture, config, target);
-  }
-
-  // Bridge CoreEvents to local capture
+function bridgeCoreEvents(capture: ActivityLogger) {
+  if (bridgeAttached) return;
+  bridgeAttached = true;
   coreEvents.on(CoreEvent.ConsoleLog, (payload) => {
     capture.logConsole(payload);
   });
+}
+
+/**
+ * Initialize the activity logger with a specific transport mode.
+ *
+ * @param config  CLI configuration
+ * @param options Transport configuration: network (WebSocket) or file (JSONL)
+ */
+export function initActivityLogger(
+  config: Config,
+  options:
+    | {
+        mode: 'network';
+        host: string;
+        port: number;
+        onReconnectFailed?: () => void;
+      }
+    | { mode: 'file'; filePath?: string },
+): void {
+  const capture = ActivityLogger.getInstance();
+  capture.enable();
+
+  if (options.mode === 'network') {
+    setupNetworkLogging(
+      capture,
+      options.host,
+      options.port,
+      config,
+      options.onReconnectFailed,
+    );
+    capture.enableNetworkLogging();
+  } else {
+    setupFileLogging(capture, config, options.filePath);
+  }
+
+  bridgeCoreEvents(capture);
+}
+
+/**
+ * Add a network (WebSocket) transport to the existing ActivityLogger singleton.
+ * Used for promotion re-entry without re-bridging coreEvents.
+ */
+export function addNetworkTransport(
+  config: Config,
+  host: string,
+  port: number,
+  onReconnectFailed?: () => void,
+): void {
+  const capture = ActivityLogger.getInstance();
+  setupNetworkLogging(capture, host, port, config, onReconnectFailed);
 }

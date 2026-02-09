@@ -247,6 +247,7 @@ export class GeminiChat {
     private tools: Tool[] = [],
     private history: Content[] = [],
     resumedSessionData?: ResumedSessionData,
+    private readonly onModelChanged?: (modelId: string) => Promise<Tool[]>,
   ) {
     validateHistory(history);
     this.chatRecordingService = new ChatRecordingService(config);
@@ -580,6 +581,10 @@ export class GeminiChat {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           config.tools = toolSelectionResult.tools as Tool[];
         }
+      }
+
+      if (this.onModelChanged) {
+        this.tools = await this.onModelChanged(modelToUse);
       }
 
       // Track final request parameters for AfterModel hooks

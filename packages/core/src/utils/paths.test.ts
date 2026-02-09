@@ -42,7 +42,11 @@ describe('escapePath', () => {
     ['double quotes', 'file"name.txt', 'file\\"name.txt'],
     ['hash symbols', 'file#name.txt', 'file\\#name.txt'],
     ['exclamation marks', 'file!name.txt', 'file\\!name.txt'],
-    ['tildes', 'file~name.txt', 'file\\~name.txt'],
+    [
+      'tildes',
+      'file~name.txt',
+      process.platform === 'win32' ? 'file~name.txt' : 'file\\~name.txt',
+    ],
     [
       'less than and greater than signs',
       'file<name>.txt',
@@ -99,10 +103,15 @@ describe('escapePath', () => {
     expect(escapePath('')).toBe('');
   });
 
-  it('should handle paths with only special characters', () => {
-    expect(escapePath(' ()[]{};&|*?$`\'"#!~<>')).toBe(
-      '\\ \\(\\)\\[\\]\\{\\}\\;\\&\\|\\*\\?\\$\\`\\\'\\"\\#\\!\\~\\<\\>',
+  it('should handle paths with multiple special characters', () => {
+    expect(escapePath(' ()[]{};&|*?$`\'"#!<>')).toBe(
+      '\\ \\(\\)\\[\\]\\{\\}\\;\\&\\|\\*\\?\\$\\`\\\'\\"\\#\\!\\<\\>',
     );
+  });
+
+  it('should handle tildes based on platform', () => {
+    const expected = process.platform === 'win32' ? '~' : '\\~';
+    expect(escapePath('~')).toBe(expected);
   });
 });
 
@@ -130,12 +139,12 @@ describe('unescapePath', () => {
     );
   });
 
-  it('should handle all special characters', () => {
+  it('should handle all special characters but tilda', () => {
     expect(
       unescapePath(
-        '\\ \\(\\)\\[\\]\\{\\}\\;\\&\\|\\*\\?\\$\\`\\\'\\"\\#\\!\\~\\<\\>',
+        '\\ \\(\\)\\[\\]\\{\\}\\;\\&\\|\\*\\?\\$\\`\\\'\\"\\#\\!\\<\\>',
       ),
-    ).toBe(' ()[]{};&|*?$`\'"#!~<>');
+    ).toBe(' ()[]{};&|*?$`\'"#!<>');
   });
 
   it('should be the inverse of escapePath', () => {
