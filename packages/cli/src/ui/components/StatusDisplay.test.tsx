@@ -54,12 +54,6 @@ const createMockUIState = (overrides: UIStateOverrides = {}): UIState =>
     backgroundShellCount: 0,
     buffer: { text: '' },
     history: [{ id: 1, type: 'user', text: 'test' }],
-    quota: {
-      userTier: undefined,
-      stats: undefined,
-      proQuotaRequest: null,
-      validationRequest: null,
-    },
     ...overrides,
   }) as UIState;
 

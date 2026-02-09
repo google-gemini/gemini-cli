@@ -2367,11 +2367,7 @@ export class Config {
 
       if (isEnabled) {
         // Pass config and message bus to tools (required for policy engine integration)
-        if (
-          ToolClass === MemoryTool ||
-          ToolClass === AskUserTool ||
-          ToolClass === WriteTodosTool
-        ) {
+        if (ToolClass.length === 1) {
           const Constructor = ToolClass as new (
             bus: MessageBus,
           ) => AnyDeclarativeTool;

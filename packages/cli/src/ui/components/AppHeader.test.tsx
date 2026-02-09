@@ -27,12 +27,6 @@ describe('<AppHeader />', () => {
         warningText: '',
       },
       bannerVisible: true,
-      quota: {
-        userTier: undefined,
-        stats: undefined,
-        proQuotaRequest: null,
-        validationRequest: null,
-      },
     };
 
     const { lastFrame, unmount } = renderWithProviders(
@@ -57,12 +51,6 @@ describe('<AppHeader />', () => {
         warningText: 'There are capacity issues',
       },
       bannerVisible: true,
-      quota: {
-        userTier: undefined,
-        stats: undefined,
-        proQuotaRequest: null,
-        validationRequest: null,
-      },
     };
 
     const { lastFrame, unmount } = renderWithProviders(
@@ -86,12 +74,6 @@ describe('<AppHeader />', () => {
         defaultText: '',
         warningText: '',
       },
-      quota: {
-        userTier: undefined,
-        stats: undefined,
-        proQuotaRequest: null,
-        validationRequest: null,
-      },
     };
 
     const { lastFrame, unmount } = renderWithProviders(
@@ -114,12 +96,6 @@ describe('<AppHeader />', () => {
       bannerData: {
         defaultText: 'This is the default banner',
         warningText: '',
-      },
-      quota: {
-        userTier: undefined,
-        stats: undefined,
-        proQuotaRequest: null,
-        validationRequest: null,
       },
     };
 
@@ -153,12 +129,6 @@ describe('<AppHeader />', () => {
         defaultText: 'This is the default banner',
         warningText: '',
       },
-      quota: {
-        userTier: undefined,
-        stats: undefined,
-        proQuotaRequest: null,
-        validationRequest: null,
-      },
     };
 
     // Set tipsShown to 10 or more to prevent Tips from incrementing its count
@@ -191,12 +161,6 @@ describe('<AppHeader />', () => {
         warningText: '',
       },
       bannerVisible: true,
-      quota: {
-        userTier: undefined,
-        stats: undefined,
-        proQuotaRequest: null,
-        validationRequest: null,
-      },
     };
 
     const { lastFrame, unmount } = renderWithProviders(
@@ -220,12 +184,6 @@ describe('<AppHeader />', () => {
         warningText: '',
       },
       bannerVisible: true,
-      quota: {
-        userTier: undefined,
-        stats: undefined,
-        proQuotaRequest: null,
-        validationRequest: null,
-      },
     };
 
     persistentStateMock.setData({ tipsShown: 5 });
@@ -270,12 +228,6 @@ describe('<AppHeader />', () => {
         warningText: '',
       },
       bannerVisible: true,
-      quota: {
-        userTier: undefined,
-        stats: undefined,
-        proQuotaRequest: null,
-        validationRequest: null,
-      },
     };
 
     // First session

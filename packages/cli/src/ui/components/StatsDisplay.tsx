@@ -19,8 +19,6 @@ import {
   USER_AGREEMENT_RATE_MEDIUM,
   CACHE_EFFICIENCY_HIGH,
   CACHE_EFFICIENCY_MEDIUM,
-  QUOTA_THRESHOLD_HIGH,
-  QUOTA_THRESHOLD_MEDIUM,
 } from '../utils/displayUtils.js';
 import { computeSessionStats } from '../utils/computeStats.js';
 import {
@@ -31,6 +29,7 @@ import {
 } from '@google/gemini-cli-core';
 import { useSettings } from '../contexts/SettingsContext.js';
 import type { QuotaStats } from '../types.js';
+import { QuotaStatsInfo } from './QuotaStatsInfo.js';
 
 // A more flexible and powerful StatRow component
 interface StatRowProps {
@@ -195,28 +194,11 @@ const ModelUsageTable: React.FC<{
         pooledLimit !== undefined &&
         pooledLimit > 0 && (
           <Box flexDirection="column" marginTop={0} marginBottom={1}>
-            <Text
-              color={getStatusColor((pooledRemaining / pooledLimit) * 100, {
-                green: QUOTA_THRESHOLD_HIGH,
-                yellow: QUOTA_THRESHOLD_MEDIUM,
-              })}
-            >
-              {pooledRemaining === 0
-                ? `Limit reached`
-                : `${((pooledRemaining / pooledLimit) * 100).toFixed(0)}% usage remaining`}
-              {pooledResetTime && `, ${formatResetTime(pooledResetTime)}`}
-            </Text>
-            <Text color={theme.text.primary}>
-              Usage limit: {pooledLimit.toLocaleString()}
-            </Text>
-            <Text color={theme.text.primary}>
-              Usage limits span all sessions and reset daily.
-            </Text>
-            {pooledRemaining === 0 && (
-              <Text color={theme.text.primary}>
-                Please /auth to upgrade or switch to an API key to continue.
-              </Text>
-            )}
+            <QuotaStatsInfo
+              remaining={pooledRemaining}
+              limit={pooledLimit}
+              resetTime={pooledResetTime}
+            />
             <Text color={theme.text.primary}>
               For a full token breakdown, run `/stats model`.
             </Text>

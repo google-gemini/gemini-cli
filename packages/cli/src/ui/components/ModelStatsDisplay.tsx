@@ -7,7 +7,7 @@
 import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
-import { formatDuration, formatResetTime } from '../utils/formatters.js';
+import { formatDuration } from '../utils/formatters.js';
 import {
   calculateAverageLatency,
   calculateCacheHitRate,
@@ -17,12 +17,8 @@ import { useSessionStats } from '../contexts/SessionContext.js';
 import { Table, type Column } from './Table.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { getDisplayString, isAutoModel } from '@google/gemini-cli-core';
-import {
-  getStatusColor,
-  QUOTA_THRESHOLD_HIGH,
-  QUOTA_THRESHOLD_MEDIUM,
-} from '../utils/displayUtils.js';
 import type { QuotaStats } from '../types.js';
+import { QuotaStatsInfo } from './QuotaStatsInfo.js';
 
 interface StatRowData {
   metric: string;
@@ -283,30 +279,11 @@ export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
         pooledRemaining !== undefined &&
         pooledLimit !== undefined &&
         pooledLimit > 0 && (
-          <Box flexDirection="column" marginTop={0} marginBottom={0}>
-            <Text
-              color={getStatusColor((pooledRemaining / pooledLimit) * 100, {
-                green: QUOTA_THRESHOLD_HIGH,
-                yellow: QUOTA_THRESHOLD_MEDIUM,
-              })}
-            >
-              {pooledRemaining === 0
-                ? `Limit reached`
-                : `${((pooledRemaining / pooledLimit) * 100).toFixed(0)}% usage remaining`}
-              {pooledResetTime && `, ${formatResetTime(pooledResetTime)}`}
-            </Text>
-            <Text color={theme.text.primary}>
-              Usage limit: {pooledLimit.toLocaleString()}
-            </Text>
-            <Text color={theme.text.primary}>
-              Usage limits span all sessions and reset daily.
-            </Text>
-            {pooledRemaining === 0 && (
-              <Text color={theme.text.primary}>
-                Please /auth to upgrade or switch to an API key to continue.
-              </Text>
-            )}
-          </Box>
+          <QuotaStatsInfo
+            remaining={pooledRemaining}
+            limit={pooledLimit}
+            resetTime={pooledResetTime}
+          />
         )}
       {(showUserIdentity || isAuto) && <Box height={1} />}
 

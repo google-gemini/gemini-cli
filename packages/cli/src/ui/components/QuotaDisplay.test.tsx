@@ -7,7 +7,6 @@
 import { render } from '../../test-utils/render.js';
 import { describe, it, expect } from 'vitest';
 import { QuotaDisplay } from './QuotaDisplay.js';
-import stripAnsi from 'strip-ansi';
 
 describe('QuotaDisplay', () => {
   it('should not render when remaining is undefined', () => {
@@ -36,14 +35,12 @@ describe('QuotaDisplay', () => {
 
   it('should render yellow when usage < 20%', () => {
     const { lastFrame } = render(<QuotaDisplay remaining={15} limit={100} />);
-    const frame = lastFrame();
-    expect(stripAnsi(frame!)).toBe('/stats 15% usage remaining');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('should render red when usage < 5%', () => {
     const { lastFrame } = render(<QuotaDisplay remaining={4} limit={100} />);
-    const frame = lastFrame();
-    expect(stripAnsi(frame!)).toBe('/stats 4% usage remaining');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('should render with reset time when provided', () => {
@@ -51,8 +48,7 @@ describe('QuotaDisplay', () => {
     const { lastFrame } = render(
       <QuotaDisplay remaining={15} limit={100} resetTime={resetTime} />,
     );
-    const frame = lastFrame();
-    expect(stripAnsi(frame!)).toMatch(/\/stats 15% usage remaining, resets in/);
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('should NOT render reset time when terse is true', () => {
@@ -65,15 +61,13 @@ describe('QuotaDisplay', () => {
         terse={true}
       />,
     );
-    const frame = lastFrame();
-    expect(stripAnsi(frame!)).toBe('15%');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('should render terse limit reached message', () => {
     const { lastFrame } = render(
       <QuotaDisplay remaining={0} limit={100} terse={true} />,
     );
-    const frame = lastFrame();
-    expect(stripAnsi(frame!)).toBe('Limit reached');
+    expect(lastFrame()).toMatchSnapshot();
   });
 });

@@ -149,6 +149,7 @@ describe('<Footer />', () => {
       },
     });
     expect(lastFrame()).toContain('15%');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('hides the usage indicator when usage is not near limit', () => {
@@ -169,6 +170,28 @@ describe('<Footer />', () => {
       },
     });
     expect(lastFrame()).not.toContain('Usage remaining');
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('displays "Limit reached" message when remaining is 0', () => {
+    const { lastFrame } = renderWithProviders(<Footer />, {
+      width: 120,
+      uiState: {
+        sessionStats: mockSessionStats,
+        quota: {
+          userTier: undefined,
+          stats: {
+            remaining: 0,
+            limit: 100,
+            resetTime: undefined,
+          },
+          proQuotaRequest: null,
+          validationRequest: null,
+        },
+      },
+    });
+    expect(lastFrame()).toContain('Limit reached');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('displays the model name and abbreviated context percentage', () => {

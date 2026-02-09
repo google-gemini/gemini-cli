@@ -89,12 +89,6 @@ describe('App', () => {
       warningText: '',
     },
     backgroundShells: new Map(),
-    quota: {
-      userTier: undefined,
-      stats: undefined,
-      proQuotaRequest: null,
-      validationRequest: null,
-    },
   };
 
   it('should render main content and composer when not quitting', () => {

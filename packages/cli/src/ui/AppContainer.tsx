@@ -320,15 +320,16 @@ export const AppContainer = (props: AppContainerProps) => {
   const [currentModel, setCurrentModel] = useState(config.getModel());
 
   const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
-  const [quotaRemaining, setQuotaRemaining] = useState<number | undefined>(
-    config.getQuotaRemaining(),
-  );
-  const [quotaLimit, setQuotaLimit] = useState<number | undefined>(
-    config.getQuotaLimit(),
-  );
-  const [quotaResetTime, setQuotaResetTime] = useState<string | undefined>(
-    config.getQuotaResetTime(),
-  );
+  const [quotaStats, setQuotaStats] = useState<QuotaStats | undefined>(() => {
+    const remaining = config.getQuotaRemaining();
+    const limit = config.getQuotaLimit();
+    const resetTime = config.getQuotaResetTime();
+    return remaining !== undefined ||
+      limit !== undefined ||
+      resetTime !== undefined
+      ? { remaining, limit, resetTime }
+      : undefined;
+  });
 
   const [isConfigInitialized, setConfigInitialized] = useState(false);
 
@@ -436,9 +437,11 @@ export const AppContainer = (props: AppContainerProps) => {
       limit: number | undefined;
       resetTime?: string;
     }) => {
-      setQuotaRemaining(payload.remaining);
-      setQuotaLimit(payload.limit);
-      setQuotaResetTime(payload.resetTime);
+      setQuotaStats({
+        remaining: payload.remaining,
+        limit: payload.limit,
+        resetTime: payload.resetTime,
+      });
     };
 
     coreEvents.on(CoreEvent.ModelChanged, handleModelChanged);
@@ -1893,16 +1896,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       currentModel,
       quota: {
         userTier,
-        stats:
-          quotaRemaining !== undefined ||
-          quotaLimit !== undefined ||
-          quotaResetTime !== undefined
-            ? {
-                remaining: quotaRemaining,
-                limit: quotaLimit,
-                resetTime: quotaResetTime,
-              }
-            : undefined,
+        stats: quotaStats,
         proQuotaRequest,
         validationRequest,
       },
@@ -2010,9 +2004,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       queueErrorMessage,
       showApprovalModeIndicator,
       userTier,
-      quotaRemaining,
-      quotaLimit,
-      quotaResetTime,
+      quotaStats,
       proQuotaRequest,
       validationRequest,
       contextFileNames,
