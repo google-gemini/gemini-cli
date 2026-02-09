@@ -371,6 +371,7 @@ function constructInitialQuery(
 async function readMcpResources(
   resourceParts: AtCommandPart[],
   config: Config,
+  signal: AbortSignal,
 ): Promise<{
   parts: PartUnion[];
   displays: IndividualToolCallDisplay[];
@@ -396,7 +397,7 @@ async function readMcpResources(
           `MCP client for server '${resource.serverName}' is not available or not connected.`,
         );
       }
-      const response = await client.readResource(resource.uri);
+      const response = await client.readResource(resource.uri, { signal });
       const resourceParts = convertResourceContentsToParts(response);
       return {
         success: true,
@@ -665,7 +666,7 @@ export async function handleAtCommand({
   }
 
   const [mcpResult, fileResult] = await Promise.all([
-    readMcpResources(resourceParts, config),
+    readMcpResources(resourceParts, config, signal),
     readLocalFiles(resolvedFiles, config, signal, userMessageTimestamp),
   ]);
 

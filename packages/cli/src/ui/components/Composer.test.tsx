@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { render } from '../../test-utils/render.js';
-import { Text } from 'ink';
+import { Box, Text } from 'ink';
 import { Composer } from './Composer.js';
 import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
 import {
@@ -164,6 +164,7 @@ const createMockConfig = (overrides = {}) => ({
   getDebugMode: vi.fn(() => false),
   getAccessibility: vi.fn(() => ({})),
   getMcpServers: vi.fn(() => ({})),
+  isPlanEnabled: vi.fn(() => false),
   getToolRegistry: () => ({
     getTool: vi.fn(),
   }),
@@ -485,16 +486,24 @@ describe('Composer', () => {
       expect(lastFrame()).not.toContain('InputPrompt');
     });
 
-    it('shows ApprovalModeIndicator when approval mode is not default and shell mode is inactive', () => {
-      const uiState = createMockUIState({
-        showApprovalModeIndicator: ApprovalMode.YOLO,
-        shellModeActive: false,
-      });
+    it.each([
+      [ApprovalMode.DEFAULT],
+      [ApprovalMode.AUTO_EDIT],
+      [ApprovalMode.PLAN],
+      [ApprovalMode.YOLO],
+    ])(
+      'shows ApprovalModeIndicator when approval mode is %s and shell mode is inactive',
+      (mode) => {
+        const uiState = createMockUIState({
+          showApprovalModeIndicator: mode,
+          shellModeActive: false,
+        });
 
-      const { lastFrame } = renderComposer(uiState);
+        const { lastFrame } = renderComposer(uiState);
 
-      expect(lastFrame()).toMatch(/ApprovalModeIndic[\s\S]*ator/);
-    });
+        expect(lastFrame()).toMatch(/ApprovalModeIndic[\s\S]*ator/);
+      },
+    );
 
     it('shows ShellModeIndicator when shell mode is active', () => {
       const uiState = createMockUIState({
@@ -587,6 +596,31 @@ describe('Composer', () => {
       expect(lastFrame()).toContain(
         "InputPrompt:   Press 'i' for INSERT mode.",
       );
+    });
+  });
+
+  describe('Shortcuts Hint', () => {
+    it('hides shortcuts hint when a action is required (e.g. dialog is open)', () => {
+      const uiState = createMockUIState({
+        customDialog: (
+          <Box>
+            <Text>Test Dialog</Text>
+            <Text>Test Content</Text>
+          </Box>
+        ),
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).not.toContain('ShortcutsHint');
+    });
+
+    it('keeps shortcuts hint visible when no action is required', () => {
+      const uiState = createMockUIState();
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).toContain('ShortcutsHint');
     });
   });
 });

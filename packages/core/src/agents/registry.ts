@@ -21,7 +21,7 @@ import {
   type ModelConfig,
   ModelConfigService,
 } from '../services/modelConfigService.js';
-import { PolicyDecision } from '../policy/types.js';
+import { PolicyDecision, PRIORITY_SUBAGENT_TOOL } from '../policy/types.js';
 
 /**
  * Returns the model config alias for a given agent definition.
@@ -297,7 +297,7 @@ export class AgentRegistry {
         definition.kind === 'local'
           ? PolicyDecision.ALLOW
           : PolicyDecision.ASK_USER,
-      priority: 1.05,
+      priority: PRIORITY_SUBAGENT_TOOL,
       source: 'AgentRegistry (Dynamic)',
     });
   }
@@ -480,38 +480,5 @@ export class AgentRegistry {
    */
   getDiscoveredDefinition(name: string): AgentDefinition | undefined {
     return this.allDefinitions.get(name);
-  }
-
-  /**
-   * Generates a markdown "Phone Book" of available agents and their schemas.
-   * This MUST be injected into the System Prompt of the parent agent.
-   */
-  getDirectoryContext(): string {
-    if (this.agents.size === 0) {
-      return 'No sub-agents are currently available.';
-    }
-
-    let context = '## Available Sub-Agents\n';
-    context += `Sub-agents are specialized expert agents that you can use to assist you in
-      the completion of all or part of a task.
-
-      Each sub-agent is available as a tool of the same name.
-
-      You MUST always delegate tasks to the sub-agent with the
-      relevant expertise, if one is available.
-
-      The following tools can be used to start sub-agents:\n\n`;
-
-    for (const [name] of this.agents) {
-      context += `- ${name}\n`;
-    }
-
-    context += `Remember that the closest relevant sub-agent should still be used even if its expertise is broader than the given task.
-
-    For example:
-    - A license-agent -> Should be used for a range of tasks, including reading, validating, and updating licenses and headers.
-    - A test-fixing-agent -> Should be used both for fixing tests as well as investigating test failures.`;
-
-    return context;
   }
 }
