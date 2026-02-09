@@ -1514,6 +1514,15 @@ const SETTINGS_SCHEMA = {
         description: 'Enable requesting and fetching of extension settings.',
         showInDialog: false,
       },
+      extensionRegistry: {
+        type: 'boolean',
+        label: 'Extension Registry Explore UI',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable extension registry explore UI.',
+        showInDialog: false,
+      },
       extensionReloading: {
         type: 'boolean',
         label: 'Extension Reloading',
