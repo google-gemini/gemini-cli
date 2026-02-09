@@ -1376,7 +1376,7 @@ export const useGeminiStream = (
         // Process pending tool calls sequentially to reduce UI chaos
         for (const call of awaitingApprovalCalls) {
           const details = call.confirmationDetails;
-          if ('onConfirm' in details) {
+          if (details && 'onConfirm' in details) {
             try {
               await details.onConfirm(ToolConfirmationOutcome.ProceedOnce);
             } catch (error) {
