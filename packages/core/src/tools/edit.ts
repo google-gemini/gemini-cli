@@ -167,7 +167,7 @@ async function calculateFlexibleReplacement(
     if (isMatch) {
       flexibleOccurrences++;
       const firstLineInMatch = window[0];
-      const indentationMatch = firstLineInMatch.match(/^(\s*)/);
+      const indentationMatch = firstLineInMatch.match(/^([ \t]*)/);
       const indentation = indentationMatch ? indentationMatch[1] : '';
       const newBlockWithIndent = replaceLines.map(
         (line: string) => `${indentation}${line}`,
@@ -229,7 +229,7 @@ async function calculateRegexReplacement(
 
   // The final pattern captures leading whitespace (indentation) and then matches the token pattern.
   // 'm' flag enables multi-line mode, so '^' matches the start of any line.
-  const finalPattern = `^(\\s*)${pattern}`;
+  const finalPattern = `^([ \t]*)${pattern}`;
   const flexibleRegex = new RegExp(finalPattern, 'm');
 
   const match = flexibleRegex.exec(currentContent);
