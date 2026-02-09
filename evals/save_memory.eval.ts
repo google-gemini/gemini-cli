@@ -109,7 +109,7 @@ describe('save_memory', () => {
     params: {
       settings: { tools: { core: ['save_memory'] } },
     },
-    prompt: `My dog's name is Buddy. What is my dog's name?`,
+    prompt: `Please remember that my dog's name is Buddy.`,
     assert: async (rig, result) => {
       const wasToolCalled = await rig.waitForToolCall('save_memory');
       expect(wasToolCalled, 'Expected save_memory tool to be called').toBe(
@@ -145,25 +145,34 @@ describe('save_memory', () => {
     },
   });
 
-  const rememberingDbSchemaLocation =
-    "Agent remembers project's database schema location";
+  const ignoringDbSchemaLocation =
+    "Agent ignores workspace's database schema location";
   evalTest('ALWAYS_PASSES', {
-    name: rememberingDbSchemaLocation,
+    name: ignoringDbSchemaLocation,
     params: {
-      settings: { tools: { core: ['save_memory'] } },
+      settings: {
+        tools: {
+          core: [
+            'save_memory',
+            'list_directory',
+            'read_file',
+            'run_shell_command',
+          ],
+        },
+      },
     },
-    prompt: `The database schema for this project is located in \`db/schema.sql\`.`,
+    prompt: `The database schema for this workspace is located in \`db/schema.sql\`.`,
     assert: async (rig, result) => {
-      const wasToolCalled = await rig.waitForToolCall('save_memory');
-      expect(wasToolCalled, 'Expected save_memory tool to be called').toBe(
-        true,
-      );
+      await rig.waitForTelemetryReady();
+      const wasToolCalled = rig
+        .readToolLogs()
+        .some((log) => log.toolRequest.name === 'save_memory');
+      expect(
+        wasToolCalled,
+        'save_memory should not be called for workspace-specific information',
+      ).toBe(false);
 
       assertModelHasOutput(result);
-      checkModelOutputContent(result, {
-        expectedContent: [/database schema|ok|remember|will do/i],
-        testName: `${TEST_PREFIX}${rememberingDbSchemaLocation}`,
-      });
     },
   });
 
@@ -189,38 +198,74 @@ describe('save_memory', () => {
     },
   });
 
-  const rememberingTestCommand =
-    'Agent remembers specific project test command';
+  const ignoringBuildArtifactLocation =
+    'Agent ignores workspace build artifact location';
   evalTest('ALWAYS_PASSES', {
-    name: rememberingTestCommand,
+    name: ignoringBuildArtifactLocation,
     params: {
-      settings: { tools: { core: ['save_memory'] } },
+      settings: {
+        tools: {
+          core: [
+            'save_memory',
+            'list_directory',
+            'read_file',
+            'run_shell_command',
+          ],
+        },
+      },
     },
-    prompt: `The command to run all backend tests is \`npm run test:backend\`.`,
+    prompt: `In this workspace, build artifacts are stored in the \`dist/artifacts\` directory.`,
     assert: async (rig, result) => {
-      const wasToolCalled = await rig.waitForToolCall('save_memory');
-      expect(wasToolCalled, 'Expected save_memory tool to be called').toBe(
-        true,
-      );
+      await rig.waitForTelemetryReady();
+      const wasToolCalled = rig
+        .readToolLogs()
+        .some((log) => log.toolRequest.name === 'save_memory');
+      expect(
+        wasToolCalled,
+        'save_memory should not be called for workspace-specific information',
+      ).toBe(false);
 
       assertModelHasOutput(result);
-      checkModelOutputContent(result, {
-        expectedContent: [
-          /command to run all backend tests|ok|remember|will do/i,
-        ],
-        testName: `${TEST_PREFIX}${rememberingTestCommand}`,
-      });
     },
   });
 
-  const rememberingMainEntryPoint =
-    "Agent remembers project's main entry point";
+  const ignoringMainEntryPoint = "Agent ignores workspace's main entry point";
   evalTest('ALWAYS_PASSES', {
-    name: rememberingMainEntryPoint,
+    name: ignoringMainEntryPoint,
+    params: {
+      settings: {
+        tools: {
+          core: [
+            'save_memory',
+            'list_directory',
+            'read_file',
+            'run_shell_command',
+          ],
+        },
+      },
+    },
+    prompt: `The main entry point for this workspace is \`src/index.js\`.`,
+    assert: async (rig, result) => {
+      await rig.waitForTelemetryReady();
+      const wasToolCalled = rig
+        .readToolLogs()
+        .some((log) => log.toolRequest.name === 'save_memory');
+      expect(
+        wasToolCalled,
+        'save_memory should not be called for workspace-specific information',
+      ).toBe(false);
+
+      assertModelHasOutput(result);
+    },
+  });
+
+  const rememberingBirthday = "Agent remembers user's birthday";
+  evalTest('ALWAYS_PASSES', {
+    name: rememberingBirthday,
     params: {
       settings: { tools: { core: ['save_memory'] } },
     },
-    prompt: `The main entry point for this project is \`src/index.js\`.`,
+    prompt: `My birthday is on June 15th.`,
     assert: async (rig, result) => {
       const wasToolCalled = await rig.waitForToolCall('save_memory');
       expect(wasToolCalled, 'Expected save_memory tool to be called').toBe(
@@ -229,10 +274,8 @@ describe('save_memory', () => {
 
       assertModelHasOutput(result);
       checkModelOutputContent(result, {
-        expectedContent: [
-          /main entry point for this project|ok|remember|will do/i,
-        ],
-        testName: `${TEST_PREFIX}${rememberingMainEntryPoint}`,
+        expectedContent: [/June 15th|ok|remember|will do/i],
+        testName: `${TEST_PREFIX}${rememberingBirthday}`,
       });
     },
   });
