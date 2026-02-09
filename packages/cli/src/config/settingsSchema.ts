@@ -195,7 +195,16 @@ const SETTINGS_SCHEMA = {
           { value: 'default', label: 'Default' },
           { value: 'auto_edit', label: 'Auto Edit' },
           { value: 'plan', label: 'Plan' },
-        ],
+        ]
+      },
+      devtools: {
+        type: 'boolean',
+        label: 'DevTools',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        description: 'Enable DevTools inspector on launch.',
+        showInDialog: false,
       },
       enableAutoUpdate: {
         type: 'boolean',

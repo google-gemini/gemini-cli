@@ -39,7 +39,7 @@ import type { LoadedSettings } from './config/settings.js';
 vi.mock('./ui/hooks/atCommandProcessor.js');
 
 const mockRegisterActivityLogger = vi.hoisted(() => vi.fn());
-vi.mock('./utils/activityLogger.js', () => ({
+vi.mock('./utils/devtoolsService.js', () => ({
   registerActivityLogger: mockRegisterActivityLogger,
 }));
 

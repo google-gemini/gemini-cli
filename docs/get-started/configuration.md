@@ -112,6 +112,9 @@ their corresponding top-level category object in your `settings.json` file.
     read-only mode. 'yolo' is not supported yet.
   - **Default:** `"default"`
   - **Values:** `"default"`, `"auto_edit"`, `"plan"`
+- **`general.devtools`** (boolean):
+  - **Description:** Enable DevTools inspector on launch.
+  - **Default:** `false`
 
 - **`general.enableAutoUpdate`** (boolean):
   - **Description:** Enable automatic updates.
