@@ -95,6 +95,10 @@ organization.
     allowlist, the admin’s rules are used exclusively. If both are undefined in
     the admin allowlist, the client falls back to the user’s local tool
     settings.
+  - **Cleared Fields**: To ensure security and consistency, the client
+    automatically clears local execution fields (`command`, `args`, `env`,
+    `cwd`, `httpUrl`, `tcp`). This prevents users from overriding the connection
+    method.
   - **Other Fields**: All other MCP fields are pulled from the user’s local
     configuration.
 - **Missing Allowlisted Servers**: If a server appears in the admin allowlist
