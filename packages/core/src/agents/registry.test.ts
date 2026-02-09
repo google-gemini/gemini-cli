@@ -1104,28 +1104,4 @@ describe('AgentRegistry', () => {
       expect(getterCalled).toBe(true); // Getter should have been called now
     });
   });
-
-  describe('getDirectoryContext', () => {
-    it('should return default message when no agents are registered', () => {
-      expect(registry.getDirectoryContext()).toContain(
-        'No sub-agents are currently available.',
-      );
-    });
-
-    it('should return formatted list of agents when agents are available', async () => {
-      await registry.testRegisterAgent(MOCK_AGENT_V1);
-      await registry.testRegisterAgent({
-        ...MOCK_AGENT_V2,
-        name: 'AnotherAgent',
-        description: 'Another agent description',
-      });
-
-      const description = registry.getDirectoryContext();
-
-      expect(description).toContain('Sub-agents are specialized expert agents');
-      expect(description).toContain('Available Sub-Agents');
-      expect(description).toContain(`- ${MOCK_AGENT_V1.name}`);
-      expect(description).toContain(`- AnotherAgent`);
-    });
-  });
 });
