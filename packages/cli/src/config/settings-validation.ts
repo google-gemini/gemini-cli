@@ -12,6 +12,161 @@ import {
   SETTINGS_SCHEMA_DEFINITIONS,
 } from './settingsSchema.js';
 
+/**
+ * Calculates the Levenshtein distance between two strings.
+ * This measures the minimum number of single-character edits (insertions,
+ * deletions, or substitutions) required to transform one string into another.
+ */
+function levenshteinDistance(a: string, b: string): number {
+  const matrix: number[][] = [];
+
+  // Initialize the matrix
+  for (let i = 0; i <= a.length; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= b.length; j++) {
+    matrix[0][j] = j;
+  }
+
+  // Fill in the matrix
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1, // deletion
+        matrix[i][j - 1] + 1, // insertion
+        matrix[i - 1][j - 1] + cost, // substitution
+      );
+    }
+  }
+
+  return matrix[a.length][b.length];
+}
+
+/**
+ * Recursively finds unknown keys in the settings data.
+ * Returns an array of { path, unknownKey, validKeys } objects.
+ */
+function findUnknownKeys(
+  data: Record<string, unknown>,
+  schema: Record<string, SettingDefinition>,
+  prefix = '',
+): Array<{ path: string; unknownKey: string; validKeys: string[] }> {
+  const unknown: Array<{
+    path: string;
+    unknownKey: string;
+    validKeys: string[];
+  }> = [];
+  const validKeysAtThisLevel = Object.keys(schema);
+
+  for (const key of Object.keys(data)) {
+    if (!(key in schema)) {
+      unknown.push({
+        path: prefix || '(root)',
+        unknownKey: key,
+        validKeys: validKeysAtThisLevel,
+      });
+    } else {
+      const definition = schema[key];
+      const value = data[key];
+      // Recurse into nested objects
+      if (
+        definition.type === 'object' &&
+        definition.properties &&
+        value &&
+        typeof value === 'object' &&
+        !Array.isArray(value)
+      ) {
+        const nestedPath = prefix ? `${prefix}.${key}` : key;
+        const nested = findUnknownKeys(
+          value as Record<string, unknown>,
+          definition.properties as Record<string, SettingDefinition>,
+          nestedPath,
+        );
+        unknown.push(...nested);
+      }
+    }
+  }
+
+  return unknown;
+}
+
+/**
+ * Threshold for considering a key as a potential typo.
+ * A Levenshtein distance of 1-2 typically indicates a typo.
+ */
+const TYPO_DISTANCE_THRESHOLD = 2;
+
+export interface TypoWarning {
+  path: string;
+  unknownKey: string;
+  suggestedKey: string;
+  distance: number;
+}
+
+/**
+ * Detects potential typos in settings by finding unknown keys that are
+ * similar to valid keys using Levenshtein distance.
+ */
+export function detectSettingsTypos(data: unknown): TypoWarning[] {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    return [];
+  }
+
+  const schema = getSettingsSchema() as Record<string, SettingDefinition>;
+  const unknownKeys = findUnknownKeys(data as Record<string, unknown>, schema);
+  const warnings: TypoWarning[] = [];
+
+  for (const { path, unknownKey, validKeys } of unknownKeys) {
+    let bestMatch: { key: string; distance: number } | null = null;
+
+    for (const validKey of validKeys) {
+      const distance = levenshteinDistance(
+        unknownKey.toLowerCase(),
+        validKey.toLowerCase(),
+      );
+
+      if (
+        distance <= TYPO_DISTANCE_THRESHOLD &&
+        (!bestMatch || distance < bestMatch.distance)
+      ) {
+        bestMatch = { key: validKey, distance };
+      }
+    }
+
+    if (bestMatch) {
+      warnings.push({
+        path,
+        unknownKey,
+        suggestedKey: bestMatch.key,
+        distance: bestMatch.distance,
+      });
+    }
+  }
+
+  return warnings;
+}
+
+/**
+ * Formats typo warnings into a human-readable message.
+ */
+export function formatTypoWarnings(warnings: TypoWarning[]): string {
+  if (warnings.length === 0) {
+    return '';
+  }
+
+  const lines: string[] = ['Possible typos detected in settings:'];
+
+  for (const warning of warnings) {
+    const location = warning.path === '(root)' ? '' : `${warning.path}.`;
+    lines.push(
+      `  - "${location}${warning.unknownKey}" - did you mean "${location}${warning.suggestedKey}"?`,
+    );
+  }
+
+  return lines.join('\n');
+}
+
 // Helper to build Zod schema from the JSON-schema-like definitions
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function buildZodSchemaFromJsonSchema(def: any): z.ZodTypeAny {
@@ -37,9 +192,8 @@ function buildZodSchemaFromJsonSchema(def: any): z.ZodTypeAny {
   }
 
   if (def.type === 'object') {
-    let schema;
+    const shape: Record<string, z.ZodTypeAny> = {};
     if (def.properties) {
-      const shape: Record<string, z.ZodTypeAny> = {};
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       for (const [key, propDef] of Object.entries(def.properties) as any) {
         let propSchema = buildZodSchemaFromJsonSchema(propDef);
@@ -54,20 +208,23 @@ function buildZodSchemaFromJsonSchema(def: any): z.ZodTypeAny {
         }
         shape[key] = propSchema;
       }
-      schema = z.object(shape).passthrough();
-    } else {
-      schema = z.object({}).passthrough();
     }
 
-    if (def.additionalProperties === false) {
-      schema = schema.strict();
-    } else if (typeof def.additionalProperties === 'object') {
-      schema = schema.catchall(
+    // Build object schema and apply the appropriate additional properties handling.
+    // These methods are mutually exclusive, so we apply exactly one.
+    const baseSchema = z.object(shape);
+
+    if (typeof def.additionalProperties === 'object') {
+      // additionalProperties is a schema - use catchall to validate additional props
+      return baseSchema.catchall(
         buildZodSchemaFromJsonSchema(def.additionalProperties),
       );
     }
 
-    return schema;
+    // For both additionalProperties: false and additionalProperties: undefined,
+    // use passthrough to allow unknown keys silently. This enables forward
+    // compatibility when users have deprecated keys or typos in their settings.
+    return baseSchema.passthrough();
   }
 
   return z.unknown();

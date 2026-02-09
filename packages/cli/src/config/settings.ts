@@ -48,6 +48,8 @@ import { updateSettingsFilePreservingFormat } from '../utils/commentJson.js';
 import {
   validateSettings,
   formatValidationError,
+  detectSettingsTypos,
+  formatTypoWarnings,
 } from './settings-validation.js';
 
 export function getMergeStrategyForPath(
@@ -628,6 +630,17 @@ export function loadSettings(
           );
           settingsErrors.push({
             message: errorMessage,
+            path: filePath,
+            severity: 'warning',
+          });
+        }
+
+        // Check for potential typos in unknown keys
+        const typoWarnings = detectSettingsTypos(settingsObject);
+        if (typoWarnings.length > 0) {
+          const typoMessage = formatTypoWarnings(typoWarnings);
+          settingsErrors.push({
+            message: `${filePath}:\n${typoMessage}`,
             path: filePath,
             severity: 'warning',
           });
