@@ -19,10 +19,7 @@ export {
   type AnsiLine,
   type AnsiToken,
 } from './src/utils/terminalSerializer.js';
-export {
-  DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
-  DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
-} from './src/config/config.js';
+export { DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD } from './src/config/config.js';
 export { detectIdeFromEnv } from './src/ide/detect-ide.js';
 export {
   logExtensionEnable,
@@ -49,4 +46,5 @@ export * from './src/utils/googleQuotaErrors.js';
 export type { GoogleApiError } from './src/utils/googleErrors.js';
 export { getCodeAssistServer } from './src/code_assist/codeAssist.js';
 export { getExperiments } from './src/code_assist/experiments/experiments.js';
+export { ExperimentFlags } from './src/code_assist/experiments/flagNames.js';
 export { getErrorStatus, ModelNotFoundError } from './src/utils/httpErrors.js';

@@ -15,7 +15,6 @@ import { ToolErrorType } from '../tools/tool-error.js';
 import { BINARY_EXTENSIONS } from './ignorePatterns.js';
 import { createRequire as createModuleRequire } from 'node:module';
 import { debugLogger } from './debugLogger.js';
-import { READ_FILE_TOOL_NAME } from '../tools/tool-names.js';
 
 const requireModule = createModuleRequire(import.meta.url);
 
@@ -230,6 +229,55 @@ export function isWithinRoot(
 }
 
 /**
+ * Safely resolves a path to its real path if it exists, otherwise returns the absolute resolved path.
+ */
+export function getRealPath(filePath: string): string {
+  try {
+    return fs.realpathSync(filePath);
+  } catch {
+    return path.resolve(filePath);
+  }
+}
+
+/**
+ * Checks if a file's content is empty or contains only whitespace.
+ * Efficiently checks file size first, and only samples the beginning of the file.
+ * Honors Unicode BOM encodings.
+ */
+export async function isEmpty(filePath: string): Promise<boolean> {
+  try {
+    const stats = await fsPromises.stat(filePath);
+    if (stats.size === 0) return true;
+
+    // Sample up to 1KB to check for non-whitespace content.
+    // If a file is larger than 1KB and contains only whitespace,
+    // it's an extreme edge case we can afford to read slightly more of if needed,
+    // but for most valid plans/files, this is sufficient.
+    const fd = await fsPromises.open(filePath, 'r');
+    try {
+      const { buffer } = await fd.read({
+        buffer: Buffer.alloc(Math.min(1024, stats.size)),
+        offset: 0,
+        length: Math.min(1024, stats.size),
+        position: 0,
+      });
+
+      const bom = detectBOM(buffer);
+      const content = bom
+        ? buffer.subarray(bom.bomLength).toString('utf8')
+        : buffer.toString('utf8');
+
+      return content.trim().length === 0;
+    } finally {
+      await fd.close();
+    }
+  } catch {
+    // If file is unreadable, we treat it as empty/invalid for validation purposes
+    return true;
+  }
+}
+
+/**
  * Heuristic: determine if a file is likely binary.
  * Now BOM-aware: if a Unicode BOM is detected, we treat it as text.
  * For non-BOM files, retain the existing null-byte and non-printable ratio checks.
@@ -307,11 +355,15 @@ export async function detectFileType(
     if (lookedUpMimeType.startsWith('image/')) {
       return 'image';
     }
-    if (lookedUpMimeType.startsWith('audio/')) {
-      return 'audio';
-    }
-    if (lookedUpMimeType.startsWith('video/')) {
-      return 'video';
+    // Verify audio/video with content check to avoid MIME misidentification (#16888)
+    if (
+      lookedUpMimeType.startsWith('audio/') ||
+      lookedUpMimeType.startsWith('video/')
+    ) {
+      if (!(await isBinaryFile(filePath))) {
+        return 'text';
+      }
+      return lookedUpMimeType.startsWith('audio/') ? 'audio' : 'video';
     }
     if (lookedUpMimeType === 'application/pdf') {
       return 'pdf';
@@ -517,66 +569,65 @@ export async function fileExists(filePath: string): Promise<boolean> {
   }
 }
 
-export async function saveTruncatedContent(
+/**
+ * Sanitizes a string for use as a filename part by removing path traversal
+ * characters and other non-alphanumeric characters.
+ */
+export function sanitizeFilenamePart(part: string): string {
+  return part.replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+/**
+ * Formats a truncated message for tool output.
+ * Shows the first 20% and last 80% of the allowed characters with a marker in between.
+ */
+export function formatTruncatedToolOutput(
+  contentStr: string,
+  outputFile: string,
+  maxChars: number,
+): string {
+  if (contentStr.length <= maxChars) return contentStr;
+
+  const headChars = Math.floor(maxChars * 0.2);
+  const tailChars = maxChars - headChars;
+
+  const head = contentStr.slice(0, headChars);
+  const tail = contentStr.slice(-tailChars);
+  const omittedChars = contentStr.length - headChars - tailChars;
+
+  return `Output too large. Showing first ${headChars.toLocaleString()} and last ${tailChars.toLocaleString()} characters. For full output see: ${outputFile}
+${head}
+
+... [${omittedChars.toLocaleString()} characters omitted] ...
+
+${tail}`;
+}
+
+/**
+ * Saves tool output to a temporary file for later retrieval.
+ */
+export const TOOL_OUTPUTS_DIR = 'tool-outputs';
+
+export async function saveTruncatedToolOutput(
   content: string,
-  callId: string,
+  toolName: string,
+  id: string | number, // Accept string (callId) or number (truncationId)
   projectTempDir: string,
-  threshold: number,
-  truncateLines: number,
-): Promise<{ content: string; outputFile?: string }> {
-  if (content.length <= threshold) {
-    return { content };
+  sessionId?: string,
+): Promise<{ outputFile: string }> {
+  const safeToolName = sanitizeFilenamePart(toolName).toLowerCase();
+  const safeId = sanitizeFilenamePart(id.toString()).toLowerCase();
+  const fileName = `${safeToolName}_${safeId}.txt`;
+
+  let toolOutputDir = path.join(projectTempDir, TOOL_OUTPUTS_DIR);
+  if (sessionId) {
+    const safeSessionId = sanitizeFilenamePart(sessionId);
+    toolOutputDir = path.join(toolOutputDir, `session-${safeSessionId}`);
   }
+  const outputFile = path.join(toolOutputDir, fileName);
 
-  let lines = content.split('\n');
-  let fileContent = content;
+  await fsPromises.mkdir(toolOutputDir, { recursive: true });
+  await fsPromises.writeFile(outputFile, content);
 
-  // If the content is long but has few lines, wrap it to enable line-based truncation.
-  if (lines.length <= truncateLines) {
-    const wrapWidth = 120; // A reasonable width for wrapping.
-    const wrappedLines: string[] = [];
-    for (const line of lines) {
-      if (line.length > wrapWidth) {
-        for (let i = 0; i < line.length; i += wrapWidth) {
-          wrappedLines.push(line.substring(i, i + wrapWidth));
-        }
-      } else {
-        wrappedLines.push(line);
-      }
-    }
-    lines = wrappedLines;
-    fileContent = lines.join('\n');
-  }
-
-  const head = Math.floor(truncateLines / 5);
-  const beginning = lines.slice(0, head);
-  const end = lines.slice(-(truncateLines - head));
-  const truncatedContent =
-    beginning.join('\n') + '\n... [CONTENT TRUNCATED] ...\n' + end.join('\n');
-
-  // Sanitize callId to prevent path traversal.
-  const safeFileName = `${path.basename(callId)}.output`;
-  const outputFile = path.join(projectTempDir, safeFileName);
-  try {
-    await fsPromises.writeFile(outputFile, fileContent);
-
-    return {
-      content: `Tool output was too large and has been truncated.
-The full output has been saved to: ${outputFile}
-To read the complete output, use the ${READ_FILE_TOOL_NAME} tool with the absolute file path above. For large files, you can use the offset and limit parameters to read specific sections:
-- ${READ_FILE_TOOL_NAME} tool with offset=0, limit=100 to see the first 100 lines
-- ${READ_FILE_TOOL_NAME} tool with offset=N to skip N lines from the beginning
-- ${READ_FILE_TOOL_NAME} tool with limit=M to read only M lines at a time
-The truncated output below shows the beginning and end of the content. The marker '... [CONTENT TRUNCATED] ...' indicates where content was removed.
-This allows you to efficiently examine different parts of the output without loading the entire file.
-Truncated part of the output:
-${truncatedContent}`,
-      outputFile,
-    };
-  } catch (_error) {
-    return {
-      content:
-        truncatedContent + `\n[Note: Could not save full output to file]`,
-    };
-  }
+  return { outputFile };
 }

@@ -12,9 +12,19 @@ import { start_sandbox } from './sandbox.js';
 import { FatalSandboxError, type SandboxConfig } from '@google/gemini-cli-core';
 import { EventEmitter } from 'node:events';
 
-vi.mock('../config/settings.js', () => ({
-  USER_SETTINGS_DIR: '/home/user/.gemini',
+const { mockedHomedir, mockedGetContainerPath } = vi.hoisted(() => ({
+  mockedHomedir: vi.fn().mockReturnValue('/home/user'),
+  mockedGetContainerPath: vi.fn().mockImplementation((p: string) => p),
 }));
+
+vi.mock('./sandboxUtils.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./sandboxUtils.js')>();
+  return {
+    ...actual,
+    getContainerPath: mockedGetContainerPath,
+  };
+});
+
 vi.mock('node:child_process');
 vi.mock('node:os');
 vi.mock('node:fs');
@@ -44,6 +54,7 @@ vi.mock('node:util', async (importOriginal) => {
     },
   };
 });
+
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
@@ -64,7 +75,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       }
     },
     GEMINI_DIR: '.gemini',
-    USER_SETTINGS_DIR: '/home/user/.gemini',
+    homedir: mockedHomedir,
   };
 });
 
@@ -341,13 +352,70 @@ describe('sandbox', () => {
 
       await start_sandbox(config);
 
-      expect(spawn).toHaveBeenCalledWith(
+      // The first call is 'docker images -q ...'
+      expect(spawn).toHaveBeenNthCalledWith(
+        1,
+        'docker',
+        expect.arrayContaining(['images', '-q']),
+      );
+
+      // The second call is 'docker run ...'
+      expect(spawn).toHaveBeenNthCalledWith(
+        2,
         'docker',
         expect.arrayContaining([
+          'run',
           '--volume',
           '/host/path:/container/path:ro',
           '--volume',
-          expect.stringContaining('/home/user/.gemini'),
+          expect.stringMatching(/[\\/]home[\\/]user[\\/]\.gemini/),
+        ]),
+        expect.any(Object),
+      );
+    });
+
+    it('should pass through GOOGLE_GEMINI_BASE_URL and GOOGLE_VERTEX_BASE_URL', async () => {
+      const config: SandboxConfig = {
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      };
+      process.env['GOOGLE_GEMINI_BASE_URL'] = 'http://gemini.proxy';
+      process.env['GOOGLE_VERTEX_BASE_URL'] = 'http://vertex.proxy';
+
+      // Mock image check to return true
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await start_sandbox(config);
+
+      expect(spawn).toHaveBeenCalledWith(
+        'docker',
+        expect.arrayContaining([
+          '--env',
+          'GOOGLE_GEMINI_BASE_URL=http://gemini.proxy',
+          '--env',
+          'GOOGLE_VERTEX_BASE_URL=http://vertex.proxy',
         ]),
         expect.any(Object),
       );

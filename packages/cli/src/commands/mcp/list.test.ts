@@ -6,15 +6,20 @@
 
 import { vi, describe, it, expect, beforeEach, type Mock } from 'vitest';
 import { listMcpServers } from './list.js';
-import { loadSettings } from '../../config/settings.js';
+import { loadSettings, mergeSettings } from '../../config/settings.js';
 import { createTransport, debugLogger } from '@google/gemini-cli-core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { ExtensionStorage } from '../../config/extensions/storage.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 
-vi.mock('../../config/settings.js', () => ({
-  loadSettings: vi.fn(),
-}));
+vi.mock('../../config/settings.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../config/settings.js')>();
+  return {
+    ...actual,
+    loadSettings: vi.fn(),
+  };
+});
 vi.mock('../../config/extensions/storage.js', () => ({
   ExtensionStorage: {
     getUserExtensionsDir: vi.fn(),
@@ -27,16 +32,22 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...original,
     createTransport: vi.fn(),
+
     MCPServerStatus: {
       CONNECTED: 'CONNECTED',
       CONNECTING: 'CONNECTING',
       DISCONNECTED: 'DISCONNECTED',
     },
-    Storage: vi.fn().mockImplementation((_cwd: string) => ({
-      getGlobalSettingsPath: () => '/tmp/gemini/settings.json',
-      getWorkspaceSettingsPath: () => '/tmp/gemini/workspace-settings.json',
-      getProjectTempDir: () => '/test/home/.gemini/tmp/mocked_hash',
-    })),
+    Storage: Object.assign(
+      vi.fn().mockImplementation((_cwd: string) => ({
+        getGlobalSettingsPath: () => '/tmp/gemini/settings.json',
+        getWorkspaceSettingsPath: () => '/tmp/gemini/workspace-settings.json',
+        getProjectTempDir: () => '/test/home/.gemini/tmp/mocked_hash',
+      })),
+      {
+        getGlobalSettingsPath: () => '/tmp/gemini/settings.json',
+      },
+    ),
     GEMINI_DIR: '.gemini',
     getErrorMessage: (e: unknown) =>
       e instanceof Error ? e.message : String(e),
@@ -96,7 +107,10 @@ describe('mcp list command', () => {
   });
 
   it('should display message when no servers configured', async () => {
-    mockedLoadSettings.mockReturnValue({ merged: { mcpServers: {} } });
+    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+    mockedLoadSettings.mockReturnValue({
+      merged: { ...defaultMergedSettings, mcpServers: {} },
+    });
 
     await listMcpServers();
 
@@ -104,12 +118,19 @@ describe('mcp list command', () => {
   });
 
   it('should display different server types with connected status', async () => {
+    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
     mockedLoadSettings.mockReturnValue({
       merged: {
+        ...defaultMergedSettings,
         mcpServers: {
           'stdio-server': { command: '/path/to/server', args: ['arg1'] },
-          'sse-server': { url: 'https://example.com/sse' },
+          'sse-server': { url: 'https://example.com/sse', type: 'sse' },
           'http-server': { httpUrl: 'https://example.com/http' },
+          'http-server-by-default': { url: 'https://example.com/http' },
+          'http-server-with-type': {
+            url: 'https://example.com/http',
+            type: 'http',
+          },
         },
       },
     });
@@ -135,11 +156,23 @@ describe('mcp list command', () => {
         'http-server: https://example.com/http (http) - Connected',
       ),
     );
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'http-server-by-default: https://example.com/http (http) - Connected',
+      ),
+    );
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'http-server-with-type: https://example.com/http (http) - Connected',
+      ),
+    );
   });
 
   it('should display disconnected status when connection fails', async () => {
+    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
     mockedLoadSettings.mockReturnValue({
       merged: {
+        ...defaultMergedSettings,
         mcpServers: {
           'test-server': { command: '/test/server' },
         },
@@ -158,9 +191,13 @@ describe('mcp list command', () => {
   });
 
   it('should merge extension servers with config servers', async () => {
+    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
     mockedLoadSettings.mockReturnValue({
       merged: {
-        mcpServers: { 'config-server': { command: '/config/server' } },
+        ...defaultMergedSettings,
+        mcpServers: {
+          'config-server': { command: '/config/server' },
+        },
       },
     });
 
@@ -185,6 +222,48 @@ describe('mcp list command', () => {
       expect.stringContaining(
         'extension-server (from test-extension): /ext/server  (stdio) - Connected',
       ),
+    );
+  });
+
+  it('should filter servers based on admin allowlist passed in settings', async () => {
+    const settingsWithAllowlist = mergeSettings({}, {}, {}, {}, true);
+    settingsWithAllowlist.admin = {
+      secureModeEnabled: false,
+      extensions: { enabled: true },
+      skills: { enabled: true },
+      mcp: {
+        enabled: true,
+        config: {
+          'allowed-server': { url: 'http://allowed' },
+        },
+      },
+    };
+
+    settingsWithAllowlist.mcpServers = {
+      'allowed-server': { command: 'cmd1' },
+      'forbidden-server': { command: 'cmd2' },
+    };
+
+    mockedLoadSettings.mockReturnValue({
+      merged: settingsWithAllowlist,
+    });
+
+    mockClient.connect.mockResolvedValue(undefined);
+    mockClient.ping.mockResolvedValue(undefined);
+
+    await listMcpServers(settingsWithAllowlist);
+
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      expect.stringContaining('allowed-server'),
+    );
+    expect(debugLogger.log).not.toHaveBeenCalledWith(
+      expect.stringContaining('forbidden-server'),
+    );
+    expect(mockedCreateTransport).toHaveBeenCalledWith(
+      'allowed-server',
+      expect.objectContaining({ url: 'http://allowed' }), // Should use admin config
+      false,
+      expect.anything(),
     );
   });
 });

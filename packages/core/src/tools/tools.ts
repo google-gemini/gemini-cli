@@ -16,7 +16,9 @@ import {
   MessageBusType,
   type ToolConfirmationRequest,
   type ToolConfirmationResponse,
+  type Question,
 } from '../confirmation-bus/types.js';
+import { type ApprovalMode } from '../policy/types.js';
 
 /**
  * Represents a validated and ready-to-execute tool call.
@@ -45,8 +47,10 @@ export interface ToolInvocation<
   toolLocations(): ToolLocation[];
 
   /**
-   * Determines if the tool should prompt for confirmation before execution.
-   * @returns Confirmation details or false if no confirmation is needed.
+   * Checks if the tool call should be confirmed by the user before execution.
+   *
+   * @param abortSignal An AbortSignal that can be used to cancel the confirmation request.
+   * @returns A ToolCallConfirmationDetails object if confirmation is required, or false if not.
    */
   shouldConfirmExecute(
     abortSignal: AbortSignal,
@@ -143,7 +147,7 @@ export abstract class BaseToolInvocation<
     ) {
       if (this._toolName) {
         const options = this.getPolicyUpdateOptions(outcome);
-        await this.messageBus.publish({
+        void this.messageBus.publish({
           type: MessageBusType.UPDATE_POLICY,
           toolName: this._toolName,
           persist: outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave,
@@ -179,16 +183,21 @@ export abstract class BaseToolInvocation<
   protected getMessageBusDecision(
     abortSignal: AbortSignal,
   ): Promise<'ALLOW' | 'DENY' | 'ASK_USER'> {
-    if (!this.messageBus) {
+    if (!this.messageBus || !this._toolName) {
       // If there's no message bus, we can't make a decision, so we allow.
       // The legacy confirmation flow will still apply if the tool needs it.
       return Promise.resolve('ALLOW');
     }
 
     const correlationId = randomUUID();
-    const toolCall = {
-      name: this._toolName || this.constructor.name,
-      args: this.params as Record<string, unknown>,
+    const request: ToolConfirmationRequest = {
+      type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+      correlationId,
+      toolCall: {
+        name: this._toolName,
+        args: this.params as Record<string, unknown>,
+      },
+      serverName: this._serverName,
     };
 
     return new Promise<'ALLOW' | 'DENY' | 'ASK_USER'>((resolve) => {
@@ -197,18 +206,19 @@ export abstract class BaseToolInvocation<
         return;
       }
 
-      let timeoutId: NodeJS.Timeout | undefined;
+      let timeoutId: NodeJS.Timeout | null = null;
+      let unsubscribe: (() => void) | null = null;
 
       const cleanup = () => {
         if (timeoutId) {
           clearTimeout(timeoutId);
-          timeoutId = undefined;
+          timeoutId = null;
+        }
+        if (unsubscribe) {
+          unsubscribe();
+          unsubscribe = null;
         }
         abortSignal.removeEventListener('abort', abortHandler);
-        this.messageBus.unsubscribe(
-          MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-          responseHandler,
-        );
       };
 
       const abortHandler = () => {
@@ -234,7 +244,7 @@ export abstract class BaseToolInvocation<
         }
       };
 
-      abortSignal.addEventListener('abort', abortHandler);
+      abortSignal.addEventListener('abort', abortHandler, { once: true });
 
       timeoutId = setTimeout(() => {
         cleanup();
@@ -245,17 +255,15 @@ export abstract class BaseToolInvocation<
         MessageBusType.TOOL_CONFIRMATION_RESPONSE,
         responseHandler,
       );
-
-      const request: ToolConfirmationRequest = {
-        type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
-        toolCall,
-        correlationId,
-        serverName: this._serverName,
+      unsubscribe = () => {
+        this.messageBus?.unsubscribe(
+          MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+          responseHandler,
+        );
       };
 
       try {
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        this.messageBus.publish(request);
+        void this.messageBus.publish(request);
       } catch (_error) {
         cleanup();
         resolve('ALLOW');
@@ -544,6 +552,11 @@ export interface ToolResult {
     message: string; // raw error message
     type?: ToolErrorType; // An optional machine-readable error type (e.g., 'FILE_NOT_FOUND').
   };
+
+  /**
+   * Optional data payload for passing structured information back to the caller.
+   */
+  data?: Record<string, unknown>;
 }
 
 /**
@@ -647,9 +660,11 @@ export interface Todo {
 export interface FileDiff {
   fileDiff: string;
   fileName: string;
+  filePath: string;
   originalContent: string | null;
   newContent: string;
   diffStat?: DiffStat;
+  isNewFile?: boolean;
 }
 
 export interface DiffStat {
@@ -679,11 +694,27 @@ export interface ToolEditConfirmationDetails {
   ideConfirmation?: Promise<DiffUpdateResult>;
 }
 
-export interface ToolConfirmationPayload {
-  // used to override `modifiedProposedContent` for modifiable tools in the
-  // inline modify flow
+export interface ToolEditConfirmationPayload {
   newContent: string;
 }
+
+export interface ToolAskUserConfirmationPayload {
+  answers: { [questionIndex: string]: string };
+}
+
+export interface ToolExitPlanModeConfirmationPayload {
+  /** Whether the user approved the plan */
+  approved: boolean;
+  /** If approved, the approval mode to use for implementation */
+  approvalMode?: ApprovalMode;
+  /** If rejected, the user's feedback */
+  feedback?: string;
+}
+
+export type ToolConfirmationPayload =
+  | ToolEditConfirmationPayload
+  | ToolAskUserConfirmationPayload
+  | ToolExitPlanModeConfirmationPayload;
 
 export interface ToolExecuteConfirmationDetails {
   type: 'exec';
@@ -691,6 +722,8 @@ export interface ToolExecuteConfirmationDetails {
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
   command: string;
   rootCommand: string;
+  rootCommands: string[];
+  commands?: string[];
 }
 
 export interface ToolMcpConfirmationDetails {
@@ -710,11 +743,33 @@ export interface ToolInfoConfirmationDetails {
   urls?: string[];
 }
 
+export interface ToolAskUserConfirmationDetails {
+  type: 'ask_user';
+  title: string;
+  questions: Question[];
+  onConfirm: (
+    outcome: ToolConfirmationOutcome,
+    payload?: ToolConfirmationPayload,
+  ) => Promise<void>;
+}
+
+export interface ToolExitPlanModeConfirmationDetails {
+  type: 'exit_plan_mode';
+  title: string;
+  planPath: string;
+  onConfirm: (
+    outcome: ToolConfirmationOutcome,
+    payload?: ToolConfirmationPayload,
+  ) => Promise<void>;
+}
+
 export type ToolCallConfirmationDetails =
   | ToolEditConfirmationDetails
   | ToolExecuteConfirmationDetails
   | ToolMcpConfirmationDetails
-  | ToolInfoConfirmationDetails;
+  | ToolInfoConfirmationDetails
+  | ToolAskUserConfirmationDetails
+  | ToolExitPlanModeConfirmationDetails;
 
 export enum ToolConfirmationOutcome {
   ProceedOnce = 'proceed_once',
@@ -735,6 +790,8 @@ export enum Kind {
   Execute = 'execute',
   Think = 'think',
   Fetch = 'fetch',
+  Communicate = 'communicate',
+  Plan = 'plan',
   Other = 'other',
 }
 

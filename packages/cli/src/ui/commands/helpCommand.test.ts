@@ -40,7 +40,6 @@ describe('helpCommand', () => {
         type: MessageType.HELP,
         timestamp: expect.any(Date),
       }),
-      expect.any(Number),
     );
   });
 

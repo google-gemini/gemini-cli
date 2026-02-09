@@ -15,6 +15,7 @@ import type {
   GitService,
   Logger,
   CommandActionReturn,
+  AgentDefinition,
 } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';
 import type { UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
@@ -66,17 +67,31 @@ export interface CommandContext {
      * Loads a new set of history items, replacing the current history.
      *
      * @param history The array of history items to load.
+     * @param postLoadInput Optional text to set in the input buffer after loading history.
      */
-    loadHistory: UseHistoryManagerReturn['loadHistory'];
+    loadHistory: (history: HistoryItem[], postLoadInput?: string) => void;
     /** Toggles a special display mode. */
     toggleCorgiMode: () => void;
     toggleDebugProfiler: () => void;
     toggleVimEnabled: () => Promise<boolean>;
     reloadCommands: () => void;
+    openAgentConfigDialog: (
+      name: string,
+      displayName: string,
+      definition: AgentDefinition,
+    ) => void;
     extensionsUpdateState: Map<string, ExtensionUpdateStatus>;
     dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
     addConfirmUpdateExtensionRequest: (value: ConfirmationRequest) => void;
+    /**
+     * Sets a confirmation request to be displayed to the user.
+     *
+     * @param value The confirmation request details.
+     */
+    setConfirmationRequest: (value: ConfirmationRequest) => void;
     removeComponent: () => void;
+    toggleBackgroundShell: () => void;
+    toggleShortcutsHelp: () => void;
   };
   // Session-specific data
   session: {
@@ -110,6 +125,7 @@ export interface OpenDialogActionReturn {
     | 'settings'
     | 'sessionBrowser'
     | 'model'
+    | 'agentConfig'
     | 'permissions';
 }
 
@@ -163,6 +179,7 @@ export enum CommandKind {
   BUILT_IN = 'built-in',
   FILE = 'file',
   MCP_PROMPT = 'mcp-prompt',
+  AGENT = 'agent',
 }
 
 // The standardized contract for any command in the system.

@@ -15,11 +15,12 @@ export function isNodeError(error: unknown): error is NodeJS.ErrnoException {
 }
 
 export function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
+  const friendlyError = toFriendlyError(error);
+  if (friendlyError instanceof Error) {
+    return friendlyError.message;
   }
   try {
-    return String(error);
+    return String(friendlyError);
   } catch {
     return 'Failed to get error details';
   }
@@ -80,6 +81,13 @@ export class CanceledError extends Error {
 export class ForbiddenError extends Error {}
 export class UnauthorizedError extends Error {}
 export class BadRequestError extends Error {}
+
+export class ChangeAuthRequestedError extends Error {
+  constructor() {
+    super('User requested to change authentication method');
+    this.name = 'ChangeAuthRequestedError';
+  }
+}
 
 interface ResponseData {
   error?: {

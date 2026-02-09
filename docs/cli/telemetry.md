@@ -8,14 +8,17 @@ Learn how to enable and setup OpenTelemetry for Gemini CLI.
   - [Configuration](#configuration)
   - [Google Cloud telemetry](#google-cloud-telemetry)
     - [Prerequisites](#prerequisites)
+    - [Authenticating with CLI Credentials](#authenticating-with-cli-credentials)
     - [Direct export (recommended)](#direct-export-recommended)
     - [Collector-based export (advanced)](#collector-based-export-advanced)
+    - [Monitoring Dashboards](#monitoring-dashboards)
   - [Local telemetry](#local-telemetry)
     - [File-based output (recommended)](#file-based-output-recommended)
     - [Collector-based export (advanced)](#collector-based-export-advanced-1)
   - [Logs and metrics](#logs-and-metrics)
     - [Logs](#logs)
       - [Sessions](#sessions)
+      - [Approval Mode](#approval-mode)
       - [Tools](#tools)
       - [Files](#files)
       - [API](#api)
@@ -213,6 +216,24 @@ forward data to Google Cloud.
    - Open `~/.gemini/tmp/<projectHash>/otel/collector-gcp.log` to view local
      collector logs.
 
+### Monitoring Dashboards
+
+Gemini CLI provides a pre-configured
+[Google Cloud Monitoring](https://cloud.google.com/monitoring) dashboard to
+visualize your telemetry.
+
+This dashboard can be found under **Google Cloud Monitoring Dashboard
+Templates** as "**Gemini CLI Monitoring**".
+
+![Gemini CLI Monitoring Dashboard Overview](/docs/assets/monitoring-dashboard-overview.png)
+
+![Gemini CLI Monitoring Dashboard Metrics](/docs/assets/monitoring-dashboard-metrics.png)
+
+![Gemini CLI Monitoring Dashboard Logs](/docs/assets/monitoring-dashboard-logs.png)
+
+To learn more, check out this blog post:
+[Instant insights: Gemini CLI’s new pre-configured monitoring dashboards](https://cloud.google.com/blog/topics/developers-practitioners/instant-insights-gemini-clis-new-pre-configured-monitoring-dashboards/).
+
 ## Local telemetry
 
 For local development and debugging, you can capture telemetry data locally:
@@ -294,6 +315,31 @@ Captures startup configuration and user prompt submissions.
     - `prompt_id` (string)
     - `prompt` (string; excluded if `telemetry.logPrompts` is `false`)
     - `auth_type` (string)
+
+#### Approval Mode
+
+Tracks changes and duration of approval modes.
+
+##### Lifecycle
+
+- `approval_mode_switch`: Approval mode was changed.
+  - **Attributes**:
+    - `from_mode` (string)
+    - `to_mode` (string)
+
+- `approval_mode_duration`: Duration spent in an approval mode.
+  - **Attributes**:
+    - `mode` (string)
+    - `duration_ms` (int)
+
+##### Execution
+
+These events track the execution of an approval mode, such as Plan Mode.
+
+- `plan_execution`: A plan was executed and the session switched from plan mode
+  to active execution.
+  - **Attributes**:
+    - `approval_mode` (string)
 
 #### Tools
 
@@ -674,6 +720,17 @@ Agent lifecycle metrics: runs, durations, and turns.
 - `gemini_cli.agent.turns` (Histogram, turns): Turns taken per agent run.
   - **Attributes**:
     - `agent_name` (string)
+
+##### Approval Mode
+
+###### Execution
+
+These metrics track the adoption and usage of specific approval workflows, such
+as Plan Mode.
+
+- `gemini_cli.plan.execution.count` (Counter, Int): Counts plan executions.
+  - **Attributes**:
+    - `approval_mode` (string)
 
 ##### UI
 

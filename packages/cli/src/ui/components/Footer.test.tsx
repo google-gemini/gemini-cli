@@ -5,10 +5,8 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import {
-  renderWithProviders,
-  createMockSettings,
-} from '../../test-utils/render.js';
+import { renderWithProviders } from '../../test-utils/render.js';
+import { createMockSettings } from '../../test-utils/settings.js';
 import { Footer } from './Footer.js';
 import { tildeifyPath, ToolCallDecision } from '@google/gemini-cli-core';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
@@ -203,6 +201,15 @@ describe('<Footer />', () => {
   });
 
   describe('footer configuration filtering (golden snapshots)', () => {
+    beforeEach(() => {
+      vi.stubEnv('SANDBOX', '');
+      vi.stubEnv('SEATBELT_PROFILE', '');
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
     it('renders complete footer with all sections visible (baseline)', () => {
       const { lastFrame } = renderWithProviders(<Footer />, {
         width: 120,

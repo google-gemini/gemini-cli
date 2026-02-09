@@ -15,6 +15,7 @@ import {
   StandardFileSystemService,
   ToolRegistry,
   COMMON_IGNORE_PATTERNS,
+  GEMINI_IGNORE_FILE_NAME,
   // DEFAULT_FILE_EXCLUDES,
 } from '@google/gemini-cli-core';
 import * as core from '@google/gemini-cli-core';
@@ -44,6 +45,7 @@ describe('handleAtCommand', () => {
   }
 
   beforeEach(async () => {
+    vi.restoreAllMocks();
     vi.resetAllMocks();
 
     testRootDir = await fsPromises.mkdtemp(
@@ -75,15 +77,46 @@ describe('handleAtCommand', () => {
       getFileSystemService: () => new StandardFileSystemService(),
       getEnableRecursiveFileSearch: vi.fn(() => true),
       getWorkspaceContext: () => ({
-        isPathWithinWorkspace: () => true,
+        isPathWithinWorkspace: (p: string) =>
+          p.startsWith(testRootDir) || p.startsWith('/private' + testRootDir),
         getDirectories: () => [testRootDir],
       }),
+      storage: {
+        getProjectTempDir: () => path.join(os.tmpdir(), 'gemini-cli-temp'),
+      },
+      isPathAllowed(this: Config, absolutePath: string): boolean {
+        if (this.interactive && path.isAbsolute(absolutePath)) {
+          return true;
+        }
+
+        const workspaceContext = this.getWorkspaceContext();
+        if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+          return true;
+        }
+
+        const projectTempDir = this.storage.getProjectTempDir();
+        const resolvedProjectTempDir = path.resolve(projectTempDir);
+        return (
+          absolutePath.startsWith(resolvedProjectTempDir + path.sep) ||
+          absolutePath === resolvedProjectTempDir
+        );
+      },
+      validatePathAccess(this: Config, absolutePath: string): string | null {
+        if (this.isPathAllowed(absolutePath)) {
+          return null;
+        }
+
+        const workspaceDirs = this.getWorkspaceContext().getDirectories();
+        const projectTempDir = this.storage.getProjectTempDir();
+        return `Path validation failed: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+      },
       getMcpServers: () => ({}),
       getMcpServerCommand: () => undefined,
       getPromptRegistry: () => ({
         getPromptsByServer: () => [],
       }),
       getDebugMode: () => false,
+      getWorkingDir: () => '/working/dir',
       getFileExclusions: () => ({
         getCoreIgnorePatterns: () => COMMON_IGNORE_PATTERNS,
         getDefaultExcludePatterns: () => [],
@@ -146,9 +179,6 @@ describe('handleAtCommand', () => {
     expect(result).toEqual({
       processedQuery: [{ text: queryWithSpaces }],
     });
-    expect(mockOnDebugMessage).toHaveBeenCalledWith(
-      'Lone @ detected, will be treated as text in the modified query.',
-    );
   });
 
   it('should process a valid text file path', async () => {
@@ -408,9 +438,6 @@ describe('handleAtCommand', () => {
     expect(mockOnDebugMessage).toHaveBeenCalledWith(
       `Glob search for '**/*${invalidFile}*' found no files or an error. Path ${invalidFile} will be skipped.`,
     );
-    expect(mockOnDebugMessage).toHaveBeenCalledWith(
-      'Lone @ detected, will be treated as text in the modified query.',
-    );
   });
 
   it('should return original query if all @paths are invalid or lone @', async () => {
@@ -597,7 +624,7 @@ describe('handleAtCommand', () => {
   describe('gemini-ignore filtering', () => {
     it('should skip gemini-ignored files in @ commands', async () => {
       await createTestFile(
-        path.join(testRootDir, '.geminiignore'),
+        path.join(testRootDir, GEMINI_IGNORE_FILE_NAME),
         'build/output.js',
       );
       const geminiIgnoredFile = await createTestFile(
@@ -628,7 +655,7 @@ describe('handleAtCommand', () => {
   });
   it('should process non-ignored files when .geminiignore is present', async () => {
     await createTestFile(
-      path.join(testRootDir, '.geminiignore'),
+      path.join(testRootDir, GEMINI_IGNORE_FILE_NAME),
       'build/output.js',
     );
     const validFile = await createTestFile(
@@ -659,7 +686,7 @@ describe('handleAtCommand', () => {
 
   it('should handle mixed gemini-ignored and valid files', async () => {
     await createTestFile(
-      path.join(testRootDir, '.geminiignore'),
+      path.join(testRootDir, GEMINI_IGNORE_FILE_NAME),
       'dist/bundle.js',
     );
     const validFile = await createTestFile(
@@ -1264,7 +1291,9 @@ describe('handleAtCommand', () => {
         signal: abortController.signal,
       });
 
-      expect(readResource).toHaveBeenCalledWith(resourceUri);
+      expect(readResource).toHaveBeenCalledWith(resourceUri, {
+        signal: abortController.signal,
+      });
       const processedParts = Array.isArray(result.processedQuery)
         ? result.processedQuery
         : [];
@@ -1369,6 +1398,34 @@ describe('handleAtCommand', () => {
         tools: [expect.objectContaining({ status: ToolCallStatus.Error })],
       }),
       134,
+    );
+  });
+
+  it('should include agent nudge when agents are found', async () => {
+    const agentName = 'my-agent';
+    const otherAgent = 'other-agent';
+
+    // Mock getAgentRegistry on the config
+    mockConfig.getAgentRegistry = vi.fn().mockReturnValue({
+      getDefinition: (name: string) =>
+        name === agentName || name === otherAgent ? { name } : undefined,
+    });
+
+    const query = `@${agentName} @${otherAgent}`;
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 600,
+      signal: abortController.signal,
+    });
+
+    const expectedNudge = `\n<system_note>\nThe user has explicitly selected the following agent(s): ${agentName}, ${otherAgent}. Please use the following tool(s) to delegate the task: '${agentName}', '${otherAgent}'.\n</system_note>\n`;
+
+    expect(result.processedQuery).toContainEqual(
+      expect.objectContaining({ text: expectedNudge }),
     );
   });
 });

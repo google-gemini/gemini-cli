@@ -28,9 +28,16 @@ const mockedIsWorkspaceTrusted = vi.hoisted(() => vi.fn());
 const mockedUseSettings = vi.hoisted(() => vi.fn());
 
 // Mock modules
-vi.mock('node:process', () => ({
-  cwd: mockedCwd,
-}));
+vi.mock('node:process', () => {
+  const mockProcess = {
+    cwd: mockedCwd,
+    env: {},
+  };
+  return {
+    ...mockProcess,
+    default: mockProcess,
+  };
+});
 
 vi.mock('node:path', async (importOriginal) => {
   const actual = await importOriginal();

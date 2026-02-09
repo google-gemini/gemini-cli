@@ -80,11 +80,13 @@ const KEY_INFO_MAP: Record<
   OQ: { name: 'f2' },
   OR: { name: 'f3' },
   OS: { name: 'f4' },
+  OZ: { name: 'tab', shift: true }, // SS3 Shift+Tab variant for Windows terminals
   '[[5~': { name: 'pageup' },
   '[[6~': { name: 'pagedown' },
   '[9u': { name: 'tab' },
   '[13u': { name: 'return' },
   '[27u': { name: 'escape' },
+  '[32u': { name: 'space' },
   '[127u': { name: 'backspace' },
   '[57414u': { name: 'return' }, // Numpad Enter
   '[a': { name: 'up', shift: true },
@@ -123,10 +125,14 @@ function charLengthAt(str: string, i: number): number {
   return code !== undefined && code >= kUTF16SurrogateThreshold ? 2 : 1;
 }
 
+// Note: we do not convert alt+z, alt+shift+z, or alt+v here
+// because mac users have alternative hotkeys.
 const MAC_ALT_KEY_CHARACTER_MAP: Record<string, string> = {
   '\u222B': 'b', // "∫" back one word
   '\u0192': 'f', // "ƒ" forward one word
   '\u00B5': 'm', // "µ" toggle markup view
+  '\u03A9': 'z', // "Ω" Option+z
+  '\u00B8': 'Z', // "¸" Option+Shift+z
 };
 
 function nonKeyboardEventFilter(
@@ -140,6 +146,34 @@ function nonKeyboardEventFilter(
     ) {
       keypressHandler(key);
     }
+  };
+}
+
+/**
+ * Converts return keys pressed quickly after other keys into plain
+ * insertable return characters.
+ *
+ * This is to accommodate older terminals that paste text without bracketing.
+ */
+function bufferFastReturn(keypressHandler: KeypressHandler): KeypressHandler {
+  let lastKeyTime = 0;
+  return (key: Key) => {
+    const now = Date.now();
+    if (key.name === 'return' && now - lastKeyTime <= FAST_RETURN_TIMEOUT) {
+      keypressHandler({
+        ...key,
+        name: 'return',
+        shift: true, // to make it a newline, not a submission
+        alt: false,
+        ctrl: false,
+        cmd: false,
+        sequence: '\r',
+        insertable: true,
+      });
+    } else {
+      keypressHandler(key);
+    }
+    lastKeyTime = now;
   };
 }
 
@@ -186,30 +220,8 @@ function bufferBackslashEnter(
 
   bufferer.next(); // prime the generator so it starts listening.
 
-  return (key: Key) => bufferer.next(key);
-}
-
-/**
- * Converts return keys pressed quickly after other keys into plain
- * insertable return characters.
- *
- * This is to accomodate older terminals that paste text without bracketing.
- */
-function bufferFastReturn(keypressHandler: KeypressHandler): KeypressHandler {
-  let lastKeyTime = 0;
   return (key: Key) => {
-    const now = Date.now();
-    if (key.name === 'return' && now - lastKeyTime <= FAST_RETURN_TIMEOUT) {
-      keypressHandler({
-        ...key,
-        name: '',
-        sequence: '\r',
-        insertable: true,
-      });
-    } else {
-      keypressHandler(key);
-    }
-    lastKeyTime = now;
+    bufferer.next(key);
   };
 }
 
@@ -249,11 +261,11 @@ function bufferPaste(keypressHandler: KeypressHandler): KeypressHandler {
 
       if (buffer.length > 0) {
         keypressHandler({
-          name: '',
-          ctrl: false,
-          meta: false,
+          name: 'paste',
           shift: false,
-          paste: true,
+          alt: false,
+          ctrl: false,
+          cmd: false,
           insertable: true,
           sequence: buffer,
         });
@@ -262,7 +274,9 @@ function bufferPaste(keypressHandler: KeypressHandler): KeypressHandler {
   })();
   bufferer.next(); // prime the generator so it starts listening.
 
-  return (key: Key) => bufferer.next(key);
+  return (key: Key) => {
+    bufferer.next(key);
+  };
 }
 
 /**
@@ -294,15 +308,20 @@ function createDataListener(keypressHandler: KeypressHandler) {
 function* emitKeys(
   keypressHandler: KeypressHandler,
 ): Generator<void, void, string> {
+  const lang = process.env['LANG'] || '';
+  const lcAll = process.env['LC_ALL'] || '';
+  const isGreek = lang.startsWith('el') || lcAll.startsWith('el');
+
   while (true) {
     let ch = yield;
     let sequence = ch;
     let escaped = false;
 
     let name = undefined;
-    let ctrl = false;
-    let meta = false;
     let shift = false;
+    let alt = false;
+    let ctrl = false;
+    let cmd = false;
     let code = undefined;
     let insertable = false;
 
@@ -353,10 +372,10 @@ function* emitKeys(
             const decoded = Buffer.from(base64Data, 'base64').toString('utf-8');
             keypressHandler({
               name: 'paste',
-              ctrl: false,
-              meta: false,
               shift: false,
-              paste: true,
+              alt: false,
+              ctrl: false,
+              cmd: false,
               insertable: true,
               sequence: decoded,
             });
@@ -491,9 +510,10 @@ function* emitKeys(
       }
 
       // Parse the key modifier
-      ctrl = !!(modifier & 4);
-      meta = !!(modifier & 10); // use 10 to catch both alt (2) and meta (8).
       shift = !!(modifier & 1);
+      alt = !!(modifier & 2);
+      ctrl = !!(modifier & 4);
+      cmd = !!(modifier & 8);
 
       const keyInfo = KEY_INFO_MAP[code];
       if (keyInfo) {
@@ -504,9 +524,16 @@ function* emitKeys(
         if (keyInfo.ctrl) {
           ctrl = true;
         }
+        if (name === 'space' && !ctrl && !cmd && !alt) {
+          sequence = ' ';
+          insertable = true;
+        }
       } else {
         name = 'undefined';
-        if ((ctrl || meta) && (code.endsWith('u') || code.endsWith('~'))) {
+        if (
+          (ctrl || cmd || alt) &&
+          (code.endsWith('u') || code.endsWith('~'))
+        ) {
           // CSI-u or tilde-coded functional keys: ESC [ <code> ; <mods> (u|~)
           const codeNumber = parseInt(code.slice(1, -1), 10);
           if (
@@ -520,26 +547,26 @@ function* emitKeys(
     } else if (ch === '\r') {
       // carriage return
       name = 'return';
-      meta = escaped;
-    } else if (ch === '\n') {
-      // Enter, should have been called linefeed
-      name = 'enter';
-      meta = escaped;
+      alt = escaped;
+    } else if (escaped && ch === '\n') {
+      // Alt+Enter (linefeed), should be consistent with carriage return
+      name = 'return';
+      alt = escaped;
     } else if (ch === '\t') {
       // tab
       name = 'tab';
-      meta = escaped;
+      alt = escaped;
     } else if (ch === '\b' || ch === '\x7f') {
       // backspace or ctrl+h
       name = 'backspace';
-      meta = escaped;
+      alt = escaped;
     } else if (ch === ESC) {
       // escape key
       name = 'escape';
-      meta = escaped;
+      alt = escaped;
     } else if (ch === ' ') {
       name = 'space';
-      meta = escaped;
+      alt = escaped;
       insertable = true;
     } else if (!escaped && ch <= '\x1a') {
       // ctrl+letter
@@ -549,30 +576,39 @@ function* emitKeys(
       // Letter, number, shift+letter
       name = ch.toLowerCase();
       shift = /^[A-Z]$/.exec(ch) !== null;
-      meta = escaped;
+      alt = escaped;
       insertable = true;
-    } else if (MAC_ALT_KEY_CHARACTER_MAP[ch] && process.platform === 'darwin') {
-      name = MAC_ALT_KEY_CHARACTER_MAP[ch];
-      meta = true;
+    } else if (MAC_ALT_KEY_CHARACTER_MAP[ch]) {
+      // Note: we do this even if we are not on Mac, because mac users may
+      // remotely connect to non-Mac systems.
+      // We skip this mapping for Greek users to avoid blocking the Omega character.
+      if (isGreek && ch === '\u03A9') {
+        insertable = true;
+      } else {
+        const mapped = MAC_ALT_KEY_CHARACTER_MAP[ch];
+        name = mapped.toLowerCase();
+        shift = mapped !== name;
+        alt = true;
+      }
     } else if (sequence === `${ESC}${ESC}`) {
       // Double escape
       name = 'escape';
-      meta = true;
+      alt = true;
 
       // Emit first escape key here, then continue processing
       keypressHandler({
         name: 'escape',
-        ctrl,
-        meta,
         shift,
-        paste: false,
+        alt,
+        ctrl,
+        cmd,
         insertable: false,
         sequence: ESC,
       });
     } else if (escaped) {
       // Escape sequence timeout
       name = ch.length ? undefined : 'escape';
-      meta = true;
+      alt = true;
     } else {
       // Any other character is considered printable.
       insertable = true;
@@ -584,10 +620,10 @@ function* emitKeys(
     ) {
       keypressHandler({
         name: name || '',
-        ctrl,
-        meta,
         shift,
-        paste: false,
+        alt,
+        ctrl,
+        cmd,
         insertable,
         sequence,
       });
@@ -598,18 +634,18 @@ function* emitKeys(
 
 export interface Key {
   name: string;
-  ctrl: boolean;
-  meta: boolean;
   shift: boolean;
-  paste: boolean;
+  alt: boolean;
+  ctrl: boolean;
+  cmd: boolean; // Command/Windows/Super key
   insertable: boolean;
   sequence: string;
 }
 
-export type KeypressHandler = (key: Key) => void;
+export type KeypressHandler = (key: Key) => boolean | void;
 
 interface KeypressContextValue {
-  subscribe: (handler: KeypressHandler) => void;
+  subscribe: (handler: KeypressHandler, priority?: boolean) => void;
   unsubscribe: (handler: KeypressHandler) => void;
 }
 
@@ -638,18 +674,44 @@ export function KeypressProvider({
 }) {
   const { stdin, setRawMode } = useStdin();
 
-  const subscribers = useRef<Set<KeypressHandler>>(new Set()).current;
+  const prioritySubscribers = useRef<Set<KeypressHandler>>(new Set()).current;
+  const normalSubscribers = useRef<Set<KeypressHandler>>(new Set()).current;
+
   const subscribe = useCallback(
-    (handler: KeypressHandler) => subscribers.add(handler),
-    [subscribers],
+    (handler: KeypressHandler, priority = false) => {
+      const set = priority ? prioritySubscribers : normalSubscribers;
+      set.add(handler);
+    },
+    [prioritySubscribers, normalSubscribers],
   );
+
   const unsubscribe = useCallback(
-    (handler: KeypressHandler) => subscribers.delete(handler),
-    [subscribers],
+    (handler: KeypressHandler) => {
+      prioritySubscribers.delete(handler);
+      normalSubscribers.delete(handler);
+    },
+    [prioritySubscribers, normalSubscribers],
   );
+
   const broadcast = useCallback(
-    (key: Key) => subscribers.forEach((handler) => handler(key)),
-    [subscribers],
+    (key: Key) => {
+      // Process priority subscribers first, in reverse order (stack behavior: last subscribed is first to handle)
+      const priorityHandlers = Array.from(prioritySubscribers).reverse();
+      for (const handler of priorityHandlers) {
+        if (handler(key) === true) {
+          return;
+        }
+      }
+
+      // Then process normal subscribers, also in reverse order
+      const normalHandlers = Array.from(normalSubscribers).reverse();
+      for (const handler of normalHandlers) {
+        if (handler(key) === true) {
+          return;
+        }
+      }
+    },
+    [prioritySubscribers, normalSubscribers],
   );
 
   useEffect(() => {
@@ -661,7 +723,7 @@ export function KeypressProvider({
     process.stdin.setEncoding('utf8'); // Make data events emit strings
 
     let processor = nonKeyboardEventFilter(broadcast);
-    if (!terminalCapabilityManager.isBracketedPasteEnabled()) {
+    if (!terminalCapabilityManager.isKittyProtocolEnabled()) {
       processor = bufferFastReturn(processor);
     }
     processor = bufferBackslashEnter(processor);

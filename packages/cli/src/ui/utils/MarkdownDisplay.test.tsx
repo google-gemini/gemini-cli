@@ -198,7 +198,7 @@ Another paragraph.
         },
         { path: '', settings: {}, originalSettings: {} },
         true,
-        new Set(),
+        [],
       );
 
       const { lastFrame } = renderWithProviders(

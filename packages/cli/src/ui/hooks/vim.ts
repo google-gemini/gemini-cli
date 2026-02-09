@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useReducer, useEffect } from 'react';
+import { useCallback, useReducer, useEffect, useRef } from 'react';
 import type { Key } from './useKeypress.js';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
 import { debugLogger } from '@google/gemini-cli-core';
+import { keyMatchers, Command } from '../keyMatchers.js';
 
 export type VimMode = 'NORMAL' | 'INSERT';
 
@@ -16,15 +17,22 @@ export type VimMode = 'NORMAL' | 'INSERT';
 const DIGIT_MULTIPLIER = 10;
 const DEFAULT_COUNT = 1;
 const DIGIT_1_TO_9 = /^[1-9]$/;
+const DOUBLE_ESCAPE_TIMEOUT_MS = 500; // Timeout for double-escape to clear input
 
 // Command types
 const CMD_TYPES = {
   DELETE_WORD_FORWARD: 'dw',
   DELETE_WORD_BACKWARD: 'db',
   DELETE_WORD_END: 'de',
+  DELETE_BIG_WORD_FORWARD: 'dW',
+  DELETE_BIG_WORD_BACKWARD: 'dB',
+  DELETE_BIG_WORD_END: 'dE',
   CHANGE_WORD_FORWARD: 'cw',
   CHANGE_WORD_BACKWARD: 'cb',
   CHANGE_WORD_END: 'ce',
+  CHANGE_BIG_WORD_FORWARD: 'cW',
+  CHANGE_BIG_WORD_BACKWARD: 'cB',
+  CHANGE_BIG_WORD_END: 'cE',
   DELETE_CHAR: 'x',
   DELETE_LINE: 'dd',
   CHANGE_LINE: 'cc',
@@ -66,7 +74,7 @@ type VimAction =
   | { type: 'ESCAPE_TO_NORMAL' };
 
 const initialVimState: VimState = {
-  mode: 'NORMAL',
+  mode: 'INSERT',
   count: 0,
   pendingOperator: null,
   lastCommand: null,
@@ -130,6 +138,9 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
   const { vimEnabled, vimMode, setVimMode } = useVimMode();
   const [state, dispatch] = useReducer(vimReducer, initialVimState);
 
+  // Track last escape timestamp for double-escape detection
+  const lastEscapeTimestampRef = useRef<number>(0);
+
   // Sync vim mode from context to local state
   useEffect(() => {
     dispatch({ type: 'SET_MODE', mode: vimMode });
@@ -150,6 +161,19 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
     [state.count],
   );
 
+  // Returns true if two escapes occurred within DOUBLE_ESCAPE_TIMEOUT_MS.
+  const checkDoubleEscape = useCallback((): boolean => {
+    const now = Date.now();
+    const lastEscape = lastEscapeTimestampRef.current;
+    lastEscapeTimestampRef.current = now;
+
+    if (now - lastEscape <= DOUBLE_ESCAPE_TIMEOUT_MS) {
+      lastEscapeTimestampRef.current = 0;
+      return true;
+    }
+    return false;
+  }, []);
+
   /** Executes common commands to eliminate duplication in dot (.) repeat command */
   const executeCommand = useCallback(
     (cmdType: string, count: number) => {
@@ -169,6 +193,21 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
           break;
         }
 
+        case CMD_TYPES.DELETE_BIG_WORD_FORWARD: {
+          buffer.vimDeleteBigWordForward(count);
+          break;
+        }
+
+        case CMD_TYPES.DELETE_BIG_WORD_BACKWARD: {
+          buffer.vimDeleteBigWordBackward(count);
+          break;
+        }
+
+        case CMD_TYPES.DELETE_BIG_WORD_END: {
+          buffer.vimDeleteBigWordEnd(count);
+          break;
+        }
+
         case CMD_TYPES.CHANGE_WORD_FORWARD: {
           buffer.vimChangeWordForward(count);
           updateMode('INSERT');
@@ -183,6 +222,24 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
         case CMD_TYPES.CHANGE_WORD_END: {
           buffer.vimChangeWordEnd(count);
+          updateMode('INSERT');
+          break;
+        }
+
+        case CMD_TYPES.CHANGE_BIG_WORD_FORWARD: {
+          buffer.vimChangeBigWordForward(count);
+          updateMode('INSERT');
+          break;
+        }
+
+        case CMD_TYPES.CHANGE_BIG_WORD_BACKWARD: {
+          buffer.vimChangeBigWordBackward(count);
+          updateMode('INSERT');
+          break;
+        }
+
+        case CMD_TYPES.CHANGE_BIG_WORD_END: {
+          buffer.vimChangeBigWordEnd(count);
           updateMode('INSERT');
           break;
         }
@@ -247,9 +304,9 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
    */
   const handleInsertModeInput = useCallback(
     (normalizedKey: Key): boolean => {
-      // Handle escape key immediately - switch to NORMAL mode on any escape
-      if (normalizedKey.name === 'escape') {
-        // Vim behavior: move cursor left when exiting insert mode (unless at beginning of line)
+      if (keyMatchers[Command.ESCAPE](normalizedKey)) {
+        // Record for double-escape detection (clearing happens in NORMAL mode)
+        checkDoubleEscape();
         buffer.vimEscapeInsertMode();
         dispatch({ type: 'ESCAPE_TO_NORMAL' });
         updateMode('NORMAL');
@@ -280,8 +337,9 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
       // Special handling for Enter key to allow command submission (lower priority than completion)
       if (
         normalizedKey.name === 'return' &&
+        !normalizedKey.alt &&
         !normalizedKey.ctrl &&
-        !normalizedKey.meta
+        !normalizedKey.cmd
       ) {
         if (buffer.text.trim() && onSubmit) {
           // Handle command submission directly
@@ -293,11 +351,9 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
         return true; // Handled by vim (even if no onSubmit callback)
       }
 
-      // useKeypress already provides the correct format for TextBuffer
-      buffer.handleInput(normalizedKey);
-      return true; // Handled by vim
+      return buffer.handleInput(normalizedKey);
     },
-    [buffer, dispatch, updateMode, onSubmit],
+    [buffer, dispatch, updateMode, onSubmit, checkDoubleEscape],
   );
 
   /**
@@ -309,10 +365,10 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
     (key: Key): Key => ({
       name: key.name || '',
       sequence: key.sequence || '',
-      ctrl: key.ctrl || false,
-      meta: key.meta || false,
       shift: key.shift || false,
-      paste: key.paste || false,
+      alt: key.alt || false,
+      ctrl: key.ctrl || false,
+      cmd: key.cmd || false,
       insertable: key.insertable || false,
     }),
     [],
@@ -354,7 +410,10 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
    * @returns boolean indicating if command was handled
    */
   const handleOperatorMotion = useCallback(
-    (operator: 'd' | 'c', motion: 'w' | 'b' | 'e'): boolean => {
+    (
+      operator: 'd' | 'c',
+      motion: 'w' | 'b' | 'e' | 'W' | 'B' | 'E',
+    ): boolean => {
       const count = getCurrentCount();
 
       const commandMap = {
@@ -362,11 +421,17 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
           w: CMD_TYPES.DELETE_WORD_FORWARD,
           b: CMD_TYPES.DELETE_WORD_BACKWARD,
           e: CMD_TYPES.DELETE_WORD_END,
+          W: CMD_TYPES.DELETE_BIG_WORD_FORWARD,
+          B: CMD_TYPES.DELETE_BIG_WORD_BACKWARD,
+          E: CMD_TYPES.DELETE_BIG_WORD_END,
         },
         c: {
           w: CMD_TYPES.CHANGE_WORD_FORWARD,
           b: CMD_TYPES.CHANGE_WORD_BACKWARD,
           e: CMD_TYPES.CHANGE_WORD_END,
+          W: CMD_TYPES.CHANGE_BIG_WORD_FORWARD,
+          B: CMD_TYPES.CHANGE_BIG_WORD_BACKWARD,
+          E: CMD_TYPES.CHANGE_BIG_WORD_END,
         },
       };
 
@@ -400,6 +465,11 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
         return false;
       }
 
+      // Let InputPrompt handle Ctrl+C for clearing input (works in all modes)
+      if (keyMatchers[Command.CLEAR_INPUT](normalizedKey)) {
+        return false;
+      }
+
       // Handle INSERT mode
       if (state.mode === 'INSERT') {
         return handleInsertModeInput(normalizedKey);
@@ -407,14 +477,21 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
       // Handle NORMAL mode
       if (state.mode === 'NORMAL') {
-        // If in NORMAL mode, allow escape to pass through to other handlers
-        // if there's no pending operation.
-        if (normalizedKey.name === 'escape') {
+        if (keyMatchers[Command.ESCAPE](normalizedKey)) {
           if (state.pendingOperator) {
             dispatch({ type: 'CLEAR_PENDING_STATES' });
+            lastEscapeTimestampRef.current = 0;
             return true; // Handled by vim
           }
-          return false; // Pass through to other handlers
+
+          // Check for double-escape to clear buffer
+          if (checkDoubleEscape()) {
+            buffer.setText('');
+            return true;
+          }
+
+          // First escape in NORMAL mode - pass through for UI feedback
+          return false;
         }
 
         // Handle count input (numbers 1-9, and 0 if count > 0)
@@ -495,6 +572,21 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
             return true;
           }
 
+          case 'W': {
+            // Check if this is part of a delete or change command (dW/cW)
+            if (state.pendingOperator === 'd') {
+              return handleOperatorMotion('d', 'W');
+            }
+            if (state.pendingOperator === 'c') {
+              return handleOperatorMotion('c', 'W');
+            }
+
+            // Normal big word movement
+            buffer.vimMoveBigWordForward(repeatCount);
+            dispatch({ type: 'CLEAR_COUNT' });
+            return true;
+          }
+
           case 'b': {
             // Check if this is part of a delete or change command (db/cb)
             if (state.pendingOperator === 'd') {
@@ -510,6 +602,21 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
             return true;
           }
 
+          case 'B': {
+            // Check if this is part of a delete or change command (dB/cB)
+            if (state.pendingOperator === 'd') {
+              return handleOperatorMotion('d', 'B');
+            }
+            if (state.pendingOperator === 'c') {
+              return handleOperatorMotion('c', 'B');
+            }
+
+            // Normal backward big word movement
+            buffer.vimMoveBigWordBackward(repeatCount);
+            dispatch({ type: 'CLEAR_COUNT' });
+            return true;
+          }
+
           case 'e': {
             // Check if this is part of a delete or change command (de/ce)
             if (state.pendingOperator === 'd') {
@@ -521,6 +628,21 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
             // Normal word end movement
             buffer.vimMoveWordEnd(repeatCount);
+            dispatch({ type: 'CLEAR_COUNT' });
+            return true;
+          }
+
+          case 'E': {
+            // Check if this is part of a delete or change command (dE/cE)
+            if (state.pendingOperator === 'd') {
+              return handleOperatorMotion('d', 'E');
+            }
+            if (state.pendingOperator === 'c') {
+              return handleOperatorMotion('c', 'E');
+            }
+
+            // Normal big word end movement
+            buffer.vimMoveBigWordEnd(repeatCount);
             dispatch({ type: 'CLEAR_COUNT' });
             return true;
           }
@@ -753,7 +875,9 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
             // Unknown command, clear count and pending states
             dispatch({ type: 'CLEAR_PENDING_STATES' });
-            return true; // Still handled by vim to prevent other handlers
+
+            // Not handled by vim so allow other handlers to process it.
+            return false;
           }
         }
       }
@@ -775,6 +899,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
       buffer,
       executeCommand,
       updateMode,
+      checkDoubleEscape,
     ],
   );
 

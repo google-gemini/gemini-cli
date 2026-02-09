@@ -4,11 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { DefaultHookOutput } from '@google/gemini-cli-core';
 import {
   uiTelemetryService,
-  fireSessionEndHook,
-  fireSessionStartHook,
   SessionEndReason,
   SessionStartSource,
   flushTelemetry,
@@ -30,11 +27,11 @@ export const clearCommand: SlashCommand = {
       ?.getGeminiClient()
       ?.getChat()
       .getChatRecordingService();
-    const messageBus = config?.getMessageBus();
 
     // Fire SessionEnd hook before clearing
-    if (config?.getEnableHooks() && messageBus) {
-      await fireSessionEndHook(messageBus, SessionEndReason.Clear);
+    const hookSystem = config?.getHookSystem();
+    if (hookSystem) {
+      await hookSystem.fireSessionEndEvent(SessionEndReason.Clear);
     }
 
     if (geminiClient) {
@@ -54,9 +51,9 @@ export const clearCommand: SlashCommand = {
     }
 
     // Fire SessionStart hook after clearing
-    let result: DefaultHookOutput | undefined;
-    if (config?.getEnableHooks() && messageBus) {
-      result = await fireSessionStartHook(messageBus, SessionStartSource.Clear);
+    let result;
+    if (hookSystem) {
+      result = await hookSystem.fireSessionStartEvent(SessionStartSource.Clear);
     }
 
     // Give the event loop a chance to process any pending telemetry operations

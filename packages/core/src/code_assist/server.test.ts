@@ -327,6 +327,22 @@ describe('CodeAssistServer', () => {
       const url = server.getMethodUrl('testMethod');
       expect(url).toBe('https://custom-endpoint.com/v1internal:testMethod');
     });
+
+    it('should use the CODE_ASSIST_API_VERSION environment variable if set', () => {
+      process.env['CODE_ASSIST_API_VERSION'] = 'v2beta';
+      const server = new CodeAssistServer({} as never);
+      const url = server.getMethodUrl('testMethod');
+      expect(url).toBe('https://cloudcode-pa.googleapis.com/v2beta:testMethod');
+    });
+
+    it('should use default value if CODE_ASSIST_API_VERSION env var is empty', () => {
+      process.env['CODE_ASSIST_API_VERSION'] = '';
+      const server = new CodeAssistServer({} as never);
+      const url = server.getMethodUrl('testMethod');
+      expect(url).toBe(
+        'https://cloudcode-pa.googleapis.com/v1internal:testMethod',
+      );
+    });
   });
 
   it('should call the generateContentStream endpoint and parse SSE', async () => {
@@ -430,6 +446,31 @@ describe('CodeAssistServer', () => {
       expect.any(Object),
     );
     expect(response.name).toBe('operations/123');
+  });
+
+  it('should call the getOperation endpoint', async () => {
+    const { server } = createTestServer();
+
+    const mockResponse = {
+      name: 'operations/123',
+      done: true,
+      response: {
+        cloudaicompanionProject: {
+          id: 'test-project',
+          name: 'projects/test-project',
+        },
+      },
+    };
+    vi.spyOn(server, 'requestGetOperation').mockResolvedValue(mockResponse);
+
+    const response = await server.getOperation('operations/123');
+
+    expect(server.requestGetOperation).toHaveBeenCalledWith('operations/123');
+    expect(response.name).toBe('operations/123');
+    expect(response.response?.cloudaicompanionProject?.id).toBe('test-project');
+    expect(response.response?.cloudaicompanionProject?.name).toBe(
+      'projects/test-project',
+    );
   });
 
   it('should call the loadCodeAssist endpoint', async () => {

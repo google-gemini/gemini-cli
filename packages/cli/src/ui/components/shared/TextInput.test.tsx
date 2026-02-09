@@ -44,10 +44,16 @@ vi.mock('./text-buffer.js', () => {
         );
       }
     }),
-    setText: vi.fn((newText) => {
+    setText: vi.fn((newText, cursorPosition) => {
       mockTextBuffer.text = newText;
       mockTextBuffer.viewportVisualLines = [newText];
-      mockTextBuffer.visualCursor[1] = newText.length;
+      if (typeof cursorPosition === 'number') {
+        mockTextBuffer.visualCursor[1] = cursorPosition;
+      } else if (cursorPosition === 'start') {
+        mockTextBuffer.visualCursor[1] = 0;
+      } else {
+        mockTextBuffer.visualCursor[1] = newText.length;
+      }
     }),
   };
 
@@ -92,10 +98,16 @@ describe('TextInput', () => {
           );
         }
       }),
-      setText: vi.fn((newText) => {
+      setText: vi.fn((newText, cursorPosition) => {
         buffer.text = newText;
         buffer.viewportVisualLines = [newText];
-        buffer.visualCursor[1] = newText.length;
+        if (typeof cursorPosition === 'number') {
+          buffer.visualCursor[1] = cursorPosition;
+        } else if (cursorPosition === 'start') {
+          buffer.visualCursor[1] = 0;
+        } else {
+          buffer.visualCursor[1] = newText.length;
+        }
       }),
     };
     mockBuffer = buffer as unknown as TextBuffer;
@@ -151,20 +163,20 @@ describe('TextInput', () => {
 
     keypressHandler({
       name: 'a',
-      sequence: 'a',
-      ctrl: false,
-      meta: false,
       shift: false,
-      paste: false,
+      alt: false,
+      ctrl: false,
+      cmd: false,
+      sequence: 'a',
     });
 
     expect(mockBuffer.handleInput).toHaveBeenCalledWith({
       name: 'a',
-      sequence: 'a',
-      ctrl: false,
-      meta: false,
       shift: false,
-      paste: false,
+      alt: false,
+      ctrl: false,
+      cmd: false,
+      sequence: 'a',
     });
     expect(mockBuffer.text).toBe('a');
   });
@@ -178,20 +190,20 @@ describe('TextInput', () => {
 
     keypressHandler({
       name: 'backspace',
-      sequence: '',
-      ctrl: false,
-      meta: false,
       shift: false,
-      paste: false,
+      alt: false,
+      ctrl: false,
+      cmd: false,
+      sequence: '',
     });
 
     expect(mockBuffer.handleInput).toHaveBeenCalledWith({
       name: 'backspace',
-      sequence: '',
-      ctrl: false,
-      meta: false,
       shift: false,
-      paste: false,
+      alt: false,
+      ctrl: false,
+      cmd: false,
+      sequence: '',
     });
     expect(mockBuffer.text).toBe('tes');
   });
@@ -205,11 +217,11 @@ describe('TextInput', () => {
 
     keypressHandler({
       name: 'left',
-      sequence: '',
-      ctrl: false,
-      meta: false,
       shift: false,
-      paste: false,
+      alt: false,
+      ctrl: false,
+      cmd: false,
+      sequence: '',
     });
 
     // Cursor moves from end to before 't'
@@ -226,11 +238,11 @@ describe('TextInput', () => {
 
     keypressHandler({
       name: 'right',
-      sequence: '',
-      ctrl: false,
-      meta: false,
       shift: false,
-      paste: false,
+      alt: false,
+      ctrl: false,
+      cmd: false,
+      sequence: '',
     });
 
     expect(mockBuffer.visualCursor[1]).toBe(3);
@@ -245,11 +257,11 @@ describe('TextInput', () => {
 
     keypressHandler({
       name: 'return',
-      sequence: '',
-      ctrl: false,
-      meta: false,
       shift: false,
-      paste: false,
+      alt: false,
+      ctrl: false,
+      cmd: false,
+      sequence: '',
     });
 
     expect(onSubmit).toHaveBeenCalledWith('test');
@@ -264,11 +276,11 @@ describe('TextInput', () => {
 
     keypressHandler({
       name: 'escape',
-      sequence: '',
-      ctrl: false,
-      meta: false,
       shift: false,
-      paste: false,
+      alt: false,
+      ctrl: false,
+      cmd: false,
+      sequence: '',
     });
     await vi.runAllTimersAsync();
 

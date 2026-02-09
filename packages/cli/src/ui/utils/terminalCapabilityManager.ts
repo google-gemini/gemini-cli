@@ -14,6 +14,7 @@ import {
   enableBracketedPasteMode,
   disableBracketedPasteMode,
 } from '@google/gemini-cli-core';
+import { parseColor } from '../themes/color-utils.js';
 
 export type TerminalBackgroundColor = string | undefined;
 
@@ -25,7 +26,6 @@ export class TerminalCapabilityManager {
   private static readonly TERMINAL_NAME_QUERY = '\x1b[>q';
   private static readonly DEVICE_ATTRIBUTES_QUERY = '\x1b[c';
   private static readonly MODIFY_OTHER_KEYS_QUERY = '\x1b[>4;?m';
-  private static readonly BRACKETED_PASTE_QUERY = '\x1b[?2004$p';
 
   // Kitty keyboard flags: CSI ? flags u
   // eslint-disable-next-line no-control-regex
@@ -37,26 +37,19 @@ export class TerminalCapabilityManager {
   // eslint-disable-next-line no-control-regex
   private static readonly DEVICE_ATTRIBUTES_REGEX = /\x1b\[\?(\d+)(;\d+)*c/;
   // OSC 11 response: OSC 11 ; rgb:rrrr/gggg/bbbb ST (or BEL)
-  private static readonly OSC_11_REGEX =
+  static readonly OSC_11_REGEX =
     // eslint-disable-next-line no-control-regex
     /\x1b\]11;rgb:([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})(\x1b\\|\x07)?/;
   // modifyOtherKeys response: CSI > 4 ; level m
   // eslint-disable-next-line no-control-regex
   private static readonly MODIFY_OTHER_KEYS_REGEX = /\x1b\[>4;(\d+)m/;
-  // DECRQM response for bracketed paste: CSI ? 2004 ; Ps $ y
-  // Ps = 1 (set), 2 (reset), 3 (permanently set), 4 (permanently reset)
-  // eslint-disable-next-line no-control-regex
-  private static readonly BRACKETED_PASTE_REGEX = /\x1b\[\?2004;([1-4])\$y/;
 
+  private detectionComplete = false;
   private terminalBackgroundColor: TerminalBackgroundColor;
   private kittySupported = false;
   private kittyEnabled = false;
-  private detectionComplete = false;
-  private terminalName: string | undefined;
   private modifyOtherKeysSupported = false;
-  private modifyOtherKeysEnabled = false;
-  private bracketedPasteSupported = false;
-  private bracketedPasteEnabled = false;
+  private terminalName: string | undefined;
 
   private constructor() {}
 
@@ -85,18 +78,14 @@ export class TerminalCapabilityManager {
     }
 
     const cleanupOnExit = () => {
-      if (this.kittySupported) {
-        this.disableKittyProtocol();
-      }
-      if (this.modifyOtherKeysSupported) {
-        this.disableModifyOtherKeys();
-      }
-      if (this.bracketedPasteSupported) {
-        this.disableBracketedPaste();
-      }
+      // don't bother catching errors since if one write
+      // fails, the other probably will too
+      disableKittyKeyboardProtocol();
+      disableModifyOtherKeys();
+      disableBracketedPasteMode();
     };
-    process.on('exit', () => cleanupOnExit);
-    process.on('SIGTERM', () => cleanupOnExit);
+    process.on('exit', cleanupOnExit);
+    process.on('SIGTERM', cleanupOnExit);
     process.on('SIGINT', cleanupOnExit);
 
     return new Promise((resolve) => {
@@ -111,7 +100,6 @@ export class TerminalCapabilityManager {
       let deviceAttributesReceived = false;
       let bgReceived = false;
       let modifyOtherKeysReceived = false;
-      let bracketedPasteReceived = false;
       // eslint-disable-next-line prefer-const
       let timeoutId: NodeJS.Timeout;
 
@@ -142,7 +130,7 @@ export class TerminalCapabilityManager {
           const match = buffer.match(TerminalCapabilityManager.OSC_11_REGEX);
           if (match) {
             bgReceived = true;
-            this.terminalBackgroundColor = this.parseColor(
+            this.terminalBackgroundColor = parseColor(
               match[1],
               match[2],
               match[3],
@@ -173,17 +161,6 @@ export class TerminalCapabilityManager {
             debugLogger.log(
               `Detected modifyOtherKeys support: ${this.modifyOtherKeysSupported} (level ${level})`,
             );
-          }
-        }
-
-        // check for bracketed paste support
-        if (!bracketedPasteReceived) {
-          const match = buffer.match(
-            TerminalCapabilityManager.BRACKETED_PASTE_REGEX,
-          );
-          if (match) {
-            bracketedPasteReceived = true;
-            this.bracketedPasteSupported = true;
           }
         }
 
@@ -223,7 +200,6 @@ export class TerminalCapabilityManager {
             TerminalCapabilityManager.OSC_11_QUERY +
             TerminalCapabilityManager.TERMINAL_NAME_QUERY +
             TerminalCapabilityManager.MODIFY_OTHER_KEYS_QUERY +
-            TerminalCapabilityManager.BRACKETED_PASTE_QUERY +
             TerminalCapabilityManager.DEVICE_ATTRIBUTES_QUERY,
         );
       } catch (e) {
@@ -234,13 +210,17 @@ export class TerminalCapabilityManager {
   }
 
   enableSupportedModes() {
-    if (this.kittySupported) {
-      this.enableKittyProtocol();
-    } else if (this.modifyOtherKeysSupported) {
-      this.enableModifyOtherKeys();
-    }
-    if (this.bracketedPasteSupported) {
-      this.enableBracketedPaste();
+    try {
+      if (this.kittySupported) {
+        enableKittyKeyboardProtocol();
+        this.kittyEnabled = true;
+      } else if (this.modifyOtherKeysSupported) {
+        enableModifyOtherKeys();
+      }
+      // Always enable bracketed paste since it'll be ignored if unsupported.
+      enableBracketedPasteMode();
+    } catch (e) {
+      debugLogger.warn('Failed to enable keyboard protocols:', e);
     }
   }
 
@@ -254,102 +234,6 @@ export class TerminalCapabilityManager {
 
   isKittyProtocolEnabled(): boolean {
     return this.kittyEnabled;
-  }
-
-  isBracketedPasteSupported(): boolean {
-    return this.bracketedPasteSupported;
-  }
-
-  isBracketedPasteEnabled(): boolean {
-    return this.bracketedPasteEnabled;
-  }
-
-  enableBracketedPaste(): void {
-    try {
-      if (this.bracketedPasteSupported) {
-        enableBracketedPasteMode();
-        this.bracketedPasteEnabled = true;
-      }
-    } catch (e) {
-      debugLogger.warn('Failed to enable bracketed paste mode:', e);
-    }
-  }
-
-  disableBracketedPaste(): void {
-    try {
-      if (this.bracketedPasteEnabled) {
-        disableBracketedPasteMode();
-        this.bracketedPasteEnabled = false;
-      }
-    } catch (e) {
-      debugLogger.warn('Failed to disable bracketed paste mode:', e);
-    }
-  }
-
-  enableKittyProtocol(): void {
-    try {
-      if (this.kittySupported) {
-        enableKittyKeyboardProtocol();
-        this.kittyEnabled = true;
-      }
-    } catch (e) {
-      debugLogger.warn('Failed to enable Kitty protocol:', e);
-    }
-  }
-
-  disableKittyProtocol(): void {
-    try {
-      if (this.kittyEnabled) {
-        disableKittyKeyboardProtocol();
-        this.kittyEnabled = false;
-      }
-    } catch (e) {
-      debugLogger.warn('Failed to disable Kitty protocol:', e);
-    }
-  }
-
-  enableModifyOtherKeys(): void {
-    try {
-      if (this.modifyOtherKeysSupported) {
-        enableModifyOtherKeys();
-        this.modifyOtherKeysEnabled = true;
-      }
-    } catch (e) {
-      debugLogger.warn('Failed to enable modifyOtherKeys protocol:', e);
-    }
-  }
-
-  disableModifyOtherKeys(): void {
-    try {
-      if (this.modifyOtherKeysEnabled) {
-        disableModifyOtherKeys();
-        this.modifyOtherKeysEnabled = false;
-      }
-    } catch (e) {
-      debugLogger.warn('Failed to disable modifyOtherKeys protocol:', e);
-    }
-  }
-
-  isModifyOtherKeysEnabled(): boolean {
-    return this.modifyOtherKeysEnabled;
-  }
-
-  private parseColor(rHex: string, gHex: string, bHex: string): string {
-    const parseComponent = (hex: string) => {
-      const val = parseInt(hex, 16);
-      if (hex.length === 1) return (val / 15) * 255;
-      if (hex.length === 2) return val;
-      if (hex.length === 3) return (val / 4095) * 255;
-      if (hex.length === 4) return (val / 65535) * 255;
-      return val;
-    };
-
-    const r = parseComponent(rHex);
-    const g = parseComponent(gHex);
-    const b = parseComponent(bHex);
-
-    const toHex = (c: number) => Math.round(c).toString(16).padStart(2, '0');
-    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
   }
 }
 
