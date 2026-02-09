@@ -1796,7 +1796,7 @@ Sub-agents are specialized expert agents. Each sub-agent is available as a tool 
 
 <available_subagents>
   <subagent>
-    <name>Test Agent</name>
+    <name>test-agent</name>
     <description>A test agent description</description>
   </subagent>
 </available_subagents>
