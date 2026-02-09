@@ -386,6 +386,7 @@ export interface ConfigParameters {
   allowedTools?: string[];
   excludeTools?: string[];
   toolDiscoveryCommand?: string;
+  enableToolDiscovery?: boolean;
   toolCallCommand?: string;
   mcpServerCommand?: string;
   mcpServers?: Record<string, MCPServerConfig>;
@@ -519,6 +520,7 @@ export class Config {
   private readonly allowedTools: string[] | undefined;
   private readonly excludeTools: string[] | undefined;
   private readonly toolDiscoveryCommand: string | undefined;
+  private readonly enableToolDiscovery: boolean;
   private readonly toolCallCommand: string | undefined;
   private readonly mcpServerCommand: string | undefined;
   private readonly mcpEnabled: boolean;
@@ -690,6 +692,7 @@ export class Config {
     this.allowedTools = params.allowedTools;
     this.excludeTools = params.excludeTools;
     this.toolDiscoveryCommand = params.toolDiscoveryCommand;
+    this.enableToolDiscovery = params.enableToolDiscovery ?? false;
     this.toolCallCommand = params.toolCallCommand;
     this.mcpServerCommand = params.mcpServerCommand;
     this.mcpServers = params.mcpServers;
@@ -1502,6 +1505,10 @@ export class Config {
 
   getToolDiscoveryCommand(): string | undefined {
     return this.toolDiscoveryCommand;
+  }
+
+  getEnableToolDiscovery(): boolean {
+    return this.enableToolDiscovery;
   }
 
   getToolCallCommand(): string | undefined {

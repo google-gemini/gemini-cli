@@ -402,6 +402,13 @@ export class ToolRegistry {
       return;
     }
 
+    if (!this.config.getEnableToolDiscovery()) {
+      debugLogger.warn(
+        'Tool discovery is disabled by default. Please enable it in settings to use discovered tools.',
+      );
+      return;
+    }
+
     try {
       const cmdParts = parse(discoveryCmd);
       if (cmdParts.length === 0) {

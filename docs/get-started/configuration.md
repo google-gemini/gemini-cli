@@ -713,6 +713,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
+- **`tools.enableToolDiscovery`** (boolean):
+  - **Description:** Enables the tool discovery feature using
+    `tools.discoveryCommand`.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`tools.callCommand`** (string):
   - **Description:** Defines a custom shell command for invoking discovered
     tools. The command must take the tool name as the first argument, read JSON

@@ -1149,6 +1149,17 @@ const SETTINGS_SCHEMA = {
         description: 'Command to run for tool discovery.',
         showInDialog: false,
       },
+      enableToolDiscovery: {
+        type: 'boolean',
+        label: 'Enable Tool Discovery',
+        category: 'Tools',
+        requiresRestart: true,
+        default: false,
+        description: oneLine`
+          Enables the tool discovery feature using \`tools.discoveryCommand\`.
+        `,
+        showInDialog: true,
+      },
       callCommand: {
         type: 'string',
         label: 'Tool Call Command',

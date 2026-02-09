@@ -218,6 +218,7 @@ describe('ToolRegistry', () => {
     unsubscribe: vi.fn(),
   } as unknown as MessageBus;
   let mockConfigGetToolDiscoveryCommand: ReturnType<typeof vi.spyOn>;
+  let mockConfigGetEnableToolDiscovery: ReturnType<typeof vi.spyOn>;
   let mockConfigGetExcludedTools: MockInstance<
     typeof Config.prototype.getExcludeTools
   >;
@@ -244,6 +245,12 @@ describe('ToolRegistry', () => {
       config,
       'getToolDiscoveryCommand',
     );
+    mockConfigGetEnableToolDiscovery = vi.spyOn(
+      config,
+      'getEnableToolDiscovery',
+    );
+    mockConfigGetEnableToolDiscovery.mockReturnValue(true);
+
     mockConfigGetExcludedTools = vi.spyOn(config, 'getExcludeTools');
     vi.spyOn(config, 'getMcpServers');
     vi.spyOn(config, 'getMcpServerCommand');
@@ -474,6 +481,22 @@ describe('ToolRegistry', () => {
   });
 
   describe('discoverTools', () => {
+    it('should warn and skip discovery if enableToolDiscovery is false', async () => {
+      const discoveryCommand = 'my-discovery-command';
+      mockConfigGetToolDiscoveryCommand.mockReturnValue(discoveryCommand);
+      mockConfigGetEnableToolDiscovery.mockReturnValue(false);
+
+      const warnSpy = vi.spyOn(debugLogger, 'warn');
+      const mockSpawn = vi.mocked(spawn);
+
+      await toolRegistry.discoverAllTools();
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Tool discovery is disabled by default'),
+      );
+      expect(mockSpawn).not.toHaveBeenCalled();
+    });
+
     it('should will preserve tool parametersJsonSchema during discovery from command', async () => {
       const discoveryCommand = 'my-discovery-command';
       mockConfigGetToolDiscoveryCommand.mockReturnValue(discoveryCommand);
@@ -685,8 +708,10 @@ describe('ToolRegistry', () => {
         mockSpawn.mockReturnValue(createExecutionProcess(0) as any);
         vi.spyOn(config, 'getToolCallCommand').mockReturnValue('python');
 
-        if (process.getuid) vi.spyOn(process, 'getuid').mockReturnValue(1000);
-        if (process.getgid) vi.spyOn(process, 'getgid').mockReturnValue(1000);
+        if (process.getuid)
+          vi.spyOn(process, 'getuid' as any).mockReturnValue(1000);
+        if (process.getgid)
+          vi.spyOn(process, 'getgid' as any).mockReturnValue(1000);
 
         // Clear env vars that might be propagated to the sandbox to ensure predictable test results
         [
@@ -708,7 +733,8 @@ describe('ToolRegistry', () => {
         vi.unstubAllEnvs();
       });
 
-      const createTool = () => new DiscoveredTool(
+      const createTool = () =>
+        new DiscoveredTool(
           config,
           'myscript.py',
           DISCOVERED_TOOL_PREFIX + 'myscript',
