@@ -32,16 +32,6 @@ export interface ReadFileToolParams {
    * The path to the file to read
    */
   file_path: string;
-
-  /**
-   * The line number to start reading from (optional)
-   */
-  offset?: number;
-
-  /**
-   * The number of lines to read (optional)
-   */
-  limit?: number;
 }
 
 class ReadFileToolInvocation extends BaseToolInvocation<
@@ -72,7 +62,7 @@ class ReadFileToolInvocation extends BaseToolInvocation<
   }
 
   override toolLocations(): ToolLocation[] {
-    return [{ path: this.resolvedPath, line: this.params.offset }];
+    return [{ path: this.resolvedPath }];
   }
 
   async execute(): Promise<ToolResult> {
@@ -91,9 +81,6 @@ class ReadFileToolInvocation extends BaseToolInvocation<
     const result = await processSingleFileContent(
       this.resolvedPath,
       this.config.getTargetDir(),
-      this.config.getFileSystemService(),
-      this.params.offset,
-      this.params.limit,
     );
 
     if (result.error) {
@@ -109,15 +96,14 @@ class ReadFileToolInvocation extends BaseToolInvocation<
 
     let llmContent: PartUnion;
     if (result.isTruncated) {
-      const [start, end] = result.linesShown!;
       const total = result.originalLineCount!;
-      const nextOffset = this.params.offset
-        ? this.params.offset + end - start + 1
-        : end;
       llmContent = `
 IMPORTANT: The file content has been truncated.
-Status: Showing lines ${start}-${end} of ${total} total lines.
-Action: To read more of the file, you can use the 'offset' and 'limit' parameters in a subsequent 'read_file' call. For example, to read the next section of the file, use offset: ${nextOffset}.
+Status: Showing the first 2000 lines of ${total} total lines.
+Action: 
+- To find specific patterns, use the 'grep_search' tool.
+- To read a specific line range, use 'run_shell_command' with 'sed'. For example: 'sed -n "500,600p" ${this.params.file_path}'.
+- You can also use other Unix utilities like 'awk', 'head', or 'tail' via 'run_shell_command'.
 
 --- FILE CONTENT (truncated) ---
 ${result.llmContent}`;
@@ -169,23 +155,13 @@ export class ReadFileTool extends BaseDeclarativeTool<
     super(
       ReadFileTool.Name,
       'ReadFile',
-      `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files. For text files, it can read specific line ranges.`,
+      `Reads and returns the content of a specified file. If the file is large (exceeding 2000 lines), the content will be truncated to the first 2000 lines. The tool's response will clearly indicate if truncation has occurred. To examine specific sections of large files, use the 'run_shell_command' tool with standard Unix utilities like 'grep', 'sed', 'awk', 'head', or 'tail'. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files.`,
       Kind.Read,
       {
         properties: {
           file_path: {
             description: 'The path to the file to read.',
             type: 'string',
-          },
-          offset: {
-            description:
-              "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
-            type: 'number',
-          },
-          limit: {
-            description:
-              "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (if feasible, up to a default limit).",
-            type: 'number',
           },
         },
         required: ['file_path'],
@@ -216,13 +192,6 @@ export class ReadFileTool extends BaseDeclarativeTool<
     const validationError = this.config.validatePathAccess(resolvedPath);
     if (validationError) {
       return validationError;
-    }
-
-    if (params.offset !== undefined && params.offset < 0) {
-      return 'Offset must be a non-negative number';
-    }
-    if (params.limit !== undefined && params.limit <= 0) {
-      return 'Limit must be a positive number';
     }
 
     const fileFilteringOptions = this.config.getFileFilteringOptions();

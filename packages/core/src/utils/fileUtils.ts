@@ -392,23 +392,21 @@ export interface ProcessedFileReadResult {
   errorType?: ToolErrorType; // Structured error type
   isTruncated?: boolean; // For text files, indicates if content was truncated
   originalLineCount?: number; // For text files
-  linesShown?: [number, number]; // For text files [startLine, endLine] (1-based for display)
 }
 
 /**
  * Reads and processes a single file, handling text, images, and PDFs.
  * @param filePath Absolute path to the file.
  * @param rootDirectory Absolute path to the project root for relative path display.
- * @param offset Optional offset for text files (0-based line number).
- * @param limit Optional limit for text files (number of lines to read).
  * @returns ProcessedFileReadResult object.
  */
 export async function processSingleFileContent(
   filePath: string,
   rootDirectory: string,
-  fileSystemService: FileSystemService,
-  offset?: number,
-  limit?: number,
+  // TODO: remove unused vars from other areas
+  _fileSystemService?: FileSystemService,
+  _offset?: number,
+  _limit?: number,
 ): Promise<ProcessedFileReadResult> {
   try {
     if (!fs.existsSync(filePath)) {
@@ -474,14 +472,11 @@ export async function processSingleFileContent(
         const lines = content.split('\n');
         const originalLineCount = lines.length;
 
-        const startLine = offset || 0;
-        const effectiveLimit =
-          limit === undefined ? DEFAULT_MAX_LINES_TEXT_FILE : limit;
-        // Ensure endLine does not exceed originalLineCount
-        const endLine = Math.min(startLine + effectiveLimit, originalLineCount);
-        // Ensure selectedLines doesn't try to slice beyond array bounds if startLine is too high
-        const actualStartLine = Math.min(startLine, originalLineCount);
-        const selectedLines = lines.slice(actualStartLine, endLine);
+        const isTruncatedInLines =
+          originalLineCount > DEFAULT_MAX_LINES_TEXT_FILE;
+        const selectedLines = isTruncatedInLines
+          ? lines.slice(0, DEFAULT_MAX_LINES_TEXT_FILE)
+          : lines;
 
         let linesWereTruncatedInLength = false;
         const formattedLines = selectedLines.map((line) => {
@@ -494,17 +489,13 @@ export async function processSingleFileContent(
           return line;
         });
 
-        const contentRangeTruncated =
-          startLine > 0 || endLine < originalLineCount;
-        const isTruncated = contentRangeTruncated || linesWereTruncatedInLength;
+        const isTruncated = isTruncatedInLines || linesWereTruncatedInLength;
         const llmContent = formattedLines.join('\n');
 
         // By default, return nothing to streamline the common case of a successful read_file.
         let returnDisplay = '';
-        if (contentRangeTruncated) {
-          returnDisplay = `Read lines ${
-            actualStartLine + 1
-          }-${endLine} of ${originalLineCount} from ${relativePathForDisplay}`;
+        if (isTruncatedInLines) {
+          returnDisplay = `Read first ${DEFAULT_MAX_LINES_TEXT_FILE} lines of ${originalLineCount} from ${relativePathForDisplay}`;
           if (linesWereTruncatedInLength) {
             returnDisplay += ' (some lines were shortened)';
           }
@@ -517,7 +508,6 @@ export async function processSingleFileContent(
           returnDisplay,
           isTruncated,
           originalLineCount,
-          linesShown: [actualStartLine + 1, endLine],
         };
       }
       case 'image':

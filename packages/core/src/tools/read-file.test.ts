@@ -129,26 +129,6 @@ describe('ReadFileTool', () => {
         /The 'file_path' parameter must be non-empty./,
       );
     });
-
-    it('should throw error if offset is negative', () => {
-      const params: ReadFileToolParams = {
-        file_path: path.join(tempRootDir, 'test.txt'),
-        offset: -1,
-      };
-      expect(() => tool.build(params)).toThrow(
-        'Offset must be a non-negative number',
-      );
-    });
-
-    it('should throw error if limit is zero or negative', () => {
-      const params: ReadFileToolParams = {
-        file_path: path.join(tempRootDir, 'test.txt'),
-        limit: 0,
-      };
-      expect(() => tool.build(params)).toThrow(
-        'Limit must be a positive number',
-      );
-    });
   });
 
   describe('getDescription', () => {
@@ -391,34 +371,6 @@ describe('ReadFileTool', () => {
       const result = await invocation.execute(abortSignal);
       expect(result.llmContent).toBe('');
       expect(result.returnDisplay).toBe('');
-    });
-
-    it('should support offset and limit for text files', async () => {
-      const filePath = path.join(tempRootDir, 'paginated.txt');
-      const lines = Array.from({ length: 20 }, (_, i) => `Line ${i + 1}`);
-      const fileContent = lines.join('\n');
-      await fsp.writeFile(filePath, fileContent, 'utf-8');
-
-      const params: ReadFileToolParams = {
-        file_path: filePath,
-        offset: 5, // Start from line 6
-        limit: 3,
-      };
-      const invocation = tool.build(params);
-
-      const result = await invocation.execute(abortSignal);
-      expect(result.llmContent).toContain(
-        'IMPORTANT: The file content has been truncated',
-      );
-      expect(result.llmContent).toContain(
-        'Status: Showing lines 6-8 of 20 total lines',
-      );
-      expect(result.llmContent).toContain('Line 6');
-      expect(result.llmContent).toContain('Line 7');
-      expect(result.llmContent).toContain('Line 8');
-      expect(result.returnDisplay).toBe(
-        'Read lines 6-8 of 20 from paginated.txt',
-      );
     });
 
     it('should successfully read files from project temp directory', async () => {

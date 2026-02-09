@@ -765,7 +765,6 @@ describe('fileUtils', () => {
       const result = await processSingleFileContent(
         testTextFilePath,
         tempRootDir,
-        new StandardFileSystemService(),
       );
       expect(result.llmContent).toBe(content);
       expect(result.returnDisplay).toBe('');
@@ -776,7 +775,6 @@ describe('fileUtils', () => {
       const result = await processSingleFileContent(
         nonexistentFilePath,
         tempRootDir,
-        new StandardFileSystemService(),
       );
       expect(result.error).toContain('File not found');
       expect(result.returnDisplay).toContain('File not found');
@@ -790,7 +788,6 @@ describe('fileUtils', () => {
       const result = await processSingleFileContent(
         testTextFilePath,
         tempRootDir,
-        new StandardFileSystemService(),
       );
       expect(result.error).toContain('Simulated read error');
       expect(result.returnDisplay).toContain('Simulated read error');
@@ -805,7 +802,6 @@ describe('fileUtils', () => {
       const result = await processSingleFileContent(
         testImageFilePath,
         tempRootDir,
-        new StandardFileSystemService(),
       );
       expect(result.error).toContain('Simulated image read error');
       expect(result.returnDisplay).toContain('Simulated image read error');
@@ -818,7 +814,6 @@ describe('fileUtils', () => {
       const result = await processSingleFileContent(
         testImageFilePath,
         tempRootDir,
-        new StandardFileSystemService(),
       );
       expect(
         (result.llmContent as { inlineData: unknown }).inlineData,
@@ -840,7 +835,6 @@ describe('fileUtils', () => {
       const result = await processSingleFileContent(
         testPdfFilePath,
         tempRootDir,
-        new StandardFileSystemService(),
       );
       expect(
         (result.llmContent as { inlineData: unknown }).inlineData,
@@ -865,7 +859,6 @@ describe('fileUtils', () => {
       const result = await processSingleFileContent(
         testAudioFilePath,
         tempRootDir,
-        new StandardFileSystemService(),
       );
       expect(
         (result.llmContent as { inlineData: unknown }).inlineData,
@@ -894,7 +887,6 @@ describe('fileUtils', () => {
       const result = await processSingleFileContent(
         testSvgFilePath,
         tempRootDir,
-        new StandardFileSystemService(),
       );
 
       expect(result.llmContent).toBe(svgContent);
@@ -912,7 +904,6 @@ describe('fileUtils', () => {
       const result = await processSingleFileContent(
         testBinaryFilePath,
         tempRootDir,
-        new StandardFileSystemService(),
       );
       expect(result.llmContent).toContain(
         'Cannot display content of binary file',
@@ -921,74 +912,26 @@ describe('fileUtils', () => {
     });
 
     it('should handle path being a directory', async () => {
-      const result = await processSingleFileContent(
-        directoryPath,
-        tempRootDir,
-        new StandardFileSystemService(),
-      );
+      const result = await processSingleFileContent(directoryPath, tempRootDir);
       expect(result.error).toContain('Path is a directory');
       expect(result.returnDisplay).toContain('Path is a directory');
     });
 
-    it('should paginate text files correctly (offset and limit)', async () => {
-      const lines = Array.from({ length: 20 }, (_, i) => `Line ${i + 1}`);
+    it('should truncate text files exceeding 2000 lines by default', async () => {
+      const lines = Array.from({ length: 2500 }, (_, i) => `Line ${i + 1}`);
       actualNodeFs.writeFileSync(testTextFilePath, lines.join('\n'));
 
       const result = await processSingleFileContent(
         testTextFilePath,
         tempRootDir,
-        new StandardFileSystemService(),
-        5,
-        5,
-      ); // Read lines 6-10
-      const expectedContent = lines.slice(5, 10).join('\n');
+      );
 
-      expect(result.llmContent).toBe(expectedContent);
-      expect(result.returnDisplay).toBe('Read lines 6-10 of 20 from test.txt');
+      expect(result.llmContent.toString().split('\n').length).toBe(2000);
+      expect(result.returnDisplay).toBe(
+        'Read first 2000 lines of 2500 from test.txt',
+      );
       expect(result.isTruncated).toBe(true);
-      expect(result.originalLineCount).toBe(20);
-      expect(result.linesShown).toEqual([6, 10]);
-    });
-
-    it('should identify truncation when reading the end of a file', async () => {
-      const lines = Array.from({ length: 20 }, (_, i) => `Line ${i + 1}`);
-      actualNodeFs.writeFileSync(testTextFilePath, lines.join('\n'));
-
-      // Read from line 11 to 20. The start is not 0, so it's truncated.
-      const result = await processSingleFileContent(
-        testTextFilePath,
-        tempRootDir,
-        new StandardFileSystemService(),
-        10,
-        10,
-      );
-      const expectedContent = lines.slice(10, 20).join('\n');
-
-      expect(result.llmContent).toContain(expectedContent);
-      expect(result.returnDisplay).toBe('Read lines 11-20 of 20 from test.txt');
-      expect(result.isTruncated).toBe(true); // This is the key check for the bug
-      expect(result.originalLineCount).toBe(20);
-      expect(result.linesShown).toEqual([11, 20]);
-    });
-
-    it('should handle limit exceeding file length', async () => {
-      const lines = ['Line 1', 'Line 2'];
-      actualNodeFs.writeFileSync(testTextFilePath, lines.join('\n'));
-
-      const result = await processSingleFileContent(
-        testTextFilePath,
-        tempRootDir,
-        new StandardFileSystemService(),
-        0,
-        10,
-      );
-      const expectedContent = lines.join('\n');
-
-      expect(result.llmContent).toBe(expectedContent);
-      expect(result.returnDisplay).toBe('');
-      expect(result.isTruncated).toBe(false);
-      expect(result.originalLineCount).toBe(2);
-      expect(result.linesShown).toEqual([1, 2]);
+      expect(result.originalLineCount).toBe(2500);
     });
 
     it('should truncate long lines in text files', async () => {
@@ -1001,7 +944,6 @@ describe('fileUtils', () => {
       const result = await processSingleFileContent(
         testTextFilePath,
         tempRootDir,
-        new StandardFileSystemService(),
       );
 
       expect(result.llmContent).toContain('Short line');
@@ -1013,69 +955,6 @@ describe('fileUtils', () => {
         'Read all 3 lines from test.txt (some lines were shortened)',
       );
       expect(result.isTruncated).toBe(true);
-    });
-
-    it('should truncate when line count exceeds the limit', async () => {
-      const lines = Array.from({ length: 11 }, (_, i) => `Line ${i + 1}`);
-      actualNodeFs.writeFileSync(testTextFilePath, lines.join('\n'));
-
-      // Read 5 lines, but there are 11 total
-      const result = await processSingleFileContent(
-        testTextFilePath,
-        tempRootDir,
-        new StandardFileSystemService(),
-        0,
-        5,
-      );
-
-      expect(result.isTruncated).toBe(true);
-      expect(result.returnDisplay).toBe('Read lines 1-5 of 11 from test.txt');
-    });
-
-    it('should truncate when a line length exceeds the character limit', async () => {
-      const longLine = 'b'.repeat(2500);
-      const lines = Array.from({ length: 10 }, (_, i) => `Line ${i + 1}`);
-      lines.push(longLine); // Total 11 lines
-      actualNodeFs.writeFileSync(testTextFilePath, lines.join('\n'));
-
-      // Read all 11 lines, including the long one
-      const result = await processSingleFileContent(
-        testTextFilePath,
-        tempRootDir,
-        new StandardFileSystemService(),
-        0,
-        11,
-      );
-
-      expect(result.isTruncated).toBe(true);
-      expect(result.returnDisplay).toBe(
-        'Read all 11 lines from test.txt (some lines were shortened)',
-      );
-    });
-
-    it('should truncate both line count and line length when both exceed limits', async () => {
-      const linesWithLongInMiddle = Array.from(
-        { length: 20 },
-        (_, i) => `Line ${i + 1}`,
-      );
-      linesWithLongInMiddle[4] = 'c'.repeat(2500);
-      actualNodeFs.writeFileSync(
-        testTextFilePath,
-        linesWithLongInMiddle.join('\n'),
-      );
-
-      // Read 10 lines out of 20, including the long line
-      const result = await processSingleFileContent(
-        testTextFilePath,
-        tempRootDir,
-        new StandardFileSystemService(),
-        0,
-        10,
-      );
-      expect(result.isTruncated).toBe(true);
-      expect(result.returnDisplay).toBe(
-        'Read lines 1-10 of 20 from test.txt (some lines were shortened)',
-      );
     });
 
     it('should return an error if the file size exceeds 20MB', async () => {
