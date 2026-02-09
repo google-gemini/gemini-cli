@@ -261,6 +261,17 @@ describe('ToolRegistry', () => {
       toolRegistry.registerTool(tool);
       expect(toolRegistry.getTool('mock-tool')).toBe(tool);
     });
+
+    it('should pass modelId to getSchema when getting function declarations', () => {
+      const tool = new MockTool({ name: 'mock-tool' });
+      const getSchemaSpy = vi.spyOn(tool, 'getSchema');
+      toolRegistry.registerTool(tool);
+
+      const modelId = 'test-model-id';
+      toolRegistry.getFunctionDeclarations(modelId);
+
+      expect(getSchemaSpy).toHaveBeenCalledWith(modelId);
+    });
   });
 
   describe('excluded tools', () => {
