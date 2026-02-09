@@ -118,6 +118,17 @@ export interface AgentsDiscoveredPayload {
   agents: AgentDefinition[];
 }
 
+export interface SlashCommandConflict {
+  name: string;
+  renamedTo: string;
+  loserExtensionName?: string;
+  winnerExtensionName?: string;
+}
+
+export interface SlashCommandConflictsPayload {
+  conflicts: SlashCommandConflict[];
+}
+
 export enum CoreEvent {
   UserFeedback = 'user-feedback',
   ModelChanged = 'model-changed',
@@ -134,6 +145,7 @@ export enum CoreEvent {
   AdminSettingsChanged = 'admin-settings-changed',
   RetryAttempt = 'retry-attempt',
   AgentsDiscovered = 'agents-discovered',
+  SlashCommandConflicts = 'slash-command-conflicts',
 }
 
 export interface CoreEvents extends ExtensionEvents {
@@ -152,6 +164,7 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.AdminSettingsChanged]: never[];
   [CoreEvent.RetryAttempt]: [RetryAttemptPayload];
   [CoreEvent.AgentsDiscovered]: [AgentsDiscoveredPayload];
+  [CoreEvent.SlashCommandConflicts]: [SlashCommandConflictsPayload];
 }
 
 type EventBacklogItem = {
@@ -280,6 +293,11 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   emitAgentsDiscovered(agents: AgentDefinition[]): void {
     const payload: AgentsDiscoveredPayload = { agents };
     this._emitOrQueue(CoreEvent.AgentsDiscovered, payload);
+  }
+
+  emitSlashCommandConflicts(conflicts: SlashCommandConflict[]): void {
+    const payload: SlashCommandConflictsPayload = { conflicts };
+    this._emitOrQueue(CoreEvent.SlashCommandConflicts, payload);
   }
 
   /**

@@ -4,15 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { debugLogger } from '@google/gemini-cli-core';
+import { debugLogger, coreEvents } from '@google/gemini-cli-core';
 import type { SlashCommand } from '../ui/commands/types.js';
 import type { ICommandLoader } from './types.js';
 
 export interface CommandConflict {
   name: string;
   winner: SlashCommand;
-  loser: SlashCommand;
-  renamedTo: string;
+  losers: Array<{
+    command: SlashCommand;
+    renamedTo: string;
+  }>;
 }
 
 /**
@@ -74,7 +76,7 @@ export class CommandService {
     }
 
     const commandMap = new Map<string, SlashCommand>();
-    const conflicts: CommandConflict[] = [];
+    const conflictsMap = new Map<string, CommandConflict>();
 
     for (const cmd of allCommands) {
       let finalName = cmd.name;
@@ -93,10 +95,16 @@ export class CommandService {
 
         finalName = renamedName;
 
-        conflicts.push({
-          name: cmd.name,
-          winner,
-          loser: cmd,
+        if (!conflictsMap.has(cmd.name)) {
+          conflictsMap.set(cmd.name, {
+            name: cmd.name,
+            winner,
+            losers: [],
+          });
+        }
+
+        conflictsMap.get(cmd.name)!.losers.push({
+          command: cmd,
           renamedTo: finalName,
         });
       }
@@ -105,6 +113,20 @@ export class CommandService {
         ...cmd,
         name: finalName,
       });
+    }
+
+    const conflicts = Array.from(conflictsMap.values());
+    if (conflicts.length > 0) {
+      coreEvents.emitSlashCommandConflicts(
+        conflicts.flatMap((c) =>
+          c.losers.map((l) => ({
+            name: c.name,
+            renamedTo: l.renamedTo,
+            loserExtensionName: l.command.extensionName,
+            winnerExtensionName: c.winner.extensionName,
+          })),
+        ),
+      );
     }
 
     const finalCommands = Object.freeze(Array.from(commandMap.values()));

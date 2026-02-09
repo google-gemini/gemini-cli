@@ -373,12 +373,16 @@ describe('CommandService', () => {
 
     expect(conflicts[0]).toMatchObject({
       name: 'deploy',
-      renamedTo: 'firebase.deploy',
-    });
-    expect(conflicts[0].winner).toEqual(builtinCommand);
-    expect(conflicts[0].loser).toMatchObject({
-      name: 'deploy',
-      extensionName: 'firebase',
+      winner: builtinCommand,
+      losers: [
+        {
+          renamedTo: 'firebase.deploy',
+          command: expect.objectContaining({
+            name: 'deploy',
+            extensionName: 'firebase',
+          }),
+        },
+      ],
     });
   });
 
@@ -408,17 +412,55 @@ describe('CommandService', () => {
 
     expect(conflicts[0]).toMatchObject({
       name: 'deploy',
-      renamedTo: 'aws.deploy', // ext2 is 'aws' and it lost because it was second in the list
+      winner: expect.objectContaining({
+        name: 'deploy',
+        extensionName: 'firebase',
+      }),
+      losers: [
+        {
+          renamedTo: 'aws.deploy', // ext2 is 'aws' and it lost because it was second in the list
+          command: expect.objectContaining({
+            name: 'deploy',
+            extensionName: 'aws',
+          }),
+        },
+      ],
     });
+  });
 
-    expect(conflicts[0].winner).toMatchObject({
-      name: 'deploy',
-      extensionName: 'firebase',
-    });
+  it('should report multiple conflicts for the same command name', async () => {
+    const builtinCommand = createMockCommand('deploy', CommandKind.BUILT_IN);
+    const ext1 = {
+      ...createMockCommand('deploy', CommandKind.FILE),
+      extensionName: 'ext1',
+    };
+    const ext2 = {
+      ...createMockCommand('deploy', CommandKind.FILE),
+      extensionName: 'ext2',
+    };
 
-    expect(conflicts[0].loser).toMatchObject({
-      name: 'deploy',
-      extensionName: 'aws',
-    });
+    const mockLoader = new MockCommandLoader([builtinCommand, ext1, ext2]);
+
+    const service = await CommandService.create(
+      [mockLoader],
+      new AbortController().signal,
+    );
+
+    const conflicts = service.getConflicts();
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0].name).toBe('deploy');
+    expect(conflicts[0].losers).toHaveLength(2);
+    expect(conflicts[0].losers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          renamedTo: 'ext1.deploy',
+          command: expect.objectContaining({ extensionName: 'ext1' }),
+        }),
+        expect.objectContaining({
+          renamedTo: 'ext2.deploy',
+          command: expect.objectContaining({ extensionName: 'ext2' }),
+        }),
+      ]),
+    );
   });
 });

@@ -21,6 +21,7 @@ import type {
   ExtensionsStoppingEvent,
   ToolCallConfirmationDetails,
   AgentDefinition,
+  SlashCommandConflictsPayload,
 } from '@google/gemini-cli-core';
 import {
   GitService,
@@ -35,6 +36,7 @@ import {
   addMCPStatusChangeListener,
   removeMCPStatusChangeListener,
   MCPDiscoveryState,
+  CoreEvent,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import type {
@@ -313,6 +315,43 @@ export const useSlashCommandProcessor = (
   }, [config, reloadCommands]);
 
   useEffect(() => {
+    const handleConflicts = (payload: SlashCommandConflictsPayload) => {
+      const newConflicts = payload.conflicts.filter((c) => {
+        const key = `${c.name}:${c.loserExtensionName}`;
+        if (notifiedConflictsRef.current.has(key)) {
+          return false;
+        }
+        notifiedConflictsRef.current.add(key);
+        return true;
+      });
+
+      if (newConflicts.length > 0) {
+        const conflictMessages = newConflicts
+          .map((c) => {
+            const winnerSource = c.winnerExtensionName
+              ? `extension '${c.winnerExtensionName}'`
+              : 'an existing command';
+            return `- Command '/${c.name}' from extension '${c.loserExtensionName}' was renamed to '/${c.renamedTo}' because it conflicts with ${winnerSource}.`;
+          })
+          .join('\n');
+
+        addItem(
+          {
+            type: MessageType.INFO,
+            text: `Command conflicts detected:\n${conflictMessages}`,
+          },
+          Date.now(),
+        );
+      }
+    };
+
+    coreEvents.on(CoreEvent.SlashCommandConflicts, handleConflicts);
+    return () => {
+      coreEvents.off(CoreEvent.SlashCommandConflicts, handleConflicts);
+    };
+  }, [addItem]);
+
+  useEffect(() => {
     const controller = new AbortController();
 
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -325,42 +364,18 @@ export const useSlashCommandProcessor = (
         ],
         controller.signal,
       );
-      setCommands(commandService.getCommands());
 
-      const conflicts = commandService.getConflicts();
-      const newConflicts = conflicts.filter((c) => {
-        const key = `${c.name}:${c.loser.extensionName}`;
-        if (notifiedConflictsRef.current.has(key)) {
-          return false;
-        }
-        notifiedConflictsRef.current.add(key);
-        return true;
-      });
-
-      if (newConflicts.length > 0) {
-        const conflictMessages = newConflicts
-          .map((c) => {
-            const winnerSource = c.winner.extensionName
-              ? `extension '${c.winner.extensionName}'`
-              : 'an existing command';
-            return `- Command '/${c.name}' from extension '${c.loser.extensionName}' was renamed to '/${c.renamedTo}' because it conflicts with ${winnerSource}.`;
-          })
-          .join('\n');
-
-        addItem(
-          {
-            type: MessageType.INFO,
-            text: `Command conflicts detected:\n${conflictMessages}`,
-          },
-          Date.now(),
-        );
+      if (controller.signal.aborted) {
+        return;
       }
+
+      setCommands(commandService.getCommands());
     })();
 
     return () => {
       controller.abort();
     };
-  }, [config, reloadTrigger, isConfigInitialized, addItem]);
+  }, [config, reloadTrigger, isConfigInitialized]);
 
   const handleSlashCommand = useCallback(
     async (
