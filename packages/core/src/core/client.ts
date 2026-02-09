@@ -324,7 +324,10 @@ export class GeminiClient {
 
     const toolRegistry = this.config.getToolRegistry();
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
-    const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
+    const tools: Tool[] =
+      this.config.getJsonSchema() && !this.config.getEnableTools()
+        ? []
+        : [{ functionDeclarations: toolDeclarations }];
 
     const history = await getInitialChatHistory(this.config, extraHistory);
 

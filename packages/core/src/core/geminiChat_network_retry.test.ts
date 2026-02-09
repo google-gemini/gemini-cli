@@ -103,6 +103,7 @@ describe('GeminiChat Network Retries', () => {
       getModelAvailabilityService: vi
         .fn()
         .mockReturnValue(createAvailabilityServiceMock()),
+      getJsonSchema: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     const mockMessageBus = createMockMessageBus();

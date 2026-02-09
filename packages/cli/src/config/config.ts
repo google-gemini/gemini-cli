@@ -7,6 +7,7 @@
 import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
+import fs from 'node:fs';
 import { mcpCommand } from '../commands/mcp.js';
 import { extensionsCommand } from '../commands/extensions.js';
 import { skillsCommand } from '../commands/skills.js';
@@ -77,6 +78,8 @@ export interface CliArgs {
   approvalMode: string | undefined;
   allowedMcpServerNames: string[] | undefined;
   allowedTools: string[] | undefined;
+  enableTools: boolean | undefined;
+  schemaFile: object | undefined;
   experimentalAcp: boolean | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
@@ -181,6 +184,50 @@ export async function parseArguments(
           coerce: (tools: string[]) =>
             // Handle comma-separated values
             tools.flatMap((tool) => tool.split(',').map((t) => t.trim())),
+        })
+        .option('schema-file', {
+          type: 'string',
+          string: true,
+          description:
+            'Path to a JSON schema file for structured output. Implies --output-format json. Tools are disabled by default.',
+          coerce: async (filePath: string) => {
+            const resolvedPath = resolvePath(filePath);
+            try {
+              await fs.promises.access(resolvedPath, fs.constants.F_OK);
+            } catch (_e) {
+              throw new Error(`Schema file not found: ${resolvedPath}`);
+            }
+
+            const stats = await fs.promises.stat(resolvedPath);
+            const ONE_MB = 1024 * 1024;
+            if (stats.size > ONE_MB) {
+              throw new Error('Schema file too large (max 1MB)');
+            }
+
+            let schema;
+            try {
+              const fileContent = await fs.promises.readFile(
+                resolvedPath,
+                'utf-8',
+              );
+              schema = JSON.parse(fileContent);
+            } catch (_e) {
+              throw new Error(`Invalid JSON in schema file: ${resolvedPath}`);
+            }
+
+            if (!schema.type && !schema.properties) {
+              throw new Error(
+                'Invalid JSON schema: must have "type" or "properties"',
+              );
+            }
+
+            return schema;
+          },
+        })
+        .option('enable-tools', {
+          type: 'boolean',
+          description:
+            'Re-enable tool usage when using --schema-file (tools are disabled by default with schemas)',
         })
         .option('extensions', {
           alias: 'e',
@@ -301,6 +348,18 @@ export async function parseArguments(
         )
       ) {
         return `Invalid values:\n  Argument: output-format, Given: "${argv['outputFormat']}", Choices: "text", "json", "stream-json"`;
+      }
+      if (argv['enableTools'] && !argv['schemaFile']) {
+        throw new Error('--enable-tools requires --schema-file');
+      }
+      if (
+        argv['schemaFile'] &&
+        (argv['outputFormat'] === 'text' ||
+          argv['outputFormat'] === 'stream-json')
+      ) {
+        throw new Error(
+          'Cannot use --schema-file with --output-format text or stream-json',
+        );
       }
       return true;
     });
@@ -722,6 +781,8 @@ export async function loadCliConfig(
     allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
     policyEngineConfig,
     excludeTools,
+    enableTools: argv.enableTools,
+    jsonSchema: argv.schemaFile,
     toolDiscoveryCommand: settings.tools?.discoveryCommand,
     toolCallCommand: settings.tools?.callCommand,
     mcpServerCommand,
@@ -802,7 +863,10 @@ export async function loadCliConfig(
     eventEmitter: coreEvents,
     useWriteTodos: argv.useWriteTodos ?? settings.useWriteTodos,
     output: {
-      format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
+      // --schema-file implies --output-format json
+      format: (argv.schemaFile
+        ? 'json'
+        : (argv.outputFormat ?? settings.output?.format)) as OutputFormat,
     },
     fakeResponses: argv.fakeResponses,
     recordResponses: argv.recordResponses,

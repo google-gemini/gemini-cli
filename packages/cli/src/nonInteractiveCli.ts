@@ -480,13 +480,18 @@ export async function runNonInteractive({
                 ),
               });
             } else if (config.getOutputFormat() === OutputFormat.JSON) {
-              const formatter = new JsonFormatter();
-              const stats = uiTelemetryService.getMetrics();
-              textOutput.write(
-                formatter.format(config.getSessionId(), responseText, stats),
-              );
+              if (config.getJsonSchema()) {
+                textOutput.write(responseText);
+                textOutput.ensureTrailingNewline();
+              } else {
+                const formatter = new JsonFormatter();
+                const stats = uiTelemetryService.getMetrics();
+                textOutput.write(
+                  formatter.format(config.getSessionId(), responseText, stats),
+                );
+              }
             } else {
-              textOutput.ensureTrailingNewline(); // Ensure a final newline
+              textOutput.ensureTrailingNewline();
             }
             return;
           }
@@ -504,13 +509,18 @@ export async function runNonInteractive({
               stats: streamFormatter.convertToStreamStats(metrics, durationMs),
             });
           } else if (config.getOutputFormat() === OutputFormat.JSON) {
-            const formatter = new JsonFormatter();
-            const stats = uiTelemetryService.getMetrics();
-            textOutput.write(
-              formatter.format(config.getSessionId(), responseText, stats),
-            );
+            if (config.getJsonSchema()) {
+              textOutput.write(responseText);
+              textOutput.ensureTrailingNewline();
+            } else {
+              const formatter = new JsonFormatter();
+              const stats = uiTelemetryService.getMetrics();
+              textOutput.write(
+                formatter.format(config.getSessionId(), responseText, stats),
+              );
+            }
           } else {
-            textOutput.ensureTrailingNewline(); // Ensure a final newline
+            textOutput.ensureTrailingNewline();
           }
           return;
         }
