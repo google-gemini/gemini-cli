@@ -684,11 +684,37 @@ priority = 150
       },
     );
 
+    const mockStat = vi.fn(
+      async (
+        path: Parameters<typeof actualFs.stat>[0],
+        options?: Parameters<typeof actualFs.stat>[1],
+      ) => {
+        if (
+          typeof path === 'string' &&
+          nodePath
+            .normalize(path)
+            .includes(nodePath.normalize('.gemini/policies'))
+        ) {
+          return {
+            isDirectory: () => true,
+            isFile: () => false,
+          } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
+        }
+        return actualFs.stat(path, options);
+      },
+    );
+
     vi.doMock('node:fs/promises', () => ({
       ...actualFs,
-      default: { ...actualFs, readFile: mockReadFile, readdir: mockReaddir },
+      default: {
+        ...actualFs,
+        readFile: mockReadFile,
+        readdir: mockReaddir,
+        stat: mockStat,
+      },
       readFile: mockReadFile,
       readdir: mockReaddir,
+      stat: mockStat,
     }));
 
     vi.resetModules();
@@ -787,11 +813,37 @@ required_context = ["environment"]
       },
     );
 
+    const mockStat = vi.fn(
+      async (
+        path: Parameters<typeof actualFs.stat>[0],
+        options?: Parameters<typeof actualFs.stat>[1],
+      ) => {
+        if (
+          typeof path === 'string' &&
+          nodePath
+            .normalize(path)
+            .includes(nodePath.normalize('.gemini/policies'))
+        ) {
+          return {
+            isDirectory: () => true,
+            isFile: () => false,
+          } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
+        }
+        return actualFs.stat(path, options);
+      },
+    );
+
     vi.doMock('node:fs/promises', () => ({
       ...actualFs,
-      default: { ...actualFs, readFile: mockReadFile, readdir: mockReaddir },
+      default: {
+        ...actualFs,
+        readFile: mockReadFile,
+        readdir: mockReaddir,
+        stat: mockStat,
+      },
       readFile: mockReadFile,
       readdir: mockReaddir,
+      stat: mockStat,
     }));
 
     vi.resetModules();
@@ -883,11 +935,37 @@ name = "invalid-name"
       },
     );
 
+    const mockStat = vi.fn(
+      async (
+        path: Parameters<typeof actualFs.stat>[0],
+        options?: Parameters<typeof actualFs.stat>[1],
+      ) => {
+        if (
+          typeof path === 'string' &&
+          nodePath
+            .normalize(path)
+            .includes(nodePath.normalize('.gemini/policies'))
+        ) {
+          return {
+            isDirectory: () => true,
+            isFile: () => false,
+          } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
+        }
+        return actualFs.stat(path, options);
+      },
+    );
+
     vi.doMock('node:fs/promises', () => ({
       ...actualFs,
-      default: { ...actualFs, readFile: mockReadFile, readdir: mockReaddir },
+      default: {
+        ...actualFs,
+        readFile: mockReadFile,
+        readdir: mockReaddir,
+        stat: mockStat,
+      },
       readFile: mockReadFile,
       readdir: mockReaddir,
+      stat: mockStat,
     }));
 
     vi.resetModules();
