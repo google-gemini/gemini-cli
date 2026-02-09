@@ -1433,8 +1433,39 @@ export class Config {
     return this.toolOutputMasking.enabled;
   }
 
-  getToolOutputMaskingConfig(): ToolOutputMaskingConfig {
-    return this.toolOutputMasking;
+  async getToolOutputMaskingConfig(): Promise<ToolOutputMaskingConfig> {
+    await this.ensureExperimentsLoaded();
+
+    const remoteProtection =
+      this.experiments?.flags[ExperimentFlags.MASKING_PROTECTION_THRESHOLD]
+        ?.intValue;
+    const remotePrunable =
+      this.experiments?.flags[ExperimentFlags.MASKING_PRUNABLE_THRESHOLD]
+        ?.intValue;
+    const remoteProtectLatest =
+      this.experiments?.flags[ExperimentFlags.MASKING_PROTECT_LATEST_TURN]
+        ?.boolValue;
+
+    const parsedProtection = remoteProtection
+      ? parseInt(remoteProtection, 10)
+      : undefined;
+    const parsedPrunable = remotePrunable
+      ? parseInt(remotePrunable, 10)
+      : undefined;
+
+    return {
+      enabled: this.toolOutputMasking.enabled,
+      toolProtectionThreshold:
+        parsedProtection !== undefined && !isNaN(parsedProtection)
+          ? parsedProtection
+          : this.toolOutputMasking.toolProtectionThreshold,
+      minPrunableTokensThreshold:
+        parsedPrunable !== undefined && !isNaN(parsedPrunable)
+          ? parsedPrunable
+          : this.toolOutputMasking.minPrunableTokensThreshold,
+      protectLatestTurn:
+        remoteProtectLatest ?? this.toolOutputMasking.protectLatestTurn,
+    };
   }
 
   getGeminiMdFileCount(): number {
@@ -1509,8 +1540,14 @@ export class Config {
       if (registry.getTool(EXIT_PLAN_MODE_TOOL_NAME)) {
         registry.unregisterTool(EXIT_PLAN_MODE_TOOL_NAME);
       }
-      if (!registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
-        registry.registerTool(new EnterPlanModeTool(this, this.messageBus));
+      if (this.planEnabled) {
+        if (!registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
+          registry.registerTool(new EnterPlanModeTool(this, this.messageBus));
+        }
+      } else {
+        if (registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
+          registry.unregisterTool(ENTER_PLAN_MODE_TOOL_NAME);
+        }
       }
     }
 
