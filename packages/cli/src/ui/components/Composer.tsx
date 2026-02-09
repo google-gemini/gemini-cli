@@ -136,11 +136,11 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             flexDirection="column"
             alignItems={isNarrow ? 'flex-start' : 'flex-end'}
           >
-            <ShortcutsHint />
+            {!hasPendingActionRequired && <ShortcutsHint />}
           </Box>
         </Box>
         {uiState.shortcutsHelpVisible && <ShortcutsHelp />}
-        <HorizontalLine width={uiState.terminalWidth} />
+        <HorizontalLine />
         <Box
           justifyContent={
             settings.merged.ui.hideContextSummary

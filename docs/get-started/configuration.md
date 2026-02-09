@@ -862,11 +862,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
-- **`experimental.enableEventDrivenScheduler`** (boolean):
-  - **Description:** Enables event-driven scheduler within the CLI session.
-  - **Default:** `true`
-  - **Requires restart:** Yes
-
 - **`experimental.extensionReloading`** (boolean):
   - **Description:** Enables extension loading/unloading within the CLI session.
   - **Default:** `false`
