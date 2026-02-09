@@ -46,22 +46,26 @@ describe('LogoutConfirmationDialog', () => {
     expect(mockCall.isFocused).toBe(true);
   });
 
-  it('should call onSelect with LOGIN when Login is selected', () => {
+  it('should call onSelect with LOGIN when Login is selected', async () => {
     const onSelect = vi.fn();
     renderWithProviders(<LogoutConfirmationDialog onSelect={onSelect} />);
 
     const mockCall = vi.mocked(RadioButtonSelect).mock.calls[0][0];
-    mockCall.onSelect(LogoutChoice.LOGIN);
+    await act(async () => {
+      mockCall.onSelect(LogoutChoice.LOGIN);
+    });
 
     expect(onSelect).toHaveBeenCalledWith(LogoutChoice.LOGIN);
   });
 
-  it('should call onSelect with EXIT when Exit is selected', () => {
+  it('should call onSelect with EXIT when Exit is selected', async () => {
     const onSelect = vi.fn();
     renderWithProviders(<LogoutConfirmationDialog onSelect={onSelect} />);
 
     const mockCall = vi.mocked(RadioButtonSelect).mock.calls[0][0];
-    mockCall.onSelect(LogoutChoice.EXIT);
+    await act(async () => {
+      mockCall.onSelect(LogoutChoice.EXIT);
+    });
 
     expect(onSelect).toHaveBeenCalledWith(LogoutChoice.EXIT);
   });
