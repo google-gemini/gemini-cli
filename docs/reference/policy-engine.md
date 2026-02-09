@@ -96,7 +96,8 @@ has a designated number that forms the base of the final priority calculation.
 | :------ | :--- | :------------------------------------------------------------------------- |
 | Default | 1    | Built-in policies that ship with the Gemini CLI.                           |
 | User    | 2    | Custom policies defined by the user.                                       |
-| Admin   | 3    | Policies managed by an administrator (e.g., in an enterprise environment). |
+| Project | 3    | Policies defined in the current project's configuration directory.         |
+| Admin   | 4    | Policies managed by an administrator (e.g., in an enterprise environment). |
 
 Within a TOML policy file, you assign a priority value from **0 to 999**. The
 engine transforms this into a final priority using the following formula:
@@ -105,7 +106,8 @@ engine transforms this into a final priority using the following formula:
 
 This system guarantees that:
 
-- Admin policies always override User and Default policies.
+- Admin policies always override Project, User, and Default policies.
+- Project policies override User and Default policies.
 - User policies always override Default policies.
 - You can still order rules within a single tier with fine-grained control.
 
@@ -113,7 +115,8 @@ For example:
 
 - A `priority: 50` rule in a Default policy file becomes `1.050`.
 - A `priority: 100` rule in a User policy file becomes `2.100`.
-- A `priority: 20` rule in an Admin policy file becomes `3.020`.
+- A `priority: 10` rule in a Project policy file becomes `3.010`.
+- A `priority: 20` rule in an Admin policy file becomes `4.020`.
 
 ### Approval modes
 
@@ -156,10 +159,11 @@ User, and (if configured) Admin directories.
 
 ### Policy locations
 
-| Tier      | Type   | Location                    |
-| :-------- | :----- | :-------------------------- |
-| **User**  | Custom | `~/.gemini/policies/*.toml` |
-| **Admin** | System | _See below (OS specific)_   |
+| Tier        | Type   | Location                                |
+| :---------- | :----- | :-------------------------------------- |
+| **User**    | Custom | `~/.gemini/policies/*.toml`             |
+| **Project** | Custom | `$PROJECT_ROOT/.gemini/policies/*.toml` |
+| **Admin**   | System | _See below (OS specific)_               |
 
 #### System-wide policies (Admin)
 
