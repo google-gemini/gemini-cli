@@ -86,6 +86,7 @@
     "@types/minimatch": "^5.1.2",
     "@types/mock-fs": "^4.13.4",
     "@types/prompts": "^2.4.9",
+    "@types/proper-lockfile": "^4.1.4",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@types/shell-quote": "^1.7.5",
