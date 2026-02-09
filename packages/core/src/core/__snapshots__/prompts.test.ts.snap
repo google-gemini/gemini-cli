@@ -592,11 +592,6 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 
 # Operational Guidelines
 
-## Shell Tool Efficiency
-
-- **Quiet Flags:** Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
-- **Pagination:** Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).
-
 ## Tone and Style
 
 - **Role:** A senior software engineer and collaborative peer programmer.
@@ -706,11 +701,6 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 
 # Operational Guidelines
 
-## Shell Tool Efficiency
-
-- **Quiet Flags:** Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
-- **Pagination:** Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).
-
 ## Tone and Style
 
 - **Role:** A senior software engineer and collaborative peer programmer.
@@ -802,11 +792,6 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 4. **Verify:** Review work against the original request. Fix bugs and deviations. **Build the application and ensure there are no compile errors.**
 
 # Operational Guidelines
-
-## Shell Tool Efficiency
-
-- **Quiet Flags:** Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
-- **Pagination:** Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).
 
 ## Tone and Style
 
@@ -1391,11 +1376,6 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 
 # Operational Guidelines
 
-## Shell Tool Efficiency
-
-- **Quiet Flags:** Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
-- **Pagination:** Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).
-
 ## Tone and Style
 
 - **Role:** A senior software engineer and collaborative peer programmer.
@@ -1514,11 +1494,6 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 
 # Operational Guidelines
 
-## Shell Tool Efficiency
-
-- **Quiet Flags:** Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
-- **Pagination:** Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).
-
 ## Tone and Style
 
 - **Role:** A senior software engineer and collaborative peer programmer.
@@ -1636,11 +1611,6 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 6. **Solicit Feedback:** Provide instructions on how to start the application and request user feedback on the prototype.
 
 # Operational Guidelines
-
-## Shell Tool Efficiency
-
-- **Quiet Flags:** Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
-- **Pagination:** Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).
 
 ## Tone and Style
 
@@ -1868,11 +1838,6 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 
 # Operational Guidelines
 
-## Shell Tool Efficiency
-
-- **Quiet Flags:** Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
-- **Pagination:** Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).
-
 ## Tone and Style
 
 - **Role:** A senior software engineer and collaborative peer programmer.
@@ -2099,11 +2064,6 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 
 # Operational Guidelines
 
-## Shell Tool Efficiency
-
-- **Quiet Flags:** Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
-- **Pagination:** Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).
-
 ## Tone and Style
 
 - **Role:** A senior software engineer and collaborative peer programmer.
@@ -2217,11 +2177,6 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 6. **Solicit Feedback:** Provide instructions on how to start the application and request user feedback on the prototype.
 
 # Operational Guidelines
-
-## Shell Tool Efficiency
-
-- **Quiet Flags:** Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
-- **Pagination:** Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).
 
 ## Tone and Style
 
@@ -2448,11 +2403,6 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 
 # Operational Guidelines
 
-## Shell Tool Efficiency
-
-- **Quiet Flags:** Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
-- **Pagination:** Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).
-
 ## Tone and Style
 
 - **Role:** A senior software engineer and collaborative peer programmer.
@@ -2566,11 +2516,6 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 6. **Solicit Feedback:** Provide instructions on how to start the application and request user feedback on the prototype.
 
 # Operational Guidelines
-
-## Shell Tool Efficiency
-
-- **Quiet Flags:** Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
-- **Pagination:** Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).
 
 ## Tone and Style
 
