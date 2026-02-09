@@ -138,7 +138,7 @@ export function isGemini3Model(model: string): boolean {
  * @returns True if the model is a Gemini-2.x model.
  */
 export function isGemini2Model(model: string): boolean {
-  return /^gemini-2(\.|-|$)/.test(model) || model === DEFAULT_GEMINI_MODEL_AUTO;
+  return /^gemini-2(\.|$)/.test(model);
 }
 
 /**
