@@ -206,7 +206,7 @@ export function renderAgentSkills(skills?: AgentSkillOptions[]): string {
   return `
 # Available Agent Skills
 
-You have access to the following specialized skills. To activate a skill and receive its detailed instructions, you can call the \`${ACTIVATE_SKILL_TOOL_NAME}\` tool with the skill's name.
+You have access to the following specialized skills. To activate a skill and receive its detailed instructions, you can call the ${formatToolName(ACTIVATE_SKILL_TOOL_NAME)} tool with the skill's name.
 
 <available_skills>
 ${skillsXml}
@@ -238,7 +238,7 @@ ${workflowStepResearch(options)}
 ${workflowStepStrategy(options)}
 3. **Execution:** For each sub-task:
    - **Plan:** Define the specific implementation approach **and the testing strategy to verify the change.**
-   - **Act:** Apply targeted, surgical changes strictly related to the sub-task. Use the available tools (e.g., '${EDIT_TOOL_NAME}', '${WRITE_FILE_TOOL_NAME}', '${SHELL_TOOL_NAME}'). Ensure changes are idiomatically complete and follow all workspace standards, even if it requires multiple tool calls. **Include necessary automated tests; a change is incomplete without verification logic.** Avoid unrelated refactoring or "cleanup" of outside code. Before making manual code changes, check if an ecosystem tool (like 'eslint --fix', 'prettier --write', 'go fmt', 'cargo fmt') is available in the project to perform the task automatically.
+   - **Act:** Apply targeted, surgical changes strictly related to the sub-task. Use the available tools (e.g., ${formatToolName(EDIT_TOOL_NAME)}, ${formatToolName(WRITE_FILE_TOOL_NAME)}, ${formatToolName(SHELL_TOOL_NAME)}). Ensure changes are idiomatically complete and follow all workspace standards, even if it requires multiple tool calls. **Include necessary automated tests; a change is incomplete without verification logic.** Avoid unrelated refactoring or "cleanup" of outside code. Before making manual code changes, check if an ecosystem tool (like 'eslint --fix', 'prettier --write', 'go fmt', 'cargo fmt') is available in the project to perform the task automatically.
    - **Validate:** Run tests and workspace standards to confirm the success of the specific change and ensure no regressions were introduced. After making code changes, execute the project-specific build, linting and type-checking commands (e.g., 'tsc', 'npm run lint', 'ruff check .') that you have identified for this project.${workflowVerifyStandardsSuffix(options.interactive)}
 
 **Validation is the only path to finality.** Never assume success or settle for unverified changes. Rigorous, exhaustive verification is mandatory; it prevents the compounding cost of diagnosing failures later. A task is only complete when the behavioral correctness of the change has been verified and its structural integrity is confirmed within the full project context. Prioritize comprehensive validation above all else, utilizing redirection and focused analysis to manage high-output tasks without sacrificing depth. Never sacrifice validation rigor for the sake of brevity or to minimize tool-call overhead; partial or isolated checks are insufficient when more comprehensive validation is possible.
@@ -270,12 +270,12 @@ export function renderOperationalGuidelines(
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly without excessive justification. Offer alternatives if appropriate.
 
 ## Security and Safety Rules
-- **Explain Critical Commands:** Before executing commands with '${SHELL_TOOL_NAME}' that modify the file system, codebase, or system state, you *must* provide a brief explanation of the command's purpose and potential impact. Prioritize user understanding and safety. You should not ask permission to use the tool; the user will be presented with a confirmation dialogue upon use (you do not need to tell them this).
+- **Explain Critical Commands:** Before executing commands with ${formatToolName(SHELL_TOOL_NAME)} that modify the file system, codebase, or system state, you *must* provide a brief explanation of the command's purpose and potential impact. Prioritize user understanding and safety. You should not ask permission to use the tool; the user will be presented with a confirmation dialogue upon use (you do not need to tell them this).
 - **Security First:** Always apply security best practices. Never introduce code that exposes, logs, or commits secrets, API keys, or other sensitive information.
 
 ## Tool Usage
 - **Parallelism:** Execute multiple independent tool calls in parallel when feasible (i.e. searching the codebase).
-- **Command Execution:** Use the '${SHELL_TOOL_NAME}' tool for running shell commands, remembering the safety rule to explain modifying commands first.${toolUsageInteractive(
+- **Command Execution:** Use the ${formatToolName(SHELL_TOOL_NAME)} tool for running shell commands, remembering the safety rule to explain modifying commands first.${toolUsageInteractive(
     options.interactive,
     options.interactiveShellEnabled,
   )}${toolUsageRememberingFacts(options)}
@@ -357,8 +357,8 @@ You are operating in **Plan Mode** - a structured planning workflow for designin
 ## Available Tools
 The following read-only tools are available in Plan Mode:
 ${options.planModeToolsList}
-- \`${WRITE_FILE_TOOL_NAME}\` - Save plans to the plans directory (see Plan Storage below)
-- \`${EDIT_TOOL_NAME}\` - Update plans in the plans directory
+- ${formatToolName(WRITE_FILE_TOOL_NAME)} - Save plans to the plans directory (see Plan Storage below)
+- ${formatToolName(EDIT_TOOL_NAME)} - Update plans in the plans directory
 
 ## Plan Storage
 - Save your plans as Markdown (.md) files ONLY within: \`${options.plansDir}/\`
@@ -371,8 +371,8 @@ ${options.planModeToolsList}
 
 ### Phase 1: Requirements Understanding
 - Analyze the user's request to identify core requirements and constraints
-- If critical information is missing or ambiguous, ask clarifying questions using the \`${ASK_USER_TOOL_NAME}\` tool
-- When using \`${ASK_USER_TOOL_NAME}\`, prefer providing multiple-choice options for the user to select from when possible
+- If critical information is missing or ambiguous, ask clarifying questions using the ${formatToolName(ASK_USER_TOOL_NAME)} tool
+- When using ${formatToolName(ASK_USER_TOOL_NAME)}, prefer providing multiple-choice options for the user to select from when possible
 - Do NOT explore the project or create a plan yet
 
 ### Phase 2: Project Exploration
@@ -390,7 +390,7 @@ ${options.planModeToolsList}
 - Save the implementation plan to the designated plans directory
 
 ### Phase 4: Review & Approval
-- Present the plan and request approval for the finalized plan using the \`${EXIT_PLAN_MODE_TOOL_NAME}\` tool
+- Present the plan and request approval for the finalized plan using the ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} tool
 - If plan is approved, you can begin implementation
 - If plan is rejected, address the feedback and iterate on the plan
 
@@ -422,7 +422,7 @@ function mandateConfirm(interactive: boolean): string {
 function mandateSkillGuidance(hasSkills: boolean): string {
   if (!hasSkills) return '';
   return `
-- **Skill Guidance:** Once a skill is activated via \`${ACTIVATE_SKILL_TOOL_NAME}\`, its instructions and resources are returned wrapped in \`<activated_skill>\` tags. You MUST treat the content within \`<instructions>\` as expert procedural guidance, prioritizing these specialized rules and workflows over your general defaults for the duration of the task. You may utilize any listed \`<available_resources>\` as needed. Follow this expert guidance strictly while continuing to uphold your core safety and security standards.`;
+- **Skill Guidance:** Once a skill is activated via ${formatToolName(ACTIVATE_SKILL_TOOL_NAME)}, its instructions and resources are returned wrapped in \`<activated_skill>\` tags. You MUST treat the content within \`<instructions>\` as expert procedural guidance, prioritizing these specialized rules and workflows over your general defaults for the duration of the task. You may utilize any listed \`<available_resources>\` as needed. Follow this expert guidance strictly while continuing to uphold your core safety and security standards.`;
 }
 
 function mandateExplainBeforeActing(isGemini3: boolean): string {
@@ -440,13 +440,13 @@ function mandateContinueWork(interactive: boolean): string {
 function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
   let suggestion = '';
   if (options.enableEnterPlanModeTool) {
-    suggestion = ` For complex tasks, consider using the '${ENTER_PLAN_MODE_TOOL_NAME}' tool to enter a dedicated planning phase before starting implementation.`;
+    suggestion = ` For complex tasks, consider using the ${formatToolName(ENTER_PLAN_MODE_TOOL_NAME)} tool to enter a dedicated planning phase before starting implementation.`;
   }
 
   if (options.enableCodebaseInvestigator) {
-    return `1. **Research:** Systematically map the codebase and validate assumptions. Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery when the task involves **complex refactoring, codebase exploration or system-wide analysis**. For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), use '${GREP_TOOL_NAME}' or '${GLOB_TOOL_NAME}' directly in parallel. Use '${READ_FILE_TOOL_NAME}' to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
+    return `1. **Research:** Systematically map the codebase and validate assumptions. Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery when the task involves **complex refactoring, codebase exploration or system-wide analysis**. For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), use ${formatToolName(GREP_TOOL_NAME)} or ${formatToolName(GLOB_TOOL_NAME)} directly in parallel. Use ${formatToolName(READ_FILE_TOOL_NAME)} to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
   }
-  return `1. **Research:** Systematically map the codebase and validate assumptions. Use '${GREP_TOOL_NAME}' and '${GLOB_TOOL_NAME}' search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions. Use '${READ_FILE_TOOL_NAME}' to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
+  return `1. **Research:** Systematically map the codebase and validate assumptions. Use ${formatToolName(GREP_TOOL_NAME)} and ${formatToolName(GLOB_TOOL_NAME)} search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions. Use ${formatToolName(READ_FILE_TOOL_NAME)} to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
 }
 
 function workflowStepStrategy(options: PrimaryWorkflowsOptions): string {
@@ -455,9 +455,13 @@ function workflowStepStrategy(options: PrimaryWorkflowsOptions): string {
   }
 
   if (options.enableWriteTodosTool) {
-    return `2. **Strategy:** Formulate a grounded plan based on your research.${options.interactive ? ' Share a concise summary of your strategy.' : ''} For complex tasks, break them down into smaller, manageable subtasks and use the \`${WRITE_TODOS_TOOL_NAME}\` tool to track your progress.`;
+    return `2. **Strategy:** Formulate a grounded plan based on your research.${
+      options.interactive ? ' Share a concise summary of your strategy.' : ''
+    } For complex tasks, break them down into smaller, manageable subtasks and use the ${formatToolName(WRITE_TODOS_TOOL_NAME)} tool to track your progress.`;
   }
-  return `2. **Strategy:** Formulate a grounded plan based on your research.${options.interactive ? ' Share a concise summary of your strategy.' : ''}`;
+  return `2. **Strategy:** Formulate a grounded plan based on your research.${
+    options.interactive ? ' Share a concise summary of your strategy.' : ''
+  }`;
 }
 
 function workflowVerifyStandardsSuffix(interactive: boolean): string {
@@ -489,7 +493,7 @@ function newApplicationSteps(options: PrimaryWorkflowsOptions): string {
      - **Games:** HTML/CSS/JS (Three.js for 3D).
      - **CLIs:** Python or Go.
 3. **User Approval:** Obtain user approval for the proposed plan.
-4. **Implementation:** Autonomously implement each feature per the approved plan. When starting, scaffold the application using '${SHELL_TOOL_NAME}' for commands like 'npm init', 'npx create-react-app'. For visual assets, utilize **platform-native primitives** (e.g., stylized shapes, gradients, icons) to ensure a complete, coherent experience. Never link to external services or assume local paths for assets that have not been created.
+4. **Implementation:** Autonomously implement each feature per the approved plan. When starting, scaffold the application using ${formatToolName(SHELL_TOOL_NAME)} for commands like 'npm init', 'npx create-react-app'. For visual assets, utilize **platform-native primitives** (e.g., stylized shapes, gradients, icons) to ensure a complete, coherent experience. Never link to external services or assume local paths for assets that have not been created.
 5. **Verify:** Review work against the original request. Fix bugs and deviations. Ensure styling and interactions produce a high-quality, functional, and beautiful prototype. **Build the application and ensure there are no compile errors.**
 6. **Solicit Feedback:** Provide instructions on how to start the application and request user feedback on the prototype.`.trim();
   }
@@ -503,13 +507,13 @@ function newApplicationSteps(options: PrimaryWorkflowsOptions): string {
      - **Mobile:** Compose Multiplatform or Flutter.
      - **Games:** HTML/CSS/JS (Three.js for 3D).
      - **CLIs:** Python or Go.
-3. Implementation: Autonomously implement each feature per the approved plan. When starting, scaffold the application using '${SHELL_TOOL_NAME}'. For visual assets, utilize **platform-native primitives** (e.g., stylized shapes, gradients, icons). Never link to external services or assume local paths for assets that have not been created.
+3. Implementation: Autonomously implement each feature per the approved plan. When starting, scaffold the application using ${formatToolName(SHELL_TOOL_NAME)}. For visual assets, utilize **platform-native primitives** (e.g., stylized shapes, gradients, icons). Never link to external services or assume local paths for assets that have not been created.
 4. **Verify:** Review work against the original request. Fix bugs and deviations. **Build the application and ensure there are no compile errors.**`.trim();
 }
 
 function planningPhaseSuggestion(options: PrimaryWorkflowsOptions): string {
   if (options.enableEnterPlanModeTool) {
-    return ` For complex tasks, consider using the '${ENTER_PLAN_MODE_TOOL_NAME}' tool to enter a dedicated planning phase before starting implementation.`;
+    return ` For complex tasks, consider using the ${formatToolName(ENTER_PLAN_MODE_TOOL_NAME)} tool to enter a dedicated planning phase before starting implementation.`;
   }
   return '';
 }
@@ -543,7 +547,7 @@ function toolUsageRememberingFacts(
   options: OperationalGuidelinesOptions,
 ): string {
   const base = `
-- **Memory Tool:** Use \`${MEMORY_TOOL_NAME}\` only for global user preferences, personal facts, or high-level information that applies across all sessions. Never save workspace-specific context, local file paths, or transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is for persistent user-related information only.`;
+- **Memory Tool:** Use ${formatToolName(MEMORY_TOOL_NAME)} only for global user preferences, personal facts, or high-level information that applies across all sessions. Never save workspace-specific context, local file paths, or transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is for persistent user-related information only.`;
   const suffix = options.interactive
     ? ' If unsure whether a fact is worth remembering globally, ask the user.'
     : '';
@@ -555,6 +559,10 @@ function gitRepoKeepUserInformed(interactive: boolean): string {
     ? `
 - Keep the user informed and ask for clarification or confirmation where needed.`
     : '';
+}
+
+function formatToolName(name: string): string {
+  return `\`${name}\``;
 }
 
 /**
