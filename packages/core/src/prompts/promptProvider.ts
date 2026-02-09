@@ -98,7 +98,12 @@ export class PromptProvider {
           location: s.location,
         })),
       );
-      basePrompt = applySubstitutions(basePrompt, config, skillsPrompt);
+      basePrompt = applySubstitutions(
+        basePrompt,
+        config,
+        skillsPrompt,
+        isGemini3,
+      );
     } else {
       // --- Standard Composition ---
       const options: snippets.SystemPromptOptions = {
@@ -110,8 +115,14 @@ export class PromptProvider {
           isGemini3,
           hasSkills: skills.length > 0,
         })),
-        agentContexts: this.withSection('agentContexts', () =>
-          config.getAgentRegistry().getDirectoryContext(),
+        subAgents: this.withSection('agentContexts', () =>
+          config
+            .getAgentRegistry()
+            .getAllDefinitions()
+            .map((d) => ({
+              name: d.displayName || d.name,
+              description: d.description,
+            })),
         ),
         agentSkills: this.withSection(
           'agentSkills',
@@ -156,6 +167,7 @@ export class PromptProvider {
             interactive: interactiveMode,
             isGemini3,
             enableShellEfficiency: config.getEnableShellOutputEfficiency(),
+            interactiveShellEnabled: config.isInteractiveShellEnabled(),
           }),
         ),
         sandbox: this.withSection('sandbox', () => getSandboxMode()),
@@ -164,12 +176,18 @@ export class PromptProvider {
           () => ({ interactive: interactiveMode }),
           isGitRepository(process.cwd()) ? true : false,
         ),
-        finalReminder: this.withSection('finalReminder', () => ({
-          readFileToolName: READ_FILE_TOOL_NAME,
-        })),
-      };
+        finalReminder: isGemini3
+          ? undefined
+          : this.withSection('finalReminder', () => ({
+              readFileToolName: READ_FILE_TOOL_NAME,
+            })),
+      } as snippets.SystemPromptOptions;
 
-      basePrompt = activeSnippets.getCoreSystemPrompt(options);
+      basePrompt = (
+        activeSnippets.getCoreSystemPrompt as (
+          options: snippets.SystemPromptOptions,
+        ) => string
+      )(options);
     }
 
     // --- Finalization (Shell) ---
