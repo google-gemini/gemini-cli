@@ -86,7 +86,6 @@ import { calculatePromptWidths } from './components/InputPrompt.js';
 import { useApp, useStdout, useStdin } from 'ink';
 import { calculateMainAreaWidth } from './utils/ui-sizing.js';
 import ansiEscapes from 'ansi-escapes';
-import * as fs from 'node:fs';
 import { basename } from 'node:path';
 import { computeTerminalTitle } from '../utils/windowTitle.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
@@ -466,14 +465,6 @@ export const AppContainer = (props: AppContainerProps) => {
 
   const staticAreaMaxItemHeight = Math.max(terminalHeight * 4, 100);
 
-  const isValidPath = useCallback((filePath: string): boolean => {
-    try {
-      return fs.existsSync(filePath) && fs.statSync(filePath).isFile();
-    } catch (_e) {
-      return false;
-    }
-  }, []);
-
   const getPreferredEditor = useCallback(
     () => settings.merged.general.preferredEditor as EditorType,
     [settings.merged.general.preferredEditor],
@@ -484,7 +475,7 @@ export const AppContainer = (props: AppContainerProps) => {
     viewport: { height: 10, width: inputWidth },
     stdin,
     setRawMode,
-    isValidPath,
+    resolvePaths: true,
     shellModeActive,
     getPreferredEditor,
   });

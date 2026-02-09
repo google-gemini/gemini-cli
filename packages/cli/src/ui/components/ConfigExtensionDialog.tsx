@@ -70,7 +70,7 @@ export const ConfigExtensionDialog: React.FC<ConfigExtensionDialogProps> = ({
     initialText: '',
     viewport: { width: 80, height: 1 },
     singleLine: true,
-    isValidPath: () => true,
+    resolvePaths: true,
   });
 
   const mounted = useRef(true);
