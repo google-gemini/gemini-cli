@@ -171,9 +171,9 @@ describe('Hooks Agent Flow', () => {
         const input = JSON.parse(fs.readFileSync(0, 'utf-8'));
         const messageCount = input.llm_request?.contents?.length || 0;
         let counts = [];
-        try { counts = JSON.parse(fs.readFileSync('${messageCountFile}', 'utf-8')); } catch (e) {}
+        try { counts = JSON.parse(fs.readFileSync(${JSON.stringify(messageCountFile)}, 'utf-8')); } catch (e) {}
         counts.push(messageCount);
-        fs.writeFileSync('${messageCountFile}', JSON.stringify(counts));
+        fs.writeFileSync(${JSON.stringify(messageCountFile)}, JSON.stringify(counts));
         console.log(JSON.stringify({ decision: 'allow' }));
       `;
       const beforeModelScriptPath = join(
@@ -181,6 +181,19 @@ describe('Hooks Agent Flow', () => {
         'before_model_counter.cjs',
       );
       writeFileSync(beforeModelScriptPath, beforeModelScript);
+
+      const afterAgentScript = `
+        console.log(JSON.stringify({
+          decision: 'block',
+          reason: 'Security policy triggered',
+          hookSpecificOutput: {
+            hookEventName: 'AfterAgent',
+            clearContext: true
+          }
+        }));
+      `;
+      const afterAgentScriptPath = join(rig.testDir!, 'after_agent_clear.cjs');
+      writeFileSync(afterAgentScriptPath, afterAgentScript);
 
       await rig.setup('should process clearContext in AfterAgent hook output', {
         settings: {
@@ -202,7 +215,7 @@ describe('Hooks Agent Flow', () => {
                 hooks: [
                   {
                     type: 'command',
-                    command: `node -e "console.log(JSON.stringify({decision: 'block', reason: 'Security policy triggered', hookSpecificOutput: {hookEventName: 'AfterAgent', clearContext: true}}))"`,
+                    command: `node "${afterAgentScriptPath}"`,
                     timeout: 5000,
                   },
                 ],
@@ -244,6 +257,22 @@ describe('Hooks Agent Flow', () => {
             import.meta.dirname,
             'hooks-agent-flow-multistep.responses',
           ),
+        },
+      );
+
+      // Create script files for hooks
+      const baPath = rig.createScript(
+        'ba_fired.cjs',
+        "console.log('BeforeAgent Fired');",
+      );
+      const aaPath = rig.createScript(
+        'aa_fired.cjs',
+        "console.log('AfterAgent Fired');",
+      );
+
+      await rig.setup(
+        'should fire BeforeAgent and AfterAgent exactly once per turn despite tool calls',
+        {
           settings: {
             hooksConfig: {
               enabled: true,
@@ -254,7 +283,7 @@ describe('Hooks Agent Flow', () => {
                   hooks: [
                     {
                       type: 'command',
-                      command: `node -e "console.log('BeforeAgent Fired')"`,
+                      command: `node "${baPath}"`,
                       timeout: 5000,
                     },
                   ],
@@ -265,7 +294,7 @@ describe('Hooks Agent Flow', () => {
                   hooks: [
                     {
                       type: 'command',
-                      command: `node -e "console.log('AfterAgent Fired')"`,
+                      command: `node "${aaPath}"`,
                       timeout: 5000,
                     },
                   ],
