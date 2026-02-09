@@ -56,6 +56,7 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   isPreviewModel,
   PREVIEW_GEMINI_MODEL,
+  DEFAULT_THINKING_MODE,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
@@ -185,6 +186,18 @@ export interface AgentOverride {
 
 export interface AgentSettings {
   overrides?: Record<string, AgentOverride>;
+}
+
+export interface CodebaseInvestigatorSettings {
+  enabled?: boolean;
+  maxNumTurns?: number;
+  maxTimeMinutes?: number;
+  thinkingBudget?: number;
+  model?: string;
+}
+
+export interface IntrospectionAgentSettings {
+  enabled?: boolean;
 }
 
 export interface CustomTheme {
@@ -1838,6 +1851,14 @@ export class Config {
 
   getAgentsSettings(): AgentSettings {
     return this.agents;
+  }
+
+  getCodebaseInvestigatorSettings(): CodebaseInvestigatorSettings {
+    return this.codebaseInvestigatorSettings;
+  }
+
+  getIntrospectionAgentSettings(): IntrospectionAgentSettings {
+    return this.introspectionAgentSettings;
   }
 
   isBrowserLaunchSuppressed(): boolean {

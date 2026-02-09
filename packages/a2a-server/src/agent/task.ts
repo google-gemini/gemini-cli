@@ -24,6 +24,7 @@ import {
   type ServerGeminiErrorEvent,
   type ServerGeminiStreamEvent,
   type ToolCallConfirmationDetails,
+  type SerializableConfirmationDetails,
   type Config,
   type UserTierId,
   type AnsiOutput,
@@ -65,7 +66,10 @@ export class Task {
   scheduler: CoreToolScheduler;
   config: Config;
   geminiClient: GeminiClient;
-  pendingToolConfirmationDetails: Map<string, ToolCallConfirmationDetails>;
+  pendingToolConfirmationDetails: Map<
+    string,
+    ToolCallConfirmationDetails | SerializableConfirmationDetails
+  >;
   taskState: TaskState;
   eventBus?: ExecutionEventBus;
   completedToolCalls: CompletedToolCall[];
@@ -411,10 +415,12 @@ export class Task {
       );
       toolCalls.forEach((tc: ToolCall) => {
         if (tc.status === 'awaiting_approval' && tc.confirmationDetails) {
-          // eslint-disable-next-line @typescript-eslint/no-floating-promises
-          (tc.confirmationDetails).onConfirm(
-            ToolConfirmationOutcome.ProceedOnce,
-          );
+          if ('onConfirm' in tc.confirmationDetails) {
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
+            tc.confirmationDetails.onConfirm(
+              ToolConfirmationOutcome.ProceedOnce,
+            );
+          }
           this.pendingToolConfirmationDetails.delete(tc.request.callId);
         }
       });
@@ -802,6 +808,13 @@ export class Task {
 
         // This will trigger the scheduler to continue or cancel the specific tool.
         // The scheduler's onToolCallsUpdate will then reflect the new state (e.g., executing or cancelled).
+
+        if (!('onConfirm' in confirmationDetails)) {
+          logger.error(
+            `[Task] Serializable confirmation details not supported yet in a2a-server for callId: ${callId}`,
+          );
+          return false;
+        }
 
         // If `edit` tool call, pass updated payload if presesent
         if (confirmationDetails.type === 'edit') {
