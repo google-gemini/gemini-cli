@@ -17,7 +17,12 @@ implementation strategy.
 > }
 > ```
 >
-> Your [feedback](#feedback) is invaluable as we refine this feature.
+> Your feedback is invaluable as we refine this feature. If you have ideas,
+> suggestions, or encounter issues:
+>
+> - Use the `/bug` command within the CLI to file an issue.
+> - [Open an issue](https://github.com/google-gemini/gemini-cli/issues) on
+>   GitHub.
 
 - [Starting in Plan Mode](#starting-in-plan-mode)
 - [How to use Plan Mode](#how-to-use-plan-mode)
@@ -25,7 +30,6 @@ implementation strategy.
   - [The Planning Workflow](#the-planning-workflow)
   - [Exiting Plan Mode](#exiting-plan-mode)
 - [Tool Restrictions](#tool-restrictions)
-- [Feedback](#feedback)
 
 ## Starting in Plan Mode
 
@@ -91,14 +95,6 @@ These are the only allowed tools:
   `postgres_read_schema`) are allowed.
 - **Planning (Write):** [`write_file`] and [`replace`] ONLY allowed for `.md`
   files in the `~/.gemini/tmp/<project>/plans/` directory.
-
-## Feedback
-
-Plan Mode is in active development. Your feedback is invaluable as we refine
-this feature. If you have ideas, suggestions, or encounter issues:
-
-- Use the `/bug` command within the CLI to file an issue.
-- [Open an issue](https://github.com/google-gemini/gemini-cli/issues) on GitHub.
 
 [`list_directory`]: ../tools/file-system.md#1-list_directory-readfolder
 [`read_file`]: ../tools/file-system.md#2-read_file-readfile
