@@ -472,7 +472,7 @@ export class ShellTool extends BaseDeclarativeTool<
       'Shell',
       definition.base.description!,
       Kind.Execute,
-      definition.base.parameters!,
+      definition.base.parametersJsonSchema,
       messageBus,
       false, // output is not markdown
       true, // output can be updated
