@@ -27,7 +27,7 @@ import { http, HttpResponse } from 'msw';
 
 import { setupServer } from 'msw/node';
 
-export const server = setupServer();
+const server = setupServer();
 
 // TODO(richieforeman): Consider moving this to test setup globally.
 beforeAll(() => {
