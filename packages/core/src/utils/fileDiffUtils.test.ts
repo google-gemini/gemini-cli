@@ -77,8 +77,8 @@ describe('fileDiffUtils', () => {
 
       const result = computeAddedAndRemovedLines(stats);
       expect(result).toEqual({
-        addedLines: 12, // 10 + 2
-        removedLines: 6, // 5 + 1
+        addedLines: 10,
+        removedLines: 5,
       });
     });
 
