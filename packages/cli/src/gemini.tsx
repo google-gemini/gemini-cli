@@ -351,12 +351,11 @@ export async function main() {
   }
 
   const isDebugMode = cliConfig.isDebugMode(argv);
-  const earlyConsoleLogs: Array<{ type: string; content: string }> = [];
   const consolePatcher = new ConsolePatcher({
     stderr: true,
     debugMode: isDebugMode,
     onNewMessage: (msg) => {
-      earlyConsoleLogs.push({ type: msg.type, content: msg.content });
+      coreEvents.emitConsoleLog(msg.type, msg.content);
     },
   });
   consolePatcher.patch();
@@ -524,16 +523,7 @@ export async function main() {
         './utils/devtoolsService.js'
       );
       await registerActivityLogger(config);
-      // Replay early console logs directly to ActivityLogger (bypasses
-      // coreEvents so they only appear in DevTools, not the TUI debug console).
-      const { ActivityLogger } = await import('./utils/activityLogger.js');
-      const capture = ActivityLogger.getInstance();
-      for (const log of earlyConsoleLogs) {
-        capture.logConsole(log);
-      }
     }
-    // Always clear early logs to avoid unbounded memory growth
-    earlyConsoleLogs.length = 0;
 
     // Register config for telemetry shutdown
     // This ensures telemetry (including SessionEnd hooks) is properly flushed on exit

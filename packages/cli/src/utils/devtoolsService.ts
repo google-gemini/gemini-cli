@@ -41,6 +41,7 @@ function probeDevTools(host: string, port: number): Promise<boolean> {
 
     ws.on('error', () => {
       clearTimeout(timer);
+      ws.close();
       resolve(false);
     });
   });
