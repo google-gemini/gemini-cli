@@ -74,16 +74,39 @@ async function main() {
     });
 
     if (zipProcess.error || zipProcess.status !== 0) {
-      // Fallback to tar --format=zip if zip is not available (common on Windows)
-      console.log('zip command not found, falling back to tar...');
-      zipProcess = spawnSync(
-        'tar',
-        ['-a', '-c', '--format=zip', '-f', outputFilename, '.'],
-        {
-          cwd: skillPath,
-          stdio: 'inherit',
-        },
-      );
+      if (process.platform === 'win32') {
+        // Fallback to PowerShell Compress-Archive on Windows
+        // Note: Compress-Archive only supports .zip extension, so we zip to .zip and rename
+        console.log('zip command not found, falling back to PowerShell...');
+        const tempZip = outputFilename + '.zip';
+        zipProcess = spawnSync(
+          'powershell.exe',
+          [
+            '-NoProfile',
+            '-Command',
+            `Compress-Archive -Path .\\* -DestinationPath "${tempZip}" -Force`,
+          ],
+          {
+            cwd: skillPath,
+            stdio: 'inherit',
+          },
+        );
+
+        if (zipProcess.status === 0 && require('node:fs').existsSync(tempZip)) {
+          require('node:fs').renameSync(tempZip, outputFilename);
+        }
+      } else {
+        // Fallback to tar on Unix-like systems
+        console.log('zip command not found, falling back to tar...');
+        zipProcess = spawnSync(
+          'tar',
+          ['-a', '-c', '--format=zip', '-f', outputFilename, '.'],
+          {
+            cwd: skillPath,
+            stdio: 'inherit',
+          },
+        );
+      }
     }
 
     if (zipProcess.error) {
