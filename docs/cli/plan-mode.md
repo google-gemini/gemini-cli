@@ -96,11 +96,11 @@ These are the only allowed tools:
 - **Planning (Write):** [`write_file`] and [`replace`] ONLY allowed for `.md`
   files in the `~/.gemini/tmp/<project>/plans/` directory.
 
-[`list_directory`]: ../tools/file-system.md#1-list_directory-readfolder
-[`read_file`]: ../tools/file-system.md#2-read_file-readfile
-[`grep_search`]: ../tools/file-system.md#5-grep_search-searchtext
-[`write_file`]: ../tools/file-system.md#3-write_file-writefile
-[`glob`]: ../tools/file-system.md#4-glob-findfiles
-[`google_web_search`]: ../tools/web-search.md
-[`replace`]: ../tools/file-system.md#6-replace-edit
-[MCP tools]: ../tools/mcp-server.md
+[`list_directory`]: /docs/tools/file-system.md#1-list_directory-readfolder
+[`read_file`]: /docs/tools/file-system.md#2-read_file-readfile
+[`grep_search`]: /docs/tools/file-system.md#5-grep_search-searchtext
+[`write_file`]: /docs/tools/file-system.md#3-write_file-writefile
+[`glob`]: /docs/tools/file-system.md#4-glob-findfiles
+[`google_web_search`]: /docs/tools/web-search.md
+[`replace`]: /docs/tools/file-system.md#6-replace-edit
+[MCP tools]: /docs/tools/mcp-server.md
