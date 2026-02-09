@@ -149,7 +149,9 @@ describe('useFolderTrust', () => {
     });
 
     await act(async () => {
-      result.current.handleFolderTrustSelect(FolderTrustChoice.TRUST_FOLDER);
+      await result.current.handleFolderTrustSelect(
+        FolderTrustChoice.TRUST_FOLDER,
+      );
     });
 
     await waitFor(() => {
@@ -173,7 +175,9 @@ describe('useFolderTrust', () => {
     );
 
     await act(async () => {
-      result.current.handleFolderTrustSelect(FolderTrustChoice.TRUST_PARENT);
+      await result.current.handleFolderTrustSelect(
+        FolderTrustChoice.TRUST_PARENT,
+      );
     });
 
     await waitFor(() => {
@@ -197,7 +201,9 @@ describe('useFolderTrust', () => {
     );
 
     await act(async () => {
-      result.current.handleFolderTrustSelect(FolderTrustChoice.DO_NOT_TRUST);
+      await result.current.handleFolderTrustSelect(
+        FolderTrustChoice.DO_NOT_TRUST,
+      );
     });
 
     await waitFor(() => {
@@ -221,7 +227,7 @@ describe('useFolderTrust', () => {
     );
 
     await act(async () => {
-      result.current.handleFolderTrustSelect(
+      await result.current.handleFolderTrustSelect(
         'invalid_choice' as FolderTrustChoice,
       );
     });
@@ -253,7 +259,9 @@ describe('useFolderTrust', () => {
     });
 
     await act(async () => {
-      result.current.handleFolderTrustSelect(FolderTrustChoice.TRUST_FOLDER);
+      await result.current.handleFolderTrustSelect(
+        FolderTrustChoice.TRUST_FOLDER,
+      );
     });
 
     await waitFor(() => {
@@ -272,7 +280,9 @@ describe('useFolderTrust', () => {
     );
 
     await act(async () => {
-      result.current.handleFolderTrustSelect(FolderTrustChoice.TRUST_FOLDER);
+      await result.current.handleFolderTrustSelect(
+        FolderTrustChoice.TRUST_FOLDER,
+      );
     });
 
     await waitFor(() => {
@@ -294,8 +304,10 @@ describe('useFolderTrust', () => {
       useFolderTrust(mockSettings, onTrustChange, addItem),
     );
 
-    act(() => {
-      result.current.handleFolderTrustSelect(FolderTrustChoice.TRUST_FOLDER);
+    await act(async () => {
+      await result.current.handleFolderTrustSelect(
+        FolderTrustChoice.TRUST_FOLDER,
+      );
     });
 
     await vi.runAllTimersAsync();
