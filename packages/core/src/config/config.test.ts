@@ -3089,6 +3089,26 @@ describe('syncPlanModeTools', () => {
   });
 });
 
+describe('isPathAllowed', () => {
+  it('should preserve casing when validating paths', () => {
+    const params: ConfigParameters = {
+      cwd: '/tmp',
+      targetDir: '/tmp/target',
+      model: DEFAULT_GEMINI_MODEL,
+      sessionId: 'test-session',
+      debugMode: false,
+    };
+    const config = new Config(params);
+    const workspaceContext = config.getWorkspaceContext();
+    const spy = vi.spyOn(workspaceContext, 'isPathWithinWorkspace');
+
+    const mixedCasePath = path.join('/tmp/target', 'SubDir', 'File.txt');
+    config.isPathAllowed(mixedCasePath);
+    expect(spy).toHaveBeenCalledWith(expect.stringMatching(/File\.txt$/));
+    expect(spy).toHaveBeenCalledWith(mixedCasePath);
+  });
+});
+
 describe('Model Persistence Bug Fix (#19864)', () => {
   const baseParams: ConfigParameters = {
     sessionId: 'test-session',
