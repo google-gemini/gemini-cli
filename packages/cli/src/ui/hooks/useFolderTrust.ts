@@ -14,7 +14,7 @@ import {
 } from '../../config/trustedFolders.js';
 import * as process from 'node:process';
 import { type HistoryItemWithoutId, MessageType } from '../types.js';
-import { coreEvents, ExitCodes } from '@google/gemini-cli-core';
+import { coreEvents, ExitCodes, isHeadlessMode } from '@google/gemini-cli-core';
 import { runExitCleanup } from '../../utils/cleanup.js';
 
 export const useFolderTrust = (
@@ -30,11 +30,10 @@ export const useFolderTrust = (
   const folderTrust = settings.merged.security.folderTrust.enabled ?? true;
 
   useEffect(() => {
+    let isMounted = true;
     const { isTrusted: trusted } = isWorkspaceTrusted(settings.merged);
-    setIsTrusted(trusted);
-    setIsFolderTrustDialogOpen(trusted === undefined);
-    onTrustChange(trusted);
 
+<<<<<<< HEAD
     if (trusted === false && !startupMessageSent.current) {
       addItem(
         {
@@ -44,7 +43,38 @@ export const useFolderTrust = (
         Date.now(),
       );
       startupMessageSent.current = true;
+=======
+    const showUntrustedMessage = () => {
+      if (trusted === false && !startupMessageSent.current) {
+        addItem(
+          {
+            type: MessageType.INFO,
+            text: 'This folder is untrusted, project settings, hooks, MCPs, and GEMINI.md files will not be applied for this folder.\nUse the `/permissions` command to change the trust level.',
+          },
+          Date.now(),
+        );
+        startupMessageSent.current = true;
+      }
+    };
+
+    if (isHeadlessMode()) {
+      if (isMounted) {
+        setIsTrusted(trusted);
+        setIsFolderTrustDialogOpen(false);
+        onTrustChange(true);
+        showUntrustedMessage();
+      }
+    } else if (isMounted) {
+      setIsTrusted(trusted);
+      setIsFolderTrustDialogOpen(trusted === undefined);
+      onTrustChange(trusted);
+      showUntrustedMessage();
+>>>>>>> bce1caefd (feat(cli): disable folder trust in headless mode (#18407))
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, [folderTrust, onTrustChange, settings.merged, addItem]);
 
   const handleFolderTrustSelect = useCallback(
