@@ -123,7 +123,10 @@ class GrepToolInvocation extends BaseToolInvocation<
       let searchDirAbs: string | null = null;
       if (pathParam) {
         searchDirAbs = path.resolve(this.config.getTargetDir(), pathParam);
-        const validationError = this.config.validatePathAccess(searchDirAbs);
+        const validationError = this.config.validatePathAccess(
+          searchDirAbs,
+          'read',
+        );
         if (validationError) {
           return {
             llmContent: validationError,
@@ -623,7 +626,10 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
         this.config.getTargetDir(),
         params.dir_path,
       );
-      const validationError = this.config.validatePathAccess(resolvedPath);
+      const validationError = this.config.validatePathAccess(
+        resolvedPath,
+        'read',
+      );
       if (validationError) {
         return validationError;
       }

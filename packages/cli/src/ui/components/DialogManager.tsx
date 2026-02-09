@@ -117,6 +117,20 @@ export const DialogManager = ({
     );
   }
 
+  if (uiState.permissionConfirmationRequest) {
+    const files = uiState.permissionConfirmationRequest.files;
+    const filesList = files.map((f) => `- ${f}`).join('\n');
+    return (
+      <ConsentPrompt
+        prompt={`The following files are outside your workspace:\n\n${filesList}\n\nDo you want to allow this read?`}
+        onConfirm={(allowed) => {
+          uiState.permissionConfirmationRequest?.onComplete({ allowed });
+        }}
+        terminalWidth={terminalWidth}
+      />
+    );
+  }
+
   // commandConfirmationRequest and authConsentRequest are kept separate
   // to avoid focus deadlocks and state race conditions between the
   // synchronous command loop and the asynchronous auth flow.
