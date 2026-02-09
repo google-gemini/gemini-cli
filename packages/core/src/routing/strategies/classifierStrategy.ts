@@ -128,16 +128,12 @@ export class ClassifierStrategy implements RoutingStrategy {
 
   async route(
     context: RoutingContext,
-
     config: Config,
-
     baseLlmClient: BaseLlmClient,
   ): Promise<RoutingDecision | null> {
     const startTime = Date.now();
-
     try {
       const model = context.requestedModel ?? config.getModel();
-
       if (
         (await config.getNumericalRoutingEnabled()) &&
         isGemini3Model(model)
@@ -150,40 +146,29 @@ export class ClassifierStrategy implements RoutingStrategy {
       const historySlice = context.history.slice(-HISTORY_SEARCH_WINDOW);
 
       // Filter out tool-related turns.
-
       // TODO - Consider using function req/res if they help accuracy.
-
       const cleanHistory = historySlice.filter(
         (content) => !isFunctionCall(content) && !isFunctionResponse(content),
       );
 
       // Take the last N turns from the *cleaned* history.
-
       const finalHistory = cleanHistory.slice(-HISTORY_TURNS_FOR_CONTEXT);
 
       const jsonResponse = await baseLlmClient.generateJson({
         modelConfigKey: { model: 'classifier' },
-
         contents: [...finalHistory, createUserContent(context.request)],
-
         schema: RESPONSE_SCHEMA,
-
         systemInstruction: CLASSIFIER_SYSTEM_PROMPT,
-
         abortSignal: context.signal,
-
         promptId,
       });
 
       const routerResponse = ClassifierResponseSchema.parse(jsonResponse);
 
       const reasoning = routerResponse.reasoning;
-
       const latencyMs = Date.now() - startTime;
-
       const selectedModel = resolveClassifierModel(
         model,
-
         routerResponse.model_choice,
       );
 
