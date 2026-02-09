@@ -5,7 +5,7 @@
  */
 
 import { useState } from 'react';
-import { Box, Text, useIsScreenReaderEnabled } from 'ink';
+import { Box, useIsScreenReaderEnabled } from 'ink';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { StatusDisplay } from './StatusDisplay.js';
 import { ApprovalModeIndicator } from './ApprovalModeIndicator.js';
@@ -71,9 +71,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     !hasPendingActionRequired;
   const showApprovalIndicator = !uiState.shellModeActive;
   const showRawMarkdownIndicator = !uiState.renderMarkdown;
-  const showEscToCancelHint =
-    showLoadingIndicator &&
-    uiState.streamingState !== StreamingState.WaitingForConfirmation;
 
   return (
     <Box
@@ -95,11 +92,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
       <TodoTray />
 
       <Box marginTop={1} width="100%" flexDirection="column">
-        {showEscToCancelHint && (
-          <Box marginLeft={3}>
-            <Text color={theme.text.secondary}>esc to cancel</Text>
-          </Box>
-        )}
         <Box
           width="100%"
           flexDirection={isNarrow ? 'column' : 'row'}
@@ -132,7 +124,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                   inlineThinkingMode === 'full' ? 'Thinking ...' : undefined
                 }
                 elapsedTime={uiState.elapsedTime}
-                showCancelAndTimer={false}
               />
             )}
           </Box>
