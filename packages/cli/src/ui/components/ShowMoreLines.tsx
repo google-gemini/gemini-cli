@@ -9,7 +9,6 @@ import { useOverflowState } from '../contexts/OverflowContext.js';
 import { useStreamingContext } from '../contexts/StreamingContext.js';
 import { StreamingState } from '../types.js';
 import { theme } from '../semantic-colors.js';
-import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 
 interface ShowMoreLinesProps {
   constrainHeight: boolean;
@@ -18,7 +17,6 @@ interface ShowMoreLinesProps {
 export const ShowMoreLines = ({ constrainHeight }: ShowMoreLinesProps) => {
   const overflowState = useOverflowState();
   const streamingState = useStreamingContext();
-  const isAlternateBuffer = useAlternateBuffer();
 
   if (
     overflowState === undefined ||
@@ -33,7 +31,7 @@ export const ShowMoreLines = ({ constrainHeight }: ShowMoreLinesProps) => {
   }
 
   return (
-    <Box marginTop={isAlternateBuffer ? 0 : 1} paddingX={1}>
+    <Box paddingX={1}>
       <Text color={theme.text.secondary} wrap="truncate">
         Press ctrl-o to show more lines
       </Text>
