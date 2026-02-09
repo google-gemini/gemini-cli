@@ -146,12 +146,28 @@ vi.mock('./components/shared/text-buffer.js');
 vi.mock('./hooks/useLogger.js');
 vi.mock('./hooks/useInputHistoryStore.js');
 vi.mock('./hooks/useHookDisplayState.js');
+vi.mock('./hooks/useBanner.js', () => ({
+  useBanner: vi.fn((bannerData) => ({
+    bannerText: (
+      bannerData.warningText ||
+      bannerData.defaultText ||
+      ''
+    ).replace(/\\n/g, '\n'),
+  })),
+}));
+vi.mock('./hooks/useShellInactivityStatus.js', () => ({
+  useShellInactivityStatus: vi.fn(() => ({
+    shouldShowFocusHint: false,
+    inactivityStatus: 'none',
+  })),
+}));
 vi.mock('./hooks/useTerminalTheme.js', () => ({
   useTerminalTheme: vi.fn(),
 }));
 
 import { useHookDisplayState } from './hooks/useHookDisplayState.js';
 import { useTerminalTheme } from './hooks/useTerminalTheme.js';
+import { useShellInactivityStatus } from './hooks/useShellInactivityStatus.js';
 
 // Mock external utilities
 vi.mock('../utils/events.js');
@@ -255,6 +271,7 @@ describe('AppContainer State Management', () => {
   const mockedUseInputHistoryStore = useInputHistoryStore as Mock;
   const mockedUseHookDisplayState = useHookDisplayState as Mock;
   const mockedUseTerminalTheme = useTerminalTheme as Mock;
+  const mockedUseShellInactivityStatus = useShellInactivityStatus as Mock;
 
   const DEFAULT_GEMINI_STREAM_MOCK = {
     streamingState: 'idle',
@@ -384,6 +401,10 @@ describe('AppContainer State Management', () => {
     });
     mockedUseHookDisplayState.mockReturnValue([]);
     mockedUseTerminalTheme.mockReturnValue(undefined);
+    mockedUseShellInactivityStatus.mockReturnValue({
+      shouldShowFocusHint: false,
+      inactivityStatus: 'none',
+    });
 
     // Mock Config
     mockConfig = makeFakeConfig();
@@ -1246,8 +1267,15 @@ describe('AppContainer State Management', () => {
     });
 
     describe('Shell Focus Action Required', () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         vi.useFakeTimers();
+        // Use real implementation for these tests to verify title updates
+        const actual = await vi.importActual<
+          typeof import('./hooks/useShellInactivityStatus.js')
+        >('./hooks/useShellInactivityStatus.js');
+        mockedUseShellInactivityStatus.mockImplementation(
+          actual.useShellInactivityStatus,
+        );
       });
 
       afterEach(() => {
