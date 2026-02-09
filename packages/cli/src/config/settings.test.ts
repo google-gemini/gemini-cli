@@ -2154,64 +2154,9 @@ describe('Settings Loading and Merging', () => {
       );
     });
 
-    it('should migrate experimental agent settings in system scope in memory but not save', () => {
-      const systemSettingsContent = {
-        experimental: {
-          codebaseInvestigatorSettings: {
-            enabled: true,
-          },
-        },
-      };
-
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      (fs.readFileSync as Mock).mockImplementation(
-        (p: fs.PathOrFileDescriptor) => {
-          if (p === getSystemSettingsPath()) {
-            return JSON.stringify(systemSettingsContent);
-          }
-          return '{}';
-        },
-      );
-
-      const feedbackSpy = mockCoreEvents.emitFeedback;
-      const settings = loadSettings(MOCK_WORKSPACE_DIR);
-
-      // Verify it was migrated in memory
-      expect(settings.system.settings.agents?.overrides).toMatchObject({
-        codebase_investigator: {
-          enabled: true,
-        },
-      });
-
-      // Verify it was NOT saved back to disk
-      expect(updateSettingsFilePreservingFormat).not.toHaveBeenCalledWith(
-        getSystemSettingsPath(),
-        expect.anything(),
-      );
-
-      // Verify warnings were shown
-      expect(feedbackSpy).toHaveBeenCalledWith(
-        'warning',
-        expect.stringContaining(
-          'The system configuration contains deprecated settings: [experimental.codebaseInvestigatorSettings]',
-        ),
-      );
-    });
-
-    it('should migrate experimental agent settings to agents overrides', () => {
+    it('should not throw if experimental settings are missing', () => {
       const userSettingsContent = {
-        experimental: {
-          codebaseInvestigatorSettings: {
-            enabled: true,
-            maxNumTurns: 15,
-            maxTimeMinutes: 5,
-            thinkingBudget: 16384,
-            model: 'gemini-1.5-pro',
-          },
-          cliHelpAgentSettings: {
-            enabled: false,
-          },
-        },
+        experimental: {},
       };
 
       vi.mocked(fs.existsSync).mockReturnValue(true);
@@ -2223,29 +2168,7 @@ describe('Settings Loading and Merging', () => {
         },
       );
 
-      const settings = loadSettings(MOCK_WORKSPACE_DIR);
-
-      // Verify migration to agents.overrides
-      expect(settings.user.settings.agents?.overrides).toMatchObject({
-        codebase_investigator: {
-          enabled: true,
-          runConfig: {
-            maxTurns: 15,
-            maxTimeMinutes: 5,
-          },
-          modelConfig: {
-            model: 'gemini-1.5-pro',
-            generateContentConfig: {
-              thinkingConfig: {
-                thinkingBudget: 16384,
-              },
-            },
-          },
-        },
-        cli_help: {
-          enabled: false,
-        },
-      });
+      expect(() => loadSettings(MOCK_WORKSPACE_DIR)).not.toThrow();
     });
   });
 

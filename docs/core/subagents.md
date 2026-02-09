@@ -49,19 +49,8 @@ Gemini CLI comes with the following built-in sub-agents:
   dependencies.
 - **When to use:** "How does the authentication system work?", "Map out the
   dependencies of the `AgentRegistry` class."
-- **Configuration:** Enabled by default. You can configure it in
-  `settings.json`. Example (forcing a specific model):
-  ```json
-  {
-    "experimental": {
-      "codebaseInvestigatorSettings": {
-        "enabled": true,
-        "maxNumTurns": 20,
-        "model": "gemini-2.5-pro"
-      }
-    }
-  }
-  ```
+- **Configuration:** Enabled by default. You can configure it using agent
+  overrides in `settings.json`.
 
 ### CLI Help Agent
 

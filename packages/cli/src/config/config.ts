@@ -804,10 +804,6 @@ export async function loadCliConfig(
     output: {
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
-    codebaseInvestigatorSettings:
-      settings.experimental?.codebaseInvestigatorSettings,
-    introspectionAgentSettings:
-      settings.experimental?.introspectionAgentSettings,
     adaptiveThinking: settings.experimental?.adaptiveThinking,
     fakeResponses: argv.fakeResponses,
     recordResponses: argv.recordResponses,

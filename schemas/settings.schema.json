@@ -1487,23 +1487,6 @@
           "default": false,
           "type": "boolean"
         },
-        "introspectionAgentSettings": {
-          "title": "Introspection Agent Settings",
-          "description": "Configuration for Introspection Agent.",
-          "markdownDescription": "Configuration for Introspection Agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `{}`",
-          "default": {},
-          "type": "object",
-          "properties": {
-            "enabled": {
-              "title": "Enable Introspection Agent",
-              "description": "Enable the Introspection Agent.",
-              "markdownDescription": "Enable the Introspection Agent.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
-              "default": false,
-              "type": "boolean"
-            }
-          },
-          "additionalProperties": false
-        },
         "adaptiveThinking": {
           "title": "Adaptive Thinking Settings",
           "description": "Configuration for Adaptive Thinking Budget.",

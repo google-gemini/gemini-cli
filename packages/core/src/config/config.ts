@@ -56,7 +56,6 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   isPreviewModel,
   PREVIEW_GEMINI_MODEL,
-  DEFAULT_THINKING_MODE,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
@@ -186,18 +185,6 @@ export interface AgentOverride {
 
 export interface AgentSettings {
   overrides?: Record<string, AgentOverride>;
-}
-
-export interface CodebaseInvestigatorSettings {
-  enabled?: boolean;
-  maxNumTurns?: number;
-  maxTimeMinutes?: number;
-  thinkingBudget?: number;
-  model?: string;
-}
-
-export interface IntrospectionAgentSettings {
-  enabled?: boolean;
 }
 
 export interface CustomTheme {
@@ -460,8 +447,6 @@ export interface ConfigParameters {
   policyEngineConfig?: PolicyEngineConfig;
   output?: OutputSettings;
   disableModelRouterForAuth?: AuthType[];
-  codebaseInvestigatorSettings?: CodebaseInvestigatorSettings;
-  introspectionAgentSettings?: IntrospectionAgentSettings;
   adaptiveThinking?: {
     enabled?: boolean;
     classifierModel?: string;
@@ -612,8 +597,6 @@ export class Config {
   private readonly messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
   private readonly outputSettings: OutputSettings;
-  private readonly codebaseInvestigatorSettings: CodebaseInvestigatorSettings;
-  private readonly introspectionAgentSettings: IntrospectionAgentSettings;
   private readonly adaptiveThinking: {
     enabled: boolean;
     classifierModel: string;
@@ -808,18 +791,6 @@ export class Config {
     this.enableHooks = params.enableHooks ?? true;
     this.disabledHooks = params.disabledHooks ?? [];
 
-    this.codebaseInvestigatorSettings = {
-      enabled: params.codebaseInvestigatorSettings?.enabled ?? true,
-      maxNumTurns: params.codebaseInvestigatorSettings?.maxNumTurns ?? 10,
-      maxTimeMinutes: params.codebaseInvestigatorSettings?.maxTimeMinutes ?? 3,
-      thinkingBudget:
-        params.codebaseInvestigatorSettings?.thinkingBudget ??
-        DEFAULT_THINKING_MODE,
-      model: params.codebaseInvestigatorSettings?.model,
-    };
-    this.introspectionAgentSettings = {
-      enabled: params.introspectionAgentSettings?.enabled ?? false,
-    };
     this.adaptiveThinking = {
       enabled: params.adaptiveThinking?.enabled ?? false,
       classifierModel: params.adaptiveThinking?.classifierModel ?? 'classifier',
@@ -1851,14 +1822,6 @@ export class Config {
 
   getAgentsSettings(): AgentSettings {
     return this.agents;
-  }
-
-  getCodebaseInvestigatorSettings(): CodebaseInvestigatorSettings {
-    return this.codebaseInvestigatorSettings;
-  }
-
-  getIntrospectionAgentSettings(): IntrospectionAgentSettings {
-    return this.introspectionAgentSettings;
   }
 
   isBrowserLaunchSuppressed(): boolean {
