@@ -5,7 +5,8 @@
  */
 
 import { useState } from 'react';
-import { Box, useIsScreenReaderEnabled } from 'ink';
+import { Box, Text, useIsScreenReaderEnabled } from 'ink';
+import { ApprovalMode, tokenLimit } from '@google/gemini-cli-core';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { StatusDisplay } from './StatusDisplay.js';
 import { ApprovalModeIndicator } from './ApprovalModeIndicator.js';
@@ -18,6 +19,7 @@ import { InputPrompt } from './InputPrompt.js';
 import { Footer } from './Footer.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
 import { QueuedMessageDisplay } from './QueuedMessageDisplay.js';
+import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 import { HorizontalLine } from './shared/HorizontalLine.js';
 import { OverflowProvider } from '../contexts/OverflowContext.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
@@ -31,6 +33,7 @@ import { StreamingState, ToolCallStatus } from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
 import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
+import { theme } from '../semantic-colors.js';
 
 export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const config = useConfig();
@@ -47,6 +50,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
 
   const isAlternateBuffer = useAlternateBuffer();
   const { showApprovalModeIndicator } = uiState;
+  const showUiDetails = uiState.cleanUiDetailsVisible;
   const suggestionsPosition = isAlternateBuffer ? 'above' : 'below';
   const hideContextSummary =
     suggestionsVisible && suggestionsPosition === 'above';
@@ -70,6 +74,36 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     !hasPendingActionRequired;
   const showApprovalIndicator = !uiState.shellModeActive;
   const showRawMarkdownIndicator = !uiState.renderMarkdown;
+  const modeBleedThrough =
+    showApprovalModeIndicator === ApprovalMode.YOLO
+      ? { text: 'YOLO', color: theme.status.error }
+      : showApprovalModeIndicator === ApprovalMode.PLAN
+        ? { text: 'plan', color: theme.status.success }
+        : showApprovalModeIndicator === ApprovalMode.AUTO_EDIT
+          ? { text: 'auto edit', color: theme.status.warning }
+          : null;
+  const hasMinimalStatusBleedThrough =
+    uiState.ctrlCPressedOnce ||
+    uiState.ctrlDPressedOnce ||
+    Boolean(uiState.warningMessage) ||
+    Boolean(uiState.queueErrorMessage) ||
+    (uiState.showEscapePrompt &&
+      (uiState.buffer.text.length > 0 || uiState.history.length > 0));
+  const contextTokenLimit =
+    typeof uiState.currentModel === 'string' && uiState.currentModel.length > 0
+      ? tokenLimit(uiState.currentModel)
+      : 0;
+  const showMinimalContextBleedThrough =
+    !settings.merged.ui.footer.hideContextPercentage &&
+    typeof uiState.currentModel === 'string' &&
+    uiState.currentModel.length > 0 &&
+    contextTokenLimit > 0 &&
+    uiState.sessionStats.lastPromptTokenCount / contextTokenLimit > 0.6;
+  const showMinimalBleedThroughRow =
+    !showUiDetails &&
+    (Boolean(modeBleedThrough) ||
+      hasMinimalStatusBleedThrough ||
+      showMinimalContextBleedThrough);
 
   return (
     <Box
@@ -86,9 +120,11 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
         />
       )}
 
-      <QueuedMessageDisplay messageQueue={uiState.messageQueue} />
+      {showUiDetails && (
+        <QueuedMessageDisplay messageQueue={uiState.messageQueue} />
+      )}
 
-      <TodoTray />
+      {showUiDetails && <TodoTray />}
 
       <Box marginTop={1} width="100%" flexDirection="column">
         <Box
@@ -131,82 +167,124 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             flexDirection="column"
             alignItems={isNarrow ? 'flex-start' : 'flex-end'}
           >
-            {!hasPendingActionRequired && <ShortcutsHint />}
+            {!hasPendingActionRequired &&
+              (!showUiDetails || !showLoadingIndicator) && <ShortcutsHint />}
           </Box>
         </Box>
-        {uiState.shortcutsHelpVisible && <ShortcutsHelp />}
-        <HorizontalLine />
-        <Box
-          justifyContent={
-            settings.merged.ui.hideContextSummary
-              ? 'flex-start'
-              : 'space-between'
-          }
-          width="100%"
-          flexDirection={isNarrow ? 'column' : 'row'}
-          alignItems={isNarrow ? 'flex-start' : 'center'}
-        >
+        {showMinimalBleedThroughRow && (
           <Box
-            marginLeft={1}
-            marginRight={isNarrow ? 0 : 1}
-            flexDirection="row"
-            alignItems="center"
-            flexGrow={1}
+            justifyContent="space-between"
+            width="100%"
+            flexDirection={isNarrow ? 'column' : 'row'}
+            alignItems={isNarrow ? 'flex-start' : 'center'}
           >
-            {!showLoadingIndicator && (
+            <Box
+              marginLeft={1}
+              marginRight={isNarrow ? 0 : 1}
+              flexDirection="row"
+              alignItems={isNarrow ? 'flex-start' : 'center'}
+              flexGrow={1}
+            >
+              {modeBleedThrough && (
+                <Text color={modeBleedThrough.color}>
+                  {modeBleedThrough.text}
+                </Text>
+              )}
+              {hasMinimalStatusBleedThrough && (
+                <Box marginLeft={modeBleedThrough ? 1 : 0}>
+                  <StatusDisplay hideContextSummary={true} />
+                </Box>
+              )}
+            </Box>
+            {showMinimalContextBleedThrough && (
               <Box
-                flexDirection={isNarrow ? 'column' : 'row'}
-                alignItems={isNarrow ? 'flex-start' : 'center'}
+                marginTop={isNarrow ? 1 : 0}
+                alignItems={isNarrow ? 'flex-start' : 'flex-end'}
               >
-                {showApprovalIndicator && (
-                  <ApprovalModeIndicator
-                    approvalMode={showApprovalModeIndicator}
-                    isPlanEnabled={config.isPlanEnabled()}
-                  />
-                )}
-                {uiState.shellModeActive && (
-                  <Box
-                    marginLeft={showApprovalIndicator && !isNarrow ? 1 : 0}
-                    marginTop={showApprovalIndicator && isNarrow ? 1 : 0}
-                  >
-                    <ShellModeIndicator />
-                  </Box>
-                )}
-                {showRawMarkdownIndicator && (
-                  <Box
-                    marginLeft={
-                      (showApprovalIndicator || uiState.shellModeActive) &&
-                      !isNarrow
-                        ? 1
-                        : 0
-                    }
-                    marginTop={
-                      (showApprovalIndicator || uiState.shellModeActive) &&
-                      isNarrow
-                        ? 1
-                        : 0
-                    }
-                  >
-                    <RawMarkdownIndicator />
-                  </Box>
-                )}
+                <ContextUsageDisplay
+                  promptTokenCount={uiState.sessionStats.lastPromptTokenCount}
+                  model={uiState.currentModel}
+                  terminalWidth={uiState.terminalWidth}
+                />
               </Box>
             )}
           </Box>
-
+        )}
+        {uiState.shortcutsHelpVisible && <ShortcutsHelp />}
+        {showUiDetails && <HorizontalLine />}
+        {showUiDetails && (
           <Box
-            marginTop={isNarrow ? 1 : 0}
-            flexDirection="column"
-            alignItems={isNarrow ? 'flex-start' : 'flex-end'}
+            justifyContent={
+              settings.merged.ui.hideContextSummary
+                ? 'flex-start'
+                : 'space-between'
+            }
+            width="100%"
+            flexDirection={isNarrow ? 'column' : 'row'}
+            alignItems={isNarrow ? 'flex-start' : 'center'}
           >
-            {!showLoadingIndicator && (
-              <StatusDisplay hideContextSummary={hideContextSummary} />
-            )}
+            <Box
+              marginLeft={1}
+              marginRight={isNarrow ? 0 : 1}
+              flexDirection="row"
+              alignItems="center"
+              flexGrow={1}
+            >
+              {!showLoadingIndicator && (
+                <Box
+                  flexDirection={isNarrow ? 'column' : 'row'}
+                  alignItems={isNarrow ? 'flex-start' : 'center'}
+                >
+                  {showApprovalIndicator && (
+                    <ApprovalModeIndicator
+                      approvalMode={showApprovalModeIndicator}
+                      isPlanEnabled={config.isPlanEnabled()}
+                    />
+                  )}
+                  {uiState.shellModeActive && (
+                    <Box
+                      marginLeft={showApprovalIndicator && !isNarrow ? 1 : 0}
+                      marginTop={showApprovalIndicator && isNarrow ? 1 : 0}
+                    >
+                      <ShellModeIndicator />
+                    </Box>
+                  )}
+                  {showRawMarkdownIndicator && (
+                    <Box
+                      marginLeft={
+                        (showApprovalIndicator || uiState.shellModeActive) &&
+                        !isNarrow
+                          ? 1
+                          : 0
+                      }
+                      marginTop={
+                        (showApprovalIndicator || uiState.shellModeActive) &&
+                        isNarrow
+                          ? 1
+                          : 0
+                      }
+                    >
+                      <RawMarkdownIndicator />
+                    </Box>
+                  )}
+                </Box>
+              )}
+            </Box>
+
+            <Box
+              marginTop={isNarrow ? 1 : 0}
+              flexDirection="column"
+              alignItems={isNarrow ? 'flex-start' : 'flex-end'}
+            >
+              {!showLoadingIndicator && (
+                <StatusDisplay hideContextSummary={hideContextSummary} />
+              )}
+            </Box>
           </Box>
-        </Box>
+        )}
       </Box>
 
-      {uiState.showErrorDetails && (
+      {showUiDetails && uiState.showErrorDetails && (
         <OverflowProvider>
           <Box flexDirection="column">
             <DetailedMessagesDisplay
@@ -258,7 +336,9 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
         />
       )}
 
-      {!settings.merged.ui.hideFooter && !isScreenReaderEnabled && <Footer />}
+      {showUiDetails &&
+        !settings.merged.ui.hideFooter &&
+        !isScreenReaderEnabled && <Footer />}
     </Box>
   );
 };

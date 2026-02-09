@@ -357,8 +357,8 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.FOCUS_SHELL_INPUT,
-      positive: [createKey('tab')],
-      negative: [createKey('f', { ctrl: true }), createKey('f')],
+      positive: [createKey('f6')],
+      negative: [createKey('tab'), createKey('f', { ctrl: true })],
     },
     {
       command: Command.TOGGLE_YOLO,

@@ -120,6 +120,8 @@ Slash commands provide meta-level control over the CLI itself.
 - **`/shortcuts`**
   - **Description:** Toggle the shortcuts panel above the input.
   - **Shortcut:** Press `?` when the prompt is empty.
+  - **Note:** This is separate from the clean UI detail toggle on `Tab`, which
+    switches between minimal and full UI chrome.
 
 - **`/hooks`**
   - **Description:** Manage hooks, which allow you to intercept and customize

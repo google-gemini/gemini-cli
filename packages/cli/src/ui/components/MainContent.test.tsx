@@ -9,11 +9,15 @@ import { waitFor } from '../../test-utils/async.js';
 import { MainContent } from './MainContent.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Box, Text } from 'ink';
-import type React from 'react';
+import { act, useState, type JSX } from 'react';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { ToolCallStatus } from '../types.js';
 import { SHELL_COMMAND_NAME } from '../constants.js';
-import type { UIState } from '../contexts/UIStateContext.js';
+import {
+  UIStateContext,
+  useUIState,
+  type UIState,
+} from '../contexts/UIStateContext.js';
 
 // Mock dependencies
 vi.mock('../contexts/SettingsContext.js', async () => {
@@ -45,7 +49,9 @@ vi.mock('../hooks/useAlternateBuffer.js', () => ({
 }));
 
 vi.mock('./AppHeader.js', () => ({
-  AppHeader: () => <Text>AppHeader</Text>,
+  AppHeader: ({ showDetails = true }: { showDetails?: boolean }) => (
+    <Text>{showDetails ? 'AppHeader(full)' : 'AppHeader(minimal)'}</Text>
+  ),
 }));
 
 vi.mock('./ShowMoreLines.js', () => ({
@@ -58,7 +64,7 @@ vi.mock('./shared/ScrollableList.js', () => ({
     renderItem,
   }: {
     data: unknown[];
-    renderItem: (props: { item: unknown }) => React.JSX.Element;
+    renderItem: (props: { item: unknown }) => JSX.Element;
   }) => (
     <Box flexDirection="column">
       <Text>ScrollableList</Text>
@@ -87,6 +93,7 @@ describe('MainContent', () => {
     activePtyId: undefined,
     embeddedShellFocused: false,
     historyRemountKey: 0,
+    cleanUiDetailsVisible: true,
     bannerData: { defaultText: '', warningText: '' },
     bannerVisible: false,
   };
@@ -99,7 +106,7 @@ describe('MainContent', () => {
     const { lastFrame } = renderWithProviders(<MainContent />, {
       uiState: defaultMockUiState as Partial<UIState>,
     });
-    await waitFor(() => expect(lastFrame()).toContain('AppHeader'));
+    await waitFor(() => expect(lastFrame()).toContain('AppHeader(full)'));
     const output = lastFrame();
 
     expect(output).toContain('Hello');
@@ -114,9 +121,104 @@ describe('MainContent', () => {
     await waitFor(() => expect(lastFrame()).toContain('ScrollableList'));
     const output = lastFrame();
 
-    expect(output).toContain('AppHeader');
+    expect(output).toContain('AppHeader(full)');
     expect(output).toContain('Hello');
     expect(output).toContain('Hi there');
+  });
+
+  it('renders minimal header in minimal mode', async () => {
+    const { lastFrame } = renderWithProviders(<MainContent />, {
+      uiState: {
+        ...defaultMockUiState,
+        cleanUiDetailsVisible: false,
+      } as Partial<UIState>,
+    });
+    await waitFor(() => expect(lastFrame()).toContain('Hello'));
+    const output = lastFrame();
+
+    expect(output).toContain('AppHeader(minimal)');
+    expect(output).not.toContain('AppHeader(full)');
+    expect(output).toContain('Hello');
+  });
+
+  it('restores full header details after toggle in alternate buffer mode', async () => {
+    vi.mocked(useAlternateBuffer).mockReturnValue(true);
+
+    let setShowDetails: ((visible: boolean) => void) | undefined;
+    const ToggleHarness = () => {
+      const outerState = useUIState();
+      const [showDetails, setShowDetailsState] = useState(
+        outerState.cleanUiDetailsVisible,
+      );
+      setShowDetails = setShowDetailsState;
+
+      return (
+        <UIStateContext.Provider
+          value={{ ...outerState, cleanUiDetailsVisible: showDetails }}
+        >
+          <MainContent />
+        </UIStateContext.Provider>
+      );
+    };
+
+    const { lastFrame } = renderWithProviders(<ToggleHarness />, {
+      uiState: {
+        ...defaultMockUiState,
+        cleanUiDetailsVisible: false,
+      } as Partial<UIState>,
+    });
+
+    await waitFor(() => expect(lastFrame()).toContain('AppHeader(minimal)'));
+    if (!setShowDetails) {
+      throw new Error('setShowDetails was not initialized');
+    }
+    const setShowDetailsSafe = setShowDetails;
+
+    act(() => {
+      setShowDetailsSafe(true);
+    });
+
+    await waitFor(() => expect(lastFrame()).toContain('AppHeader(full)'));
+  });
+
+  it('restores full header details after toggle in normal buffer mode', async () => {
+    vi.mocked(useAlternateBuffer).mockReturnValue(false);
+
+    let setShowDetails: ((visible: boolean) => void) | undefined;
+    const ToggleHarness = () => {
+      const outerState = useUIState();
+      const [showDetails, setShowDetailsState] = useState(
+        outerState.cleanUiDetailsVisible,
+      );
+      setShowDetails = setShowDetailsState;
+
+      return (
+        <UIStateContext.Provider
+          value={{ ...outerState, cleanUiDetailsVisible: showDetails }}
+        >
+          <MainContent />
+        </UIStateContext.Provider>
+      );
+    };
+
+    const { lastFrame } = renderWithProviders(<ToggleHarness />, {
+      uiState: {
+        ...defaultMockUiState,
+        cleanUiDetailsVisible: false,
+      } as Partial<UIState>,
+    });
+
+    await waitFor(() => expect(lastFrame()).toContain('AppHeader(minimal)'));
+    if (!setShowDetails) {
+      throw new Error('setShowDetails was not initialized');
+    }
+    const setShowDetailsSafe = setShowDetails;
+
+    act(() => {
+      setShowDetailsSafe(true);
+    });
+
+    await waitFor(() => expect(lastFrame()).toContain('AppHeader(full)'));
   });
 
   it('does not constrain height in alternate buffer mode', async () => {
@@ -207,6 +309,7 @@ describe('MainContent', () => {
           isEditorDialogOpen: false,
           slashCommands: [],
           historyRemountKey: 0,
+          cleanUiDetailsVisible: true,
           bannerData: {
             defaultText: '',
             warningText: '',

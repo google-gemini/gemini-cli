@@ -279,11 +279,11 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.TOGGLE_BACKGROUND_SHELL_LIST]: [{ key: 'l', ctrl: true }],
   [Command.KILL_BACKGROUND_SHELL]: [{ key: 'k', ctrl: true }],
   [Command.UNFOCUS_BACKGROUND_SHELL]: [{ key: 'tab', shift: true }],
-  [Command.UNFOCUS_BACKGROUND_SHELL_LIST]: [{ key: 'tab', shift: false }],
+  [Command.UNFOCUS_BACKGROUND_SHELL_LIST]: [{ key: 'f6', shift: false }],
   [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING]: [
-    { key: 'tab', shift: false },
+    { key: 'f6', shift: false },
   ],
-  [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING]: [{ key: 'tab', shift: false }],
+  [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING]: [{ key: 'f6', shift: false }],
   [Command.BACKGROUND_SHELL_SELECT]: [{ key: 'return' }],
   [Command.BACKGROUND_SHELL_ESCAPE]: [{ key: 'escape' }],
   [Command.SHOW_MORE_LINES]: [
@@ -291,8 +291,8 @@ export const defaultKeyBindings: KeyBindingConfig = {
     { key: 's', ctrl: true },
   ],
   [Command.EXPAND_PASTE]: [{ key: 'o', ctrl: true }],
-  [Command.FOCUS_SHELL_INPUT]: [{ key: 'tab', shift: false }],
-  [Command.UNFOCUS_SHELL_INPUT]: [{ key: 'tab', shift: true }],
+  [Command.FOCUS_SHELL_INPUT]: [{ key: 'f6', shift: false }],
+  [Command.UNFOCUS_SHELL_INPUT]: [{ key: 'f6', shift: true }],
   [Command.CLEAR_SCREEN]: [{ key: 'l', ctrl: true }],
   [Command.RESTART_APP]: [{ key: 'r' }],
   [Command.SUSPEND_APP]: [{ key: 'z', ctrl: true }],
@@ -516,9 +516,9 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.UNFOCUS_BACKGROUND_SHELL_LIST]:
     'Move focus from background shell list to Gemini.',
   [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING]:
-    'Show warning when trying to unfocus background shell via Tab.',
+    'Show warning when trying to move focus away from background shell.',
   [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING]:
-    'Show warning when trying to unfocus shell input via Tab.',
+    'Show warning when trying to move focus away from shell input.',
   [Command.FOCUS_SHELL_INPUT]: 'Move focus from Gemini to the active shell.',
   [Command.UNFOCUS_SHELL_INPUT]: 'Move focus from the shell back to Gemini.',
   [Command.CLEAR_SCREEN]: 'Clear the terminal screen and redraw the UI.',

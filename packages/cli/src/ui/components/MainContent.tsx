@@ -54,7 +54,9 @@ export const MainContent = () => {
     mainAreaWidth,
     staticAreaMaxItemHeight,
     availableTerminalHeight,
+    cleanUiDetailsVisible,
   } = uiState;
+  const showHeaderDetails = cleanUiDetailsVisible;
 
   const inlineThinkingMode = getInlineThinkingMode(settings);
 
@@ -134,7 +136,13 @@ export const MainContent = () => {
   const renderItem = useCallback(
     ({ item }: { item: (typeof virtualizedData)[number] }) => {
       if (item.type === 'header') {
-        return <MemoizedAppHeader key="app-header" version={version} />;
+        return (
+          <MemoizedAppHeader
+            key="app-header"
+            version={version}
+            showDetails={showHeaderDetails}
+          />
+        );
       } else if (item.type === 'history') {
         return (
           <MemoizedHistoryItemDisplay
@@ -153,6 +161,7 @@ export const MainContent = () => {
       }
     },
     [
+      showHeaderDetails,
       version,
       mainAreaWidth,
       uiState.slashCommands,
@@ -183,13 +192,12 @@ export const MainContent = () => {
 
   return (
     <>
-      <Static
-        key={uiState.historyRemountKey}
-        items={[
-          <AppHeader key="app-header" version={version} />,
-          ...historyItems,
-        ]}
-      >
+      <AppHeader
+        key="app-header"
+        version={version}
+        showDetails={showHeaderDetails}
+      />
+      <Static key={uiState.historyRemountKey} items={[...historyItems]}>
         {(item) => item}
       </Static>
       {pendingItems}

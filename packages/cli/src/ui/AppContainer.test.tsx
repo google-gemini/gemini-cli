@@ -1942,7 +1942,7 @@ describe('AppContainer State Management', () => {
       });
     });
 
-    describe('Focus Handling (Tab / Shift+Tab)', () => {
+    describe('Focus Handling (F6 / Shift+F6)', () => {
       beforeEach(() => {
         // Mock activePtyId to enable focus
         mockedUseGeminiStream.mockReturnValue({
@@ -1951,24 +1951,24 @@ describe('AppContainer State Management', () => {
         });
       });
 
-      it('should focus shell input on Tab', async () => {
+      it('should focus shell input on F6', async () => {
         await setupKeypressTest();
 
-        pressKey({ name: 'tab', shift: false });
+        pressKey({ name: 'f6', shift: false });
 
         expect(capturedUIState.embeddedShellFocused).toBe(true);
         unmount();
       });
 
-      it('should unfocus shell input on Shift+Tab', async () => {
+      it('should unfocus shell input on Shift+F6', async () => {
         await setupKeypressTest();
 
         // Focus first
-        pressKey({ name: 'tab', shift: false });
+        pressKey({ name: 'f6', shift: false });
         expect(capturedUIState.embeddedShellFocused).toBe(true);
 
-        // Unfocus via Shift+Tab
-        pressKey({ name: 'tab', shift: true });
+        // Unfocus via Shift+F6
+        pressKey({ name: 'f6', shift: true });
         expect(capturedUIState.embeddedShellFocused).toBe(false);
         unmount();
       });
@@ -1988,7 +1988,7 @@ describe('AppContainer State Management', () => {
         // Focus it
         act(() => {
           handleGlobalKeypress({
-            name: 'tab',
+            name: 'f6',
             shift: false,
             alt: false,
             ctrl: false,
@@ -2012,7 +2012,7 @@ describe('AppContainer State Management', () => {
         renderResult.unmount();
       });
 
-      it('should focus background shell on Tab when already visible (not toggle it off)', async () => {
+      it('should focus background shell on F6 when already visible (not toggle it off)', async () => {
         const mockToggleBackgroundShell = vi.fn();
         mockedUseGeminiStream.mockReturnValue({
           ...DEFAULT_GEMINI_STREAM_MOCK,
@@ -2027,8 +2027,8 @@ describe('AppContainer State Management', () => {
         // Initially not focused
         expect(capturedUIState.embeddedShellFocused).toBe(false);
 
-        // Press Tab
-        pressKey({ name: 'tab', shift: false });
+        // Press F6
+        pressKey({ name: 'f6', shift: false });
 
         // Should be focused
         expect(capturedUIState.embeddedShellFocused).toBe(true);

@@ -23,7 +23,7 @@ vi.mock('../contexts/VimModeContext.js', () => ({
     vimMode: 'INSERT',
   })),
 }));
-import { ApprovalMode } from '@google/gemini-cli-core';
+import { ApprovalMode, tokenLimit } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
 import { StreamingState, ToolCallStatus } from '../types.js';
 import type { LoadedSettings } from '../../config/settings.js';
@@ -138,15 +138,19 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     ctrlDPressedOnce: false,
     showEscapePrompt: false,
     shortcutsHelpVisible: false,
+    cleanUiDetailsVisible: true,
     ideContextState: null,
     geminiMdFileCount: 0,
     renderMarkdown: true,
     filteredConsoleMessages: [],
     history: [],
     sessionStats: {
+      sessionId: 'test-session',
+      sessionStartTime: new Date(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      metrics: {} as any,
       lastPromptTokenCount: 0,
-      sessionTokenCount: 0,
-      totalPrompts: 0,
+      promptCount: 0,
     },
     branchName: 'main',
     debugMessage: '',
@@ -171,6 +175,9 @@ const createMockUIActions = (): UIActions =>
     handleFinalSubmit: vi.fn(),
     handleClearScreen: vi.fn(),
     setShellModeActive: vi.fn(),
+    setCleanUiDetailsVisible: vi.fn(),
+    toggleCleanUiDetailsVisible: vi.fn(),
+    revealCleanUiDetailsTemporarily: vi.fn(),
     onEscapePromptChange: vi.fn(),
     vimHandleInput: vi.fn(),
   }) as Partial<UIActions> as UIActions;
@@ -317,10 +324,11 @@ describe('Composer', () => {
       expect(output).toContain('LoadingIndicator: Thinking ...');
     });
 
-    it('keeps shortcuts hint visible while loading', () => {
+    it('keeps shortcuts hint visible while loading in clean mode', () => {
       const uiState = createMockUIState({
         streamingState: StreamingState.Responding,
         elapsedTime: 1,
+        cleanUiDetailsVisible: false,
       });
 
       const { lastFrame } = renderComposer(uiState);
@@ -504,6 +512,21 @@ describe('Composer', () => {
   });
 
   describe('Input and Indicators', () => {
+    it('hides non-essential UI details in clean mode', () => {
+      const uiState = createMockUIState({
+        cleanUiDetailsVisible: false,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      const output = lastFrame();
+      expect(output).toContain('ShortcutsHint');
+      expect(output).toContain('InputPrompt');
+      expect(output).not.toContain('Footer');
+      expect(output).not.toContain('ApprovalModeIndicator');
+      expect(output).not.toContain('ContextSummaryDisplay');
+    });
+
     it('renders InputPrompt when input is active', () => {
       const uiState = createMockUIState({
         isInputActive: true,
@@ -571,6 +594,60 @@ describe('Composer', () => {
       const { lastFrame } = renderComposer(uiState);
 
       expect(lastFrame()).not.toContain('raw markdown mode');
+    });
+
+    it.each([
+      [ApprovalMode.YOLO, 'YOLO'],
+      [ApprovalMode.PLAN, 'plan'],
+      [ApprovalMode.AUTO_EDIT, 'auto edit'],
+    ])(
+      'shows minimal mode badge "%s" when clean UI details are hidden',
+      (mode, label) => {
+        const uiState = createMockUIState({
+          cleanUiDetailsVisible: false,
+          showApprovalModeIndicator: mode,
+        });
+
+        const { lastFrame } = renderComposer(uiState);
+        expect(lastFrame()).toContain(label);
+      },
+    );
+
+    it('shows Esc rewind prompt in minimal mode without showing full UI', () => {
+      const uiState = createMockUIState({
+        cleanUiDetailsVisible: false,
+        showEscapePrompt: true,
+        history: [{ id: 1, type: 'user', text: 'msg' }],
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+      const output = lastFrame();
+      expect(output).toContain('Press Esc again to rewind');
+      expect(output).not.toContain('ContextSummaryDisplay');
+    });
+
+    it('shows context usage bleed-through when over 60%', () => {
+      const model = 'gemini-2.5-pro';
+      const uiState = createMockUIState({
+        cleanUiDetailsVisible: false,
+        currentModel: model,
+        sessionStats: {
+          sessionId: 'test-session',
+          sessionStartTime: new Date(),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          metrics: {} as any,
+          lastPromptTokenCount: Math.floor(tokenLimit(model) * 0.7),
+          promptCount: 0,
+        },
+      });
+      const settings = createMockSettings({
+        ui: {
+          footer: { hideContextPercentage: false },
+        },
+      });
+
+      const { lastFrame } = renderComposer(uiState, settings);
+      expect(lastFrame()).toContain('%');
     });
   });
 
@@ -657,11 +734,46 @@ describe('Composer', () => {
     });
 
     it('keeps shortcuts hint visible when no action is required', () => {
-      const uiState = createMockUIState();
+      const uiState = createMockUIState({
+        cleanUiDetailsVisible: false,
+      });
 
       const { lastFrame } = renderComposer(uiState);
 
       expect(lastFrame()).toContain('ShortcutsHint');
+    });
+
+    it('shows shortcuts hint when full UI details are visible', () => {
+      const uiState = createMockUIState({
+        cleanUiDetailsVisible: true,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).toContain('ShortcutsHint');
+    });
+
+    it('keeps shortcuts hint visible while loading in minimal mode', () => {
+      const uiState = createMockUIState({
+        cleanUiDetailsVisible: false,
+        streamingState: StreamingState.Responding,
+        elapsedTime: 1,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).toContain('ShortcutsHint');
+    });
+
+    it('shows shortcuts help in minimal mode when toggled on', () => {
+      const uiState = createMockUIState({
+        cleanUiDetailsVisible: false,
+        shortcutsHelpVisible: true,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).toContain('ShortcutsHelp');
     });
   });
 });

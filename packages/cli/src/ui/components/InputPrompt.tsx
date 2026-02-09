@@ -207,7 +207,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const { merged: settings } = useSettings();
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
-  const { setEmbeddedShellFocused, setShortcutsHelpVisible } = useUIActions();
+  const {
+    setEmbeddedShellFocused,
+    setShortcutsHelpVisible,
+    toggleCleanUiDetailsVisible,
+    revealCleanUiDetailsTemporarily,
+  } = useUIActions();
   const {
     terminalWidth,
     activePtyId,
@@ -216,6 +221,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     backgroundShells,
     backgroundShellHeight,
     shortcutsHelpVisible,
+    cleanUiDetailsVisible,
   } = useUIState();
   const [suppressCompletion, setSuppressCompletion] = useState(false);
   const escPressCount = useRef(0);
@@ -623,6 +629,22 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           streamingState === StreamingState.WaitingForConfirmation)
       ) {
         return false;
+      }
+
+      if (key.shift && key.name === 'tab' && !cleanUiDetailsVisible) {
+        revealCleanUiDetailsTemporarily();
+      }
+
+      const isPlainTab =
+        key.name === 'tab' && !key.shift && !key.alt && !key.ctrl && !key.cmd;
+      const hasTabCompletionInteraction =
+        completion.showSuggestions ||
+        Boolean(completion.promptCompletion.text) ||
+        reverseSearchActive ||
+        commandSearchActive;
+      if (isPlainTab && !hasTabCompletionInteraction) {
+        toggleCleanUiDetailsVisible();
+        return true;
       }
 
       if (key.name === 'paste') {
@@ -1169,7 +1191,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       commandSearchCompletion,
       kittyProtocol.enabled,
       shortcutsHelpVisible,
+      cleanUiDetailsVisible,
       setShortcutsHelpVisible,
+      toggleCleanUiDetailsVisible,
+      revealCleanUiDetailsTemporarily,
       tryLoadQueuedMessages,
       setBannerVisible,
       onSubmit,

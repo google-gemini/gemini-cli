@@ -120,6 +120,7 @@ export interface UIState {
   ctrlDPressedOnce: boolean;
   showEscapePrompt: boolean;
   shortcutsHelpVisible: boolean;
+  cleanUiDetailsVisible: boolean;
   elapsedTime: number;
   currentLoadingPhrase: string;
   historyRemountKey: number;
