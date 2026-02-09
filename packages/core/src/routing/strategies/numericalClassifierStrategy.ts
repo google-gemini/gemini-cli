@@ -12,7 +12,10 @@ import type {
   RoutingDecision,
   RoutingStrategy,
 } from '../routingStrategy.js';
-import { resolveClassifierModel } from '../../config/models.js';
+import {
+  PREVIEW_GEMINI_FLASH_MODEL,
+  resolveClassifierModel,
+} from '../../config/models.js';
 import { createUserContent, Type } from '@google/genai';
 import type { Config } from '../../config/config.js';
 import { debugLogger } from '../../utils/debugLogger.js';
@@ -158,7 +161,8 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
       });
 
       const jsonResponse = await baseLlmClient.generateJson({
-        modelConfigKey: { model: 'classifier' },
+        // Use a concrete Flash model for classification to avoid routing recursion.
+        modelConfigKey: { model: PREVIEW_GEMINI_FLASH_MODEL },
         contents: [...finalHistory, createUserContent(sanitizedRequest)],
         schema: RESPONSE_SCHEMA,
         systemInstruction: CLASSIFIER_SYSTEM_PROMPT,
