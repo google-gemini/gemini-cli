@@ -139,6 +139,48 @@ describe('WorkspaceContext with real filesystem', () => {
       expect(workspaceContext.isPathWithinWorkspace(invalidPath)).toBe(false);
     });
 
+    it('should match paths case-insensitively on Windows', () => {
+      // Force win32 platform for this test
+      const originalPlatform = os.platform();
+      Object.defineProperty(process, 'platform', { value: 'win32' });
+
+      try {
+        // Setup: cwd is lowercase-ish, checkPath is MixedCase
+        // In the real fix, we normalize BOTH to lowercase for comparison.
+        // Let's assume cwd is '/tmp/project'
+        const lowerCwd = cwd.toLowerCase();
+        // Ensure the directory exists for the test to pass validation
+        if (!fs.existsSync(lowerCwd)) {
+          fs.mkdirSync(lowerCwd, { recursive: true });
+        }
+        const workspaceContext = new WorkspaceContext(lowerCwd);
+
+        // A path that matches case-insensitively
+        const mixedCasePath = path.join(lowerCwd, 'SubDir', 'File.txt');
+        expect(workspaceContext.isPathWithinWorkspace(mixedCasePath)).toBe(
+          true,
+        );
+
+        // Case 1: Root is lower, Check is Upper
+        const upperPath = path.join(lowerCwd.toUpperCase(), 'FILE.TXT');
+        expect(workspaceContext.isPathWithinWorkspace(upperPath)).toBe(true);
+
+        // Case 2: Root is Upper, Check is Lower
+        // Use a mixed case directory to simulate case-insensitivity without hitting root-level EACCES
+        const mixedRoot = path.join(cwd, 'MixedCaseRoot');
+        if (!fs.existsSync(mixedRoot)) {
+          fs.mkdirSync(mixedRoot);
+        }
+        const workspaceContextMixed = new WorkspaceContext(mixedRoot);
+        const lowerPathValues = path.join(mixedRoot.toLowerCase(), 'file.txt');
+        expect(
+          workspaceContextMixed.isPathWithinWorkspace(lowerPathValues),
+        ).toBe(true);
+      } finally {
+        Object.defineProperty(process, 'platform', { value: originalPlatform });
+      }
+    });
+
     it('should handle nested directories correctly', () => {
       const workspaceContext = new WorkspaceContext(cwd, [otherDir]);
       const nestedPath = path.join(cwd, 'deeply', 'nested', 'path', 'file.txt');

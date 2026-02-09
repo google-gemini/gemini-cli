@@ -6,6 +6,7 @@
 
 import { isNodeError } from '../utils/errors.js';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { debugLogger } from './debugLogger.js';
 
@@ -22,6 +23,7 @@ export interface AddDirectoriesResult {
  * in a single session.
  */
 export class WorkspaceContext {
+  readonly targetDir: string;
   private directories = new Set<string>();
   private initialDirectories: Set<string>;
   private onDirectoriesChangedListeners = new Set<() => void>();
@@ -31,10 +33,13 @@ export class WorkspaceContext {
    * @param targetDir The initial working directory (usually cwd)
    * @param additionalDirectories Optional array of additional directories to include
    */
-  constructor(
-    readonly targetDir: string,
-    additionalDirectories: string[] = [],
-  ) {
+  constructor(targetDir: string, additionalDirectories: string[] = []) {
+    // Ensure targetDir is in original case from filesystem
+    try {
+      this.targetDir = fs.realpathSync(targetDir);
+    } catch {
+      this.targetDir = targetDir;
+    }
     this.addDirectory(targetDir);
     this.addDirectories(additionalDirectories);
     this.initialDirectories = new Set(this.directories);
@@ -181,7 +186,26 @@ export class WorkspaceContext {
    */
   private fullyResolvedPath(pathToCheck: string): string {
     try {
-      return fs.realpathSync(path.resolve(this.targetDir, pathToCheck));
+      let resolvedInput = path.resolve(this.targetDir, pathToCheck);
+
+      // On Windows, if pathToCheck is already absolute with incorrect casing, fix it
+      if (os.platform() === 'win32' && path.isAbsolute(pathToCheck)) {
+        try {
+          resolvedInput = fs.realpathSync(pathToCheck);
+        } catch {
+          // Normalize the case by matching against targetDir
+          const normalizedPathToCheck = pathToCheck.toLowerCase();
+          const normalizedTargetDir = this.targetDir.toLowerCase();
+
+          if (normalizedPathToCheck.startsWith(normalizedTargetDir)) {
+            resolvedInput =
+              this.targetDir +
+              pathToCheck.substring(normalizedTargetDir.length);
+          }
+        }
+      }
+
+      return fs.realpathSync(resolvedInput);
     } catch (e: unknown) {
       if (
         isNodeError(e) &&
@@ -208,7 +232,12 @@ export class WorkspaceContext {
     pathToCheck: string,
     rootDirectory: string,
   ): boolean {
-    const relative = path.relative(rootDirectory, pathToCheck);
+    const normalizedRoot =
+      os.platform() === 'win32' ? rootDirectory.toLowerCase() : rootDirectory;
+    const normalizedPath =
+      os.platform() === 'win32' ? pathToCheck.toLowerCase() : pathToCheck;
+
+    const relative = path.relative(normalizedRoot, normalizedPath);
     return (
       !relative.startsWith(`..${path.sep}`) &&
       relative !== '..' &&

@@ -6,7 +6,6 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as os from 'node:os';
 import { lock } from 'proper-lockfile';
 import { debugLogger } from '../utils/debugLogger.js';
 
@@ -68,11 +67,7 @@ export class ProjectRegistry {
   }
 
   private normalizePath(projectPath: string): string {
-    let resolved = path.resolve(projectPath);
-    if (os.platform() === 'win32') {
-      resolved = resolved.toLowerCase();
-    }
-    return resolved;
+    return path.resolve(projectPath);
   }
 
   private async save(data: RegistryData): Promise<void> {
