@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 
-/* eslint-env node */
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 /**
  * Skill Packager - Creates a distributable .skill file of a skill folder
