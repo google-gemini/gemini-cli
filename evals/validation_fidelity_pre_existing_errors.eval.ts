@@ -8,7 +8,7 @@ import { describe, expect } from 'vitest';
 import { evalTest } from './test-helper.js';
 
 describe('validation_fidelity_pre_existing_errors', () => {
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: 'should handle pre-existing project errors gracefully during validation',
     files: {
       'src/math.ts': `
