@@ -179,13 +179,6 @@ export const getCachedStringWidth = (str: string): number => {
   return width;
 };
 
-/**
- * Clear the string width cache
- */
-export const clearStringWidthCache = (): void => {
-  stringWidthCache.clear();
-};
-
 const regex = ansiRegex();
 
 /* Recursively traverses a JSON-like structure (objects, arrays, primitives)
