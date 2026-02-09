@@ -1,0 +1,29 @@
+# captain-hook project policy
+# See docs for full configuration reference.
+
+sensitive_paths:
+  ask_write:
+    - ".claude/**"
+    - ".captain-hook/**"
+    - ".env*"
+    - "**/.env*"
+    - ".git/hooks/**"
+    - "**/secrets/**"
+    - "~/.claude/**"
+    - "~/.config/**"
+
+confidence:
+  org: 0.9
+  project: 0.7
+  user: 0.6
+
+similarity:
+  jaccard_threshold: 0.7
+  embedding_threshold: 0.85
+  jaccard_min_tokens: 3
+
+human_timeout_secs: 60
+registration_timeout_secs: 5
+
+supervisor:
+  backend: socket
