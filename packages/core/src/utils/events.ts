@@ -203,11 +203,10 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
       this._eventBacklog.push({ event, args } as EventBacklogItem);
     } else {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const emit = this.emit as <K extends keyof CoreEvents>(
-        event: K,
-        ...args: CoreEvents[K]
-      ) => boolean;
-      emit.call(this, event, ...args);
+      (this.emit as (event: K, ...args: CoreEvents[K]) => boolean)(
+        event,
+        ...args,
+      );
     }
   }
 
@@ -321,11 +320,11 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
     this._eventBacklog.length = 0; // Clear in-place
     for (const item of backlog) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const emit = this.emit as <K extends keyof CoreEvents>(
-        event: K,
-        ...args: CoreEvents[K]
+      const func = this.emit as (
+        event: keyof CoreEvents,
+        ...args: unknown[]
       ) => boolean;
-      emit.call(this, item.event, ...item.args);
+      func(item.event, ...item.args);
     }
   }
 }
