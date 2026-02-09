@@ -79,3 +79,15 @@ powerful tool for developers.
 - Documentation is located in the `docs/` directory.
 - Suggest documentation updates when code changes render existing documentation
   obsolete or incomplete.
+
+## Risk Assessment & Release Planning
+
+- **Lunar New Year Window (Feb 15 - Feb 22, 2026):** A significant portion of
+  the active developer and contributor base will be offline during this period.
+  Given the current architectural shift towards a more complex, IDE-like engine
+  (e.g., event-driven scheduler, XML sub-agents, and interactive UI refactors),
+  pushing a stable release around Feb 15 (Lunar New Year Eve) carries high risk.
+  Infrastructure instability or critical UX regressions (like ESC/Mouse
+  deadlocks) discovered during this window may experience delayed resolution. It
+  is recommended to implement a release freeze or prioritize stability over new
+  features during this period.
