@@ -757,7 +757,7 @@ interface UseTextBufferProps {
   stdin?: NodeJS.ReadStream | null; // For external editor
   setRawMode?: (mode: boolean) => void; // For external editor
   onChange?: (text: string) => void; // Callback for when text changes
-  isValidPath: (path: string) => boolean;
+  escapePastedPaths?: boolean;
   shellModeActive?: boolean; // Whether the text buffer is in shell mode
   inputFilter?: (text: string) => string; // Optional filter for input text
   singleLine?: boolean;
@@ -2682,7 +2682,7 @@ export function useTextBuffer({
   stdin,
   setRawMode,
   onChange,
-  isValidPath,
+  escapePastedPaths = false,
   shellModeActive = false,
   inputFilter,
   singleLine = false,
@@ -2799,7 +2799,8 @@ export function useTextBuffer({
       if (
         ch.length >= minLengthToInferAsDragDrop &&
         !shellModeActive &&
-        paste
+        paste &&
+        escapePastedPaths
       ) {
         let potentialPath = ch.trim();
         const quoteMatch = potentialPath.match(/^'(.*)'$/);
@@ -2809,7 +2810,7 @@ export function useTextBuffer({
 
         potentialPath = potentialPath.trim();
 
-        const processed = parsePastedPaths(potentialPath, isValidPath);
+        const processed = parsePastedPaths(potentialPath);
         if (processed) {
           textToInsert = processed;
         }
@@ -2831,7 +2832,7 @@ export function useTextBuffer({
         dispatch({ type: 'insert', payload: currentText, isPaste: paste });
       }
     },
-    [isValidPath, shellModeActive],
+    [shellModeActive, escapePastedPaths],
   );
 
   const newline = useCallback((): void => {
