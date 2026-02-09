@@ -667,6 +667,17 @@ export function loadSettings(
   // Environment variables for runtime use
   systemSettings = resolveEnvVarsInObject(systemResult.settings);
   systemDefaultSettings = resolveEnvVarsInObject(systemDefaultsResult.settings);
+
+  // Enable alternate buffer by default for Cloud Shell to prevent flickering.
+  // This is set in systemDefaults so users can opt out via their user settings.
+  if (process.env['CLOUD_SHELL'] === 'true') {
+    systemDefaultSettings = customDeepMerge(
+      getMergeStrategyForPath,
+      systemDefaultSettings,
+      { ui: { useAlternateBuffer: true } },
+    ) as Settings;
+  }
+
   userSettings = resolveEnvVarsInObject(userResult.settings);
   workspaceSettings = resolveEnvVarsInObject(workspaceResult.settings);
 
