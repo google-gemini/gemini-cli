@@ -31,7 +31,7 @@ export function getFileDiffFromResultDisplay(
   return undefined;
 }
 
-export function computeAddedAndRemovedLines(
+export function computeModelAddedAndRemovedLines(
   stats: FileDiff['diffStat'] | undefined,
 ): {
   addedLines: number;
