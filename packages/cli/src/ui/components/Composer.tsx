@@ -30,7 +30,6 @@ import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { StreamingState, ToolCallStatus } from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
-import { theme } from '../semantic-colors.js';
 import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 
 export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
