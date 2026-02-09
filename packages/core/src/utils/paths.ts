@@ -16,10 +16,12 @@ export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
 
 /**
  * Special characters that need to be escaped in file paths for shell compatibility.
- * Includes: spaces, parentheses, brackets, braces, semicolons, ampersands, pipes,
- * asterisks, question marks, dollar signs, backticks, quotes, hash, and other shell metacharacters.
+ * Note that windows doesn't escape tilda.
  */
-export const SHELL_SPECIAL_CHARS = /[ \t()[\]{};|*?$`'"#&<>!~]/;
+export const SHELL_SPECIAL_CHARS =
+  process.platform === 'win32'
+    ? /[ \t()[\]{};|*?$`'"#&<>!]/
+    : /[ \t()[\]{};|*?$`'"#&<>!~]/;
 
 /**
  * Returns the home directory.

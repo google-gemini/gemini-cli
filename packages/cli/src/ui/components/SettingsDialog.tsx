@@ -219,7 +219,6 @@ export function SettingsDialog({
       width: viewportWidth,
       height: 1,
     },
-    isValidPath: () => false,
     singleLine: true,
     onChange: (text) => setSearchQuery(text),
   });

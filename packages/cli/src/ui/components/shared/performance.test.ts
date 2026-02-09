@@ -19,7 +19,6 @@ describe('text-buffer performance', () => {
     const { result } = renderHook(() =>
       useTextBuffer({
         viewport,
-        isValidPath: () => false,
       }),
     );
 
@@ -52,7 +51,6 @@ describe('text-buffer performance', () => {
       useTextBuffer({
         initialText,
         viewport,
-        isValidPath: () => false,
       }),
     );
 

@@ -24,7 +24,6 @@ describe('useReverseSearchCompletion', () => {
       initialText: text,
       initialCursorOffset: text.length,
       viewport: { width: 80, height: 20 },
-      isValidPath: () => false,
       onChange: () => {},
     });
   }

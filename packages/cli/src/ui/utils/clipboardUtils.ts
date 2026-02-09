@@ -5,7 +5,7 @@
  */
 
 import * as fs from 'node:fs/promises';
-import { createWriteStream } from 'node:fs';
+import { createWriteStream, existsSync, statSync } from 'node:fs';
 import { execSync, spawn } from 'node:child_process';
 import * as path from 'node:path';
 import {
@@ -463,19 +463,26 @@ export function splitEscapedPaths(text: string): string[] {
 }
 
 /**
+ * Helper to validate if a path exists and is a file.
+ */
+function isValidFilePath(p: string): boolean {
+  try {
+    return existsSync(p) && statSync(p).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Processes pasted text containing file paths, adding @ prefix to valid paths.
  * Handles both single and multiple space-separated paths.
  *
  * @param text The pasted text (potentially space-separated paths)
- * @param isValidPath Function to validate if a path exists/is valid
  * @returns Processed string with @ prefixes on valid paths, or null if no valid paths
  */
-export function parsePastedPaths(
-  text: string,
-  isValidPath: (path: string) => boolean,
-): string | null {
+export function parsePastedPaths(text: string): string | null {
   // First, check if the entire text is a single valid path
-  if (PATH_PREFIX_PATTERN.test(text) && isValidPath(text)) {
+  if (PATH_PREFIX_PATTERN.test(text) && isValidFilePath(text)) {
     return `@${escapePath(text)} `;
   }
 
@@ -492,7 +499,7 @@ export function parsePastedPaths(
       return segment;
     }
     const unescaped = unescapePath(segment);
-    if (isValidPath(unescaped)) {
+    if (isValidFilePath(unescaped)) {
       anyValidPath = true;
       return `@${segment}`;
     }
