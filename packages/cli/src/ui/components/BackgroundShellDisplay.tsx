@@ -18,7 +18,7 @@ import { cpLen, cpSlice, getCachedStringWidth } from '../utils/textUtils.js';
 import { type BackgroundShell } from '../hooks/shellCommandProcessor.js';
 import { Command, keyMatchers } from '../keyMatchers.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { commandDescriptions } from '../../config/keyBindings.js';
+import { formatCommand } from '../utils/keybindingUtils.js';
 import {
   appEvents,
   AppEvent,
@@ -158,12 +158,11 @@ export const BackgroundShellDisplay = ({
         keyMatchers[Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING](key)
       ) {
         appEvents.emit(AppEvent.TransientMessage, {
-          message: `Press ${commandDescriptions[Command.UNFOCUS_BACKGROUND_SHELL]} to focus out.`,
+          message: `Press ${formatCommand(Command.UNFOCUS_BACKGROUND_SHELL)} to focus out.`,
           type: TransientMessageType.Warning,
         });
         // Fall through to allow Tab to be sent to the shell
       }
-
       if (isListOpenProp) {
         // Navigation (Up/Down/Enter) is handled by RadioButtonSelect
         // We only handle special keys not consumed by RadioButtonSelect or overriding them if needed
@@ -193,7 +192,7 @@ export const BackgroundShellDisplay = ({
       }
 
       if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL](key)) {
-        return true;
+        return false;
       }
 
       if (keyMatchers[Command.KILL_BACKGROUND_SHELL](key)) {
@@ -221,7 +220,27 @@ export const BackgroundShellDisplay = ({
     { isActive: isFocused && !!activeShell },
   );
 
-  const helpText = `${commandDescriptions[Command.TOGGLE_BACKGROUND_SHELL]} Hide | ${commandDescriptions[Command.KILL_BACKGROUND_SHELL]} Kill | ${commandDescriptions[Command.TOGGLE_BACKGROUND_SHELL_LIST]} List`;
+  const helpTextParts = [
+    { label: 'Close', command: Command.TOGGLE_BACKGROUND_SHELL },
+    { label: 'Kill', command: Command.KILL_BACKGROUND_SHELL },
+    { label: 'List', command: Command.TOGGLE_BACKGROUND_SHELL_LIST },
+  ];
+
+  const helpTextStr = helpTextParts
+    .map((p) => `${p.label} (${formatCommand(p.command)})`)
+    .join(' | ');
+
+  const renderHelpText = () => (
+    <Text>
+      {helpTextParts.map((p, i) => (
+        <Text key={p.label}>
+          {i > 0 ? ' | ' : ''}
+          {p.label} (
+          <Text color={theme.text.accent}>{formatCommand(p.command)}</Text>)
+        </Text>
+      ))}
+    </Text>
+  );
 
   const renderTabs = () => {
     const shellList = Array.from(shells.values()).filter(
@@ -235,7 +254,7 @@ export const BackgroundShellDisplay = ({
     const availableWidth =
       width -
       TAB_DISPLAY_HORIZONTAL_PADDING -
-      getCachedStringWidth(helpText) -
+      getCachedStringWidth(helpTextStr) -
       pidInfoWidth;
 
     let currentWidth = 0;
@@ -277,7 +296,7 @@ export const BackgroundShellDisplay = ({
     }
 
     if (shellList.length > tabs.length && !isListOpenProp) {
-      const overflowLabel = ` ... (${commandDescriptions[Command.TOGGLE_BACKGROUND_SHELL_LIST]}) `;
+      const overflowLabel = ` ... (${formatCommand(Command.TOGGLE_BACKGROUND_SHELL_LIST)}) `;
       const overflowWidth = getCachedStringWidth(overflowLabel);
 
       // If we only have one tab, ensure we don't show the overflow if it's too cramped
@@ -329,7 +348,7 @@ export const BackgroundShellDisplay = ({
       <Box flexDirection="column" height="100%" width="100%">
         <Box flexShrink={0} marginBottom={1} paddingTop={1}>
           <Text bold>
-            {`Select Process (${commandDescriptions[Command.BACKGROUND_SHELL_SELECT]} to select, ${commandDescriptions[Command.BACKGROUND_SHELL_ESCAPE]} to cancel):`}
+            {`Select Process (${formatCommand(Command.BACKGROUND_SHELL_SELECT)} to select, ${formatCommand(Command.KILL_BACKGROUND_SHELL)} to kill, ${formatCommand(Command.BACKGROUND_SHELL_ESCAPE)} to cancel):`}
           </Text>
         </Box>
         <Box flexGrow={1} width="100%">
@@ -455,7 +474,7 @@ export const BackgroundShellDisplay = ({
             (PID: {activeShell?.pid}) {isFocused ? '(Focused)' : ''}
           </Text>
         </Box>
-        <Text color={theme.text.accent}>{helpText}</Text>
+        {renderHelpText()}
       </Box>
       <Box flexGrow={1} overflow="hidden" paddingX={CONTENT_PADDING_X}>
         {isListOpenProp ? renderProcessList() : renderOutput()}

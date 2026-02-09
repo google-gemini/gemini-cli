@@ -145,6 +145,7 @@ vi.mock('./contexts/SessionContext.js');
 vi.mock('./components/shared/text-buffer.js');
 vi.mock('./hooks/useLogger.js');
 vi.mock('./hooks/useInputHistoryStore.js');
+vi.mock('./hooks/atCommandProcessor.js');
 vi.mock('./hooks/useHookDisplayState.js');
 vi.mock('./hooks/useTerminalTheme.js', () => ({
   useTerminalTheme: vi.fn(),
@@ -1940,6 +1941,160 @@ describe('AppContainer State Management', () => {
         unmount();
       });
     });
+
+    describe('Focus Handling (Tab / Shift+Tab)', () => {
+      beforeEach(() => {
+        // Mock activePtyId to enable focus
+        mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
+          activePtyId: 1,
+        });
+      });
+
+      it('should focus shell input on Tab', async () => {
+        await setupKeypressTest();
+
+        pressKey({ name: 'tab', shift: false });
+
+        expect(capturedUIState.embeddedShellFocused).toBe(true);
+        unmount();
+      });
+
+      it('should unfocus shell input on Shift+Tab', async () => {
+        await setupKeypressTest();
+
+        // Focus first
+        pressKey({ name: 'tab', shift: false });
+        expect(capturedUIState.embeddedShellFocused).toBe(true);
+
+        // Unfocus via Shift+Tab
+        pressKey({ name: 'tab', shift: true });
+        expect(capturedUIState.embeddedShellFocused).toBe(false);
+        unmount();
+      });
+
+      it('should auto-unfocus when activePtyId becomes null', async () => {
+        // Start with active pty and focused
+        mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
+          activePtyId: 1,
+        });
+
+        const renderResult = render(getAppContainer());
+        await act(async () => {
+          vi.advanceTimersByTime(0);
+        });
+
+        // Focus it
+        act(() => {
+          handleGlobalKeypress({
+            name: 'tab',
+            shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
+          } as Key);
+        });
+        expect(capturedUIState.embeddedShellFocused).toBe(true);
+
+        // Now mock activePtyId becoming null
+        mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
+          activePtyId: null,
+        });
+
+        // Rerender to trigger useEffect
+        await act(async () => {
+          renderResult.rerender(getAppContainer());
+        });
+
+        expect(capturedUIState.embeddedShellFocused).toBe(false);
+        renderResult.unmount();
+      });
+
+      it('should focus background shell on Tab when already visible (not toggle it off)', async () => {
+        const mockToggleBackgroundShell = vi.fn();
+        mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
+          activePtyId: null,
+          isBackgroundShellVisible: true,
+          backgroundShells: new Map([[123, { pid: 123, status: 'running' }]]),
+          toggleBackgroundShell: mockToggleBackgroundShell,
+        });
+
+        await setupKeypressTest();
+
+        // Initially not focused
+        expect(capturedUIState.embeddedShellFocused).toBe(false);
+
+        // Press Tab
+        pressKey({ name: 'tab', shift: false });
+
+        // Should be focused
+        expect(capturedUIState.embeddedShellFocused).toBe(true);
+        // Should NOT have toggled (closed) the shell
+        expect(mockToggleBackgroundShell).not.toHaveBeenCalled();
+
+        unmount();
+      });
+    });
+
+    describe('Background Shell Toggling (CTRL+B)', () => {
+      it('should toggle background shell on Ctrl+B even if visible but not focused', async () => {
+        const mockToggleBackgroundShell = vi.fn();
+        mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
+          activePtyId: null,
+          isBackgroundShellVisible: true,
+          backgroundShells: new Map([[123, { pid: 123, status: 'running' }]]),
+          toggleBackgroundShell: mockToggleBackgroundShell,
+        });
+
+        await setupKeypressTest();
+
+        // Initially not focused, but visible
+        expect(capturedUIState.embeddedShellFocused).toBe(false);
+
+        // Press Ctrl+B
+        pressKey({ name: 'b', ctrl: true });
+
+        // Should have toggled (closed) the shell
+        expect(mockToggleBackgroundShell).toHaveBeenCalled();
+        // Should be unfocused
+        expect(capturedUIState.embeddedShellFocused).toBe(false);
+
+        unmount();
+      });
+
+      it('should show and focus background shell on Ctrl+B if hidden', async () => {
+        const mockToggleBackgroundShell = vi.fn();
+        const geminiStreamMock = {
+          ...DEFAULT_GEMINI_STREAM_MOCK,
+          activePtyId: null,
+          isBackgroundShellVisible: false,
+          backgroundShells: new Map([[123, { pid: 123, status: 'running' }]]),
+          toggleBackgroundShell: mockToggleBackgroundShell,
+        };
+        mockedUseGeminiStream.mockReturnValue(geminiStreamMock);
+
+        await setupKeypressTest();
+
+        // Update the mock state when toggled to simulate real behavior
+        mockToggleBackgroundShell.mockImplementation(() => {
+          geminiStreamMock.isBackgroundShellVisible = true;
+        });
+
+        // Press Ctrl+B
+        pressKey({ name: 'b', ctrl: true });
+
+        // Should have toggled (shown) the shell
+        expect(mockToggleBackgroundShell).toHaveBeenCalled();
+        // Should be focused
+        expect(capturedUIState.embeddedShellFocused).toBe(true);
+
+        unmount();
+      });
+    });
   });
 
   describe('Copy Mode (CTRL+S)', () => {
@@ -2579,5 +2734,68 @@ describe('AppContainer State Management', () => {
       expect(clearTerminalCalls).toHaveLength(0);
       compUnmount();
     });
+  });
+
+  describe('Permission Handling', () => {
+    it('shows permission dialog when checkPermissions returns paths', async () => {
+      const { checkPermissions } = await import(
+        './hooks/atCommandProcessor.js'
+      );
+      vi.mocked(checkPermissions).mockResolvedValue(['/test/file.txt']);
+
+      let unmount: () => void;
+      await act(async () => (unmount = renderAppContainer().unmount));
+
+      await waitFor(() => expect(capturedUIActions).toBeTruthy());
+
+      await act(async () =>
+        capturedUIActions.handleFinalSubmit('read @file.txt'),
+      );
+
+      expect(capturedUIState.permissionConfirmationRequest).not.toBeNull();
+      expect(capturedUIState.permissionConfirmationRequest?.files).toEqual([
+        '/test/file.txt',
+      ]);
+      await act(async () => unmount!());
+    });
+
+    it.each([true, false])(
+      'handles permissions when allowed is %s',
+      async (allowed) => {
+        const { checkPermissions } = await import(
+          './hooks/atCommandProcessor.js'
+        );
+        vi.mocked(checkPermissions).mockResolvedValue(['/test/file.txt']);
+        const addReadOnlyPathSpy = vi.spyOn(
+          mockConfig.getWorkspaceContext(),
+          'addReadOnlyPath',
+        );
+        const { submitQuery } = mockedUseGeminiStream();
+
+        let unmount: () => void;
+        await act(async () => (unmount = renderAppContainer().unmount));
+
+        await waitFor(() => expect(capturedUIActions).toBeTruthy());
+
+        await act(async () =>
+          capturedUIActions.handleFinalSubmit('read @file.txt'),
+        );
+
+        await act(async () =>
+          capturedUIState.permissionConfirmationRequest?.onComplete({
+            allowed,
+          }),
+        );
+
+        if (allowed) {
+          expect(addReadOnlyPathSpy).toHaveBeenCalledWith('/test/file.txt');
+        } else {
+          expect(addReadOnlyPathSpy).not.toHaveBeenCalled();
+        }
+        expect(submitQuery).toHaveBeenCalledWith('read @file.txt');
+        expect(capturedUIState.permissionConfirmationRequest).toBeNull();
+        await act(async () => unmount!());
+      },
+    );
   });
 });

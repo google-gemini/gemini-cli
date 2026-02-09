@@ -389,7 +389,6 @@ export const useGeminiStream = (
       toolCalls.length > 0 &&
       toolCalls.every((tc) => pushedToolCallIds.has(tc.request.callId));
 
-    const isEventDriven = config.isEventDrivenSchedulerEnabled();
     const anyVisibleInHistory = pushedToolCallIds.size > 0;
     const anyVisibleInPending = remainingTools.some((tc) => {
       // AskUser tools are rendered by AskUserDialog, not ToolGroupMessage
@@ -400,7 +399,6 @@ export const useGeminiStream = (
       if (tc.request.name === ASK_USER_TOOL_NAME && isInProgress) {
         return false;
       }
-      if (!isEventDriven) return true;
       return (
         tc.status !== 'scheduled' &&
         tc.status !== 'validating' &&
@@ -422,7 +420,7 @@ export const useGeminiStream = (
     }
 
     return items;
-  }, [toolCalls, pushedToolCallIds, config]);
+  }, [toolCalls, pushedToolCallIds]);
 
   const activeToolPtyId = useMemo(() => {
     const executingShellTool = toolCalls.find(
@@ -473,12 +471,6 @@ export const useGeminiStream = (
   );
 
   const activePtyId = activeShellPtyId || activeToolPtyId;
-
-  useEffect(() => {
-    if (!activePtyId) {
-      setShellInputFocused(false);
-    }
-  }, [activePtyId, setShellInputFocused]);
 
   const prevActiveShellPtyIdRef = useRef<number | null>(null);
   useEffect(() => {

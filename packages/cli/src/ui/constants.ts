@@ -39,3 +39,9 @@ export const DEFAULT_BACKGROUND_OPACITY = 0.08;
 export const KEYBOARD_SHORTCUTS_URL =
   'https://geminicli.com/docs/cli/keyboard-shortcuts/';
 export const LRU_BUFFER_PERF_CACHE_LIMIT = 20000;
+
+// Max lines to show for active shell output when not focused
+export const ACTIVE_SHELL_MAX_LINES = 15;
+
+// Max lines to preserve in history for completed shell commands
+export const COMPLETED_SHELL_MAX_LINES = 15;

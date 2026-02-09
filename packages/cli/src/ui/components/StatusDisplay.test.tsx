@@ -44,6 +44,7 @@ const createMockUIState = (overrides: UIStateOverrides = {}): UIState =>
     transientMessage: null,
     ctrlDPressedOnce: false,
     showEscapePrompt: false,
+    shortcutsHelpVisible: false,
     queueErrorMessage: null,
     activeHooks: [],
     ideContextState: null,

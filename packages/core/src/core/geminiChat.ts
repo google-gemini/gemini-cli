@@ -492,18 +492,12 @@ export class GeminiChat {
 
     const apiCall = async () => {
       // Default to the last used model (which respects arguments/availability selection)
-      let modelToUse = resolveModel(
-        lastModelToUse,
-        this.config.getPreviewFeatures(),
-      );
+      let modelToUse = resolveModel(lastModelToUse);
 
       // If the active model has changed (e.g. due to a fallback updating the config),
       // we switch to the new active model.
       if (this.config.getActiveModel() !== initialActiveModel) {
-        modelToUse = resolveModel(
-          this.config.getActiveModel(),
-          this.config.getPreviewFeatures(),
-        );
+        modelToUse = resolveModel(this.config.getActiveModel());
       }
 
       if (modelToUse !== lastModelToUse) {
@@ -705,6 +699,7 @@ export class GeminiChat {
     this.lastPromptTokenCount = estimateTokenCountSync(
       this.history.flatMap((c) => c.parts || []),
     );
+    this.chatRecordingService.updateMessagesFromHistory(history);
   }
 
   stripThoughtsFromHistory(): void {
