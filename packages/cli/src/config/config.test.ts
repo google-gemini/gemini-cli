@@ -3217,6 +3217,8 @@ describe('Policy Engine Integration in loadCliConfig', () => {
         }),
       }),
       expect.anything(),
+      undefined,
+      expect.anything(),
     );
   });
 
@@ -3237,6 +3239,8 @@ describe('Policy Engine Integration in loadCliConfig', () => {
           exclude: expect.arrayContaining([SHELL_TOOL_NAME]),
         }),
       }),
+      expect.anything(),
+      undefined,
       expect.anything(),
     );
   });

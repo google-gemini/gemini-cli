@@ -146,6 +146,10 @@ export class Storage {
     return path.join(tempDir, identifier);
   }
 
+  getProjectPoliciesDir(): string {
+    return path.join(this.getGeminiDir(), 'policies');
+  }
+
   ensureProjectTempDirExists(): void {
     fs.mkdirSync(this.getProjectTempDir(), { recursive: true });
   }

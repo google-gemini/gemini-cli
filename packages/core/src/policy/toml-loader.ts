@@ -105,7 +105,7 @@ export type PolicyFileErrorType =
 export interface PolicyFileError {
   filePath: string;
   fileName: string;
-  tier: 'default' | 'user' | 'admin';
+  tier: 'default' | 'user' | 'project' | 'admin';
   ruleIndex?: number;
   errorType: PolicyFileErrorType;
   message: string;
@@ -125,10 +125,11 @@ export interface PolicyLoadResult {
 /**
  * Converts a tier number to a human-readable tier name.
  */
-function getTierName(tier: number): 'default' | 'user' | 'admin' {
+function getTierName(tier: number): 'default' | 'user' | 'project' | 'admin' {
   if (tier === 1) return 'default';
   if (tier === 2) return 'user';
-  if (tier === 3) return 'admin';
+  if (tier === 3) return 'project';
+  if (tier === 4) return 'admin';
   return 'default';
 }
 
@@ -211,7 +212,7 @@ function transformPriority(priority: number, tier: number): number {
  * 4. Collects detailed error information for any failures
  *
  * @param policyPaths Array of paths (directories or files) to scan for policy files
- * @param getPolicyTier Function to determine tier (1-3) for a path
+ * @param getPolicyTier Function to determine tier (1-4) for a path
  * @returns Object containing successfully parsed rules and any errors encountered
  */
 export async function loadPoliciesFromToml(

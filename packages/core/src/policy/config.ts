@@ -39,46 +39,54 @@ export const DEFAULT_CORE_POLICIES_DIR = path.join(__dirname, 'policies');
 // Policy tier constants for priority calculation
 export const DEFAULT_POLICY_TIER = 1;
 export const USER_POLICY_TIER = 2;
-export const ADMIN_POLICY_TIER = 3;
+export const PROJECT_POLICY_TIER = 3;
+export const ADMIN_POLICY_TIER = 4;
 
 /**
- * Gets the list of directories to search for policy files, in order of decreasing priority
- * (Admin -> User -> Default).
+ * Gets the list of directories to search for policy files, in order of increasing priority
+ * (Default -> User -> Project -> Admin).
  *
  * @param defaultPoliciesDir Optional path to a directory containing default policies.
  * @param policyPaths Optional user-provided policy paths (from --policy flag).
  *   When provided, these replace the default user policies directory.
+ * @param projectPoliciesDir Optional path to a directory containing project policies.
  */
 export function getPolicyDirectories(
   defaultPoliciesDir?: string,
   policyPaths?: string[],
+  projectPoliciesDir?: string,
 ): string[] {
-  const dirs: string[] = [];
+  const dirs = [];
 
-  // Default tier (lowest priority)
-  dirs.push(defaultPoliciesDir ?? DEFAULT_CORE_POLICIES_DIR);
+  // Admin tier (highest priority)
+  dirs.push(Storage.getSystemPoliciesDir());
 
-  // User tier (middle priority)
+  // User tier (second higheset priority)
   if (policyPaths && policyPaths.length > 0) {
     dirs.push(...policyPaths);
   } else {
     dirs.push(Storage.getUserPoliciesDir());
   }
+  
+  // Project Tier (third highest)
+  if (projectPoliciesDir) {
+    dirs.push(projectPoliciesDir);
+  }
 
-  // Admin tier (highest priority)
-  dirs.push(Storage.getSystemPoliciesDir());
+  // Default tier (lowest priority)
+  dirs.push(defaultPoliciesDir ?? DEFAULT_CORE_POLICIES_DIR);
 
-  // Reverse so highest priority (Admin) is first
-  return dirs.reverse();
+  return dirs;
 }
 
 /**
- * Determines the policy tier (1=default, 2=user, 3=admin) for a given directory.
+ * Determines the policy tier (1=default, 2=user, 3=project, 4=admin) for a given directory.
  * This is used by the TOML loader to assign priority bands.
  */
 export function getPolicyTier(
   dir: string,
   defaultPoliciesDir?: string,
+  projectPoliciesDir?: string,
 ): number {
   const USER_POLICIES_DIR = Storage.getUserPoliciesDir();
   const ADMIN_POLICIES_DIR = Storage.getSystemPoliciesDir();
@@ -98,6 +106,12 @@ export function getPolicyTier(
   }
   if (normalizedDir === normalizedUser) {
     return USER_POLICY_TIER;
+  }
+  if (
+    projectPoliciesDir &&
+    normalizedDir === path.resolve(projectPoliciesDir)
+  ) {
+    return PROJECT_POLICY_TIER;
   }
   if (normalizedDir === normalizedAdmin) {
     return ADMIN_POLICY_TIER;
@@ -153,12 +167,13 @@ export async function createPolicyEngineConfig(
   settings: PolicySettings,
   approvalMode: ApprovalMode,
   defaultPoliciesDir?: string,
+  projectPoliciesDir?: string,
 ): Promise<PolicyEngineConfig> {
   const policyDirs = getPolicyDirectories(
     defaultPoliciesDir,
     settings.policyPaths,
+    projectPoliciesDir,
   );
-
   const securePolicyDirs = await filterSecurePolicyDirectories(policyDirs);
 
   const normalizedAdminPoliciesDir = path.resolve(
@@ -171,7 +186,7 @@ export async function createPolicyEngineConfig(
     checkers: tomlCheckers,
     errors,
   } = await loadPoliciesFromToml(securePolicyDirs, (p) => {
-    const tier = getPolicyTier(p, defaultPoliciesDir);
+    const tier = getPolicyTier(p, defaultPoliciesDir, projectPoliciesDir);
 
     // If it's a user-provided path that isn't already categorized as ADMIN,
     // treat it as USER tier.
@@ -208,9 +223,10 @@ export async function createPolicyEngineConfig(
   // Priority bands (tiers):
   // - Default policies (TOML): 1 + priority/1000 (e.g., priority 100 → 1.100)
   // - User policies (TOML): 2 + priority/1000 (e.g., priority 100 → 2.100)
-  // - Admin policies (TOML): 3 + priority/1000 (e.g., priority 100 → 3.100)
+  // - Project policies (TOML): 3 + priority/1000 (e.g., priority 100 → 3.100)
+  // - Admin policies (TOML): 4 + priority/1000 (e.g., priority 100 → 4.100)
   //
-  // This ensures Admin > User > Default hierarchy is always preserved,
+  // This ensures Admin > Project > User > Default hierarchy is always preserved,
   // while allowing user-specified priorities to work within each tier.
   //
   // Settings-based and dynamic rules (all in user tier 2.x):
