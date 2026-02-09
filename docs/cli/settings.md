@@ -22,13 +22,14 @@ they appear in the UI.
 
 ### General
 
-| UI Label                 | Setting                            | Description                                                   | Default |
-| ------------------------ | ---------------------------------- | ------------------------------------------------------------- | ------- |
-| Vim Mode                 | `general.vimMode`                  | Enable Vim keybindings                                        | `false` |
-| Enable Auto Update       | `general.enableAutoUpdate`         | Enable automatic updates.                                     | `true`  |
-| Enable Prompt Completion | `general.enablePromptCompletion`   | Enable AI-powered prompt completion suggestions while typing. | `false` |
-| Debug Keystroke Logging  | `general.debugKeystrokeLogging`    | Enable debug logging of keystrokes to the console.            | `false` |
-| Enable Session Cleanup   | `general.sessionRetention.enabled` | Enable automatic session cleanup                              | `false` |
+| UI Label                 | Setting                            | Description                                                                                                                                                                    | Default     |
+| ------------------------ | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- |
+| Vim Mode                 | `general.vimMode`                  | Enable Vim keybindings                                                                                                                                                         | `false`     |
+| Default Approval Mode    | `general.defaultApprovalMode`      | The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet. | `"default"` |
+| Enable Auto Update       | `general.enableAutoUpdate`         | Enable automatic updates.                                                                                                                                                      | `true`      |
+| Enable Prompt Completion | `general.enablePromptCompletion`   | Enable AI-powered prompt completion suggestions while typing.                                                                                                                  | `false`     |
+| Debug Keystroke Logging  | `general.debugKeystrokeLogging`    | Enable debug logging of keystrokes to the console.                                                                                                                             | `false`     |
+| Enable Session Cleanup   | `general.sessionRetention.enabled` | Enable automatic session cleanup                                                                                                                                               | `false`     |
 
 ### Output
 
@@ -95,14 +96,13 @@ they appear in the UI.
 
 ### Tools
 
-| UI Label                         | Setting                              | Description                                                                                                                                                                    | Default     |
-| -------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- |
-| Enable Interactive Shell         | `tools.shell.enableInteractiveShell` | Use node-pty for an interactive shell experience. Fallback to child_process still applies.                                                                                     | `true`      |
-| Show Color                       | `tools.shell.showColor`              | Show color in shell output.                                                                                                                                                    | `false`     |
-| Approval Mode                    | `tools.approvalMode`                 | The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet. | `"default"` |
-| Use Ripgrep                      | `tools.useRipgrep`                   | Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.                                                                | `true`      |
-| Tool Output Truncation Threshold | `tools.truncateToolOutputThreshold`  | Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.                                                                     | `40000`     |
-| Disable LLM Correction           | `tools.disableLLMCorrection`         | Disable LLM-based error correction for edit tools. When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct.     | `true`      |
+| UI Label                         | Setting                              | Description                                                                                                                                                                | Default |
+| -------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| Enable Interactive Shell         | `tools.shell.enableInteractiveShell` | Use node-pty for an interactive shell experience. Fallback to child_process still applies.                                                                                 | `true`  |
+| Show Color                       | `tools.shell.showColor`              | Show color in shell output.                                                                                                                                                | `false` |
+| Use Ripgrep                      | `tools.useRipgrep`                   | Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.                                                            | `true`  |
+| Tool Output Truncation Threshold | `tools.truncateToolOutputThreshold`  | Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.                                                                 | `40000` |
+| Disable LLM Correction           | `tools.disableLLMCorrection`         | Disable LLM-based error correction for edit tools. When enabled, tools will fail immediately if exact string matches are not found, instead of attempting to self-correct. | `true`  |
 
 ### Security
 
