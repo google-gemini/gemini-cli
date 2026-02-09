@@ -1104,8 +1104,8 @@ describe('Server Config (config.ts)', () => {
         1000,
       );
       // 4 * (32000 - 1000) = 4 * 31000 = 124000
-      // default is 4_000_000
-      expect(config.getTruncateToolOutputThreshold()).toBe(124000);
+      // default is 40_000, so min(124000, 40000) = 40000
+      expect(config.getTruncateToolOutputThreshold()).toBe(40_000);
     });
 
     it('should return the default threshold when the calculated value is larger', () => {
@@ -1115,8 +1115,8 @@ describe('Server Config (config.ts)', () => {
         500_000,
       );
       // 4 * (2_000_000 - 500_000) = 4 * 1_500_000 = 6_000_000
-      // default is 4_000_000
-      expect(config.getTruncateToolOutputThreshold()).toBe(4_000_000);
+      // default is 40_000
+      expect(config.getTruncateToolOutputThreshold()).toBe(40_000);
     });
 
     it('should use a custom truncateToolOutputThreshold if provided', () => {
@@ -2333,10 +2333,11 @@ describe('syncPlanModeTools', () => {
     expect(registeredTool).toBeInstanceOf(ExitPlanModeTool);
   });
 
-  it('should register EnterPlanModeTool and unregister ExitPlanModeTool when NOT in PLAN mode', async () => {
+  it('should register EnterPlanModeTool and unregister ExitPlanModeTool when NOT in PLAN mode and experimental.plan is enabled', async () => {
     const config = new Config({
       ...baseParams,
       approvalMode: ApprovalMode.DEFAULT,
+      plan: true,
     });
     const registry = new ToolRegistry(config, config.getMessageBus());
     vi.spyOn(config, 'getToolRegistry').mockReturnValue(registry);
@@ -2358,6 +2359,27 @@ describe('syncPlanModeTools', () => {
     const registeredTool = registerSpy.mock.calls[0][0];
     const { EnterPlanModeTool } = await import('../tools/enter-plan-mode.js');
     expect(registeredTool).toBeInstanceOf(EnterPlanModeTool);
+  });
+
+  it('should NOT register EnterPlanModeTool when experimental.plan is disabled', async () => {
+    const config = new Config({
+      ...baseParams,
+      approvalMode: ApprovalMode.DEFAULT,
+      plan: false,
+    });
+    const registry = new ToolRegistry(config, config.getMessageBus());
+    vi.spyOn(config, 'getToolRegistry').mockReturnValue(registry);
+
+    const registerSpy = vi.spyOn(registry, 'registerTool');
+    vi.spyOn(registry, 'getTool').mockReturnValue(undefined);
+
+    config.syncPlanModeTools();
+
+    const { EnterPlanModeTool } = await import('../tools/enter-plan-mode.js');
+    const registeredTool = registerSpy.mock.calls.find(
+      (call) => call[0] instanceof EnterPlanModeTool,
+    );
+    expect(registeredTool).toBeUndefined();
   });
 
   it('should call geminiClient.setTools if initialized', async () => {
