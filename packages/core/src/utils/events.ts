@@ -320,11 +320,10 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
     this._eventBacklog.length = 0; // Clear in-place
     for (const item of backlog) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const func = this.emit as (
-        event: keyof CoreEvents,
-        ...args: unknown[]
-      ) => boolean;
-      func(item.event, ...item.args);
+      (this.emit as (event: keyof CoreEvents, ...args: unknown[]) => boolean)(
+        item.event,
+        ...item.args,
+      );
     }
   }
 }
