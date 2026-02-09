@@ -531,8 +531,9 @@ export async function main() {
       for (const log of earlyConsoleLogs) {
         capture.logConsole(log);
       }
-      earlyConsoleLogs.length = 0;
     }
+    // Always clear early logs to avoid unbounded memory growth
+    earlyConsoleLogs.length = 0;
 
     // Register config for telemetry shutdown
     // This ensures telemetry (including SessionEnd hooks) is properly flushed on exit

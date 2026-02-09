@@ -18,6 +18,8 @@ interface IDevTools {
 const DEVTOOLS_PKG = 'gemini-cli-devtools';
 const DEFAULT_DEVTOOLS_PORT = 25417;
 const DEFAULT_DEVTOOLS_HOST = '127.0.0.1';
+const MAX_PROMOTION_ATTEMPTS = 3;
+let promotionAttempts = 0;
 
 /**
  * Probe whether a DevTools server is already listening on the given host:port.
@@ -85,6 +87,14 @@ async function startOrJoinDevTools(
  * and add a new network transport for the logger.
  */
 async function handlePromotion(config: Config) {
+  promotionAttempts++;
+  if (promotionAttempts > MAX_PROMOTION_ATTEMPTS) {
+    debugLogger.debug(
+      `Giving up on DevTools promotion after ${MAX_PROMOTION_ATTEMPTS} attempts`,
+    );
+    return;
+  }
+
   try {
     const result = await startOrJoinDevTools(
       DEFAULT_DEVTOOLS_HOST,
@@ -160,4 +170,9 @@ export async function registerActivityLogger(config: Config) {
   }
 
   initActivityLogger(config, { mode: 'file', filePath: target });
+}
+
+/** Reset module-level state — test only. */
+export function resetForTesting() {
+  promotionAttempts = 0;
 }
