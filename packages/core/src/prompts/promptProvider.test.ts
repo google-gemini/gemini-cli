@@ -7,7 +7,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PromptProvider } from './promptProvider.js';
 import type { Config } from '../config/config.js';
-import { getAllGeminiMdFilenames } from '../tools/memoryTool.js';
+import {
+  getAllGeminiMdFilenames,
+  DEFAULT_CONTEXT_FILENAME,
+} from '../tools/memoryTool.js';
 import { PREVIEW_GEMINI_MODEL } from '../config/models.js';
 
 vi.mock('../tools/memoryTool.js', async (importOriginal) => {
@@ -55,7 +58,7 @@ describe('PromptProvider', () => {
 
   it('should handle multiple context filenames in the system prompt', () => {
     vi.mocked(getAllGeminiMdFilenames).mockReturnValue([
-      'GEMINI.md',
+      DEFAULT_CONTEXT_FILENAME,
       'CUSTOM.md',
       'ANOTHER.md',
     ]);
@@ -65,13 +68,13 @@ describe('PromptProvider', () => {
 
     // Verify renderCoreMandates usage
     expect(prompt).toContain(
-      'Instructions found in `GEMINI.md`, `CUSTOM.md` or `ANOTHER.md` files are foundational mandates.',
+      `Instructions found in \`${DEFAULT_CONTEXT_FILENAME}\`, \`CUSTOM.md\` or \`ANOTHER.md\` files are foundational mandates.`,
     );
   });
 
   it('should handle multiple context filenames in user memory section', () => {
     vi.mocked(getAllGeminiMdFilenames).mockReturnValue([
-      'GEMINI.md',
+      DEFAULT_CONTEXT_FILENAME,
       'CUSTOM.md',
     ]);
 
@@ -83,7 +86,7 @@ describe('PromptProvider', () => {
 
     // Verify renderUserMemory usage
     expect(prompt).toContain(
-      '# Contextual Instructions (GEMINI.md, CUSTOM.md)',
+      `# Contextual Instructions (${DEFAULT_CONTEXT_FILENAME}, CUSTOM.md)`,
     );
   });
 });

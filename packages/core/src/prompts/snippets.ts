@@ -18,6 +18,7 @@ import {
   WRITE_FILE_TOOL_NAME,
   WRITE_TODOS_TOOL_NAME,
 } from '../tools/tool-names.js';
+import { DEFAULT_CONTEXT_FILENAME } from '../tools/memoryTool.js';
 
 // --- Options Structs ---
 
@@ -32,7 +33,6 @@ export interface SystemPromptOptions {
   operationalGuidelines?: OperationalGuidelinesOptions;
   sandbox?: SandboxMode;
   gitRepo?: GitRepoOptions;
-  contextFilenames?: string[];
 }
 
 export interface PreambleOptions {
@@ -142,7 +142,7 @@ export function renderPreamble(options?: PreambleOptions): string {
 
 export function renderCoreMandates(options?: CoreMandatesOptions): string {
   if (!options) return '';
-  const filenames = options.contextFilenames ?? ['GEMINI.md'];
+  const filenames = options.contextFilenames ?? [DEFAULT_CONTEXT_FILENAME];
   const formattedFilenames =
     filenames.length > 1
       ? filenames
@@ -345,7 +345,7 @@ export function renderUserMemory(
   contextFilenames?: string[],
 ): string {
   if (!memory || memory.trim().length === 0) return '';
-  const filenames = contextFilenames ?? ['GEMINI.md'];
+  const filenames = contextFilenames ?? [DEFAULT_CONTEXT_FILENAME];
   const formattedHeader = filenames.join(', ');
   return `
 # Contextual Instructions (${formattedHeader})
@@ -557,7 +557,7 @@ function toolUsageInteractive(
 ): string {
   if (interactive) {
     const ctrlF = interactiveShellEnabled
-      ? ' If you choose to execute an interactive command consider letting the user know they can press \`ctrl + f\` to focus into the shell to provide input.'
+      ? ' If you choose to execute an interactive command consider letting the user know they can press `ctrl + f` to focus into the shell to provide input.'
       : '';
     return `
 - **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true. If unsure, ask the user.
