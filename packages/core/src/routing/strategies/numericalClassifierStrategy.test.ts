@@ -102,11 +102,11 @@ describe('NumericalClassifierStrategy', () => {
   });
 
   describe('A/B Testing Logic (Deterministic)', () => {
-    it('Control Group (SessionID "control-group-id" -> Threshold 50): Score 40 -> FLASH', async () => {
+    it('Control Group (SessionID "control-group-id" -> Threshold 30): Score 20 -> FLASH', async () => {
       vi.mocked(mockConfig.getSessionId).mockReturnValue('control-group-id'); // Hash 71 -> Control
       const mockApiResponse = {
-        complexity_reasoning: 'Standard task',
-        complexity_score: 40,
+        complexity_reasoning: 'Trivial task',
+        complexity_score: 20,
       };
       vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
         mockApiResponse,
@@ -123,16 +123,16 @@ describe('NumericalClassifierStrategy', () => {
         metadata: {
           source: 'NumericalClassifier (Control)',
           latencyMs: expect.any(Number),
-          reasoning: expect.stringContaining('Score: 40 / Threshold: 50'),
+          reasoning: expect.stringContaining('Score: 20 / Threshold: 30'),
         },
       });
     });
 
-    it('Control Group (SessionID "control-group-id" -> Threshold 50): Score 60 -> PRO', async () => {
+    it('Control Group (SessionID "control-group-id" -> Threshold 30): Score 40 -> PRO', async () => {
       vi.mocked(mockConfig.getSessionId).mockReturnValue('control-group-id');
       const mockApiResponse = {
-        complexity_reasoning: 'Complex task',
-        complexity_score: 60,
+        complexity_reasoning: 'Standard task',
+        complexity_score: 40,
       };
       vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
         mockApiResponse,
@@ -149,16 +149,16 @@ describe('NumericalClassifierStrategy', () => {
         metadata: {
           source: 'NumericalClassifier (Control)',
           latencyMs: expect.any(Number),
-          reasoning: expect.stringContaining('Score: 60 / Threshold: 50'),
+          reasoning: expect.stringContaining('Score: 40 / Threshold: 30'),
         },
       });
     });
 
-    it('Strict Group (SessionID "test-session-1" -> Threshold 80): Score 60 -> FLASH', async () => {
+    it('Strict Group (SessionID "test-session-1" -> Threshold 60): Score 50 -> FLASH', async () => {
       vi.mocked(mockConfig.getSessionId).mockReturnValue('test-session-1'); // FNV Normalized 18 < 50 -> Strict
       const mockApiResponse = {
-        complexity_reasoning: 'Complex task',
-        complexity_score: 60,
+        complexity_reasoning: 'Standard task',
+        complexity_score: 50,
       };
       vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
         mockApiResponse,
@@ -171,20 +171,20 @@ describe('NumericalClassifierStrategy', () => {
       );
 
       expect(decision).toEqual({
-        model: DEFAULT_GEMINI_FLASH_MODEL, // Routed to Flash because 60 < 80
+        model: DEFAULT_GEMINI_FLASH_MODEL, // Routed to Flash because 50 < 60
         metadata: {
           source: 'NumericalClassifier (Strict)',
           latencyMs: expect.any(Number),
-          reasoning: expect.stringContaining('Score: 60 / Threshold: 80'),
+          reasoning: expect.stringContaining('Score: 50 / Threshold: 60'),
         },
       });
     });
 
-    it('Strict Group (SessionID "test-session-1" -> Threshold 80): Score 90 -> PRO', async () => {
+    it('Strict Group (SessionID "test-session-1" -> Threshold 60): Score 70 -> PRO', async () => {
       vi.mocked(mockConfig.getSessionId).mockReturnValue('test-session-1');
       const mockApiResponse = {
-        complexity_reasoning: 'Extreme task',
-        complexity_score: 90,
+        complexity_reasoning: 'Complex task',
+        complexity_score: 70,
       };
       vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
         mockApiResponse,
@@ -201,7 +201,7 @@ describe('NumericalClassifierStrategy', () => {
         metadata: {
           source: 'NumericalClassifier (Strict)',
           latencyMs: expect.any(Number),
-          reasoning: expect.stringContaining('Score: 90 / Threshold: 80'),
+          reasoning: expect.stringContaining('Score: 70 / Threshold: 60'),
         },
       });
     });
@@ -289,10 +289,10 @@ describe('NumericalClassifierStrategy', () => {
     it('should fall back to A/B testing if CLASSIFIER_THRESHOLD is not present in experiments', async () => {
       // Mock getClassifierThreshold to return undefined
       vi.mocked(mockConfig.getClassifierThreshold).mockResolvedValue(undefined);
-      vi.mocked(mockConfig.getSessionId).mockReturnValue('control-group-id'); // Should resolve to Control (50)
+      vi.mocked(mockConfig.getSessionId).mockReturnValue('control-group-id'); // Should resolve to Control (30)
       const mockApiResponse = {
         complexity_reasoning: 'Test task',
-        complexity_score: 40,
+        complexity_score: 20,
       };
       vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
         mockApiResponse,
@@ -305,11 +305,11 @@ describe('NumericalClassifierStrategy', () => {
       );
 
       expect(decision).toEqual({
-        model: DEFAULT_GEMINI_FLASH_MODEL, // Score 40 < Default A/B Threshold 50
+        model: DEFAULT_GEMINI_FLASH_MODEL, // Score 20 < Default A/B Threshold 30
         metadata: {
           source: 'NumericalClassifier (Control)',
           latencyMs: expect.any(Number),
-          reasoning: expect.stringContaining('Score: 40 / Threshold: 50'),
+          reasoning: expect.stringContaining('Score: 20 / Threshold: 30'),
         },
       });
     });
@@ -319,7 +319,7 @@ describe('NumericalClassifierStrategy', () => {
       vi.mocked(mockConfig.getSessionId).mockReturnValue('control-group-id');
       const mockApiResponse = {
         complexity_reasoning: 'Test task',
-        complexity_score: 40,
+        complexity_score: 20,
       };
       vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
         mockApiResponse,
@@ -336,7 +336,7 @@ describe('NumericalClassifierStrategy', () => {
         metadata: {
           source: 'NumericalClassifier (Control)',
           latencyMs: expect.any(Number),
-          reasoning: expect.stringContaining('Score: 40 / Threshold: 50'),
+          reasoning: expect.stringContaining('Score: 20 / Threshold: 30'),
         },
       });
     });
@@ -346,7 +346,7 @@ describe('NumericalClassifierStrategy', () => {
       vi.mocked(mockConfig.getSessionId).mockReturnValue('control-group-id');
       const mockApiResponse = {
         complexity_reasoning: 'Test task',
-        complexity_score: 60,
+        complexity_score: 40,
       };
       vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
         mockApiResponse,
@@ -363,7 +363,7 @@ describe('NumericalClassifierStrategy', () => {
         metadata: {
           source: 'NumericalClassifier (Control)',
           latencyMs: expect.any(Number),
-          reasoning: expect.stringContaining('Score: 60 / Threshold: 50'),
+          reasoning: expect.stringContaining('Score: 40 / Threshold: 30'),
         },
       });
     });
