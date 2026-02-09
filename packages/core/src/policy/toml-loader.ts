@@ -226,8 +226,8 @@ export async function loadPoliciesFromToml(
     const tier = getPolicyTier(p);
     const tierName = getTierName(tier);
 
-    let filesToLoad: string[];
-    let baseDir: string;
+    let filesToLoad: string[] = [];
+    let baseDir = '';
 
     try {
       const stats = await fs.stat(p);
@@ -237,12 +237,12 @@ export async function loadPoliciesFromToml(
         filesToLoad = dirEntries
           .filter((entry) => entry.isFile() && entry.name.endsWith('.toml'))
           .map((entry) => entry.name);
-      } else if (stats.isFile()) {
+      } else if (stats.isFile() && p.endsWith('.toml')) {
         baseDir = path.dirname(p);
         filesToLoad = [path.basename(p)];
-      } else {
-        continue;
       }
+      // Other file types or non-.toml files are silently ignored
+      // for consistency with directory scanning behavior.
     } catch (e) {
       const error = e as NodeJS.ErrnoException;
       if (error.code === 'ENOENT') {
