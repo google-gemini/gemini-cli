@@ -6,8 +6,15 @@
 
 import { Type } from '@google/genai';
 import type { ToolDefinition } from './types.js';
-import { READ_FILE_TOOL_NAME, SHELL_TOOL_NAME } from '../tool-names.js';
 import * as os from 'node:os';
+
+// Centralized tool names to avoid circular dependencies
+export const GLOB_TOOL_NAME = 'glob';
+export const GREP_TOOL_NAME = 'grep_search';
+export const LS_TOOL_NAME = 'list_directory';
+export const READ_FILE_TOOL_NAME = 'read_file';
+export const SHELL_TOOL_NAME = 'run_shell_command';
+export const WRITE_FILE_TOOL_NAME = 'write_file';
 
 // ============================================================================
 // READ_FILE TOOL
@@ -41,6 +48,153 @@ export const READ_FILE_DEFINITION: ToolDefinition = {
 };
 
 // ============================================================================
+// WRITE_FILE TOOL
+// ============================================================================
+
+export const WRITE_FILE_DEFINITION: ToolDefinition = {
+  base: {
+    name: WRITE_FILE_TOOL_NAME,
+    description: `Writes content to a specified file in the local filesystem.
+
+      The user has the ability to modify \`content\`. If modified, this will be stated in the response.`,
+    parametersJsonSchema: {
+      type: Type.OBJECT,
+      properties: {
+        file_path: {
+          description: 'The path to the file to write to.',
+          type: Type.STRING,
+        },
+        content: {
+          description: 'The content to write to the file.',
+          type: Type.STRING,
+        },
+      },
+      required: ['file_path', 'content'],
+    },
+  },
+};
+
+// ============================================================================
+// GREP TOOL
+// ============================================================================
+
+export const GREP_DEFINITION: ToolDefinition = {
+  base: {
+    name: GREP_TOOL_NAME,
+    description:
+      'Searches for a regular expression pattern within file contents. Max 100 matches.',
+    parametersJsonSchema: {
+      type: Type.OBJECT,
+      properties: {
+        pattern: {
+          description: `The regular expression (regex) pattern to search for within file contents (e.g., 'function\\s+myFunction', 'import\\s+\\{.*\\}\\s+from\\s+.*').`,
+          type: Type.STRING,
+        },
+        dir_path: {
+          description:
+            'Optional: The absolute path to the directory to search within. If omitted, searches the current working directory.',
+          type: Type.STRING,
+        },
+        include: {
+          description: `Optional: A glob pattern to filter which files are searched (e.g., '*.js', '*.{ts,tsx}', 'src/**'). If omitted, searches all files (respecting potential global ignores).`,
+          type: Type.STRING,
+        },
+      },
+      required: ['pattern'],
+    },
+  },
+};
+
+// ============================================================================
+// GLOB TOOL
+// ============================================================================
+
+export const GLOB_DEFINITION: ToolDefinition = {
+  base: {
+    name: GLOB_TOOL_NAME,
+    description:
+      'Efficiently finds files matching specific glob patterns (e.g., `src/**/*.ts`, `**/*.md`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.',
+    parametersJsonSchema: {
+      type: Type.OBJECT,
+      properties: {
+        pattern: {
+          description:
+            "The glob pattern to match against (e.g., '**/*.py', 'docs/*.md').",
+          type: Type.STRING,
+        },
+        dir_path: {
+          description:
+            'Optional: The absolute path to the directory to search within. If omitted, searches the root directory.',
+          type: Type.STRING,
+        },
+        case_sensitive: {
+          description:
+            'Optional: Whether the search should be case-sensitive. Defaults to false.',
+          type: Type.BOOLEAN,
+        },
+        respect_git_ignore: {
+          description:
+            'Optional: Whether to respect .gitignore patterns when finding files. Only available in git repositories. Defaults to true.',
+          type: Type.BOOLEAN,
+        },
+        respect_gemini_ignore: {
+          description:
+            'Optional: Whether to respect .geminiignore patterns when finding files. Defaults to true.',
+          type: Type.BOOLEAN,
+        },
+      },
+      required: ['pattern'],
+    },
+  },
+};
+
+// ============================================================================
+// LS TOOL
+// ============================================================================
+
+export const LS_DEFINITION: ToolDefinition = {
+  base: {
+    name: LS_TOOL_NAME,
+    description:
+      'Lists the names of files and subdirectories directly within a specified directory path. Can optionally ignore entries matching provided glob patterns.',
+    parametersJsonSchema: {
+      type: Type.OBJECT,
+      properties: {
+        dir_path: {
+          description: 'The path to the directory to list',
+          type: Type.STRING,
+        },
+        ignore: {
+          description: 'List of glob patterns to ignore',
+          items: {
+            type: Type.STRING,
+          },
+          type: Type.ARRAY,
+        },
+        file_filtering_options: {
+          description:
+            'Optional: Whether to respect ignore patterns from .gitignore or .geminiignore',
+          type: Type.OBJECT,
+          properties: {
+            respect_git_ignore: {
+              description:
+                'Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.',
+              type: Type.BOOLEAN,
+            },
+            respect_gemini_ignore: {
+              description:
+                'Optional: Whether to respect .geminiignore patterns when listing files. Defaults to true.',
+              type: Type.BOOLEAN,
+            },
+          },
+        },
+      },
+      required: ['dir_path'],
+    },
+  },
+};
+
+// ============================================================================
 // SHELL TOOL
 // ============================================================================
 
@@ -49,7 +203,16 @@ export const READ_FILE_DEFINITION: ToolDefinition = {
  */
 export function getShellToolDescription(
   enableInteractiveShell: boolean,
+  enableEfficiency: boolean,
 ): string {
+  const efficiencyGuidelines = enableEfficiency
+    ? `
+
+      Efficiency Guidelines:
+      - Quiet Flags: Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
+      - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).`
+    : '';
+
   const returnedInfo = `
 
       The following information is returned:
@@ -65,12 +228,12 @@ export function getShellToolDescription(
     const backgroundInstructions = enableInteractiveShell
       ? 'To run a command in the background, set the `is_background` parameter to true. Do NOT use PowerShell background constructs.'
       : 'Command can start background processes using PowerShell constructs such as `Start-Process -NoNewWindow` or `Start-Job`.';
-    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. ${backgroundInstructions}${returnedInfo}`;
+    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. ${backgroundInstructions}${efficiencyGuidelines}${returnedInfo}`;
   } else {
     const backgroundInstructions = enableInteractiveShell
       ? 'To run a command in the background, set the `is_background` parameter to true. Do NOT use `&` to background commands.'
       : 'Command can start background processes using `&`.';
-    return `This tool executes a given shell command as \`bash -c <command>\`. ${backgroundInstructions} Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${returnedInfo}`;
+    return `This tool executes a given shell command as \`bash -c <command>\`. ${backgroundInstructions} Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${efficiencyGuidelines}${returnedInfo}`;
   }
 }
 
@@ -89,11 +252,15 @@ export function getCommandDescription(): string {
  */
 export function getShellDefinition(
   enableInteractiveShell: boolean,
+  enableEfficiency: boolean,
 ): ToolDefinition {
   return {
     base: {
       name: SHELL_TOOL_NAME,
-      description: getShellToolDescription(enableInteractiveShell),
+      description: getShellToolDescription(
+        enableInteractiveShell,
+        enableEfficiency,
+      ),
       parametersJsonSchema: {
         type: Type.OBJECT,
         properties: {

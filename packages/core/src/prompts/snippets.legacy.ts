@@ -24,7 +24,7 @@ import {
 export interface SystemPromptOptions {
   preamble?: PreambleOptions;
   coreMandates?: CoreMandatesOptions;
-  agentContexts?: string;
+  subAgents?: SubAgentOptions[];
   agentSkills?: AgentSkillOptions[];
   hookContext?: boolean;
   primaryWorkflows?: PrimaryWorkflowsOptions;
@@ -57,6 +57,7 @@ export interface OperationalGuidelinesOptions {
   interactive: boolean;
   isGemini3: boolean;
   enableShellEfficiency: boolean;
+  interactiveShellEnabled: boolean;
 }
 
 export type SandboxMode = 'macos-seatbelt' | 'generic' | 'outside';
@@ -81,6 +82,11 @@ export interface AgentSkillOptions {
   location: string;
 }
 
+export interface SubAgentOptions {
+  name: string;
+  description: string;
+}
+
 // --- High Level Composition ---
 
 /**
@@ -93,7 +99,7 @@ ${renderPreamble(options.preamble)}
 
 ${renderCoreMandates(options.coreMandates)}
 
-${renderAgentContexts(options.agentContexts)}
+${renderSubAgents(options.subAgents)}
 ${renderAgentSkills(options.agentSkills)}
 
 ${renderHookContext(options.hookContext)}
@@ -154,9 +160,27 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
 `.trim();
 }
 
-export function renderAgentContexts(contexts?: string): string {
-  if (!contexts) return '';
-  return contexts.trim();
+export function renderSubAgents(subAgents?: SubAgentOptions[]): string {
+  if (!subAgents || subAgents.length === 0) return '';
+  const subAgentsList = subAgents
+    .map((agent) => `- ${agent.name} -> ${agent.description}`)
+    .join('\n');
+
+  return `
+# Available Sub-Agents
+Sub-agents are specialized expert agents that you can use to assist you in the completion of all or part of a task.
+
+Each sub-agent is available as a tool of the same name. You MUST always delegate tasks to the sub-agent with the relevant expertise, if one is available.
+
+The following tools can be used to start sub-agents:
+
+${subAgentsList}
+
+Remember that the closest relevant sub-agent should still be used even if its expertise is broader than the given task.
+
+For example:
+- A license-agent -> Should be used for a range of tasks, including reading, validating, and updating licenses and headers.
+- A test-fixing-agent -> Should be used both for fixing tests as well as investigating test failures.`;
 }
 
 export function renderAgentSkills(skills?: AgentSkillOptions[]): string {
@@ -221,6 +245,7 @@ export function renderOperationalGuidelines(
   if (!options) return '';
   return `
 # Operational Guidelines
+
 ${shellEfficiencyGuidelines(options.enableShellEfficiency)}
 
 ## Tone and Style (CLI Interaction)
@@ -237,7 +262,10 @@ ${shellEfficiencyGuidelines(options.enableShellEfficiency)}
 
 ## Tool Usage
 - **Parallelism:** Execute multiple independent tool calls in parallel when feasible (i.e. searching the codebase).
-- **Command Execution:** Use the '${SHELL_TOOL_NAME}' tool for running shell commands, remembering the safety rule to explain modifying commands first.${toolUsageInteractive(options.interactive)}${toolUsageRememberingFacts(options)}
+- **Command Execution:** Use the '${SHELL_TOOL_NAME}' tool for running shell commands, remembering the safety rule to explain modifying commands first.${toolUsageInteractive(
+    options.interactive,
+    options.interactiveShellEnabled,
+  )}${toolUsageRememberingFacts(options)}
 - **Respect User Confirmations:** Most tool calls (also denoted as 'function calls') will first require confirmation from the user, where they will either approve or cancel the function call. If a user cancels a function call, respect their choice and do _not_ try to make the function call again. It is okay to request the tool call again _only_ if the user requests that same tool call on a subsequent prompt. When a user cancels a function call, assume best intentions from the user and consider inquiring if they prefer any alternative paths forward.
 
 ## Interaction Details
@@ -497,15 +525,21 @@ function toneAndStyleNoChitchat(isGemini3: boolean): string {
 - **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes..."). Get straight to the action or answer.`;
 }
 
-function toolUsageInteractive(interactive: boolean): string {
+function toolUsageInteractive(
+  interactive: boolean,
+  interactiveShellEnabled: boolean,
+): string {
   if (interactive) {
+    const ctrlF = interactiveShellEnabled
+      ? ' If you choose to execute an interactive command consider letting the user know they can press `ctrl + f` to focus into the shell to provide input.'
+      : '';
     return `
 - **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true. If unsure, ask the user.
-- **Interactive Commands:** Never use interactive shell commands unless absolutely necessary. **ALWAYS** use arguments to bypass prompts for **EVERY** tool in use that supports it, even if that command is part of a chain or larger command. For example: 'git --no-pager', 'vitest run', and 'npx --yes' to bypass interactive prompts.`;
+- **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim).${ctrlF}`;
   }
   return `
 - **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true.
-- **Interactive Commands:** Never use interactive shell commands. **ALWAYS** use arguments to bypass prompts for **EVERY** tool in use that supports it, even if that command is part of a chain or larger command. For example: 'git --no-pager', 'vitest run', and 'npx --yes' to bypass interactive prompts.`;
+- **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim).`;
 }
 
 function toolUsageRememberingFacts(

@@ -20,6 +20,7 @@
       { "label": "Project context (GEMINI.md)", "slug": "docs/cli/gemini-md" },
       { "label": "Shell commands", "slug": "docs/tools/shell" },
       { "label": "Session management", "slug": "docs/cli/session-management" },
+      { "label": "Plan mode (experimental)", "slug": "docs/cli/plan-mode" },
       { "label": "Todos", "slug": "docs/tools/todos" },
       { "label": "Web search and fetch", "slug": "docs/tools/web-search" }
     ]
