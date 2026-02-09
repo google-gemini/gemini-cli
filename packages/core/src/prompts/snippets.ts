@@ -32,7 +32,6 @@ export interface SystemPromptOptions {
   operationalGuidelines?: OperationalGuidelinesOptions;
   sandbox?: SandboxMode;
   gitRepo?: GitRepoOptions;
-  finalReminder?: FinalReminderOptions;
 }
 
 export interface PreambleOptions {
@@ -64,10 +63,6 @@ export type SandboxMode = 'macos-seatbelt' | 'generic' | 'outside';
 
 export interface GitRepoOptions {
   interactive: boolean;
-}
-
-export interface FinalReminderOptions {
-  readFileToolName: string;
 }
 
 export interface PlanningWorkflowOptions {
@@ -116,8 +111,6 @@ ${renderOperationalGuidelines(options.operationalGuidelines)}
 ${renderSandbox(options.sandbox)}
 
 ${renderGitRepo(options.gitRepo)}
-
-${renderFinalReminder(options.finalReminder)}
 `.trim();
 }
 
@@ -309,12 +302,8 @@ export function renderSandbox(mode?: SandboxMode): string {
       # Sandbox
       
       You are running in a sandbox container with limited access to files outside the project directory or system temp directory, and with limited access to host system resources such as ports. If you encounter failures that could be due to sandboxing (e.g. if a command fails with 'Operation not permitted' or similar error), when you report the error to the user, also explain why you think it could be due to sandboxing, and how the user may need to adjust their sandbox configuration.`.trim();
-  } else {
-    return `
-        # Outside of Sandbox
-        
-        You are running outside of a sandbox container, directly on the user's system. For critical commands that are particularly likely to modify the user's system outside of the project directory or system temp directory, as you explain the command to the user (per the Explain Critical Commands rule above), also remind the user to consider enabling sandboxing.`.trim();
   }
+  return '';
 }
 
 export function renderGitRepo(options?: GitRepoOptions): string {
@@ -337,14 +326,6 @@ export function renderGitRepo(options?: GitRepoOptions): string {
 - After each commit, confirm that it was successful by running \`git status\`.
 - If a commit fails, never attempt to work around the issues without being asked to do so.
 - Never push changes to a remote repository without being asked explicitly by the user.`.trim();
-}
-
-export function renderFinalReminder(options?: FinalReminderOptions): string {
-  if (!options) return '';
-  return `
-# Final Reminder
-
-Your core function is efficient and safe assistance. Balance extreme conciseness with the crucial need for clarity, especially regarding safety and potential system modifications. Always prioritize user control and project conventions. Never make assumptions about the contents of files; instead use '${options.readFileToolName}' to ensure you aren't making broad assumptions. Finally, you are an agent - please keep going until the user's query is completely resolved.`.trim();
 }
 
 export function renderUserMemory(memory?: string): string {

@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -67,7 +67,7 @@ test('formats log correctly', () => {
       );
 
       const hasBuildOrTsc = shellCalls.some((log) => {
-        const cmd = log.toolRequest.args.toLowerCase();
+        const cmd = JSON.parse(log.toolRequest.args).command.toLowerCase();
         return (
           cmd.includes('npm run build') ||
           cmd.includes('tsc') ||
