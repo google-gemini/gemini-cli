@@ -262,11 +262,16 @@ export class HookRunner {
       let timedOut = false;
 
       const shellConfig = getShellConfiguration();
-      const command = this.expandCommand(
+      let command = this.expandCommand(
         hookConfig.command,
         input,
         shellConfig.shell,
       );
+
+      if (shellConfig.shell === 'powershell') {
+        // Append exit code check to ensure the exit code of the command is propagated
+        command = `${command}; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }`;
+      }
 
       // Set up environment variables
       const env = {

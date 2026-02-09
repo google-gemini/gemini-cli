@@ -1,0 +1,159 @@
+name: 'Test Build Binary'
+
+on:
+  push:
+    branches:
+      - 'main'
+      - 'release/**'
+      - 'build-binary'
+  pull_request:
+    branches:
+      - 'main'
+      - 'release/**'
+  workflow_dispatch:
+
+permissions:
+  contents: 'read'
+
+defaults:
+  run:
+    shell: 'bash'
+
+jobs:
+  build-node-binary:
+    name: 'Build Binary (${{ matrix.os }})'
+    runs-on: '${{ matrix.os }}'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: 'ubuntu-latest'
+            platform_name: 'linux-x64'
+            arch: 'x64'
+          - os: 'windows-latest'
+            platform_name: 'win32-x64'
+            arch: 'x64'
+          - os: 'macos-latest' # Apple Silicon (ARM64)
+            platform_name: 'darwin-arm64'
+            arch: 'arm64'
+          - os: 'macos-latest' # Intel (x64) running on ARM via Rosetta
+            platform_name: 'darwin-x64'
+            arch: 'x64'
+
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@v4'
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@v4'
+        with:
+          node-version-file: '.nvmrc'
+          architecture: '${{ matrix.arch }}'
+          cache: 'npm'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Check Secrets'
+        id: 'check_secrets'
+        run: |
+          echo "has_win_cert=${{ secrets.WINDOWS_PFX_BASE64 != '' }}" >> "$GITHUB_OUTPUT"
+          echo "has_mac_cert=${{ secrets.MACOS_CERT_P12_BASE64 != '' }}" >> "$GITHUB_OUTPUT"
+
+      - name: 'Setup Windows SDK (Windows)'
+        if: "matrix.os == 'windows-latest'"
+        uses: 'microsoft/setup-msbuild@v2'
+
+      - name: 'Add Signtool to Path (Windows)'
+        if: "matrix.os == 'windows-latest'"
+        run: |
+          $signtoolPath = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter "signtool.exe" | Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty DirectoryName
+          echo "Found signtool at: $signtoolPath"
+          echo "$signtoolPath" >> $env:GITHUB_PATH
+        shell: 'pwsh'
+
+      - name: 'Setup macOS Keychain'
+        if: "startsWith(matrix.os, 'macos') && steps.check_secrets.outputs.has_mac_cert == 'true' && github.event_name != 'pull_request'"
+        env:
+          BUILD_CERTIFICATE_BASE64: '${{ secrets.MACOS_CERT_P12_BASE64 }}'
+          P12_PASSWORD: '${{ secrets.MACOS_CERT_PASSWORD }}'
+          KEYCHAIN_PASSWORD: 'temp-password'
+        run: |
+          # Create the P12 file
+          echo "$BUILD_CERTIFICATE_BASE64" | base64 --decode > certificate.p12
+
+          # Create a temporary keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+
+          # Import the certificate
+          security import certificate.p12 -k build.keychain -P "$P12_PASSWORD" -T /usr/bin/codesign
+
+          # Allow codesign to access it
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+
+          # Set Identity for build script
+          echo "APPLE_IDENTITY=${{ secrets.MACOS_CERT_IDENTITY }}" >> "$GITHUB_ENV"
+
+      - name: 'Setup Windows Certificate'
+        if: "matrix.os == 'windows-latest' && steps.check_secrets.outputs.has_win_cert == 'true' && github.event_name != 'pull_request'"
+        env:
+          PFX_BASE64: '${{ secrets.WINDOWS_PFX_BASE64 }}'
+          PFX_PASSWORD: '${{ secrets.WINDOWS_PFX_PASSWORD }}'
+        run: |
+          $pfx_cert_byte = [System.Convert]::FromBase64String("$env:PFX_BASE64")
+          $certPath = Join-Path (Get-Location) "cert.pfx"
+          [IO.File]::WriteAllBytes($certPath, $pfx_cert_byte)
+          echo "WINDOWS_PFX_FILE=$certPath" >> $env:GITHUB_ENV
+          echo "WINDOWS_PFX_PASSWORD=$env:PFX_PASSWORD" >> $env:GITHUB_ENV
+        shell: 'pwsh'
+
+      - name: 'Build Binary'
+        run: 'npm run build:binary'
+
+      - name: 'Build Core Package'
+        run: 'npm run build -w @google/gemini-cli-core'
+
+      - name: 'Verify Output Exists'
+        run: |
+          if [ -f "dist/${{ matrix.platform_name }}/gemini" ]; then
+            echo "Binary found at dist/${{ matrix.platform_name }}/gemini"
+          elif [ -f "dist/${{ matrix.platform_name }}/gemini.exe" ]; then
+            echo "Binary found at dist/${{ matrix.platform_name }}/gemini.exe"
+          else
+            echo "Error: Binary not found in dist/${{ matrix.platform_name }}/"
+            ls -R dist/
+            exit 1
+          fi
+
+      - name: 'Smoke Test Binary'
+        run: |
+          echo "Running binary smoke test..."
+          if [ -f "dist/${{ matrix.platform_name }}/gemini.exe" ]; then
+            "./dist/${{ matrix.platform_name }}/gemini.exe" --version
+          else
+            "./dist/${{ matrix.platform_name }}/gemini" --version
+          fi
+
+      - name: 'Run Integration Tests'
+        if: "github.event_name != 'pull_request'"
+        env:
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+        run: |
+          echo "Running integration tests with binary..."
+          if [[ "${{ matrix.os }}" == 'windows-latest' ]]; then
+            BINARY_PATH="$(cygpath -m "$(pwd)/dist/${{ matrix.platform_name }}/gemini.exe")"
+          else
+            BINARY_PATH="$(pwd)/dist/${{ matrix.platform_name }}/gemini"
+          fi
+          echo "Using binary at $BINARY_PATH"
+          export INTEGRATION_TEST_GEMINI_BINARY_PATH="$BINARY_PATH"
+          npm run test:integration:sandbox:none -- --testTimeout=600000
+
+      - name: 'Upload Artifact'
+        uses: 'actions/upload-artifact@v4'
+        with:
+          name: 'gemini-cli-${{ matrix.platform_name }}'
+          path: 'dist/${{ matrix.platform_name }}/'
+          retention-days: 5
