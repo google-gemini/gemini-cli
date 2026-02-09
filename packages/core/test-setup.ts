@@ -13,13 +13,13 @@ import { setSimulate429 } from './src/utils/testUtils.js';
 import { vi, afterEach } from 'vitest';
 import { coreEvents } from './src/utils/events.js';
 
+// Increase max listeners to avoid warnings in large test suites
+coreEvents.setMaxListeners(100);
+
 // Disable 429 simulation globally for all tests
 setSimulate429(false);
 
 afterEach(() => {
-  // Clear all listeners from the global coreEvents singleton to prevent leaks
-  // between tests and avoid MaxListenersExceededWarning.
-  coreEvents.removeAllListeners();
   vi.unstubAllEnvs();
 });
 
