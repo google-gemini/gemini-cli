@@ -213,7 +213,6 @@ export class ToolExecutor {
       if (content.length > threshold) {
         const { outputFile: savedPath } = await saveTruncatedToolOutput(
           content,
-          toolName,
           callId,
           this.config.storage.getProjectTempDir(),
         );

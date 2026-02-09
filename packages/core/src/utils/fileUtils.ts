@@ -564,16 +564,14 @@ ${processedLines.join('\n')}`;
  */
 export async function saveTruncatedToolOutput(
   content: string,
-  toolName: string,
   id: string | number, // Accept string (callId) or number (truncationId)
   projectTempDir: string,
 ): Promise<{ outputFile: string; totalLines: number }> {
-  const safeToolName = toolName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
   const safeId = id
     .toString()
     .replace(/[^a-z0-9]/gi, '_')
     .toLowerCase();
-  const fileName = `${safeToolName}_${safeId}.txt`;
+  const fileName = `${safeId}.txt`;
   const outputFile = path.join(projectTempDir, fileName);
 
   await fsPromises.writeFile(outputFile, content);

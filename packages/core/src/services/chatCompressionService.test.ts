@@ -513,7 +513,7 @@ describe('ChatCompressionService', () => {
       // Verify a file was actually created
       const files = fs.readdirSync(testTempDir);
       expect(files.length).toBeGreaterThan(0);
-      expect(files[0]).toMatch(/grep_.*\.txt/);
+      expect(files[0]).toMatch(/\.txt$/);
     });
 
     it('should correctly handle massive single-line strings inside JSON by using multi-line Elephant Line logic', async () => {
