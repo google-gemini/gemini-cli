@@ -37,6 +37,10 @@ exports[`ShellTool > getDescription > should return the windows description when
 exports[`ShellTool > getSchema > should return the base schema when no modelId is provided 1`] = `
 "This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.
 
+      Efficiency Guidelines:
+      - Quiet Flags: Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
+      - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).
+
       The following information is returned:
 
       Output: Combined stdout/stderr. Can be \`(empty)\` or partial on error and for any unwaited background processes.
@@ -49,6 +53,10 @@ exports[`ShellTool > getSchema > should return the base schema when no modelId i
 
 exports[`ShellTool > getSchema > should return the schema from the resolver when modelId is provided 1`] = `
 "This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.
+
+      Efficiency Guidelines:
+      - Quiet Flags: Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
+      - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).
 
       The following information is returned:
 
