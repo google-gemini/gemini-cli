@@ -17,7 +17,6 @@ import {
   logToolOutputTruncated,
   runInDevTraceSpan,
 } from '../index.js';
-import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import { ShellToolInvocation } from '../tools/shell.js';
 import { executeToolWithHooks } from '../core/coreToolHookTriggers.js';
 import {
@@ -204,7 +203,7 @@ export class ToolExecutor {
     const toolName = call.request.name;
     const callId = call.request.callId;
 
-    if (typeof content === 'string' && toolName === SHELL_TOOL_NAME) {
+    if (typeof content === 'string') {
       const threshold = this.config.getTruncateToolOutputThreshold();
 
       if (threshold > 0 && content.length > threshold) {

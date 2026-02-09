@@ -125,6 +125,7 @@ export interface ResumedSessionData {
  */
 export class ChatRecordingService {
   private conversationFile: string | null = null;
+  private conversation: ConversationRecord | null = null;
   private cachedLastConvData: string | null = null;
   private sessionId: string;
   private projectHash: string;
@@ -148,6 +149,7 @@ export class ChatRecordingService {
         // Resume from existing session
         this.conversationFile = resumedSessionData.filePath;
         this.sessionId = resumedSessionData.conversation.sessionId;
+        this.conversation = resumedSessionData.conversation;
 
         // Update the session ID in the existing file
         this.updateConversation((conversation) => {
@@ -174,13 +176,15 @@ export class ChatRecordingService {
         )}.json`;
         this.conversationFile = path.join(chatsDir, filename);
 
-        this.writeConversation({
+        const initialConversation: ConversationRecord = {
           sessionId: this.sessionId,
           projectHash: this.projectHash,
           startTime: new Date().toISOString(),
           lastUpdated: new Date().toISOString(),
           messages: [],
-        });
+        };
+        this.conversation = initialConversation;
+        this.writeConversation(initialConversation, { allowEmpty: true });
       }
 
       // Clear any queued data since this is a fresh start
@@ -416,9 +420,12 @@ export class ChatRecordingService {
    * Loads up the conversation record from disk.
    */
   private readConversation(): ConversationRecord {
+    if (this.conversation) return this.conversation;
+
     try {
       this.cachedLastConvData = fs.readFileSync(this.conversationFile!, 'utf8');
-      return JSON.parse(this.cachedLastConvData);
+      this.conversation = JSON.parse(this.cachedLastConvData);
+      return this.conversation!;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         debugLogger.error('Error reading conversation file.', error);
@@ -426,13 +433,14 @@ export class ChatRecordingService {
       }
 
       // Placeholder empty conversation if file doesn't exist.
-      return {
+      this.conversation = {
         sessionId: this.sessionId,
         projectHash: this.projectHash,
         startTime: new Date().toISOString(),
         lastUpdated: new Date().toISOString(),
         messages: [],
       };
+      return this.conversation;
     }
   }
 
@@ -446,14 +454,18 @@ export class ChatRecordingService {
     try {
       if (!this.conversationFile) return;
       // Don't write the file yet until there's at least one message.
-      if (conversation.messages.length === 0 && !allowEmpty) return;
+      if ((conversation.messages?.length ?? 0) === 0 && !allowEmpty) return;
 
-      // Only write the file if this change would change the file.
-      if (this.cachedLastConvData !== JSON.stringify(conversation, null, 2)) {
+      // Avoid redundant stringification by checking if the content changed first.
+      // We use the cached string for comparison to avoid a new stringification
+      // when nothing has changed.
+      const currentContent = JSON.stringify(conversation, null, 2);
+      if (this.cachedLastConvData !== currentContent) {
+        // Only update the timestamp and re-stringify if something actually changed.
         conversation.lastUpdated = new Date().toISOString();
-        const newContent = JSON.stringify(conversation, null, 2);
-        this.cachedLastConvData = newContent;
-        fs.writeFileSync(this.conversationFile, newContent);
+        const finalContent = JSON.stringify(conversation, null, 2);
+        this.cachedLastConvData = finalContent;
+        fs.writeFileSync(this.conversationFile, finalContent);
       }
     } catch (error) {
       // Handle disk full (ENOSPC) gracefully - disable recording but allow conversation to continue
