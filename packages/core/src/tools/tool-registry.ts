@@ -21,7 +21,11 @@ import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
-import { DISCOVERED_TOOL_PREFIX } from './tool-names.js';
+import {
+  DISCOVERED_TOOL_PREFIX,
+  TOOL_LEGACY_ALIASES,
+  getToolAliases,
+} from './tool-names.js';
 
 type ToolParams = Record<string, unknown>;
 
@@ -431,7 +435,9 @@ export class ToolRegistry {
    * @returns All the tools that are not excluded.
    */
   private getActiveTools(): AnyDeclarativeTool[] {
-    const excludedTools = this.config.getExcludeTools() ?? new Set([]);
+    const excludedTools =
+      this.expandExcludeToolsWithAliases(this.config.getExcludeTools()) ??
+      new Set([]);
     const activeTools: AnyDeclarativeTool[] = [];
     for (const tool of this.allKnownTools.values()) {
       if (this.isActiveTool(tool, excludedTools)) {
@@ -439,6 +445,26 @@ export class ToolRegistry {
       }
     }
     return activeTools;
+  }
+
+  /**
+   * Expands an excludeTools set to include all legacy aliases.
+   * For example, if 'search_file_content' is excluded and it's an alias for
+   * 'grep_search', both names will be in the returned set.
+   */
+  private expandExcludeToolsWithAliases(
+    excludeTools: Set<string> | undefined,
+  ): Set<string> | undefined {
+    if (!excludeTools || excludeTools.size === 0) {
+      return excludeTools;
+    }
+    const expanded = new Set<string>();
+    for (const name of excludeTools) {
+      for (const alias of getToolAliases(name)) {
+        expanded.add(alias);
+      }
+    }
+    return expanded;
   }
 
   /**
@@ -450,7 +476,9 @@ export class ToolRegistry {
     tool: AnyDeclarativeTool,
     excludeTools?: Set<string>,
   ): boolean {
-    excludeTools ??= this.config.getExcludeTools() ?? new Set([]);
+    excludeTools ??=
+      this.expandExcludeToolsWithAliases(this.config.getExcludeTools()) ??
+      new Set([]);
     const normalizedClassName = tool.constructor.name.replace(/^_+/, '');
     const possibleNames = [tool.name, normalizedClassName];
     if (tool instanceof DiscoveredMCPTool) {
@@ -488,8 +516,8 @@ export class ToolRegistry {
   getFunctionDeclarationsFiltered(toolNames: string[]): FunctionDeclaration[] {
     const declarations: FunctionDeclaration[] = [];
     for (const name of toolNames) {
-      const tool = this.allKnownTools.get(name);
-      if (tool && this.isActiveTool(tool)) {
+      const tool = this.getTool(name);
+      if (tool) {
         declarations.push(tool.schema);
       }
     }
@@ -530,7 +558,30 @@ export class ToolRegistry {
    * Get the definition of a specific tool.
    */
   getTool(name: string): AnyDeclarativeTool | undefined {
-    const tool = this.allKnownTools.get(name);
+    let tool = this.allKnownTools.get(name);
+
+    // If not found, check legacy aliases
+    if (!tool && TOOL_LEGACY_ALIASES[name]) {
+      const currentName = TOOL_LEGACY_ALIASES[name];
+      tool = this.allKnownTools.get(currentName);
+      if (tool) {
+        debugLogger.debug(
+          `Resolved legacy tool name "${name}" to current name "${currentName}"`,
+        );
+      }
+    }
+
+    if (!tool && name.includes('__')) {
+      for (const t of this.allKnownTools.values()) {
+        if (t instanceof DiscoveredMCPTool) {
+          if (t.getFullyQualifiedName() === name) {
+            tool = t;
+            break;
+          }
+        }
+      }
+    }
+
     if (tool && this.isActiveTool(tool)) {
       return tool;
     }

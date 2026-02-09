@@ -24,7 +24,6 @@ import { getToolSuggestion } from '../utils/tool-utils.js';
 import type { ToolConfirmationRequest } from '../confirmation-bus/types.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import { fireToolNotificationHook } from './coreToolHookTriggers.js';
 import {
   type ToolCall,
   type ValidatingToolCall,
@@ -44,6 +43,8 @@ import {
   type ToolCallResponseInfo,
 } from '../scheduler/types.js';
 import { ToolExecutor } from '../scheduler/tool-executor.js';
+import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
+import { getPolicyDenialError } from '../scheduler/policy.js';
 
 export type {
   ToolCall,
@@ -591,21 +592,25 @@ export class CoreToolScheduler {
           name: toolCall.request.name,
           args: toolCall.request.args,
         };
-        const { decision } = await this.config
+        const serverName =
+          toolCall.tool instanceof DiscoveredMCPTool
+            ? toolCall.tool.serverName
+            : undefined;
+
+        const { decision, rule } = await this.config
           .getPolicyEngine()
-          .check(toolCallForPolicy, undefined); // Server name undefined for local tools
+          .check(toolCallForPolicy, serverName);
 
         if (decision === PolicyDecision.DENY) {
-          const errorMessage = `Tool execution denied by policy.`;
+          const { errorMessage, errorType } = getPolicyDenialError(
+            this.config,
+            rule,
+          );
           this.setStatusInternal(
             reqInfo.callId,
             'error',
             signal,
-            createErrorResponse(
-              reqInfo,
-              new Error(errorMessage),
-              ToolErrorType.POLICY_VIOLATION,
-            ),
+            createErrorResponse(reqInfo, new Error(errorMessage), errorType),
           );
           await this.checkAndNotifyCompletion(signal);
           return;
@@ -640,10 +645,9 @@ export class CoreToolScheduler {
             }
 
             // Fire Notification hook before showing confirmation to user
-            const messageBus = this.config.getMessageBus();
-            const hooksEnabled = this.config.getEnableHooks();
-            if (hooksEnabled && messageBus) {
-              await fireToolNotificationHook(messageBus, confirmationDetails);
+            const hookSystem = this.config.getHookSystem();
+            if (hookSystem) {
+              await hookSystem.fireToolNotificationEvent(confirmationDetails);
             }
 
             // Allow IDE to resolve confirmation
@@ -780,7 +784,7 @@ export class CoreToolScheduler {
     } else {
       // If the client provided new content, apply it and wait for
       // re-confirmation.
-      if (payload?.newContent && toolCall) {
+      if (payload && 'newContent' in payload && toolCall) {
         const result = await this.toolModifier.applyInlineModify(
           toolCall as WaitingToolCall,
           payload,
@@ -902,21 +906,36 @@ export class CoreToolScheduler {
         this._cancelAllQueuedCalls();
       }
 
+      // If we are already finalizing, another concurrent call to
+      // checkAndNotifyCompletion will just return. The ongoing finalized loop
+      // will pick up any new tools added to completedToolCallsForBatch.
+      if (this.isFinalizingToolCalls) {
+        return;
+      }
+
       // If there's nothing to report and we weren't cancelled, we can stop.
       // But if we were cancelled, we must proceed to potentially start the next queued request.
       if (this.completedToolCallsForBatch.length === 0 && !signal.aborted) {
         return;
       }
 
-      if (this.onAllToolCallsComplete) {
-        this.isFinalizingToolCalls = true;
-        // Use the batch array, not the (now empty) active array.
-        await this.onAllToolCallsComplete(this.completedToolCallsForBatch);
-        this.completedToolCallsForBatch = []; // Clear after reporting.
+      this.isFinalizingToolCalls = true;
+      try {
+        // We use a while loop here to ensure that if new tools are added to the
+        // batch (e.g., via cancellation) while we are awaiting
+        // onAllToolCallsComplete, they are also reported before we finish.
+        while (this.completedToolCallsForBatch.length > 0) {
+          const batchToReport = [...this.completedToolCallsForBatch];
+          this.completedToolCallsForBatch = [];
+          if (this.onAllToolCallsComplete) {
+            await this.onAllToolCallsComplete(batchToReport);
+          }
+        }
+      } finally {
         this.isFinalizingToolCalls = false;
+        this.isCancelling = false;
+        this.notifyToolCallsUpdate();
       }
-      this.isCancelling = false;
-      this.notifyToolCallsUpdate();
 
       // After completion of the entire batch, process the next item in the main request queue.
       if (this.requestQueue.length > 0) {

@@ -16,13 +16,17 @@ import {
 import type { RipGrepToolParams } from './ripGrep.js';
 import { canUseRipgrep, RipGrepTool, ensureRgPath } from './ripGrep.js';
 import path from 'node:path';
+import { isSubpath } from '../utils/paths.js';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import type { Config } from '../config/config.js';
 import { Storage } from '../config/storage.js';
+import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import type { ChildProcess } from 'node:child_process';
 import { spawn } from 'node:child_process';
+import { PassThrough, Readable } from 'node:stream';
+import EventEmitter from 'node:events';
 import { downloadRipGrep } from '@joshua.litt/get-ripgrep';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 // Mock dependencies for canUseRipgrep
@@ -197,47 +201,43 @@ describe('ensureRgPath', () => {
 function createMockSpawn(
   options: {
     outputData?: string;
-    exitCode?: number;
+    exitCode?: number | null;
     signal?: string;
   } = {},
 ) {
   const { outputData, exitCode = 0, signal } = options;
 
   return () => {
-    const mockProcess = {
-      stdout: {
-        on: vi.fn(),
-        removeListener: vi.fn(),
+    // strict Readable implementation
+    let pushed = false;
+    const stdout = new Readable({
+      read() {
+        if (!pushed) {
+          if (outputData) {
+            this.push(outputData);
+          }
+          this.push(null); // EOF
+          pushed = true;
+        }
       },
-      stderr: {
-        on: vi.fn(),
-        removeListener: vi.fn(),
-      },
-      on: vi.fn(),
-      removeListener: vi.fn(),
-      kill: vi.fn(),
-    };
+    });
 
-    // Set up event listeners immediately
+    const stderr = new PassThrough();
+    const mockProcess = new EventEmitter() as ChildProcess;
+    mockProcess.stdout = stdout as unknown as Readable;
+    mockProcess.stderr = stderr;
+    mockProcess.kill = vi.fn();
+    // @ts-expect-error - mocking private/internal property
+    mockProcess.killed = false;
+    // @ts-expect-error - mocking private/internal property
+    mockProcess.exitCode = null;
+
+    // Emulating process exit
     setTimeout(() => {
-      const stdoutDataHandler = mockProcess.stdout.on.mock.calls.find(
-        (call) => call[0] === 'data',
-      )?.[1];
+      mockProcess.emit('close', exitCode, signal);
+    }, 10);
 
-      const closeHandler = mockProcess.on.mock.calls.find(
-        (call) => call[0] === 'close',
-      )?.[1];
-
-      if (stdoutDataHandler && outputData) {
-        stdoutDataHandler(Buffer.from(outputData));
-      }
-
-      if (closeHandler) {
-        closeHandler(exitCode, signal);
-      }
-    }, 0);
-
-    return mockProcess as unknown as ChildProcess;
+    return mockProcess;
   };
 }
 
@@ -249,11 +249,16 @@ describe('RipGrepTool', () => {
   let grepTool: RipGrepTool;
   const abortSignal = new AbortController().signal;
 
-  const mockConfig = {
+  let mockConfig = {
     getTargetDir: () => tempRootDir,
     getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
     getDebugMode: () => false,
+    getFileFilteringRespectGitIgnore: () => true,
     getFileFilteringRespectGeminiIgnore: () => true,
+    getFileFilteringOptions: () => ({
+      respectGitIgnore: true,
+      respectGeminiIgnore: true,
+    }),
   } as unknown as Config;
 
   beforeEach(async () => {
@@ -268,6 +273,40 @@ describe('RipGrepTool', () => {
     await fs.writeFile(ripgrepBinaryPath, '');
     storageSpy.mockImplementation(() => binDir);
     tempRootDir = await fs.mkdtemp(path.join(os.tmpdir(), 'grep-tool-root-'));
+
+    mockConfig = {
+      getTargetDir: () => tempRootDir,
+      getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
+      getDebugMode: () => false,
+      getFileFilteringRespectGitIgnore: () => true,
+      getFileFilteringRespectGeminiIgnore: () => true,
+      getFileFilteringOptions: () => ({
+        respectGitIgnore: true,
+        respectGeminiIgnore: true,
+      }),
+      storage: {
+        getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+      },
+      isPathAllowed(this: Config, absolutePath: string): boolean {
+        const workspaceContext = this.getWorkspaceContext();
+        if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+          return true;
+        }
+
+        const projectTempDir = this.storage.getProjectTempDir();
+        return isSubpath(path.resolve(projectTempDir), absolutePath);
+      },
+      validatePathAccess(this: Config, absolutePath: string): string | null {
+        if (this.isPathAllowed(absolutePath)) {
+          return null;
+        }
+
+        const workspaceDirs = this.getWorkspaceContext().getDirectories();
+        const projectTempDir = this.storage.getProjectTempDir();
+        return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+      },
+    } as unknown as Config;
+
     grepTool = new RipGrepTool(mockConfig, createMockMessageBus());
 
     // Create some test files and directories
@@ -313,17 +352,19 @@ describe('RipGrepTool', () => {
         params: { pattern: 'hello', dir_path: '.', include: '*.txt' },
         expected: null,
       },
-      {
-        name: 'invalid regex pattern',
-        params: { pattern: '[[' },
-        expected: null,
-      },
     ])(
       'should return null for valid params ($name)',
       ({ params, expected }) => {
         expect(grepTool.validateToolParams(params)).toBe(expected);
       },
     );
+
+    it('should throw error for invalid regex pattern', () => {
+      const params: RipGrepToolParams = { pattern: '[[' };
+      expect(grepTool.validateToolParams(params)).toMatch(
+        /Invalid regular expression pattern provided/,
+      );
+    });
 
     it('should return error if pattern is missing', () => {
       const params = { dir_path: '.' } as unknown as RipGrepToolParams;
@@ -338,10 +379,9 @@ describe('RipGrepTool', () => {
         dir_path: 'nonexistent',
       };
       // Check for the core error message, as the full path might vary
-      expect(grepTool.validateToolParams(params)).toContain(
-        'Path does not exist',
-      );
-      expect(grepTool.validateToolParams(params)).toContain('nonexistent');
+      const result = grepTool.validateToolParams(params);
+      expect(result).toMatch(/Path does not exist/);
+      expect(result).toMatch(/nonexistent/);
     });
 
     it('should allow path to be a file', async () => {
@@ -404,6 +444,40 @@ describe('RipGrepTool', () => {
       );
       expect(result.llmContent).toContain('L1: another world in sub dir');
       expect(result.returnDisplay).toBe('Found 3 matches');
+    });
+
+    it('should ignore matches that escape the base path', async () => {
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: '..env' },
+                line_number: 1,
+                lines: { text: 'world in ..env\n' },
+              },
+            }) +
+            '\n' +
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: '../secret.txt' },
+                line_number: 1,
+                lines: { text: 'leak\n' },
+              },
+            }) +
+            '\n',
+          exitCode: 0,
+        }),
+      );
+
+      const params: RipGrepToolParams = { pattern: 'world' };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+      expect(result.llmContent).toContain('File: ..env');
+      expect(result.llmContent).toContain('L1: world in ..env');
+      expect(result.llmContent).not.toContain('secret.txt');
     });
 
     it('should find matches in a specific path', async () => {
@@ -471,51 +545,20 @@ describe('RipGrepTool', () => {
       );
 
       // Setup specific mock for this test - searching for 'hello' in 'sub' with '*.js' filter
-      mockSpawn.mockImplementationOnce(() => {
-        const mockProcess = {
-          stdout: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          stderr: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          on: vi.fn(),
-          removeListener: vi.fn(),
-          kill: vi.fn(),
-        };
-
-        setTimeout(() => {
-          const onData = mockProcess.stdout.on.mock.calls.find(
-            (call) => call[0] === 'data',
-          )?.[1];
-          const onClose = mockProcess.on.mock.calls.find(
-            (call) => call[0] === 'close',
-          )?.[1];
-
-          if (onData) {
-            // Only return match from the .js file in sub directory
-            onData(
-              Buffer.from(
-                JSON.stringify({
-                  type: 'match',
-                  data: {
-                    path: { text: 'another.js' },
-                    line_number: 1,
-                    lines: { text: 'const greeting = "hello";\n' },
-                  },
-                }) + '\n',
-              ),
-            );
-          }
-          if (onClose) {
-            onClose(0);
-          }
-        }, 0);
-
-        return mockProcess as unknown as ChildProcess;
-      });
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'another.js' },
+                line_number: 1,
+                lines: { text: 'const greeting = "hello";\n' },
+              },
+            }) + '\n',
+          exitCode: 0,
+        }),
+      );
 
       const params: RipGrepToolParams = {
         pattern: 'hello',
@@ -549,69 +592,166 @@ describe('RipGrepTool', () => {
       expect(result.returnDisplay).toBe('No matches found');
     });
 
-    it('should return an error from ripgrep for invalid regex pattern', async () => {
-      mockSpawn.mockImplementationOnce(
+    it('should throw error for invalid regex pattern during build', async () => {
+      const params: RipGrepToolParams = { pattern: '[[' };
+      expect(() => grepTool.build(params)).toThrow(
+        /Invalid regular expression pattern provided/,
+      );
+    });
+
+    it('should ignore invalid regex error from ripgrep when it is not a user error', async () => {
+      mockSpawn.mockImplementation(
         createMockSpawn({
+          outputData: '',
           exitCode: 2,
+          signal: undefined,
         }),
       );
 
-      const params: RipGrepToolParams = { pattern: '[[' };
-      const invocation = grepTool.build(params);
+      const invocation = grepTool.build({
+        pattern: 'foo',
+        dir_path: tempRootDir,
+      });
+
       const result = await invocation.execute(abortSignal);
-      expect(result.llmContent).toContain('ripgrep exited with code 2');
+      expect(result.llmContent).toContain('Process exited with code 2');
       expect(result.returnDisplay).toContain(
-        'Error: ripgrep exited with code 2',
+        'Error: Process exited with code 2',
       );
+    });
+
+    it('should handle massive output by terminating early without crashing (Regression)', async () => {
+      const massiveOutputLines = 30000;
+
+      // Custom mock for massive streaming
+      mockSpawn.mockImplementation(() => {
+        const stdout = new PassThrough();
+        const stderr = new PassThrough();
+        const mockProcess = new EventEmitter() as ChildProcess;
+        mockProcess.stdout = stdout;
+        mockProcess.stderr = stderr;
+        mockProcess.kill = vi.fn();
+        // @ts-expect-error - mocking private/internal property
+        mockProcess.killed = false;
+        // @ts-expect-error - mocking private/internal property
+        mockProcess.exitCode = null;
+
+        // Push data over time
+        let linesPushed = 0;
+        const pushInterval = setInterval(() => {
+          if (linesPushed >= massiveOutputLines) {
+            clearInterval(pushInterval);
+            stdout.end();
+            mockProcess.emit('close', 0);
+            return;
+          }
+
+          // Push a batch
+          try {
+            for (let i = 0; i < 2000 && linesPushed < massiveOutputLines; i++) {
+              const match = JSON.stringify({
+                type: 'match',
+                data: {
+                  path: { text: `file_${linesPushed}.txt` },
+                  line_number: 1,
+                  lines: { text: `match ${linesPushed}\n` },
+                },
+              });
+              stdout.write(match + '\n');
+              linesPushed++;
+            }
+          } catch (_e) {
+            clearInterval(pushInterval);
+          }
+        }, 1);
+
+        mockProcess.kill = vi.fn().mockImplementation(() => {
+          clearInterval(pushInterval);
+          stdout.end();
+          // Emit close async to allow listeners to attach
+          setTimeout(() => mockProcess.emit('close', 0, 'SIGTERM'), 0);
+          return true;
+        });
+
+        return mockProcess;
+      });
+
+      const invocation = grepTool.build({
+        pattern: 'test',
+        dir_path: tempRootDir,
+      });
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.returnDisplay).toContain('(limited)');
+    }, 10000);
+
+    it('should filter out files based on FileDiscoveryService even if ripgrep returns them', async () => {
+      // Create .geminiignore to ignore 'ignored.txt'
+      await fs.writeFile(
+        path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME),
+        'ignored.txt',
+      );
+
+      // Re-initialize tool so FileDiscoveryService loads the new .geminiignore
+      const toolWithIgnore = new RipGrepTool(
+        mockConfig,
+        createMockMessageBus(),
+      );
+
+      // Mock ripgrep returning both an ignored file and an allowed file
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'ignored.txt' },
+                line_number: 1,
+                lines: { text: 'should be ignored\n' },
+              },
+            }) +
+            '\n' +
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'allowed.txt' },
+                line_number: 1,
+                lines: { text: 'should be kept\n' },
+              },
+            }) +
+            '\n',
+          exitCode: 0,
+        }),
+      );
+
+      const params: RipGrepToolParams = { pattern: 'should' };
+      const invocation = toolWithIgnore.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      // Verify ignored file is filtered out
+      expect(result.llmContent).toContain('allowed.txt');
+      expect(result.llmContent).toContain('should be kept');
+      expect(result.llmContent).not.toContain('ignored.txt');
+      expect(result.llmContent).not.toContain('should be ignored');
+      expect(result.returnDisplay).toContain('Found 1 match');
     });
 
     it('should handle regex special characters correctly', async () => {
       // Setup specific mock for this test - regex pattern 'foo.*bar' should match 'const foo = "bar";'
-      mockSpawn.mockImplementationOnce(() => {
-        const mockProcess = {
-          stdout: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          stderr: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          on: vi.fn(),
-          removeListener: vi.fn(),
-          kill: vi.fn(),
-        };
-
-        setTimeout(() => {
-          const onData = mockProcess.stdout.on.mock.calls.find(
-            (call) => call[0] === 'data',
-          )?.[1];
-          const onClose = mockProcess.on.mock.calls.find(
-            (call) => call[0] === 'close',
-          )?.[1];
-
-          if (onData) {
-            // Return match for the regex pattern
-            onData(
-              Buffer.from(
-                JSON.stringify({
-                  type: 'match',
-                  data: {
-                    path: { text: 'fileB.js' },
-                    line_number: 1,
-                    lines: { text: 'const foo = "bar";\n' },
-                  },
-                }) + '\n',
-              ),
-            );
-          }
-          if (onClose) {
-            onClose(0);
-          }
-        }, 0);
-
-        return mockProcess as unknown as ChildProcess;
-      });
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileB.js' },
+                line_number: 1,
+                lines: { text: 'const foo = "bar";\n' },
+              },
+            }) + '\n',
+          exitCode: 0,
+        }),
+      );
 
       const params: RipGrepToolParams = { pattern: 'foo.*bar' }; // Matches 'const foo = "bar";'
       const invocation = grepTool.build(params);
@@ -625,61 +765,30 @@ describe('RipGrepTool', () => {
 
     it('should be case-insensitive by default (JS fallback)', async () => {
       // Setup specific mock for this test - case insensitive search for 'HELLO'
-      mockSpawn.mockImplementationOnce(() => {
-        const mockProcess = {
-          stdout: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          stderr: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          on: vi.fn(),
-          removeListener: vi.fn(),
-          kill: vi.fn(),
-        };
-
-        setTimeout(() => {
-          const onData = mockProcess.stdout.on.mock.calls.find(
-            (call) => call[0] === 'data',
-          )?.[1];
-          const onClose = mockProcess.on.mock.calls.find(
-            (call) => call[0] === 'close',
-          )?.[1];
-
-          if (onData) {
-            // Return case-insensitive matches for 'HELLO'
-            onData(
-              Buffer.from(
-                JSON.stringify({
-                  type: 'match',
-                  data: {
-                    path: { text: 'fileA.txt' },
-                    line_number: 1,
-                    lines: { text: 'hello world\n' },
-                  },
-                }) +
-                  '\n' +
-                  JSON.stringify({
-                    type: 'match',
-                    data: {
-                      path: { text: 'fileB.js' },
-                      line_number: 2,
-                      lines: { text: 'function baz() { return "hello"; }\n' },
-                    },
-                  }) +
-                  '\n',
-              ),
-            );
-          }
-          if (onClose) {
-            onClose(0);
-          }
-        }, 0);
-
-        return mockProcess as unknown as ChildProcess;
-      });
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileA.txt' },
+                line_number: 1,
+                lines: { text: 'hello world\n' },
+              },
+            }) +
+            '\n' +
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileB.js' },
+                line_number: 2,
+                lines: { text: 'function baz() { return "hello"; }\n' },
+              },
+            }) +
+            '\n',
+          exitCode: 0,
+        }),
+      );
 
       const params: RipGrepToolParams = { pattern: 'HELLO' };
       const invocation = grepTool.build(params);
@@ -737,102 +846,70 @@ describe('RipGrepTool', () => {
         getWorkspaceContext: () =>
           createMockWorkspaceContext(tempRootDir, [secondDir]),
         getDebugMode: () => false,
+        getFileFilteringRespectGitIgnore: () => true,
         getFileFilteringRespectGeminiIgnore: () => true,
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+        }),
+        storage: {
+          getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+        },
+        isPathAllowed(this: Config, absolutePath: string): boolean {
+          const workspaceContext = this.getWorkspaceContext();
+          if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+            return true;
+          }
+
+          const projectTempDir = this.storage.getProjectTempDir();
+          return isSubpath(path.resolve(projectTempDir), absolutePath);
+        },
+        validatePathAccess(this: Config, absolutePath: string): string | null {
+          if (this.isPathAllowed(absolutePath)) {
+            return null;
+          }
+
+          const workspaceDirs = this.getWorkspaceContext().getDirectories();
+          const projectTempDir = this.storage.getProjectTempDir();
+          return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+        },
       } as unknown as Config;
 
       // Setup specific mock for this test - multi-directory search for 'world'
       // Mock will be called twice - once for each directory
-      let callCount = 0;
-      mockSpawn.mockImplementation(() => {
-        callCount++;
-        const mockProcess = {
-          stdout: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          stderr: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          on: vi.fn(),
-          removeListener: vi.fn(),
-          kill: vi.fn(),
-        };
 
-        setTimeout(() => {
-          const stdoutDataHandler = mockProcess.stdout.on.mock.calls.find(
-            (call) => call[0] === 'data',
-          )?.[1];
-
-          const closeHandler = mockProcess.on.mock.calls.find(
-            (call) => call[0] === 'close',
-          )?.[1];
-
-          let outputData = '';
-          if (callCount === 1) {
-            // First directory (tempRootDir)
-            outputData =
-              JSON.stringify({
-                type: 'match',
-                data: {
-                  path: { text: 'fileA.txt' },
-                  line_number: 1,
-                  lines: { text: 'hello world\n' },
-                },
-              }) +
-              '\n' +
-              JSON.stringify({
-                type: 'match',
-                data: {
-                  path: { text: 'fileA.txt' },
-                  line_number: 2,
-                  lines: { text: 'second line with world\n' },
-                },
-              }) +
-              '\n' +
-              JSON.stringify({
-                type: 'match',
-                data: {
-                  path: { text: 'sub/fileC.txt' },
-                  line_number: 1,
-                  lines: { text: 'another world in sub dir\n' },
-                },
-              }) +
-              '\n';
-          } else if (callCount === 2) {
-            // Second directory (secondDir)
-            outputData =
-              JSON.stringify({
-                type: 'match',
-                data: {
-                  path: { text: 'other.txt' },
-                  line_number: 2,
-                  lines: { text: 'world in second\n' },
-                },
-              }) +
-              '\n' +
-              JSON.stringify({
-                type: 'match',
-                data: {
-                  path: { text: 'another.js' },
-                  line_number: 1,
-                  lines: { text: 'function world() { return "test"; }\n' },
-                },
-              }) +
-              '\n';
-          }
-
-          if (stdoutDataHandler && outputData) {
-            stdoutDataHandler(Buffer.from(outputData));
-          }
-
-          if (closeHandler) {
-            closeHandler(0);
-          }
-        }, 0);
-
-        return mockProcess as unknown as ChildProcess;
-      });
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileA.txt' },
+                line_number: 1,
+                lines: { text: 'hello world\n' },
+              },
+            }) +
+            '\n' +
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileA.txt' },
+                line_number: 2,
+                lines: { text: 'second line with world\n' },
+              },
+            }) +
+            '\n' +
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'sub/fileC.txt' },
+                line_number: 1,
+                lines: { text: 'another world in sub dir\n' },
+              },
+            }) +
+            '\n',
+        }),
+      );
 
       const multiDirGrepTool = new RipGrepTool(
         multiDirConfig,
@@ -882,54 +959,49 @@ describe('RipGrepTool', () => {
         getWorkspaceContext: () =>
           createMockWorkspaceContext(tempRootDir, [secondDir]),
         getDebugMode: () => false,
+        getFileFilteringRespectGitIgnore: () => true,
         getFileFilteringRespectGeminiIgnore: () => true,
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+        }),
+        storage: {
+          getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+        },
+        isPathAllowed(this: Config, absolutePath: string): boolean {
+          const workspaceContext = this.getWorkspaceContext();
+          if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+            return true;
+          }
+
+          const projectTempDir = this.storage.getProjectTempDir();
+          return isSubpath(path.resolve(projectTempDir), absolutePath);
+        },
+        validatePathAccess(this: Config, absolutePath: string): string | null {
+          if (this.isPathAllowed(absolutePath)) {
+            return null;
+          }
+
+          const workspaceDirs = this.getWorkspaceContext().getDirectories();
+          const projectTempDir = this.storage.getProjectTempDir();
+          return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+        },
       } as unknown as Config;
 
       // Setup specific mock for this test - searching in 'sub' should only return matches from that directory
-      mockSpawn.mockImplementationOnce(() => {
-        const mockProcess = {
-          stdout: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          stderr: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          on: vi.fn(),
-          removeListener: vi.fn(),
-          kill: vi.fn(),
-        };
-
-        setTimeout(() => {
-          const onData = mockProcess.stdout.on.mock.calls.find(
-            (call) => call[0] === 'data',
-          )?.[1];
-          const onClose = mockProcess.on.mock.calls.find(
-            (call) => call[0] === 'close',
-          )?.[1];
-
-          if (onData) {
-            onData(
-              Buffer.from(
-                JSON.stringify({
-                  type: 'match',
-                  data: {
-                    path: { text: 'fileC.txt' },
-                    line_number: 1,
-                    lines: { text: 'another world in sub dir\n' },
-                  },
-                }) + '\n',
-              ),
-            );
-          }
-          if (onClose) {
-            onClose(0);
-          }
-        }, 0);
-
-        return mockProcess as unknown as ChildProcess;
-      });
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileC.txt' },
+                line_number: 1,
+                lines: { text: 'another world in sub dir\n' },
+              },
+            }) + '\n',
+        }),
+      );
 
       const multiDirGrepTool = new RipGrepTool(
         multiDirConfig,
@@ -970,35 +1042,12 @@ describe('RipGrepTool', () => {
 
     it('should abort streaming search when signal is triggered', async () => {
       // Setup specific mock for this test - simulate process being killed due to abort
-      mockSpawn.mockImplementationOnce(() => {
-        const mockProcess = {
-          stdout: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          stderr: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          on: vi.fn(),
-          removeListener: vi.fn(),
-          kill: vi.fn(),
-        };
-
-        // Simulate process being aborted - use setTimeout to ensure handlers are registered first
-        setTimeout(() => {
-          const closeHandler = mockProcess.on.mock.calls.find(
-            (call) => call[0] === 'close',
-          )?.[1];
-
-          if (closeHandler) {
-            // Simulate process killed by signal (code is null, signal is SIGTERM)
-            closeHandler(null, 'SIGTERM');
-          }
-        }, 0);
-
-        return mockProcess as unknown as ChildProcess;
-      });
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          exitCode: null,
+          signal: 'SIGTERM',
+        }),
+      );
 
       const controller = new AbortController();
       const params: RipGrepToolParams = { pattern: 'test' };
@@ -1008,12 +1057,7 @@ describe('RipGrepTool', () => {
       controller.abort();
 
       const result = await invocation.execute(controller.signal);
-      expect(result.llmContent).toContain(
-        'Error during grep search operation: ripgrep exited with code null',
-      );
-      expect(result.returnDisplay).toContain(
-        'Error: ripgrep exited with code null',
-      );
+      expect(result.returnDisplay).toContain('No matches found');
     });
   });
 
@@ -1023,7 +1067,7 @@ describe('RipGrepTool', () => {
         pattern: 'test',
         dir_path: '../outside',
       };
-      expect(() => grepTool.build(params)).toThrow(/Path validation failed/);
+      expect(() => grepTool.build(params)).toThrow(/Path not in workspace/);
     });
 
     it.each([
@@ -1060,50 +1104,19 @@ describe('RipGrepTool', () => {
       );
 
       // Setup specific mock for this test - searching for 'world' should find the file with special characters
-      mockSpawn.mockImplementationOnce(() => {
-        const mockProcess = {
-          stdout: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          stderr: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          on: vi.fn(),
-          removeListener: vi.fn(),
-          kill: vi.fn(),
-        };
-
-        setTimeout(() => {
-          const onData = mockProcess.stdout.on.mock.calls.find(
-            (call) => call[0] === 'data',
-          )?.[1];
-          const onClose = mockProcess.on.mock.calls.find(
-            (call) => call[0] === 'close',
-          )?.[1];
-
-          if (onData) {
-            onData(
-              Buffer.from(
-                JSON.stringify({
-                  type: 'match',
-                  data: {
-                    path: { text: specialFileName },
-                    line_number: 1,
-                    lines: { text: 'hello world with special chars\n' },
-                  },
-                }) + '\n',
-              ),
-            );
-          }
-          if (onClose) {
-            onClose(0);
-          }
-        }, 0);
-
-        return mockProcess as unknown as ChildProcess;
-      });
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: specialFileName },
+                line_number: 1,
+                lines: { text: 'hello world with special chars\n' },
+              },
+            }) + '\n',
+        }),
+      );
 
       const params: RipGrepToolParams = { pattern: 'world' };
       const invocation = grepTool.build(params);
@@ -1122,50 +1135,19 @@ describe('RipGrepTool', () => {
       );
 
       // Setup specific mock for this test - searching for 'deep' should find the deeply nested file
-      mockSpawn.mockImplementationOnce(() => {
-        const mockProcess = {
-          stdout: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          stderr: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          on: vi.fn(),
-          removeListener: vi.fn(),
-          kill: vi.fn(),
-        };
-
-        setTimeout(() => {
-          const onData = mockProcess.stdout.on.mock.calls.find(
-            (call) => call[0] === 'data',
-          )?.[1];
-          const onClose = mockProcess.on.mock.calls.find(
-            (call) => call[0] === 'close',
-          )?.[1];
-
-          if (onData) {
-            onData(
-              Buffer.from(
-                JSON.stringify({
-                  type: 'match',
-                  data: {
-                    path: { text: 'a/b/c/d/e/deep.txt' },
-                    line_number: 1,
-                    lines: { text: 'content in deep directory\n' },
-                  },
-                }) + '\n',
-              ),
-            );
-          }
-          if (onClose) {
-            onClose(0);
-          }
-        }, 0);
-
-        return mockProcess as unknown as ChildProcess;
-      });
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'a/b/c/d/e/deep.txt' },
+                line_number: 1,
+                lines: { text: 'content in deep directory\n' },
+              },
+            }) + '\n',
+        }),
+      );
 
       const params: RipGrepToolParams = { pattern: 'deep' };
       const invocation = grepTool.build(params);
@@ -1184,50 +1166,19 @@ describe('RipGrepTool', () => {
       );
 
       // Setup specific mock for this test - regex pattern should match function declarations
-      mockSpawn.mockImplementationOnce(() => {
-        const mockProcess = {
-          stdout: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          stderr: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          on: vi.fn(),
-          removeListener: vi.fn(),
-          kill: vi.fn(),
-        };
-
-        setTimeout(() => {
-          const onData = mockProcess.stdout.on.mock.calls.find(
-            (call) => call[0] === 'data',
-          )?.[1];
-          const onClose = mockProcess.on.mock.calls.find(
-            (call) => call[0] === 'close',
-          )?.[1];
-
-          if (onData) {
-            onData(
-              Buffer.from(
-                JSON.stringify({
-                  type: 'match',
-                  data: {
-                    path: { text: 'code.js' },
-                    line_number: 1,
-                    lines: { text: 'function getName() { return "test"; }\n' },
-                  },
-                }) + '\n',
-              ),
-            );
-          }
-          if (onClose) {
-            onClose(0);
-          }
-        }, 0);
-
-        return mockProcess as unknown as ChildProcess;
-      });
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'code.js' },
+                line_number: 1,
+                lines: { text: 'function getName() { return "test"; }\n' },
+              },
+            }) + '\n',
+        }),
+      );
 
       const params: RipGrepToolParams = { pattern: 'function\\s+\\w+\\s*\\(' };
       const invocation = grepTool.build(params);
@@ -1244,69 +1195,38 @@ describe('RipGrepTool', () => {
       );
 
       // Setup specific mock for this test - case insensitive search should match all variants
-      mockSpawn.mockImplementationOnce(() => {
-        const mockProcess = {
-          stdout: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          stderr: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          on: vi.fn(),
-          removeListener: vi.fn(),
-          kill: vi.fn(),
-        };
-
-        setTimeout(() => {
-          const onData = mockProcess.stdout.on.mock.calls.find(
-            (call) => call[0] === 'data',
-          )?.[1];
-          const onClose = mockProcess.on.mock.calls.find(
-            (call) => call[0] === 'close',
-          )?.[1];
-
-          if (onData) {
-            onData(
-              Buffer.from(
-                JSON.stringify({
-                  type: 'match',
-                  data: {
-                    path: { text: 'case.txt' },
-                    line_number: 1,
-                    lines: { text: 'Hello World\n' },
-                  },
-                }) +
-                  '\n' +
-                  JSON.stringify({
-                    type: 'match',
-                    data: {
-                      path: { text: 'case.txt' },
-                      line_number: 2,
-                      lines: { text: 'hello world\n' },
-                    },
-                  }) +
-                  '\n' +
-                  JSON.stringify({
-                    type: 'match',
-                    data: {
-                      path: { text: 'case.txt' },
-                      line_number: 3,
-                      lines: { text: 'HELLO WORLD\n' },
-                    },
-                  }) +
-                  '\n',
-              ),
-            );
-          }
-          if (onClose) {
-            onClose(0);
-          }
-        }, 0);
-
-        return mockProcess as unknown as ChildProcess;
-      });
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'case.txt' },
+                line_number: 1,
+                lines: { text: 'Hello World\n' },
+              },
+            }) +
+            '\n' +
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'case.txt' },
+                line_number: 2,
+                lines: { text: 'hello world\n' },
+              },
+            }) +
+            '\n' +
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'case.txt' },
+                line_number: 3,
+                lines: { text: 'HELLO WORLD\n' },
+              },
+            }) +
+            '\n',
+        }),
+      );
 
       const params: RipGrepToolParams = { pattern: 'hello' };
       const invocation = grepTool.build(params);
@@ -1324,50 +1244,19 @@ describe('RipGrepTool', () => {
       );
 
       // Setup specific mock for this test - escaped regex pattern should match price format
-      mockSpawn.mockImplementationOnce(() => {
-        const mockProcess = {
-          stdout: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          stderr: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          on: vi.fn(),
-          removeListener: vi.fn(),
-          kill: vi.fn(),
-        };
-
-        setTimeout(() => {
-          const onData = mockProcess.stdout.on.mock.calls.find(
-            (call) => call[0] === 'data',
-          )?.[1];
-          const onClose = mockProcess.on.mock.calls.find(
-            (call) => call[0] === 'close',
-          )?.[1];
-
-          if (onData) {
-            onData(
-              Buffer.from(
-                JSON.stringify({
-                  type: 'match',
-                  data: {
-                    path: { text: 'special.txt' },
-                    line_number: 1,
-                    lines: { text: 'Price: $19.99\n' },
-                  },
-                }) + '\n',
-              ),
-            );
-          }
-          if (onClose) {
-            onClose(0);
-          }
-        }, 0);
-
-        return mockProcess as unknown as ChildProcess;
-      });
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'special.txt' },
+                line_number: 1,
+                lines: { text: 'Price: $19.99\n' },
+              },
+            }) + '\n',
+        }),
+      );
 
       const params: RipGrepToolParams = { pattern: '\\$\\d+\\.\\d+' };
       const invocation = grepTool.build(params);
@@ -1392,60 +1281,29 @@ describe('RipGrepTool', () => {
       await fs.writeFile(path.join(tempRootDir, 'test.txt'), 'text content');
 
       // Setup specific mock for this test - include pattern should filter to only ts/tsx files
-      mockSpawn.mockImplementationOnce(() => {
-        const mockProcess = {
-          stdout: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          stderr: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          on: vi.fn(),
-          removeListener: vi.fn(),
-          kill: vi.fn(),
-        };
-
-        setTimeout(() => {
-          const onData = mockProcess.stdout.on.mock.calls.find(
-            (call) => call[0] === 'data',
-          )?.[1];
-          const onClose = mockProcess.on.mock.calls.find(
-            (call) => call[0] === 'close',
-          )?.[1];
-
-          if (onData) {
-            onData(
-              Buffer.from(
-                JSON.stringify({
-                  type: 'match',
-                  data: {
-                    path: { text: 'test.ts' },
-                    line_number: 1,
-                    lines: { text: 'typescript content\n' },
-                  },
-                }) +
-                  '\n' +
-                  JSON.stringify({
-                    type: 'match',
-                    data: {
-                      path: { text: 'test.tsx' },
-                      line_number: 1,
-                      lines: { text: 'tsx content\n' },
-                    },
-                  }) +
-                  '\n',
-              ),
-            );
-          }
-          if (onClose) {
-            onClose(0);
-          }
-        }, 0);
-
-        return mockProcess as unknown as ChildProcess;
-      });
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'test.ts' },
+                line_number: 1,
+                lines: { text: 'typescript content\n' },
+              },
+            }) +
+            '\n' +
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'test.tsx' },
+                line_number: 1,
+                lines: { text: 'tsx content\n' },
+              },
+            }) +
+            '\n',
+        }),
+      );
 
       const params: RipGrepToolParams = {
         pattern: 'content',
@@ -1469,50 +1327,19 @@ describe('RipGrepTool', () => {
       await fs.writeFile(path.join(tempRootDir, 'other.ts'), 'other code');
 
       // Setup specific mock for this test - include pattern should filter to only src/** files
-      mockSpawn.mockImplementationOnce(() => {
-        const mockProcess = {
-          stdout: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          stderr: {
-            on: vi.fn(),
-            removeListener: vi.fn(),
-          },
-          on: vi.fn(),
-          removeListener: vi.fn(),
-          kill: vi.fn(),
-        };
-
-        setTimeout(() => {
-          const onData = mockProcess.stdout.on.mock.calls.find(
-            (call) => call[0] === 'data',
-          )?.[1];
-          const onClose = mockProcess.on.mock.calls.find(
-            (call) => call[0] === 'close',
-          )?.[1];
-
-          if (onData) {
-            onData(
-              Buffer.from(
-                JSON.stringify({
-                  type: 'match',
-                  data: {
-                    path: { text: 'src/main.ts' },
-                    line_number: 1,
-                    lines: { text: 'source code\n' },
-                  },
-                }) + '\n',
-              ),
-            );
-          }
-          if (onClose) {
-            onClose(0);
-          }
-        }, 0);
-
-        return mockProcess as unknown as ChildProcess;
-      });
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'src/main.ts' },
+                line_number: 1,
+                lines: { text: 'source code\n' },
+              },
+            }) + '\n',
+        }),
+      );
 
       const params: RipGrepToolParams = {
         pattern: 'code',
@@ -1654,14 +1481,104 @@ describe('RipGrepTool', () => {
       expect(result.llmContent).toContain('L1: secret log entry');
     });
 
+    it('should disable gitignore rules when respectGitIgnore is false', async () => {
+      const configWithoutGitIgnore = {
+        getTargetDir: () => tempRootDir,
+        getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
+        getDebugMode: () => false,
+        getFileFilteringRespectGitIgnore: () => false,
+        getFileFilteringRespectGeminiIgnore: () => true,
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: false,
+          respectGeminiIgnore: true,
+        }),
+        storage: {
+          getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+        },
+        isPathAllowed(this: Config, absolutePath: string): boolean {
+          const workspaceContext = this.getWorkspaceContext();
+          if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+            return true;
+          }
+
+          const projectTempDir = this.storage.getProjectTempDir();
+          return isSubpath(path.resolve(projectTempDir), absolutePath);
+        },
+        validatePathAccess(this: Config, absolutePath: string): string | null {
+          if (this.isPathAllowed(absolutePath)) {
+            return null;
+          }
+
+          const workspaceDirs = this.getWorkspaceContext().getDirectories();
+          const projectTempDir = this.storage.getProjectTempDir();
+          return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+        },
+      } as unknown as Config;
+      const gitIgnoreDisabledTool = new RipGrepTool(
+        configWithoutGitIgnore,
+        createMockMessageBus(),
+      );
+
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'ignored.log' },
+                line_number: 1,
+                lines: { text: 'secret log entry\n' },
+              },
+            }) + '\n',
+          exitCode: 0,
+        }),
+      );
+
+      const params: RipGrepToolParams = { pattern: 'secret' };
+      const invocation = gitIgnoreDisabledTool.build(params);
+      await invocation.execute(abortSignal);
+
+      expect(mockSpawn).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.arrayContaining(['--no-ignore-vcs', '--no-ignore-exclude']),
+        expect.anything(),
+      );
+    });
+
     it('should add .geminiignore when enabled and patterns exist', async () => {
-      const geminiIgnorePath = path.join(tempRootDir, '.geminiignore');
+      const geminiIgnorePath = path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME);
       await fs.writeFile(geminiIgnorePath, 'ignored.log');
       const configWithGeminiIgnore = {
         getTargetDir: () => tempRootDir,
         getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
         getDebugMode: () => false,
+        getFileFilteringRespectGitIgnore: () => true,
         getFileFilteringRespectGeminiIgnore: () => true,
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+        }),
+        storage: {
+          getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+        },
+        isPathAllowed(this: Config, absolutePath: string): boolean {
+          const workspaceContext = this.getWorkspaceContext();
+          if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+            return true;
+          }
+
+          const projectTempDir = this.storage.getProjectTempDir();
+          return isSubpath(path.resolve(projectTempDir), absolutePath);
+        },
+        validatePathAccess(this: Config, absolutePath: string): string | null {
+          if (this.isPathAllowed(absolutePath)) {
+            return null;
+          }
+
+          const workspaceDirs = this.getWorkspaceContext().getDirectories();
+          const projectTempDir = this.storage.getProjectTempDir();
+          return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+        },
       } as unknown as Config;
       const geminiIgnoreTool = new RipGrepTool(
         configWithGeminiIgnore,
@@ -1695,13 +1612,39 @@ describe('RipGrepTool', () => {
     });
 
     it('should skip .geminiignore when disabled', async () => {
-      const geminiIgnorePath = path.join(tempRootDir, '.geminiignore');
+      const geminiIgnorePath = path.join(tempRootDir, GEMINI_IGNORE_FILE_NAME);
       await fs.writeFile(geminiIgnorePath, 'ignored.log');
       const configWithoutGeminiIgnore = {
         getTargetDir: () => tempRootDir,
         getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
         getDebugMode: () => false,
+        getFileFilteringRespectGitIgnore: () => true,
         getFileFilteringRespectGeminiIgnore: () => false,
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: false,
+        }),
+        storage: {
+          getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+        },
+        isPathAllowed(this: Config, absolutePath: string): boolean {
+          const workspaceContext = this.getWorkspaceContext();
+          if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+            return true;
+          }
+
+          const projectTempDir = this.storage.getProjectTempDir();
+          return isSubpath(path.resolve(projectTempDir), absolutePath);
+        },
+        validatePathAccess(this: Config, absolutePath: string): string | null {
+          if (this.isPathAllowed(absolutePath)) {
+            return null;
+          }
+
+          const workspaceDirs = this.getWorkspaceContext().getDirectories();
+          const projectTempDir = this.storage.getProjectTempDir();
+          return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+        },
       } as unknown as Config;
       const geminiIgnoreTool = new RipGrepTool(
         configWithoutGeminiIgnore,
@@ -1827,6 +1770,31 @@ describe('RipGrepTool', () => {
         getWorkspaceContext: () =>
           createMockWorkspaceContext(tempRootDir, ['/another/dir']),
         getDebugMode: () => false,
+        getFileFilteringOptions: () => ({
+          respectGitIgnore: true,
+          respectGeminiIgnore: true,
+        }),
+        storage: {
+          getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+        },
+        isPathAllowed(this: Config, absolutePath: string): boolean {
+          const workspaceContext = this.getWorkspaceContext();
+          if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
+            return true;
+          }
+
+          const projectTempDir = this.storage.getProjectTempDir();
+          return isSubpath(path.resolve(projectTempDir), absolutePath);
+        },
+        validatePathAccess(this: Config, absolutePath: string): string | null {
+          if (this.isPathAllowed(absolutePath)) {
+            return null;
+          }
+
+          const workspaceDirs = this.getWorkspaceContext().getDirectories();
+          const projectTempDir = this.storage.getProjectTempDir();
+          return `Path not in workspace: Attempted path "${absolutePath}" resolves outside the allowed workspace directories: ${workspaceDirs.join(', ')} or the project temp directory: ${projectTempDir}`;
+        },
       } as unknown as Config;
 
       const multiDirGrepTool = new RipGrepTool(

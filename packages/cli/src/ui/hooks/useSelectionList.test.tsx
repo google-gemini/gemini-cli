@@ -59,9 +59,9 @@ describe('useSelectionList', () => {
           name,
           sequence,
           ctrl: options.ctrl ?? false,
-          meta: false,
+          cmd: false,
+          alt: false,
           shift: options.shift ?? false,
-          paste: false,
           insertable: false,
         };
         activeKeypressHandler(key);
@@ -80,6 +80,7 @@ describe('useSelectionList', () => {
     initialIndex?: number;
     isFocused?: boolean;
     showNumbers?: boolean;
+    wrapAround?: boolean;
   }) => {
     let hookResult: ReturnType<typeof useSelectionList>;
     function TestComponent(props: typeof initialProps) {
@@ -286,6 +287,39 @@ describe('useSelectionList', () => {
     });
   });
 
+  describe('Wrapping (wrapAround)', () => {
+    it('should wrap by default (wrapAround=true)', async () => {
+      const { result } = await renderSelectionListHook({
+        items,
+        initialIndex: items.length - 1,
+        onSelect: mockOnSelect,
+      });
+      expect(result.current.activeIndex).toBe(3);
+      pressKey('down');
+      expect(result.current.activeIndex).toBe(0);
+
+      pressKey('up');
+      expect(result.current.activeIndex).toBe(3);
+    });
+
+    it('should not wrap when wrapAround is false', async () => {
+      const { result } = await renderSelectionListHook({
+        items,
+        initialIndex: items.length - 1,
+        onSelect: mockOnSelect,
+        wrapAround: false,
+      });
+      expect(result.current.activeIndex).toBe(3);
+      pressKey('down');
+      expect(result.current.activeIndex).toBe(3); // Should stay at bottom
+
+      act(() => result.current.setActiveIndex(0));
+      expect(result.current.activeIndex).toBe(0);
+      pressKey('up');
+      expect(result.current.activeIndex).toBe(0); // Should stay at top
+    });
+  });
+
   describe('Selection (Enter)', () => {
     it('should call onSelect when "return" is pressed on enabled item', async () => {
       await renderSelectionListHook({
@@ -329,9 +363,9 @@ describe('useSelectionList', () => {
           name,
           sequence: name,
           ctrl: false,
-          meta: false,
+          cmd: false,
+          alt: false,
           shift: false,
-          paste: false,
           insertable: true,
         };
         handler(key);
@@ -379,9 +413,9 @@ describe('useSelectionList', () => {
             name,
             sequence: name,
             ctrl: false,
-            meta: false,
+            cmd: false,
+            alt: false,
             shift: false,
-            paste: false,
             insertable: false,
           };
           handler(key);

@@ -60,6 +60,7 @@ const createMockMCPTool = (
     { type: 'object', properties: {} },
     mockMessageBus,
     undefined, // trust
+    undefined, // isReadOnly
     undefined, // nameOverride
     undefined, // cliConfig
     undefined, // extensionName
@@ -231,7 +232,6 @@ describe('mcpCommand', () => {
             }),
           ]),
         }),
-        expect.any(Number),
       );
     });
 
@@ -246,7 +246,6 @@ describe('mcpCommand', () => {
           type: MessageType.MCP_STATUS,
           showDescriptions: true,
         }),
-        expect.any(Number),
       );
     });
 
@@ -261,7 +260,6 @@ describe('mcpCommand', () => {
           type: MessageType.MCP_STATUS,
           showDescriptions: false,
         }),
-        expect.any(Number),
       );
     });
   });

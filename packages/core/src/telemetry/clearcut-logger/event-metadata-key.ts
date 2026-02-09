@@ -7,7 +7,7 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
-  // Next ID: 137
+  // Next ID: 152
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
@@ -517,4 +517,64 @@ export enum EventMetadataKey {
 
   // Logs the exit code of the hook script (if applicable).
   GEMINI_CLI_HOOK_EXIT_CODE = 136,
+
+  // Logs CPU information of user machine.
+  GEMINI_CLI_CPU_INFO = 137,
+
+  // Logs number of CPU cores of user machine.
+  GEMINI_CLI_CPU_CORES = 138,
+
+  // Logs GPU information of user machine.
+  GEMINI_CLI_GPU_INFO = 139,
+
+  // Logs total RAM in GB of user machine.
+  GEMINI_CLI_RAM_TOTAL_GB = 140,
+
+  // ==========================================================================
+  // Approval Mode Event Keys
+  // ==========================================================================
+
+  // Logs the active approval mode in the session.
+  GEMINI_CLI_ACTIVE_APPROVAL_MODE = 141,
+
+  // Logs the new approval mode.
+  GEMINI_CLI_APPROVAL_MODE_TO = 142,
+
+  // Logs the duration spent in an approval mode in milliseconds.
+  GEMINI_CLI_APPROVAL_MODE_DURATION_MS = 143,
+
+  // ==========================================================================
+  // Rewind Event Keys
+  // ==========================================================================
+
+  // Logs the outcome of a rewind operation.
+  GEMINI_CLI_REWIND_OUTCOME = 144,
+
+  // Model Routing Event Keys (Cont.)
+  // ==========================================================================
+
+  // Logs the reasoning for the routing decision.
+  GEMINI_CLI_ROUTING_REASONING = 145,
+
+  // Logs whether numerical routing was enabled.
+  GEMINI_CLI_ROUTING_NUMERICAL_ENABLED = 146,
+
+  // Logs the classifier threshold used.
+  GEMINI_CLI_ROUTING_CLASSIFIER_THRESHOLD = 147,
+
+  // ==========================================================================
+  // Tool Output Masking Event Keys
+  // ==========================================================================
+
+  // Logs the total tokens in the prunable block before masking.
+  GEMINI_CLI_TOOL_OUTPUT_MASKING_TOKENS_BEFORE = 148,
+
+  // Logs the total tokens in the masked remnants after masking.
+  GEMINI_CLI_TOOL_OUTPUT_MASKING_TOKENS_AFTER = 149,
+
+  // Logs the number of tool outputs masked in this operation.
+  GEMINI_CLI_TOOL_OUTPUT_MASKING_MASKED_COUNT = 150,
+
+  // Logs the total prunable tokens identified at the trigger point.
+  GEMINI_CLI_TOOL_OUTPUT_MASKING_TOTAL_PRUNABLE_TOKENS = 151,
 }

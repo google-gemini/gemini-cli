@@ -10,11 +10,11 @@ exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlterna
 
 exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlternateBuffer = false > should correctly render a diff with multiple hunks and a gap indicator > with terminalWidth 30 and height 6 1`] = `
 "... first 10 lines hidden ...
-   ;
-21 + const anotherNew = 'test'
-   ;
-22   console.log('end of
-     second hunk');"
+   'test';
+21 + const anotherNew =
+   'test';
+22  console.log('end of second
+    hunk');"
 `;
 
 exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlternateBuffer = false > should correctly render a diff with multiple hunks and a gap indicator > with terminalWidth 80 and height 6 1`] = `
@@ -84,22 +84,13 @@ exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlterna
 exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlternateBuffer = true > should correctly render a diff with a SVN diff format 1`] = `
 " 1 - const oldVar = 1;
  1 + const newVar = 1;
-═══════════════════════════════════════════════════════════════════════════════
+════════════════════════════════════════════════════════════════════════════════
 20 - const anotherOld = 'test';
 20 + const anotherNew = 'test';"
 `;
 
 exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlternateBuffer = true > should correctly render a diff with multiple hunks and a gap indicator > with terminalWidth 30 and height 6 1`] = `
-" 1  console.log('first hunk');
-
- 2 - const oldVar = 1;
- 2 + const newVar = 1;
- 3   console.log('end of first
-     hunk');
-═════════════════════════════
-20  console.log('second
-    hunk');
-21 - const anotherOld =
+"... first 10 lines hidden ...
    'test';
 21 + const anotherNew =
    'test';
@@ -108,11 +99,8 @@ exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlterna
 `;
 
 exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlternateBuffer = true > should correctly render a diff with multiple hunks and a gap indicator > with terminalWidth 80 and height 6 1`] = `
-" 1   console.log('first hunk');
- 2 - const oldVar = 1;
- 2 + const newVar = 1;
- 3   console.log('end of first hunk');
-═══════════════════════════════════════════════════════════════════════════════
+"... first 4 lines hidden ...
+════════════════════════════════════════════════════════════════════════════════
 20   console.log('second hunk');
 21 - const anotherOld = 'test';
 21 + const anotherNew = 'test';
@@ -124,7 +112,7 @@ exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlterna
  2 - const oldVar = 1;
  2 + const newVar = 1;
  3   console.log('end of first hunk');
-═══════════════════════════════════════════════════════════════════════════════
+════════════════════════════════════════════════════════════════════════════════
 20   console.log('second hunk');
 21 - const anotherOld = 'test';
 21 + const anotherNew = 'test';
@@ -164,7 +152,7 @@ exports[`<OverflowProvider><DiffRenderer /></OverflowProvider> > with useAlterna
 " 1   context line 1
  2 - deleted line
  2 + added line
-═══════════════════════════════════════════════════════════════════════════════
+════════════════════════════════════════════════════════════════════════════════
 10   context line 10
 11   context line 11"
 `;

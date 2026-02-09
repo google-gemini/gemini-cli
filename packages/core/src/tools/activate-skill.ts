@@ -80,6 +80,10 @@ class ActivateSkillToolInvocation extends BaseToolInvocation<
       return false;
     }
 
+    if (skill.isBuiltin) {
+      return false;
+    }
+
     const folderStructure = await this.getOrFetchFolderStructure(
       skill.location,
     );

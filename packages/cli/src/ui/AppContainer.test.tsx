@@ -20,6 +20,7 @@ import { cleanup } from 'ink-testing-library';
 import { act, useContext, type ReactElement } from 'react';
 import { AppContainer } from './AppContainer.js';
 import { SettingsContext } from './contexts/SettingsContext.js';
+import { type TrackedToolCall } from './hooks/useReactToolScheduler.js';
 import {
   type Config,
   makeFakeConfig,
@@ -27,6 +28,7 @@ import {
   type UserFeedbackPayload,
   type ResumedSessionData,
   AuthType,
+  type AgentDefinition,
 } from '@google/gemini-cli-core';
 
 // Mock coreEvents
@@ -82,7 +84,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 import ansiEscapes from 'ansi-escapes';
-import type { LoadedSettings } from '../config/settings.js';
+import { type LoadedSettings, mergeSettings } from '../config/settings.js';
 import type { InitializationResult } from '../core/initializer.js';
 import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
@@ -136,7 +138,7 @@ vi.mock('./hooks/useLoadingIndicator.js');
 vi.mock('./hooks/useFolderTrust.js');
 vi.mock('./hooks/useIdeTrustListener.js');
 vi.mock('./hooks/useMessageQueue.js');
-vi.mock('./hooks/useAutoAcceptIndicator.js');
+vi.mock('./hooks/useApprovalModeIndicator.js');
 vi.mock('./hooks/useGitBranchName.js');
 vi.mock('./contexts/VimModeContext.js');
 vi.mock('./contexts/SessionContext.js');
@@ -144,6 +146,12 @@ vi.mock('./components/shared/text-buffer.js');
 vi.mock('./hooks/useLogger.js');
 vi.mock('./hooks/useInputHistoryStore.js');
 vi.mock('./hooks/useHookDisplayState.js');
+vi.mock('./hooks/useTerminalTheme.js', () => ({
+  useTerminalTheme: vi.fn(),
+}));
+
+import { useHookDisplayState } from './hooks/useHookDisplayState.js';
+import { useTerminalTheme } from './hooks/useTerminalTheme.js';
 
 // Mock external utilities
 vi.mock('../utils/events.js');
@@ -164,7 +172,7 @@ import { useVim } from './hooks/vim.js';
 import { useFolderTrust } from './hooks/useFolderTrust.js';
 import { useIdeTrustListener } from './hooks/useIdeTrustListener.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
-import { useAutoAcceptIndicator } from './hooks/useAutoAcceptIndicator.js';
+import { useApprovalModeIndicator } from './hooks/useApprovalModeIndicator.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
 import { useVimMode } from './contexts/VimModeContext.js';
 import { useSessionStats } from './contexts/SessionContext.js';
@@ -172,7 +180,6 @@ import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
-import { useHookDisplayState } from './hooks/useHookDisplayState.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { measureElement } from 'ink';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
@@ -183,6 +190,7 @@ import {
   disableMouseEvents,
 } from '@google/gemini-cli-core';
 import { type ExtensionManager } from '../config/extension-manager.js';
+import { WARNING_PROMPT_DURATION_MS } from './constants.js';
 
 describe('AppContainer State Management', () => {
   let mockConfig: Config;
@@ -236,7 +244,7 @@ describe('AppContainer State Management', () => {
   const mockedUseFolderTrust = useFolderTrust as Mock;
   const mockedUseIdeTrustListener = useIdeTrustListener as Mock;
   const mockedUseMessageQueue = useMessageQueue as Mock;
-  const mockedUseAutoAcceptIndicator = useAutoAcceptIndicator as Mock;
+  const mockedUseApprovalModeIndicator = useApprovalModeIndicator as Mock;
   const mockedUseGitBranchName = useGitBranchName as Mock;
   const mockedUseVimMode = useVimMode as Mock;
   const mockedUseSessionStats = useSessionStats as Mock;
@@ -246,24 +254,37 @@ describe('AppContainer State Management', () => {
   const mockedUseKeypress = useKeypress as Mock;
   const mockedUseInputHistoryStore = useInputHistoryStore as Mock;
   const mockedUseHookDisplayState = useHookDisplayState as Mock;
+  const mockedUseTerminalTheme = useTerminalTheme as Mock;
+
+  const DEFAULT_GEMINI_STREAM_MOCK = {
+    streamingState: 'idle',
+    submitQuery: vi.fn(),
+    initError: null,
+    pendingHistoryItems: [],
+    thought: null,
+    cancelOngoingRequest: vi.fn(),
+    handleApprovalModeChange: vi.fn(),
+    activePtyId: null,
+    loopDetectionConfirmationRequest: null,
+    backgroundShellCount: 0,
+    isBackgroundShellVisible: false,
+    toggleBackgroundShell: vi.fn(),
+    backgroundCurrentShell: vi.fn(),
+    backgroundShells: new Map(),
+    registerBackgroundShell: vi.fn(),
+    dismissBackgroundShell: vi.fn(),
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
 
+    mockIdeClient.getInstance.mockReturnValue(new Promise(() => {}));
+
     // Initialize mock stdout for terminal title tests
+
     mocks.mockStdout.write.mockClear();
 
-    // Mock computeWindowTitle function to centralize title logic testing
-    vi.mock('../utils/windowTitle.js', async () => ({
-      computeWindowTitle: vi.fn(
-        (folderName: string) =>
-          // Default behavior: return "Gemini - {folderName}" unless CLI_TITLE is set
-          process.env['CLI_TITLE'] || `Gemini - ${folderName}`,
-      ),
-    }));
-
     capturedUIState = null!;
-    capturedUIActions = null!;
 
     // **Provide a default return value for EVERY mocked hook.**
     mockedUseQuotaAndFallback.mockReturnValue({
@@ -318,14 +339,7 @@ describe('AppContainer State Management', () => {
       handleNewMessage: vi.fn(),
       clearConsoleMessages: vi.fn(),
     });
-    mockedUseGeminiStream.mockReturnValue({
-      streamingState: 'idle',
-      submitQuery: vi.fn(),
-      initError: null,
-      pendingHistoryItems: [],
-      thought: null,
-      cancelOngoingRequest: vi.fn(),
-    });
+    mockedUseGeminiStream.mockReturnValue(DEFAULT_GEMINI_STREAM_MOCK);
     mockedUseVim.mockReturnValue({ handleInput: vi.fn() });
     mockedUseFolderTrust.mockReturnValue({
       isFolderTrustDialogOpen: false,
@@ -342,7 +356,7 @@ describe('AppContainer State Management', () => {
       clearQueue: vi.fn(),
       getQueuedMessagesText: vi.fn().mockReturnValue(''),
     });
-    mockedUseAutoAcceptIndicator.mockReturnValue(false);
+    mockedUseApprovalModeIndicator.mockReturnValue(false);
     mockedUseGitBranchName.mockReturnValue('main');
     mockedUseVimMode.mockReturnValue({
       isVimEnabled: false,
@@ -352,7 +366,9 @@ describe('AppContainer State Management', () => {
     mockedUseTextBuffer.mockReturnValue({
       text: '',
       setText: vi.fn(),
-      // Add other properties if AppContainer uses them
+      lines: [''],
+      cursor: [0, 0],
+      handleInput: vi.fn().mockReturnValue(false),
     });
     mockedUseLogger.mockReturnValue({
       getPreviousUserMessages: vi.fn().mockResolvedValue([]),
@@ -367,6 +383,7 @@ describe('AppContainer State Management', () => {
       currentLoadingPhrase: '',
     });
     mockedUseHookDisplayState.mockReturnValue([]);
+    mockedUseTerminalTheme.mockReturnValue(undefined);
 
     // Mock Config
     mockConfig = makeFakeConfig();
@@ -387,14 +404,17 @@ describe('AppContainer State Management', () => {
     );
 
     // Mock LoadedSettings
+    const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
     mockSettings = {
       merged: {
+        ...defaultMergedSettings,
         hideBanner: false,
         hideFooter: false,
         hideTips: false,
         showMemoryUsage: false,
         theme: 'default',
         ui: {
+          ...defaultMergedSettings.ui,
           showStatusInTitle: false,
           hideWindowTitle: false,
         },
@@ -413,6 +433,7 @@ describe('AppContainer State Management', () => {
 
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
   });
 
   describe('Basic Rendering', () => {
@@ -513,8 +534,10 @@ describe('AppContainer State Management', () => {
 
   describe('Settings Integration', () => {
     it('handles settings with all display options disabled', async () => {
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const settingsAllHidden = {
         merged: {
+          ...defaultMergedSettings,
           hideBanner: true,
           hideFooter: true,
           hideTips: true,
@@ -532,8 +555,10 @@ describe('AppContainer State Management', () => {
     });
 
     it('handles settings with memory usage enabled', async () => {
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const settingsWithMemory = {
         merged: {
+          ...defaultMergedSettings,
           hideBanner: false,
           hideFooter: false,
           hideTips: false,
@@ -580,7 +605,7 @@ describe('AppContainer State Management', () => {
 
     it('handles undefined settings gracefully', async () => {
       const undefinedSettings = {
-        merged: {},
+        merged: mergeSettings({}, {}, {}, {}, true),
       } as LoadedSettings;
 
       let unmount: () => void;
@@ -995,42 +1020,92 @@ describe('AppContainer State Management', () => {
       expect(stdout).toBe(mocks.mockStdout);
     });
 
-    it('should not update terminal title when showStatusInTitle is false', () => {
+    it('should update terminal title with Working… when showStatusInTitle is false', () => {
       // Arrange: Set up mock settings with showStatusInTitle disabled
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const mockSettingsWithShowStatusFalse = {
         ...mockSettings,
         merged: {
-          ...mockSettings.merged,
+          ...defaultMergedSettings,
           ui: {
-            ...mockSettings.merged.ui,
+            ...defaultMergedSettings.ui,
             showStatusInTitle: false,
             hideWindowTitle: false,
           },
         },
       } as unknown as LoadedSettings;
 
+      // Mock the streaming state as Active
+      mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        streamingState: 'responding',
+        thought: { subject: 'Some thought' },
+      });
+
       // Act: Render the container
       const { unmount } = renderAppContainer({
         settings: mockSettingsWithShowStatusFalse,
       });
 
-      // Assert: Check that no title-related writes occurred
+      // Assert: Check that title was updated with "Working…"
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
-        call[0].includes('\x1b]2;'),
+        call[0].includes('\x1b]0;'),
       );
 
-      expect(titleWrites).toHaveLength(0);
+      expect(titleWrites).toHaveLength(1);
+      expect(titleWrites[0][0]).toBe(
+        `\x1b]0;${'✦  Working… (workspace)'.padEnd(80, ' ')}\x07`,
+      );
       unmount();
     });
 
-    it('should not update terminal title when hideWindowTitle is true', () => {
-      // Arrange: Set up mock settings with hideWindowTitle enabled
-      const mockSettingsWithHideTitleTrue = {
+    it('should use legacy terminal title when dynamicWindowTitle is false', () => {
+      // Arrange: Set up mock settings with dynamicWindowTitle disabled
+      const mockSettingsWithDynamicTitleFalse = {
         ...mockSettings,
         merged: {
           ...mockSettings.merged,
           ui: {
             ...mockSettings.merged.ui,
+            dynamicWindowTitle: false,
+            hideWindowTitle: false,
+          },
+        },
+      } as unknown as LoadedSettings;
+
+      // Mock the streaming state
+      mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        streamingState: 'responding',
+        thought: { subject: 'Some thought' },
+      });
+
+      // Act: Render the container
+      const { unmount } = renderAppContainer({
+        settings: mockSettingsWithDynamicTitleFalse,
+      });
+
+      // Assert: Check that legacy title was used
+      const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
+        call[0].includes('\x1b]0;'),
+      );
+
+      expect(titleWrites).toHaveLength(1);
+      expect(titleWrites[0][0]).toBe(
+        `\x1b]0;${'Gemini CLI (workspace)'.padEnd(80, ' ')}\x07`,
+      );
+      unmount();
+    });
+
+    it('should not update terminal title when hideWindowTitle is true', () => {
+      // Arrange: Set up mock settings with hideWindowTitle enabled
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+      const mockSettingsWithHideTitleTrue = {
+        ...mockSettings,
+        merged: {
+          ...defaultMergedSettings,
+          ui: {
+            ...defaultMergedSettings.ui,
             showStatusInTitle: true,
             hideWindowTitle: true,
           },
@@ -1044,7 +1119,7 @@ describe('AppContainer State Management', () => {
 
       // Assert: Check that no title-related writes occurred
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
-        call[0].includes('\x1b]2;'),
+        call[0].includes('\x1b]0;'),
       );
 
       expect(titleWrites).toHaveLength(0);
@@ -1053,12 +1128,13 @@ describe('AppContainer State Management', () => {
 
     it('should update terminal title with thought subject when in active state', () => {
       // Arrange: Set up mock settings with showStatusInTitle enabled
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const mockSettingsWithTitleEnabled = {
         ...mockSettings,
         merged: {
-          ...mockSettings.merged,
+          ...defaultMergedSettings,
           ui: {
-            ...mockSettings.merged.ui,
+            ...defaultMergedSettings.ui,
             showStatusInTitle: true,
             hideWindowTitle: false,
           },
@@ -1068,12 +1144,9 @@ describe('AppContainer State Management', () => {
       // Mock the streaming state and thought
       const thoughtSubject = 'Processing request';
       mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
         streamingState: 'responding',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
         thought: { subject: thoughtSubject },
-        cancelOngoingRequest: vi.fn(),
       });
 
       // Act: Render the container
@@ -1081,26 +1154,27 @@ describe('AppContainer State Management', () => {
         settings: mockSettingsWithTitleEnabled,
       });
 
-      // Assert: Check that title was updated with thought subject
+      // Assert: Check that title was updated with thought subject and suffix
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
-        call[0].includes('\x1b]2;'),
+        call[0].includes('\x1b]0;'),
       );
 
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
-        `\x1b]2;${thoughtSubject.padEnd(80, ' ')}\x07`,
+        `\x1b]0;${`✦  ${thoughtSubject} (workspace)`.padEnd(80, ' ')}\x07`,
       );
       unmount();
     });
 
     it('should update terminal title with default text when in Idle state and no thought subject', () => {
       // Arrange: Set up mock settings with showStatusInTitle enabled
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const mockSettingsWithTitleEnabled = {
         ...mockSettings,
         merged: {
-          ...mockSettings.merged,
+          ...defaultMergedSettings,
           ui: {
-            ...mockSettings.merged.ui,
+            ...defaultMergedSettings.ui,
             showStatusInTitle: true,
             hideWindowTitle: false,
           },
@@ -1108,14 +1182,7 @@ describe('AppContainer State Management', () => {
       } as unknown as LoadedSettings;
 
       // Mock the streaming state as Idle with no thought
-      mockedUseGeminiStream.mockReturnValue({
-        streamingState: 'idle',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
-        thought: null,
-        cancelOngoingRequest: vi.fn(),
-      });
+      mockedUseGeminiStream.mockReturnValue(DEFAULT_GEMINI_STREAM_MOCK);
 
       // Act: Render the container
       const { unmount } = renderAppContainer({
@@ -1124,24 +1191,25 @@ describe('AppContainer State Management', () => {
 
       // Assert: Check that title was updated with default Idle text
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
-        call[0].includes('\x1b]2;'),
+        call[0].includes('\x1b]0;'),
       );
 
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
-        `\x1b]2;${'Gemini - workspace'.padEnd(80, ' ')}\x07`,
+        `\x1b]0;${'◇  Ready (workspace)'.padEnd(80, ' ')}\x07`,
       );
       unmount();
     });
 
-    it('should update terminal title when in WaitingForConfirmation state with thought subject', () => {
+    it('should update terminal title when in WaitingForConfirmation state with thought subject', async () => {
       // Arrange: Set up mock settings with showStatusInTitle enabled
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const mockSettingsWithTitleEnabled = {
         ...mockSettings,
         merged: {
-          ...mockSettings.merged,
+          ...defaultMergedSettings,
           ui: {
-            ...mockSettings.merged.ui,
+            ...defaultMergedSettings.ui,
             showStatusInTitle: true,
             hideWindowTitle: false,
           },
@@ -1151,39 +1219,316 @@ describe('AppContainer State Management', () => {
       // Mock the streaming state and thought
       const thoughtSubject = 'Confirm tool execution';
       mockedUseGeminiStream.mockReturnValue({
-        streamingState: 'waitingForConfirmation',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        streamingState: 'waiting_for_confirmation',
         thought: { subject: thoughtSubject },
-        cancelOngoingRequest: vi.fn(),
       });
 
       // Act: Render the container
-      const { unmount } = renderAppContainer({
-        settings: mockSettingsWithTitleEnabled,
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({
+          settings: mockSettingsWithTitleEnabled,
+        });
+        unmount = result.unmount;
       });
 
       // Assert: Check that title was updated with confirmation text
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
-        call[0].includes('\x1b]2;'),
+        call[0].includes('\x1b]0;'),
       );
 
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
-        `\x1b]2;${thoughtSubject.padEnd(80, ' ')}\x07`,
+        `\x1b]0;${'✋  Action Required (workspace)'.padEnd(80, ' ')}\x07`,
       );
-      unmount();
+      unmount!();
+    });
+
+    describe('Shell Focus Action Required', () => {
+      beforeEach(() => {
+        vi.useFakeTimers();
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it('should show Action Required in title after a delay when shell is awaiting focus', async () => {
+        const startTime = 1000000;
+        vi.setSystemTime(startTime);
+
+        // Arrange: Set up mock settings with showStatusInTitle enabled
+        const mockSettingsWithTitleEnabled = {
+          ...mockSettings,
+          merged: {
+            ...mockSettings.merged,
+            ui: {
+              ...mockSettings.merged.ui,
+              showStatusInTitle: true,
+              hideWindowTitle: false,
+            },
+          },
+        } as unknown as LoadedSettings;
+
+        // Mock an active shell pty but not focused
+        mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
+          streamingState: 'responding',
+          thought: { subject: 'Executing shell command' },
+          pendingToolCalls: [],
+          activePtyId: 'pty-1',
+          lastOutputTime: startTime + 100, // Trigger aggressive delay
+          retryStatus: null,
+        });
+
+        vi.spyOn(mockConfig, 'isInteractive').mockReturnValue(true);
+        vi.spyOn(mockConfig, 'isInteractiveShellEnabled').mockReturnValue(true);
+
+        // Act: Render the container (embeddedShellFocused is false by default in state)
+        const { unmount } = renderAppContainer({
+          settings: mockSettingsWithTitleEnabled,
+        });
+
+        // Initially it should show the working status
+        const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
+          call[0].includes('\x1b]0;'),
+        );
+        expect(titleWrites[titleWrites.length - 1][0]).toContain(
+          '✦  Executing shell command',
+        );
+
+        // Fast-forward time by 40 seconds
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(40000);
+        });
+
+        // Now it should show Action Required
+        const titleWritesDelayed = mocks.mockStdout.write.mock.calls.filter(
+          (call) => call[0].includes('\x1b]0;'),
+        );
+        const lastTitle = titleWritesDelayed[titleWritesDelayed.length - 1][0];
+        expect(lastTitle).toContain('✋  Action Required');
+
+        unmount();
+      });
+
+      it('should show Working… in title for redirected commands after 2 mins', async () => {
+        const startTime = 1000000;
+        vi.setSystemTime(startTime);
+
+        // Arrange: Set up mock settings with showStatusInTitle enabled
+        const mockSettingsWithTitleEnabled = {
+          ...mockSettings,
+          merged: {
+            ...mockSettings.merged,
+            ui: {
+              ...mockSettings.merged.ui,
+              showStatusInTitle: true,
+              hideWindowTitle: false,
+            },
+          },
+        } as unknown as LoadedSettings;
+
+        // Mock an active shell pty with redirection active
+        mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
+          streamingState: 'responding',
+          thought: { subject: 'Executing shell command' },
+          pendingToolCalls: [
+            {
+              request: {
+                name: 'run_shell_command',
+                args: { command: 'ls > out' },
+              },
+              status: 'executing',
+            } as unknown as TrackedToolCall,
+          ],
+          activePtyId: 'pty-1',
+          lastOutputTime: startTime,
+          retryStatus: null,
+        });
+
+        vi.spyOn(mockConfig, 'isInteractive').mockReturnValue(true);
+        vi.spyOn(mockConfig, 'isInteractiveShellEnabled').mockReturnValue(true);
+
+        const { unmount } = renderAppContainer({
+          settings: mockSettingsWithTitleEnabled,
+        });
+
+        // Fast-forward time by 65 seconds - should still NOT be Action Required
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(65000);
+        });
+
+        const titleWritesMid = mocks.mockStdout.write.mock.calls.filter(
+          (call) => call[0].includes('\x1b]0;'),
+        );
+        expect(titleWritesMid[titleWritesMid.length - 1][0]).not.toContain(
+          '✋  Action Required',
+        );
+
+        // Fast-forward to 2 minutes (120000ms)
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(60000);
+        });
+
+        const titleWritesEnd = mocks.mockStdout.write.mock.calls.filter(
+          (call) => call[0].includes('\x1b]0;'),
+        );
+        expect(titleWritesEnd[titleWritesEnd.length - 1][0]).toContain(
+          '⏲  Working…',
+        );
+
+        unmount();
+      });
+
+      it('should show Working… in title for silent non-redirected commands after 1 min', async () => {
+        const startTime = 1000000;
+        vi.setSystemTime(startTime);
+
+        // Arrange: Set up mock settings with showStatusInTitle enabled
+        const mockSettingsWithTitleEnabled = {
+          ...mockSettings,
+          merged: {
+            ...mockSettings.merged,
+            ui: {
+              ...mockSettings.merged.ui,
+              showStatusInTitle: true,
+              hideWindowTitle: false,
+            },
+          },
+        } as unknown as LoadedSettings;
+
+        // Mock an active shell pty with NO output since operation started (silent)
+        mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
+          streamingState: 'responding',
+          thought: { subject: 'Executing shell command' },
+          pendingToolCalls: [],
+          activePtyId: 'pty-1',
+          lastOutputTime: startTime, // lastOutputTime <= operationStartTime
+          retryStatus: null,
+        });
+
+        vi.spyOn(mockConfig, 'isInteractive').mockReturnValue(true);
+        vi.spyOn(mockConfig, 'isInteractiveShellEnabled').mockReturnValue(true);
+
+        const { unmount } = renderAppContainer({
+          settings: mockSettingsWithTitleEnabled,
+        });
+
+        // Fast-forward time by 65 seconds
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(65000);
+        });
+
+        const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
+          call[0].includes('\x1b]0;'),
+        );
+        const lastTitle = titleWrites[titleWrites.length - 1][0];
+        // Should show Working… (⏲) instead of Action Required (✋)
+        expect(lastTitle).toContain('⏲  Working…');
+
+        unmount();
+      });
+
+      it('should NOT show Action Required in title if shell is streaming output', async () => {
+        const startTime = 1000000;
+        vi.setSystemTime(startTime);
+
+        // Arrange: Set up mock settings with showStatusInTitle enabled
+        const mockSettingsWithTitleEnabled = {
+          ...mockSettings,
+          merged: {
+            ...mockSettings.merged,
+            ui: {
+              ...mockSettings.merged.ui,
+              showStatusInTitle: true,
+              hideWindowTitle: false,
+            },
+          },
+        } as unknown as LoadedSettings;
+
+        // Mock an active shell pty but not focused
+        let lastOutputTime = startTime + 1000;
+        mockedUseGeminiStream.mockImplementation(() => ({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
+          streamingState: 'responding',
+          thought: { subject: 'Executing shell command' },
+          activePtyId: 'pty-1',
+          lastOutputTime,
+        }));
+
+        vi.spyOn(mockConfig, 'isInteractive').mockReturnValue(true);
+        vi.spyOn(mockConfig, 'isInteractiveShellEnabled').mockReturnValue(true);
+
+        // Act: Render the container
+        const { unmount, rerender } = renderAppContainer({
+          settings: mockSettingsWithTitleEnabled,
+        });
+
+        // Fast-forward time by 20 seconds
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(20000);
+        });
+
+        // Update lastOutputTime to simulate new output
+        lastOutputTime = startTime + 21000;
+        mockedUseGeminiStream.mockImplementation(() => ({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
+          streamingState: 'responding',
+          thought: { subject: 'Executing shell command' },
+          activePtyId: 'pty-1',
+          lastOutputTime,
+        }));
+
+        // Rerender to propagate the new lastOutputTime
+        await act(async () => {
+          rerender(getAppContainer({ settings: mockSettingsWithTitleEnabled }));
+        });
+
+        // Fast-forward time by another 20 seconds
+        // Total time elapsed: 40s.
+        // Time since last output: 20s.
+        // It should NOT show Action Required yet.
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(20000);
+        });
+
+        const titleWritesAfterOutput = mocks.mockStdout.write.mock.calls.filter(
+          (call) => call[0].includes('\x1b]0;'),
+        );
+        const lastTitle =
+          titleWritesAfterOutput[titleWritesAfterOutput.length - 1][0];
+        expect(lastTitle).not.toContain('✋  Action Required');
+        expect(lastTitle).toContain('✦  Executing shell command');
+
+        // Fast-forward another 40 seconds (Total 60s since last output)
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(40000);
+        });
+
+        // Now it SHOULD show Action Required
+        const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
+          call[0].includes('\x1b]0;'),
+        );
+        const lastTitleFinal = titleWrites[titleWrites.length - 1][0];
+        expect(lastTitleFinal).toContain('✋  Action Required');
+
+        unmount();
+      });
     });
 
     it('should pad title to exactly 80 characters', () => {
       // Arrange: Set up mock settings with showStatusInTitle enabled
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const mockSettingsWithTitleEnabled = {
         ...mockSettings,
         merged: {
-          ...mockSettings.merged,
+          ...defaultMergedSettings,
           ui: {
-            ...mockSettings.merged.ui,
+            ...defaultMergedSettings.ui,
             showStatusInTitle: true,
             hideWindowTitle: false,
           },
@@ -1193,12 +1538,9 @@ describe('AppContainer State Management', () => {
       // Mock the streaming state and thought with a short subject
       const shortTitle = 'Short';
       mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
         streamingState: 'responding',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
         thought: { subject: shortTitle },
-        cancelOngoingRequest: vi.fn(),
       });
 
       // Act: Render the container
@@ -1208,28 +1550,26 @@ describe('AppContainer State Management', () => {
 
       // Assert: Check that title is padded to exactly 80 characters
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
-        call[0].includes('\x1b]2;'),
+        call[0].includes('\x1b]0;'),
       );
 
       expect(titleWrites).toHaveLength(1);
       const calledWith = titleWrites[0][0];
-      const expectedTitle = shortTitle.padEnd(80, ' ');
-
-      expect(calledWith).toContain(shortTitle);
-      expect(calledWith).toContain('\x1b]2;');
-      expect(calledWith).toContain('\x07');
-      expect(calledWith).toBe('\x1b]2;' + expectedTitle + '\x07');
+      const expectedTitle = `✦  ${shortTitle} (workspace)`.padEnd(80, ' ');
+      const expectedEscapeSequence = `\x1b]0;${expectedTitle}\x07`;
+      expect(calledWith).toBe(expectedEscapeSequence);
       unmount();
     });
 
     it('should use correct ANSI escape code format', () => {
       // Arrange: Set up mock settings with showStatusInTitle enabled
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const mockSettingsWithTitleEnabled = {
         ...mockSettings,
         merged: {
-          ...mockSettings.merged,
+          ...defaultMergedSettings,
           ui: {
-            ...mockSettings.merged.ui,
+            ...defaultMergedSettings.ui,
             showStatusInTitle: true,
             hideWindowTitle: false,
           },
@@ -1239,12 +1579,9 @@ describe('AppContainer State Management', () => {
       // Mock the streaming state and thought
       const title = 'Test Title';
       mockedUseGeminiStream.mockReturnValue({
+        ...DEFAULT_GEMINI_STREAM_MOCK,
         streamingState: 'responding',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
         thought: { subject: title },
-        cancelOngoingRequest: vi.fn(),
       });
 
       // Act: Render the container
@@ -1254,24 +1591,24 @@ describe('AppContainer State Management', () => {
 
       // Assert: Check that the correct ANSI escape sequence is used
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
-        call[0].includes('\x1b]2;'),
+        call[0].includes('\x1b]0;'),
       );
 
       expect(titleWrites).toHaveLength(1);
-      const expectedEscapeSequence = `\x1b]2;${title.padEnd(80, ' ')}\x07`;
+      const expectedEscapeSequence = `\x1b]0;${`✦  ${title} (workspace)`.padEnd(80, ' ')}\x07`;
       expect(titleWrites[0][0]).toBe(expectedEscapeSequence);
       unmount();
     });
 
     it('should use CLI_TITLE environment variable when set', () => {
-      // Arrange: Set up mock settings with showStatusInTitle enabled
-      const mockSettingsWithTitleEnabled = {
+      // Arrange: Set up mock settings with showStatusInTitle disabled (so it shows suffix)
+      const mockSettingsWithTitleDisabled = {
         ...mockSettings,
         merged: {
           ...mockSettings.merged,
           ui: {
             ...mockSettings.merged.ui,
-            showStatusInTitle: true,
+            showStatusInTitle: false,
             hideWindowTitle: false,
           },
         },
@@ -1280,29 +1617,25 @@ describe('AppContainer State Management', () => {
       // Mock CLI_TITLE environment variable
       vi.stubEnv('CLI_TITLE', 'Custom Gemini Title');
 
-      // Mock the streaming state as Idle with no thought
+      // Mock the streaming state
       mockedUseGeminiStream.mockReturnValue({
-        streamingState: 'idle',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
-        thought: null,
-        cancelOngoingRequest: vi.fn(),
+        ...DEFAULT_GEMINI_STREAM_MOCK,
+        streamingState: 'responding',
       });
 
       // Act: Render the container
       const { unmount } = renderAppContainer({
-        settings: mockSettingsWithTitleEnabled,
+        settings: mockSettingsWithTitleDisabled,
       });
 
       // Assert: Check that title was updated with CLI_TITLE value
       const titleWrites = mocks.mockStdout.write.mock.calls.filter((call) =>
-        call[0].includes('\x1b]2;'),
+        call[0].includes('\x1b]0;'),
       );
 
       expect(titleWrites).toHaveLength(1);
       expect(titleWrites[0][0]).toBe(
-        `\x1b]2;${'Custom Gemini Title'.padEnd(80, ' ')}\x07`,
+        `\x1b]0;${'✦  Working… (Custom Gemini Title)'.padEnd(80, ' ')}\x07`,
       );
       unmount();
     });
@@ -1315,6 +1648,7 @@ describe('AppContainer State Management', () => {
 
     afterEach(() => {
       vi.useRealTimers();
+      vi.restoreAllMocks();
     });
 
     it('should set and clear the queue error message after a timeout', async () => {
@@ -1388,12 +1722,7 @@ describe('AppContainer State Management', () => {
       mockedMeasureElement.mockReturnValue({ width: 80, height: 10 }); // Footer is taller than the screen
 
       mockedUseGeminiStream.mockReturnValue({
-        streamingState: 'idle',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
-        thought: null,
-        cancelOngoingRequest: vi.fn(),
+        ...DEFAULT_GEMINI_STREAM_MOCK,
         activePtyId: 'some-id',
       });
 
@@ -1412,7 +1741,7 @@ describe('AppContainer State Management', () => {
   });
 
   describe('Keyboard Input Handling (CTRL+C / CTRL+D)', () => {
-    let handleGlobalKeypress: (key: Key) => void;
+    let handleGlobalKeypress: (key: Key) => boolean;
     let mockHandleSlashCommand: Mock;
     let mockCancelOngoingRequest: Mock;
     let rerender: () => void;
@@ -1434,9 +1763,10 @@ describe('AppContainer State Management', () => {
         act(() => {
           handleGlobalKeypress({
             name: 'c',
-            ctrl: false,
-            meta: false,
             shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
             ...key,
           } as Key);
         });
@@ -1446,9 +1776,11 @@ describe('AppContainer State Management', () => {
 
     beforeEach(() => {
       // Capture the keypress handler from the AppContainer
-      mockedUseKeypress.mockImplementation((callback: (key: Key) => void) => {
-        handleGlobalKeypress = callback;
-      });
+      mockedUseKeypress.mockImplementation(
+        (callback: (key: Key) => boolean) => {
+          handleGlobalKeypress = callback;
+        },
+      );
 
       // Mock slash command handler
       mockHandleSlashCommand = vi.fn();
@@ -1464,11 +1796,7 @@ describe('AppContainer State Management', () => {
       // Mock request cancellation
       mockCancelOngoingRequest = vi.fn();
       mockedUseGeminiStream.mockReturnValue({
-        streamingState: 'idle',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
-        thought: null,
+        ...DEFAULT_GEMINI_STREAM_MOCK,
         cancelOngoingRequest: mockCancelOngoingRequest,
       });
 
@@ -1476,6 +1804,9 @@ describe('AppContainer State Management', () => {
       mockedUseTextBuffer.mockReturnValue({
         text: '',
         setText: vi.fn(),
+        lines: [''],
+        cursor: [0, 0],
+        handleInput: vi.fn().mockReturnValue(false),
       });
 
       vi.useFakeTimers();
@@ -1483,16 +1814,14 @@ describe('AppContainer State Management', () => {
 
     afterEach(() => {
       vi.useRealTimers();
+      vi.restoreAllMocks();
     });
 
     describe('CTRL+C', () => {
       it('should cancel ongoing request on first press', async () => {
         mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
           streamingState: 'responding',
-          submitQuery: vi.fn(),
-          initError: null,
-          pendingHistoryItems: [],
-          thought: null,
           cancelOngoingRequest: mockCancelOngoingRequest,
         });
         await setupKeypressTest();
@@ -1527,7 +1856,7 @@ describe('AppContainer State Management', () => {
 
         // Advance timer past the reset threshold
         act(() => {
-          vi.advanceTimersByTime(1001);
+          vi.advanceTimersByTime(WARNING_PROMPT_DURATION_MS + 1);
         });
 
         pressKey({ name: 'c', ctrl: true });
@@ -1537,24 +1866,55 @@ describe('AppContainer State Management', () => {
     });
 
     describe('CTRL+D', () => {
-      it('should do nothing if text buffer is not empty', async () => {
-        mockedUseTextBuffer.mockReturnValue({
-          text: 'some text',
-          setText: vi.fn(),
-        });
-        await setupKeypressTest();
-
-        pressKey({ name: 'd', ctrl: true }, 2);
-
-        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
-        unmount();
-      });
-
       it('should quit on second press if buffer is empty', async () => {
         await setupKeypressTest();
 
         pressKey({ name: 'd', ctrl: true }, 2);
 
+        expect(mockHandleSlashCommand).toHaveBeenCalledWith(
+          '/quit',
+          undefined,
+          undefined,
+          false,
+        );
+        unmount();
+      });
+
+      it('should NOT quit if buffer is not empty (bubbles from InputPrompt)', async () => {
+        mockedUseTextBuffer.mockReturnValue({
+          text: 'some text',
+          setText: vi.fn(),
+          lines: ['some text'],
+          cursor: [0, 9], // At the end
+          handleInput: vi.fn().mockReturnValue(false),
+        });
+        await setupKeypressTest();
+
+        // Capture return value
+        let result = true;
+        const originalPressKey = (key: Partial<Key>) => {
+          act(() => {
+            result = handleGlobalKeypress({
+              name: 'd',
+              shift: false,
+              alt: false,
+              ctrl: true,
+              cmd: false,
+              ...key,
+            } as Key);
+          });
+          rerender();
+        };
+
+        originalPressKey({ name: 'd', ctrl: true });
+
+        // AppContainer's handler should return true if it reaches it
+        expect(result).toBe(true);
+        // But it should only be called once, so count is 1, not quitting yet.
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+
+        originalPressKey({ name: 'd', ctrl: true });
+        // Now count is 2, it should quit.
         expect(mockHandleSlashCommand).toHaveBeenCalledWith(
           '/quit',
           undefined,
@@ -1572,7 +1932,7 @@ describe('AppContainer State Management', () => {
 
         // Advance timer past the reset threshold
         act(() => {
-          vi.advanceTimersByTime(1001);
+          vi.advanceTimersByTime(WARNING_PROMPT_DURATION_MS + 1);
         });
 
         pressKey({ name: 'd', ctrl: true });
@@ -1580,21 +1940,176 @@ describe('AppContainer State Management', () => {
         unmount();
       });
     });
+
+    describe('Focus Handling (Tab / Shift+Tab)', () => {
+      beforeEach(() => {
+        // Mock activePtyId to enable focus
+        mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
+          activePtyId: 1,
+        });
+      });
+
+      it('should focus shell input on Tab', async () => {
+        await setupKeypressTest();
+
+        pressKey({ name: 'tab', shift: false });
+
+        expect(capturedUIState.embeddedShellFocused).toBe(true);
+        unmount();
+      });
+
+      it('should unfocus shell input on Shift+Tab', async () => {
+        await setupKeypressTest();
+
+        // Focus first
+        pressKey({ name: 'tab', shift: false });
+        expect(capturedUIState.embeddedShellFocused).toBe(true);
+
+        // Unfocus via Shift+Tab
+        pressKey({ name: 'tab', shift: true });
+        expect(capturedUIState.embeddedShellFocused).toBe(false);
+        unmount();
+      });
+
+      it('should auto-unfocus when activePtyId becomes null', async () => {
+        // Start with active pty and focused
+        mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
+          activePtyId: 1,
+        });
+
+        const renderResult = render(getAppContainer());
+        await act(async () => {
+          vi.advanceTimersByTime(0);
+        });
+
+        // Focus it
+        act(() => {
+          handleGlobalKeypress({
+            name: 'tab',
+            shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
+          } as Key);
+        });
+        expect(capturedUIState.embeddedShellFocused).toBe(true);
+
+        // Now mock activePtyId becoming null
+        mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
+          activePtyId: null,
+        });
+
+        // Rerender to trigger useEffect
+        await act(async () => {
+          renderResult.rerender(getAppContainer());
+        });
+
+        expect(capturedUIState.embeddedShellFocused).toBe(false);
+        renderResult.unmount();
+      });
+
+      it('should focus background shell on Tab when already visible (not toggle it off)', async () => {
+        const mockToggleBackgroundShell = vi.fn();
+        mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
+          activePtyId: null,
+          isBackgroundShellVisible: true,
+          backgroundShells: new Map([[123, { pid: 123, status: 'running' }]]),
+          toggleBackgroundShell: mockToggleBackgroundShell,
+        });
+
+        await setupKeypressTest();
+
+        // Initially not focused
+        expect(capturedUIState.embeddedShellFocused).toBe(false);
+
+        // Press Tab
+        pressKey({ name: 'tab', shift: false });
+
+        // Should be focused
+        expect(capturedUIState.embeddedShellFocused).toBe(true);
+        // Should NOT have toggled (closed) the shell
+        expect(mockToggleBackgroundShell).not.toHaveBeenCalled();
+
+        unmount();
+      });
+    });
+
+    describe('Background Shell Toggling (CTRL+B)', () => {
+      it('should toggle background shell on Ctrl+B even if visible but not focused', async () => {
+        const mockToggleBackgroundShell = vi.fn();
+        mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
+          activePtyId: null,
+          isBackgroundShellVisible: true,
+          backgroundShells: new Map([[123, { pid: 123, status: 'running' }]]),
+          toggleBackgroundShell: mockToggleBackgroundShell,
+        });
+
+        await setupKeypressTest();
+
+        // Initially not focused, but visible
+        expect(capturedUIState.embeddedShellFocused).toBe(false);
+
+        // Press Ctrl+B
+        pressKey({ name: 'b', ctrl: true });
+
+        // Should have toggled (closed) the shell
+        expect(mockToggleBackgroundShell).toHaveBeenCalled();
+        // Should be unfocused
+        expect(capturedUIState.embeddedShellFocused).toBe(false);
+
+        unmount();
+      });
+
+      it('should show and focus background shell on Ctrl+B if hidden', async () => {
+        const mockToggleBackgroundShell = vi.fn();
+        const geminiStreamMock = {
+          ...DEFAULT_GEMINI_STREAM_MOCK,
+          activePtyId: null,
+          isBackgroundShellVisible: false,
+          backgroundShells: new Map([[123, { pid: 123, status: 'running' }]]),
+          toggleBackgroundShell: mockToggleBackgroundShell,
+        };
+        mockedUseGeminiStream.mockReturnValue(geminiStreamMock);
+
+        await setupKeypressTest();
+
+        // Update the mock state when toggled to simulate real behavior
+        mockToggleBackgroundShell.mockImplementation(() => {
+          geminiStreamMock.isBackgroundShellVisible = true;
+        });
+
+        // Press Ctrl+B
+        pressKey({ name: 'b', ctrl: true });
+
+        // Should have toggled (shown) the shell
+        expect(mockToggleBackgroundShell).toHaveBeenCalled();
+        // Should be focused
+        expect(capturedUIState.embeddedShellFocused).toBe(true);
+
+        unmount();
+      });
+    });
   });
 
   describe('Copy Mode (CTRL+S)', () => {
-    let handleGlobalKeypress: (key: Key) => void;
+    let handleGlobalKeypress: (key: Key) => boolean;
     let rerender: () => void;
     let unmount: () => void;
 
     const setupCopyModeTest = async (isAlternateMode = false) => {
       // Update settings for this test run
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
       const testSettings = {
         ...mockSettings,
         merged: {
-          ...mockSettings.merged,
+          ...defaultMergedSettings,
           ui: {
-            ...mockSettings.merged.ui,
+            ...defaultMergedSettings.ui,
             useAlternateBuffer: isAlternateMode,
           },
         },
@@ -1612,14 +2127,17 @@ describe('AppContainer State Management', () => {
 
     beforeEach(() => {
       mocks.mockStdout.write.mockClear();
-      mockedUseKeypress.mockImplementation((callback: (key: Key) => void) => {
-        handleGlobalKeypress = callback;
-      });
+      mockedUseKeypress.mockImplementation(
+        (callback: (key: Key) => boolean) => {
+          handleGlobalKeypress = callback;
+        },
+      );
       vi.useFakeTimers();
     });
 
     afterEach(() => {
       vi.useRealTimers();
+      vi.restoreAllMocks();
     });
 
     describe.each([
@@ -1641,10 +2159,10 @@ describe('AppContainer State Management', () => {
         act(() => {
           handleGlobalKeypress({
             name: 's',
-            ctrl: true,
-            meta: false,
             shift: false,
-            paste: false,
+            alt: false,
+            ctrl: true,
+            cmd: false,
             insertable: false,
             sequence: '\x13',
           });
@@ -1668,10 +2186,10 @@ describe('AppContainer State Management', () => {
           act(() => {
             handleGlobalKeypress({
               name: 's',
-              ctrl: true,
-              meta: false,
               shift: false,
-              paste: false,
+              alt: false,
+              ctrl: true,
+              cmd: false,
               insertable: false,
               sequence: '\x13',
             });
@@ -1683,10 +2201,10 @@ describe('AppContainer State Management', () => {
           act(() => {
             handleGlobalKeypress({
               name: 'any', // Any key should exit copy mode
-              ctrl: false,
-              meta: false,
               shift: false,
-              paste: false,
+              alt: false,
+              ctrl: false,
+              cmd: false,
               insertable: true,
               sequence: 'a',
             });
@@ -1704,10 +2222,10 @@ describe('AppContainer State Management', () => {
           act(() => {
             handleGlobalKeypress({
               name: 's',
-              ctrl: true,
-              meta: false,
               shift: false,
-              paste: false,
+              alt: false,
+              ctrl: true,
+              cmd: false,
               insertable: false,
               sequence: '\x13',
             });
@@ -1720,10 +2238,10 @@ describe('AppContainer State Management', () => {
           act(() => {
             handleGlobalKeypress({
               name: 'a',
-              ctrl: false,
-              meta: false,
               shift: false,
-              paste: false,
+              alt: false,
+              ctrl: false,
+              cmd: false,
               insertable: true,
               sequence: 'a',
             });
@@ -1778,6 +2296,77 @@ describe('AppContainer State Management', () => {
         capturedUIActions.closeModelDialog();
       });
       expect(mockCloseModelDialog).toHaveBeenCalled();
+      unmount!();
+    });
+  });
+
+  describe('Agent Configuration Dialog Integration', () => {
+    it('should initialize with dialog closed and no agent selected', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      expect(capturedUIState.isAgentConfigDialogOpen).toBe(false);
+      expect(capturedUIState.selectedAgentName).toBeUndefined();
+      expect(capturedUIState.selectedAgentDisplayName).toBeUndefined();
+      expect(capturedUIState.selectedAgentDefinition).toBeUndefined();
+      unmount!();
+    });
+
+    it('should update state when openAgentConfigDialog is called', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      const agentDefinition = { name: 'test-agent' };
+      act(() => {
+        capturedUIActions.openAgentConfigDialog(
+          'test-agent',
+          'Test Agent',
+          agentDefinition as unknown as AgentDefinition,
+        );
+      });
+
+      expect(capturedUIState.isAgentConfigDialogOpen).toBe(true);
+      expect(capturedUIState.selectedAgentName).toBe('test-agent');
+      expect(capturedUIState.selectedAgentDisplayName).toBe('Test Agent');
+      expect(capturedUIState.selectedAgentDefinition).toEqual(agentDefinition);
+      unmount!();
+    });
+
+    it('should clear state when closeAgentConfigDialog is called', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      const agentDefinition = { name: 'test-agent' };
+      act(() => {
+        capturedUIActions.openAgentConfigDialog(
+          'test-agent',
+          'Test Agent',
+          agentDefinition as unknown as AgentDefinition,
+        );
+      });
+
+      expect(capturedUIState.isAgentConfigDialogOpen).toBe(true);
+
+      act(() => {
+        capturedUIActions.closeAgentConfigDialog();
+      });
+
+      expect(capturedUIState.isAgentConfigDialogOpen).toBe(false);
+      expect(capturedUIState.selectedAgentName).toBeUndefined();
+      expect(capturedUIState.selectedAgentDisplayName).toBeUndefined();
+      expect(capturedUIState.selectedAgentDefinition).toBeUndefined();
       unmount!();
     });
   });
@@ -1875,7 +2464,9 @@ describe('AppContainer State Management', () => {
       });
 
       // Assert: Verify model is updated
-      expect(capturedUIState.currentModel).toBe('new-model');
+      await waitFor(() => {
+        expect(capturedUIState.currentModel).toBe('new-model');
+      });
       unmount!();
     });
 
@@ -1893,6 +2484,59 @@ describe('AppContainer State Management', () => {
       expect(capturedUIState.activeHooks).toEqual(mockHooks);
       unmount!();
     });
+
+    it('handles consent request events', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      const handler = mockCoreEvents.on.mock.calls.find(
+        (call: unknown[]) => call[0] === CoreEvent.ConsentRequest,
+      )?.[1];
+      expect(handler).toBeDefined();
+
+      const onConfirm = vi.fn();
+      const payload = {
+        prompt: 'Do you consent?',
+        onConfirm,
+      };
+
+      act(() => {
+        handler(payload);
+      });
+
+      expect(capturedUIState.authConsentRequest).toBeDefined();
+      expect(capturedUIState.authConsentRequest?.prompt).toBe(
+        'Do you consent?',
+      );
+
+      act(() => {
+        capturedUIState.authConsentRequest?.onConfirm(true);
+      });
+
+      expect(onConfirm).toHaveBeenCalledWith(true);
+      expect(capturedUIState.authConsentRequest).toBeNull();
+      unmount!();
+    });
+
+    it('unsubscribes from ConsentRequest on unmount', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      unmount!();
+
+      expect(mockCoreEvents.off).toHaveBeenCalledWith(
+        CoreEvent.ConsentRequest,
+        expect.any(Function),
+      );
+    });
   });
 
   describe('Shell Interaction', () => {
@@ -1904,12 +2548,7 @@ describe('AppContainer State Management', () => {
         });
 
       mockedUseGeminiStream.mockReturnValue({
-        streamingState: 'idle',
-        submitQuery: vi.fn(),
-        initError: null,
-        pendingHistoryItems: [],
-        thought: null,
-        cancelOngoingRequest: vi.fn(),
+        ...DEFAULT_GEMINI_STREAM_MOCK,
         activePtyId: 'some-pty-id', // Make sure activePtyId is set
       });
 
@@ -2006,7 +2645,9 @@ describe('AppContainer State Management', () => {
         onCancelSubmit(true);
       });
 
-      expect(mockSetText).toHaveBeenCalledWith('previous message');
+      await waitFor(() => {
+        expect(mockSetText).toHaveBeenCalledWith('previous message');
+      });
 
       unmount!();
     });

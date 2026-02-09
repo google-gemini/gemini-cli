@@ -5,12 +5,21 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { PolicyDecision, ApprovalMode } from './types.js';
+import {
+  PolicyDecision,
+  ApprovalMode,
+  PRIORITY_SUBAGENT_TOOL,
+} from './types.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { loadPoliciesFromToml } from './toml-loader.js';
 import type { PolicyLoadResult } from './toml-loader.js';
+import { PolicyEngine } from './policy-engine.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 describe('policy-toml-loader', () => {
   let tempDir: string;
@@ -53,6 +62,7 @@ priority = 100
         toolName: 'glob',
         decision: PolicyDecision.ALLOW,
         priority: 1.1, // tier 1 + 100/1000
+        source: 'Default: test.toml',
       });
       expect(result.checkers).toHaveLength(0);
       expect(result.errors).toHaveLength(0);
@@ -165,7 +175,23 @@ allow_redirection = true
       expect(result.errors).toHaveLength(0);
     });
 
-    it('should NOT support modes property for Tier 2 and Tier 3 policies and report an error', async () => {
+    it('should parse deny_message property', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "rm"
+decision = "deny"
+priority = 100
+deny_message = "Deletion is permanent"
+`);
+
+      expect(result.rules).toHaveLength(1);
+      expect(result.rules[0].toolName).toBe('rm');
+      expect(result.rules[0].decision).toBe(PolicyDecision.DENY);
+      expect(result.rules[0].denyMessage).toBe('Deletion is permanent');
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('should support modes property for Tier 2 and Tier 3 policies', async () => {
       await fs.writeFile(
         path.join(tempDir, 'tier2.toml'),
         `
@@ -186,11 +212,9 @@ modes = ["autoEdit"]
 
       expect(result.rules).toHaveLength(1);
       expect(result.rules[0].toolName).toBe('tier2-tool');
-      expect(result.rules[0].modes).toBeUndefined();
-      expect(result.errors).toHaveLength(1);
-      expect(result.errors[0].message).toContain(
-        'Restricted property "modes" cannot be used in user tier policies',
-      );
+      expect(result.rules[0].modes).toEqual(['autoEdit']);
+      expect(result.rules[0].source).toBe('User: tier2.toml');
+      expect(result.errors).toHaveLength(0);
     });
 
     it('should handle TOML parse errors', async () => {
@@ -608,6 +632,63 @@ checker = { type = "in-process", name = "allowed-path" }
       );
       expect(error.suggestion).toBeDefined();
       expect(error.suggestion).toContain('Check regex syntax');
+    });
+  });
+
+  describe('Built-in Plan Mode Policy', () => {
+    it('should override default subagent rules when in Plan Mode', async () => {
+      const planTomlPath = path.resolve(__dirname, 'policies', 'plan.toml');
+      const fileContent = await fs.readFile(planTomlPath, 'utf-8');
+      const tempPolicyDir = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'plan-policy-test-'),
+      );
+      try {
+        await fs.writeFile(path.join(tempPolicyDir, 'plan.toml'), fileContent);
+        const getPolicyTier = () => 1; // Default tier
+
+        // 1. Load the actual Plan Mode policies
+        const result = await loadPoliciesFromToml(
+          [tempPolicyDir],
+          getPolicyTier,
+          ApprovalMode.DEFAULT,
+        );
+
+        // 2. Initialize Policy Engine with these rules
+        const engine = new PolicyEngine({
+          rules: result.rules,
+          approvalMode: ApprovalMode.PLAN,
+        });
+
+        // 3. Simulate a Subagent being registered (Dynamic Rule)
+        engine.addRule({
+          toolName: 'codebase_investigator',
+          decision: PolicyDecision.ALLOW,
+          priority: PRIORITY_SUBAGENT_TOOL,
+          source: 'AgentRegistry (Dynamic)',
+        });
+
+        // 4. Verify Behavior:
+        // The Plan Mode "Catch-All Deny" (from plan.toml) should override the Subagent Allow
+        const checkResult = await engine.check(
+          { name: 'codebase_investigator' },
+          undefined,
+        );
+
+        expect(
+          checkResult.decision,
+          'Subagent should be DENIED in Plan Mode',
+        ).toBe(PolicyDecision.DENY);
+
+        // 5. Verify Explicit Allows still work
+        // e.g. 'read_file' should be allowed because its priority in plan.toml (70) is higher than the deny (60)
+        const readResult = await engine.check({ name: 'read_file' }, undefined);
+        expect(
+          readResult.decision,
+          'Explicitly allowed tools (read_file) should be ALLOWED in Plan Mode',
+        ).toBe(PolicyDecision.ALLOW);
+      } finally {
+        await fs.rm(tempPolicyDir, { recursive: true, force: true });
+      }
     });
   });
 });

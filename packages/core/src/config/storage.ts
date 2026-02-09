@@ -9,14 +9,19 @@ import * as os from 'node:os';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import { GEMINI_DIR, homedir } from '../utils/paths.js';
+import { ProjectRegistry } from './projectRegistry.js';
+import { StorageMigration } from './storageMigration.js';
 
 export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
 export const OAUTH_FILE = 'oauth_creds.json';
 const TMP_DIR_NAME = 'tmp';
 const BIN_DIR_NAME = 'bin';
+const AGENTS_DIR_NAME = '.agents';
 
 export class Storage {
   private readonly targetDir: string;
+  private projectIdentifier: string | undefined;
+  private initPromise: Promise<void> | undefined;
 
   constructor(targetDir: string) {
     this.targetDir = targetDir;
@@ -28,6 +33,14 @@ export class Storage {
       return path.join(os.tmpdir(), GEMINI_DIR);
     }
     return path.join(homeDir, GEMINI_DIR);
+  }
+
+  static getGlobalAgentsDir(): string {
+    const homeDir = homedir();
+    if (!homeDir) {
+      return '';
+    }
+    return path.join(homeDir, AGENTS_DIR_NAME);
   }
 
   static getMcpOAuthTokensPath(): string {
@@ -54,6 +67,10 @@ export class Storage {
     return path.join(Storage.getGlobalGeminiDir(), 'skills');
   }
 
+  static getUserAgentSkillsDir(): string {
+    return path.join(Storage.getGlobalAgentsDir(), 'skills');
+  }
+
   static getGlobalMemoryFilePath(): string {
     return path.join(Storage.getGlobalGeminiDir(), 'memory.md');
   }
@@ -66,21 +83,33 @@ export class Storage {
     return path.join(Storage.getGlobalGeminiDir(), 'agents');
   }
 
+  static getAcknowledgedAgentsPath(): string {
+    return path.join(
+      Storage.getGlobalGeminiDir(),
+      'acknowledgments',
+      'agents.json',
+    );
+  }
+
+  private static getSystemConfigDir(): string {
+    if (os.platform() === 'darwin') {
+      return '/Library/Application Support/GeminiCli';
+    } else if (os.platform() === 'win32') {
+      return 'C:\\ProgramData\\gemini-cli';
+    } else {
+      return '/etc/gemini-cli';
+    }
+  }
+
   static getSystemSettingsPath(): string {
     if (process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH']) {
       return process.env['GEMINI_CLI_SYSTEM_SETTINGS_PATH'];
     }
-    if (os.platform() === 'darwin') {
-      return '/Library/Application Support/GeminiCli/settings.json';
-    } else if (os.platform() === 'win32') {
-      return 'C:\\ProgramData\\gemini-cli\\settings.json';
-    } else {
-      return '/etc/gemini-cli/settings.json';
-    }
+    return path.join(Storage.getSystemConfigDir(), 'settings.json');
   }
 
   static getSystemPoliciesDir(): string {
-    return path.join(path.dirname(Storage.getSystemSettingsPath()), 'policies');
+    return path.join(Storage.getSystemConfigDir(), 'policies');
   }
 
   static getGlobalTempDir(): string {
@@ -95,10 +124,14 @@ export class Storage {
     return path.join(this.targetDir, GEMINI_DIR);
   }
 
+  getAgentsDir(): string {
+    return path.join(this.targetDir, AGENTS_DIR_NAME);
+  }
+
   getProjectTempDir(): string {
-    const hash = this.getFilePathHash(this.getProjectRoot());
+    const identifier = this.getProjectIdentifier();
     const tempDir = Storage.getGlobalTempDir();
-    return path.join(tempDir, hash);
+    return path.join(tempDir, identifier);
   }
 
   ensureProjectTempDirExists(): void {
@@ -117,10 +150,67 @@ export class Storage {
     return crypto.createHash('sha256').update(filePath).digest('hex');
   }
 
-  getHistoryDir(): string {
-    const hash = this.getFilePathHash(this.getProjectRoot());
+  private getProjectIdentifier(): string {
+    if (!this.projectIdentifier) {
+      throw new Error('Storage must be initialized before use');
+    }
+    return this.projectIdentifier;
+  }
+
+  /**
+   * Initializes storage by setting up the project registry and performing migrations.
+   */
+  async initialize(): Promise<void> {
+    if (this.initPromise) {
+      return this.initPromise;
+    }
+
+    this.initPromise = (async () => {
+      if (this.projectIdentifier) {
+        return;
+      }
+
+      const registryPath = path.join(
+        Storage.getGlobalGeminiDir(),
+        'projects.json',
+      );
+      const registry = new ProjectRegistry(registryPath, [
+        Storage.getGlobalTempDir(),
+        path.join(Storage.getGlobalGeminiDir(), 'history'),
+      ]);
+      await registry.initialize();
+
+      this.projectIdentifier = await registry.getShortId(this.getProjectRoot());
+      await this.performMigration();
+    })();
+
+    return this.initPromise;
+  }
+
+  /**
+   * Performs migration of legacy hash-based directories to the new slug-based format.
+   * This is called internally by initialize().
+   */
+  private async performMigration(): Promise<void> {
+    const shortId = this.getProjectIdentifier();
+    const oldHash = this.getFilePathHash(this.getProjectRoot());
+
+    // Migrate Temp Dir
+    const newTempDir = path.join(Storage.getGlobalTempDir(), shortId);
+    const oldTempDir = path.join(Storage.getGlobalTempDir(), oldHash);
+    await StorageMigration.migrateDirectory(oldTempDir, newTempDir);
+
+    // Migrate History Dir
     const historyDir = path.join(Storage.getGlobalGeminiDir(), 'history');
-    return path.join(historyDir, hash);
+    const newHistoryDir = path.join(historyDir, shortId);
+    const oldHistoryDir = path.join(historyDir, oldHash);
+    await StorageMigration.migrateDirectory(oldHistoryDir, newHistoryDir);
+  }
+
+  getHistoryDir(): string {
+    const identifier = this.getProjectIdentifier();
+    const historyDir = path.join(Storage.getGlobalGeminiDir(), 'history');
+    return path.join(historyDir, identifier);
   }
 
   getWorkspaceSettingsPath(): string {
@@ -135,12 +225,24 @@ export class Storage {
     return path.join(this.getGeminiDir(), 'skills');
   }
 
+  getProjectAgentSkillsDir(): string {
+    return path.join(this.getAgentsDir(), 'skills');
+  }
+
   getProjectAgentsDir(): string {
     return path.join(this.getGeminiDir(), 'agents');
   }
 
   getProjectTempCheckpointsDir(): string {
     return path.join(this.getProjectTempDir(), 'checkpoints');
+  }
+
+  getProjectTempLogsDir(): string {
+    return path.join(this.getProjectTempDir(), 'logs');
+  }
+
+  getProjectTempPlansDir(): string {
+    return path.join(this.getProjectTempDir(), 'plans');
   }
 
   getExtensionsDir(): string {

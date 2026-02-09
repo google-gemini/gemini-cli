@@ -46,6 +46,9 @@ describe('sanitizeEnvironment', () => {
       CLIENT_ID: 'sensitive-id',
       DB_URI: 'sensitive-uri',
       DATABASE_URL: 'sensitive-url',
+      GEMINI_API_KEY: 'sensitive-gemini-key',
+      GOOGLE_API_KEY: 'sensitive-google-key',
+      GOOGLE_APPLICATION_CREDENTIALS: '/path/to/creds.json',
       SAFE_VAR: 'is-safe',
     };
     const sanitized = sanitizeEnvironment(env, EMPTY_OPTIONS);

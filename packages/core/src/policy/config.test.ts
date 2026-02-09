@@ -10,8 +10,13 @@ import nodePath from 'node:path';
 
 import type { PolicySettings } from './types.js';
 import { ApprovalMode, PolicyDecision, InProcessCheckerType } from './types.js';
+import { isDirectorySecure } from '../utils/security.js';
 
-import { Storage } from '../config/storage.js';
+vi.unmock('../config/storage.js');
+
+vi.mock('../utils/security.js', () => ({
+  isDirectorySecure: vi.fn().mockResolvedValue({ secure: true }),
+}));
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -20,7 +25,9 @@ afterEach(() => {
 });
 
 describe('createPolicyEngineConfig', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    vi.resetModules();
+    const { Storage } = await import('../config/storage.js');
     // Mock Storage to avoid picking up real user/system policies from the host environment
     vi.spyOn(Storage, 'getUserPoliciesDir').mockReturnValue(
       '/non/existent/user/policies',
@@ -28,7 +35,53 @@ describe('createPolicyEngineConfig', () => {
     vi.spyOn(Storage, 'getSystemPoliciesDir').mockReturnValue(
       '/non/existent/system/policies',
     );
+    // Reset security check to default secure
+    vi.mocked(isDirectorySecure).mockResolvedValue({ secure: true });
   });
+
+  it('should filter out insecure system policy directories', async () => {
+    const { Storage } = await import('../config/storage.js');
+    const systemPolicyDir = '/insecure/system/policies';
+    vi.spyOn(Storage, 'getSystemPoliciesDir').mockReturnValue(systemPolicyDir);
+
+    vi.mocked(isDirectorySecure).mockImplementation(async (path: string) => {
+      if (nodePath.resolve(path) === nodePath.resolve(systemPolicyDir)) {
+        return { secure: false, reason: 'Insecure directory' };
+      }
+      return { secure: true };
+    });
+
+    // We need to spy on loadPoliciesFromToml to verify which directories were passed
+    // But it is not exported from config.js, it is imported.
+    // We can spy on the module it comes from.
+    const tomlLoader = await import('./toml-loader.js');
+    const loadPoliciesSpy = vi.spyOn(tomlLoader, 'loadPoliciesFromToml');
+    loadPoliciesSpy.mockResolvedValue({
+      rules: [],
+      checkers: [],
+      errors: [],
+    });
+
+    const { createPolicyEngineConfig } = await import('./config.js');
+    const settings: PolicySettings = {};
+
+    await createPolicyEngineConfig(
+      settings,
+      ApprovalMode.DEFAULT,
+      '/tmp/mock/default/policies',
+    );
+
+    // Verify loadPoliciesFromToml was called
+    expect(loadPoliciesSpy).toHaveBeenCalled();
+    const calledDirs = loadPoliciesSpy.mock.calls[0][0];
+
+    // The system directory should NOT be in the list
+    expect(calledDirs).not.toContain(systemPolicyDir);
+    // But other directories (user, default) should be there
+    expect(calledDirs).toContain('/non/existent/user/policies');
+    expect(calledDirs).toContain('/tmp/mock/default/policies');
+  });
+
   it('should return ASK_USER for write tools and ALLOW for read-only tools by default', async () => {
     const actualFs =
       await vi.importActual<typeof import('node:fs/promises')>(
@@ -98,7 +151,7 @@ describe('createPolicyEngineConfig', () => {
     expect(config.rules).toEqual([]);
 
     vi.doUnmock('node:fs/promises');
-  });
+  }, 30000);
 
   it('should allow tools in tools.allowed', async () => {
     const { createPolicyEngineConfig } = await import('./config.js');
@@ -276,7 +329,10 @@ describe('createPolicyEngineConfig', () => {
       ApprovalMode.AUTO_EDIT,
     );
     const rule = config.rules?.find(
-      (r) => r.toolName === 'replace' && r.decision === PolicyDecision.ALLOW,
+      (r) =>
+        r.toolName === 'replace' &&
+        r.decision === PolicyDecision.ALLOW &&
+        r.modes?.includes(ApprovalMode.AUTO_EDIT),
     );
     expect(rule).toBeDefined();
     // Priority 15 in default tier → 1.015

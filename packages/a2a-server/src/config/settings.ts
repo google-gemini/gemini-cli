@@ -31,14 +31,13 @@ export interface Settings {
   showMemoryUsage?: boolean;
   checkpointing?: CheckpointingSettings;
   folderTrust?: boolean;
-  general?: {
-    previewFeatures?: boolean;
-  };
 
   // Git-aware file filtering settings
   fileFiltering?: {
     respectGitIgnore?: boolean;
+    respectGeminiIgnore?: boolean;
     enableRecursiveFileSearch?: boolean;
+    customIgnoreFilePaths?: string[];
   };
 }
 

@@ -31,6 +31,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { writeToStdout } from '../utils/stdio.js';
 import { FatalCancellationError } from '../utils/errors.js';
 import process from 'node:process';
+import { coreEvents } from '../utils/events.js';
 
 vi.mock('node:os', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:os')>();
@@ -88,6 +89,13 @@ const mockConfig = {
 global.fetch = vi.fn();
 
 describe('oauth2', () => {
+  beforeEach(() => {
+    vi.spyOn(coreEvents, 'listenerCount').mockReturnValue(1);
+    vi.spyOn(coreEvents, 'emitConsentRequest').mockImplementation((payload) => {
+      payload.onConfirm(true);
+    });
+  });
+
   describe('with encrypted flag false', () => {
     let tempHomeDir: string;
 
@@ -208,7 +216,7 @@ describe('oauth2', () => {
       expect(open).toHaveBeenCalledWith(mockAuthUrl);
       expect(mockGetToken).toHaveBeenCalledWith({
         code: mockCode,
-        redirect_uri: `http://localhost:${capturedPort}/oauth2callback`,
+        redirect_uri: `http://127.0.0.1:${capturedPort}/oauth2callback`,
       });
       expect(mockSetCredentials).toHaveBeenCalledWith(mockTokens);
 
@@ -1242,6 +1250,18 @@ describe('oauth2', () => {
 
         stdinOnSpy.mockRestore();
         stdinRemoveListenerSpy.mockRestore();
+      });
+
+      it('should throw FatalCancellationError when consent is denied', async () => {
+        vi.spyOn(coreEvents, 'emitConsentRequest').mockImplementation(
+          (payload) => {
+            payload.onConfirm(false);
+          },
+        );
+
+        await expect(
+          getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig),
+        ).rejects.toThrow(FatalCancellationError);
       });
     });
 

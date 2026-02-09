@@ -45,6 +45,7 @@ const PolicyRuleSchema = z.object({
     }),
   modes: z.array(z.nativeEnum(ApprovalMode)).optional(),
   allow_redirection: z.boolean().optional(),
+  deny_message: z.string().optional(),
 });
 
 /**
@@ -239,6 +240,7 @@ function processPolicyItems<
     argsPattern: RegExp | undefined,
     commandPattern: RegExp | undefined,
     modes: ApprovalMode[] | undefined,
+    source: string,
   ) => TOutput,
 ): TOutput[] {
   const invalidIndices = new Set<number>();
@@ -258,26 +260,6 @@ function processPolicyItems<
             ? 'Invalid shell command syntax in safety checker'
             : 'Invalid shell command syntax',
         details: validationError,
-      });
-    }
-
-    // Check for restricted modes property in Tier 2/3
-    if (
-      (context.tier === 2 || context.tier === 3) &&
-      item.modes !== undefined &&
-      item.modes.length > 0
-    ) {
-      errors.push({
-        filePath: context.filePath,
-        fileName: context.fileName,
-        tier: context.tierName,
-        ruleIndex: i,
-        errorType: 'rule_validation',
-        message: `Restricted property "modes" cannot be used in ${context.tierName} tier policies`,
-        details:
-          `${itemType} #${i + 1}: The "modes" property is only allowed in default tier (Tier 1) policies.\n` +
-          `  Found: modes = ${JSON.stringify(item.modes)}\n` +
-          `  Fix: Remove the "modes" property or move this rule to a default tier policy file`,
       });
     }
   }
@@ -356,6 +338,8 @@ function processPolicyItems<
             : [item.toolName]
           : [undefined];
 
+        const source = `${context.tierName.charAt(0).toUpperCase() + context.tierName.slice(1)}: ${context.fileName}`;
+
         return toolNames.map((toolName) => {
           let effectiveToolName: string | undefined;
           if (item.mcpName && toolName) {
@@ -366,17 +350,14 @@ function processPolicyItems<
             effectiveToolName = toolName;
           }
 
-          // For Tier 2/3, modes property is restricted and should be undefined
-          const effectiveModes =
-            context.tier === 2 || context.tier === 3 ? undefined : item.modes;
-
           return createOutput(
             item,
             effectiveToolName,
             prefix,
             argsPattern,
             commandPattern,
-            effectiveModes,
+            item.modes,
+            source,
           );
         });
       });
@@ -492,6 +473,7 @@ export async function loadPoliciesFromToml(
             argsPattern,
             commandPattern,
             modes,
+            source,
           ): PolicyRule => ({
             toolName,
             decision: item.decision,
@@ -501,6 +483,8 @@ export async function loadPoliciesFromToml(
             commandPattern,
             modes,
             allowRedirection: item.allow_redirection,
+            denyMessage: item.deny_message,
+            source,
           }),
         );
         rules.push(...parsedRules);

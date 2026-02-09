@@ -273,6 +273,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(1);
         expect(result.params.new_string).toBe('replace with "this"');
@@ -293,6 +294,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(0);
         expect(result.params.new_string).toBe('replace with this');
@@ -316,6 +318,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(1);
         expect(result.params.new_string).toBe('replace with "this"');
@@ -336,6 +339,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(0);
         expect(result.params.new_string).toBe('replace with this');
@@ -360,6 +364,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(1);
         expect(result.params.new_string).toBe('replace with "this"');
@@ -380,6 +385,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(0);
         expect(result.params.new_string).toBe('replace with this');
@@ -400,6 +406,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(0);
         expect(result.params.new_string).toBe('replace with foobar');
@@ -425,6 +432,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(1);
         expect(result.params.new_string).toBe(llmNewString);
@@ -449,6 +457,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(2);
         expect(result.params.new_string).toBe(llmNewString);
@@ -471,6 +480,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(1);
         expect(result.params.new_string).toBe('replace with "this"');
@@ -495,6 +505,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(1);
         expect(result.params.new_string).toBe(newStringForLLMAndReturnedByLLM);
@@ -518,6 +529,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(1);
         expect(result.params).toEqual(originalParams);
@@ -538,6 +550,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(0);
         expect(result.params).toEqual(originalParams);
@@ -563,6 +576,7 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
         expect(mockGenerateJson).toHaveBeenCalledTimes(2);
         expect(result.params.old_string).toBe(currentContent);
@@ -618,10 +632,62 @@ describe('editCorrector', () => {
           mockGeminiClientInstance,
           mockBaseLlmClientInstance,
           abortSignal,
+          false,
         );
 
         expect(result.occurrences).toBe(0);
         expect(result.params).toEqual(originalParams);
+      });
+    });
+
+    describe('Scenario Group 7: Trimming with Newline Preservation', () => {
+      it('Test 7.1: should preserve trailing newlines in new_string when trimming is applied', async () => {
+        const currentContent = '  find me'; // Matches old_string initially
+        const originalParams = {
+          file_path: '/test/file.txt',
+          old_string: '  find me', // Matches, but has whitespace to trim
+          new_string: '  replaced\n\n', // Needs trimming but preserve newlines
+        };
+
+        const result = await ensureCorrectEdit(
+          '/test/file.txt',
+          currentContent,
+          originalParams,
+          mockGeminiClientInstance,
+          mockBaseLlmClientInstance,
+          abortSignal,
+          false,
+        );
+
+        // old_string should be trimmed to 'find me' because 'find me' also exists uniquely in '  find me'
+        expect(result.params.old_string).toBe('find me');
+        // new_string should be trimmed of spaces but keep ALL newlines
+        expect(result.params.new_string).toBe('replaced\n\n');
+        expect(result.occurrences).toBe(1);
+      });
+
+      it('Test 7.2: should handle trailing newlines separated by spaces (regression fix)', async () => {
+        const currentContent = 'find me '; // Matches old_string initially
+        const originalParams = {
+          file_path: '/test/file.txt',
+          old_string: 'find me ', // Trailing space
+          new_string: 'replaced \n \n', // Trailing newlines with spaces
+        };
+
+        const result = await ensureCorrectEdit(
+          '/test/file.txt',
+          currentContent,
+          originalParams,
+          mockGeminiClientInstance,
+          mockBaseLlmClientInstance,
+          abortSignal,
+          false,
+        );
+
+        expect(result.params.old_string).toBe('find me');
+        // Should capture both newlines and join them, stripping the space between
+        expect(result.params.new_string).toBe('replaced\n\n');
+        expect(result.occurrences).toBe(1);
       });
     });
   });
@@ -665,6 +731,7 @@ describe('editCorrector', () => {
         content,
         mockBaseLlmClientInstance,
         abortSignal,
+        false,
       );
       expect(result).toBe(content);
       expect(mockGenerateJson).toHaveBeenCalledTimes(0);
@@ -681,6 +748,7 @@ describe('editCorrector', () => {
         content,
         mockBaseLlmClientInstance,
         abortSignal,
+        false,
       );
 
       expect(result).toBe(correctedContent);
@@ -701,6 +769,7 @@ describe('editCorrector', () => {
         content,
         mockBaseLlmClientInstance,
         abortSignal,
+        false,
       );
 
       expect(result).toBe(correctedContent);
@@ -716,6 +785,7 @@ describe('editCorrector', () => {
         content,
         mockBaseLlmClientInstance,
         abortSignal,
+        false,
       );
 
       expect(result).toBe(content);
@@ -736,6 +806,7 @@ describe('editCorrector', () => {
         content,
         mockBaseLlmClientInstance,
         abortSignal,
+        false,
       );
 
       expect(result).toBe(correctedContent);

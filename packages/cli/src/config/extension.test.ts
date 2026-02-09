@@ -23,8 +23,14 @@ import {
   ExtensionDisableEvent,
   ExtensionEnableEvent,
   KeychainTokenStorage,
+  loadAgentsFromDirectory,
+  loadSkillsFromDir,
 } from '@google/gemini-cli-core';
-import { loadSettings, SettingScope } from './settings.js';
+import {
+  loadSettings,
+  createTestMergedSettings,
+  SettingScope,
+} from './settings.js';
 import {
   isWorkspaceTrusted,
   resetTrustedFoldersForTesting,
@@ -117,6 +123,10 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       listSecrets: vi.fn(),
       isAvailable: vi.fn().mockResolvedValue(true),
     })),
+    loadAgentsFromDirectory: vi
+      .fn()
+      .mockImplementation(async () => ({ agents: [], errors: [] })),
+    loadSkillsFromDir: vi.fn().mockImplementation(async () => []),
   };
 });
 
@@ -171,6 +181,11 @@ describe('extension tests', () => {
     (
       KeychainTokenStorage as unknown as ReturnType<typeof vi.fn>
     ).mockImplementation(() => mockKeychainStorage);
+    vi.mocked(loadAgentsFromDirectory).mockResolvedValue({
+      agents: [],
+      errors: [],
+    });
+    vi.mocked(loadSkillsFromDir).mockResolvedValue([]);
     tempHomeDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'gemini-cli-test-home-'),
     );
@@ -189,11 +204,13 @@ describe('extension tests', () => {
       source: undefined,
     });
     vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
+    const settings = loadSettings(tempWorkspaceDir).merged;
+    settings.experimental.extensionConfig = true;
     extensionManager = new ExtensionManager({
       workspaceDir: tempWorkspaceDir,
       requestConsent: mockRequestConsent,
       requestSetting: mockPromptForSettings,
-      settings: loadSettings(tempWorkspaceDir).merged,
+      settings,
     });
     resetTrustedFoldersForTesting();
   });
@@ -605,6 +622,7 @@ describe('extension tests', () => {
     });
 
     it('should not load github extensions if blockGitExtensions is set', async () => {
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       createExtension({
         extensionsDir: userExtensionsDir,
         name: 'my-ext',
@@ -615,11 +633,9 @@ describe('extension tests', () => {
         },
       });
 
-      const blockGitExtensionsSetting = {
-        security: {
-          blockGitExtensions: true,
-        },
-      };
+      const blockGitExtensionsSetting = createTestMergedSettings({
+        security: { blockGitExtensions: true },
+      });
       extensionManager = new ExtensionManager({
         workspaceDir: tempWorkspaceDir,
         requestConsent: mockRequestConsent,
@@ -630,6 +646,73 @@ describe('extension tests', () => {
       const extension = extensions.find((e) => e.name === 'my-ext');
 
       expect(extension).toBeUndefined();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'Extensions from remote sources is disallowed by your current settings.',
+        ),
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it('should load allowed extensions if the allowlist is set.', async () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'my-ext',
+        version: '1.0.0',
+        installMetadata: {
+          type: 'git',
+          source: 'http://allowed.com/foo/bar',
+        },
+      });
+      const extensionAllowlistSetting = createTestMergedSettings({
+        security: {
+          allowedExtensions: ['\\b(https?:\\/\\/)?(www\\.)?allowed\\.com\\S*'],
+        },
+      });
+      extensionManager = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        requestConsent: mockRequestConsent,
+        requestSetting: mockPromptForSettings,
+        settings: extensionAllowlistSetting,
+      });
+      const extensions = await extensionManager.loadExtensions();
+
+      expect(extensions).toHaveLength(1);
+      expect(extensions[0].name).toBe('my-ext');
+    });
+
+    it('should not load disallowed extensions if the allowlist is set.', async () => {
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'my-ext',
+        version: '1.0.0',
+        installMetadata: {
+          type: 'git',
+          source: 'http://notallowed.com/foo/bar',
+        },
+      });
+      const extensionAllowlistSetting = createTestMergedSettings({
+        security: {
+          allowedExtensions: ['\\b(https?:\\/\\/)?(www\\.)?allowed\\.com\\S*'],
+        },
+      });
+      extensionManager = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        requestConsent: mockRequestConsent,
+        requestSetting: mockPromptForSettings,
+        settings: extensionAllowlistSetting,
+      });
+      const extensions = await extensionManager.loadExtensions();
+      const extension = extensions.find((e) => e.name === 'my-ext');
+
+      expect(extension).toBeUndefined();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'This extension is not allowed by the "allowedExtensions" security setting',
+        ),
+      );
+      consoleSpy.mockRestore();
     });
 
     it('should not load any extensions if admin.extensions.enabled is false', async () => {
@@ -639,7 +722,6 @@ describe('extension tests', () => {
         version: '1.0.0',
       });
       const loadedSettings = loadSettings(tempWorkspaceDir).merged;
-      (loadedSettings.admin ??= {}).extensions ??= {};
       loadedSettings.admin.extensions.enabled = false;
 
       extensionManager = new ExtensionManager({
@@ -663,7 +745,6 @@ describe('extension tests', () => {
         },
       });
       const loadedSettings = loadSettings(tempWorkspaceDir).merged;
-      (loadedSettings.admin ??= {}).mcp ??= {};
       loadedSettings.admin.mcp.enabled = false;
 
       extensionManager = new ExtensionManager({
@@ -688,7 +769,6 @@ describe('extension tests', () => {
         },
       });
       const loadedSettings = loadSettings(tempWorkspaceDir).merged;
-      (loadedSettings.admin ??= {}).mcp ??= {};
       loadedSettings.admin.mcp.enabled = true;
 
       extensionManager = new ExtensionManager({
@@ -803,6 +883,7 @@ describe('extension tests', () => {
         fs.mkdirSync(hooksDir);
 
         const hooksConfig = {
+          enabled: false,
           hooks: {
             BeforeTool: [
               {
@@ -824,8 +905,7 @@ describe('extension tests', () => {
         );
 
         const settings = loadSettings(tempWorkspaceDir).merged;
-        if (!settings.hooks) settings.hooks = {};
-        settings.hooks.enabled = true;
+        settings.hooksConfig.enabled = true;
 
         extensionManager = new ExtensionManager({
           workspaceDir: tempWorkspaceDir,
@@ -856,12 +936,11 @@ describe('extension tests', () => {
         fs.mkdirSync(hooksDir);
         fs.writeFileSync(
           path.join(hooksDir, 'hooks.json'),
-          JSON.stringify({ hooks: { BeforeTool: [] } }),
+          JSON.stringify({ hooks: { BeforeTool: [] }, enabled: false }),
         );
 
         const settings = loadSettings(tempWorkspaceDir).merged;
-        if (!settings.hooks) settings.hooks = {};
-        settings.hooks.enabled = false;
+        settings.hooksConfig.enabled = false;
 
         extensionManager = new ExtensionManager({
           workspaceDir: tempWorkspaceDir,
@@ -1085,11 +1164,9 @@ describe('extension tests', () => {
 
     it('should not install a github extension if blockGitExtensions is set', async () => {
       const gitUrl = 'https://somehost.com/somerepo.git';
-      const blockGitExtensionsSetting = {
-        security: {
-          blockGitExtensions: true,
-        },
-      };
+      const blockGitExtensionsSetting = createTestMergedSettings({
+        security: { blockGitExtensions: true },
+      });
       extensionManager = new ExtensionManager({
         workspaceDir: tempWorkspaceDir,
         requestConsent: mockRequestConsent,
@@ -1104,6 +1181,30 @@ describe('extension tests', () => {
         }),
       ).rejects.toThrow(
         'Installing extensions from remote sources is disallowed by your current settings.',
+      );
+    });
+
+    it('should not install a disallowed extension if the allowlist is set', async () => {
+      const gitUrl = 'https://somehost.com/somerepo.git';
+      const allowedExtensionsSetting = createTestMergedSettings({
+        security: {
+          allowedExtensions: ['\\b(https?:\\/\\/)?(www\\.)?allowed\\.com\\S*'],
+        },
+      });
+      extensionManager = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        requestConsent: mockRequestConsent,
+        requestSetting: mockPromptForSettings,
+        settings: allowedExtensionsSetting,
+      });
+      await extensionManager.loadExtensions();
+      await expect(
+        extensionManager.installOrUpdateExtension({
+          source: gitUrl,
+          type: 'git',
+        }),
+      ).rejects.toThrow(
+        `Installing extension from source "${gitUrl}" is not allowed by the "allowedExtensions" security setting.`,
       );
     });
 
@@ -1285,10 +1386,11 @@ describe('extension tests', () => {
 
       expect(mockRequestConsent).toHaveBeenCalledWith(
         `Installing extension "my-local-extension".
-${INSTALL_WARNING_MESSAGE}
 This extension will run the following MCP servers:
   * test-server (local): node dobadthing \\u001b[12D\\u001b[K server.js
-  * test-server-2 (remote): https://google.com`,
+  * test-server-2 (remote): https://google.com
+
+${INSTALL_WARNING_MESSAGE}`,
       );
     });
 

@@ -66,6 +66,7 @@ const BASELINE_COMPARISON = 'gemini_cli.performance.baseline.comparison';
 const FLICKER_FRAME_COUNT = 'gemini_cli.ui.flicker.count';
 const SLOW_RENDER_LATENCY = 'gemini_cli.ui.slow_render.latency';
 const EXIT_FAIL_COUNT = 'gemini_cli.exit.fail.count';
+const PLAN_EXECUTION_COUNT = 'gemini_cli.plan.execution.count';
 
 const baseMetricDefinition = {
   getCommonAttributes,
@@ -204,6 +205,14 @@ const COUNTER_DEFINITIONS = {
     valueType: ValueType.INT,
     assign: (c: Counter) => (exitFailCounter = c),
     attributes: {} as Record<string, never>,
+  },
+  [PLAN_EXECUTION_COUNT]: {
+    description: 'Counts plan executions (switching from Plan Mode).',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (planExecutionCounter = c),
+    attributes: {} as {
+      approval_mode: string;
+    },
   },
   [EVENT_HOOK_CALL_COUNT]: {
     description: 'Counts hook calls, tagged by hook event name and success.',
@@ -529,6 +538,7 @@ let agentRecoveryAttemptCounter: Counter | undefined;
 let agentRecoveryAttemptDurationHistogram: Histogram | undefined;
 let flickerFrameCounter: Counter | undefined;
 let exitFailCounter: Counter | undefined;
+let planExecutionCounter: Counter | undefined;
 let slowRenderHistogram: Histogram | undefined;
 let hookCallCounter: Counter | undefined;
 let hookCallLatencyHistogram: Histogram | undefined;
@@ -721,6 +731,20 @@ export function recordExitFail(config: Config): void {
 }
 
 /**
+ * Records a metric for when a plan is executed.
+ */
+export function recordPlanExecution(
+  config: Config,
+  attributes: MetricDefinitions[typeof PLAN_EXECUTION_COUNT]['attributes'],
+): void {
+  if (!planExecutionCounter || !isMetricsInitialized) return;
+  planExecutionCounter.add(1, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    ...attributes,
+  });
+}
+
+/**
  * Records a metric for when a UI frame is slow in rendering
  */
 export function recordSlowRender(config: Config, renderLatency: number): void {
@@ -779,16 +803,29 @@ export function recordModelRoutingMetrics(
   )
     return;
 
-  modelRoutingLatencyHistogram.record(event.routing_latency_ms, {
+  const attributes: Attributes = {
     ...baseMetricDefinition.getCommonAttributes(config),
     'routing.decision_model': event.decision_model,
     'routing.decision_source': event.decision_source,
-  });
+    'routing.failed': event.failed,
+  };
+
+  if (event.reasoning) {
+    attributes['routing.reasoning'] = event.reasoning;
+  }
+  if (event.enable_numerical_routing !== undefined) {
+    attributes['routing.enable_numerical_routing'] =
+      event.enable_numerical_routing;
+  }
+  if (event.classifier_threshold) {
+    attributes['routing.classifier_threshold'] = event.classifier_threshold;
+  }
+
+  modelRoutingLatencyHistogram.record(event.routing_latency_ms, attributes);
 
   if (event.failed) {
     modelRoutingFailureCounter.add(1, {
-      ...baseMetricDefinition.getCommonAttributes(config),
-      'routing.decision_source': event.decision_source,
+      ...attributes,
       'routing.error_message': event.error_message,
     });
   }

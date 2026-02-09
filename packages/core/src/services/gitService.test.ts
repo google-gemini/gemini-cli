@@ -18,12 +18,10 @@ import { Storage } from '../config/storage.js';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
-import {
-  getProjectHash,
-  GEMINI_DIR,
-  homedir as pathsHomedir,
-} from '../utils/paths.js';
+import { GEMINI_DIR, homedir as pathsHomedir } from '../utils/paths.js';
 import { spawnAsync } from '../utils/shell-utils.js';
+
+const PROJECT_SLUG = 'project-slug';
 
 vi.mock('../utils/shell-utils.js', () => ({
   spawnAsync: vi.fn(),
@@ -85,7 +83,6 @@ describe('GitService', () => {
   let testRootDir: string;
   let projectRoot: string;
   let homedir: string;
-  let hash: string;
   let storage: Storage;
 
   beforeEach(async () => {
@@ -94,8 +91,6 @@ describe('GitService', () => {
     homedir = path.join(testRootDir, 'home');
     await fs.mkdir(projectRoot, { recursive: true });
     await fs.mkdir(homedir, { recursive: true });
-
-    hash = getProjectHash(projectRoot);
 
     vi.clearAllMocks();
     hoistedIsGitRepositoryMock.mockReturnValue(true);
@@ -147,15 +142,13 @@ describe('GitService', () => {
 
   describe('verifyGitAvailability', () => {
     it('should resolve true if git --version command succeeds', async () => {
-      const service = new GitService(projectRoot, storage);
-      await expect(service.verifyGitAvailability()).resolves.toBe(true);
+      await expect(GitService.verifyGitAvailability()).resolves.toBe(true);
       expect(spawnAsync).toHaveBeenCalledWith('git', ['--version']);
     });
 
     it('should resolve false if git --version command fails', async () => {
       (spawnAsync as Mock).mockRejectedValue(new Error('git not found'));
-      const service = new GitService(projectRoot, storage);
-      await expect(service.verifyGitAvailability()).resolves.toBe(false);
+      await expect(GitService.verifyGitAvailability()).resolves.toBe(false);
     });
   });
 
@@ -183,8 +176,8 @@ describe('GitService', () => {
     let repoDir: string;
     let gitConfigPath: string;
 
-    beforeEach(() => {
-      repoDir = path.join(homedir, GEMINI_DIR, 'history', hash);
+    beforeEach(async () => {
+      repoDir = path.join(homedir, GEMINI_DIR, 'history', PROJECT_SLUG);
       gitConfigPath = path.join(repoDir, '.gitconfig');
     });
 
@@ -284,6 +277,25 @@ describe('GitService', () => {
       expect(hoistedMockDebugLogger.debug).toHaveBeenCalledWith(
         expect.stringContaining('checkIsRepo failed'),
       );
+    });
+
+    it('should configure git environment to use local gitconfig', async () => {
+      hoistedMockCheckIsRepo.mockResolvedValue(false);
+      const service = new GitService(projectRoot, storage);
+      await service.setupShadowGitRepository();
+
+      expect(hoistedMockEnv).toHaveBeenCalledWith(
+        expect.objectContaining({
+          GIT_CONFIG_GLOBAL: gitConfigPath,
+          GIT_CONFIG_SYSTEM: path.join(repoDir, '.gitconfig_system_empty'),
+        }),
+      );
+
+      const systemConfigContent = await fs.readFile(
+        path.join(repoDir, '.gitconfig_system_empty'),
+        'utf-8',
+      );
+      expect(systemConfigContent).toBe('');
     });
   });
 

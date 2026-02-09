@@ -267,6 +267,7 @@ export class HookRunner {
         ...sanitizeEnvironment(process.env, this.config.sanitizationConfig),
         GEMINI_PROJECT_DIR: input.cwd,
         CLAUDE_PROJECT_DIR: input.cwd, // For compatibility
+        ...hookConfig.env,
       };
 
       const child = spawn(

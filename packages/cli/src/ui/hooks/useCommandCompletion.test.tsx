@@ -16,7 +16,10 @@ import {
 import { act, useEffect } from 'react';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
-import { useCommandCompletion } from './useCommandCompletion.js';
+import {
+  useCommandCompletion,
+  CompletionMode,
+} from './useCommandCompletion.js';
 import type { CommandContext } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
 import { useTextBuffer } from '../components/shared/text-buffer.js';
@@ -111,6 +114,7 @@ describe('useCommandCompletion', () => {
     initialText: string,
     cursorOffset?: number,
     shellModeActive = false,
+    active = true,
   ) => {
     let hookResult: ReturnType<typeof useCommandCompletion> & {
       textBuffer: ReturnType<typeof useTextBuffer>;
@@ -118,15 +122,16 @@ describe('useCommandCompletion', () => {
 
     function TestComponent() {
       const textBuffer = useTextBufferForTest(initialText, cursorOffset);
-      const completion = useCommandCompletion(
-        textBuffer,
-        testRootDir,
-        [],
-        mockCommandContext,
-        false,
+      const completion = useCommandCompletion({
+        buffer: textBuffer,
+        cwd: testRootDir,
+        slashCommands: [],
+        commandContext: mockCommandContext,
+        reverseSearchActive: false,
         shellModeActive,
-        mockConfig,
-      );
+        config: mockConfig,
+        active,
+      });
       hookResult = { ...completion, textBuffer };
       return null;
     }
@@ -160,6 +165,7 @@ describe('useCommandCompletion', () => {
         expect(result.current.visibleStartIndex).toBe(0);
         expect(result.current.showSuggestions).toBe(false);
         expect(result.current.isLoadingSuggestions).toBe(false);
+        expect(result.current.completionMode).toBe(CompletionMode.IDLE);
       });
 
       it('should reset state when completion mode becomes IDLE', async () => {
@@ -193,7 +199,6 @@ describe('useCommandCompletion', () => {
 
         act(() => {
           result.current.setActiveSuggestionIndex(5);
-          result.current.setShowSuggestions(true);
         });
 
         act(() => {
@@ -207,7 +212,7 @@ describe('useCommandCompletion', () => {
 
       it('should call useAtCompletion with the correct query for an escaped space', async () => {
         const text = '@src/a\\ file.txt';
-        renderCommandCompletionHook(text);
+        const { result } = renderCommandCompletionHook(text);
 
         await waitFor(() => {
           expect(useAtCompletion).toHaveBeenLastCalledWith(
@@ -216,6 +221,7 @@ describe('useCommandCompletion', () => {
               pattern: 'src/a\\ file.txt',
             }),
           );
+          expect(result.current.completionMode).toBe(CompletionMode.AT);
         });
       });
 
@@ -272,6 +278,9 @@ describe('useCommandCompletion', () => {
             expect(result.current.showSuggestions).toBe(
               expectedShowSuggestions,
             );
+            if (!shellModeActive) {
+              expect(result.current.completionMode).toBe(CompletionMode.SLASH);
+            }
           });
         },
       );
@@ -501,22 +510,25 @@ describe('useCommandCompletion', () => {
 
       function TestComponent() {
         const textBuffer = useTextBufferForTest('// This is a line comment');
-        const completion = useCommandCompletion(
-          textBuffer,
-          testRootDir,
-          [],
-          mockCommandContext,
-          false,
-          false,
-          mockConfig,
-        );
+        const completion = useCommandCompletion({
+          buffer: textBuffer,
+          cwd: testRootDir,
+          slashCommands: [],
+          commandContext: mockCommandContext,
+          reverseSearchActive: false,
+          shellModeActive: false,
+          config: mockConfig,
+          active: true,
+        });
         hookResult = { ...completion, textBuffer };
         return null;
       }
       renderWithProviders(<TestComponent />);
 
       // Should not trigger prompt completion for comments
-      expect(hookResult!.suggestions.length).toBe(0);
+      await waitFor(() => {
+        expect(hookResult!.suggestions.length).toBe(0);
+      });
     });
 
     it('should not trigger prompt completion for block comments', async () => {
@@ -533,22 +545,25 @@ describe('useCommandCompletion', () => {
         const textBuffer = useTextBufferForTest(
           '/* This is a block comment */',
         );
-        const completion = useCommandCompletion(
-          textBuffer,
-          testRootDir,
-          [],
-          mockCommandContext,
-          false,
-          false,
-          mockConfig,
-        );
+        const completion = useCommandCompletion({
+          buffer: textBuffer,
+          cwd: testRootDir,
+          slashCommands: [],
+          commandContext: mockCommandContext,
+          reverseSearchActive: false,
+          shellModeActive: false,
+          config: mockConfig,
+          active: true,
+        });
         hookResult = { ...completion, textBuffer };
         return null;
       }
       renderWithProviders(<TestComponent />);
 
       // Should not trigger prompt completion for comments
-      expect(hookResult!.suggestions.length).toBe(0);
+      await waitFor(() => {
+        expect(hookResult!.suggestions.length).toBe(0);
+      });
     });
 
     it('should trigger prompt completion for regular text when enabled', async () => {
@@ -565,24 +580,27 @@ describe('useCommandCompletion', () => {
         const textBuffer = useTextBufferForTest(
           'This is regular text that should trigger completion',
         );
-        const completion = useCommandCompletion(
-          textBuffer,
-          testRootDir,
-          [],
-          mockCommandContext,
-          false,
-          false,
-          mockConfig,
-        );
+        const completion = useCommandCompletion({
+          buffer: textBuffer,
+          cwd: testRootDir,
+          slashCommands: [],
+          commandContext: mockCommandContext,
+          reverseSearchActive: false,
+          shellModeActive: false,
+          config: mockConfig,
+          active: true,
+        });
         hookResult = { ...completion, textBuffer };
         return null;
       }
       renderWithProviders(<TestComponent />);
 
       // This test verifies that comments are filtered out while regular text is not
-      expect(hookResult!.textBuffer.text).toBe(
-        'This is regular text that should trigger completion',
-      );
+      await waitFor(() => {
+        expect(hookResult!.textBuffer.text).toBe(
+          'This is regular text that should trigger completion',
+        );
+      });
     });
   });
 
