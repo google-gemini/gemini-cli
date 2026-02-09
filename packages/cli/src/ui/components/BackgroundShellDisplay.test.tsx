@@ -13,11 +13,6 @@ import { act } from 'react';
 import { type Key, type KeypressHandler } from '../contexts/KeypressContext.js';
 import { ScrollProvider } from '../contexts/ScrollProvider.js';
 import { Box } from 'ink';
-import {
-  appEvents,
-  AppEvent,
-  TransientMessageType,
-} from '../../utils/events.js';
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -25,14 +20,12 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const mockDismissBackgroundShell = vi.fn();
 const mockSetActiveBackgroundShellPid = vi.fn();
 const mockSetIsBackgroundShellListOpen = vi.fn();
-const mockSetEmbeddedShellFocused = vi.fn();
 
 vi.mock('../contexts/UIActionsContext.js', () => ({
   useUIActions: () => ({
     dismissBackgroundShell: mockDismissBackgroundShell,
     setActiveBackgroundShellPid: mockSetActiveBackgroundShellPid,
     setIsBackgroundShellListOpen: mockSetIsBackgroundShellListOpen,
-    setEmbeddedShellFocused: mockSetEmbeddedShellFocused,
   }),
 }));
 
@@ -411,61 +404,5 @@ describe('<BackgroundShellDisplay />', () => {
     });
 
     expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('unfocuses the shell when Shift+Tab is pressed', async () => {
-    render(
-      <ScrollProvider>
-        <BackgroundShellDisplay
-          shells={mockShells}
-          activePid={shell1.pid}
-          width={80}
-          height={24}
-          isFocused={true}
-          isListOpenProp={false}
-        />
-      </ScrollProvider>,
-    );
-    await act(async () => {
-      await delay(0);
-    });
-
-    act(() => {
-      simulateKey({ name: 'tab', shift: true });
-    });
-
-    expect(mockSetEmbeddedShellFocused).toHaveBeenCalledWith(false);
-  });
-
-  it('shows a warning when Tab is pressed', async () => {
-    render(
-      <ScrollProvider>
-        <BackgroundShellDisplay
-          shells={mockShells}
-          activePid={shell1.pid}
-          width={80}
-          height={24}
-          isFocused={true}
-          isListOpenProp={false}
-        />
-      </ScrollProvider>,
-    );
-    await act(async () => {
-      await delay(0);
-    });
-
-    const emitSpy = vi.spyOn(appEvents, 'emit');
-
-    act(() => {
-      simulateKey({ name: 'tab' });
-    });
-
-    expect(emitSpy).toHaveBeenCalledWith(AppEvent.TransientMessage, {
-      message: 'Press Shift+Tab to focus out.',
-      type: TransientMessageType.Warning,
-    });
-    expect(mockSetEmbeddedShellFocused).not.toHaveBeenCalled();
-
-    emitSpy.mockRestore();
   });
 });

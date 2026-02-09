@@ -20,11 +20,6 @@ import { Command, keyMatchers } from '../keyMatchers.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { formatCommand } from '../utils/keybindingUtils.js';
 import {
-  appEvents,
-  AppEvent,
-  TransientMessageType,
-} from '../../utils/events.js';
-import {
   ScrollableList,
   type ScrollableListRef,
 } from './shared/ScrollableList.js';
@@ -69,7 +64,6 @@ export const BackgroundShellDisplay = ({
     dismissBackgroundShell,
     setActiveBackgroundShellPid,
     setIsBackgroundShellListOpen,
-    setEmbeddedShellFocused,
   } = useUIActions();
   const activeShell = shells.get(activePid);
   const [output, setOutput] = useState<string | AnsiOutput>(
@@ -142,27 +136,6 @@ export const BackgroundShellDisplay = ({
     (key) => {
       if (!activeShell) return;
 
-      // Handle Shift+Tab or Tab (in list) to focus out
-      if (
-        keyMatchers[Command.UNFOCUS_BACKGROUND_SHELL](key) ||
-        (isListOpenProp &&
-          keyMatchers[Command.UNFOCUS_BACKGROUND_SHELL_LIST](key))
-      ) {
-        setEmbeddedShellFocused(false);
-        return true;
-      }
-
-      // Handle Tab to warn but propagate
-      if (
-        !isListOpenProp &&
-        keyMatchers[Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING](key)
-      ) {
-        appEvents.emit(AppEvent.TransientMessage, {
-          message: `Press ${formatCommand(Command.UNFOCUS_BACKGROUND_SHELL)} to focus out.`,
-          type: TransientMessageType.Warning,
-        });
-        // Fall through to allow Tab to be sent to the shell
-      }
       if (isListOpenProp) {
         // Navigation (Up/Down/Enter) is handled by RadioButtonSelect
         // We only handle special keys not consumed by RadioButtonSelect or overriding them if needed
