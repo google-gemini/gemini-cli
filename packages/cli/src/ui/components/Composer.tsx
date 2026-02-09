@@ -5,7 +5,7 @@
  */
 
 import { useState } from 'react';
-import { Box, Text, useIsScreenReaderEnabled } from 'ink';
+import { Box, useIsScreenReaderEnabled } from 'ink';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { StatusDisplay } from './StatusDisplay.js';
 import { ApprovalModeIndicator } from './ApprovalModeIndicator.js';
@@ -30,7 +30,6 @@ import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { StreamingState, ToolCallStatus } from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
-import { theme } from '../semantic-colors.js';
 
 export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const config = useConfig();
@@ -63,20 +62,12 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     Boolean(uiState.proQuotaRequest) ||
     Boolean(uiState.validationRequest) ||
     Boolean(uiState.customDialog);
-  const isActivelyStreaming =
-    uiState.streamingState === StreamingState.Responding;
   const showLoadingIndicator =
     (!uiState.embeddedShellFocused || uiState.isBackgroundShellVisible) &&
-    (uiState.streamingState === StreamingState.Responding ||
-      uiState.streamingState === StreamingState.WaitingForConfirmation) &&
+    uiState.streamingState === StreamingState.Responding &&
     !hasPendingActionRequired;
   const showApprovalIndicator = !uiState.shellModeActive;
   const showRawMarkdownIndicator = !uiState.renderMarkdown;
-  const showEscToCancelHint =
-    isActivelyStreaming &&
-    (!uiState.embeddedShellFocused || uiState.isBackgroundShellVisible) &&
-    !hasPendingActionRequired &&
-    uiState.streamingState !== StreamingState.WaitingForConfirmation;
 
   return (
     <Box
@@ -98,11 +89,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
       <TodoTray />
 
       <Box marginTop={1} width="100%" flexDirection="column">
-        {showEscToCancelHint && (
-          <Box marginLeft={3}>
-            <Text color={theme.text.secondary}>esc to cancel</Text>
-          </Box>
-        )}
         <Box
           width="100%"
           flexDirection={isNarrow ? 'column' : 'row'}
@@ -132,7 +118,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                     : uiState.currentLoadingPhrase
                 }
                 elapsedTime={uiState.elapsedTime}
-                showCancelAndTimer={false}
               />
             )}
           </Box>
@@ -163,7 +148,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             alignItems="center"
             flexGrow={1}
           >
-            {!isActivelyStreaming && (
+            {!showLoadingIndicator && (
               <Box
                 flexDirection={isNarrow ? 'column' : 'row'}
                 alignItems={isNarrow ? 'flex-start' : 'center'}
@@ -209,7 +194,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             flexDirection="column"
             alignItems={isNarrow ? 'flex-start' : 'flex-end'}
           >
-            {!isActivelyStreaming && (
+            {!showLoadingIndicator && (
               <StatusDisplay hideContextSummary={hideContextSummary} />
             )}
           </Box>

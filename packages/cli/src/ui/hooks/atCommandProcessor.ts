@@ -13,6 +13,8 @@ import {
   getErrorMessage,
   isNodeError,
   unescapePath,
+  resolveToRealPath,
+  fileExists,
   ReadManyFilesTool,
   REFERENCE_CONTENT_START,
   REFERENCE_CONTENT_END,
@@ -152,6 +154,35 @@ function categorizeAtCommands(
   return { agentParts, resourceParts, fileParts };
 }
 
+/**
+ * Checks if the query contains any file paths that require read permission.
+ * Returns an array of such paths.
+ */
+export async function checkPermissions(
+  query: string,
+  config: Config,
+): Promise<string[]> {
+  const commandParts = parseAllAtCommands(query);
+  const { fileParts } = categorizeAtCommands(commandParts, config);
+  const permissionsRequired: string[] = [];
+
+  for (const part of fileParts) {
+    const pathName = part.content.substring(1);
+    if (!pathName) continue;
+
+    const resolvedPathName = resolveToRealPath(
+      path.resolve(config.getTargetDir(), pathName),
+    );
+
+    if (config.validatePathAccess(resolvedPathName, 'read')) {
+      if (await fileExists(resolvedPathName)) {
+        permissionsRequired.push(resolvedPathName);
+      }
+    }
+  }
+  return permissionsRequired;
+}
+
 interface ResolvedFile {
   part: AtCommandPart;
   pathSpec: string;
@@ -189,17 +220,6 @@ async function resolveFilePaths(
       continue;
     }
 
-    const resolvedPathName = path.isAbsolute(pathName)
-      ? pathName
-      : path.resolve(config.getTargetDir(), pathName);
-
-    if (!config.isPathAllowed(resolvedPathName)) {
-      onDebugMessage(
-        `Path ${pathName} is not in the workspace and will be skipped.`,
-      );
-      continue;
-    }
-
     const gitIgnored =
       respectFileIgnore.respectGitIgnore &&
       fileDiscovery.shouldIgnoreFile(pathName, {
@@ -229,9 +249,7 @@ async function resolveFilePaths(
 
     for (const dir of config.getWorkspaceContext().getDirectories()) {
       try {
-        const absolutePath = path.isAbsolute(pathName)
-          ? pathName
-          : path.resolve(dir, pathName);
+        const absolutePath = path.resolve(dir, pathName);
         const stats = await fs.stat(absolutePath);
 
         const relativePath = path.isAbsolute(pathName)
@@ -371,6 +389,7 @@ function constructInitialQuery(
 async function readMcpResources(
   resourceParts: AtCommandPart[],
   config: Config,
+  signal: AbortSignal,
 ): Promise<{
   parts: PartUnion[];
   displays: IndividualToolCallDisplay[];
@@ -396,7 +415,7 @@ async function readMcpResources(
           `MCP client for server '${resource.serverName}' is not available or not connected.`,
         );
       }
-      const response = await client.readResource(resource.uri);
+      const response = await client.readResource(resource.uri, { signal });
       const resourceParts = convertResourceContentsToParts(response);
       return {
         success: true,
@@ -665,7 +684,7 @@ export async function handleAtCommand({
   }
 
   const [mcpResult, fileResult] = await Promise.all([
-    readMcpResources(resourceParts, config),
+    readMcpResources(resourceParts, config, signal),
     readLocalFiles(resolvedFiles, config, signal, userMessageTimestamp),
   ]);
 

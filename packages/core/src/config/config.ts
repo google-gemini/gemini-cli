@@ -1540,8 +1540,14 @@ export class Config {
       if (registry.getTool(EXIT_PLAN_MODE_TOOL_NAME)) {
         registry.unregisterTool(EXIT_PLAN_MODE_TOOL_NAME);
       }
-      if (!registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
-        registry.registerTool(new EnterPlanModeTool(this, this.messageBus));
+      if (this.planEnabled) {
+        if (!registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
+          registry.registerTool(new EnterPlanModeTool(this, this.messageBus));
+        }
+      } else {
+        if (registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
+          registry.unregisterTool(ENTER_PLAN_MODE_TOOL_NAME);
+        }
       }
     }
 
@@ -1874,9 +1880,22 @@ export class Config {
    * Validates if a path is allowed and returns a detailed error message if not.
    *
    * @param absolutePath The absolute path to validate.
+   * @param checkType The type of access to check ('read' or 'write'). Defaults to 'write' for safety.
    * @returns An error message string if the path is disallowed, null otherwise.
    */
-  validatePathAccess(absolutePath: string): string | null {
+  validatePathAccess(
+    absolutePath: string,
+    checkType: 'read' | 'write' = 'write',
+  ): string | null {
+    // For read operations, check read-only paths first
+    if (checkType === 'read') {
+      if (this.getWorkspaceContext().isPathReadable(absolutePath)) {
+        return null;
+      }
+    }
+
+    // Then check standard allowed paths (Workspace + Temp)
+    // This covers 'write' checks and acts as a fallback/temp-dir check for 'read'
     if (this.isPathAllowed(absolutePath)) {
       return null;
     }
