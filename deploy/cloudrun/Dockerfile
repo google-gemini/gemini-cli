@@ -17,7 +17,7 @@ RUN cd packages/core && npm pack && mv *.tgz /tmp/gemini-core.tgz \
 
 # Stage 2: Build captain-hook (Rust binary)
 FROM rust:slim AS captain-hook-builder
-RUN apt-get update && apt-get install -y --no-install-recommends git pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends git pkg-config libssl-dev g++ && rm -rf /var/lib/apt/lists/*
 # Remove Rust docs to save ~500MB disk during build
 RUN rm -rf /usr/local/rustup/toolchains/*/share/doc
 RUN git clone --depth 1 https://github.com/epiphytic/captain-hook.git /build
