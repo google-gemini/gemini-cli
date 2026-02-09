@@ -22,10 +22,19 @@ export class StorageMigration {
     newPath: string,
   ): Promise<void> {
     try {
-      // If the new path already exists, we consider migration done or skipped to avoid overwriting.
-      // If the old path doesn't exist, there's nothing to migrate.
-      if (fs.existsSync(newPath) || !fs.existsSync(oldPath)) {
+      if (!fs.existsSync(oldPath)) {
         return;
+      }
+
+      if (fs.existsSync(newPath)) {
+        const files = await fs.promises.readdir(newPath);
+        // If it contains more than just the .project_root file, it's not a fresh directory from ProjectRegistry
+        if (
+          files.length > 1 ||
+          (files.length === 1 && files[0] !== '.project_root')
+        ) {
+          return;
+        }
       }
 
       // Ensure the parent directory of the new path exists
