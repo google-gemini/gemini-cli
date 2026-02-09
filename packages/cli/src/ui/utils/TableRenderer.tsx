@@ -11,11 +11,12 @@ import {
   toStyledCharacters,
   styledCharsToString,
   styledCharsWidth,
+  wordBreakStyledChars,
   wrapStyledChars,
   widestLineFromStyledChars,
 } from 'ink';
 import { theme } from '../semantic-colors.js';
-import { RenderInline, getPlainTextLength } from './InlineMarkdownRenderer.js';
+import { RenderInline } from './InlineMarkdownRenderer.js';
 
 interface TableRendererProps {
   headers: string[];
@@ -27,28 +28,9 @@ const MIN_COLUMN_WIDTH = 5;
 
 const calculateWidths = (text: string) => {
   const styledChars = toStyledCharacters(text);
-
-  const words: StyledChar[][] = [];
-  let currentWord: StyledChar[] = [];
-
-  // 1. Tokenize into words exactly like Ink does
-  for (const char of styledChars) {
-    if (char.value === '\n' || char.value === ' ') {
-      if (currentWord.length > 0) {
-        words.push(currentWord);
-      }
-      currentWord = [];
-      // Ink treats the delimiter itself as a "word" for processing
-      words.push([char]);
-    } else {
-      currentWord.push(char);
-    }
-  }
-  if (currentWord.length > 0) {
-    words.push(currentWord);
-  }
-
   const contentWidth = styledCharsWidth(styledChars);
+
+  const words: StyledChar[][] = wordBreakStyledChars(styledChars);
   const maxWordWidth = widestLineFromStyledChars(words);
 
   return { contentWidth, maxWordWidth };
@@ -142,8 +124,41 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     }
   }
 
-  // Add padding (+2) to get the visual widths expected by the renderers
-  const adjustedWidths = finalContentWidths.map((w) => w + 2);
+  // --- Step 4: Pre-wrap and Optimize Widths ---
+  const wrappedRows: string[][][] = [];
+  const actualColumnWidths = new Array(cleanedHeaders.length).fill(0);
+
+  const wrapAndProcessRow = (row: string[]) => {
+    const rowResult: string[][] = [];
+    row.forEach((cell, colIndex) => {
+      const allocatedWidth = finalContentWidths[colIndex];
+      const contentWidth = Math.max(1, allocatedWidth);
+
+      const contentStyledChars = toStyledCharacters(cell);
+      const wrappedStyledLines = wrapStyledChars(
+        contentStyledChars,
+        contentWidth,
+      );
+
+      const maxLineWidth = widestLineFromStyledChars(wrappedStyledLines);
+      actualColumnWidths[colIndex] = Math.max(
+        actualColumnWidths[colIndex],
+        maxLineWidth,
+      );
+
+      const lines = wrappedStyledLines.map((line) => styledCharsToString(line));
+      rowResult.push(lines);
+    });
+    return rowResult;
+  };
+
+  const wrappedHeaders = wrapAndProcessRow(cleanedHeaders);
+  rows.forEach((row) => {
+    wrappedRows.push(wrapAndProcessRow(row));
+  });
+
+  // Use the TIGHTEST widths that fit the wrapped content + padding
+  const adjustedWidths = actualColumnWidths.map((w) => w + 2);
 
   // Helper function to render a cell with proper width
   const renderCell = (
@@ -152,7 +167,8 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     isHeader = false,
   ): React.ReactNode => {
     const contentWidth = Math.max(0, width - 2);
-    const displayWidth = getPlainTextLength(content);
+    const styledChars = toStyledCharacters(content);
+    const displayWidth = styledCharsWidth(styledChars);
     const paddingNeeded = Math.max(0, contentWidth - displayWidth);
 
     return (
@@ -212,27 +228,10 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
 
   // Handles the wrapping logic for a logical data row
   const renderDataRow = (
-    row: string[],
+    wrappedCells: string[][],
     rowIndex: number,
     isHeader = false,
   ): React.ReactNode => {
-    const wrappedCells = row.map((cell, colIndex) => {
-      const colWidth = adjustedWidths[colIndex];
-      const contentWidth = Math.max(1, colWidth - 2); // Subtract padding
-
-      const contentStyledChars = toStyledCharacters(cell);
-      const wrappedStyledLines = wrapStyledChars(
-        contentStyledChars,
-        contentWidth,
-      );
-
-      const finalLines = wrappedStyledLines.map((styledLine: StyledChar[]) =>
-        styledCharsToString(styledLine),
-      );
-
-      return finalLines;
-    });
-
     const maxHeight = Math.max(...wrappedCells.map((lines) => lines.length), 1);
 
     const visualRows: React.ReactNode[] = [];
@@ -257,13 +256,13 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
       Header row
       Keep the rowIndex as -1 to differentiate from data rows
       */}
-      {renderDataRow(cleanedHeaders, -1, true)}
+      {renderDataRow(wrappedHeaders, -1, true)}
 
       {/* Middle border */}
       {renderBorder('middle')}
 
       {/* Data rows */}
-      {rows.map((row, index) => renderDataRow(row, index))}
+      {wrappedRows.map((row, index) => renderDataRow(row, index))}
 
       {/* Bottom border */}
       {renderBorder('bottom')}
