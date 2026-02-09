@@ -181,10 +181,7 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
           config.getSessionId() || 'unknown-session',
         );
 
-      const selectedModel = resolveClassifierModel(
-        context.requestedModel ?? config.getModel(),
-        modelAlias,
-      );
+      const selectedModel = resolveClassifierModel(model, modelAlias);
 
       const latencyMs = Date.now() - startTime;
 
