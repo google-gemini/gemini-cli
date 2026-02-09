@@ -261,4 +261,44 @@ another user turn
     // There should be 1 item which is the flattened history.
     expect(generateJsonCall).toHaveLength(1);
   });
+
+  it('should filter out non-text parts from history', async () => {
+    mockContext.history = [
+      { role: 'user', parts: [{ text: 'first message' }] },
+      // This part has no `text` property and should be filtered out.
+      { role: 'user', parts: [{}] } as Content,
+      { role: 'user', parts: [{ text: 'second message' }] },
+    ];
+    const mockApiResponse = {
+      reasoning: 'Simple.',
+      model_choice: 'flash',
+    };
+    mockGenerateJson.mockResolvedValue(mockApiResponse);
+
+    await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
+
+    type GenerateJsonCall = [Content[], string, string | undefined];
+    const calls = mockGenerateJson.mock.calls as GenerateJsonCall[];
+    const contents = calls[0][0];
+    const lastTurn = contents.at(-1);
+    expect(lastTurn).toBeDefined();
+
+    const expectedLastTurn = `You are provided with a **Chat History** and the user's **Current Request** below.
+
+#### Chat History:
+first message
+
+second message
+
+#### Current Request:
+"simple task"
+`;
+     
+    expect(lastTurn!.parts!.at(0)!.text).toEqual(expectedLastTurn);
+  });
 });

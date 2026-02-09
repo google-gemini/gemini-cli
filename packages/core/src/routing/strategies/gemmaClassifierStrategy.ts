@@ -138,13 +138,22 @@ export class GemmaClassifierStrategy implements RoutingStrategy {
     const formattedHistory = turns
       .slice(0, -1)
       .map((turn) =>
-        turn.parts ? turn.parts.map((part) => part.text).join('\n') : '',
+        turn.parts
+          ? turn.parts
+              .map((part) => part.text)
+              .filter(Boolean)
+              .join('\n')
+          : '',
       )
+      .filter(Boolean)
       .join('\n\n');
 
     const lastTurn = turns.at(-1);
     const userRequest =
-      lastTurn?.parts?.map((part: Part) => part.text).join('\n\n') ?? '';
+      lastTurn?.parts
+        ?.map((part: Part) => part.text)
+        .filter(Boolean)
+        .join('\n\n') ?? '';
 
     const finalPrompt = `You are provided with a **Chat History** and the user's **Current Request** below.
 
