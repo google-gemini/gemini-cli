@@ -16,10 +16,13 @@ RUN cd packages/core && npm pack && mv *.tgz /tmp/gemini-core.tgz \
     && cd ../a2a-server && npm pack && mv *.tgz /tmp/gemini-a2a-server.tgz
 
 # Stage 2: Build captain-hook (Rust binary)
-FROM rust:latest AS captain-hook-builder
-RUN git clone https://github.com/epiphytic/captain-hook.git /build
+FROM rust:slim AS captain-hook-builder
+RUN apt-get update && apt-get install -y --no-install-recommends git pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
+# Remove Rust docs to save ~500MB disk during build
+RUN rm -rf /usr/local/rustup/toolchains/*/share/doc
+RUN git clone --depth 1 https://github.com/epiphytic/captain-hook.git /build
 WORKDIR /build
-RUN cargo build --release
+RUN cargo build --release && rm -rf target/release/deps target/release/build target/release/.fingerprint
 
 # Stage 3: Build ai-plugin-translator
 FROM node:20 AS translator-builder
