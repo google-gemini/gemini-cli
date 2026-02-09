@@ -53,25 +53,6 @@ export function disableSimulationAfterFallback(): void {
 }
 
 /**
- * Create a simulated 429 error response
- */
-export function createSimulated429Error(): Error {
-  const error = new Error('Rate limit exceeded (simulated)') as Error & {
-    status: number;
-  };
-  error.status = 429;
-  return error;
-}
-
-/**
- * Reset simulation state when switching auth methods
- */
-export function resetSimulationState(): void {
-  fallbackOccurred = false;
-  resetRequestCounter();
-}
-
-/**
  * Enable/disable 429 simulation programmatically (for tests)
  */
 export function setSimulate429(
