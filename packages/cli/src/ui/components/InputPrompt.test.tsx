@@ -7,7 +7,7 @@
 import { renderWithProviders } from '../../test-utils/render.js';
 import { createMockSettings } from '../../test-utils/settings.js';
 import { waitFor } from '../../test-utils/async.js';
-import { act, useState } from 'react';
+import { act, useContext, useState } from 'react';
 import type { InputPromptProps } from './InputPrompt.js';
 import { InputPrompt } from './InputPrompt.js';
 import type { TextBuffer } from './shared/text-buffer.js';
@@ -41,7 +41,8 @@ import stripAnsi from 'strip-ansi';
 import chalk from 'chalk';
 import { StreamingState } from '../types.js';
 import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
-import type { UIState } from '../contexts/UIStateContext.js';
+import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
+import { UIActionsContext } from '../contexts/UIActionsContext.js';
 import { isLowColorDepth } from '../utils/terminalUtils.js';
 import { cpLen } from '../utils/textUtils.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
@@ -4030,6 +4031,119 @@ describe('InputPrompt', () => {
   });
 
   describe('shortcuts help visibility', () => {
+    const StatefulShortcutsInputPrompt = ({
+      onSetShortcutsHelpVisible,
+    }: {
+      onSetShortcutsHelpVisible: (visible: boolean) => void;
+    }) => {
+      const parentUiState = useContext(UIStateContext);
+      const parentUiActions = useContext(UIActionsContext);
+
+      if (!parentUiState || !parentUiActions) {
+        throw new Error(
+          'StatefulShortcutsInputPrompt must be rendered in context',
+        );
+      }
+
+      const [shortcutsHelpVisible, setShortcutsHelpVisible] = useState(
+        parentUiState.shortcutsHelpVisible,
+      );
+
+      return (
+        <UIStateContext.Provider
+          value={{ ...parentUiState, shortcutsHelpVisible }}
+        >
+          <UIActionsContext.Provider
+            value={{
+              ...parentUiActions,
+              setShortcutsHelpVisible: (visible: boolean) => {
+                onSetShortcutsHelpVisible(visible);
+                setShortcutsHelpVisible(visible);
+              },
+            }}
+          >
+            <InputPrompt {...props} />
+          </UIActionsContext.Provider>
+        </UIStateContext.Provider>
+      );
+    };
+
+    it('should use tri-state ? behavior on an empty prompt', async () => {
+      const setShortcutsHelpVisible = vi.fn();
+      const { stdin, unmount } = renderWithProviders(
+        <StatefulShortcutsInputPrompt
+          onSetShortcutsHelpVisible={setShortcutsHelpVisible}
+        />,
+        {
+          uiActions,
+          uiState: { shortcutsHelpVisible: false },
+        },
+      );
+
+      await act(async () => {
+        stdin.write('?');
+      });
+
+      await waitFor(() => {
+        expect(setShortcutsHelpVisible).toHaveBeenNthCalledWith(1, true);
+      });
+      expect(props.buffer.handleInput).not.toHaveBeenCalled();
+
+      await act(async () => {
+        stdin.write('?');
+      });
+
+      await waitFor(() => {
+        expect(setShortcutsHelpVisible).toHaveBeenNthCalledWith(2, false);
+      });
+      expect(props.buffer.handleInput).not.toHaveBeenCalled();
+
+      await act(async () => {
+        stdin.write('?');
+      });
+
+      await waitFor(() => {
+        expect(props.buffer.handleInput).toHaveBeenCalledWith(
+          expect.objectContaining({ sequence: '?', insertable: true }),
+        );
+      });
+      expect(setShortcutsHelpVisible).toHaveBeenCalledTimes(2);
+      unmount();
+    });
+
+    it('should close the shortcuts panel and insert other characters normally', async () => {
+      const setShortcutsHelpVisible = vi.fn();
+      const { stdin, unmount } = renderWithProviders(
+        <StatefulShortcutsInputPrompt
+          onSetShortcutsHelpVisible={setShortcutsHelpVisible}
+        />,
+        {
+          uiActions,
+          uiState: { shortcutsHelpVisible: false },
+        },
+      );
+
+      await act(async () => {
+        stdin.write('?');
+      });
+
+      await waitFor(() => {
+        expect(setShortcutsHelpVisible).toHaveBeenNthCalledWith(1, true);
+      });
+
+      await act(async () => {
+        stdin.write('a');
+      });
+
+      await waitFor(() => {
+        expect(setShortcutsHelpVisible).toHaveBeenNthCalledWith(2, false);
+      });
+      expect(props.buffer.handleInput).toHaveBeenCalledWith(
+        expect.objectContaining({ sequence: 'a', insertable: true }),
+      );
+      unmount();
+    });
+
     it.each([
       {
         name: 'terminal paste event occurs',

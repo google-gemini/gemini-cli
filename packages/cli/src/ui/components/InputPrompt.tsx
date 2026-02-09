@@ -106,6 +106,11 @@ export interface InputPromptProps {
   setBannerVisible: (visible: boolean) => void;
 }
 
+type QuestionToggleState =
+  | 'idle'
+  | 'openedByQuestion'
+  | 'dismissedByQuestionToggle';
+
 // The input content, input container, and input suggestions list may have different widths
 export const calculatePromptWidths = (mainContentWidth: number) => {
   const FRAME_PADDING_AND_BORDER = 4; // Border (2) + padding (2)
@@ -169,6 +174,9 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     number | null
   >(null);
   const pasteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Empty prompt `?` follows a 3-step cycle:
+  // open shortcuts panel -> close panel -> insert literal `?`.
+  const questionToggleStateRef = useRef<QuestionToggleState>('idle');
   const innerBoxRef = useRef<DOMElement>(null);
 
   const [reverseSearchActive, setReverseSearchActive] = useState(false);
@@ -362,6 +370,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     if (shortcutsHelpVisible) {
       setShortcutsHelpVisible(false);
     }
+    questionToggleStateRef.current = 'idle';
     try {
       if (await clipboardHasImage()) {
         const imagePath = await saveClipboardImage(config.getTargetDir());
@@ -546,11 +555,54 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return false;
       }
 
+      const isInsertableQuestion = key.sequence === '?' && key.insertable;
+      const isPromptEmpty = buffer.text.length === 0;
+
+      if (!isPromptEmpty && questionToggleStateRef.current !== 'idle') {
+        questionToggleStateRef.current = 'idle';
+      }
+
+      if (
+        !shortcutsHelpVisible &&
+        questionToggleStateRef.current === 'openedByQuestion'
+      ) {
+        questionToggleStateRef.current = 'idle';
+      }
+
+      if (
+        questionToggleStateRef.current === 'dismissedByQuestionToggle' &&
+        !isInsertableQuestion
+      ) {
+        questionToggleStateRef.current = 'idle';
+      }
+
+      if (isInsertableQuestion && isPromptEmpty) {
+        if (questionToggleStateRef.current === 'openedByQuestion') {
+          setShortcutsHelpVisible(false);
+          questionToggleStateRef.current = 'dismissedByQuestionToggle';
+          return true;
+        }
+        if (
+          questionToggleStateRef.current === 'dismissedByQuestionToggle' &&
+          !shortcutsHelpVisible
+        ) {
+          questionToggleStateRef.current = 'idle';
+          buffer.handleInput(key);
+          return true;
+        }
+        if (!shortcutsHelpVisible) {
+          setShortcutsHelpVisible(true);
+          questionToggleStateRef.current = 'openedByQuestion';
+          return true;
+        }
+      }
+
       // Handle escape to close shortcuts panel first, before letting it bubble
       // up for cancellation. This ensures pressing Escape once closes the panel,
       // and pressing again cancels the operation.
       if (shortcutsHelpVisible && key.name === 'escape') {
         setShortcutsHelpVisible(false);
+        questionToggleStateRef.current = 'idle';
         return true;
       }
 
@@ -566,6 +618,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         if (shortcutsHelpVisible) {
           setShortcutsHelpVisible(false);
         }
+        questionToggleStateRef.current = 'idle';
         // Record paste time to prevent accidental auto-submission
         if (!isTerminalPasteTrusted(kittyProtocol.enabled)) {
           setRecentUnsafePasteTime(Date.now());
@@ -597,6 +650,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       if (shortcutsHelpVisible) {
         if (key.sequence === '?' && key.insertable) {
           setShortcutsHelpVisible(false);
+          questionToggleStateRef.current = 'idle';
           buffer.handleInput(key);
           return true;
         }
@@ -604,21 +658,13 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         // potentially cancelling an operation
         if (key.name === 'backspace' || key.sequence === '\b') {
           setShortcutsHelpVisible(false);
+          questionToggleStateRef.current = 'idle';
           return true;
         }
         if (key.insertable) {
           setShortcutsHelpVisible(false);
+          questionToggleStateRef.current = 'idle';
         }
-      }
-
-      if (
-        key.sequence === '?' &&
-        key.insertable &&
-        !shortcutsHelpVisible &&
-        buffer.text.length === 0
-      ) {
-        setShortcutsHelpVisible(true);
-        return true;
       }
 
       if (vimHandleInput && vimHandleInput(key)) {
