@@ -19,6 +19,8 @@
   "scripts": {
     "start": "cross-env NODE_ENV=development node scripts/start.js",
     "start:a2a-server": "CODER_AGENT_PORT=41242 npm run start --workspace @google/gemini-cli-a2a-server",
+    "start:gca-proxy": "node scripts/start-with-gca-proxy.js",
+    "setup:gca-proxy": "cd tools/gca-proxy && npm install && cd client && npm install && npm run build",
     "debug": "cross-env DEBUG=1 node --inspect-brk scripts/start.js",
     "deflake": "node scripts/deflake.js",
     "deflake:test:integration:sandbox:none": "npm run deflake -- --command=\"npm run test:integration:sandbox:none -- --retry=0\"",
