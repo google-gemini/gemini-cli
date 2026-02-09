@@ -145,7 +145,7 @@ export class DiffManager {
 
     if (uriToClose) {
       const rightDoc = await vscode.workspace.openTextDocument(uriToClose);
-      const modifiedContent = rightDoc.getText();
+      const modifiedContent = rightDoc.getText() ?? '';
       await this.closeDiffEditor(uriToClose);
       return modifiedContent;
     }
@@ -162,7 +162,7 @@ export class DiffManager {
     }
 
     const rightDoc = await vscode.workspace.openTextDocument(rightDocUri);
-    const modifiedContent = rightDoc.getText();
+    const modifiedContent = rightDoc.getText() ?? '';
     await this.closeDiffEditor(rightDocUri);
 
     this.onDidChangeEmitter.fire(
@@ -188,7 +188,7 @@ export class DiffManager {
     }
 
     const rightDoc = await vscode.workspace.openTextDocument(rightDocUri);
-    const modifiedContent = rightDoc.getText();
+    const modifiedContent = rightDoc.getText() ?? '';
     await this.closeDiffEditor(rightDocUri);
 
     this.onDidChangeEmitter.fire(
