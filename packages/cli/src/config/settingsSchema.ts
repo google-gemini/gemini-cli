@@ -179,6 +179,15 @@ const SETTINGS_SCHEMA = {
         description: 'Enable Vim keybindings',
         showInDialog: true,
       },
+      devtools: {
+        type: 'boolean',
+        label: 'DevTools',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        description: 'Enable DevTools inspector on launch.',
+        showInDialog: false,
+      },
       enableAutoUpdate: {
         type: 'boolean',
         label: 'Enable Auto Update',
