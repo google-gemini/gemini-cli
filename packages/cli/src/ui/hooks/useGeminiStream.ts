@@ -1088,7 +1088,6 @@ export const useGeminiStream = (
       for await (const event of stream) {
         if (
           event.type !== ServerGeminiEventType.Thought &&
-          getInlineThinkingMode(settings) === 'summary' &&
           thoughtRef.current !== null
         ) {
           setThought(null);
@@ -1186,7 +1185,6 @@ export const useGeminiStream = (
       handleContentEvent,
       handleThoughtEvent,
       thoughtRef,
-      settings,
       handleUserCancelledEvent,
       handleErrorEvent,
       scheduleToolCalls,

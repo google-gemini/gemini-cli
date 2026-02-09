@@ -6,7 +6,7 @@
 
 import type { LoadedSettings } from '../../config/settings.js';
 
-export type InlineThinkingMode = 'off' | 'summary' | 'full';
+export type InlineThinkingMode = 'off' | 'full';
 
 export function getInlineThinkingMode(
   settings: LoadedSettings,

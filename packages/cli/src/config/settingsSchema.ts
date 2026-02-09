@@ -389,12 +389,10 @@ const SETTINGS_SCHEMA = {
         category: 'UI',
         requiresRestart: false,
         default: 'off',
-        description:
-          'Display model thinking inline: off, summary (truncated), or full.',
+        description: 'Display model thinking inline: off or full.',
         showInDialog: true,
         options: [
           { value: 'off', label: 'Off' },
-          { value: 'summary', label: 'Summary' },
           { value: 'full', label: 'Full' },
         ],
       },

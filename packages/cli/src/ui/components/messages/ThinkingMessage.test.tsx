@@ -9,26 +9,22 @@ import { renderWithProviders } from '../../../test-utils/render.js';
 import { ThinkingMessage } from './ThinkingMessage.js';
 
 describe('ThinkingMessage', () => {
-  it('renders summary mode text without icon chrome', () => {
+  it('renders subject line', () => {
     const { lastFrame } = renderWithProviders(
       <ThinkingMessage
         thought={{ subject: 'Planning', description: 'test' }}
         terminalWidth={80}
-        mode="summary"
       />,
     );
 
     expect(lastFrame()).toContain('Planning');
-    expect(lastFrame()).not.toContain('💬');
-    expect(lastFrame()).not.toContain('╭');
   });
 
-  it('uses description when subject is empty in summary mode', () => {
+  it('uses description when subject is empty', () => {
     const { lastFrame } = renderWithProviders(
       <ThinkingMessage
         thought={{ subject: '', description: 'Processing details' }}
         terminalWidth={80}
-        mode="summary"
       />,
     );
 
@@ -43,7 +39,6 @@ describe('ThinkingMessage', () => {
           description: 'I am planning the solution.',
         }}
         terminalWidth={80}
-        mode="full"
       />,
     );
 
@@ -64,7 +59,6 @@ describe('ThinkingMessage', () => {
           description: 'First body line',
         }}
         terminalWidth={80}
-        mode="full"
       />,
     );
 
@@ -82,7 +76,6 @@ describe('ThinkingMessage', () => {
           description: '\\n\\n',
         }}
         terminalWidth={80}
-        mode="full"
       />,
     );
 
@@ -95,7 +88,6 @@ describe('ThinkingMessage', () => {
       <ThinkingMessage
         thought={{ subject: '', description: '' }}
         terminalWidth={80}
-        mode="summary"
       />,
     );
 

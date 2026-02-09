@@ -28,9 +28,18 @@ import { StreamingState, ToolCallStatus } from '../types.js';
 
 // Mock child components
 vi.mock('./LoadingIndicator.js', () => ({
-  LoadingIndicator: ({ thought }: { thought?: string }) => (
-    <Text>LoadingIndicator{thought ? `: ${thought}` : ''}</Text>
-  ),
+  LoadingIndicator: ({
+    thought,
+    thoughtLabel,
+  }: {
+    thought?: { subject?: string } | string;
+    thoughtLabel?: string;
+  }) => {
+    const fallbackText =
+      typeof thought === 'string' ? thought : thought?.subject;
+    const text = thoughtLabel ?? fallbackText;
+    return <Text>LoadingIndicator{text ? `: ${text}` : ''}</Text>;
+  },
 }));
 
 vi.mock('./ContextSummaryDisplay.js', () => ({
@@ -276,7 +285,25 @@ describe('Composer', () => {
       const { lastFrame } = renderComposer(uiState);
 
       const output = lastFrame();
-      expect(output).toContain('LoadingIndicator');
+      expect(output).toContain('LoadingIndicator: Processing');
+    });
+
+    it('renders generic thinking text in loading indicator when full inline thinking is enabled', () => {
+      const uiState = createMockUIState({
+        streamingState: StreamingState.Responding,
+        thought: {
+          subject: 'Detailed in-history thought',
+          description: 'Full text is already in history',
+        },
+      });
+      const settings = createMockSettings({
+        ui: { inlineThinkingMode: 'full' },
+      });
+
+      const { lastFrame } = renderComposer(uiState, settings);
+
+      const output = lastFrame();
+      expect(output).toContain('LoadingIndicator: Thinking ...');
     });
 
     it('keeps shortcuts hint visible while loading', () => {

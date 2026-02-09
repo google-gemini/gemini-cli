@@ -5,20 +5,16 @@
  */
 
 import type React from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Box, Text } from 'ink';
 import type { ThoughtSummary } from '@google/gemini-cli-core';
 import { theme } from '../../semantic-colors.js';
-import type { InlineThinkingMode } from '../../utils/inlineThinkingMode.js';
 
 interface ThinkingMessageProps {
   thought: ThoughtSummary;
   terminalWidth: number;
-  mode: Exclude<InlineThinkingMode, 'off'>;
 }
 
-const MAX_THOUGHT_SUMMARY_LENGTH = 140;
-const SUMMARY_BLINK_INTERVAL_MS = 450;
 const THINKING_LEFT_PADDING = 1;
 
 function splitGraphemes(value: string): string[] {
@@ -30,29 +26,6 @@ function splitGraphemes(value: string): string[] {
   }
 
   return Array.from(value);
-}
-
-function summarizeThought(thought: ThoughtSummary): string {
-  const subject = normalizeEscapedNewlines(thought.subject).trim();
-  if (subject) {
-    return subject;
-  }
-
-  const description = normalizeEscapedNewlines(thought.description).trim();
-  if (!description) {
-    return '';
-  }
-
-  const descriptionGraphemes = splitGraphemes(description);
-  if (descriptionGraphemes.length <= MAX_THOUGHT_SUMMARY_LENGTH) {
-    return description;
-  }
-
-  const trimmed = descriptionGraphemes
-    .slice(0, MAX_THOUGHT_SUMMARY_LENGTH - 3)
-    .join('')
-    .trimEnd();
-  return `${trimmed}...`;
 }
 
 function normalizeEscapedNewlines(value: string): string {
@@ -144,10 +117,7 @@ function wrapLineToWidth(line: string, width: number): string[] {
 export const ThinkingMessage: React.FC<ThinkingMessageProps> = ({
   thought,
   terminalWidth,
-  mode,
 }) => {
-  const [isBlinkVisible, setIsBlinkVisible] = useState(true);
-  const summaryText = useMemo(() => summarizeThought(thought), [thought]);
   const fullLines = useMemo(() => normalizeThoughtLines(thought), [thought]);
   const fullSummaryDisplayLines = useMemo(() => {
     const contentWidth = Math.max(terminalWidth - THINKING_LEFT_PADDING - 2, 1);
@@ -161,44 +131,6 @@ export const ThinkingMessage: React.FC<ThinkingMessageProps> = ({
       .slice(1)
       .flatMap((line) => wrapLineToWidth(line, contentWidth));
   }, [fullLines, terminalWidth]);
-  const shouldBlinkSummary =
-    mode === 'summary' &&
-    summaryText.length > 0 &&
-    process.env['NODE_ENV'] !== 'test';
-
-  useEffect(() => {
-    if (!shouldBlinkSummary) {
-      return;
-    }
-
-    setIsBlinkVisible(true);
-    const interval = setInterval(() => {
-      setIsBlinkVisible((current) => !current);
-    }, SUMMARY_BLINK_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [shouldBlinkSummary, summaryText]);
-
-  if (mode === 'summary') {
-    if (!summaryText) {
-      return null;
-    }
-
-    return (
-      <Box
-        width={terminalWidth}
-        marginBottom={1}
-        paddingLeft={THINKING_LEFT_PADDING}
-        flexDirection="row"
-      >
-        <Box width={2}>
-          <Text color={theme.text.accent}>{isBlinkVisible ? '●' : ' '}</Text>
-        </Box>
-        <Text color={theme.text.secondary} bold italic wrap="truncate-end">
-          {summaryText}
-        </Text>
-      </Box>
-    );
-  }
 
   if (
     fullSummaryDisplayLines.length === 0 &&

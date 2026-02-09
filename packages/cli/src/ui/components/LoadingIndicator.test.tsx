@@ -215,7 +215,6 @@ describe('<LoadingIndicator />', () => {
         description: 'and other stuff.',
       },
       elapsedTime: 5,
-      showThoughtIndicator: true,
     };
     const { lastFrame, unmount } = renderWithContext(
       <LoadingIndicator {...props} />,
@@ -239,7 +238,6 @@ describe('<LoadingIndicator />', () => {
         description: 'details',
       },
       elapsedTime: 5,
-      showThoughtIndicator: true,
     };
     const { lastFrame, unmount } = renderWithContext(
       <LoadingIndicator {...props} />,
@@ -260,7 +258,6 @@ describe('<LoadingIndicator />', () => {
       },
       currentLoadingPhrase: 'This should not be displayed',
       elapsedTime: 5,
-      showThoughtIndicator: true,
     };
     const { lastFrame, unmount } = renderWithContext(
       <LoadingIndicator {...props} />,
@@ -278,7 +275,6 @@ describe('<LoadingIndicator />', () => {
       <LoadingIndicator
         currentLoadingPhrase="some random tip..."
         elapsedTime={3}
-        showThoughtIndicator={true}
       />,
       StreamingState.Responding,
     );

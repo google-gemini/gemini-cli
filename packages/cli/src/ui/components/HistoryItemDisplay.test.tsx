@@ -243,7 +243,7 @@ describe('<HistoryItemDisplay />', () => {
         <HistoryItemDisplay
           {...baseItem}
           item={item}
-          inlineThinkingMode="summary"
+          inlineThinkingMode="full"
         />,
       );
 

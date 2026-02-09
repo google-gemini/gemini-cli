@@ -23,8 +23,8 @@ interface LoadingIndicatorProps {
   inline?: boolean;
   rightContent?: React.ReactNode;
   thought?: ThoughtSummary | null;
+  thoughtLabel?: string;
   showCancelAndTimer?: boolean;
-  showThoughtIndicator?: boolean;
 }
 
 export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
@@ -33,8 +33,8 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   inline = false,
   rightContent,
   thought,
+  thoughtLabel,
   showCancelAndTimer = true,
-  showThoughtIndicator = false,
 }) => {
   const streamingState = useStreamingContext();
   const { columns: terminalWidth } = useTerminalSize();
@@ -53,9 +53,10 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   const primaryText =
     currentLoadingPhrase === INTERACTIVE_SHELL_WAITING_PHRASE
       ? currentLoadingPhrase
-      : thought?.subject || currentLoadingPhrase;
+      : thought?.subject
+        ? (thoughtLabel ?? thought.subject)
+        : currentLoadingPhrase;
   const hasThoughtIndicator =
-    showThoughtIndicator &&
     currentLoadingPhrase !== INTERACTIVE_SHELL_WAITING_PHRASE &&
     Boolean(thought?.subject?.trim());
   const thinkingIndicator = hasThoughtIndicator
