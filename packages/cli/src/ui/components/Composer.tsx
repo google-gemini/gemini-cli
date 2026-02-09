@@ -67,6 +67,8 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     uiState.shortcutsHelpVisible &&
     uiState.streamingState === StreamingState.Idle &&
     !hasPendingActionRequired;
+  const showShortcutsHint =
+    uiState.streamingState === StreamingState.Idle && !hasPendingActionRequired;
   const showLoadingIndicator =
     (!uiState.embeddedShellFocused || uiState.isBackgroundShellVisible) &&
     uiState.streamingState === StreamingState.Responding &&
@@ -140,7 +142,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             flexDirection="column"
             alignItems={isNarrow ? 'flex-start' : 'flex-end'}
           >
-            {!hasPendingActionRequired && <ShortcutsHint />}
+            {showShortcutsHint && <ShortcutsHint />}
           </Box>
         </Box>
         {showShortcutsHelp && <ShortcutsHelp />}

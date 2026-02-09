@@ -279,7 +279,7 @@ describe('Composer', () => {
       expect(output).toContain('LoadingIndicator');
     });
 
-    it('keeps shortcuts hint visible while loading', () => {
+    it('hides shortcuts hint while loading', () => {
       const uiState = createMockUIState({
         streamingState: StreamingState.Responding,
         elapsedTime: 1,
@@ -289,7 +289,7 @@ describe('Composer', () => {
 
       const output = lastFrame();
       expect(output).toContain('LoadingIndicator');
-      expect(output).toContain('ShortcutsHint');
+      expect(output).not.toContain('ShortcutsHint');
     });
 
     it('renders LoadingIndicator without thought when accessibility disables loading phrases', () => {
