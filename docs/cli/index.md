@@ -23,6 +23,8 @@ overview of Gemini CLI, see the [main documentation page](../index.md).
 
 ## Advanced features
 
+- **[Plan mode (experimental)](./plan-mode.md):** Use a safe, read-only mode for
+  planning complex changes.
 - **[Checkpointing](./checkpointing.md):** Automatically save and restore
   snapshots of your session and files.
 - **[Enterprise configuration](./enterprise.md):** Deploy and manage Gemini CLI
