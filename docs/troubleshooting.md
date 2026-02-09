@@ -97,6 +97,21 @@ topics on:
     documentation for more information, including how to customize your sandbox
     configuration.
 
+- **Error: "DiscoveredTool: sandbox-exec is configured but not supported..."**
+  - **Cause:** You are attempting to run a custom discovered tool while
+    configured to use `sandbox-exec` (macOS Seatbelt), but the agent itself is
+    not running inside the sandbox. The system cannot safely wrap the individual
+    tool execution in this mode.
+  - **Solution:** Restart the Gemini CLI with the `--sandbox` flag to run the
+    entire session inside the sandbox.
+
+- **Error: "DiscoveredTool: Unknown sandbox command..."**
+  - **Cause:** You have configured a custom sandbox command that the system does
+    not know how to use for transient tool wrapping.
+  - **Solution:** Restart the Gemini CLI with the `--sandbox` flag to run the
+    entire session inside the sandbox, or switch to a supported sandbox type
+    (`docker` or `podman`).
+
 - **Gemini CLI is not running in interactive mode in "CI" environments**
   - **Issue:** The Gemini CLI does not enter interactive mode (no prompt
     appears) if an environment variable starting with `CI_` (e.g., `CI_TOKEN`)

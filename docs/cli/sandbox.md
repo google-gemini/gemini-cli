@@ -157,6 +157,20 @@ gemini -s -p "run shell command: env | grep SANDBOX"
 gemini -s -p "run shell command: mount | grep workspace"
 ```
 
+## Discovered tools
+
+When using custom discovered tools (configured via `tools.discoveryCommand`),
+the Gemini CLI automatically enforces sandboxing if a container-based sandbox
+(`docker` or `podman`) is configured.
+
+If the session is running on the host, tool execution is automatically wrapped
+in a hardened transient container. For more details on the security measures and
+limitations of this feature, see the
+[Core Tools API documentation](../core/tools-api.md#sandboxing-and-security-for-discovered-tools).
+
+> **Warning:** Automatic wrapping is not supported for `sandbox-exec`. Execution
+> will fail unless the entire session is started with `--sandbox`.
+
 ## Security notes
 
 - Sandboxing reduces but doesn't eliminate all risks.

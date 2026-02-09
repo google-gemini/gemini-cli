@@ -21,7 +21,9 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import { MockTool } from '../test-utils/mock-tool.js';
 import { ToolErrorType } from './tool-error.js';
+import { FatalToolExecutionError } from '../utils/errors.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 vi.mock('node:fs');
 
@@ -673,6 +675,169 @@ describe('ToolRegistry', () => {
       const invocation = tool.build(params);
       const description = invocation.getDescription();
       expect(description).toBe(JSON.stringify(params));
+    });
+
+    describe('sandboxing', () => {
+      let mockSpawn: any;
+
+      beforeEach(() => {
+        mockSpawn = vi.mocked(spawn);
+        mockSpawn.mockReturnValue(createExecutionProcess(0) as any);
+        vi.spyOn(config, 'getToolCallCommand').mockReturnValue('python');
+
+        if (process.getuid) vi.spyOn(process, 'getuid').mockReturnValue(1000);
+        if (process.getgid) vi.spyOn(process, 'getgid').mockReturnValue(1000);
+
+        // Clear env vars that might be propagated to the sandbox to ensure predictable test results
+        [
+          'GEMINI_API_KEY',
+          'GOOGLE_API_KEY',
+          'GOOGLE_GEMINI_BASE_URL',
+          'GOOGLE_VERTEX_BASE_URL',
+          'GOOGLE_GENAI_USE_VERTEXAI',
+          'GOOGLE_GENAI_USE_GCA',
+          'GOOGLE_CLOUD_PROJECT',
+          'GOOGLE_CLOUD_LOCATION',
+          'GEMINI_MODEL',
+          'TERM',
+          'COLORTERM',
+        ].forEach((env) => vi.stubEnv(env, ''));
+      });
+
+      afterEach(() => {
+        vi.unstubAllEnvs();
+      });
+
+      const createTool = () => new DiscoveredTool(
+          config,
+          'myscript.py',
+          DISCOVERED_TOOL_PREFIX + 'myscript',
+          'A script',
+          {},
+          mockMessageBus,
+        );
+
+      it('should execute command directly when sandbox is not configured', async () => {
+        vi.spyOn(config, 'getSandbox').mockReturnValue(undefined);
+        vi.stubEnv('SANDBOX', '');
+
+        const tool = createTool();
+        const invocation = tool.build({});
+        await invocation.execute(new AbortController().signal);
+
+        expect(mockSpawn).toHaveBeenCalledWith('python', ['myscript.py']);
+      });
+
+      it('should execute command directly when already running in a sandbox', async () => {
+        vi.spyOn(config, 'getSandbox').mockReturnValue({
+          command: 'docker',
+          image: 'test-image',
+        });
+        vi.stubEnv('SANDBOX', 'true'); // Simulate being inside sandbox
+
+        const tool = createTool();
+        const invocation = tool.build({});
+        await invocation.execute(new AbortController().signal);
+
+        expect(mockSpawn).toHaveBeenCalledWith('python', ['myscript.py']);
+      });
+
+      it('should wrap command in docker run when sandbox is configured and not active', async () => {
+        vi.spyOn(config, 'getSandbox').mockReturnValue({
+          command: 'docker',
+          image: 'test-image',
+        });
+        vi.stubEnv('SANDBOX', ''); // Not inside sandbox
+        // Mock getTargetDir to return a fixed path for assertion
+        vi.spyOn(config, 'getTargetDir').mockReturnValue('/project/root');
+
+        const tool = createTool();
+        const invocation = tool.build({});
+        await invocation.execute(new AbortController().signal);
+
+        expect(mockSpawn).toHaveBeenCalledWith('docker', [
+          'run',
+          '-i',
+          '--rm',
+          '--security-opt',
+          'no-new-privileges',
+          '--cap-drop',
+          'ALL',
+          '--user',
+          '1000:1000',
+          '-v',
+          '/project/root:/project/root',
+          '-w',
+          '/project/root',
+          'test-image',
+          'python',
+          'myscript.py',
+        ]);
+      });
+
+      it('should wrap command in podman run when configured', async () => {
+        vi.spyOn(config, 'getSandbox').mockReturnValue({
+          command: 'podman',
+          image: 'test-image',
+        });
+        vi.stubEnv('SANDBOX', '');
+        vi.spyOn(config, 'getTargetDir').mockReturnValue('/project/root');
+
+        const tool = createTool();
+        const invocation = tool.build({});
+        await invocation.execute(new AbortController().signal);
+
+        expect(mockSpawn).toHaveBeenCalledWith('podman', [
+          'run',
+          '-i',
+          '--rm',
+          '--security-opt',
+          'no-new-privileges',
+          '--cap-drop',
+          'ALL',
+          '--user',
+          '1000:1000',
+          '-v',
+          '/project/root:/project/root',
+          '-w',
+          '/project/root',
+          'test-image',
+          'python',
+          'myscript.py',
+        ]);
+      });
+
+      it('should throw FatalToolExecutionError for sandbox-exec (not supported for individual tools)', async () => {
+        vi.spyOn(config, 'getSandbox').mockReturnValue({
+          command: 'sandbox-exec',
+          image: '',
+        });
+        vi.stubEnv('SANDBOX', '');
+
+        const tool = createTool();
+        const invocation = tool.build({});
+
+        await expect(
+          invocation.execute(new AbortController().signal),
+        ).rejects.toThrow(FatalToolExecutionError);
+        expect(mockSpawn).not.toHaveBeenCalled();
+      });
+
+      it('should throw FatalToolExecutionError for unknown sandbox command', async () => {
+        vi.spyOn(config, 'getSandbox').mockReturnValue({
+          command: 'unknown' as any,
+          image: 'test-image',
+        });
+        vi.stubEnv('SANDBOX', '');
+
+        const tool = createTool();
+        const invocation = tool.build({});
+
+        await expect(
+          invocation.execute(new AbortController().signal),
+        ).rejects.toThrow(FatalToolExecutionError);
+        expect(mockSpawn).not.toHaveBeenCalled();
+      });
     });
   });
 });

@@ -18,6 +18,7 @@ import { DiscoveredMCPTool } from './mcp-tool.js';
 import { parse } from 'shell-quote';
 import { ToolErrorType } from './tool-error.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import { FatalToolExecutionError } from '../utils/errors.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
@@ -26,6 +27,20 @@ import {
   TOOL_LEGACY_ALIASES,
   getToolAliases,
 } from './tool-names.js';
+
+const PROPAGATED_ENV_VARS = [
+  'GEMINI_API_KEY',
+  'GOOGLE_API_KEY',
+  'GOOGLE_GEMINI_BASE_URL',
+  'GOOGLE_VERTEX_BASE_URL',
+  'GOOGLE_GENAI_USE_VERTEXAI',
+  'GOOGLE_GENAI_USE_GCA',
+  'GOOGLE_CLOUD_PROJECT',
+  'GOOGLE_CLOUD_LOCATION',
+  'GEMINI_MODEL',
+  'TERM',
+  'COLORTERM',
+];
 
 type ToolParams = Record<string, unknown>;
 
@@ -52,7 +67,40 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
     _updateOutput?: (output: string) => void,
   ): Promise<ToolResult> {
     const callCommand = this.config.getToolCallCommand()!;
-    const child = spawn(callCommand, [this.originalToolName]);
+    let cmd = callCommand;
+    let args = [this.originalToolName];
+
+    const sandboxConfig = this.config.getSandbox();
+    // If sandbox is configured but we are not currently running inside it (checked via env var),
+    // we should attempt to run the tool inside the sandbox container.
+    if (sandboxConfig && !process.env['SANDBOX']) {
+      if (
+        sandboxConfig.command === 'docker' ||
+        sandboxConfig.command === 'podman'
+      ) {
+        cmd = sandboxConfig.command;
+        args = this.constructContainerArgs(
+          sandboxConfig.command,
+          sandboxConfig.image,
+          callCommand,
+        );
+      } else if (sandboxConfig.command === 'sandbox-exec') {
+        // sandbox-exec requires a profile string which is managed by the CLI package.
+        // We cannot easily replicate that here without duplicating logic or adding a dependency.
+        // To maintain security posture, we must fail if we cannot provide the requested sandbox.
+        throw new FatalToolExecutionError(
+          'DiscoveredTool: sandbox-exec is configured but not supported for individual tool sandboxing. ' +
+            'Please run the entire agent with --sandbox to use this feature.',
+        );
+      } else {
+        // If we have a sandbox config but don't know how to handle it, fail secure.
+        throw new FatalToolExecutionError(
+          `DiscoveredTool: Unknown sandbox command '${sandboxConfig.command}'. Execution aborted to maintain security.`,
+        );
+      }
+    }
+
+    const child = spawn(cmd, args);
     child.stdin.write(JSON.stringify(this.params));
     child.stdin.end();
 
@@ -124,6 +172,46 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
       llmContent: stdout,
       returnDisplay: stdout,
     };
+  }
+
+  private constructContainerArgs(
+    command: 'docker' | 'podman',
+    image: string,
+    callCommand: string,
+  ): string[] {
+    const projectRoot = this.config.getTargetDir();
+    // Use process.getuid() if available (posix), otherwise default to current user
+    const uid = process.getuid ? process.getuid() : 1000;
+    const gid = process.getgid ? process.getgid() : 1000;
+
+    const args = [
+      'run',
+      '-i', // interactive, keep stdin open
+      '--rm', // remove container after exit
+      // Security Hardening
+      '--security-opt',
+      'no-new-privileges',
+      '--cap-drop',
+      'ALL',
+      // User Mapping
+      '--user',
+      `${uid}:${gid}`,
+      // Mounts
+      '-v',
+      `${projectRoot}:${projectRoot}`,
+      '-w',
+      projectRoot,
+    ];
+
+    for (const envVar of PROPAGATED_ENV_VARS) {
+      if (process.env[envVar]) {
+        args.push('-e', `${envVar}=${process.env[envVar]}`);
+      }
+    }
+
+    args.push(image, callCommand, this.originalToolName);
+
+    return args;
   }
 }
 
