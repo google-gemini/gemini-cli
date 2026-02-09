@@ -8,6 +8,18 @@ import { describe, expect } from 'vitest';
 import { evalTest } from './test-helper.js';
 
 describe('Shell Efficiency', () => {
+  const getCommand = (call: any): string | undefined => {
+    let args = call.toolRequest.args;
+    if (typeof args === 'string') {
+      try {
+        args = JSON.parse(args);
+      } catch (e) {
+        // Ignore parse errors
+      }
+    }
+    return typeof args === 'string' ? args : (args as any)['command'];
+  };
+
   evalTest('ALWAYS_PASSES', {
     name: 'should use --silent/--quiet flags when installing packages',
     prompt: 'Install the "lodash" package using npm.',
@@ -18,15 +30,7 @@ describe('Shell Efficiency', () => {
       );
 
       const hasEfficiencyFlag = shellCalls.some((call) => {
-        let args = call.toolRequest.args;
-        if (typeof args === 'string') {
-          try {
-            args = JSON.parse(args);
-          } catch (e) {
-            // Ignore parse errors
-          }
-        }
-        const cmd = typeof args === 'string' ? args : (args as any)['command'];
+        const cmd = getCommand(call);
         return (
           cmd &&
           cmd.includes('npm install') &&
@@ -39,7 +43,7 @@ describe('Shell Efficiency', () => {
       expect(
         hasEfficiencyFlag,
         `Expected agent to use efficiency flags for npm install. Commands used: ${shellCalls
-          .map((c) => (c.toolRequest.args as any)['command'])
+          .map(getCommand)
           .join(', ')}`,
       ).toBe(true);
     },
@@ -55,22 +59,14 @@ describe('Shell Efficiency', () => {
       );
 
       const hasNoPager = shellCalls.some((call) => {
-        let args = call.toolRequest.args;
-        if (typeof args === 'string') {
-          try {
-            args = JSON.parse(args);
-          } catch (e) {
-            // Ignore parse errors
-          }
-        }
-        const cmd = typeof args === 'string' ? args : (args as any)['command'];
+        const cmd = getCommand(call);
         return cmd && cmd.includes('git') && cmd.includes('--no-pager');
       });
 
       expect(
         hasNoPager,
         `Expected agent to use --no-pager with git. Commands used: ${shellCalls
-          .map((c) => (c.toolRequest.args as any)['command'])
+          .map(getCommand)
           .join(', ')}`,
       ).toBe(true);
     },
@@ -95,15 +91,7 @@ describe('Shell Efficiency', () => {
       );
 
       const hasEfficiencyFlag = shellCalls.some((call) => {
-        let args = call.toolRequest.args;
-        if (typeof args === 'string') {
-          try {
-            args = JSON.parse(args);
-          } catch (e) {
-            // Ignore parse errors
-          }
-        }
-        const cmd = typeof args === 'string' ? args : (args as any)['command'];
+        const cmd = getCommand(call);
         return (
           cmd &&
           cmd.includes('npm install') &&
