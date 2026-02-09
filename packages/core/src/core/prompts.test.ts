@@ -198,6 +198,8 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).not.toContain('No sub-agents are currently available.');
     expect(prompt).toContain('# Core Mandates');
     expect(prompt).toContain('- **Conventions:**');
+    expect(prompt).toContain('# Outside of Sandbox');
+    expect(prompt).toContain('# Final Reminder');
     expect(prompt).toMatchSnapshot();
   });
 
@@ -255,13 +257,24 @@ describe('Core System Prompt (prompts.ts)', () => {
   it.each([
     ['true', '# Sandbox', ['# macOS Seatbelt', '# Outside of Sandbox']],
     ['sandbox-exec', '# macOS Seatbelt', ['# Sandbox', '# Outside of Sandbox']],
-    [undefined, '# Outside of Sandbox', ['# Sandbox', '# macOS Seatbelt']],
+    [
+      undefined,
+      'You are Gemini CLI, an interactive CLI agent',
+      ['# Sandbox', '# macOS Seatbelt'],
+    ],
   ])(
     'should include correct sandbox instructions for SANDBOX=%s',
     (sandboxValue, expectedContains, expectedNotContains) => {
       vi.stubEnv('SANDBOX', sandboxValue);
+      vi.mocked(mockConfig.getActiveModel).mockReturnValue(
+        PREVIEW_GEMINI_MODEL,
+      );
       const prompt = getCoreSystemPrompt(mockConfig);
       expect(prompt).toContain(expectedContains);
+
+      // modern snippets should NOT contain outside
+      expect(prompt).not.toContain('# Outside of Sandbox');
+
       expectedNotContains.forEach((text) => expect(prompt).not.toContain(text));
       expect(prompt).toMatchSnapshot();
     },
@@ -450,26 +463,6 @@ describe('Core System Prompt (prompts.ts)', () => {
   });
 
   describe('Platform-specific and Background Process instructions', () => {
-    it('should include Windows-specific shell efficiency commands on win32', () => {
-      mockPlatform('win32');
-      const prompt = getCoreSystemPrompt(mockConfig);
-      expect(prompt).toContain(
-        "using commands like 'type' or 'findstr' (on CMD) and 'Get-Content' or 'Select-String' (on PowerShell)",
-      );
-      expect(prompt).not.toContain(
-        "using commands like 'grep', 'tail', 'head'",
-      );
-    });
-
-    it('should include generic shell efficiency commands on non-Windows', () => {
-      mockPlatform('linux');
-      const prompt = getCoreSystemPrompt(mockConfig);
-      expect(prompt).toContain("using commands like 'grep', 'tail', 'head'");
-      expect(prompt).not.toContain(
-        "using commands like 'type' or 'findstr' (on CMD) and 'Get-Content' or 'Select-String' (on PowerShell)",
-      );
-    });
-
     it('should use is_background parameter in background process instructions', () => {
       const prompt = getCoreSystemPrompt(mockConfig);
       expect(prompt).toContain(
