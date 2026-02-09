@@ -10,7 +10,7 @@
 
 import type { Content, FunctionDeclaration } from '@google/genai';
 import type { AnyDeclarativeTool } from '../tools/tools.js';
-import { type z } from 'zod';
+import { z } from 'zod';
 import type { ModelConfig } from '../services/modelConfigService.js';
 import type { AnySchema } from 'ajv';
 import type { A2AAuthConfig } from './auth-provider/types.js';
@@ -57,11 +57,6 @@ export const DEFAULT_MAX_TIME_MINUTES = 5;
 export type AgentInputs = Record<string, unknown>;
 
 /**
- * Simplified input structure for Remote Agents, which consumes a single string query.
- */
-export type RemoteAgentInputs = { query: string };
-
-/**
  * Structured events emitted during subagent execution for user observability.
  */
 export interface SubagentActivityEvent {
@@ -103,6 +98,7 @@ export interface LocalAgentDefinition<
 
   // Optional configs
   toolConfig?: ToolConfig;
+  workflowMode?: boolean;
 
   /**
    * An optional function to process the raw output from the agent's final tool
@@ -204,3 +200,36 @@ export interface RunConfig {
    */
   maxTurns?: number;
 }
+
+export const PlanStepSchema = z.object({
+  id: z.string(),
+  description: z.string(),
+});
+
+export const PlanProposalSchema = z.object({
+  title: z.string(),
+  description: z.string(),
+  steps: z.array(PlanStepSchema),
+});
+
+export const ReviewIssueSchema = z.object({
+  severity: z.enum(['low', 'medium', 'high', 'critical']),
+  description: z.string(),
+  line: z.number().optional(),
+});
+
+export const ReviewScoreSchema = z.object({
+  agentId: z.string().optional(),
+  confidence: z.number().min(0).max(100),
+  issues: z.array(ReviewIssueSchema),
+});
+
+export const TaskContextSchema = z.object({
+  taskId: z.string(),
+  cwd: z.string(),
+  files: z.array(z.string()),
+});
+
+export type PlanProposal = z.infer<typeof PlanProposalSchema>;
+export type ReviewScore = z.infer<typeof ReviewScoreSchema>;
+export type TaskContext = z.infer<typeof TaskContextSchema>;

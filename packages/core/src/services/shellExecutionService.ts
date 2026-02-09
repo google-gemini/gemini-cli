@@ -18,7 +18,7 @@ import {
   type ShellType,
 } from '../utils/shell-utils.js';
 import { isBinary } from '../utils/textUtils.js';
-import pkg from '@xterm/headless';
+import { Terminal } from '@xterm/headless';
 import {
   serializeTerminalToObject,
   type AnsiOutput,
@@ -28,7 +28,6 @@ import {
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
 import { killProcessGroup } from '../utils/process-utils.js';
-const { Terminal } = pkg;
 
 const MAX_CHILD_PROCESS_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
 

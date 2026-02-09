@@ -1,43 +1,52 @@
-/**
- * @license
- * Copyright 2025 Google LLC
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import type { AgentInputs } from './types.js';
+import { ReviewScore } from './types.js';
 
 /**
- * Replaces `${...}` placeholders in a template string with values from AgentInputs.
- *
- * @param template The template string containing placeholders.
- * @param inputs The AgentInputs object providing placeholder values.
- * @returns The populated string with all placeholders replaced.
- * @throws {Error} if any placeholder key is not found in the inputs.
+ * Replaces placeholders in a template string with values from an input object.
+ * Supports `${variable}` syntax. Throws an error if any required variable is missing.
  */
-export function templateString(template: string, inputs: AgentInputs): string {
-  const placeholderRegex = /\$\{(\w+)\}/g;
-
-  // First, find all unique keys required by the template.
+export function templateString(
+  template: string,
+  variables: Record<string, unknown>,
+): string {
+  const placeholderRegex = /\${(\w+)}/g;
   const requiredKeys = new Set(
     Array.from(template.matchAll(placeholderRegex), (match) => match[1]),
   );
 
-  // Check if all required keys exist in the inputs.
-  const inputKeys = new Set(Object.keys(inputs));
   const missingKeys = Array.from(requiredKeys).filter(
-    (key) => !inputKeys.has(key),
+    (key) => variables[key] === undefined,
   );
 
   if (missingKeys.length > 0) {
-    // Enhanced error message showing both missing and available keys
     throw new Error(
-      `Template validation failed: Missing required input parameters: ${missingKeys.join(', ')}. ` +
-        `Available inputs: ${Object.keys(inputs).join(', ')}`,
+      `Template validation failed: Missing required input parameters: ${missingKeys.join(
+        ', ',
+      )}. Available inputs: ${Object.keys(variables).join(', ')}`,
     );
   }
 
-  // Perform the replacement using a replacer function.
-  return template.replace(placeholderRegex, (_match, key) =>
-    String(inputs[key]),
-  );
+  return template.replace(placeholderRegex, (_match, key) => {
+    return String(variables[key]);
+  });
+}
+
+/**
+ * Calculates the average confidence score from a set of reviews.
+ */
+export function calculateConsensusScore(scores: ReviewScore[]): number {
+  if (scores.length === 0) return 0;
+  const sum = scores.reduce((acc, s) => acc + s.confidence, 0);
+  return sum / scores.length;
+}
+
+/**
+ * Filters and flattens issues from reviews that meet a minimum confidence threshold.
+ */
+export function filterHighConfidenceIssues(
+  scores: ReviewScore[],
+  threshold: number
+) {
+  return scores
+    .filter(s => s.confidence >= threshold)
+    .flatMap(s => s.issues);
 }

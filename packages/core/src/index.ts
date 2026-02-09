@@ -58,7 +58,11 @@ export * from './core/apiKeyCredentialStorage.js';
 export * from './utils/fetch.js';
 export { homedir, tmpdir } from './utils/paths.js';
 export * from './utils/paths.js';
+export * from './utils/pathReader.js';
 export * from './utils/checks.js';
+export * from './utils/httpErrors.js';
+export { ExperimentFlags } from './code_assist/experiments/flagNames.js';
+export { KeychainTokenStorage } from './mcp/token-storage/keychain-token-storage.js';
 export * from './utils/schemaValidator.js';
 export * from './utils/errors.js';
 export * from './utils/exitCodes.js';
@@ -110,6 +114,7 @@ export * from './services/chatRecordingService.js';
 export * from './services/fileSystemService.js';
 export * from './services/sessionSummaryUtils.js';
 export * from './services/contextManager.js';
+export * from './services/lspService.js';
 export * from './skills/skillManager.js';
 export * from './skills/skillLoader.js';
 
@@ -138,6 +143,7 @@ export * from './prompts/mcp-prompts.js';
 export * from './agents/types.js';
 export * from './agents/agentLoader.js';
 export * from './agents/local-executor.js';
+export * from './workflow/engine.js';
 
 // Export specific tool logic
 export * from './tools/read-file.js';
@@ -152,6 +158,8 @@ export * from './tools/memoryTool.js';
 export * from './tools/shell.js';
 export * from './tools/web-search.js';
 export * from './tools/read-many-files.js';
+export * from './tools/lsp-find-references.js';
+export * from './tools/lsp-go-to-definition.js';
 export * from './tools/mcp-client.js';
 export * from './tools/mcp-tool.js';
 export * from './tools/write-todos.js';
