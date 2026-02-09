@@ -132,8 +132,37 @@ Follow these steps:
 14. Discuss with me before making any comments on the issue. I will clarify
     which possible issues you identified are problems, which ones you need to
     investigate further, and which ones I do not care about.
-15. If I request you to add comments to the issue, use
-    `gh pr comment {{args}} --body {{review}}` to post the review to the PR.
+15. If I request you to add comments to the issue, post a proper GitHub PR
+    review with inline comments using the GitHub REST API. Follow these steps:
+    a. Get the repo owner and name:
+       `gh repo view --json nameWithOwner -q .nameWithOwner`
+       This returns a string like `owner/repo`.
+    b. From the diff you already fetched in step 2 and the review findings from
+       step 7 onward, determine which lines to comment on. For each finding
+       that refers to a specific line or range of code, create an inline
+       comment. The line numbers must refer to the new version of the file
+       (the right side of the diff). Only comment on lines that are part of
+       the diff -- do not comment on unchanged lines.
+    c. Construct a JSON payload and pipe it to `gh api` to create the review.
+       The payload should have:
+       - `body`: A concise summary of the review covering the key findings.
+       - `event`: "COMMENT" (this is the neutral review status).
+       - `comments`: An array of inline comment objects, one per finding. Each
+         object has:
+         - `path`: The relative path to the changed file.
+         - `line`: The line number in the new version of the file.
+         - `body`: The specific review comment for that line.
+         For multi-line comments, you may also include `start_line` to mark
+         the beginning of the range (with `line` as the end).
+       Example command:
+       ```
+       printf '%s' '{"body":"Summary of review...","event":"COMMENT","comments":[{"path":"src/foo.ts","line":10,"body":"Consider using a reducer here."},{"path":"src/bar.ts","start_line":20,"line":25,"body":"This block duplicates logic from utils.ts."}]}' | gh api repos/OWNER/REPO/pulls/{{args}}/reviews --input - -X POST
+       ```
+       Replace OWNER/REPO with the value from step (a). Make sure to properly
+       escape any double quotes or special characters inside the JSON string
+       values. If the JSON payload is large, write it to a temporary file and
+       use `gh api repos/OWNER/REPO/pulls/{{args}}/reviews --input /tmp/review.json -X POST`
+       instead of piping.
 
 Remember to use the GitHub CLI (`gh`) with the Shell tool for all
 GitHub-related tasks.
