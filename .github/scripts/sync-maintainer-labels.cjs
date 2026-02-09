@@ -1,5 +1,9 @@
-/* eslint-disable @typescript-eslint/no-require-imports */
-/* global process, console, require */
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 const { Octokit } = require('@octokit/rest');
 
 /**
