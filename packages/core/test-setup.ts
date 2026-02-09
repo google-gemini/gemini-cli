@@ -10,10 +10,18 @@ if (process.env.NO_COLOR !== undefined) {
 }
 
 import { setSimulate429 } from './src/utils/testUtils.js';
-import { vi } from 'vitest';
+import { vi, afterEach } from 'vitest';
+import { coreEvents } from './src/utils/events.js';
 
 // Disable 429 simulation globally for all tests
 setSimulate429(false);
+
+afterEach(() => {
+  // Clear all listeners from the global coreEvents singleton to prevent leaks
+  // between tests and avoid MaxListenersExceededWarning.
+  coreEvents.removeAllListeners();
+  vi.unstubAllEnvs();
+});
 
 // Default mocks for Storage and ProjectRegistry to prevent disk access in most tests.
 // These can be overridden in specific tests using vi.unmock().

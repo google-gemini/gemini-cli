@@ -6,6 +6,7 @@
 
 import { vi, beforeEach, afterEach } from 'vitest';
 import { format } from 'node:util';
+import { coreEvents } from '@google/gemini-cli-core';
 
 global.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -54,6 +55,10 @@ beforeEach(() => {
 
 afterEach(() => {
   consoleErrorSpy.mockRestore();
+
+  // Clear all listeners from the global coreEvents singleton to prevent leaks
+  // between tests and avoid MaxListenersExceededWarning.
+  coreEvents.removeAllListeners();
 
   if (actWarnings.length > 0) {
     const messages = actWarnings
