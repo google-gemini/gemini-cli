@@ -127,12 +127,8 @@ export function isPreviewModel(model: string): boolean {
  * @returns True if the model is a Gemini 3 model.
  */
 export function isGemini3Model(model: string): boolean {
-  return (
-    /^gemini-3(\.|-|$)/.test(model) ||
-    model === PREVIEW_GEMINI_MODEL_AUTO ||
-    model === GEMINI_MODEL_ALIAS_PRO ||
-    model === GEMINI_MODEL_ALIAS_AUTO
-  );
+  const resolved = resolveModel(model);
+  return /^gemini-3(\.|-|$)/.test(resolved);
 }
 
 /**
