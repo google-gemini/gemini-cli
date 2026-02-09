@@ -123,8 +123,10 @@ class GlobToolInvocation extends BaseToolInvocation<
           this.config.getTargetDir(),
           this.params.dir_path,
         );
-        const validationError =
-          this.config.validatePathAccess(searchDirAbsolute);
+        const validationError = this.config.validatePathAccess(
+          searchDirAbsolute,
+          'read',
+        );
         if (validationError) {
           return {
             llmContent: validationError,
@@ -318,7 +320,10 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
       params.dir_path || '.',
     );
 
-    const validationError = this.config.validatePathAccess(searchDirAbsolute);
+    const validationError = this.config.validatePathAccess(
+      searchDirAbsolute,
+      'read',
+    );
     if (validationError) {
       return validationError;
     }

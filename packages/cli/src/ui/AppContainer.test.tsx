@@ -145,6 +145,7 @@ vi.mock('./contexts/SessionContext.js');
 vi.mock('./components/shared/text-buffer.js');
 vi.mock('./hooks/useLogger.js');
 vi.mock('./hooks/useInputHistoryStore.js');
+vi.mock('./hooks/atCommandProcessor.js');
 vi.mock('./hooks/useHookDisplayState.js');
 vi.mock('./hooks/useTerminalTheme.js', () => ({
   useTerminalTheme: vi.fn(),
@@ -2733,5 +2734,68 @@ describe('AppContainer State Management', () => {
       expect(clearTerminalCalls).toHaveLength(0);
       compUnmount();
     });
+  });
+
+  describe('Permission Handling', () => {
+    it('shows permission dialog when checkPermissions returns paths', async () => {
+      const { checkPermissions } = await import(
+        './hooks/atCommandProcessor.js'
+      );
+      vi.mocked(checkPermissions).mockResolvedValue(['/test/file.txt']);
+
+      let unmount: () => void;
+      await act(async () => (unmount = renderAppContainer().unmount));
+
+      await waitFor(() => expect(capturedUIActions).toBeTruthy());
+
+      await act(async () =>
+        capturedUIActions.handleFinalSubmit('read @file.txt'),
+      );
+
+      expect(capturedUIState.permissionConfirmationRequest).not.toBeNull();
+      expect(capturedUIState.permissionConfirmationRequest?.files).toEqual([
+        '/test/file.txt',
+      ]);
+      await act(async () => unmount!());
+    });
+
+    it.each([true, false])(
+      'handles permissions when allowed is %s',
+      async (allowed) => {
+        const { checkPermissions } = await import(
+          './hooks/atCommandProcessor.js'
+        );
+        vi.mocked(checkPermissions).mockResolvedValue(['/test/file.txt']);
+        const addReadOnlyPathSpy = vi.spyOn(
+          mockConfig.getWorkspaceContext(),
+          'addReadOnlyPath',
+        );
+        const { submitQuery } = mockedUseGeminiStream();
+
+        let unmount: () => void;
+        await act(async () => (unmount = renderAppContainer().unmount));
+
+        await waitFor(() => expect(capturedUIActions).toBeTruthy());
+
+        await act(async () =>
+          capturedUIActions.handleFinalSubmit('read @file.txt'),
+        );
+
+        await act(async () =>
+          capturedUIState.permissionConfirmationRequest?.onComplete({
+            allowed,
+          }),
+        );
+
+        if (allowed) {
+          expect(addReadOnlyPathSpy).toHaveBeenCalledWith('/test/file.txt');
+        } else {
+          expect(addReadOnlyPathSpy).not.toHaveBeenCalled();
+        }
+        expect(submitQuery).toHaveBeenCalledWith('read @file.txt');
+        expect(capturedUIState.permissionConfirmationRequest).toBeNull();
+        await act(async () => unmount!());
+      },
+    );
   });
 });

@@ -52,7 +52,7 @@ export interface UIActions {
   setConstrainHeight: (value: boolean) => void;
   onEscapePromptChange: (show: boolean) => void;
   refreshStatic: () => void;
-  handleFinalSubmit: (value: string) => void;
+  handleFinalSubmit: (value: string) => Promise<void>;
   handleClearScreen: () => void;
   handleProQuotaChoice: (
     choice: 'retry_later' | 'retry_once' | 'retry_always' | 'upgrade',
