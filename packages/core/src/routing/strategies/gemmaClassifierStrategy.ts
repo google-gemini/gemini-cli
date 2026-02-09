@@ -196,6 +196,7 @@ ${formattedHistory}
         singleMessageHistory,
         LITERT_GEMMA_CLASSIFIER_SYSTEM_PROMPT,
         LITERT_GEMMA_CLASSIFIER_REMINDER,
+        context.signal,
       );
 
       const routerResponse = ClassifierResponseSchema.parse(jsonResponse);

@@ -47,6 +47,7 @@ export class LocalLiteRtLmClient {
     contents: Content[],
     systemInstruction: string,
     reminder?: string,
+    abortSignal?: AbortSignal,
   ): Promise<object> {
     const geminiContents = contents.map((c) => ({
       role: c.role,
@@ -71,6 +72,7 @@ export class LocalLiteRtLmClient {
             : undefined,
           temperature: 0,
           maxOutputTokens: 256,
+          abortSignal,
         },
       });
 
