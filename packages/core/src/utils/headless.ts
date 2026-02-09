@@ -28,6 +28,13 @@ export interface HeadlessModeOptions {
  * @returns true if the environment is considered headless.
  */
 export function isHeadlessMode(options?: HeadlessModeOptions): boolean {
+  if (process.env['GEMINI_CLI_INTEGRATION_TEST'] === 'true') {
+    return (
+      !!options?.prompt ||
+      (!!process.stdin && !process.stdin.isTTY) ||
+      (!!process.stdout && !process.stdout.isTTY)
+    );
+  }
   return (
     process.env['CI'] === 'true' ||
     process.env['GITHUB_ACTIONS'] === 'true' ||

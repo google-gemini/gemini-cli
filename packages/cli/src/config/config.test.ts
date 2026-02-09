@@ -141,14 +141,22 @@ vi.mock('@google/gemini-cli-core', async () => {
       defaultDecision: ServerConfig.PolicyDecision.ASK_USER,
       approvalMode: ServerConfig.ApprovalMode.DEFAULT,
     })),
-    isHeadlessMode: vi.fn(
-      (opts) =>
+    isHeadlessMode: vi.fn((opts) => {
+      if (process.env['VITEST'] === 'true') {
+        return (
+          !!opts?.prompt ||
+          (!!process.stdin && !process.stdin.isTTY) ||
+          (!!process.stdout && !process.stdout.isTTY)
+        );
+      }
+      return (
         !!opts?.prompt ||
         process.env['CI'] === 'true' ||
         process.env['GITHUB_ACTIONS'] === 'true' ||
         (!!process.stdin && !process.stdin.isTTY) ||
-        (!!process.stdout && !process.stdout.isTTY),
-    ),
+        (!!process.stdout && !process.stdout.isTTY)
+      );
+    }),
   };
 });
 
@@ -162,15 +170,11 @@ vi.mock('./extension-manager.js', () => {
 // Global setup to ensure clean environment for all tests in this file
 const originalArgv = process.argv;
 const originalGeminiModel = process.env['GEMINI_MODEL'];
-const originalCI = process.env['CI'];
-const originalGithubActions = process.env['GITHUB_ACTIONS'];
 const originalStdoutIsTTY = process.stdout.isTTY;
 const originalStdinIsTTY = process.stdin.isTTY;
 
 beforeEach(() => {
   delete process.env['GEMINI_MODEL'];
-  delete process.env['CI'];
-  delete process.env['GITHUB_ACTIONS'];
   // Restore ExtensionManager mocks by re-assigning them
   ExtensionManager.prototype.getExtensions = vi.fn().mockReturnValue([]);
   ExtensionManager.prototype.loadExtensions = vi
@@ -196,16 +200,6 @@ afterEach(() => {
     process.env['GEMINI_MODEL'] = originalGeminiModel;
   } else {
     delete process.env['GEMINI_MODEL'];
-  }
-  if (originalCI !== undefined) {
-    process.env['CI'] = originalCI;
-  } else {
-    delete process.env['CI'];
-  }
-  if (originalGithubActions !== undefined) {
-    process.env['GITHUB_ACTIONS'] = originalGithubActions;
-  } else {
-    delete process.env['GITHUB_ACTIONS'];
   }
   Object.defineProperty(process.stdout, 'isTTY', {
     value: originalStdoutIsTTY,
