@@ -3,5 +3,8 @@
     "toolOutputMasking": {
       "enabled": true
     }
+  },
+  "general": {
+    "devtools": true
   }
 }

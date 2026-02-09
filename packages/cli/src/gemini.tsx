@@ -351,11 +351,12 @@ export async function main() {
   }
 
   const isDebugMode = cliConfig.isDebugMode(argv);
+  const earlyConsoleLogs: Array<{ type: string; content: string }> = [];
   const consolePatcher = new ConsolePatcher({
     stderr: true,
     debugMode: isDebugMode,
     onNewMessage: (msg) => {
-      coreEvents.emitConsoleLog(msg.type, msg.content);
+      earlyConsoleLogs.push({ type: msg.type, content: msg.content });
     },
   });
   consolePatcher.patch();
@@ -518,11 +519,19 @@ export async function main() {
 
     adminControlsListner.setConfig(config);
 
-    if (config.isInteractive() && config.getDebugMode()) {
+    if (config.isInteractive() && settings.merged.general.devtools) {
       const { registerActivityLogger } = await import(
-        './utils/activityLogger.js'
+        './utils/devtoolsService.js'
       );
-      registerActivityLogger(config);
+      await registerActivityLogger(config);
+      // Replay early console logs directly to ActivityLogger (bypasses
+      // coreEvents so they only appear in DevTools, not the TUI debug console).
+      const { ActivityLogger } = await import('./utils/activityLogger.js');
+      const capture = ActivityLogger.getInstance();
+      for (const log of earlyConsoleLogs) {
+        capture.logConsole(log);
+      }
+      earlyConsoleLogs.length = 0;
     }
 
     // Register config for telemetry shutdown
