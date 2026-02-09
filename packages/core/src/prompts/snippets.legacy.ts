@@ -245,6 +245,7 @@ export function renderOperationalGuidelines(
   if (!options) return '';
   return `
 # Operational Guidelines
+
 ${shellEfficiencyGuidelines(options.enableShellEfficiency)}
 
 ## Tone and Style (CLI Interaction)
