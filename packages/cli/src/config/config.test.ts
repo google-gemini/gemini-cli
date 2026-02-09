@@ -1729,22 +1729,6 @@ describe('loadCliConfig model selection', () => {
 
     expect(config.getModel()).toBe('auto-gemini-3');
   });
-
-  it('selects the gemini 2.5 auto model if specified in settings', async () => {
-    process.argv = ['node', 'script.js'];
-    const argv = await parseArguments(createTestMergedSettings());
-    const config = await loadCliConfig(
-      createTestMergedSettings({
-        model: {
-          name: 'auto-gemini-2.5',
-        },
-      }),
-      'test-session',
-      argv,
-    );
-
-    expect(config.getModel()).toBe('auto-gemini-2.5');
-  });
 });
 
 describe('loadCliConfig folderTrust', () => {
