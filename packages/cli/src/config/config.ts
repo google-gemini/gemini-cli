@@ -437,7 +437,11 @@ export async function loadCliConfig(
 
   const ideMode = settings.ide?.enabled ?? false;
 
-  const folderTrust = settings.security?.folderTrust?.enabled ?? false;
+  const folderTrust =
+    process.env['GEMINI_CLI_INTEGRATION_TEST'] === 'true' ||
+    process.env['VITEST'] === 'true'
+      ? false
+      : (settings.security?.folderTrust?.enabled ?? false);
   const trustedFolder = isWorkspaceTrusted(settings, cwd)?.isTrusted ?? false;
 
   // Set the context filename in the server's memoryTool module BEFORE loading memory

@@ -1792,14 +1792,29 @@ describe('loadCliConfig model selection', () => {
 });
 
 describe('loadCliConfig folderTrust', () => {
+  let originalVitest: string | undefined;
+  let originalIntegrationTest: string | undefined;
+
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
     vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+
+    originalVitest = process.env['VITEST'];
+    originalIntegrationTest = process.env['GEMINI_CLI_INTEGRATION_TEST'];
+    delete process.env['VITEST'];
+    delete process.env['GEMINI_CLI_INTEGRATION_TEST'];
   });
 
   afterEach(() => {
+    if (originalVitest !== undefined) {
+      process.env['VITEST'] = originalVitest;
+    }
+    if (originalIntegrationTest !== undefined) {
+      process.env['GEMINI_CLI_INTEGRATION_TEST'] = originalIntegrationTest;
+    }
+
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
