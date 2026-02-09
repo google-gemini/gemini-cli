@@ -17,8 +17,6 @@ import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getConsentForOauth } from '../utils/authConsent.js';
 
-export const OAUTH_DISPLAY_MESSAGE_EVENT = 'oauth-display-message' as const;
-
 /**
  * OAuth configuration for an MCP server.
  */
@@ -38,7 +36,7 @@ export interface MCPOAuthConfig {
 /**
  * OAuth authorization response.
  */
-export interface OAuthAuthorizationResponse {
+interface OAuthAuthorizationResponse {
   code: string;
   state: string;
 }
@@ -57,7 +55,7 @@ export interface OAuthTokenResponse {
 /**
  * Dynamic client registration request (RFC 7591).
  */
-export interface OAuthClientRegistrationRequest {
+interface OAuthClientRegistrationRequest {
   client_name: string;
   redirect_uris: string[];
   grant_types: string[];

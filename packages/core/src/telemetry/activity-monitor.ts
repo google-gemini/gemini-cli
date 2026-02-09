@@ -37,7 +37,7 @@ export interface ActivityMonitorConfig {
 /**
  * Activity listener callback function
  */
-export type ActivityListener = (event: ActivityEvent) => void;
+type ActivityListener = (event: ActivityEvent) => void;
 
 /**
  * Default configuration for activity monitoring

@@ -276,14 +276,14 @@ export function toOTelPart(part: Part): AnyPart {
   return new GenericPart('unknown', { ...part });
 }
 
-export enum OTelRole {
+enum OTelRole {
   SYSTEM = 'system',
   USER = 'user',
   ASSISTANT = 'assistant',
   TOOL = 'tool',
 }
 
-export function toOTelRole(role?: string): OTelRole {
+function toOTelRole(role?: string): OTelRole {
   switch (role?.toLowerCase()) {
     case 'system':
       return OTelRole.SYSTEM;
@@ -301,7 +301,7 @@ export function toOTelRole(role?: string): OTelRole {
   }
 }
 
-export type InputMessages = ChatMessage[];
+type InputMessages = ChatMessage[];
 
 export enum OTelOutputType {
   IMAGE = 'image',
@@ -318,7 +318,7 @@ export enum OTelFinishReason {
   ERROR = 'error',
 }
 
-export function toOTelFinishReason(finishReason?: string): OTelFinishReason {
+function toOTelFinishReason(finishReason?: string): OTelFinishReason {
   switch (finishReason) {
     // we have significantly more finish reasons than the spec
     case FinishReason.FINISH_REASON_UNSPECIFIED:
@@ -352,27 +352,27 @@ export function toOTelFinishReason(finishReason?: string): OTelFinishReason {
   }
 }
 
-export interface OutputMessage extends ChatMessage {
+interface OutputMessage extends ChatMessage {
   finish_reason: FinishReason | string;
 }
 
-export type OutputMessages = OutputMessage[];
+type OutputMessages = OutputMessage[];
 
-export type AnyPart =
+type AnyPart =
   | TextPart
   | ToolCallRequestPart
   | ToolCallResponsePart
   | ReasoningPart
   | GenericPart;
 
-export type SystemInstruction = AnyPart[];
+type SystemInstruction = AnyPart[];
 
-export interface ChatMessage {
+interface ChatMessage {
   role: string | undefined;
   parts: AnyPart[];
 }
 
-export class TextPart {
+class TextPart {
   readonly type = 'text';
   content: string;
 
@@ -381,7 +381,7 @@ export class TextPart {
   }
 }
 
-export class ToolCallRequestPart {
+class ToolCallRequestPart {
   readonly type = 'tool_call';
   name?: string;
   id?: string;
@@ -394,7 +394,7 @@ export class ToolCallRequestPart {
   }
 }
 
-export class ToolCallResponsePart {
+class ToolCallResponsePart {
   readonly type = 'tool_call_response';
   response?: string;
   id?: string;
@@ -405,7 +405,7 @@ export class ToolCallResponsePart {
   }
 }
 
-export class ReasoningPart {
+class ReasoningPart {
   readonly type = 'reasoning';
   content: string;
 
@@ -414,7 +414,7 @@ export class ReasoningPart {
   }
 }
 
-export class GenericPart {
+class GenericPart {
   type: string;
   [key: string]: unknown;
 

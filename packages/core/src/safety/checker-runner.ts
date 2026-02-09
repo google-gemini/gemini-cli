@@ -36,7 +36,7 @@ const SafetyCheckResultSchema: z.ZodType<SafetyCheckResult> =
 /**
  * Configuration for the checker runner.
  */
-export interface CheckerRunnerConfig {
+interface CheckerRunnerConfig {
   /**
    * Maximum time (in milliseconds) to wait for a checker to complete.
    * Default: 5000 (5 seconds)

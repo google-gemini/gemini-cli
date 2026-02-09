@@ -10,7 +10,7 @@ import { Storage } from '../config/storage.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 
-export interface AcknowledgedAgentsMap {
+interface AcknowledgedAgentsMap {
   // Project Path -> Agent Name -> Agent Hash
   [projectPath: string]: {
     [agentName: string]: string;

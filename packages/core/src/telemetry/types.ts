@@ -41,7 +41,7 @@ import {
 import { sanitizeHookName } from './sanitize.js';
 import { getFileDiffFromResultDisplay } from '../utils/fileDiffUtils.js';
 
-export interface BaseTelemetryEvent {
+interface BaseTelemetryEvent {
   'event.name': string;
   /** Current timestamp in ISO 8601 format */
   'event.timestamp': string;
@@ -522,19 +522,19 @@ export interface ServerDetails {
   port: number;
 }
 
-export interface GenAIPromptDetails {
+interface GenAIPromptDetails {
   prompt_id: string;
   contents: Content[];
   generate_content_config?: GenerateContentConfig;
   server?: ServerDetails;
 }
 
-export interface GenAIResponseDetails {
+interface GenAIResponseDetails {
   response_id?: string;
   candidates?: Candidate[];
 }
 
-export interface GenAIUsageDetails {
+interface GenAIUsageDetails {
   input_token_count: number;
   output_token_count: number;
   cached_content_token_count: number;

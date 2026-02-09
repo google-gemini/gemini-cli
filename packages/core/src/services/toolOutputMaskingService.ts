@@ -42,7 +42,7 @@ const EXEMPT_TOOLS = new Set([
   EXIT_PLAN_MODE_TOOL_NAME,
 ]);
 
-export interface MaskingResult {
+interface MaskingResult {
   newHistory: Content[];
   maskedCount: number;
   tokensSaved: number;

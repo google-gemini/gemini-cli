@@ -73,7 +73,7 @@ export interface HookToolConfig {
 /**
  * Base class for hook translators - handles version-specific translation logic
  */
-export abstract class HookTranslator {
+abstract class HookTranslator {
   abstract toHookLLMRequest(sdkRequest: GenerateContentParameters): LLMRequest;
   abstract fromHookLLMRequest(
     hookRequest: LLMRequest,

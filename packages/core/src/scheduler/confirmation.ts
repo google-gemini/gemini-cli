@@ -30,7 +30,7 @@ import type { DiffUpdateResult } from '../ide/ide-client.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
 
-export interface ConfirmationResult {
+interface ConfirmationResult {
   outcome: ToolConfirmationOutcome;
   payload?: ToolConfirmationPayload;
 }
@@ -38,7 +38,7 @@ export interface ConfirmationResult {
 /**
  * Result of the full confirmation flow, including any user modifications.
  */
-export interface ResolutionResult {
+interface ResolutionResult {
   outcome: ToolConfirmationOutcome;
   lastDetails?: SerializableConfirmationDetails;
 }

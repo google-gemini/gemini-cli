@@ -28,7 +28,7 @@ import type {
 } from '@google/genai';
 import { GenerateContentResponse } from '@google/genai';
 
-export interface CAGenerateContentRequest {
+interface CAGenerateContentRequest {
   model: string;
   project?: string;
   user_prompt_id?: string;
@@ -84,7 +84,7 @@ interface VertexGenerateContentResponse {
   modelVersion?: string;
 }
 
-export interface CaCountTokenRequest {
+interface CaCountTokenRequest {
   request: VertexCountTokenRequest;
 }
 
