@@ -59,7 +59,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   );
 
   const { wrappedHeaders, wrappedRows, adjustedWidths } = useMemo(() => {
-    // --- Step 1: Define Constraints per Column ---
+    // --- Define Constraints per Column ---
     const constraints = cleanedHeaders.map((header, colIndex) => {
       let { contentWidth: maxContentWidth, maxWordWidth } =
         calculateWidths(header);
@@ -79,12 +79,12 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
       return { minWidth, maxWidth };
     });
 
-    // --- Step 2: Calculate Available Space ---
+    // --- Calculate Available Space ---
     // Fixed overhead: borders (n+1) + padding (2n)
     const fixedOverhead = cleanedHeaders.length + 1 + cleanedHeaders.length * 2;
     const availableWidth = Math.max(0, terminalWidth - fixedOverhead - 2);
 
-    // --- Step 3: Allocation Algorithm ---
+    // --- Allocation Algorithm ---
     const totalMinWidth = constraints.reduce((sum, c) => sum + c.minWidth, 0);
     let finalContentWidths: number[];
 
@@ -131,7 +131,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
       }
     }
 
-    // --- Step 4: Pre-wrap and Optimize Widths ---
+    // --- Pre-wrap and Optimize Widths ---
     const actualColumnWidths = new Array(cleanedHeaders.length).fill(0);
 
     const wrapAndProcessRow = (row: string[]) => {
