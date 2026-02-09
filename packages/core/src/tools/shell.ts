@@ -466,7 +466,10 @@ export class ShellTool extends BaseDeclarativeTool<
     void initializeShellParsers().catch(() => {
       // Errors are surfaced when parsing commands.
     });
-    const definition = getShellDefinition(config.getEnableInteractiveShell());
+    const definition = getShellDefinition(
+      config.getEnableInteractiveShell(),
+      config.getEnableShellOutputEfficiency(),
+    );
     super(
       ShellTool.Name,
       'Shell',
@@ -514,6 +517,7 @@ export class ShellTool extends BaseDeclarativeTool<
   override getSchema(modelId?: string) {
     const definition = getShellDefinition(
       this.config.getEnableInteractiveShell(),
+      this.config.getEnableShellOutputEfficiency(),
     );
     return resolveToolDeclaration(definition, modelId);
   }
