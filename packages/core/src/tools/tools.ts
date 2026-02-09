@@ -195,6 +195,7 @@ export abstract class BaseToolInvocation<
       correlationId,
       toolCall: {
         name: this._toolName,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         args: this.params as Record<string, unknown>,
       },
       serverName: this._serverName,
@@ -525,6 +526,7 @@ export function isTool(obj: unknown): obj is AnyDeclarativeTool {
     obj !== null &&
     'name' in obj &&
     'build' in obj &&
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     typeof (obj as AnyDeclarativeTool).build === 'function'
   );
 }
@@ -579,8 +581,10 @@ export function hasCycleInSchema(schema: object): boolean {
       ) {
         return null;
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       current = (current as Record<string, unknown>)[segment];
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return current as object;
   }
 
@@ -628,6 +632,7 @@ export function hasCycleInSchema(schema: object): boolean {
       if (Object.prototype.hasOwnProperty.call(node, key)) {
         if (
           traverse(
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             (node as Record<string, unknown>)[key],
             visitedRefs,
             pathRefs,

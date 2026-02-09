@@ -250,6 +250,7 @@ export const AppContainer = (props: AppContainerProps) => {
 
   const { bannerText } = useBanner(bannerData);
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const extensionManager = config.getExtensionLoader() as ExtensionManager;
   // We are in the interactive CLI, update how we request consent and settings.
   extensionManager.setRequestConsent((description) =>
@@ -477,6 +478,7 @@ export const AppContainer = (props: AppContainerProps) => {
   }, []);
 
   const getPreferredEditor = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     () => settings.merged.general.preferredEditor as EditorType,
     [settings.merged.general.preferredEditor],
   );
