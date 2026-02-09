@@ -131,12 +131,12 @@ export function useIncludeDirsTrust(
         'Creating custom dialog with undecidedDirs:',
         undefinedTrustDirs,
       );
+      config.clearPendingIncludeDirectories();
       setCustomDialog(
         <MultiFolderTrustDialog
           folders={undefinedTrustDirs}
           onComplete={() => {
             setCustomDialog(null);
-            config.clearPendingIncludeDirectories();
           }}
           trustedDirs={added}
           errors={errors}
