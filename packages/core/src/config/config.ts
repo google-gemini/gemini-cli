@@ -947,7 +947,10 @@ export class Config {
         this.getSkillManager().setDisabledSkills(this.disabledSkills);
 
         // Re-register ActivateSkillTool to update its schema with the discovered enabled skill enums
-        if (this.getSkillManager().getSkills().length > 0) {
+        if (
+          this.getSkillManager().getSkills().length > 0 &&
+          this.isToolEnabledByCore(ActivateSkillTool.Name)
+        ) {
           this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
           this.getToolRegistry().registerTool(
             new ActivateSkillTool(this, this.messageBus),
@@ -969,6 +972,21 @@ export class Config {
 
     await this.geminiClient.initialize();
     this.syncPlanModeTools();
+  }
+
+  /**
+   * Returns true if the specified tool name is enabled based on the current
+   * coreTools configuration.
+   */
+  private isToolEnabledByCore(toolName: string): boolean {
+    const coreTools = this.getCoreTools();
+    if (!coreTools) {
+      return true;
+    }
+
+    return coreTools.some(
+      (name) => name === toolName || name === toolName.toLowerCase(),
+    );
   }
 
   getContentGenerator(): ContentGenerator {
@@ -2002,7 +2020,10 @@ export class Config {
       this.getSkillManager().setDisabledSkills(this.disabledSkills);
 
       // Re-register ActivateSkillTool to update its schema with the newly discovered skills
-      if (this.getSkillManager().getSkills().length > 0) {
+      if (
+        this.getSkillManager().getSkills().length > 0 &&
+        this.isToolEnabledByCore(ActivateSkillTool.Name)
+      ) {
         this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
         this.getToolRegistry().registerTool(
           new ActivateSkillTool(this, this.messageBus),
@@ -2234,8 +2255,10 @@ export class Config {
       const definitions = this.agentRegistry.getAllDefinitions();
 
       for (const definition of definitions) {
-        const isAllowed =
+        const isAllowedByTools =
           !allowedTools || allowedTools.includes(definition.name);
+        const isAllowed =
+          isAllowedByTools && this.isToolEnabledByCore(definition.name);
 
         if (isAllowed) {
           try {
