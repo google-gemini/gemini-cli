@@ -60,6 +60,7 @@ export const createMockCommandContext = (
       setPendingItem: vi.fn(),
       loadHistory: vi.fn(),
       toggleCorgiMode: vi.fn(),
+      toggleShortcutsHelp: vi.fn(),
       toggleVimEnabled: vi.fn(),
       openAgentConfigDialog: vi.fn(),
       closeAgentConfigDialog: vi.fn(),

@@ -29,13 +29,6 @@
       "default": {},
       "type": "object",
       "properties": {
-        "previewFeatures": {
-          "title": "Preview Features (e.g., models)",
-          "description": "Enable preview features (e.g., preview models).",
-          "markdownDescription": "Enable preview features (e.g., preview models).\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
-          "type": "boolean"
-        },
         "preferredEditor": {
           "title": "Preferred Editor",
           "description": "The preferred editor to open files in.",
@@ -1187,25 +1180,11 @@
           "default": true,
           "type": "boolean"
         },
-        "enableToolOutputTruncation": {
-          "title": "Enable Tool Output Truncation",
-          "description": "Enable truncation of large tool outputs.",
-          "markdownDescription": "Enable truncation of large tool outputs.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `true`",
-          "default": true,
-          "type": "boolean"
-        },
         "truncateToolOutputThreshold": {
           "title": "Tool Output Truncation Threshold",
-          "description": "Truncate tool output if it is larger than this many characters. Set to -1 to disable.",
-          "markdownDescription": "Truncate tool output if it is larger than this many characters. Set to -1 to disable.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `4000000`",
-          "default": 4000000,
-          "type": "number"
-        },
-        "truncateToolOutputLines": {
-          "title": "Tool Output Truncation Lines",
-          "description": "The number of lines to keep when truncating tool output.",
-          "markdownDescription": "The number of lines to keep when truncating tool output.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `1000`",
-          "default": 1000,
+          "description": "Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.",
+          "markdownDescription": "Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.\n\n- Category: `General`\n- Requires restart: `yes`\n- Default: `40000`",
+          "default": 40000,
           "type": "number"
         },
         "disableLLMCorrection": {
@@ -1483,14 +1462,7 @@
         "extensionConfig": {
           "title": "Extension Configuration",
           "description": "Enable requesting and fetching of extension settings.",
-          "markdownDescription": "Enable requesting and fetching of extension settings.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
-          "type": "boolean"
-        },
-        "enableEventDrivenScheduler": {
-          "title": "Event Driven Scheduler",
-          "description": "Enables event-driven scheduler within the CLI session.",
-          "markdownDescription": "Enables event-driven scheduler within the CLI session.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+          "markdownDescription": "Enable requesting and fetching of extension settings.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },

@@ -20,6 +20,7 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     setTerminalBackground: vi.fn(),
     storage: {
       getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
+      initialize: vi.fn().mockResolvedValue(undefined),
     },
     getDebugMode: vi.fn(() => false),
     getProjectRoot: vi.fn(() => '/'),
@@ -44,7 +45,6 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     setRemoteAdminSettings: vi.fn(),
     isYoloModeDisabled: vi.fn(() => false),
     isPlanEnabled: vi.fn(() => false),
-    isEventDrivenSchedulerEnabled: vi.fn(() => false),
     getCoreTools: vi.fn(() => []),
     getAllowedTools: vi.fn(() => []),
     getApprovalMode: vi.fn(() => 'default'),
@@ -151,7 +151,6 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getAllowedMcpServers: vi.fn().mockReturnValue([]),
     getBlockedMcpServers: vi.fn().mockReturnValue([]),
     getExperiments: vi.fn().mockReturnValue(undefined),
-    getPreviewFeatures: vi.fn().mockReturnValue(false),
     getHasAccessToPreviewModel: vi.fn().mockReturnValue(false),
     ...overrides,
   }) as unknown as Config;

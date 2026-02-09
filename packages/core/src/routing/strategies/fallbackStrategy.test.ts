@@ -25,7 +25,6 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config =>
   ({
     getModelAvailabilityService: vi.fn(),
     getModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL),
-    getPreviewFeatures: vi.fn().mockReturnValue(false),
     ...overrides,
   }) as unknown as Config;
 

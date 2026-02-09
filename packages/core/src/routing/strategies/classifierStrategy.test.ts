@@ -51,7 +51,6 @@ describe('ClassifierStrategy', () => {
         getResolvedConfig: vi.fn().mockReturnValue(mockResolvedConfig),
       },
       getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
-      getPreviewFeatures: () => false,
       getNumericalRoutingEnabled: vi.fn().mockResolvedValue(false),
     } as unknown as Config;
     mockBaseLlmClient = {
