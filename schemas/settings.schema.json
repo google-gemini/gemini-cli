@@ -42,6 +42,14 @@
           "default": false,
           "type": "boolean"
         },
+        "defaultApprovalMode": {
+          "title": "Default Approval Mode",
+          "description": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet.",
+          "markdownDescription": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `default`",
+          "default": "default",
+          "type": "string",
+          "enum": ["default", "auto_edit", "plan"]
+        },
         "enableAutoUpdate": {
           "title": "Enable Auto Update",
           "description": "Enable automatic updates.",
@@ -1125,14 +1133,6 @@
             }
           },
           "additionalProperties": false
-        },
-        "approvalMode": {
-          "title": "Approval Mode",
-          "description": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet.",
-          "markdownDescription": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `default`",
-          "default": "default",
-          "type": "string",
-          "enum": ["default", "auto_edit", "plan"]
         },
         "core": {
           "title": "Core Tools",

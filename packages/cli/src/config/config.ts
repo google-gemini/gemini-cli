@@ -510,8 +510,8 @@ export async function loadCliConfig(
   const rawApprovalMode =
     argv.approvalMode ||
     (argv.yolo ? 'yolo' : undefined) ||
-    ((settings.tools?.approvalMode as string) !== 'yolo'
-      ? settings.tools.approvalMode
+    ((settings.general?.defaultApprovalMode as string) !== 'yolo'
+      ? settings.general?.defaultApprovalMode
       : undefined);
 
   if (rawApprovalMode) {
