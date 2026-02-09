@@ -28,7 +28,9 @@ import {
   type HistoryItemToolGroup,
   AuthState,
   type ConfirmationRequest,
+  type PermissionConfirmationRequest,
 } from './types.js';
+import { checkPermissions } from './hooks/atCommandProcessor.js';
 import { MessageType, StreamingState } from './types.js';
 import { ToolActionsProvider } from './contexts/ToolActionsContext.js';
 import {
@@ -86,7 +88,6 @@ import { calculatePromptWidths } from './components/InputPrompt.js';
 import { useApp, useStdout, useStdin } from 'ink';
 import { calculateMainAreaWidth } from './utils/ui-sizing.js';
 import ansiEscapes from 'ansi-escapes';
-import * as fs from 'node:fs';
 import { basename } from 'node:path';
 import { computeTerminalTitle } from '../utils/windowTitle.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
@@ -466,14 +467,6 @@ export const AppContainer = (props: AppContainerProps) => {
 
   const staticAreaMaxItemHeight = Math.max(terminalHeight * 4, 100);
 
-  const isValidPath = useCallback((filePath: string): boolean => {
-    try {
-      return fs.existsSync(filePath) && fs.statSync(filePath).isFile();
-    } catch (_e) {
-      return false;
-    }
-  }, []);
-
   const getPreferredEditor = useCallback(
     () => settings.merged.general.preferredEditor as EditorType,
     [settings.merged.general.preferredEditor],
@@ -484,7 +477,7 @@ export const AppContainer = (props: AppContainerProps) => {
     viewport: { height: 10, width: inputWidth },
     stdin,
     setRawMode,
-    isValidPath,
+    escapePastedPaths: true,
     shellModeActive,
     getPreferredEditor,
   });
@@ -844,6 +837,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const [authConsentRequest, setAuthConsentRequest] =
     useState<ConfirmationRequest | null>(null);
+  const [permissionConfirmationRequest, setPermissionConfirmationRequest] =
+    useState<PermissionConfirmationRequest | null>(null);
 
   useEffect(() => {
     const handleConsentRequest = (payload: ConsentRequestPayload) => {
@@ -1078,11 +1073,30 @@ Logging in with Google... Restarting Gemini CLI to continue.
   );
 
   const handleFinalSubmit = useCallback(
-    (submittedValue: string) => {
+    async (submittedValue: string) => {
       const isSlash = isSlashCommand(submittedValue.trim());
       const isIdle = streamingState === StreamingState.Idle;
 
       if (isSlash || (isIdle && isMcpReady)) {
+        if (!isSlash) {
+          const permissions = await checkPermissions(submittedValue, config);
+          if (permissions.length > 0) {
+            setPermissionConfirmationRequest({
+              files: permissions,
+              onComplete: (result) => {
+                setPermissionConfirmationRequest(null);
+                if (result.allowed) {
+                  permissions.forEach((p) =>
+                    config.getWorkspaceContext().addReadOnlyPath(p),
+                  );
+                }
+                void submitQuery(submittedValue);
+              },
+            });
+            addInput(submittedValue);
+            return;
+          }
+        }
         void submitQuery(submittedValue);
       } else {
         // Check messageQueue.length === 0 to only notify on the first queued item
@@ -1103,6 +1117,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isMcpReady,
       streamingState,
       messageQueue.length,
+      config,
     ],
   );
 
@@ -1221,7 +1236,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       !showPrivacyNotice &&
       geminiClient?.isInitialized?.()
     ) {
-      handleFinalSubmit(initialPrompt);
+      void handleFinalSubmit(initialPrompt);
       initialPromptSubmitted.current = true;
     }
   }, [
@@ -1714,6 +1729,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     adminSettingsChanged ||
     !!commandConfirmationRequest ||
     !!authConsentRequest ||
+    !!permissionConfirmationRequest ||
     !!customDialog ||
     confirmUpdateExtensionRequests.length > 0 ||
     !!loopDetectionConfirmationRequest ||
@@ -1819,6 +1835,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       authConsentRequest,
       confirmUpdateExtensionRequests,
       loopDetectionConfirmationRequest,
+      permissionConfirmationRequest,
       geminiMdFileCount,
       streamingState,
       initError,
@@ -1925,6 +1942,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       authConsentRequest,
       confirmUpdateExtensionRequests,
       loopDetectionConfirmationRequest,
+      permissionConfirmationRequest,
       geminiMdFileCount,
       streamingState,
       initError,
