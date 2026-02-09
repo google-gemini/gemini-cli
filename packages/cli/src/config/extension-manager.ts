@@ -186,7 +186,10 @@ export class ExtensionManager extends ExtensionLoader {
           )
         ) {
           const trustedFolders = loadTrustedFolders();
-          trustedFolders.setValue(this.workspaceDir, TrustLevel.TRUST_FOLDER);
+          await trustedFolders.setValue(
+            this.workspaceDir,
+            TrustLevel.TRUST_FOLDER,
+          );
         } else {
           throw new Error(
             `Could not install extension because the current workspace at ${this.workspaceDir} is not trusted.`,

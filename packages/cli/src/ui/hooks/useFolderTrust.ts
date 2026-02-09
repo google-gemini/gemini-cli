@@ -48,7 +48,7 @@ export const useFolderTrust = (
   }, [folderTrust, onTrustChange, settings.merged, addItem]);
 
   const handleFolderTrustSelect = useCallback(
-    (choice: FolderTrustChoice) => {
+    async (choice: FolderTrustChoice) => {
       const trustLevelMap: Record<FolderTrustChoice, TrustLevel> = {
         [FolderTrustChoice.TRUST_FOLDER]: TrustLevel.TRUST_FOLDER,
         [FolderTrustChoice.TRUST_PARENT]: TrustLevel.TRUST_PARENT,
@@ -62,7 +62,7 @@ export const useFolderTrust = (
       const trustedFolders = loadTrustedFolders();
 
       try {
-        trustedFolders.setValue(cwd, trustLevel);
+        await trustedFolders.setValue(cwd, trustLevel);
       } catch (_e) {
         coreEvents.emitFeedback(
           'error',
