@@ -32,6 +32,7 @@ export interface SystemPromptOptions {
   operationalGuidelines?: OperationalGuidelinesOptions;
   sandbox?: SandboxMode;
   gitRepo?: GitRepoOptions;
+  contextFilenames?: string[];
 }
 
 export interface PreambleOptions {
@@ -42,6 +43,7 @@ export interface CoreMandatesOptions {
   interactive: boolean;
   isGemini3: boolean;
   hasSkills: boolean;
+  contextFilenames?: string[];
 }
 
 export interface PrimaryWorkflowsOptions {
@@ -120,11 +122,12 @@ ${renderGitRepo(options.gitRepo)}
 export function renderFinalShell(
   basePrompt: string,
   userMemory?: string,
+  contextFilenames?: string[],
 ): string {
   return `
 ${basePrompt.trim()}
 
-${renderUserMemory(userMemory)}
+${renderUserMemory(userMemory, contextFilenames)}
 `.trim();
 }
 
@@ -139,6 +142,15 @@ export function renderPreamble(options?: PreambleOptions): string {
 
 export function renderCoreMandates(options?: CoreMandatesOptions): string {
   if (!options) return '';
+  const filenames = options.contextFilenames ?? ['GEMINI.md'];
+  const formattedFilenames =
+    filenames.length > 1
+      ? filenames
+          .slice(0, -1)
+          .map((f) => `\`${f}\``)
+          .join(', ') + ` or \`${filenames[filenames.length - 1]}\``
+      : `\`${filenames[0]}\``;
+
   return `
 # Core Mandates
 
@@ -148,7 +160,7 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
 - **Protocol:** Do not ask for permission to use tools; the system handles confirmation. Your responsibility is to justify the action, not to seek authorization.
 
 ## Engineering Standards
-- **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
+- **Contextual Precedence:** Instructions found in ${formattedFilenames} files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
 - **Conventions & Style:** Rigorously adhere to existing workspace conventions, architectural patterns, and style (naming, formatting, typing, commenting). During the research phase, analyze surrounding files, tests, and configuration to ensure your changes are seamless, idiomatic, and consistent with the local context. Never compromise idiomatic quality or completeness (e.g., proper declarations, type safety, documentation) to minimize tool calls; all supporting changes required by local conventions are part of a surgical update.
 - **Libraries/Frameworks:** NEVER assume a library/framework is available. Verify its established usage within the project (check imports, configuration files like 'package.json', 'Cargo.toml', 'requirements.txt', etc.) before employing it.
 - **Technical Integrity:** You are responsible for the entire lifecycle: implementation, testing, and validation. Within the scope of your changes, prioritize readability and long-term maintainability by consolidating logic into clean abstractions rather than threading state across unrelated layers. Align strictly with the requested architectural direction, ensuring the final implementation is focused and free of redundant "just-in-case" alternatives. Validation is not merely running tests; it is the exhaustive process of ensuring that every aspect of your change—behavioral, structural, and stylistic—is correct and fully compatible with the broader project. For bug fixes, you must empirically reproduce the failure with a new test case or reproduction script before applying the fix.
@@ -328,10 +340,15 @@ export function renderGitRepo(options?: GitRepoOptions): string {
 - Never push changes to a remote repository without being asked explicitly by the user.`.trim();
 }
 
-export function renderUserMemory(memory?: string): string {
+export function renderUserMemory(
+  memory?: string,
+  contextFilenames?: string[],
+): string {
   if (!memory || memory.trim().length === 0) return '';
+  const filenames = contextFilenames ?? ['GEMINI.md'];
+  const formattedHeader = filenames.join(', ');
   return `
-# Contextual Instructions (GEMINI.md)
+# Contextual Instructions (${formattedHeader})
 The following content is loaded from local and global configuration files.
 **Context Precedence:**
 - **Global (~/.gemini/):** foundational user preferences. Apply these broadly.
@@ -540,7 +557,7 @@ function toolUsageInteractive(
 ): string {
   if (interactive) {
     const ctrlF = interactiveShellEnabled
-      ? ' If you choose to execute an interactive command consider letting the user know they can press `ctrl + f` to focus into the shell to provide input.'
+      ? ' If you choose to execute an interactive command consider letting the user know they can press \`ctrl + f\` to focus into the shell to provide input.'
       : '';
     return `
 - **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true. If unsure, ask the user.
