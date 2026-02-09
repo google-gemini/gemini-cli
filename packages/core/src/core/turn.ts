@@ -233,7 +233,6 @@ export type ServerGeminiStreamEvent =
 
 // A turn manages the agentic loop turn within the server context.
 export class Turn {
-  private lastCallTs = 0;
   private callCounter = 0;
 
   readonly pendingToolCalls: ToolCallRequestInfo[] = [];
@@ -403,14 +402,7 @@ export class Turn {
   ): ServerGeminiStreamEvent | null {
     const name = fnCall.name || 'undefined_tool_name';
     const args = fnCall.args || {};
-    const now = Date.now();
-    if (now === this.lastCallTs) {
-      this.callCounter++;
-    } else {
-      this.lastCallTs = now;
-      this.callCounter = 0;
-    }
-    const callId = fnCall.id ?? `${name}_${now}_${this.callCounter}`;
+    const callId = fnCall.id ?? `${name}_${Date.now()}_${this.callCounter++}`;
 
     const toolCallRequest: ToolCallRequestInfo = {
       callId,

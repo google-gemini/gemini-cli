@@ -180,6 +180,7 @@ describe('ToolExecutor', () => {
   it('should truncate large shell output', async () => {
     // 1. Setup Config for Truncation
     vi.spyOn(config, 'getTruncateToolOutputThreshold').mockReturnValue(10);
+    vi.spyOn(config.storage, 'getProjectTempDir').mockReturnValue('/tmp');
 
     const mockTool = new MockTool({ name: SHELL_TOOL_NAME });
     const invocation = mockTool.build({});
@@ -215,6 +216,7 @@ describe('ToolExecutor', () => {
     // 4. Verify Truncation Logic
     expect(fileUtils.saveTruncatedToolOutput).toHaveBeenCalledWith(
       longOutput,
+      SHELL_TOOL_NAME,
       'call-trunc',
       expect.any(String), // temp dir
       'test-session-id', // session id from makeFakeConfig

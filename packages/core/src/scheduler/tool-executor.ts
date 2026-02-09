@@ -211,6 +211,7 @@ export class ToolExecutor {
         const originalContentLength = content.length;
         const { outputFile: savedPath } = await saveTruncatedToolOutput(
           content,
+          toolName,
           callId,
           this.config.storage.getProjectTempDir(),
           this.config.getSessionId(),

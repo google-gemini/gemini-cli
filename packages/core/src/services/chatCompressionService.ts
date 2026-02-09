@@ -179,6 +179,7 @@ async function truncateHistoryToBudget(
               // Budget exceeded: Truncate this response.
               const { outputFile } = await saveTruncatedToolOutput(
                 contentStr,
+                part.functionResponse.name ?? 'unknown_tool',
                 config.getNextCompressionTruncationId(),
                 config.storage.getProjectTempDir(),
               );
