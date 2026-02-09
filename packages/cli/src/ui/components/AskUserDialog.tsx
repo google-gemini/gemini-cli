@@ -285,7 +285,6 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
     initialText: initialAnswer,
     viewport: { width: Math.max(1, bufferWidth), height: 1 },
     singleLine: true,
-    isValidPath: () => false,
   });
 
   const { text: textValue } = buffer;
@@ -564,7 +563,6 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     initialText: initialCustomText,
     viewport: { width: Math.max(1, bufferWidth), height: 1 },
     singleLine: true,
-    isValidPath: () => false,
   });
 
   const customOptionText = customBuffer.text;

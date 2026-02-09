@@ -99,7 +99,6 @@ export const TriageIssues = ({
   const commentBuffer = useTextBuffer({
     initialText: '',
     viewport: { width: 80, height: 5 },
-    isValidPath: () => false,
   });
 
   const currentIssue = state.issues[state.currentIndex];
