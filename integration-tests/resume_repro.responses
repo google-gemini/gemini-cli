@@ -1,0 +1,1 @@
+{"method":"generateContentStream","response":[{"candidates":[{"content":{"parts":[{"text":"Session started."}],"role":"model"},"finishReason":"STOP","index":0}]}]}

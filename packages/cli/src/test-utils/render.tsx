@@ -10,7 +10,7 @@ import type React from 'react';
 import { vi } from 'vitest';
 import { act, useState } from 'react';
 import os from 'node:os';
-import { LoadedSettings, type Settings } from '../config/settings.js';
+import { LoadedSettings } from '../config/settings.js';
 import { KeypressProvider } from '../ui/contexts/KeypressContext.js';
 import { SettingsContext } from '../ui/contexts/SettingsContext.js';
 import { ShellFocusContext } from '../ui/contexts/ShellFocusContext.js';
@@ -27,10 +27,12 @@ import {
 import { type HistoryItemToolGroup, StreamingState } from '../ui/types.js';
 import { ToolActionsProvider } from '../ui/contexts/ToolActionsContext.js';
 import { AskUserActionsProvider } from '../ui/contexts/AskUserActionsContext.js';
+import { TerminalProvider } from '../ui/contexts/TerminalContext.js';
 
 import { makeFakeConfig, type Config } from '@google/gemini-cli-core';
 import { FakePersistentState } from './persistentStateFake.js';
 import { AppContext, type AppState } from '../ui/contexts/AppContext.js';
+import { createMockSettings } from './settings.js';
 
 export const persistentStateMock = new FakePersistentState();
 
@@ -134,20 +136,6 @@ export const mockSettings = new LoadedSettings(
   [],
 );
 
-export const createMockSettings = (
-  overrides: Partial<Settings>,
-): LoadedSettings => {
-  const settings = overrides as Settings;
-  return new LoadedSettings(
-    { path: '', settings: {}, originalSettings: {} },
-    { path: '', settings: {}, originalSettings: {} },
-    { path: '', settings, originalSettings: settings },
-    { path: '', settings: {}, originalSettings: {} },
-    true,
-    [],
-  );
-};
-
 // A minimal mock UIState to satisfy the context provider.
 // Tests that need specific UIState values should provide their own.
 const baseMockUiState = {
@@ -157,6 +145,9 @@ const baseMockUiState = {
   terminalHeight: 40,
   currentModel: 'gemini-pro',
   terminalBackgroundColor: undefined,
+  activePtyId: undefined,
+  backgroundShells: new Map(),
+  backgroundShellHeight: 0,
 };
 
 export const mockAppState: AppState = {
@@ -200,8 +191,13 @@ const mockUIActions: UIActions = {
   handleApiKeySubmit: vi.fn(),
   handleApiKeyCancel: vi.fn(),
   setBannerVisible: vi.fn(),
+  setShortcutsHelpVisible: vi.fn(),
   setEmbeddedShellFocused: vi.fn(),
+  dismissBackgroundShell: vi.fn(),
+  setActiveBackgroundShellPid: vi.fn(),
+  setIsBackgroundShellListOpen: vi.fn(),
   setAuthContext: vi.fn(),
+  handleWarning: vi.fn(),
   handleRestart: vi.fn(),
   handleNewAgentsSelect: vi.fn(),
 };
@@ -310,16 +306,18 @@ export const renderWithProviders = (
                           <MouseProvider
                             mouseEventsEnabled={mouseEventsEnabled}
                           >
-                            <ScrollProvider>
-                              <Box
-                                width={terminalWidth}
-                                flexShrink={0}
-                                flexGrow={0}
-                                flexDirection="column"
-                              >
-                                {component}
-                              </Box>
-                            </ScrollProvider>
+                            <TerminalProvider>
+                              <ScrollProvider>
+                                <Box
+                                  width={terminalWidth}
+                                  flexShrink={0}
+                                  flexGrow={0}
+                                  flexDirection="column"
+                                >
+                                  {component}
+                                </Box>
+                              </ScrollProvider>
+                            </TerminalProvider>
                           </MouseProvider>
                         </KeypressProvider>
                       </AskUserActionsProvider>

@@ -12,11 +12,9 @@ import { extensionsCommand } from '../commands/extensions.js';
 import { skillsCommand } from '../commands/skills.js';
 import { hooksCommand } from '../commands/hooks.js';
 import {
-  Config,
   setGeminiMdFilename as setServerGeminiMdFilename,
   getCurrentGeminiMdFilename,
   ApprovalMode,
-  DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_FILE_FILTERING_OPTIONS,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
@@ -31,13 +29,20 @@ import {
   debugLogger,
   loadServerHierarchicalMemory,
   WEB_FETCH_TOOL_NAME,
+  ASK_USER_TOOL_NAME,
   getVersion,
   PREVIEW_GEMINI_MODEL_AUTO,
-  type HookDefinition,
-  type HookEventName,
-  type OutputFormat,
   coreEvents,
   GEMINI_MODEL_ALIAS_AUTO,
+  getAdminErrorMessage,
+  Config,
+  applyAdminAllowlist,
+  getAdminBlockedMcpServersMessage,
+} from '@google/gemini-cli-core';
+import type {
+  HookDefinition,
+  HookEventName,
+  OutputFormat,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -308,7 +313,7 @@ export async function parseArguments(
     yargsInstance.command(skillsCommand);
   }
   // Register hooks command if hooks are enabled
-  if (settings.tools?.enableHooks) {
+  if (settings.hooksConfig.enabled) {
     yargsInstance.command(hooksCommand);
   }
 
@@ -432,7 +437,7 @@ export async function loadCliConfig(
   const ideMode = settings.ide?.enabled ?? false;
 
   const folderTrust = settings.security?.folderTrust?.enabled ?? false;
-  const trustedFolder = isWorkspaceTrusted(settings)?.isTrusted ?? false;
+  const trustedFolder = isWorkspaceTrusted(settings, cwd)?.isTrusted ?? false;
 
   // Set the context filename in the server's memoryTool module BEFORE loading memory
   // TODO(b/343434939): This is a bit of a hack. The contextFileName should ideally be passed
@@ -550,7 +555,7 @@ export async function loadCliConfig(
         );
       }
       throw new FatalConfigError(
-        'Cannot start in YOLO mode since it is disabled by your admin',
+        getAdminErrorMessage('YOLO mode', undefined /* config */),
       );
     }
   } else if (approvalMode === ApprovalMode.YOLO) {
@@ -595,6 +600,10 @@ export async function loadCliConfig(
   // In non-interactive mode, exclude tools that require a prompt.
   const extraExcludes: string[] = [];
   if (!interactive) {
+    // ask_user requires user interaction and must be excluded in all
+    // non-interactive modes, regardless of the approval mode.
+    extraExcludes.push(ASK_USER_TOOL_NAME);
+
     const defaultExcludes = [
       SHELL_TOOL_NAME,
       EDIT_TOOL_NAME,
@@ -653,9 +662,7 @@ export async function loadCliConfig(
   );
   policyEngineConfig.nonInteractive = !interactive;
 
-  const defaultModel = settings.general?.previewFeatures
-    ? PREVIEW_GEMINI_MODEL_AUTO
-    : DEFAULT_GEMINI_MODEL_AUTO;
+  const defaultModel = PREVIEW_GEMINI_MODEL_AUTO;
   const specifiedModel =
     argv.model || process.env['GEMINI_MODEL'] || settings.model?.name;
 
@@ -681,6 +688,24 @@ export async function loadCliConfig(
     ? mcpEnablementManager.getEnablementCallbacks()
     : undefined;
 
+  const adminAllowlist = settings.admin?.mcp?.config;
+  let mcpServerCommand = mcpEnabled ? settings.mcp?.serverCommand : undefined;
+  let mcpServers = mcpEnabled ? settings.mcpServers : {};
+
+  if (mcpEnabled && adminAllowlist && Object.keys(adminAllowlist).length > 0) {
+    const result = applyAdminAllowlist(mcpServers, adminAllowlist);
+    mcpServers = result.mcpServers;
+    mcpServerCommand = undefined;
+
+    if (result.blockedServerNames && result.blockedServerNames.length > 0) {
+      const message = getAdminBlockedMcpServersMessage(
+        result.blockedServerNames,
+        undefined,
+      );
+      coreEvents.emitConsoleLog('warn', message);
+    }
+  }
+
   return new Config({
     sessionId,
     clientVersion: await getVersion(),
@@ -692,7 +717,6 @@ export async function loadCliConfig(
       settings.context?.loadMemoryFromIncludeDirectories || false,
     debugMode,
     question,
-    previewFeatures: settings.general?.previewFeatures,
 
     coreTools: settings.tools?.core || undefined,
     allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
@@ -700,8 +724,8 @@ export async function loadCliConfig(
     excludeTools,
     toolDiscoveryCommand: settings.tools?.discoveryCommand,
     toolCallCommand: settings.tools?.callCommand,
-    mcpServerCommand: mcpEnabled ? settings.mcp?.serverCommand : undefined,
-    mcpServers: mcpEnabled ? settings.mcpServers : {},
+    mcpServerCommand,
+    mcpServers,
     mcpEnablementCallbacks,
     mcpEnabled,
     extensionsEnabled,
@@ -753,14 +777,15 @@ export async function loadCliConfig(
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.experimental?.plan,
-    enableEventDrivenScheduler:
-      settings.experimental?.enableEventDrivenScheduler,
+    enableEventDrivenScheduler: true,
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
+    toolOutputMasking: settings.experimental?.toolOutputMasking,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
     ideMode,
+    disableLoopDetection: settings.model?.disableLoopDetection,
     compressionThreshold: settings.model?.compressionThreshold,
     folderTrust,
     interactive,
@@ -774,8 +799,6 @@ export async function loadCliConfig(
     skipNextSpeakerCheck: settings.model?.skipNextSpeakerCheck,
     enablePromptCompletion: settings.general?.enablePromptCompletion,
     truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,
-    truncateToolOutputLines: settings.tools?.truncateToolOutputLines,
-    enableToolOutputTruncation: settings.tools?.enableToolOutputTruncation,
     eventEmitter: coreEvents,
     useWriteTodos: argv.useWriteTodos ?? settings.useWriteTodos,
     output: {
@@ -790,10 +813,8 @@ export async function loadCliConfig(
     acceptRawOutputRisk: argv.acceptRawOutputRisk,
     modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
-    enableHooks:
-      (settings.tools?.enableHooks ?? true) &&
-      (settings.hooksConfig?.enabled ?? true),
-    enableHooksUI: settings.tools?.enableHooks ?? true,
+    enableHooks: settings.hooksConfig.enabled,
+    enableHooksUI: settings.hooksConfig.enabled,
     hooks: settings.hooks || {},
     disabledHooks: settings.hooksConfig?.disabled || [],
     projectHooks: projectHooks || {},

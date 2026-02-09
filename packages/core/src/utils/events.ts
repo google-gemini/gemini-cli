@@ -8,6 +8,7 @@ import { EventEmitter } from 'node:events';
 import type { AgentDefinition } from '../agents/types.js';
 import type { McpClient } from '../tools/mcp-client.js';
 import type { ExtensionEvents } from './extensionLoader.js';
+import type { EditorType } from './editor.js';
 
 /**
  * Defines the severity level for user-facing feedback.
@@ -112,6 +113,14 @@ export interface RetryAttemptPayload {
 }
 
 /**
+ * Payload for the 'consent-request' event.
+ */
+export interface ConsentRequestPayload {
+  prompt: string;
+  onConfirm: (confirmed: boolean) => void;
+}
+
+/**
  * Payload for the 'agents-discovered' event.
  */
 export interface AgentsDiscoveredPayload {
@@ -144,8 +153,18 @@ export enum CoreEvent {
   AgentsRefreshed = 'agents-refreshed',
   AdminSettingsChanged = 'admin-settings-changed',
   RetryAttempt = 'retry-attempt',
+  ConsentRequest = 'consent-request',
   AgentsDiscovered = 'agents-discovered',
+  RequestEditorSelection = 'request-editor-selection',
+  EditorSelected = 'editor-selected',
   SlashCommandConflicts = 'slash-command-conflicts',
+}
+
+/**
+ * Payload for the 'editor-selected' event.
+ */
+export interface EditorSelectedPayload {
+  editor?: EditorType;
 }
 
 export interface CoreEvents extends ExtensionEvents {
@@ -163,7 +182,10 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.AgentsRefreshed]: never[];
   [CoreEvent.AdminSettingsChanged]: never[];
   [CoreEvent.RetryAttempt]: [RetryAttemptPayload];
+  [CoreEvent.ConsentRequest]: [ConsentRequestPayload];
   [CoreEvent.AgentsDiscovered]: [AgentsDiscoveredPayload];
+  [CoreEvent.RequestEditorSelection]: never[];
+  [CoreEvent.EditorSelected]: [EditorSelectedPayload];
   [CoreEvent.SlashCommandConflicts]: [SlashCommandConflictsPayload];
 }
 
@@ -285,6 +307,13 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
    */
   emitRetryAttempt(payload: RetryAttemptPayload): void {
     this.emit(CoreEvent.RetryAttempt, payload);
+  }
+
+  /**
+   * Requests consent from the user via the UI.
+   */
+  emitConsentRequest(payload: ConsentRequestPayload): void {
+    this._emitOrQueue(CoreEvent.ConsentRequest, payload);
   }
 
   /**

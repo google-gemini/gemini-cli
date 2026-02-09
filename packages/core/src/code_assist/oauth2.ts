@@ -45,6 +45,7 @@ import {
   exitAlternateScreen,
 } from '../utils/terminal.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
+import { getConsentForOauth } from '../utils/authConsent.js';
 
 export const authEvents = new EventEmitter();
 
@@ -269,6 +270,11 @@ async function initOauthClient(
 
     await triggerPostAuthCallbacks(client.credentials);
   } else {
+    const userConsent = await getConsentForOauth('Code Assist login required.');
+    if (!userConsent) {
+      throw new FatalCancellationError('Authentication cancelled by user.');
+    }
+
     const webLogin = await authWithWeb(client);
 
     coreEvents.emit(CoreEvent.UserFeedback, {

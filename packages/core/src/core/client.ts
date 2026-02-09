@@ -54,6 +54,7 @@ import { handleFallback } from '../fallback/handler.js';
 import type { RoutingContext } from '../routing/routingStrategy.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
+import { ToolOutputMaskingService } from '../services/toolOutputMaskingService.js';
 import { calculateRequestTokenCount } from '../utils/tokenCalculation.js';
 import {
   applyModelSelection,
@@ -84,6 +85,7 @@ export class GeminiClient {
 
   private readonly loopDetector: LoopDetectionService;
   private readonly compressionService: ChatCompressionService;
+  private readonly toolOutputMaskingService: ToolOutputMaskingService;
   private lastPromptId: string;
   private currentSequenceModel: string | null = null;
   private lastSentIdeContext: IdeContext | undefined;
@@ -98,6 +100,7 @@ export class GeminiClient {
   constructor(private readonly config: Config) {
     this.loopDetector = new LoopDetectionService(config);
     this.compressionService = new ChatCompressionService();
+    this.toolOutputMaskingService = new ToolOutputMaskingService();
     this.lastPromptId = this.config.getSessionId();
 
     coreEvents.on(CoreEvent.ModelChanged, this.handleModelChanged);
@@ -532,6 +535,7 @@ export class GeminiClient {
     prompt_id: string,
     boundedTurns: number,
     isInvalidStreamRetry: boolean,
+    displayContent?: PartListUnion,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     // Re-initialize turn (it was empty before if in loop, or new instance)
     let turn = new Turn(this.getChat(), prompt_id);
@@ -560,6 +564,8 @@ export class GeminiClient {
 
     const remainingTokenCount =
       tokenLimit(modelForLimitCheck) - this.getChat().getLastPromptTokenCount();
+
+    await this.tryMaskToolOutputs(this.getHistory());
 
     // Estimate tokens. For text-only requests, we estimate based on character length.
     // For requests with non-text parts (like images, tools), we use the countTokens API.
@@ -647,7 +653,12 @@ export class GeminiClient {
       yield { type: GeminiEventType.ModelInfo, value: modelToUse };
     }
     this.currentSequenceModel = modelToUse;
-    const resultStream = turn.run(modelConfigKey, request, linkedSignal);
+    const resultStream = turn.run(
+      modelConfigKey,
+      request,
+      linkedSignal,
+      displayContent,
+    );
     let isError = false;
     let isInvalidStream = false;
 
@@ -708,6 +719,7 @@ export class GeminiClient {
           prompt_id,
           boundedTurns - 1,
           true,
+          displayContent,
         );
         return turn;
       }
@@ -739,7 +751,8 @@ export class GeminiClient {
             signal,
             prompt_id,
             boundedTurns - 1,
-            // isInvalidStreamRetry is false
+            false, // isInvalidStreamRetry is false
+            displayContent,
           );
           return turn;
         }
@@ -754,6 +767,7 @@ export class GeminiClient {
     prompt_id: string,
     turns: number = MAX_TURNS,
     isInvalidStreamRetry: boolean = false,
+    displayContent?: PartListUnion,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (!isInvalidStreamRetry) {
       this.config.resetTurn();
@@ -809,6 +823,7 @@ export class GeminiClient {
         prompt_id,
         boundedTurns,
         isInvalidStreamRetry,
+        displayContent,
       );
 
       // Fire AfterAgent hook if we have a turn and no pending tools
@@ -860,6 +875,8 @@ export class GeminiClient {
             signal,
             prompt_id,
             boundedTurns - 1,
+            false,
+            displayContent,
           );
         }
       }
@@ -1043,5 +1060,21 @@ export class GeminiClient {
     }
 
     return info;
+  }
+
+  /**
+   * Masks bulky tool outputs to save context window space.
+   */
+  private async tryMaskToolOutputs(history: Content[]): Promise<void> {
+    if (!this.config.getToolOutputMaskingEnabled()) {
+      return;
+    }
+    const result = await this.toolOutputMaskingService.mask(
+      history,
+      this.config,
+    );
+    if (result.maskedCount > 0) {
+      this.getChat().setHistory(result.newHistory);
+    }
   }
 }

@@ -85,6 +85,8 @@ interface SlashCommandProcessorActions {
   toggleDebugProfiler: () => void;
   dispatchExtensionStateUpdate: (action: ExtensionUpdateAction) => void;
   addConfirmUpdateExtensionRequest: (request: ConfirmationRequest) => void;
+  toggleBackgroundShell: () => void;
+  toggleShortcutsHelp: () => void;
   setText: (text: string) => void;
 }
 
@@ -240,7 +242,10 @@ export const useSlashCommandProcessor = (
         dispatchExtensionStateUpdate: actions.dispatchExtensionStateUpdate,
         addConfirmUpdateExtensionRequest:
           actions.addConfirmUpdateExtensionRequest,
+        setConfirmationRequest,
         removeComponent: () => setCustomDialog(null),
+        toggleBackgroundShell: actions.toggleBackgroundShell,
+        toggleShortcutsHelp: actions.toggleShortcutsHelp,
       },
       session: {
         stats: session.stats,
@@ -260,6 +265,7 @@ export const useSlashCommandProcessor = (
       actions,
       pendingItem,
       setPendingItem,
+      setConfirmationRequest,
       toggleVimEnabled,
       sessionShellAllowlist,
       reloadCommands,
