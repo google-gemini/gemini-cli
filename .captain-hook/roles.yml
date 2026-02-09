@@ -1,0 +1,48 @@
+# captain-hook role definitions
+# Each role has path policies and a description for the LLM supervisor.
+
+roles:
+  coder:
+    name: coder
+    description: "Implementation role: writes source code and project config"
+    paths:
+      allow_write:
+        - "src/**"
+        - "lib/**"
+        - "Cargo.toml"
+        - "package.json"
+        - "tsconfig.json"
+      deny_write:
+        - "tests/**"
+        - "docs/**"
+        - ".github/**"
+        - "*.tf"
+      allow_read:
+        - "**"
+
+  tester:
+    name: tester
+    description: "Testing role: writes tests and test fixtures"
+    paths:
+      allow_write:
+        - "tests/**"
+        - "test-fixtures/**"
+        - "*.test.*"
+        - "*_test.go"
+      deny_write:
+        - "src/**"
+        - "lib/**"
+        - "docs/**"
+        - ".github/**"
+      allow_read:
+        - "**"
+
+  maintainer:
+    name: maintainer
+    description: "Full-access role: unrestricted permissions"
+    paths:
+      allow_write:
+        - "**"
+      deny_write: []
+      allow_read:
+        - "**"

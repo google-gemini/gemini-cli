@@ -61,3 +61,6 @@ gemini-debug.log
 .gemini-clipboard/
 .eslintcache
 evals/logs/
+
+# Agent fork-join session files (auto-added)
+.fork-join/
