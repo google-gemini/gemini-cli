@@ -195,7 +195,7 @@ const SETTINGS_SCHEMA = {
           { value: 'default', label: 'Default' },
           { value: 'auto_edit', label: 'Auto Edit' },
           { value: 'plan', label: 'Plan' },
-        ]
+        ],
       },
       devtools: {
         type: 'boolean',
