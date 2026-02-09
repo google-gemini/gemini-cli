@@ -9,7 +9,6 @@ import {
   useMemo,
   useEffect,
   useState,
-  useRef,
   createElement,
 } from 'react';
 import { type PartListUnion } from '@google/genai';
@@ -21,7 +20,6 @@ import type {
   ExtensionsStoppingEvent,
   ToolCallConfirmationDetails,
   AgentDefinition,
-  SlashCommandConflictsPayload,
 } from '@google/gemini-cli-core';
 import {
   GitService,
@@ -36,7 +34,6 @@ import {
   addMCPStatusChangeListener,
   removeMCPStatusChangeListener,
   MCPDiscoveryState,
-  CoreEvent,
 } from '@google/gemini-cli-core';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import type {
@@ -113,7 +110,6 @@ export const useSlashCommandProcessor = (
     undefined,
   );
   const [reloadTrigger, setReloadTrigger] = useState(0);
-  const notifiedConflictsRef = useRef(new Set<string>());
 
   const reloadCommands = useCallback(() => {
     setReloadTrigger((v) => v + 1);
@@ -319,43 +315,6 @@ export const useSlashCommandProcessor = (
       coreEvents.off('extensionsStopping', extensionEventListener);
     };
   }, [config, reloadCommands]);
-
-  useEffect(() => {
-    const handleConflicts = (payload: SlashCommandConflictsPayload) => {
-      const newConflicts = payload.conflicts.filter((c) => {
-        const key = `${c.name}:${c.loserExtensionName}`;
-        if (notifiedConflictsRef.current.has(key)) {
-          return false;
-        }
-        notifiedConflictsRef.current.add(key);
-        return true;
-      });
-
-      if (newConflicts.length > 0) {
-        const conflictMessages = newConflicts
-          .map((c) => {
-            const winnerSource = c.winnerExtensionName
-              ? `extension '${c.winnerExtensionName}'`
-              : 'an existing command';
-            return `- Command '/${c.name}' from extension '${c.loserExtensionName}' was renamed to '/${c.renamedTo}' because it conflicts with ${winnerSource}.`;
-          })
-          .join('\n');
-
-        addItem(
-          {
-            type: MessageType.INFO,
-            text: `Command conflicts detected:\n${conflictMessages}`,
-          },
-          Date.now(),
-        );
-      }
-    };
-
-    coreEvents.on(CoreEvent.SlashCommandConflicts, handleConflicts);
-    return () => {
-      coreEvents.off(CoreEvent.SlashCommandConflicts, handleConflicts);
-    };
-  }, [addItem]);
 
   useEffect(() => {
     const controller = new AbortController();

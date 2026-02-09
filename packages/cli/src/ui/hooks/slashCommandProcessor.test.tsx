@@ -18,10 +18,13 @@ import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import { McpPromptLoader } from '../../services/McpPromptLoader.js';
 import {
   type GeminiClient,
+  type UserFeedbackPayload,
   SlashCommandStatus,
   makeFakeConfig,
   coreEvents,
+  CoreEvent,
 } from '@google/gemini-cli-core';
+import { SlashCommandConflictHandler } from '../../services/SlashCommandConflictHandler.js';
 
 const {
   logSlashCommand,
@@ -182,6 +185,26 @@ describe('useSlashCommandProcessor', () => {
     mockFileLoadCommands.mockResolvedValue(Object.freeze(fileCommands));
     mockMcpLoadCommands.mockResolvedValue(Object.freeze(mcpCommands));
 
+    const conflictHandler = new SlashCommandConflictHandler();
+    conflictHandler.start();
+
+    const handleFeedback = (payload: UserFeedbackPayload) => {
+      let type = MessageType.INFO;
+      if (payload.severity === 'error') {
+        type = MessageType.ERROR;
+      } else if (payload.severity === 'warning') {
+        type = MessageType.WARNING;
+      }
+      mockAddItem(
+        {
+          type,
+          text: payload.message,
+        },
+        Date.now(),
+      );
+    };
+    coreEvents.on(CoreEvent.UserFeedback, handleFeedback);
+
     let result!: { current: ReturnType<typeof useSlashCommandProcessor> };
     let unmount!: () => void;
     let rerender!: (props?: unknown) => void;
@@ -228,7 +251,11 @@ describe('useSlashCommandProcessor', () => {
       rerender = hook.rerender;
     });
 
-    unmountHook = async () => unmount();
+    unmountHook = async () => {
+      conflictHandler.stop();
+      coreEvents.off(CoreEvent.UserFeedback, handleFeedback);
+      unmount();
+    };
 
     await waitFor(() => {
       expect(result.current.slashCommands).toBeDefined();
