@@ -912,9 +912,7 @@ export function migrateDeprecatedSettings(
     }
 
     // Migrate tools settings
-    const toolsSettings = settings.tools as unknown as
-      | Record<string, unknown>
-      | undefined;
+    const toolsSettings = settings.tools as Record<string, unknown> | undefined;
     if (toolsSettings) {
       if (toolsSettings['approvalMode'] !== undefined) {
         foundDeprecated.push('tools.approvalMode');
