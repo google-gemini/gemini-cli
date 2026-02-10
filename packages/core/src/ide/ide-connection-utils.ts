@@ -10,6 +10,7 @@ import * as os from 'node:os';
 import { EnvHttpProxyAgent } from 'undici';
 import { debugLogger } from '../utils/debugLogger.js';
 import { isSubpath, resolveToRealPath } from '../utils/paths.js';
+import { isNodeError } from '../utils/errors.js';
 import { type IdeInfo } from './detect-ide.js';
 
 const logger = {
@@ -265,7 +266,7 @@ function isPidAlive(pid: number): boolean {
     process.kill(pid, 0);
     return true;
   } catch (e) {
-    return (e as { code?: string }).code === 'EPERM';
+    return isNodeError(e) && e.code === 'EPERM';
   }
 }
 
