@@ -139,6 +139,22 @@ vi.mock('@google/gemini-cli-core', async () => {
       defaultDecision: ServerConfig.PolicyDecision.ASK_USER,
       approvalMode: ServerConfig.ApprovalMode.DEFAULT,
     })),
+    isHeadlessMode: vi.fn((opts) => {
+      if (process.env['VITEST'] === 'true') {
+        return (
+          !!opts?.prompt ||
+          (!!process.stdin && !process.stdin.isTTY) ||
+          (!!process.stdout && !process.stdout.isTTY)
+        );
+      }
+      return (
+        !!opts?.prompt ||
+        process.env['CI'] === 'true' ||
+        process.env['GITHUB_ACTIONS'] === 'true' ||
+        (!!process.stdin && !process.stdin.isTTY) ||
+        (!!process.stdout && !process.stdout.isTTY)
+      );
+    }),
   };
 });
 
@@ -152,6 +168,8 @@ vi.mock('./extension-manager.js', () => {
 // Global setup to ensure clean environment for all tests in this file
 const originalArgv = process.argv;
 const originalGeminiModel = process.env['GEMINI_MODEL'];
+const originalStdoutIsTTY = process.stdout.isTTY;
+const originalStdinIsTTY = process.stdin.isTTY;
 
 beforeEach(() => {
   delete process.env['GEMINI_MODEL'];
@@ -160,6 +178,18 @@ beforeEach(() => {
   ExtensionManager.prototype.loadExtensions = vi
     .fn()
     .mockResolvedValue(undefined);
+
+  // Default to interactive mode for tests unless otherwise specified
+  Object.defineProperty(process.stdout, 'isTTY', {
+    value: true,
+    configurable: true,
+    writable: true,
+  });
+  Object.defineProperty(process.stdin, 'isTTY', {
+    value: true,
+    configurable: true,
+    writable: true,
+  });
 });
 
 afterEach(() => {
@@ -169,6 +199,16 @@ afterEach(() => {
   } else {
     delete process.env['GEMINI_MODEL'];
   }
+  Object.defineProperty(process.stdout, 'isTTY', {
+    value: originalStdoutIsTTY,
+    configurable: true,
+    writable: true,
+  });
+  Object.defineProperty(process.stdin, 'isTTY', {
+    value: originalStdinIsTTY,
+    configurable: true,
+    writable: true,
+  });
 });
 
 describe('parseArguments', () => {
@@ -247,6 +287,16 @@ describe('parseArguments', () => {
   });
 
   describe('positional arguments and @commands', () => {
+    beforeEach(() => {
+      // Default to headless mode for these tests as they mostly expect one-shot behavior
+      process.stdin.isTTY = false;
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: false,
+        configurable: true,
+        writable: true,
+      });
+    });
+
     it.each([
       {
         description:
@@ -377,8 +427,12 @@ describe('parseArguments', () => {
     );
 
     it('should include a startup message when converting positional query to interactive prompt', async () => {
-      const originalIsTTY = process.stdin.isTTY;
       process.stdin.isTTY = true;
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: true,
+        configurable: true,
+        writable: true,
+      });
       process.argv = ['node', 'script.js', 'hello'];
 
       try {
@@ -387,7 +441,7 @@ describe('parseArguments', () => {
           'Positional arguments now default to interactive mode. To run in non-interactive mode, use the --prompt (-p) flag.',
         );
       } finally {
-        process.stdin.isTTY = originalIsTTY;
+        // beforeEach handles resetting
       }
     });
   });
@@ -1516,14 +1570,29 @@ describe('loadCliConfig model selection', () => {
 });
 
 describe('loadCliConfig folderTrust', () => {
+  let originalVitest: string | undefined;
+  let originalIntegrationTest: string | undefined;
+
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
     vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+
+    originalVitest = process.env['VITEST'];
+    originalIntegrationTest = process.env['GEMINI_CLI_INTEGRATION_TEST'];
+    delete process.env['VITEST'];
+    delete process.env['GEMINI_CLI_INTEGRATION_TEST'];
   });
 
   afterEach(() => {
+    if (originalVitest !== undefined) {
+      process.env['VITEST'] = originalVitest;
+    }
+    if (originalIntegrationTest !== undefined) {
+      process.env['GEMINI_CLI_INTEGRATION_TEST'] = originalIntegrationTest;
+    }
+
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
@@ -2558,6 +2627,16 @@ describe('Output format', () => {
 
 describe('parseArguments with positional prompt', () => {
   const originalArgv = process.argv;
+
+  beforeEach(() => {
+    // Default to headless mode for these tests as they mostly expect one-shot behavior
+    process.stdin.isTTY = false;
+    Object.defineProperty(process.stdout, 'isTTY', {
+      value: false,
+      configurable: true,
+      writable: true,
+    });
+  });
 
   afterEach(() => {
     process.argv = originalArgv;

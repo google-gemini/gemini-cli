@@ -33,12 +33,15 @@ import {
   WEB_FETCH_TOOL_NAME,
   getVersion,
   PREVIEW_GEMINI_MODEL_AUTO,
-  type HookDefinition,
-  type HookEventName,
-  type OutputFormat,
   coreEvents,
   GEMINI_MODEL_ALIAS_AUTO,
   getAdminErrorMessage,
+  isHeadlessMode,
+} from '@google/gemini-cli-core';
+import type {
+  HookDefinition,
+  HookEventName,
+  OutputFormat,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -348,7 +351,7 @@ export async function parseArguments(
 
   // -p/--prompt forces non-interactive mode; positional args default to interactive in TTY
   if (q && !result['prompt']) {
-    if (process.stdin.isTTY) {
+    if (!isHeadlessMode()) {
       startupMessages.push(
         'Positional arguments now default to interactive mode. To run in non-interactive mode, use the --prompt (-p) flag.',
       );
@@ -432,7 +435,11 @@ export async function loadCliConfig(
 
   const ideMode = settings.ide?.enabled ?? false;
 
-  const folderTrust = settings.security?.folderTrust?.enabled ?? false;
+  const folderTrust =
+    process.env['GEMINI_CLI_INTEGRATION_TEST'] === 'true' ||
+    process.env['VITEST'] === 'true'
+      ? false
+      : (settings.security?.folderTrust?.enabled ?? false);
   const trustedFolder = isWorkspaceTrusted(settings, cwd)?.isTrusted ?? false;
 
   // Set the context filename in the server's memoryTool module BEFORE loading memory
@@ -588,7 +595,9 @@ export async function loadCliConfig(
   const interactive =
     !!argv.promptInteractive ||
     !!argv.experimentalAcp ||
-    (process.stdin.isTTY && !argv.query && !argv.prompt && !argv.isCommand);
+    (!isHeadlessMode({ prompt: argv.prompt }) &&
+      !argv.query &&
+      !argv.isCommand);
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
   const allowedToolsSet = new Set(allowedTools);
