@@ -12,6 +12,15 @@ import { useUIState, type UIState } from '../contexts/UIStateContext.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 
 vi.mock('../contexts/UIStateContext.js');
+vi.mock('../contexts/SettingsContext.js', () => ({
+  useSettings: () => ({
+    merged: {
+      ui: {
+        inlineThinkingMode: 'off',
+      },
+    },
+  }),
+}));
 vi.mock('../hooks/useTerminalSize.js');
 vi.mock('./HistoryItemDisplay.js', async () => {
   const { Text } = await vi.importActual('ink');

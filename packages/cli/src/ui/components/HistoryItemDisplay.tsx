@@ -34,6 +34,8 @@ import { McpStatus } from './views/McpStatus.js';
 import { ChatList } from './views/ChatList.js';
 import { HooksList } from './views/HooksList.js';
 import { ModelMessage } from './messages/ModelMessage.js';
+import { ThinkingMessage } from './messages/ThinkingMessage.js';
+import type { InlineThinkingMode } from '../utils/inlineThinkingMode.js';
 
 interface HistoryItemDisplayProps {
   item: HistoryItem;
@@ -45,6 +47,7 @@ interface HistoryItemDisplayProps {
   activeShellPtyId?: number | null;
   embeddedShellFocused?: boolean;
   availableTerminalHeightGemini?: number;
+  inlineThinkingMode?: InlineThinkingMode;
 }
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
@@ -57,12 +60,19 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   activeShellPtyId,
   embeddedShellFocused,
   availableTerminalHeightGemini,
+  inlineThinkingMode = 'off',
 }) => {
   const itemForDisplay = useMemo(() => escapeAnsiCtrlCodes(item), [item]);
 
   return (
     <Box flexDirection="column" key={itemForDisplay.id} width={terminalWidth}>
       {/* Render standard message types */}
+      {itemForDisplay.type === 'thinking' && inlineThinkingMode !== 'off' && (
+        <ThinkingMessage
+          thought={itemForDisplay.thought}
+          terminalWidth={terminalWidth}
+        />
+      )}
       {itemForDisplay.type === 'user' && (
         <UserMessage text={itemForDisplay.text} width={terminalWidth} />
       )}

@@ -188,6 +188,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`ui.inlineThinkingMode`** (enum):
+  - **Description:** Display model thinking inline: off or full.
+  - **Default:** `"off"`
+  - **Values:** `"off"`, `"full"`
+
 - **`ui.showStatusInTitle`** (boolean):
   - **Description:** Show Gemini CLI model thoughts in the terminal window title
     during the working phase
