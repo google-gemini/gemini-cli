@@ -403,6 +403,51 @@ describe('CodeAssistServer', () => {
     expect(results[1].candidates?.[0].content?.parts?.[0].text).toBe(' World');
   });
 
+  it('should ignore SSE messages that do not match the schema', async () => {
+    const { server, mockRequest } = createTestServer();
+
+    const { Readable } = await import('node:stream');
+    const mockStream = new Readable({
+      read() {},
+    });
+
+    const mockResponseData1 = {
+      response: { candidates: [{ content: { parts: [{ text: 'Hello' }] } }] },
+    };
+    const mockResponseData2 = {
+      somethingElse: 'that does not match schema',
+    };
+    const mockResponseData3 = {
+      response: { candidates: [{ content: { parts: [{ text: ' World' }] } }] },
+    };
+
+    mockRequest.mockResolvedValue({ data: mockStream });
+
+    const stream = await server.generateContentStream(
+      {
+        model: 'test-model',
+        contents: [{ role: 'user', parts: [{ text: 'request' }] }],
+      },
+      'user-prompt-id',
+    );
+
+    setTimeout(() => {
+      mockStream.push('data: ' + JSON.stringify(mockResponseData1) + '\n\n');
+      mockStream.push('data: ' + JSON.stringify(mockResponseData2) + '\n\n');
+      mockStream.push('data: ' + JSON.stringify(mockResponseData3) + '\n\n');
+      mockStream.push(null);
+    }, 0);
+
+    const results = [];
+    for await (const res of stream) {
+      results.push(res);
+    }
+
+    expect(results).toHaveLength(2);
+    expect(results[0].candidates?.[0].content?.parts?.[0].text).toBe('Hello');
+    expect(results[1].candidates?.[0].content?.parts?.[0].text).toBe(' World');
+  });
+
   it('should ignore malformed SSE data', async () => {
     const { server, mockRequest } = createTestServer();
 

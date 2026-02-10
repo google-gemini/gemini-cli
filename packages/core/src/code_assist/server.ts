@@ -65,6 +65,7 @@ import {
   recordConversationOffered,
 } from './telemetry.js';
 import { getClientMetadata } from './experiments/client_metadata.js';
+import { debugLogger } from 'src/utils/debugLogger.js';
 /** HTTP options to be used in each of the requests. */
 export interface HttpOptions {
   /** Additional HTTP headers to be sent with the request. */
@@ -390,6 +391,8 @@ export class CodeAssistServer implements ContentGenerator {
         crlfDelay: Infinity, // Recognizes '\r\n' and '\n' as line breaks
       });
 
+      let seenUnrecognizedNotificationType = false;
+
       let bufferedLines: string[] = [];
       for await (const line of rl) {
         if (line.startsWith('data: ')) {
@@ -398,7 +401,16 @@ export class CodeAssistServer implements ContentGenerator {
           if (bufferedLines.length === 0) {
             continue; // no data to yield
           }
-          yield schema.parse(JSON.parse(bufferedLines.join('\n')));
+          // Ignore notifications that fail to parse.
+          const result = schema.safeParse(JSON.parse(bufferedLines.join('\n')));
+          if (result.success) {
+            yield result.data;
+          } else if (!seenUnrecognizedNotificationType) {
+            seenUnrecognizedNotificationType = true;
+            debugLogger.debug(
+              `[Client] Unrecognized notification type ${result.data}`,
+            );
+          }
           bufferedLines = []; // Reset the buffer after yielding
         }
         // Ignore other lines like comments or id fields
