@@ -131,15 +131,14 @@ export const ThinkingMessage: React.FC<ThinkingMessageProps> = ({
   );
 
   const fullSummaryDisplayLines = useMemo(
-    () => (fullLines.length > 0 ? wrapLineToWidth(fullLines[0], contentWidth) : []),
+    () =>
+      fullLines.length > 0 ? wrapLineToWidth(fullLines[0], contentWidth) : [],
     [fullLines, contentWidth],
   );
 
   const fullBodyDisplayLines = useMemo(
     () =>
-      fullLines
-        .slice(1)
-        .flatMap((line) => wrapLineToWidth(line, contentWidth)),
+      fullLines.slice(1).flatMap((line) => wrapLineToWidth(line, contentWidth)),
     [fullLines, contentWidth],
   );
 
@@ -163,7 +162,7 @@ export const ThinkingMessage: React.FC<ThinkingMessageProps> = ({
         <>
           <Text color={theme.text.primary} italic>
             {' '}
-            Thinking...
+            Thinking...{' '}
           </Text>
           <Box flexDirection="row">
             <Box width={THINKING_LEFT_PADDING} />
