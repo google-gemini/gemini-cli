@@ -4,9 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import path from 'node:path';
 import { resolveToolDeclaration } from './resolver.js';
+
+// Mock node:os BEFORE importing coreTools to ensure it uses the mock
+vi.mock('node:os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:os')>();
+  return {
+    ...actual,
+    platform: () => 'linux',
+  };
+});
+
 import {
   READ_FILE_DEFINITION,
   WRITE_FILE_DEFINITION,
