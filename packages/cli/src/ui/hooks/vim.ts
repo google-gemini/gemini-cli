@@ -706,7 +706,10 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
           }
 
           case '$': {
-            // Move to end of line
+            // Move to end of line (with count, move down count-1 lines first)
+            if (repeatCount > 1) {
+              buffer.vimMoveDown(repeatCount - 1);
+            }
             buffer.vimMoveToLineEnd();
             dispatch({ type: 'CLEAR_COUNT' });
             return true;
@@ -721,14 +724,18 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
           case 'g': {
             if (state.pendingOperator === 'g') {
-              // Second 'g' - go to first line (gg command)
-              buffer.vimMoveToFirstLine();
+              // Second 'g' - go to line N (gg command), or first line if no count
+              if (state.count > 0) {
+                buffer.vimMoveToLine(state.count);
+              } else {
+                buffer.vimMoveToFirstLine();
+              }
               dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
+              dispatch({ type: 'CLEAR_COUNT' });
             } else {
-              // First 'g' - wait for second g
+              // First 'g' - wait for second g (don't clear count yet)
               dispatch({ type: 'SET_PENDING_OPERATOR', operator: 'g' });
             }
-            dispatch({ type: 'CLEAR_COUNT' });
             return true;
           }
 
@@ -819,12 +826,13 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
           }
 
           case '.': {
-            // Repeat last command
+            // Repeat last command (use current count if provided, otherwise use original count)
             if (state.lastCommand) {
               const cmdData = state.lastCommand;
+              const count = state.count > 0 ? state.count : cmdData.count;
 
               // All repeatable commands are now handled by executeCommand
-              executeCommand(cmdData.type, cmdData.count);
+              executeCommand(cmdData.type, count);
             }
 
             dispatch({ type: 'CLEAR_COUNT' });
