@@ -46,17 +46,32 @@ export function resolvePolicyChain(
   const resolvedModel = resolveModel(modelFromConfig);
   const isAutoPreferred = preferredModel ? isAutoModel(preferredModel) : false;
   const isAutoConfigured = isAutoModel(configuredModel);
+  const hasAccessToPreview = config.getHasAccessToPreviewModel?.() ?? true;
 
   if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
     chain = getFlashLitePolicyChain();
-  } else if (isAutoPreferred || isAutoConfigured) {
-    const previewEnabled =
-      preferredModel === PREVIEW_GEMINI_MODEL_AUTO ||
-      configuredModel === PREVIEW_GEMINI_MODEL_AUTO;
-    chain = getModelPolicyChain({
-      previewEnabled,
-      userTier: config.getUserTier(),
-    });
+  } else if (
+    resolvedModel.startsWith('gemini-3-') ||
+    isAutoPreferred ||
+    isAutoConfigured
+  ) {
+    if (hasAccessToPreview) {
+      const previewEnabled =
+        resolvedModel.startsWith('gemini-3-') ||
+        preferredModel === PREVIEW_GEMINI_MODEL_AUTO ||
+        configuredModel === PREVIEW_GEMINI_MODEL_AUTO;
+      chain = getModelPolicyChain({
+        previewEnabled,
+        userTier: config.getUserTier(),
+      });
+    } else {
+      // User requested Gemini 3 but has no access. Proactively downgrade
+      // to the stable Gemini 2.5 chain.
+      return getModelPolicyChain({
+        previewEnabled: false,
+        userTier: config.getUserTier(),
+      });
+    }
   } else {
     chain = createSingleModelChain(modelFromConfig);
   }
