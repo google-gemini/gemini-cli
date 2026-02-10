@@ -22,6 +22,7 @@ interface LoadingIndicatorProps {
   inline?: boolean;
   rightContent?: React.ReactNode;
   thought?: ThoughtSummary | null;
+  thoughtLabel?: string;
   showCancelAndTimer?: boolean;
 }
 
@@ -31,6 +32,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   inline = false,
   rightContent,
   thought,
+  thoughtLabel,
   showCancelAndTimer = true,
 }) => {
   const streamingState = useStreamingContext();
@@ -50,7 +52,13 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   const primaryText =
     currentLoadingPhrase === INTERACTIVE_SHELL_WAITING_PHRASE
       ? currentLoadingPhrase
-      : thought?.subject || currentLoadingPhrase;
+      : thought?.subject
+        ? (thoughtLabel ?? thought.subject)
+        : currentLoadingPhrase;
+  const hasThoughtIndicator =
+    currentLoadingPhrase !== INTERACTIVE_SHELL_WAITING_PHRASE &&
+    Boolean(thought?.subject?.trim());
+  const thinkingIndicator = hasThoughtIndicator ? '💬 ' : '';
 
   const cancelAndTimerContent =
     showCancelAndTimer &&
@@ -71,7 +79,8 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
           />
         </Box>
         {primaryText && (
-          <Text color={theme.text.accent} wrap="truncate-end">
+          <Text color={theme.text.primary} italic wrap="truncate-end">
+            {thinkingIndicator}
             {primaryText}
           </Text>
         )}
@@ -104,7 +113,8 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
             />
           </Box>
           {primaryText && (
-            <Text color={theme.text.accent} wrap="truncate-end">
+            <Text color={theme.text.primary} italic wrap="truncate-end">
+              {thinkingIndicator}
               {primaryText}
             </Text>
           )}
