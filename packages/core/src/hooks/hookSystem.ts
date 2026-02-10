@@ -254,6 +254,7 @@ export class HookSystem {
 
       const blockingError = hookOutput?.getBlockingError();
       if (blockingError?.blocked) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const beforeModelOutput = hookOutput as BeforeModelHookOutput;
         const syntheticResponse = beforeModelOutput.getSyntheticResponse();
         return {
@@ -265,6 +266,7 @@ export class HookSystem {
       }
 
       if (hookOutput) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const beforeModelOutput = hookOutput as BeforeModelHookOutput;
         const modifiedRequest =
           beforeModelOutput.applyLLMRequestModifications(llmRequest);
@@ -311,6 +313,7 @@ export class HookSystem {
       }
 
       if (hookOutput) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const afterModelOutput = hookOutput as AfterModelHookOutput;
         const modifiedResponse = afterModelOutput.getModifiedResponse();
         if (modifiedResponse) {

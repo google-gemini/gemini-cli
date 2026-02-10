@@ -133,6 +133,7 @@ export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
           workspaceContext.addDirectory(expandedPath);
           added.push(dir);
         } catch (e) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           const error = e as Error;
           errors.push(`Error adding '${dir}': ${error.message}`);
         }

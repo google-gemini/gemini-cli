@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -153,20 +153,30 @@ export type HistoryItemHelp = HistoryItemBase & {
   timestamp: Date;
 };
 
-export type HistoryItemStats = HistoryItemBase & {
+export interface HistoryItemQuotaBase extends HistoryItemBase {
+  selectedAuthType?: string;
+  userEmail?: string;
+  tier?: string;
+  currentModel?: string;
+  pooledRemaining?: number;
+  pooledLimit?: number;
+  pooledResetTime?: string;
+}
+
+export interface QuotaStats {
+  remaining: number | undefined;
+  limit: number | undefined;
+  resetTime?: string;
+}
+
+export type HistoryItemStats = HistoryItemQuotaBase & {
   type: 'stats';
   duration: string;
   quotas?: RetrieveUserQuotaResponse;
-  selectedAuthType?: string;
-  userEmail?: string;
-  tier?: string;
 };
 
-export type HistoryItemModelStats = HistoryItemBase & {
+export type HistoryItemModelStats = HistoryItemQuotaBase & {
   type: 'model_stats';
-  selectedAuthType?: string;
-  userEmail?: string;
-  tier?: string;
 };
 
 export type HistoryItemToolStats = HistoryItemBase & {
@@ -209,6 +219,11 @@ export interface ChatDetail {
   name: string;
   mtime: string;
 }
+
+export type HistoryItemThinking = HistoryItemBase & {
+  type: 'thinking';
+  thought: ThoughtSummary;
+};
 
 export type HistoryItemChatList = HistoryItemBase & {
   type: 'chat_list';
@@ -333,6 +348,7 @@ export type HistoryItemWithoutId =
   | HistoryItemAgentsList
   | HistoryItemMcpStatus
   | HistoryItemChatList
+  | HistoryItemThinking
   | HistoryItemHooksList;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };

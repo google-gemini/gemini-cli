@@ -17,6 +17,8 @@ import {
   logicalPosToOffset,
   PASTED_TEXT_PLACEHOLDER_REGEX,
   getTransformUnderCursor,
+  LARGE_PASTE_LINE_THRESHOLD,
+  LARGE_PASTE_CHAR_THRESHOLD,
 } from './shared/text-buffer.js';
 import {
   cpSlice,
@@ -54,11 +56,19 @@ import {
 } from '../utils/commandUtils.js';
 import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
-import { DEFAULT_BACKGROUND_OPACITY } from '../constants.js';
+import {
+  DEFAULT_BACKGROUND_OPACITY,
+  DEFAULT_INPUT_BACKGROUND_OPACITY,
+} from '../constants.js';
 import { getSafeLowColorBackground } from '../themes/color-utils.js';
 import { isLowColorDepth } from '../utils/terminalUtils.js';
 import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+import {
+  appEvents,
+  AppEvent,
+  TransientMessageType,
+} from '../../utils/events.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { StreamingState } from '../types.js';
 import { useMouseClick } from '../hooks/useMouseClick.js';
@@ -121,6 +131,55 @@ export const calculatePromptWidths = (mainContentWidth: number) => {
     frameOverhead: FRAME_OVERHEAD,
   } as const;
 };
+
+/**
+ * Returns true if the given text exceeds the thresholds for being considered a "large paste".
+ */
+export function isLargePaste(text: string): boolean {
+  const pasteLineCount = text.split('\n').length;
+  return (
+    pasteLineCount > LARGE_PASTE_LINE_THRESHOLD ||
+    text.length > LARGE_PASTE_CHAR_THRESHOLD
+  );
+}
+
+/**
+ * Attempt to toggle expansion of a paste placeholder in the buffer.
+ * Returns true if a toggle action was performed or hint was shown, false otherwise.
+ */
+export function tryTogglePasteExpansion(buffer: TextBuffer): boolean {
+  if (!buffer.pastedContent || Object.keys(buffer.pastedContent).length === 0) {
+    return false;
+  }
+
+  const [row, col] = buffer.cursor;
+
+  // 1. Check if cursor is on or immediately after a collapsed placeholder
+  const transform = getTransformUnderCursor(
+    row,
+    col,
+    buffer.transformationsByLine,
+    { includeEdge: true },
+  );
+  if (transform?.type === 'paste' && transform.id) {
+    buffer.togglePasteExpansion(transform.id, row, col);
+    return true;
+  }
+
+  // 2. Check if cursor is inside an expanded paste region — collapse it
+  const expandedId = buffer.getExpandedPasteAtLine(row);
+  if (expandedId) {
+    buffer.togglePasteExpansion(expandedId, row, col);
+    return true;
+  }
+
+  // 3. Placeholders exist but cursor isn't on one — show hint
+  appEvents.emit(AppEvent.TransientMessage, {
+    message: 'Move cursor within placeholder to expand',
+    type: TransientMessageType.Hint,
+  });
+  return true;
+}
 
 export const InputPrompt: React.FC<InputPromptProps> = ({
   buffer,
@@ -278,31 +337,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     ],
   );
 
-  const handleSubmit = useCallback(
-    (submittedValue: string) => {
-      const trimmedMessage = submittedValue.trim();
-      const isSlash = isSlashCommand(trimmedMessage);
-
-      const isShell = shellModeActive;
-      if (
-        (isSlash || isShell) &&
-        streamingState === StreamingState.Responding
-      ) {
-        setQueueErrorMessage(
-          `${isShell ? 'Shell' : 'Slash'} commands cannot be queued`,
-        );
-        return;
-      }
-      handleSubmitAndClear(trimmedMessage);
-    },
-    [
-      handleSubmitAndClear,
-      shellModeActive,
-      streamingState,
-      setQueueErrorMessage,
-    ],
-  );
-
   const customSetTextAndResetCompletionSignal = useCallback(
     (newText: string, cursorPosition?: 'start' | 'end' | number) => {
       buffer.setText(newText, cursorPosition);
@@ -321,6 +355,26 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     currentCursorOffset: buffer.getOffset(),
     onChange: customSetTextAndResetCompletionSignal,
   });
+
+  const handleSubmit = useCallback(
+    (submittedValue: string) => {
+      const trimmedMessage = submittedValue.trim();
+      const isSlash = isSlashCommand(trimmedMessage);
+
+      const isShell = shellModeActive;
+      if (
+        (isSlash || isShell) &&
+        streamingState === StreamingState.Responding
+      ) {
+        setQueueErrorMessage(
+          `${isShell ? 'Shell' : 'Slash'} commands cannot be queued`,
+        );
+        return;
+      }
+      inputHistory.handleSubmit(trimmedMessage);
+    },
+    [inputHistory, shellModeActive, streamingState, setQueueErrorMessage],
+  );
 
   // Effect to reset completion if history navigation just occurred and set the text
   useEffect(() => {
@@ -402,6 +456,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       } else {
         const textToInsert = await clipboardy.read();
         buffer.insert(textToInsert, { paste: true });
+        if (isLargePaste(textToInsert)) {
+          appEvents.emit(AppEvent.TransientMessage, {
+            message: 'Press Ctrl+O to expand pasted text',
+            type: TransientMessageType.Hint,
+          });
+        }
       }
     } catch (error) {
       debugLogger.error('Error handling paste:', error);
@@ -455,6 +515,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           logicalPos.row,
           logicalPos.col,
           buffer.transformationsByLine,
+          { includeEdge: true },
         );
         if (transform?.type === 'paste' && transform.id) {
           buffer.togglePasteExpansion(
@@ -591,6 +652,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         }
         // Ensure we never accidentally interpret paste as regular input.
         buffer.handleInput(key);
+        if (key.sequence && isLargePaste(key.sequence)) {
+          appEvents.emit(AppEvent.TransientMessage, {
+            message: 'Press Ctrl+O to expand pasted text',
+            type: TransientMessageType.Hint,
+          });
+        }
         return true;
       }
 
@@ -630,6 +697,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         if (escPressCount.current > 0 || showEscapePrompt) {
           resetEscapeState();
         }
+      }
+
+      // Ctrl+O to expand/collapse paste placeholders
+      if (keyMatchers[Command.EXPAND_PASTE](key)) {
+        const handled = tryTogglePasteExpansion(buffer);
+        if (handled) return true;
       }
 
       if (
@@ -780,7 +853,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             showSuggestions && activeSuggestionIndex > -1
               ? suggestions[activeSuggestionIndex].value
               : buffer.text;
-          handleSubmitAndClear(textToSubmit);
+          handleSubmit(textToSubmit);
           resetState();
           setActive(false);
           return true;
@@ -1077,7 +1150,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       setShellModeActive,
       onClearScreen,
       inputHistory,
-      handleSubmitAndClear,
       handleSubmit,
       shellHistory,
       reverseSearchCompletion,
@@ -1330,12 +1402,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         />
       ) : null}
       <HalfLinePaddedBox
-        backgroundBaseColor={
-          isShellFocused && !isEmbeddedShellFocused
-            ? theme.border.focused
-            : theme.border.default
+        backgroundBaseColor={theme.text.secondary}
+        backgroundOpacity={
+          showCursor
+            ? DEFAULT_INPUT_BACKGROUND_OPACITY
+            : DEFAULT_BACKGROUND_OPACITY
         }
-        backgroundOpacity={DEFAULT_BACKGROUND_OPACITY}
         useBackgroundColor={useBackgroundColor}
       >
         <Box
