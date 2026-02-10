@@ -15,6 +15,8 @@ import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
 import { ToolErrorType } from './tool-error.js';
 import { LS_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { LS_DEFINITION } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
 
 /**
  * Parameters for the LS tool
@@ -280,42 +282,9 @@ export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
     super(
       LSTool.Name,
       'ReadFolder',
-      'Lists the names of files and subdirectories directly within a specified directory path. Can optionally ignore entries matching provided glob patterns.',
+      LS_DEFINITION.base.description!,
       Kind.Search,
-      {
-        properties: {
-          dir_path: {
-            description: 'The path to the directory to list',
-            type: 'string',
-          },
-          ignore: {
-            description: 'List of glob patterns to ignore',
-            items: {
-              type: 'string',
-            },
-            type: 'array',
-          },
-          file_filtering_options: {
-            description:
-              'Optional: Whether to respect ignore patterns from .gitignore or .geminiignore',
-            type: 'object',
-            properties: {
-              respect_git_ignore: {
-                description:
-                  'Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.',
-                type: 'boolean',
-              },
-              respect_gemini_ignore: {
-                description:
-                  'Optional: Whether to respect .geminiignore patterns when listing files. Defaults to true.',
-                type: 'boolean',
-              },
-            },
-          },
-        },
-        required: ['dir_path'],
-        type: 'object',
-      },
+      LS_DEFINITION.base.parametersJsonSchema,
       messageBus,
       true,
       false,
@@ -350,5 +319,9 @@ export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
       _toolName,
       _toolDisplayName,
     );
+  }
+
+  override getSchema(modelId?: string) {
+    return resolveToolDeclaration(LS_DEFINITION, modelId);
   }
 }

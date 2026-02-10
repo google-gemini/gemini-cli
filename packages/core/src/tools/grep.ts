@@ -25,6 +25,8 @@ import type { FileExclusions } from '../utils/ignorePatterns.js';
 import { ToolErrorType } from './tool-error.js';
 import { GREP_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { GREP_DEFINITION } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
 
 // --- Interfaces ---
 
@@ -579,27 +581,9 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
     super(
       GrepTool.Name,
       'SearchText',
-      'Searches for a regular expression pattern within file contents. Max 100 matches.',
+      GREP_DEFINITION.base.description!,
       Kind.Search,
-      {
-        properties: {
-          pattern: {
-            description: `The regular expression (regex) pattern to search for within file contents (e.g., 'function\\s+myFunction', 'import\\s+\\{.*\\}\\s+from\\s+.*').`,
-            type: 'string',
-          },
-          dir_path: {
-            description:
-              'Optional: The absolute path to the directory to search within. If omitted, searches the current working directory.',
-            type: 'string',
-          },
-          include: {
-            description: `Optional: A glob pattern to filter which files are searched (e.g., '*.js', '*.{ts,tsx}', 'src/**'). If omitted, searches all files (respecting potential global ignores).`,
-            type: 'string',
-          },
-        },
-        required: ['pattern'],
-        type: 'object',
-      },
+      GREP_DEFINITION.base.parametersJsonSchema,
       messageBus,
       true,
       false,
@@ -664,5 +648,9 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
       _toolName,
       _toolDisplayName,
     );
+  }
+
+  override getSchema(modelId?: string) {
+    return resolveToolDeclaration(GREP_DEFINITION, modelId);
   }
 }
