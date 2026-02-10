@@ -14,3 +14,8 @@ exports[`<SectionHeader /> > 'renders correctly with a standard tit…' 1`] = `
 "────────────────────────────────────────
 My Header"
 `;
+
+exports[`<SectionHeader /> > 'renders correctly with a subtitle' 1`] = `
+"────────────────────────────────────────
+Shortcuts See /help for more"
+`;

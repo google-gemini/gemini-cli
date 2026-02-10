@@ -23,7 +23,7 @@ export const SectionHeader: React.FC<{ title: string; subtitle?: string }> = ({
       borderColor={theme.text.secondary}
     />
     <Box flexDirection="row">
-      <Text color="white" bold wrap="truncate-end">
+      <Text color={theme.text.primary} bold wrap="truncate-end">
         {title}
       </Text>
       {subtitle && <Text color={theme.text.secondary}> {subtitle}</Text>}
