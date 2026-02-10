@@ -50,7 +50,7 @@ export const Card: React.FC<CardProps> = ({
       case ToolCallStatus.Canceled:
         return { border: theme.status.warning, text: theme.status.warning };
       case ToolCallStatus.Executing:
-        return { border: theme.border.default, text: theme.status.success };
+        return { border: theme.border.default, text: theme.text.accent };
       default:
         checkExhaustive(status);
         return { border: theme.border.default, text: theme.text.primary };
