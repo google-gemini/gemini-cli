@@ -155,10 +155,9 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
   return `
 # Core Mandates
 
-## Security Protocols
+## Security & System Integrity
 - **Credential Protection:** Never log, print, or commit secrets, API keys, or sensitive credentials. Rigorously protect \`.env\` files, \`.git\`, and system configuration folders.
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
-- **Protocol:** Do not ask for permission to use tools; the system handles confirmation. Your responsibility is to justify the action, not to seek authorization.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in ${formattedFilenames} files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
