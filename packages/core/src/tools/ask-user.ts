@@ -207,7 +207,20 @@ export class AskUserInvocation extends BaseToolInvocation<
           .map(([index, answer]) => {
             const question = this.params.questions[parseInt(index, 10)];
             const category = question?.header ?? `Q${index}`;
-            return `  ${category} → ${answer}`;
+            const prefix = `  ${category} → `;
+            const indent = ' '.repeat(prefix.length);
+
+            const lines = answer.split('\n');
+            if (lines.length > 5) {
+              const visibleLines = lines.slice(0, 5);
+              const hiddenCount = lines.length - 5;
+              return (
+                prefix +
+                visibleLines.join('\n' + indent) +
+                `\n${indent}... ${hiddenCount} more lines hidden`
+              );
+            }
+            return prefix + lines.join('\n' + indent);
           })
           .join('\n')}`
       : 'User submitted without answering questions.';

@@ -230,17 +230,22 @@ const ReviewView: React.FC<ReviewViewProps> = ({
       )}
 
       <Box flexDirection="column">
-        {questions.map((q, i) => (
-          <Box key={i} marginBottom={0}>
-            <Text color={theme.text.secondary}>{q.header}</Text>
-            <Text color={theme.text.secondary}> → </Text>
-            <Text
-              color={answers[i] ? theme.text.primary : theme.status.warning}
-            >
-              {answers[i] || '(not answered)'}
-            </Text>
-          </Box>
-        ))}
+        {questions.map((q, i) => {
+          const header = q.header;
+          const answer = answers[i] || '(not answered)';
+
+          return (
+            <Box key={i} marginBottom={0}>
+              <Text color={theme.text.secondary}>{header}</Text>
+              <Text color={theme.text.secondary}> → </Text>
+              <Text
+                color={answers[i] ? theme.text.primary : theme.status.warning}
+              >
+                {answer}
+              </Text>
+            </Box>
+          );
+        })}
       </Box>
       <DialogFooter
         primaryAction="Enter to submit"
@@ -283,8 +288,8 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
 
   const buffer = useTextBuffer({
     initialText: initialAnswer,
-    viewport: { width: Math.max(1, bufferWidth), height: 1 },
-    singleLine: true,
+    viewport: { width: Math.max(1, bufferWidth), height: 3 },
+    singleLine: false,
   });
 
   const { text: textValue } = buffer;
@@ -317,9 +322,7 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
 
   const handleSubmit = useCallback(
     (val: string) => {
-      if (val.trim()) {
-        onAnswer(val.trim());
-      }
+      onAnswer(val.trim());
     },
     [onAnswer],
   );
