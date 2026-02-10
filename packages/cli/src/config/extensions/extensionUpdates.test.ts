@@ -67,6 +67,14 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     loadAgentsFromDirectory: vi
       .fn()
       .mockResolvedValue({ agents: [], errors: [] }),
+    logExtensionInstallEvent: vi.fn().mockResolvedValue(undefined),
+    logExtensionUpdateEvent: vi.fn().mockResolvedValue(undefined),
+    logExtensionUninstall: vi.fn().mockResolvedValue(undefined),
+    logExtensionEnable: vi.fn().mockResolvedValue(undefined),
+    logExtensionDisable: vi.fn().mockResolvedValue(undefined),
+    Config: vi.fn().mockImplementation(() => ({
+      getEnableExtensionReloading: vi.fn().mockReturnValue(true),
+    })),
   };
 });
 
