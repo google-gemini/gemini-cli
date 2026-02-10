@@ -106,6 +106,10 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable Vim keybindings
   - **Default:** `false`
 
+- **`general.devtools`** (boolean):
+  - **Description:** Enable DevTools inspector on launch.
+  - **Default:** `false`
+
 - **`general.enableAutoUpdate`** (boolean):
   - **Description:** Enable automatic updates.
   - **Default:** `true`
@@ -183,6 +187,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Hide the window title bar
   - **Default:** `false`
   - **Requires restart:** Yes
+
+- **`ui.inlineThinkingMode`** (enum):
+  - **Description:** Display model thinking inline: off or full.
+  - **Default:** `"off"`
+  - **Values:** `"off"`, `"full"`
 
 - **`ui.showStatusInTitle`** (boolean):
   - **Description:** Show Gemini CLI model thoughts in the terminal window title

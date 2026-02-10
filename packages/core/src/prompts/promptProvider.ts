@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import type { Config } from '../config/config.js';
+import type { HierarchicalMemory } from '../config/memory.js';
 import { GEMINI_DIR } from '../utils/paths.js';
 import { ApprovalMode } from '../policy/types.js';
 import * as snippets from './snippets.js';
@@ -28,6 +29,7 @@ import {
 } from '../tools/tool-names.js';
 import { resolveModel, isPreviewModel } from '../config/models.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
+import { getAllGeminiMdFilenames } from '../tools/memoryTool.js';
 
 /**
  * Orchestrates prompt generation by gathering context and building options.
@@ -38,7 +40,7 @@ export class PromptProvider {
    */
   getCoreSystemPrompt(
     config: Config,
-    userMemory?: string,
+    userMemory?: string | HierarchicalMemory,
     interactiveOverride?: boolean,
   ): string {
     const systemMdResolution = resolvePathFromEnv(
@@ -56,6 +58,7 @@ export class PromptProvider {
     const desiredModel = resolveModel(config.getActiveModel());
     const isGemini3 = isPreviewModel(desiredModel);
     const activeSnippets = isGemini3 ? snippets : legacySnippets;
+    const contextFilenames = getAllGeminiMdFilenames();
 
     // --- Context Gathering ---
     let planModeToolsList = PLAN_MODE_TOOLS.filter((t) =>
@@ -106,6 +109,13 @@ export class PromptProvider {
       );
     } else {
       // --- Standard Composition ---
+      const hasHierarchicalMemory =
+        typeof userMemory === 'object' &&
+        userMemory !== null &&
+        (!!userMemory.global?.trim() ||
+          !!userMemory.extension?.trim() ||
+          !!userMemory.project?.trim());
+
       const options: snippets.SystemPromptOptions = {
         preamble: this.withSection('preamble', () => ({
           interactive: interactiveMode,
@@ -114,6 +124,8 @@ export class PromptProvider {
           interactive: interactiveMode,
           isGemini3,
           hasSkills: skills.length > 0,
+          hasHierarchicalMemory,
+          contextFilenames,
         })),
         subAgents: this.withSection('agentContexts', () =>
           config
@@ -183,15 +195,19 @@ export class PromptProvider {
             })),
       } as snippets.SystemPromptOptions;
 
-      basePrompt = (
-        activeSnippets.getCoreSystemPrompt as (
-          options: snippets.SystemPromptOptions,
-        ) => string
-      )(options);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const getCoreSystemPrompt = activeSnippets.getCoreSystemPrompt as (
+        options: snippets.SystemPromptOptions,
+      ) => string;
+      basePrompt = getCoreSystemPrompt(options);
     }
 
     // --- Finalization (Shell) ---
-    const finalPrompt = activeSnippets.renderFinalShell(basePrompt, userMemory);
+    const finalPrompt = activeSnippets.renderFinalShell(
+      basePrompt,
+      userMemory,
+      contextFilenames,
+    );
 
     // Sanitize erratic newlines from composition
     const sanitizedPrompt = finalPrompt.replace(/\n{3,}/g, '\n\n');

@@ -1,11 +1,11 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import { useState } from 'react';
-import { Box, Text, useIsScreenReaderEnabled } from 'ink';
+import { Box, useIsScreenReaderEnabled } from 'ink';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { StatusDisplay } from './StatusDisplay.js';
 import { ApprovalModeIndicator } from './ApprovalModeIndicator.js';
@@ -30,7 +30,7 @@ import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { StreamingState, ToolCallStatus } from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
-import { theme } from '../semantic-colors.js';
+import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 
 export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const config = useConfig();
@@ -39,6 +39,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const uiState = useUIState();
   const uiActions = useUIActions();
   const { vimEnabled, vimMode } = useVimMode();
+  const inlineThinkingMode = getInlineThinkingMode(settings);
   const terminalWidth = process.stdout.columns;
   const isNarrow = isNarrowWidth(terminalWidth);
   const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
@@ -60,8 +61,8 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     Boolean(uiState.authConsentRequest) ||
     (uiState.confirmUpdateExtensionRequests?.length ?? 0) > 0 ||
     Boolean(uiState.loopDetectionConfirmationRequest) ||
-    Boolean(uiState.proQuotaRequest) ||
-    Boolean(uiState.validationRequest) ||
+    Boolean(uiState.quota.proQuotaRequest) ||
+    Boolean(uiState.quota.validationRequest) ||
     Boolean(uiState.customDialog);
   const showLoadingIndicator =
     (!uiState.embeddedShellFocused || uiState.isBackgroundShellVisible) &&
@@ -69,9 +70,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     !hasPendingActionRequired;
   const showApprovalIndicator = !uiState.shellModeActive;
   const showRawMarkdownIndicator = !uiState.renderMarkdown;
-  const showEscToCancelHint =
-    showLoadingIndicator &&
-    uiState.streamingState !== StreamingState.WaitingForConfirmation;
 
   return (
     <Box
@@ -93,11 +91,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
       <TodoTray />
 
       <Box marginTop={1} width="100%" flexDirection="column">
-        {showEscToCancelHint && (
-          <Box marginLeft={3}>
-            <Text color={theme.text.secondary}>esc to cancel</Text>
-          </Box>
-        )}
         <Box
           width="100%"
           flexDirection={isNarrow ? 'column' : 'row'}
@@ -126,8 +119,10 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                     ? undefined
                     : uiState.currentLoadingPhrase
                 }
+                thoughtLabel={
+                  inlineThinkingMode === 'full' ? 'Thinking ...' : undefined
+                }
                 elapsedTime={uiState.elapsedTime}
-                showCancelAndTimer={false}
               />
             )}
           </Box>
