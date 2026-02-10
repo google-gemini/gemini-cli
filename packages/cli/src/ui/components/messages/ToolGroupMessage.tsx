@@ -260,9 +260,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         )
       }
       {(borderBottomOverride ?? true) && visibleToolCalls.length > 0 && (
-        <Box paddingX={1}>
-          <ShowMoreLines constrainHeight={constrainHeight} />
-        </Box>
+        <ShowMoreLines constrainHeight={constrainHeight} />
       )}
     </Box>
   );
