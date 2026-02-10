@@ -12,6 +12,7 @@ import { StreamingContext } from '../contexts/StreamingContext.js';
 import { StreamingState } from '../types.js';
 import { vi } from 'vitest';
 import * as useTerminalSize from '../hooks/useTerminalSize.js';
+import * as terminalUtils from '../utils/terminalUtils.js';
 
 // Mock GeminiRespondingSpinner
 vi.mock('./GeminiRespondingSpinner.js', () => ({
@@ -34,7 +35,12 @@ vi.mock('../hooks/useTerminalSize.js', () => ({
   useTerminalSize: vi.fn(),
 }));
 
+vi.mock('../utils/terminalUtils.js', () => ({
+  shouldUseEmoji: vi.fn(() => true),
+}));
+
 const useTerminalSizeMock = vi.mocked(useTerminalSize.useTerminalSize);
+const shouldUseEmojiMock = vi.mocked(terminalUtils.shouldUseEmoji);
 
 const renderWithContext = (
   ui: React.ReactElement,
@@ -258,17 +264,15 @@ describe('<LoadingIndicator />', () => {
     const output = lastFrame();
     expect(output).toBeDefined();
     if (output) {
-      expect(output).toContain('Thinking: ');
+      expect(output).toContain('💬');
       expect(output).toContain('Thinking about something...');
       expect(output).not.toContain('and other stuff.');
     }
     unmount();
   });
 
-<<<<<<< HEAD
-  it('should prioritize thought.subject over currentLoadingPhrase', async () => {
-=======
-  it('should use "Thinking: " as the thought indicator', () => {
+  it('should use ASCII fallback thought indicator when emoji is unavailable', async () => {
+    shouldUseEmojiMock.mockReturnValue(false);
     const props = {
       thought: {
         subject: 'Thinking with fallback',
@@ -276,17 +280,19 @@ describe('<LoadingIndicator />', () => {
       },
       elapsedTime: 5,
     };
-    const { lastFrame, unmount } = renderWithContext(
+    const { lastFrame, unmount, waitUntilReady } = renderWithContext(
       <LoadingIndicator {...props} />,
       StreamingState.Responding,
     );
+    await waitUntilReady();
     const output = lastFrame();
-    expect(output).toContain('Thinking: Thinking with fallback');
+    expect(output).toContain('o Thinking with fallback');
+    expect(output).not.toContain('💬');
+    shouldUseEmojiMock.mockReturnValue(true);
     unmount();
   });
 
-  it('should prioritize thought.subject over currentLoadingPhrase', () => {
->>>>>>> 3e1e540d7 (feat(cli): overhaul inline thinking UI to match mock and update status bar indicator)
+  it('should prioritize thought.subject over currentLoadingPhrase', async () => {
     const props = {
       thought: {
         subject: 'This should be displayed',
@@ -301,31 +307,22 @@ describe('<LoadingIndicator />', () => {
     );
     await waitUntilReady();
     const output = lastFrame();
-    expect(output).toContain('Thinking: ');
+    expect(output).toContain('💬');
     expect(output).toContain('This should be displayed');
     expect(output).not.toContain('This should not be displayed');
     unmount();
   });
 
-<<<<<<< HEAD
   it('should not display thought icon for non-thought loading phrases', async () => {
     const { lastFrame, unmount, waitUntilReady } = renderWithContext(
-=======
-  it('should not display thought indicator for non-thought loading phrases', () => {
-    const { lastFrame, unmount } = renderWithContext(
->>>>>>> 3e1e540d7 (feat(cli): overhaul inline thinking UI to match mock and update status bar indicator)
       <LoadingIndicator
         currentLoadingPhrase="some random tip..."
         elapsedTime={3}
       />,
       StreamingState.Responding,
     );
-<<<<<<< HEAD
     await waitUntilReady();
     expect(lastFrame()).not.toContain('💬');
-=======
-    expect(lastFrame()).not.toContain('Thinking: ');
->>>>>>> 3e1e540d7 (feat(cli): overhaul inline thinking UI to match mock and update status bar indicator)
     unmount();
   });
 
