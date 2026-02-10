@@ -426,5 +426,57 @@ describe('Color Utils', () => {
         ),
       ).toBeUndefined();
     });
+
+    it('should switch to preferred light theme if set', () => {
+      expect(
+        shouldSwitchTheme(
+          DEFAULT_THEME,
+          LIGHT_THRESHOLD + 1,
+          DEFAULT_THEME,
+          DEFAULT_LIGHT_THEME,
+          undefined,
+          'preferred-light',
+        ),
+      ).toBe('preferred-light');
+    });
+
+    it('should switch to preferred dark theme if set', () => {
+      expect(
+        shouldSwitchTheme(
+          DEFAULT_LIGHT_THEME,
+          DARK_THRESHOLD - 1,
+          DEFAULT_THEME,
+          DEFAULT_LIGHT_THEME,
+          'preferred-dark',
+          undefined,
+        ),
+      ).toBe('preferred-dark');
+    });
+
+    it('should switch from preferred dark to preferred light', () => {
+      expect(
+        shouldSwitchTheme(
+          'preferred-dark',
+          LIGHT_THRESHOLD + 1,
+          DEFAULT_THEME,
+          DEFAULT_LIGHT_THEME,
+          'preferred-dark',
+          'preferred-light',
+        ),
+      ).toBe('preferred-light');
+    });
+
+    it('should switch from preferred light to preferred dark', () => {
+      expect(
+        shouldSwitchTheme(
+          'preferred-light',
+          DARK_THRESHOLD - 1,
+          DEFAULT_THEME,
+          DEFAULT_LIGHT_THEME,
+          'preferred-dark',
+          'preferred-light',
+        ),
+      ).toBe('preferred-dark');
+    });
   });
 });
