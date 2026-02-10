@@ -5,8 +5,7 @@
  */
 
 import { Box, Text } from 'ink';
-import { useEffect, useMemo, useState } from 'react';
-import { UserAccountManager, AuthType } from '@google/gemini-cli-core';
+import { UserIdentity } from './UserIdentity.js';
 import { Tips } from './Tips.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
@@ -35,20 +34,6 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
 
   const { bannerText } = useBanner(bannerData);
   const { showTips } = useTips();
-
-  const authType = config.getContentGeneratorConfig()?.authType;
-  const [email, setEmail] = useState<string | undefined>();
-
-  useEffect(() => {
-    if (authType) {
-      const userAccountManager = new UserAccountManager();
-      // Even though the current implementation of getCachedGoogleAccount is sync,
-      // it performs file I/O. Moving it to useEffect ensures it doesn't block the render cycle.
-      setEmail(userAccountManager.getCachedGoogleAccount() ?? undefined);
-    }
-  }, [authType]);
-
-  const tierName = useMemo(() => config.getUserTierName(), [config]);
 
   const showHeader = !(
     settings.merged.ui.hideBanner || config.getScreenReader()
@@ -107,24 +92,11 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
             {/* Line 2: Blank */}
             <Box height={1} />
 
-            {/* Line 3: User Email /auth */}
+            {/* Lines 3 & 4: User Identity info (Email /auth and Plan /upgrade) */}
             <Box>
-              <Text color={theme.text.primary}>
-                {authType === AuthType.LOGIN_WITH_GOOGLE ? (
-                  <Text>{email ?? 'Logged in with Google'}</Text>
-                ) : (
-                  `Authenticated with ${authType}`
-                )}
-              </Text>
-              <Text color={theme.text.secondary}> /auth</Text>
-            </Box>
-
-            {/* Line 4: Tier Name /upgrade */}
-            <Box>
-              <Text color={theme.text.primary}>
-                {tierName ?? 'Gemini Code Assist for individuals'}
-              </Text>
-              <Text color={theme.text.secondary}> /upgrade</Text>
+              {settings.merged.ui.showUserIdentity !== false && (
+                <UserIdentity config={config} />
+              )}
             </Box>
           </Box>
         </Box>
