@@ -601,7 +601,6 @@ export function BaseSettingsDialog({
               onHighlight={handleScopeHighlight}
               isFocused={focusSection === 'scope'}
               showNumbers={focusSection === 'scope'}
-              priority={focusSection === 'scope'}
             />
           </Box>
         )}
