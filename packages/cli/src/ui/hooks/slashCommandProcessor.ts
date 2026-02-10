@@ -702,6 +702,7 @@ export const useSlashCommandProcessor = (
       setIsProcessing,
       setConfirmationRequest,
       setCustomDialog,
+      setPendingItem,
     ],
   );
 

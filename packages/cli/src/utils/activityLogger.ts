@@ -4,18 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unnecessary-type-assertion */
-/* eslint-disable @typescript-eslint/no-this-alias */
-
 import http from 'node:http';
 import https from 'node:https';
 import zlib from 'node:zlib';
 import fs from 'node:fs';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
-import { CoreEvent, coreEvents, debugLogger } from '@google/gemini-cli-core';
-import type { Config } from '@google/gemini-cli-core';
+import {
+  CoreEvent,
+  coreEvents,
+  debugLogger,
+  type ConsoleLogPayload,
+  type Config,
+} from '@google/gemini-cli-core';
 import WebSocket from 'ws';
 
 const ACTIVITY_ID_HEADER = 'x-activity-request-id';
@@ -43,6 +44,9 @@ export interface NetworkLog {
   error?: string;
 }
 
+/** Partial update to an existing network log. */
+export type PartialNetworkLog = { id: string } & Partial<NetworkLog>;
+
 /**
  * Capture utility for session activities (network and console).
  * Provides a stream of events that can be persisted for analysis or inspection.
@@ -52,6 +56,10 @@ export class ActivityLogger extends EventEmitter {
   private isInterceptionEnabled = false;
   private requestStartTimes = new Map<string, number>();
   private networkLoggingEnabled = false;
+
+  private networkBuffer: Array<NetworkLog | PartialNetworkLog> = [];
+  private consoleBuffer: Array<ConsoleLogPayload & { timestamp: number }> = [];
+  private readonly bufferLimit = 10;
 
   static getInstance(): ActivityLogger {
     if (!ActivityLogger.instance) {
@@ -73,6 +81,19 @@ export class ActivityLogger extends EventEmitter {
     return this.networkLoggingEnabled;
   }
 
+  getBufferedLogs(): {
+    network: Array<NetworkLog | PartialNetworkLog>;
+    console: Array<ConsoleLogPayload & { timestamp: number }>;
+  } {
+    const logs = {
+      network: [...this.networkBuffer],
+      console: [...this.consoleBuffer],
+    };
+    this.networkBuffer = [];
+    this.consoleBuffer = [];
+    return logs;
+  }
+
   private stringifyHeaders(headers: unknown): Record<string, string> {
     const result: Record<string, string> = {};
     if (!headers) return result;
@@ -91,13 +112,15 @@ export class ActivityLogger extends EventEmitter {
     return result;
   }
 
-  private sanitizeNetworkLog(log: any): any {
+  private sanitizeNetworkLog(
+    log: NetworkLog | PartialNetworkLog,
+  ): NetworkLog | PartialNetworkLog {
     if (!log || typeof log !== 'object') return log;
 
     const sanitized = { ...log };
 
     // Sanitize request headers
-    if (sanitized.headers) {
+    if ('headers' in sanitized && sanitized.headers) {
       const headers = { ...sanitized.headers };
       for (const key of Object.keys(headers)) {
         if (
@@ -112,7 +135,7 @@ export class ActivityLogger extends EventEmitter {
     }
 
     // Sanitize response headers
-    if (sanitized.response?.headers) {
+    if ('response' in sanitized && sanitized.response?.headers) {
       const resHeaders = { ...sanitized.response.headers };
       for (const key of Object.keys(resHeaders)) {
         if (['set-cookie'].includes(key.toLowerCase())) {
@@ -125,8 +148,13 @@ export class ActivityLogger extends EventEmitter {
     return sanitized;
   }
 
-  private safeEmitNetwork(payload: any) {
-    this.emit('network', this.sanitizeNetworkLog(payload));
+  private safeEmitNetwork(payload: NetworkLog | PartialNetworkLog) {
+    const sanitized = this.sanitizeNetworkLog(payload);
+    this.networkBuffer.push(sanitized);
+    if (this.networkBuffer.length > this.bufferLimit) {
+      this.networkBuffer.shift();
+    }
+    this.emit('network', sanitized);
   }
 
   enable() {
@@ -147,7 +175,7 @@ export class ActivityLogger extends EventEmitter {
           ? input
           : input instanceof URL
             ? input.toString()
-            : (input as any).url;
+            : input.url;
       if (url.includes('127.0.0.1') || url.includes('localhost'))
         return originalFetch(input, init);
 
@@ -276,72 +304,98 @@ export class ActivityLogger extends EventEmitter {
   }
 
   private patchNodeHttp() {
-    const self = this;
     const originalRequest = http.request;
     const originalHttpsRequest = https.request;
 
-    const wrapRequest = (originalFn: any, args: any[], protocol: string) => {
-      const options = args[0];
-      const url =
-        typeof options === 'string'
-          ? options
-          : options.href ||
-            `${protocol}//${options.hostname || options.host || 'localhost'}${options.path || '/'}`;
+    const wrapRequest = (
+      originalFn: typeof http.request,
+      args: unknown[],
+      protocol: string,
+    ) => {
+      const options = args[0] as http.RequestOptions | string | URL;
+      let url = '';
+      if (typeof options === 'string') {
+        url = options;
+      } else if (options instanceof URL) {
+        url = options.href;
+      } else {
+        url =
+          ((options as Record<string, unknown>)['href'] as string) ||
+          `${protocol}//${options.hostname || options.host || 'localhost'}${options.path || '/'}`;
+      }
 
       if (url.includes('127.0.0.1') || url.includes('localhost'))
-        return originalFn.apply(http, args);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return originalFn.apply(http, args as any);
 
       const headers =
-        typeof options === 'object' && typeof options !== 'function'
-          ? (options as any).headers
+        typeof options === 'object' &&
+        options !== null &&
+        !(options instanceof URL)
+          ? (options.headers as http.OutgoingHttpHeaders)
           : {};
-      if (headers && headers[ACTIVITY_ID_HEADER]) {
-        delete headers[ACTIVITY_ID_HEADER];
-        return originalFn.apply(http, args);
+
+      if (headers && (headers as Record<string, unknown>)[ACTIVITY_ID_HEADER]) {
+        delete (headers as Record<string, unknown>)[ACTIVITY_ID_HEADER];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return originalFn.apply(http, args as any);
       }
 
       const id = Math.random().toString(36).substring(7);
-      self.requestStartTimes.set(id, Date.now());
-      const req = originalFn.apply(http, args);
+      this.requestStartTimes.set(id, Date.now());
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const req = originalFn.apply(http, args as any);
       const requestChunks: Buffer[] = [];
 
       const oldWrite = req.write;
       const oldEnd = req.end;
 
-      req.write = function (chunk: any, ...etc: any[]) {
+      req.write = function (chunk: unknown, ...etc: unknown[]) {
         if (chunk) {
-          const encoding =
-            typeof etc[0] === 'string' ? (etc[0] as BufferEncoding) : undefined;
+          const encoding = typeof etc[0] === 'string' ? etc[0] : undefined;
           requestChunks.push(
-            Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, encoding),
+            Buffer.isBuffer(chunk)
+              ? chunk
+              : // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                Buffer.from(chunk as any, encoding as any),
           );
         }
-        return oldWrite.apply(this, [chunk, ...etc]);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return oldWrite.apply(this, [chunk as any, ...etc] as any);
       };
 
-      req.end = function (this: any, chunk: any, ...etc: any[]) {
+      req.end = function (
+        this: http.ClientRequest,
+        chunk: unknown,
+        ...etc: unknown[]
+      ) {
         if (chunk && typeof chunk !== 'function') {
-          const encoding =
-            typeof etc[0] === 'string' ? (etc[0] as BufferEncoding) : undefined;
+          const encoding = typeof etc[0] === 'string' ? etc[0] : undefined;
           requestChunks.push(
-            Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, encoding),
+            Buffer.isBuffer(chunk)
+              ? chunk
+              : // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                Buffer.from(chunk as any, encoding as any),
           );
         }
         const body = Buffer.concat(requestChunks).toString('utf8');
 
-        self.safeEmitNetwork({
+        ActivityLogger.getInstance().safeEmitNetwork({
           id,
           timestamp: Date.now(),
           method: req.method || 'GET',
           url,
-          headers: self.stringifyHeaders(req.getHeaders()),
+          headers: ActivityLogger.getInstance().stringifyHeaders(
+            req.getHeaders(),
+          ),
           body,
           pending: true,
         });
-        return oldEnd.apply(this, [chunk, ...etc]);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (oldEnd as any).apply(this, [chunk, ...etc]);
       };
 
-      req.on('response', (res: any) => {
+      req.on('response', (res: http.IncomingMessage) => {
         const responseChunks: Buffer[] = [];
         let chunkIndex = 0;
 
@@ -350,7 +404,7 @@ export class ActivityLogger extends EventEmitter {
           responseChunks.push(chunkBuffer);
 
           // Emit chunk update for streaming
-          self.safeEmitNetwork({
+          ActivityLogger.getInstance().safeEmitNetwork({
             id,
             pending: true,
             chunk: {
@@ -367,16 +421,19 @@ export class ActivityLogger extends EventEmitter {
 
           const processBuffer = (finalBuffer: Buffer) => {
             const resBody = finalBuffer.toString('utf8');
-            const startTime = self.requestStartTimes.get(id);
+            const startTime =
+              ActivityLogger.getInstance().requestStartTimes.get(id);
             const durationMs = startTime ? Date.now() - startTime : 0;
-            self.requestStartTimes.delete(id);
+            ActivityLogger.getInstance().requestStartTimes.delete(id);
 
-            self.safeEmitNetwork({
+            ActivityLogger.getInstance().safeEmitNetwork({
               id,
               pending: false,
               response: {
-                status: res.statusCode,
-                headers: self.stringifyHeaders(res.headers),
+                status: res.statusCode || 0,
+                headers: ActivityLogger.getInstance().stringifyHeaders(
+                  res.headers,
+                ),
                 body: resBody,
                 durationMs,
               },
@@ -397,23 +454,34 @@ export class ActivityLogger extends EventEmitter {
         });
       });
 
-      req.on('error', (err: any) => {
-        self.requestStartTimes.delete(id);
-        const message = err instanceof Error ? err.message : String(err);
-        self.safeEmitNetwork({ id, pending: false, error: message });
+      req.on('error', (err: Error) => {
+        ActivityLogger.getInstance().requestStartTimes.delete(id);
+        const message = err.message;
+        ActivityLogger.getInstance().safeEmitNetwork({
+          id,
+          pending: false,
+          error: message,
+        });
       });
 
       return req;
     };
 
-    http.request = (...args: any[]) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (http as any).request = (...args: unknown[]) =>
       wrapRequest(originalRequest, args, 'http:');
-    https.request = (...args: any[]) =>
-      wrapRequest(originalHttpsRequest, args, 'https:');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (https as any).request = (...args: unknown[]) =>
+      wrapRequest(originalHttpsRequest as typeof http.request, args, 'https:');
   }
 
-  logConsole(payload: unknown) {
-    this.emit('console', payload);
+  logConsole(payload: ConsoleLogPayload) {
+    const enriched = { ...payload, timestamp: Date.now() };
+    this.consoleBuffer.push(enriched);
+    if (this.consoleBuffer.length > this.bufferLimit) {
+      this.consoleBuffer.shift();
+    }
+    this.emit('console', enriched);
   }
 }
 
@@ -473,7 +541,7 @@ function setupNetworkLogging(
   config: Config,
   onReconnectFailed?: () => void,
 ) {
-  const buffer: Array<Record<string, unknown>> = [];
+  const transportBuffer: Array<Record<string, unknown>> = [];
   let ws: WebSocket | null = null;
   let reconnectTimer: NodeJS.Timeout | null = null;
   let sessionId: string | null = null;
@@ -498,7 +566,10 @@ function setupNetworkLogging(
 
       ws.on('message', (data: Buffer) => {
         try {
-          const message = JSON.parse(data.toString());
+          const message = JSON.parse(data.toString()) as {
+            type: string;
+            sessionId?: string;
+          };
           handleServerMessage(message);
         } catch (err) {
           debugLogger.debug('Invalid WebSocket message:', err);
@@ -520,10 +591,13 @@ function setupNetworkLogging(
     }
   };
 
-  const handleServerMessage = (message: any) => {
+  const handleServerMessage = (message: {
+    type: string;
+    sessionId?: string;
+  }) => {
     switch (message.type) {
       case 'registered':
-        sessionId = message.sessionId;
+        sessionId = message.sessionId || null;
         debugLogger.debug(`WebSocket session registered: ${sessionId}`);
 
         // Start ping interval
@@ -546,7 +620,7 @@ function setupNetworkLogging(
     }
   };
 
-  const sendMessage = (message: any) => {
+  const sendMessage = (message: Record<string, unknown>) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(message));
     }
@@ -555,7 +629,7 @@ function setupNetworkLogging(
   const sendToNetwork = (type: 'console' | 'network', payload: unknown) => {
     const message = {
       type,
-      payload,
+      payload: payload as Record<string, unknown>,
       sessionId: sessionId || config.getSessionId(),
       timestamp: Date.now(),
     };
@@ -566,8 +640,8 @@ function setupNetworkLogging(
       ws.readyState !== WebSocket.OPEN ||
       !capture.isNetworkLoggingEnabled()
     ) {
-      buffer.push(message);
-      if (buffer.length > MAX_BUFFER_SIZE) buffer.shift();
+      transportBuffer.push(message);
+      if (transportBuffer.length > MAX_BUFFER_SIZE) transportBuffer.shift();
       return;
     }
 
@@ -583,9 +657,39 @@ function setupNetworkLogging(
       return;
     }
 
-    debugLogger.debug(`Flushing ${buffer.length} buffered logs...`);
-    while (buffer.length > 0) {
-      const message = buffer.shift()!;
+    const { network, console: consoleLogs } = capture.getBufferedLogs();
+    const allInitialLogs: Array<{
+      type: 'network' | 'console';
+      payload: NetworkLog | PartialNetworkLog | ConsoleLogPayload;
+      timestamp: number;
+    }> = [
+      ...network.map((l) => ({
+        type: 'network' as const,
+        payload: l,
+        timestamp: 'timestamp' in l && l.timestamp ? l.timestamp : Date.now(),
+      })),
+      ...consoleLogs.map((l) => ({
+        type: 'console' as const,
+        payload: l,
+        timestamp: l.timestamp,
+      })),
+    ].sort((a, b) => a.timestamp - b.timestamp);
+
+    debugLogger.debug(
+      `Flushing ${allInitialLogs.length} initial buffered logs and ${transportBuffer.length} transport buffered logs...`,
+    );
+
+    for (const log of allInitialLogs) {
+      sendMessage({
+        type: log.type,
+        payload: log.payload as Record<string, unknown>,
+        sessionId: sessionId || config.getSessionId(),
+        timestamp: Date.now(),
+      });
+    }
+
+    while (transportBuffer.length > 0) {
+      const message = transportBuffer.shift()!;
       sendMessage(message);
     }
   };
@@ -622,6 +726,7 @@ function setupNetworkLogging(
 
   capture.on('console', (payload) => sendToNetwork('console', payload));
   capture.on('network', (payload) => sendToNetwork('network', payload));
+
   capture.on('network-logging-enabled', () => {
     debugLogger.debug('Network logging enabled, flushing buffer...');
     flushBuffer();

@@ -56,9 +56,18 @@ const mockDevToolsInstance = vi.hoisted(() => ({
   getPort: vi.fn(),
 }));
 
+const mockActivityLoggerInstance = vi.hoisted(() => ({
+  disableNetworkLogging: vi.fn(),
+  enableNetworkLogging: vi.fn(),
+  getBufferedLogs: vi.fn().mockReturnValue({ network: [], console: [] }),
+}));
+
 vi.mock('./activityLogger.js', () => ({
   initActivityLogger: mockInitActivityLogger,
   addNetworkTransport: mockAddNetworkTransport,
+  ActivityLogger: {
+    getInstance: () => mockActivityLoggerInstance,
+  },
 }));
 
 vi.mock('@google/gemini-cli-core', () => ({
@@ -80,7 +89,11 @@ vi.mock('gemini-cli-devtools', () => ({
 }));
 
 // --- Import under test (after mocks) ---
-import { registerActivityLogger, resetForTesting } from './devtoolsService.js';
+import {
+  setupInitialActivityLogger,
+  startDevToolsServer,
+  resetForTesting,
+} from './devtoolsService.js';
 
 function createMockConfig(overrides: Record<string, unknown> = {}) {
   return {
@@ -100,180 +113,84 @@ describe('devtoolsService', () => {
     delete process.env['GEMINI_CLI_ACTIVITY_LOG_TARGET'];
   });
 
-  describe('registerActivityLogger', () => {
-    it('connects to existing DevTools server when probe succeeds', async () => {
+  describe('setupInitialActivityLogger', () => {
+    it('initializes in network mode with no host/port and disables logging', () => {
       const config = createMockConfig();
-
-      // The probe WebSocket will succeed
-      const promise = registerActivityLogger(config);
-
-      // Wait for WebSocket to be created
-      await vi.waitFor(() => {
-        expect(MockWebSocket.instances.length).toBe(1);
-      });
-
-      // Simulate probe success
-      MockWebSocket.instances[0].simulateOpen();
-
-      await promise;
+      setupInitialActivityLogger(config);
 
       expect(mockInitActivityLogger).toHaveBeenCalledWith(config, {
         mode: 'network',
-        host: '127.0.0.1',
-        port: 25417,
-        onReconnectFailed: expect.any(Function),
+        host: '',
+        port: 0,
       });
+      expect(
+        mockActivityLoggerInstance.disableNetworkLogging,
+      ).toHaveBeenCalled();
     });
 
-    it('starts new DevTools server when probe fails', async () => {
-      const config = createMockConfig();
-      mockDevToolsInstance.start.mockResolvedValue('http://127.0.0.1:25417');
-      mockDevToolsInstance.getPort.mockReturnValue(25417);
-
-      const promise = registerActivityLogger(config);
-
-      // Wait for probe WebSocket
-      await vi.waitFor(() => {
-        expect(MockWebSocket.instances.length).toBe(1);
-      });
-
-      // Simulate probe failure
-      MockWebSocket.instances[0].simulateError();
-
-      await promise;
-
-      expect(mockDevToolsInstance.start).toHaveBeenCalled();
-      expect(mockInitActivityLogger).toHaveBeenCalledWith(config, {
-        mode: 'network',
-        host: '127.0.0.1',
-        port: 25417,
-        onReconnectFailed: expect.any(Function),
-      });
-    });
-
-    it('falls back to file mode when target env var is set', async () => {
+    it('initializes in file mode when target env var is set', () => {
       process.env['GEMINI_CLI_ACTIVITY_LOG_TARGET'] = '/tmp/test.jsonl';
       const config = createMockConfig();
-
-      await registerActivityLogger(config);
+      setupInitialActivityLogger(config);
 
       expect(mockInitActivityLogger).toHaveBeenCalledWith(config, {
         mode: 'file',
         filePath: '/tmp/test.jsonl',
       });
     });
+  });
 
-    it('does nothing in file mode when config.storage is missing', async () => {
-      process.env['GEMINI_CLI_ACTIVITY_LOG_TARGET'] = '/tmp/test.jsonl';
-      const config = createMockConfig({ storage: undefined });
-
-      await registerActivityLogger(config);
-
-      expect(mockInitActivityLogger).not.toHaveBeenCalled();
-    });
-
-    it('falls back to file logging when DevTools start fails', async () => {
+  describe('startDevToolsServer', () => {
+    it('starts new server when none exists and enables logging', async () => {
       const config = createMockConfig();
-      mockDevToolsInstance.start.mockRejectedValue(
-        new Error('MODULE_NOT_FOUND'),
-      );
+      mockDevToolsInstance.start.mockResolvedValue('http://127.0.0.1:25417');
+      mockDevToolsInstance.getPort.mockReturnValue(25417);
 
-      const promise = registerActivityLogger(config);
+      const promise = startDevToolsServer(config);
 
-      // Wait for probe WebSocket
-      await vi.waitFor(() => {
-        expect(MockWebSocket.instances.length).toBe(1);
-      });
-
-      // Probe fails → tries to start server → server start fails → file fallback
+      await vi.waitFor(() => expect(MockWebSocket.instances.length).toBe(1));
       MockWebSocket.instances[0].simulateError();
 
-      await promise;
+      const url = await promise;
 
-      expect(mockInitActivityLogger).toHaveBeenCalledWith(config, {
-        mode: 'file',
-        filePath: undefined,
-      });
+      expect(url).toBe('http://127.0.0.1:25417');
+      expect(mockAddNetworkTransport).toHaveBeenCalledWith(
+        config,
+        '127.0.0.1',
+        25417,
+        expect.any(Function),
+      );
+      expect(
+        mockActivityLoggerInstance.enableNetworkLogging,
+      ).toHaveBeenCalled();
+    });
+
+    it('connects to existing server if one is found', async () => {
+      const config = createMockConfig();
+
+      const promise = startDevToolsServer(config);
+
+      await vi.waitFor(() => expect(MockWebSocket.instances.length).toBe(1));
+      MockWebSocket.instances[0].simulateOpen();
+
+      const url = await promise;
+
+      expect(url).toBe('http://127.0.0.1:25417');
+      expect(mockAddNetworkTransport).toHaveBeenCalled();
+      expect(
+        mockActivityLoggerInstance.enableNetworkLogging,
+      ).toHaveBeenCalled();
     });
   });
 
-  describe('startOrJoinDevTools (via registerActivityLogger)', () => {
-    it('stops own server and connects to existing when losing port race', async () => {
-      const config = createMockConfig();
-
-      // Server starts on a different port (lost the race)
-      mockDevToolsInstance.start.mockResolvedValue('http://127.0.0.1:25418');
-      mockDevToolsInstance.getPort.mockReturnValue(25418);
-
-      const promise = registerActivityLogger(config);
-
-      // First: probe for existing server (fails)
-      await vi.waitFor(() => {
-        expect(MockWebSocket.instances.length).toBe(1);
-      });
-      MockWebSocket.instances[0].simulateError();
-
-      // Second: after starting, probes the default port winner
-      await vi.waitFor(() => {
-        expect(MockWebSocket.instances.length).toBe(2);
-      });
-      // Winner is alive
-      MockWebSocket.instances[1].simulateOpen();
-
-      await promise;
-
-      expect(mockDevToolsInstance.stop).toHaveBeenCalled();
-      expect(mockInitActivityLogger).toHaveBeenCalledWith(
-        config,
-        expect.objectContaining({
-          mode: 'network',
-          host: '127.0.0.1',
-          port: 25417, // connected to winner's port
-        }),
-      );
-    });
-
-    it('keeps own server when winner is not responding', async () => {
-      const config = createMockConfig();
-
-      mockDevToolsInstance.start.mockResolvedValue('http://127.0.0.1:25418');
-      mockDevToolsInstance.getPort.mockReturnValue(25418);
-
-      const promise = registerActivityLogger(config);
-
-      // Probe for existing (fails)
-      await vi.waitFor(() => {
-        expect(MockWebSocket.instances.length).toBe(1);
-      });
-      MockWebSocket.instances[0].simulateError();
-
-      // Probe the winner (also fails)
-      await vi.waitFor(() => {
-        expect(MockWebSocket.instances.length).toBe(2);
-      });
-      MockWebSocket.instances[1].simulateError();
-
-      await promise;
-
-      expect(mockDevToolsInstance.stop).not.toHaveBeenCalled();
-      expect(mockInitActivityLogger).toHaveBeenCalledWith(
-        config,
-        expect.objectContaining({
-          mode: 'network',
-          port: 25418, // kept own port
-        }),
-      );
-    });
-  });
-
-  describe('handlePromotion (via onReconnectFailed)', () => {
+  describe('handlePromotion (via startDevToolsServer)', () => {
     it('caps promotion attempts at MAX_PROMOTION_ATTEMPTS', async () => {
       const config = createMockConfig();
       mockDevToolsInstance.start.mockResolvedValue('http://127.0.0.1:25417');
       mockDevToolsInstance.getPort.mockReturnValue(25417);
 
       // First: set up the logger so we can grab onReconnectFailed
-      const promise = registerActivityLogger(config);
+      const promise = startDevToolsServer(config);
 
       await vi.waitFor(() => {
         expect(MockWebSocket.instances.length).toBe(1);
@@ -283,8 +200,8 @@ describe('devtoolsService', () => {
       await promise;
 
       // Extract onReconnectFailed callback
-      const initCall = mockInitActivityLogger.mock.calls[0];
-      const onReconnectFailed = initCall[1].onReconnectFailed;
+      const initCall = mockAddNetworkTransport.mock.calls[0];
+      const onReconnectFailed = initCall[3];
       expect(onReconnectFailed).toBeDefined();
 
       // Trigger promotion MAX_PROMOTION_ATTEMPTS + 1 times

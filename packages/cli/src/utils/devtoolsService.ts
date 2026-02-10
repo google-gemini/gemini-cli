@@ -7,7 +7,11 @@
 import { debugLogger } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
 import WebSocket from 'ws';
-import { initActivityLogger, addNetworkTransport } from './activityLogger.js';
+import {
+  initActivityLogger,
+  addNetworkTransport,
+  ActivityLogger,
+} from './activityLogger.js';
 
 interface IDevTools {
   start(): Promise<string>;
@@ -110,67 +114,80 @@ async function handlePromotion(config: Config) {
 }
 
 /**
- * Registers the activity logger.
- * Captures network and console logs via DevTools WebSocket or to a file.
- *
- * Environment variable GEMINI_CLI_ACTIVITY_LOG_TARGET controls the output:
- * - file path (e.g., "/tmp/logs.jsonl") → file mode
- * - not set → auto-start DevTools (reuses existing instance if already running)
- *
- * @param config The CLI configuration
+ * Initializes the activity logger in buffering mode.
+ * Interception starts immediately, but the DevTools server is not started yet.
  */
-export async function registerActivityLogger(config: Config) {
+export function setupInitialActivityLogger(config: Config) {
   const target = process.env['GEMINI_CLI_ACTIVITY_LOG_TARGET'];
 
-  if (!target) {
-    // No explicit target: try connecting to existing DevTools, then start new one
-    const onReconnectFailed = () => handlePromotion(config);
+  if (target) {
+    if (!config.storage) return;
+    initActivityLogger(config, { mode: 'file', filePath: target });
+  } else {
+    // Start in buffering mode (no transport attached yet)
+    initActivityLogger(config, {
+      mode: 'network',
+      host: '',
+      port: 0,
+    });
+    // Explicitly disable network logging so it buffers until promoted
+    const capture = ActivityLogger.getInstance();
+    capture.disableNetworkLogging();
+  }
+}
 
-    // Probe for an existing DevTools server
-    const existing = await probeDevTools(
-      DEFAULT_DEVTOOLS_HOST,
-      DEFAULT_DEVTOOLS_PORT,
+/**
+ * Starts the DevTools server and opens the UI in the browser.
+ * Returns the URL to the DevTools UI.
+ */
+export async function startDevToolsServer(config: Config): Promise<string> {
+  const onReconnectFailed = () => handlePromotion(config);
+
+  // Probe for an existing DevTools server
+  const existing = await probeDevTools(
+    DEFAULT_DEVTOOLS_HOST,
+    DEFAULT_DEVTOOLS_PORT,
+  );
+
+  let host = DEFAULT_DEVTOOLS_HOST;
+  let port = DEFAULT_DEVTOOLS_PORT;
+
+  if (existing) {
+    debugLogger.log(
+      `DevTools (existing) at: http://${DEFAULT_DEVTOOLS_HOST}:${DEFAULT_DEVTOOLS_PORT}`,
     );
-    if (existing) {
-      debugLogger.log(
-        `DevTools (existing) at: http://${DEFAULT_DEVTOOLS_HOST}:${DEFAULT_DEVTOOLS_PORT}`,
-      );
-      initActivityLogger(config, {
-        mode: 'network',
-        host: DEFAULT_DEVTOOLS_HOST,
-        port: DEFAULT_DEVTOOLS_PORT,
-        onReconnectFailed,
-      });
-      return;
-    }
-
+  } else {
     // No existing server — start (or join if we lose the race)
     try {
       const result = await startOrJoinDevTools(
         DEFAULT_DEVTOOLS_HOST,
         DEFAULT_DEVTOOLS_PORT,
       );
-      initActivityLogger(config, {
-        mode: 'network',
-        host: result.host,
-        port: result.port,
-        onReconnectFailed,
-      });
-      return;
+      host = result.host;
+      port = result.port;
     } catch (err) {
-      debugLogger.debug(
-        'Failed to start DevTools, falling back to file logging:',
-        err,
-      );
+      debugLogger.debug('Failed to start DevTools:', err);
+      throw err;
     }
   }
 
-  // File mode fallback
-  if (!config.storage) {
-    return;
-  }
+  // Promote the activity logger to use the network transport
+  addNetworkTransport(config, host, port, onReconnectFailed);
+  const capture = ActivityLogger.getInstance();
+  capture.enableNetworkLogging();
 
-  initActivityLogger(config, { mode: 'file', filePath: target });
+  return `http://${host}:${port}`;
+}
+
+/**
+ * Registers the activity logger (legacy wrapper).
+ */
+export async function registerActivityLogger(config: Config) {
+  setupInitialActivityLogger(config);
+  const target = process.env['GEMINI_CLI_ACTIVITY_LOG_TARGET'];
+  if (!target) {
+    await startDevToolsServer(config);
+  }
 }
 
 /** Reset module-level state — test only. */

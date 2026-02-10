@@ -1492,7 +1492,37 @@ Logging in with Google... Restarting Gemini CLI to continue.
       }
 
       if (keyMatchers[Command.SHOW_ERROR_DETAILS](key)) {
-        setShowErrorDetails((prev) => !prev);
+        if (settings.merged.general.devtools) {
+          void (async () => {
+            try {
+              const { startDevToolsServer } = await import(
+                '../utils/devtoolsService.js'
+              );
+              const { openBrowserSecurely } = await import(
+                '@google/gemini-cli-core'
+              );
+              const url = await startDevToolsServer(config);
+              try {
+                await openBrowserSecurely(url);
+              } catch (e) {
+                setShowErrorDetails(true);
+                historyManager.addItem(
+                  {
+                    type: MessageType.INFO,
+                    text: `Failed to open browser. DevTools available at: ${url}`,
+                  },
+                  Date.now(),
+                );
+                debugLogger.warn('Failed to open browser securely:', e);
+              }
+            } catch (e) {
+              setShowErrorDetails(true);
+              debugLogger.error('Failed to start DevTools server:', e);
+            }
+          })();
+        } else {
+          setShowErrorDetails((prev) => !prev);
+        }
         return true;
       } else if (keyMatchers[Command.SUSPEND_APP](key)) {
         const undoMessage = isITerm2()
@@ -1619,6 +1649,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       lastOutputTimeRef,
       tabFocusTimeoutRef,
       handleWarning,
+      historyManager,
+      settings.merged.general.devtools,
     ],
   );
 
