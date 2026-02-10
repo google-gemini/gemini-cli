@@ -281,7 +281,10 @@ describe('InputPrompt', () => {
       navigateDown: vi.fn(),
       handleSubmit: vi.fn(),
     };
-    mockedUseInputHistory.mockReturnValue(mockInputHistory);
+    mockedUseInputHistory.mockImplementation(({ onSubmit }) => {
+      mockInputHistory.handleSubmit = vi.fn((val) => onSubmit(val));
+      return mockInputHistory;
+    });
 
     mockReverseSearchCompletion = {
       suggestions: [],
@@ -4093,7 +4096,7 @@ describe('InputPrompt', () => {
     beforeEach(() => {
       props.userMessages = ['first message', 'second message'];
       // Mock useInputHistory to actually call onChange
-      mockedUseInputHistory.mockImplementation(({ onChange }) => ({
+      mockedUseInputHistory.mockImplementation(({ onChange, onSubmit }) => ({
         navigateUp: () => {
           onChange('second message', 'start');
           return true;
@@ -4102,7 +4105,7 @@ describe('InputPrompt', () => {
           onChange('first message', 'end');
           return true;
         },
-        handleSubmit: vi.fn(),
+        handleSubmit: vi.fn((val) => onSubmit(val)),
       }));
     });
 
