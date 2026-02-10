@@ -274,6 +274,57 @@ describe('devtoolsService', () => {
       expect(mockAddNetworkTransport).not.toHaveBeenCalled();
     });
 
+    it('allows retry after server start failure', async () => {
+      const config = createMockConfig();
+      mockDevToolsInstance.start.mockRejectedValueOnce(
+        new Error('MODULE_NOT_FOUND'),
+      );
+
+      const promise1 = startDevToolsServer(config);
+
+      // Probe fails
+      await vi.waitFor(() => expect(MockWebSocket.instances.length).toBe(1));
+      MockWebSocket.instances[0].simulateError();
+
+      await expect(promise1).rejects.toThrow('MODULE_NOT_FOUND');
+
+      // Second attempt should work (not return the cached rejected promise)
+      mockDevToolsInstance.start.mockResolvedValue('http://127.0.0.1:25417');
+      mockDevToolsInstance.getPort.mockReturnValue(25417);
+
+      const promise2 = startDevToolsServer(config);
+
+      await vi.waitFor(() => expect(MockWebSocket.instances.length).toBe(2));
+      MockWebSocket.instances[1].simulateError();
+
+      const url = await promise2;
+      expect(url).toBe('http://localhost:25417');
+      expect(mockAddNetworkTransport).toHaveBeenCalled();
+    });
+
+    it('short-circuits on second F12 after successful start', async () => {
+      const config = createMockConfig();
+      mockDevToolsInstance.start.mockResolvedValue('http://127.0.0.1:25417');
+      mockDevToolsInstance.getPort.mockReturnValue(25417);
+
+      const promise1 = startDevToolsServer(config);
+
+      await vi.waitFor(() => expect(MockWebSocket.instances.length).toBe(1));
+      MockWebSocket.instances[0].simulateError();
+
+      const url1 = await promise1;
+      expect(url1).toBe('http://localhost:25417');
+
+      mockAddNetworkTransport.mockClear();
+      mockDevToolsInstance.start.mockClear();
+
+      // Second call should short-circuit via connectedUrl
+      const url2 = await startDevToolsServer(config);
+      expect(url2).toBe('http://localhost:25417');
+      expect(mockAddNetworkTransport).not.toHaveBeenCalled();
+      expect(mockDevToolsInstance.start).not.toHaveBeenCalled();
+    });
+
     it('stops own server and connects to existing when losing port race', async () => {
       const config = createMockConfig();
 

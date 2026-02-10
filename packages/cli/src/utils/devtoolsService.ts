@@ -162,7 +162,10 @@ export async function setupInitialActivityLogger(config: Config) {
 export function startDevToolsServer(config: Config): Promise<string> {
   if (connectedUrl) return Promise.resolve(connectedUrl);
   if (serverStartPromise) return serverStartPromise;
-  serverStartPromise = startDevToolsServerImpl(config);
+  serverStartPromise = startDevToolsServerImpl(config).catch((err) => {
+    serverStartPromise = null;
+    throw err;
+  });
   return serverStartPromise;
 }
 
@@ -202,7 +205,9 @@ async function startDevToolsServerImpl(config: Config): Promise<string> {
   const capture = ActivityLogger.getInstance();
   capture.enableNetworkLogging();
 
-  return `http://localhost:${port}`;
+  const url = `http://localhost:${port}`;
+  connectedUrl = url;
+  return url;
 }
 
 /** Reset module-level state — test only. */
