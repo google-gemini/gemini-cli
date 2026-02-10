@@ -481,6 +481,16 @@ const SETTINGS_SCHEMA = {
           'Hide the context summary (GEMINI.md, MCP servers) above the input.',
         showInDialog: true,
       },
+      focusUiPreview: {
+        type: 'boolean',
+        label: 'Focus UI (preview)',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable the Focus UI preview experience with minimal mode and Tab-Tab UI reveal.',
+        showInDialog: true,
+      },
       footer: {
         type: 'object',
         label: 'Footer',

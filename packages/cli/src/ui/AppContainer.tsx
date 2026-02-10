@@ -786,11 +786,13 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const setIsBackgroundShellListOpenRef = useRef<(open: boolean) => void>(
     () => {},
   );
+  const focusUiPreviewEnabled = settings.merged.ui.focusUiPreview === true;
   const [shortcutsHelpVisible, setShortcutsHelpVisible] = useState(false);
-  const [cleanUiDetailsVisible, setCleanUiDetailsVisibleState] =
-    useState(false);
+  const [cleanUiDetailsVisible, setCleanUiDetailsVisibleState] = useState(
+    !focusUiPreviewEnabled,
+  );
   const modeRevealTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const cleanUiDetailsPinnedRef = useRef(false);
+  const cleanUiDetailsPinnedRef = useRef(!focusUiPreviewEnabled);
 
   const clearModeRevealTimeout = useCallback(() => {
     if (modeRevealTimeoutRef.current) {
@@ -801,25 +803,34 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const setCleanUiDetailsVisible = useCallback(
     (visible: boolean) => {
+      if (!focusUiPreviewEnabled) {
+        clearModeRevealTimeout();
+        cleanUiDetailsPinnedRef.current = true;
+        setCleanUiDetailsVisibleState(true);
+        return;
+      }
       clearModeRevealTimeout();
       cleanUiDetailsPinnedRef.current = visible;
       setCleanUiDetailsVisibleState(visible);
     },
-    [clearModeRevealTimeout],
+    [clearModeRevealTimeout, focusUiPreviewEnabled],
   );
 
   const toggleCleanUiDetailsVisible = useCallback(() => {
+    if (!focusUiPreviewEnabled) {
+      return;
+    }
     clearModeRevealTimeout();
     setCleanUiDetailsVisibleState((visible) => {
       const nextVisible = !visible;
       cleanUiDetailsPinnedRef.current = nextVisible;
       return nextVisible;
     });
-  }, [clearModeRevealTimeout]);
+  }, [clearModeRevealTimeout, focusUiPreviewEnabled]);
 
   const revealCleanUiDetailsTemporarily = useCallback(
     (durationMs: number = APPROVAL_MODE_REVEAL_DURATION_MS) => {
-      if (cleanUiDetailsPinnedRef.current) {
+      if (!focusUiPreviewEnabled || cleanUiDetailsPinnedRef.current) {
         return;
       }
       clearModeRevealTimeout();
@@ -831,8 +842,15 @@ Logging in with Google... Restarting Gemini CLI to continue.
         modeRevealTimeoutRef.current = null;
       }, durationMs);
     },
-    [clearModeRevealTimeout],
+    [clearModeRevealTimeout, focusUiPreviewEnabled],
   );
+
+  useEffect(() => {
+    clearModeRevealTimeout();
+    const fullUiVisibleByDefault = !focusUiPreviewEnabled;
+    cleanUiDetailsPinnedRef.current = fullUiVisibleByDefault;
+    setCleanUiDetailsVisibleState(fullUiVisibleByDefault);
+  }, [clearModeRevealTimeout, focusUiPreviewEnabled]);
 
   const slashCommandActions = useMemo(
     () => ({

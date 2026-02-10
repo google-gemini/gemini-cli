@@ -210,6 +210,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 }) => {
   const { stdout } = useStdout();
   const { merged: settings } = useSettings();
+  const focusUiPreviewEnabled = settings.ui.focusUiPreview === true;
   const kittyProtocol = useKittyKeyboardProtocol();
   const isShellFocused = useShellFocusState();
   const {
@@ -642,7 +643,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         Boolean(completion.promptCompletion.text) ||
         reverseSearchActive ||
         commandSearchActive;
-      if (isPlainTab) {
+      if (isPlainTab && focusUiPreviewEnabled) {
         if (!hasTabCompletionInteraction) {
           const now = Date.now();
           const isDoubleTabPress =
@@ -1207,6 +1208,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       kittyProtocol.enabled,
       shortcutsHelpVisible,
       setShortcutsHelpVisible,
+      focusUiPreviewEnabled,
       toggleCleanUiDetailsVisible,
       tryLoadQueuedMessages,
       setBannerVisible,

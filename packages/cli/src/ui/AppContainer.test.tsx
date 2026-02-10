@@ -480,6 +480,46 @@ describe('AppContainer State Management', () => {
       await waitFor(() => expect(capturedUIState).toBeTruthy());
       unmount!();
     });
+
+    it('shows full UI details by default when Focus UI preview is disabled', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState.cleanUiDetailsVisible).toBe(true);
+      });
+      unmount!();
+    });
+
+    it('starts in minimal UI mode when Focus UI preview is enabled', async () => {
+      const defaultMergedSettings = mergeSettings({}, {}, {}, {}, true);
+      const focusUiPreviewSettings = {
+        ...mockSettings,
+        merged: {
+          ...defaultMergedSettings,
+          ui: {
+            ...defaultMergedSettings.ui,
+            focusUiPreview: true,
+          },
+        },
+      } as unknown as LoadedSettings;
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer({
+          settings: focusUiPreviewSettings,
+        });
+        unmount = result.unmount;
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState.cleanUiDetailsVisible).toBe(false);
+      });
+      unmount!();
+    });
   });
 
   describe('State Initialization', () => {

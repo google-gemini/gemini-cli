@@ -190,6 +190,12 @@ describe('SettingsSchema', () => {
         true,
       );
       expect(
+        getSettingsSchema().ui.properties.focusUiPreview.showInDialog,
+      ).toBe(true);
+      expect(getSettingsSchema().ui.properties.focusUiPreview.default).toBe(
+        false,
+      );
+      expect(
         getSettingsSchema().privacy.properties.usageStatisticsEnabled
           .showInDialog,
       ).toBe(false);

@@ -10,17 +10,18 @@ import { theme } from '../semantic-colors.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 import { SectionHeader } from './shared/SectionHeader.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+import { useSettings } from '../contexts/SettingsContext.js';
 
 type ShortcutItem = {
   key: string;
   description: string;
 };
 
-const buildShortcutItems = (): ShortcutItem[] => {
+const buildShortcutItems = (focusUiPreviewEnabled: boolean): ShortcutItem[] => {
   const isMac = process.platform === 'darwin';
   const altLabel = isMac ? 'Option' : 'Alt';
 
-  return [
+  const items: ShortcutItem[] = [
     { key: '!', description: 'shell mode' },
     { key: 'Shift+Tab', description: 'cycle mode' },
     { key: 'Ctrl+V', description: 'paste images' },
@@ -30,8 +31,13 @@ const buildShortcutItems = (): ShortcutItem[] => {
     { key: 'Esc Esc', description: 'clear & rewind' },
     { key: 'Ctrl+R', description: 'reverse-search history' },
     { key: 'Ctrl+X', description: 'open external editor' },
-    { key: 'Tab Tab', description: 'focus UI' },
   ];
+
+  if (focusUiPreviewEnabled) {
+    items.push({ key: 'Tab Tab', description: 'focus UI' });
+  }
+
+  return items;
 };
 
 const Shortcut: React.FC<{ item: ShortcutItem }> = ({ item }) => (
@@ -47,7 +53,8 @@ const Shortcut: React.FC<{ item: ShortcutItem }> = ({ item }) => (
 
 export const ShortcutsHelp: React.FC = () => {
   const { terminalWidth } = useUIState();
-  const items = buildShortcutItems();
+  const settings = useSettings();
+  const items = buildShortcutItems(settings.merged.ui.focusUiPreview === true);
 
   const isNarrow = isNarrowWidth(terminalWidth);
 

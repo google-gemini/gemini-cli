@@ -3001,6 +3001,11 @@ describe('InputPrompt', () => {
           {
             uiActions,
             uiState: {},
+            settings: createMockSettings({
+              ui: {
+                focusUiPreview: true,
+              },
+            }),
           },
         );
 
@@ -3048,6 +3053,11 @@ describe('InputPrompt', () => {
         {
           uiActions,
           uiState: { activePtyId: 1, cleanUiDetailsVisible: false },
+          settings: createMockSettings({
+            ui: {
+              focusUiPreview: true,
+            },
+          }),
         },
       );
 
@@ -3059,6 +3069,45 @@ describe('InputPrompt', () => {
         expect(
           uiActions.revealCleanUiDetailsTemporarily,
         ).not.toHaveBeenCalled();
+      });
+      unmount();
+    });
+
+    it('should not toggle clean UI details on double-Tab when Focus UI preview is disabled', async () => {
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        showSuggestions: false,
+        suggestions: [],
+        promptCompletion: {
+          text: '',
+          accept: vi.fn(),
+          clear: vi.fn(),
+          isLoading: false,
+          isActive: false,
+          markSelected: vi.fn(),
+        },
+      });
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          uiActions,
+          uiState: {},
+          settings: createMockSettings({
+            ui: {
+              focusUiPreview: false,
+            },
+          }),
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\t');
+        stdin.write('\t');
+      });
+
+      await waitFor(() => {
+        expect(uiActions.toggleCleanUiDetailsVisible).not.toHaveBeenCalled();
       });
       unmount();
     });
