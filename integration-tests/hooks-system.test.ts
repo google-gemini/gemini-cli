@@ -102,7 +102,7 @@ describe('Hooks System Integration', () => {
         'stderr_block_hook.cjs',
         `
 process.stderr.write('File writing blocked by security policy');
-process.exit(2);
+process.exit(101);
 `,
       );
 
