@@ -33,24 +33,15 @@ import {
   WEB_FETCH_TOOL_NAME,
   getVersion,
   PREVIEW_GEMINI_MODEL_AUTO,
-  type HookDefinition,
-  type HookEventName,
-  type OutputFormat,
   coreEvents,
   GEMINI_MODEL_ALIAS_AUTO,
   getAdminErrorMessage,
-<<<<<<< HEAD
-=======
   isHeadlessMode,
-  Config,
-  applyAdminAllowlist,
-  getAdminBlockedMcpServersMessage,
 } from '@google/gemini-cli-core';
 import type {
   HookDefinition,
   HookEventName,
   OutputFormat,
->>>>>>> bce1caefd (feat(cli): disable folder trust in headless mode (#18407))
 } from '@google/gemini-cli-core';
 import {
   type Settings,

@@ -33,17 +33,6 @@ export const useFolderTrust = (
     let isMounted = true;
     const { isTrusted: trusted } = isWorkspaceTrusted(settings.merged);
 
-<<<<<<< HEAD
-    if (trusted === false && !startupMessageSent.current) {
-      addItem(
-        {
-          type: MessageType.INFO,
-          text: 'This folder is not trusted. Some features may be disabled. Use the `/permissions` command to change the trust level.',
-        },
-        Date.now(),
-      );
-      startupMessageSent.current = true;
-=======
     const showUntrustedMessage = () => {
       if (trusted === false && !startupMessageSent.current) {
         addItem(
@@ -69,7 +58,6 @@ export const useFolderTrust = (
       setIsFolderTrustDialogOpen(trusted === undefined);
       onTrustChange(trusted);
       showUntrustedMessage();
->>>>>>> bce1caefd (feat(cli): disable folder trust in headless mode (#18407))
     }
 
     return () => {
