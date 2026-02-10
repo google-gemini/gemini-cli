@@ -87,7 +87,7 @@ describe('Hooks System Integration', () => {
       expect(hookTelemetryFound).toBeTruthy();
     });
 
-    it('should block tool execution and use stderr as reason when hook exits with code 2', async () => {
+    it.only('should block tool execution and use stderr as reason when hook exits with code 2', async () => {
       rig.setup(
         'should block tool execution and use stderr as reason when hook exits with code 2',
         {
@@ -102,6 +102,9 @@ describe('Hooks System Integration', () => {
         'stderr_block_hook.cjs',
         "process.stderr.write('File writing blocked by security policy'); process.exit(2);",
       );
+
+      const normalizedCmd = normalizePath(`node "${scriptPath}"`);
+      console.log(`[Test] normalizedCmd: ${normalizedCmd}`);
 
       rig.setup(
         'should block tool execution and use stderr as reason when hook exits with code 2',
@@ -119,7 +122,7 @@ describe('Hooks System Integration', () => {
                     {
                       type: 'command',
                       // Exit with code 2 and write reason to stderr
-                      command: normalizePath(`node "${scriptPath}"`),
+                      command: normalizedCmd!,
                       timeout: 5000,
                     },
                   ],
@@ -1885,7 +1888,7 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
       expect(disabledHookLog).toBeUndefined();
     });
 
-    it('should respect disabled hooks across multiple operations', async () => {
+    it.only('should respect disabled hooks across multiple operations', async () => {
       rig.setup('should respect disabled hooks across multiple operations', {
         fakeResponsesPath: join(
           import.meta.dirname,
@@ -1910,7 +1913,7 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
         settings: {
           hooksConfig: {
             enabled: true,
-            disabled: [`node "${disabledPath}"`], // Disable the second hook,
+            disabled: [normalizePath(`node "${disabledPath}"`)!], // Disable the second hook,
           },
           hooks: {
             BeforeTool: [

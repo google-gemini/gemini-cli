@@ -377,22 +377,35 @@ export class TestRig {
 
     if (!this._initialized) {
       // Clean up existing directories from previous runs (e.g. retries)
-      if (fs.existsSync(this.testDir)) {
-        if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
-          console.log(
-            `[TestRig] Cleaning up existing testDir: ${this.testDir}`,
-          );
+      const cleanDir = (dir: string, name: string) => {
+        if (fs.existsSync(dir)) {
+          if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+            console.log(`[TestRig] Cleaning up existing ${name}: ${dir}`);
+          }
+          for (let i = 0; i < 5; i++) {
+            try {
+              fs.rmSync(dir, { recursive: true, force: true });
+              return;
+            } catch (err) {
+              if (i === 4) throw err;
+              if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+                console.log(
+                  `[TestRig] Failed to clean ${name} (attempt ${i + 1}): ${err}`,
+                );
+              }
+              // Use timeout on windows, sleep on others
+              const sleepCmd =
+                process.platform === 'win32' ? 'timeout /t 1' : 'sleep 1';
+              try {
+                execSync(sleepCmd);
+              } catch {}
+            }
+          }
         }
-        fs.rmSync(this.testDir, { recursive: true, force: true });
-      }
-      if (fs.existsSync(this.homeDir)) {
-        if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
-          console.log(
-            `[TestRig] Cleaning up existing homeDir: ${this.homeDir}`,
-          );
-        }
-        fs.rmSync(this.homeDir, { recursive: true, force: true });
-      }
+      };
+
+      cleanDir(this.testDir, 'testDir');
+      cleanDir(this.homeDir, 'homeDir');
       this._initialized = true;
     }
 
@@ -591,6 +604,11 @@ export class TestRig {
       env: this._getCleanEnv(options.env),
     });
     this._spawnedProcesses.push(child);
+
+    if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+      console.log(`[TestRig] Running: ${command} ${commandArgs.join(' ')}`);
+      console.log(`[TestRig] CWD: ${this.testDir}`);
+    }
 
     let stdout = '';
     let stderr = '';
