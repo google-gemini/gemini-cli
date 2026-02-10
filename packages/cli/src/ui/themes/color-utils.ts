@@ -126,7 +126,7 @@ export function shouldSwitchTheme(
 
   const isLightActive =
     currentThemeName === defaultLightThemeName ||
-    currentThemeName === preferredLightThemeName;
+    (preferredLightThemeName && currentThemeName === preferredLightThemeName);
 
   if (luminance > LIGHT_THEME_LUMINANCE_THRESHOLD && isDarkActive) {
     return targetLightTheme;
