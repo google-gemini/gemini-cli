@@ -503,6 +503,17 @@ export class TestRig {
     return { command, initialArgs };
   }
 
+  createScript(fileName: string, content: string) {
+    if (!this.testDir) {
+      throw new Error(
+        'TestRig.setup must be called before creating files or scripts',
+      );
+    }
+    const scriptPath = join(this.testDir, fileName);
+    writeFileSync(scriptPath, content);
+    return normalizePath(scriptPath);
+  }
+
   private _getCleanEnv(
     extraEnv?: Record<string, string | undefined>,
   ): Record<string, string | undefined> {
