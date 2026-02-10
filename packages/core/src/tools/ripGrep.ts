@@ -499,7 +499,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
     super(
       RipGrepTool.Name,
       'SearchText',
-      'Searches for a regular expression pattern within file contents. Max 100 matches.',
+      'FAST, optimized regular expression search. Use context parameters (`context`, `after`, `before`) to read code surrounding matches in a single turn. For surgical extraction (e.g., regex ranges), see `run_shell_command`.',
       Kind.Search,
       {
         properties: {
