@@ -34,7 +34,7 @@ describe('Project-Level Policies', () => {
     vi.doUnmock('node:fs/promises');
   });
 
-  it('should load project policies with correct priority (Tier 3)', async () => {
+  it('should load project policies with correct priority (Tier 2)', async () => {
     const projectPoliciesDir = '/mock/project/policies';
     const defaultPoliciesDir = '/mock/default/policies';
 
@@ -88,14 +88,14 @@ priority = 10
 toolName = "test_tool"
 decision = "deny"
 priority = 10
-`; // Tier 2 -> 2.010
+`; // Tier 3 -> 3.010
       }
       if (path.includes('project.toml')) {
         return `[[rule]]
 toolName = "test_tool"
 decision = "allow"
 priority = 10
-`; // Tier 3 -> 3.010
+`; // Tier 2 -> 2.010
       }
       if (path.includes('admin.toml')) {
         return `[[rule]]
@@ -116,7 +116,7 @@ priority = 10
 
     const { createPolicyEngineConfig } = await import('./config.js');
 
-    // Test 1: Project vs User (Project should win)
+    // Test 1: Project vs User (User should win)
     const config = await createPolicyEngineConfig(
       {},
       ApprovalMode.DEFAULT,
@@ -129,8 +129,8 @@ priority = 10
 
     // Check for all 4 rules
     const defaultRule = rules?.find((r) => r.priority === 1.01);
-    const userRule = rules?.find((r) => r.priority === 2.01);
-    const projectRule = rules?.find((r) => r.priority === 3.01);
+    const projectRule = rules?.find((r) => r.priority === 2.01);
+    const userRule = rules?.find((r) => r.priority === 3.01);
     const adminRule = rules?.find((r) => r.priority === 4.01);
 
     expect(defaultRule).toBeDefined();
@@ -138,10 +138,10 @@ priority = 10
     expect(projectRule).toBeDefined();
     expect(adminRule).toBeDefined();
 
-    // Verify Hierarchy: Admin > Project > User > Default
-    expect(adminRule!.priority).toBeGreaterThan(projectRule!.priority!);
-    expect(projectRule!.priority).toBeGreaterThan(userRule!.priority!);
-    expect(userRule!.priority).toBeGreaterThan(defaultRule!.priority!);
+    // Verify Hierarchy: Admin > User > Project > Default
+    expect(adminRule!.priority).toBeGreaterThan(userRule!.priority!);
+    expect(userRule!.priority).toBeGreaterThan(projectRule!.priority!);
+    expect(projectRule!.priority).toBeGreaterThan(defaultRule!.priority!);
   });
 
   it('should ignore project policies if projectPoliciesDir is undefined', async () => {
@@ -192,7 +192,7 @@ priority=10`,
     expect(rules![0].priority).toBe(1.01);
   });
 
-  it('should load project policies and correctly transform to Tier 3', async () => {
+  it('should load project policies and correctly transform to Tier 2', async () => {
     const projectPoliciesDir = '/mock/project/policies';
 
     // Mock FS
@@ -236,7 +236,7 @@ priority=500`,
 
     const rule = config.rules?.find((r) => r.toolName === 'p_tool');
     expect(rule).toBeDefined();
-    // Project Tier (3) + 500/1000 = 3.5
-    expect(rule?.priority).toBe(3.5);
+    // Project Tier (2) + 500/1000 = 2.5
+    expect(rule?.priority).toBe(2.5);
   });
 });

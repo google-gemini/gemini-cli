@@ -127,8 +127,8 @@ export interface PolicyLoadResult {
  */
 function getTierName(tier: number): 'default' | 'user' | 'project' | 'admin' {
   if (tier === 1) return 'default';
-  if (tier === 2) return 'user';
-  if (tier === 3) return 'project';
+  if (tier === 2) return 'project';
+  if (tier === 3) return 'user';
   if (tier === 4) return 'admin';
   return 'default';
 }
