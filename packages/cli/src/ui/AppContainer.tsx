@@ -29,6 +29,7 @@ import {
   AuthState,
   type ConfirmationRequest,
   type PermissionConfirmationRequest,
+  type QuotaStats,
 } from './types.js';
 import { checkPermissions } from './hooks/atCommandProcessor.js';
 import { MessageType, StreamingState } from './types.js';
