@@ -1936,6 +1936,40 @@ describe('Settings Loading and Merging', () => {
       );
     });
 
+    it('should migrate tools.approvalMode to general.defaultApprovalMode', () => {
+      const userSettingsContent = {
+        tools: {
+          approvalMode: 'plan',
+        },
+      };
+
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const setValueSpy = vi.spyOn(LoadedSettings.prototype, 'setValue');
+      const loadedSettings = loadSettings(MOCK_WORKSPACE_DIR);
+
+      migrateDeprecatedSettings(loadedSettings, true);
+
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'general',
+        expect.objectContaining({ defaultApprovalMode: 'plan' }),
+      );
+
+      // Verify removal
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'tools',
+        expect.not.objectContaining({ approvalMode: 'plan' }),
+      );
+    });
+
     it('should migrate all 4 inverted boolean settings', () => {
       const userSettingsContent = {
         general: {
