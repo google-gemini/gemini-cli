@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -71,24 +71,30 @@ export const DialogManager = ({
       />
     );
   }
-  if (uiState.proQuotaRequest) {
+  if (uiState.quota.proQuotaRequest) {
     return (
       <ProQuotaDialog
-        failedModel={uiState.proQuotaRequest.failedModel}
-        fallbackModel={uiState.proQuotaRequest.fallbackModel}
-        message={uiState.proQuotaRequest.message}
-        isTerminalQuotaError={uiState.proQuotaRequest.isTerminalQuotaError}
-        isModelNotFoundError={!!uiState.proQuotaRequest.isModelNotFoundError}
+        failedModel={uiState.quota.proQuotaRequest.failedModel}
+        fallbackModel={uiState.quota.proQuotaRequest.fallbackModel}
+        message={uiState.quota.proQuotaRequest.message}
+        isTerminalQuotaError={
+          uiState.quota.proQuotaRequest.isTerminalQuotaError
+        }
+        isModelNotFoundError={
+          !!uiState.quota.proQuotaRequest.isModelNotFoundError
+        }
         onChoice={uiActions.handleProQuotaChoice}
       />
     );
   }
-  if (uiState.validationRequest) {
+  if (uiState.quota.validationRequest) {
     return (
       <ValidationDialog
-        validationLink={uiState.validationRequest.validationLink}
-        validationDescription={uiState.validationRequest.validationDescription}
-        learnMoreUrl={uiState.validationRequest.learnMoreUrl}
+        validationLink={uiState.quota.validationRequest.validationLink}
+        validationDescription={
+          uiState.quota.validationRequest.validationDescription
+        }
+        learnMoreUrl={uiState.quota.validationRequest.learnMoreUrl}
         onChoice={uiActions.handleValidationChoice}
       />
     );

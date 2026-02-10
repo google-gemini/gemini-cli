@@ -27,6 +27,17 @@ import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 const REF_CONTENT_HEADER = `\n${REFERENCE_CONTENT_START}`;
 const REF_CONTENT_FOOTER = `\n${REFERENCE_CONTENT_END}`;
 
+/**
+ * Regex source for the path/command part of an @ reference.
+ * It uses strict ASCII whitespace delimiters to allow Unicode characters like NNBSP in filenames.
+ *
+ * 1. \\. matches any escaped character (e.g., \ ).
+ * 2. [^ \t\n\r,;!?()\[\]{}.] matches any character that is NOT a delimiter and NOT a period.
+ * 3. \.(?!$|[ \t\n\r]) matches a period ONLY if it is NOT followed by whitespace or end-of-string.
+ */
+export const AT_COMMAND_PATH_REGEX_SOURCE =
+  '(?:\\\\.|[^ \\t\\n\\r,;!?()\\[\\]{}.]|\\.(?!$|[ \\t\\n\\r]))+';
+
 interface HandleAtCommandParams {
   query: string;
   config: Config;
@@ -52,68 +63,40 @@ interface AtCommandPart {
  */
 function parseAllAtCommands(query: string): AtCommandPart[] {
   const parts: AtCommandPart[] = [];
-  let currentIndex = 0;
+  let lastIndex = 0;
 
-  while (currentIndex < query.length) {
-    let atIndex = -1;
-    let nextSearchIndex = currentIndex;
-    // Find next unescaped '@'
-    while (nextSearchIndex < query.length) {
-      if (
-        query[nextSearchIndex] === '@' &&
-        (nextSearchIndex === 0 || query[nextSearchIndex - 1] !== '\\')
-      ) {
-        atIndex = nextSearchIndex;
-        break;
-      }
-      nextSearchIndex++;
-    }
+  // Create a new RegExp instance for each call to avoid shared state/lastIndex issues.
+  const atCommandRegex = new RegExp(
+    `(?<!\\\\)@${AT_COMMAND_PATH_REGEX_SOURCE}`,
+    'g',
+  );
 
-    if (atIndex === -1) {
-      // No more @
-      if (currentIndex < query.length) {
-        parts.push({ type: 'text', content: query.substring(currentIndex) });
-      }
-      break;
-    }
+  let match: RegExpExecArray | null;
+
+  while ((match = atCommandRegex.exec(query)) !== null) {
+    const matchIndex = match.index;
+    const fullMatch = match[0];
 
     // Add text before @
-    if (atIndex > currentIndex) {
+    if (matchIndex > lastIndex) {
       parts.push({
         type: 'text',
-        content: query.substring(currentIndex, atIndex),
+        content: query.substring(lastIndex, matchIndex),
       });
     }
 
-    // Parse @path
-    let pathEndIndex = atIndex + 1;
-    let inEscape = false;
-    while (pathEndIndex < query.length) {
-      const char = query[pathEndIndex];
-      if (inEscape) {
-        inEscape = false;
-      } else if (char === '\\') {
-        inEscape = true;
-      } else if (/[,\s;!?()[\]{}]/.test(char)) {
-        // Path ends at first whitespace or punctuation not escaped
-        break;
-      } else if (char === '.') {
-        // For . we need to be more careful - only terminate if followed by whitespace or end of string
-        // This allows file extensions like .txt, .js but terminates at sentence endings like "file.txt. Next sentence"
-        const nextChar =
-          pathEndIndex + 1 < query.length ? query[pathEndIndex + 1] : '';
-        if (nextChar === '' || /\s/.test(nextChar)) {
-          break;
-        }
-      }
-      pathEndIndex++;
-    }
-    const rawAtPath = query.substring(atIndex, pathEndIndex);
     // unescapePath expects the @ symbol to be present, and will handle it.
-    const atPath = unescapePath(rawAtPath);
+    const atPath = unescapePath(fullMatch);
     parts.push({ type: 'atPath', content: atPath });
-    currentIndex = pathEndIndex;
+
+    lastIndex = matchIndex + fullMatch.length;
   }
+
+  // Add remaining text
+  if (lastIndex < query.length) {
+    parts.push({ type: 'text', content: query.substring(lastIndex) });
+  }
+
   // Filter out empty text parts that might result from consecutive @paths or leading/trailing spaces
   return parts.filter(
     (part) => !(part.type === 'text' && part.content.trim() === ''),

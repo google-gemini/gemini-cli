@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -9,8 +9,11 @@ import { render } from '../../test-utils/render.js';
 import { Text } from 'ink';
 import { StatusDisplay } from './StatusDisplay.js';
 import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
+import { TransientMessageType } from '../../utils/events.js';
 import { ConfigContext } from '../contexts/ConfigContext.js';
 import { SettingsContext } from '../contexts/SettingsContext.js';
+import type { Config } from '@google/gemini-cli-core';
+import type { LoadedSettings } from '../../config/settings.js';
 import { createMockSettings } from '../../test-utils/settings.js';
 import type { TextBuffer } from './shared/text-buffer.js';
 
@@ -40,7 +43,7 @@ type UIStateOverrides = Partial<Omit<UIState, 'buffer'>> & {
 const createMockUIState = (overrides: UIStateOverrides = {}): UIState =>
   ({
     ctrlCPressedOnce: false,
-    warningMessage: null,
+    transientMessage: null,
     ctrlDPressedOnce: false,
     showEscapePrompt: false,
     shortcutsHelpVisible: false,
@@ -67,7 +70,6 @@ const createMockConfig = (overrides = {}) => ({
   ...overrides,
 });
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const renderStatusDisplay = (
   props: { hideContextSummary: boolean } = { hideContextSummary: false },
   uiState: UIState = createMockUIState(),
@@ -75,15 +77,14 @@ const renderStatusDisplay = (
   config = createMockConfig(),
 ) =>
   render(
-    <ConfigContext.Provider value={config as any}>
-      <SettingsContext.Provider value={settings as any}>
+    <ConfigContext.Provider value={config as unknown as Config}>
+      <SettingsContext.Provider value={settings as unknown as LoadedSettings}>
         <UIStateContext.Provider value={uiState}>
           <StatusDisplay {...props} />
         </UIStateContext.Provider>
       </SettingsContext.Provider>
     </ConfigContext.Provider>,
   );
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 describe('StatusDisplay', () => {
   const originalEnv = process.env;
@@ -112,7 +113,10 @@ describe('StatusDisplay', () => {
   it('prioritizes Ctrl+C prompt over everything else (except system md)', () => {
     const uiState = createMockUIState({
       ctrlCPressedOnce: true,
-      warningMessage: 'Warning',
+      transientMessage: {
+        text: 'Warning',
+        type: TransientMessageType.Warning,
+      },
       activeHooks: [{ name: 'hook', eventName: 'event' }],
     });
     const { lastFrame } = renderStatusDisplay(
@@ -124,7 +128,24 @@ describe('StatusDisplay', () => {
 
   it('renders warning message', () => {
     const uiState = createMockUIState({
-      warningMessage: 'This is a warning',
+      transientMessage: {
+        text: 'This is a warning',
+        type: TransientMessageType.Warning,
+      },
+    });
+    const { lastFrame } = renderStatusDisplay(
+      { hideContextSummary: false },
+      uiState,
+    );
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('renders hint message', () => {
+    const uiState = createMockUIState({
+      transientMessage: {
+        text: 'This is a hint',
+        type: TransientMessageType.Hint,
+      },
     });
     const { lastFrame } = renderStatusDisplay(
       { hideContextSummary: false },
@@ -135,7 +156,10 @@ describe('StatusDisplay', () => {
 
   it('prioritizes warning over Ctrl+D', () => {
     const uiState = createMockUIState({
-      warningMessage: 'Warning',
+      transientMessage: {
+        text: 'Warning',
+        type: TransientMessageType.Warning,
+      },
       ctrlDPressedOnce: true,
     });
     const { lastFrame } = renderStatusDisplay(

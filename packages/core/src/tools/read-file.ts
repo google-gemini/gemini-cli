@@ -176,7 +176,7 @@ export class ReadFileTool extends BaseDeclarativeTool<
       'ReadFile',
       READ_FILE_DEFINITION.base.description!,
       Kind.Read,
-      READ_FILE_DEFINITION.base.parameters!,
+      READ_FILE_DEFINITION.base.parametersJsonSchema,
       messageBus,
       true,
       false,

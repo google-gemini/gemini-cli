@@ -22,6 +22,13 @@ import WebSocket from 'ws';
 const ACTIVITY_ID_HEADER = 'x-activity-request-id';
 const MAX_BUFFER_SIZE = 100;
 
+/** Type guard: Array.isArray doesn't narrow readonly arrays in TS 5.8 */
+function isHeaderRecord(
+  h: http.OutgoingHttpHeaders | readonly string[],
+): h is http.OutgoingHttpHeaders {
+  return !Array.isArray(h);
+}
+
 export interface NetworkLog {
   id: string;
   timestamp: number;
@@ -360,38 +367,56 @@ export class ActivityLogger extends EventEmitter {
       args: unknown[],
       protocol: string,
     ) => {
-      const options = args[0] as http.RequestOptions | string | URL;
+      const firstArg = args[0];
+      let options: http.RequestOptions | string | URL;
+      if (typeof firstArg === 'string') {
+        options = firstArg;
+      } else if (firstArg instanceof URL) {
+        options = firstArg;
+      } else {
+        options = (firstArg ?? {}) as http.RequestOptions;
+      }
+
       let url = '';
       if (typeof options === 'string') {
         url = options;
       } else if (options instanceof URL) {
         url = options.href;
       } else {
+        // Some callers pass URL-like objects that include href
+        const href =
+          'href' in options && typeof options.href === 'string'
+            ? options.href
+            : '';
         url =
-          ((options as Record<string, unknown>)['href'] as string) ||
+          href ||
           `${protocol}//${options.hostname || options.host || 'localhost'}${options.path || '/'}`;
       }
 
       if (url.includes('127.0.0.1') || url.includes('localhost'))
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
         return originalFn.apply(http, args as any);
 
-      const headers =
+      const rawHeaders =
         typeof options === 'object' &&
         options !== null &&
         !(options instanceof URL)
-          ? (options.headers as http.OutgoingHttpHeaders)
-          : {};
+          ? options.headers
+          : undefined;
+      let headers: http.OutgoingHttpHeaders = {};
+      if (rawHeaders && isHeaderRecord(rawHeaders)) {
+        headers = rawHeaders;
+      }
 
-      if (headers && (headers as Record<string, unknown>)[ACTIVITY_ID_HEADER]) {
-        delete (headers as Record<string, unknown>)[ACTIVITY_ID_HEADER];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (headers[ACTIVITY_ID_HEADER]) {
+        delete headers[ACTIVITY_ID_HEADER];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
         return originalFn.apply(http, args as any);
       }
 
       const id = Math.random().toString(36).substring(7);
       this.requestStartTimes.set(id, Date.now());
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
       const req = originalFn.apply(http, args as any);
       const requestChunks: Buffer[] = [];
 
@@ -400,17 +425,20 @@ export class ActivityLogger extends EventEmitter {
 
       req.write = function (chunk: unknown, ...etc: unknown[]) {
         if (chunk) {
-          const encoding = typeof etc[0] === 'string' ? etc[0] : undefined;
+          const encoding =
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            typeof etc[0] === 'string' ? (etc[0] as BufferEncoding) : undefined;
           requestChunks.push(
             Buffer.isBuffer(chunk)
               ? chunk
-              : Buffer.from(
-                  chunk as string,
-                  encoding as BufferEncoding | undefined,
-                ),
+              : typeof chunk === 'string'
+                ? Buffer.from(chunk, encoding)
+                : Buffer.from(
+                    chunk instanceof Uint8Array ? chunk : String(chunk),
+                  ),
           );
         }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
         return oldWrite.apply(this, [chunk, ...etc] as any);
       };
 
@@ -420,14 +448,17 @@ export class ActivityLogger extends EventEmitter {
         ...etc: unknown[]
       ) {
         if (chunk && typeof chunk !== 'function') {
-          const encoding = typeof etc[0] === 'string' ? etc[0] : undefined;
+          const encoding =
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            typeof etc[0] === 'string' ? (etc[0] as BufferEncoding) : undefined;
           requestChunks.push(
             Buffer.isBuffer(chunk)
               ? chunk
-              : Buffer.from(
-                  chunk as string,
-                  encoding as BufferEncoding | undefined,
-                ),
+              : typeof chunk === 'string'
+                ? Buffer.from(chunk, encoding)
+                : Buffer.from(
+                    chunk instanceof Uint8Array ? chunk : String(chunk),
+                  ),
           );
         }
         const body = Buffer.concat(requestChunks).toString('utf8');
@@ -441,7 +472,7 @@ export class ActivityLogger extends EventEmitter {
           body,
           pending: true,
         });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
         return (oldEnd as any).apply(this, [chunk, ...etc]);
       };
 
@@ -514,10 +545,10 @@ export class ActivityLogger extends EventEmitter {
       return req;
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
     (http as any).request = (...args: unknown[]) =>
       wrapRequest(originalRequest, args, 'http:');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
     (https as any).request = (...args: unknown[]) =>
       wrapRequest(originalHttpsRequest as typeof http.request, args, 'https:');
   }
@@ -588,7 +619,7 @@ function setupNetworkLogging(
   config: Config,
   onReconnectFailed?: () => void,
 ) {
-  const transportBuffer: Array<Record<string, unknown>> = [];
+  const transportBuffer: object[] = [];
   let ws: WebSocket | null = null;
   let reconnectTimer: NodeJS.Timeout | null = null;
   let sessionId: string | null = null;
@@ -613,11 +644,21 @@ function setupNetworkLogging(
 
       ws.on('message', (data: Buffer) => {
         try {
-          const message = JSON.parse(data.toString()) as {
-            type: string;
-            sessionId?: string;
-          };
-          handleServerMessage(message);
+          const parsed: unknown = JSON.parse(data.toString());
+          if (
+            typeof parsed === 'object' &&
+            parsed !== null &&
+            'type' in parsed &&
+            typeof parsed.type === 'string'
+          ) {
+            handleServerMessage({
+              type: parsed.type,
+              sessionId:
+                'sessionId' in parsed && typeof parsed.sessionId === 'string'
+                  ? parsed.sessionId
+                  : undefined,
+            });
+          }
         } catch (err) {
           debugLogger.debug('Invalid WebSocket message:', err);
         }
@@ -667,16 +708,16 @@ function setupNetworkLogging(
     }
   };
 
-  const sendMessage = (message: Record<string, unknown>) => {
+  const sendMessage = (message: object) => {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify(message));
     }
   };
 
-  const sendToNetwork = (type: 'console' | 'network', payload: unknown) => {
+  const sendToNetwork = (type: 'console' | 'network', payload: object) => {
     const message = {
       type,
-      payload: payload as Record<string, unknown>,
+      payload,
       sessionId: sessionId || config.getSessionId(),
       timestamp: Date.now(),
     };
@@ -707,7 +748,7 @@ function setupNetworkLogging(
     const { network, console: consoleLogs } = capture.drainBufferedLogs();
     const allInitialLogs: Array<{
       type: 'network' | 'console';
-      payload: NetworkLog | PartialNetworkLog | ConsoleLogPayload;
+      payload: object;
       timestamp: number;
     }> = [
       ...network.map((l) => ({
@@ -729,7 +770,7 @@ function setupNetworkLogging(
     for (const log of allInitialLogs) {
       sendMessage({
         type: log.type,
-        payload: log.payload as Record<string, unknown>,
+        payload: log.payload,
         sessionId: sessionId || config.getSessionId(),
         timestamp: Date.now(),
       });
