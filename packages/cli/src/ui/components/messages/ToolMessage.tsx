@@ -22,7 +22,7 @@ import {
 } from './ToolShared.js';
 import { type Config } from '@google/gemini-cli-core';
 import { ShellInputPrompt } from '../ShellInputPrompt.js';
-import { useUIState } from '../../contexts/UIStateContext.js';
+import { CopySafeBox } from '../shared/CopySafeBox.js';
 
 export type { TextEmphasis };
 
@@ -73,8 +73,6 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
     resultDisplay,
   );
 
-  const { copyModeEnabled } = useUIState();
-
   return (
     // It is crucial we don't replace this <> with a Box because otherwise the
     // sticky header inside it would be sticky to that box rather than to the
@@ -99,16 +97,16 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         />
         {emphasis === 'high' && <TrailingIndicator />}
       </StickyHeader>
-      <Box
+      <CopySafeBox
         width={terminalWidth}
-        borderStyle={copyModeEnabled ? undefined : 'round'}
+        borderStyle="round"
         borderColor={borderColor}
         borderDimColor={borderDimColor}
         borderTop={false}
         borderBottom={false}
-        borderLeft={!copyModeEnabled}
-        borderRight={!copyModeEnabled}
-        paddingX={copyModeEnabled ? 0 : 1}
+        borderLeft={true}
+        borderRight={true}
+        paddingX={1}
         flexDirection="column"
       >
         <ToolResultDisplay
@@ -126,7 +124,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
             />
           </Box>
         )}
-      </Box>
+      </CopySafeBox>
     </>
   );
 };

@@ -29,7 +29,7 @@ import {
 } from '../../constants.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 import type { Config } from '@google/gemini-cli-core';
-import { useUIState } from '../../contexts/UIStateContext.js';
+import { CopySafeBox } from '../shared/CopySafeBox.js';
 
 export interface ShellToolMessageProps extends ToolMessageProps {
   activeShellPtyId?: number | null;
@@ -115,8 +115,6 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
     resultDisplay,
   );
 
-  const { copyModeEnabled } = useUIState();
-
   return (
     <>
       <StickyHeader
@@ -143,17 +141,17 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
         {emphasis === 'high' && <TrailingIndicator />}
       </StickyHeader>
 
-      <Box
+      <CopySafeBox
         ref={contentRef}
         width={terminalWidth}
-        borderStyle={copyModeEnabled ? undefined : 'round'}
+        borderStyle="round"
         borderColor={borderColor}
         borderDimColor={borderDimColor}
         borderTop={false}
         borderBottom={false}
-        borderLeft={!copyModeEnabled}
-        borderRight={!copyModeEnabled}
-        paddingX={copyModeEnabled ? 0 : 1}
+        borderLeft={true}
+        borderRight={true}
+        paddingX={1}
         flexDirection="column"
       >
         <ToolResultDisplay
@@ -178,7 +176,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
             />
           </Box>
         )}
-      </Box>
+      </CopySafeBox>
     </>
   );
 };

@@ -50,7 +50,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   maxLines,
   hasFocus = false,
 }) => {
-  const { renderMarkdown, copyModeEnabled } = useUIState();
+  const { renderMarkdown } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
 
   let availableHeight = availableTerminalHeight
@@ -64,7 +64,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
     availableHeight = Math.min(availableHeight, maxLines);
   }
 
-  const combinedPaddingAndBorderWidth = copyModeEnabled ? 0 : 4;
+  const combinedPaddingAndBorderWidth = 4;
   const childWidth = terminalWidth - combinedPaddingAndBorderWidth;
 
   const keyExtractor = React.useCallback(

@@ -8,6 +8,7 @@ import type React from 'react';
 import { Box, type DOMElement } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { useUIState } from '../contexts/UIStateContext.js';
+import { CopySafeBox } from './shared/CopySafeBox.js';
 
 export interface StickyHeaderProps {
   children: React.ReactNode;
@@ -36,18 +37,16 @@ export const StickyHeader: React.FC<StickyHeaderProps> = ({
       flexShrink={0}
       width={width}
       stickyChildren={
-        <Box
-          borderStyle={copyModeEnabled ? undefined : 'round'}
+        <CopySafeBox
+          borderStyle="round"
           flexDirection="column"
           width={width}
           opaque
           borderColor={borderColor}
           borderDimColor={borderDimColor}
           borderBottom={false}
-          borderTop={!copyModeEnabled && isFirst}
-          borderLeft={!copyModeEnabled}
-          borderRight={!copyModeEnabled}
-          paddingTop={isFirst || copyModeEnabled ? 0 : 1}
+          borderTop={isFirst}
+          paddingTop={isFirst ? 0 : 1}
         >
           <Box paddingX={copyModeEnabled ? 0 : 1}>{children}</Box>
           {/* Dark border to separate header from content. */}
@@ -62,24 +61,24 @@ export const StickyHeader: React.FC<StickyHeaderProps> = ({
               borderRight={false}
             ></Box>
           )}
-        </Box>
+        </CopySafeBox>
       }
     >
-      <Box
-        borderStyle={copyModeEnabled ? undefined : 'round'}
+      <CopySafeBox
+        borderStyle="round"
+        flexDirection="column"
         width={width}
         borderColor={borderColor}
         borderDimColor={borderDimColor}
         borderBottom={false}
-        borderTop={!copyModeEnabled && isFirst}
-        borderLeft={!copyModeEnabled}
-        borderRight={!copyModeEnabled}
-        paddingX={copyModeEnabled ? 0 : 1}
+        borderTop={isFirst}
+        borderLeft={true}
+        borderRight={true}
         paddingBottom={copyModeEnabled ? 0 : 1}
-        paddingTop={isFirst || copyModeEnabled ? 0 : 1}
+        paddingTop={isFirst ? 0 : 1}
       >
-        {children}
-      </Box>
+        <Box paddingX={copyModeEnabled ? 0 : 1}>{children}</Box>
+      </CopySafeBox>
     </Box>
   );
 };

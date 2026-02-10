@@ -18,6 +18,7 @@ import { isShellTool, isThisShellFocused } from './ToolShared.js';
 import { ASK_USER_DISPLAY_NAME } from '@google/gemini-cli-core';
 import { ShowMoreLines } from '../ShowMoreLines.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
+import { CopySafeBox } from '../shared/CopySafeBox.js';
 
 interface ToolGroupMessageProps {
   groupId: number;
@@ -203,17 +204,17 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
             ) : (
               <ToolMessage {...commonProps} />
             )}
-            <Box
-              borderLeft={!copyModeEnabled}
-              borderRight={!copyModeEnabled}
+            <CopySafeBox
+              borderLeft={true}
+              borderRight={true}
               borderTop={false}
               borderBottom={false}
               borderColor={borderColor}
               borderDimColor={borderDimColor}
               flexDirection="column"
-              borderStyle={copyModeEnabled ? undefined : 'round'}
-              paddingLeft={copyModeEnabled ? 0 : 1}
-              paddingRight={copyModeEnabled ? 0 : 1}
+              borderStyle="round"
+              paddingLeft={1}
+              paddingRight={1}
             >
               {tool.status === ToolCallStatus.Confirming &&
                 isConfirming &&
@@ -238,7 +239,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                   </Text>
                 </Box>
               )}
-            </Box>
+            </CopySafeBox>
           </Box>
         );
       })}
