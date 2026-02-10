@@ -83,6 +83,11 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
         : showApprovalModeIndicator === ApprovalMode.AUTO_EDIT
           ? { text: 'auto edit', color: theme.status.warning }
           : null;
+  const hideMinimalModeHintWhileBusy =
+    !showUiDetails && (showLoadingIndicator || hasPendingActionRequired);
+  const minimalModeBleedThrough = hideMinimalModeHintWhileBusy
+    ? null
+    : modeBleedThrough;
   const hasMinimalStatusBleedThrough =
     uiState.ctrlCPressedOnce ||
     uiState.ctrlDPressedOnce ||
@@ -102,14 +107,20 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     contextTokenLimit > 0 &&
     uiState.sessionStats.lastPromptTokenCount / contextTokenLimit > 0.6;
   const showShortcutsHint =
-    !hasPendingActionRequired && (!showUiDetails || !showLoadingIndicator);
+    !hideMinimalModeHintWhileBusy &&
+    !hasPendingActionRequired &&
+    (!showUiDetails || !showLoadingIndicator);
+  const showMinimalInlineLoading = !showUiDetails && showLoadingIndicator;
   const showMinimalBleedThroughRow =
     !showUiDetails &&
-    (Boolean(modeBleedThrough) ||
+    (Boolean(minimalModeBleedThrough) ||
       hasMinimalStatusBleedThrough ||
       showMinimalContextBleedThrough);
   const showMinimalMetaRow =
-    !showUiDetails && (showMinimalBleedThroughRow || showShortcutsHint);
+    !showUiDetails &&
+    (showMinimalInlineLoading ||
+      showMinimalBleedThroughRow ||
+      showShortcutsHint);
 
   return (
     <Box
@@ -146,7 +157,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             alignItems="center"
             flexGrow={1}
           >
-            {showLoadingIndicator && (
+            {showUiDetails && showLoadingIndicator && (
               <LoadingIndicator
                 inline
                 thought={
@@ -190,13 +201,38 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
               alignItems={isNarrow ? 'flex-start' : 'center'}
               flexGrow={1}
             >
-              {modeBleedThrough && (
-                <Text color={modeBleedThrough.color}>
-                  {modeBleedThrough.text}
+              {showMinimalInlineLoading && (
+                <LoadingIndicator
+                  inline
+                  thought={
+                    uiState.streamingState ===
+                      StreamingState.WaitingForConfirmation ||
+                    config.getAccessibility()?.enableLoadingPhrases === false
+                      ? undefined
+                      : uiState.thought
+                  }
+                  currentLoadingPhrase={
+                    config.getAccessibility()?.enableLoadingPhrases === false
+                      ? undefined
+                      : uiState.currentLoadingPhrase
+                  }
+                  thoughtLabel={
+                    inlineThinkingMode === 'full' ? 'Thinking ...' : undefined
+                  }
+                  elapsedTime={uiState.elapsedTime}
+                />
+              )}
+              {minimalModeBleedThrough && (
+                <Text color={minimalModeBleedThrough.color}>
+                  {minimalModeBleedThrough.text}
                 </Text>
               )}
               {hasMinimalStatusBleedThrough && (
-                <Box marginLeft={modeBleedThrough ? 1 : 0}>
+                <Box
+                  marginLeft={
+                    showMinimalInlineLoading || minimalModeBleedThrough ? 1 : 0
+                  }
+                >
                   <StatusDisplay hideContextSummary={true} />
                 </Box>
               )}

@@ -324,7 +324,7 @@ describe('Composer', () => {
       expect(output).toContain('LoadingIndicator: Thinking ...');
     });
 
-    it('keeps shortcuts hint visible while loading in clean mode', () => {
+    it('hides shortcuts hint while loading in clean mode', () => {
       const uiState = createMockUIState({
         streamingState: StreamingState.Responding,
         elapsedTime: 1,
@@ -335,7 +335,7 @@ describe('Composer', () => {
 
       const output = lastFrame();
       expect(output).toContain('LoadingIndicator');
-      expect(output).toContain('ShortcutsHint');
+      expect(output).not.toContain('ShortcutsHint');
     });
 
     it('renders LoadingIndicator without thought when accessibility disables loading phrases', () => {
@@ -613,6 +613,38 @@ describe('Composer', () => {
       },
     );
 
+    it('hides minimal mode badge while loading in clean mode', () => {
+      const uiState = createMockUIState({
+        cleanUiDetailsVisible: false,
+        streamingState: StreamingState.Responding,
+        elapsedTime: 1,
+        showApprovalModeIndicator: ApprovalMode.PLAN,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+      const output = lastFrame();
+      expect(output).toContain('LoadingIndicator');
+      expect(output).not.toContain('plan');
+      expect(output).not.toContain('ShortcutsHint');
+    });
+
+    it('hides minimal mode badge while action-required state is active', () => {
+      const uiState = createMockUIState({
+        cleanUiDetailsVisible: false,
+        showApprovalModeIndicator: ApprovalMode.PLAN,
+        customDialog: (
+          <Box>
+            <Text>Prompt</Text>
+          </Box>
+        ),
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+      const output = lastFrame();
+      expect(output).not.toContain('plan');
+      expect(output).not.toContain('ShortcutsHint');
+    });
+
     it('shows Esc rewind prompt in minimal mode without showing full UI', () => {
       const uiState = createMockUIState({
         cleanUiDetailsVisible: false,
@@ -753,7 +785,7 @@ describe('Composer', () => {
       expect(lastFrame()).toContain('ShortcutsHint');
     });
 
-    it('keeps shortcuts hint visible while loading in minimal mode', () => {
+    it('hides shortcuts hint while loading in minimal mode', () => {
       const uiState = createMockUIState({
         cleanUiDetailsVisible: false,
         streamingState: StreamingState.Responding,
@@ -762,7 +794,7 @@ describe('Composer', () => {
 
       const { lastFrame } = renderComposer(uiState);
 
-      expect(lastFrame()).toContain('ShortcutsHint');
+      expect(lastFrame()).not.toContain('ShortcutsHint');
     });
 
     it('shows shortcuts help in minimal mode when toggled on', () => {
