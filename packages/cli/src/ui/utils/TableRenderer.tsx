@@ -70,30 +70,37 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   );
 
   const { wrappedHeaders, wrappedRows, adjustedWidths } = useMemo(() => {
+    const numColumns = Math.max(
+      styledHeaders.length,
+      ...styledRows.map((r) => r.length),
+    );
+
     // --- Define Constraints per Column ---
-    const constraints = styledHeaders.map((headerStyledChars, colIndex) => {
-      let { contentWidth: maxContentWidth, maxWordWidth } =
-        calculateWidths(headerStyledChars);
+    const constraints = Array.from({ length: numColumns }).map(
+      (_, colIndex) => {
+        const headerStyledChars = styledHeaders[colIndex] || [];
+        let { contentWidth: maxContentWidth, maxWordWidth } =
+          calculateWidths(headerStyledChars);
 
-      styledRows.forEach((row) => {
-        const cellStyledChars = row[colIndex] || [];
-        const { contentWidth: cellWidth, maxWordWidth: cellWordWidth } =
-          calculateWidths(cellStyledChars);
+        styledRows.forEach((row) => {
+          const cellStyledChars = row[colIndex] || [];
+          const { contentWidth: cellWidth, maxWordWidth: cellWordWidth } =
+            calculateWidths(cellStyledChars);
 
-        maxContentWidth = Math.max(maxContentWidth, cellWidth);
-        maxWordWidth = Math.max(maxWordWidth, cellWordWidth);
-      });
+          maxContentWidth = Math.max(maxContentWidth, cellWidth);
+          maxWordWidth = Math.max(maxWordWidth, cellWordWidth);
+        });
 
-      const minWidth = maxWordWidth;
-      const maxWidth = Math.max(minWidth, maxContentWidth);
+        const minWidth = maxWordWidth;
+        const maxWidth = Math.max(minWidth, maxContentWidth);
 
-      return { minWidth, maxWidth };
-    });
+        return { minWidth, maxWidth };
+      },
+    );
 
     // --- Calculate Available Space ---
     // Fixed overhead: borders (n+1) + padding (2n)
-    const fixedOverhead =
-      styledHeaders.length + 1 + styledHeaders.length * COLUMN_PADDING;
+    const fixedOverhead = numColumns + 1 + numColumns * COLUMN_PADDING;
     const availableWidth = Math.max(
       0,
       terminalWidth - fixedOverhead - TABLE_MARGIN,
@@ -145,11 +152,13 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     }
 
     // --- Pre-wrap and Optimize Widths ---
-    const actualColumnWidths = new Array(styledHeaders.length).fill(0);
+    const actualColumnWidths = new Array(numColumns).fill(0);
 
     const wrapAndProcessRow = (row: StyledChar[][]) => {
       const rowResult: ProcessedLine[][] = [];
-      row.forEach((cellStyledChars, colIndex) => {
+      // Ensure we iterate up to numColumns, filling with empty cells if needed
+      for (let colIndex = 0; colIndex < numColumns; colIndex++) {
+        const cellStyledChars = row[colIndex] || [];
         const allocatedWidth = finalContentWidths[colIndex];
         const contentWidth = Math.max(1, allocatedWidth);
 
@@ -169,7 +178,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
           width: styledCharsWidth(line),
         }));
         rowResult.push(lines);
-      });
+      }
       return rowResult;
     };
 
@@ -181,7 +190,6 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
 
     return { wrappedHeaders, wrappedRows, adjustedWidths };
   }, [styledHeaders, styledRows, terminalWidth]);
-
   // Helper function to render a cell with proper width
   const renderCell = (
     content: ProcessedLine,
