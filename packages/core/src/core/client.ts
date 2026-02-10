@@ -65,6 +65,7 @@ import { resolveModel } from '../config/models.js';
 import type { RetryAvailabilityContext } from '../utils/retry.js';
 import { partToString } from '../utils/partUtils.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
+import type { AdaptiveBudgetResult } from '../services/adaptiveBudgetService.js';
 
 const MAX_TURNS = 100;
 
@@ -89,6 +90,7 @@ export class GeminiClient {
   private readonly toolOutputMaskingService: ToolOutputMaskingService;
   private lastPromptId: string;
   private currentSequenceModel: string | null = null;
+  private currentAdaptiveConfig: AdaptiveBudgetResult | null = null;
   private lastSentIdeContext: IdeContext | undefined;
   private forceFullIdeContext = true;
 
@@ -647,22 +649,34 @@ export class GeminiClient {
     // Adaptive Thinking Budget Integration
     if (
       !isInvalidStreamRetry &&
-      this.config.getAdaptiveThinkingConfig().enabled
+      this.config.getAdaptiveThinkingConfig().enabled &&
+      prompt_id !== 'adaptive-budget-classifier'
     ) {
-      const userMessage = partListUnionToString(request);
-      if (userMessage) {
-        const adaptiveConfig = await this.config
-          .getAdaptiveBudgetService()
-          .determineAdaptiveConfig(userMessage, modelToUse);
+      if (this.currentAdaptiveConfig) {
+        modelConfigKey.thinkingBudget =
+          this.currentAdaptiveConfig.thinkingBudget;
+        modelConfigKey.thinkingLevel = this.currentAdaptiveConfig.thinkingLevel;
+      } else {
+        const userMessage = partListUnionToString(request);
+        if (userMessage) {
+          const adaptiveConfig = await this.config
+            .getAdaptiveBudgetService()
+            .determineAdaptiveConfig(
+              userMessage,
+              modelToUse,
+              this.getHistory(),
+            );
 
-        if (adaptiveConfig) {
-          modelConfigKey.thinkingBudget = adaptiveConfig.thinkingBudget;
-          modelConfigKey.thinkingLevel = adaptiveConfig.thinkingLevel;
-          this.getChat().recordAdaptiveThinking({
-            complexity: adaptiveConfig.complexity,
-            thinkingBudget: adaptiveConfig.thinkingBudget,
-            thinkingLevel: adaptiveConfig.thinkingLevel,
-          });
+          if (adaptiveConfig) {
+            this.currentAdaptiveConfig = adaptiveConfig;
+            modelConfigKey.thinkingBudget = adaptiveConfig.thinkingBudget;
+            modelConfigKey.thinkingLevel = adaptiveConfig.thinkingLevel;
+            this.getChat().recordAdaptiveThinking({
+              complexity: adaptiveConfig.complexity,
+              thinkingBudget: adaptiveConfig.thinkingBudget,
+              thinkingLevel: adaptiveConfig.thinkingLevel,
+            });
+          }
         }
       }
     }
@@ -806,6 +820,7 @@ export class GeminiClient {
       this.hookStateMap.delete(this.lastPromptId);
       this.lastPromptId = prompt_id;
       this.currentSequenceModel = null;
+      this.currentAdaptiveConfig = null;
     }
 
     if (hooksEnabled && messageBus) {

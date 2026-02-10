@@ -6,7 +6,11 @@
 import type { Config } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { isGemini2Model, isPreviewModel } from '../config/models.js';
-import { ThinkingLevel } from '@google/genai';
+import type { Content } from '@google/genai';
+import {
+  isFunctionCall,
+  isFunctionResponse,
+} from '../utils/messageInspectors.js';
 
 export enum ComplexityLevel {
   SIMPLE = 1,
@@ -22,17 +26,20 @@ export const BUDGET_MAPPING_V2: Record<ComplexityLevel, number> = {
   [ComplexityLevel.EXTREME]: 32768,
 };
 
-export const LEVEL_MAPPING_V3: Record<ComplexityLevel, ThinkingLevel> = {
-  [ComplexityLevel.SIMPLE]: ThinkingLevel.LOW,
-  [ComplexityLevel.MODERATE]: ThinkingLevel.LOW,
-  [ComplexityLevel.HIGH]: ThinkingLevel.HIGH,
-  [ComplexityLevel.EXTREME]: ThinkingLevel.HIGH,
+export const LEVEL_MAPPING_V3: Record<ComplexityLevel, string> = {
+  [ComplexityLevel.SIMPLE]: 'LOW',
+  [ComplexityLevel.MODERATE]: 'LOW',
+  [ComplexityLevel.HIGH]: 'HIGH',
+  [ComplexityLevel.EXTREME]: 'HIGH',
 };
+
+const HISTORY_TURNS_FOR_CONTEXT = 4;
+const HISTORY_SEARCH_WINDOW = 20;
 
 export interface AdaptiveBudgetResult {
   complexity: ComplexityLevel;
   thinkingBudget?: number;
-  thinkingLevel?: ThinkingLevel;
+  thinkingLevel?: string;
   strategyNote?: string;
 }
 
@@ -51,6 +58,7 @@ export class AdaptiveBudgetService {
   async determineAdaptiveConfig(
     userPrompt: string,
     model: string,
+    history: Content[],
   ): Promise<AdaptiveBudgetResult | undefined> {
     const { classifierModel } = this.config.getAdaptiveThinkingConfig();
 
@@ -59,6 +67,18 @@ export class AdaptiveBudgetService {
       debugLogger.debug(
         `AdaptiveBudgetService: Classifying prompt complexity using ${classifierModel}...`,
       );
+
+      // situational context: provide the last N turns of the history
+      const historySlice = history.slice(-HISTORY_SEARCH_WINDOW);
+
+      // Filter out tool-related turns to keep context focused on conversation.
+      const cleanHistory = historySlice.filter(
+        (content) => !isFunctionCall(content) && !isFunctionResponse(content),
+      );
+
+      // Take the last N turns from the *cleaned* history.
+      const finalHistory = cleanHistory.slice(-HISTORY_TURNS_FOR_CONTEXT);
+
       const systemPrompt = `You are a complexity classifier for a coding assistant. 
 Analyze the user's request and determine the complexity of the task.
 Output ONLY a single integer from 1 to 4 based on the following scale:
@@ -73,7 +93,10 @@ Complexity Level:`;
 
       const response = await llm.generateContent({
         modelConfigKey: { model: classifierModel },
-        contents: [{ role: 'user', parts: [{ text: systemPrompt }] }],
+        contents: [
+          ...finalHistory,
+          { role: 'user', parts: [{ text: systemPrompt }] },
+        ],
         promptId: 'adaptive-budget-classifier',
         abortSignal: new AbortController().signal,
       });
@@ -99,7 +122,7 @@ Complexity Level:`;
       // Determine mapping based on model version
       // Gemini 3 uses ThinkingLevel, Gemini 2.x uses thinkingBudget
       if (isPreviewModel(model)) {
-        result.thinkingLevel = LEVEL_MAPPING_V3[level] ?? ThinkingLevel.HIGH;
+        result.thinkingLevel = LEVEL_MAPPING_V3[level] ?? 'HIGH';
       } else if (isGemini2Model(model)) {
         result.thinkingBudget = BUDGET_MAPPING_V2[level];
       }
@@ -126,7 +149,7 @@ Complexity Level:`;
     return BUDGET_MAPPING_V2[level];
   }
 
-  getThinkingLevelV3(level: ComplexityLevel): ThinkingLevel {
-    return LEVEL_MAPPING_V3[level] ?? ThinkingLevel.HIGH;
+  getThinkingLevelV3(level: ComplexityLevel): string {
+    return LEVEL_MAPPING_V3[level] ?? 'HIGH';
   }
 }

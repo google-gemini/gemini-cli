@@ -9,7 +9,6 @@ import {
   ComplexityLevel,
 } from './adaptiveBudgetService.js';
 import type { Config } from '../config/config.js';
-import { ThinkingLevel } from '@google/genai';
 
 describe('AdaptiveBudgetService', () => {
   it('should map complexity levels to correct V2 budgets', () => {
@@ -22,18 +21,10 @@ describe('AdaptiveBudgetService', () => {
 
   it('should map complexity levels to correct V3 levels', () => {
     const service = new AdaptiveBudgetService({} as Config);
-    expect(service.getThinkingLevelV3(ComplexityLevel.SIMPLE)).toBe(
-      ThinkingLevel.LOW,
-    );
-    expect(service.getThinkingLevelV3(ComplexityLevel.MODERATE)).toBe(
-      ThinkingLevel.LOW,
-    );
-    expect(service.getThinkingLevelV3(ComplexityLevel.HIGH)).toBe(
-      ThinkingLevel.HIGH,
-    );
-    expect(service.getThinkingLevelV3(ComplexityLevel.EXTREME)).toBe(
-      ThinkingLevel.HIGH,
-    );
+    expect(service.getThinkingLevelV3(ComplexityLevel.SIMPLE)).toBe('LOW');
+    expect(service.getThinkingLevelV3(ComplexityLevel.MODERATE)).toBe('LOW');
+    expect(service.getThinkingLevelV3(ComplexityLevel.HIGH)).toBe('HIGH');
+    expect(service.getThinkingLevelV3(ComplexityLevel.EXTREME)).toBe('HIGH');
   });
 
   it('should determine adaptive config based on LLM response', async () => {
@@ -55,6 +46,7 @@ describe('AdaptiveBudgetService', () => {
     const result = await service.determineAdaptiveConfig(
       'Complex task',
       'gemini-2.5-pro',
+      [],
     );
 
     expect(result?.complexity).toBe(ComplexityLevel.HIGH);
@@ -79,10 +71,11 @@ describe('AdaptiveBudgetService', () => {
     const result = await service.determineAdaptiveConfig(
       'Hi',
       'gemini-3-pro-preview',
+      [],
     );
 
     expect(result?.complexity).toBe(ComplexityLevel.SIMPLE);
-    expect(result?.thinkingLevel).toBe(ThinkingLevel.LOW);
+    expect(result?.thinkingLevel).toBe('LOW');
     expect(result?.thinkingBudget).toBeUndefined();
   });
 });

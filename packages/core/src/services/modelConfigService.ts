@@ -29,7 +29,7 @@ export interface ModelConfigKey {
 
   // Dynamic thinking configuration determined at runtime (e.g. via complexity classification)
   thinkingBudget?: number;
-  thinkingLevel?: ThinkingLevel;
+  thinkingLevel?: ThinkingLevel | string;
 }
 
 export interface ModelConfig {
@@ -159,17 +159,27 @@ export class ModelConfigService {
       context.thinkingBudget !== undefined ||
       context.thinkingLevel !== undefined
     ) {
+      const thinkingConfig = {
+        ...(currentConfig.generateContentConfig?.thinkingConfig as object),
+        ...(context.thinkingBudget !== undefined
+          ? { thinkingBudget: context.thinkingBudget }
+          : {}),
+        ...(context.thinkingLevel !== undefined
+          ? { thinkingLevel: context.thinkingLevel }
+          : {}),
+      };
+
+      // Ensure we don't have BOTH if one was a default from an alias
+      if (context.thinkingLevel) {
+        delete (thinkingConfig as Record<string, unknown>).thinkingBudget;
+      }
+      if (context.thinkingBudget) {
+        delete (thinkingConfig as Record<string, unknown>).thinkingLevel;
+      }
+
       currentConfig.generateContentConfig = {
         ...currentConfig.generateContentConfig,
-        thinkingConfig: {
-          ...(currentConfig.generateContentConfig?.thinkingConfig as object),
-          ...(context.thinkingBudget !== undefined
-            ? { thinkingBudget: context.thinkingBudget }
-            : {}),
-          ...(context.thinkingLevel !== undefined
-            ? { thinkingLevel: context.thinkingLevel }
-            : {}),
-        },
+        thinkingConfig: thinkingConfig as Record<string, unknown>,
       };
     }
 
