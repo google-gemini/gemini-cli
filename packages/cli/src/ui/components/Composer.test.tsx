@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { render } from '../../test-utils/render.js';
 import { Box, Text } from 'ink';
+import { useEffect } from 'react';
 import { Composer } from './Composer.js';
 import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
 import {
@@ -28,6 +29,11 @@ import type { Config } from '@google/gemini-cli-core';
 import { StreamingState, ToolCallStatus } from '../types.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import type { SessionMetrics } from '../contexts/SessionContext.js';
+
+const composerTestControls = vi.hoisted(() => ({
+  suggestionsVisible: false,
+  isAlternateBuffer: false,
+}));
 
 // Mock child components
 vi.mock('./LoadingIndicator.js', () => ({
@@ -74,14 +80,28 @@ vi.mock('./DetailedMessagesDisplay.js', () => ({
 }));
 
 vi.mock('./InputPrompt.js', () => ({
-  InputPrompt: ({ placeholder }: { placeholder?: string }) => (
-    <Text>InputPrompt: {placeholder}</Text>
-  ),
+  InputPrompt: ({
+    placeholder,
+    onSuggestionsVisibilityChange,
+  }: {
+    placeholder?: string;
+    onSuggestionsVisibilityChange?: (visible: boolean) => void;
+  }) => {
+    useEffect(() => {
+      onSuggestionsVisibilityChange?.(composerTestControls.suggestionsVisible);
+    }, [onSuggestionsVisibilityChange]);
+
+    return <Text>InputPrompt: {placeholder}</Text>;
+  },
   calculatePromptWidths: vi.fn(() => ({
     inputWidth: 80,
     suggestionsWidth: 40,
     containerWidth: 84,
   })),
+}));
+
+vi.mock('../hooks/useAlternateBuffer.js', () => ({
+  useAlternateBuffer: () => composerTestControls.isAlternateBuffer,
 }));
 
 vi.mock('./Footer.js', () => ({
@@ -223,6 +243,11 @@ const renderComposer = (
   );
 
 describe('Composer', () => {
+  beforeEach(() => {
+    composerTestControls.suggestionsVisible = false;
+    composerTestControls.isAlternateBuffer = false;
+  });
+
   describe('Footer Display Settings', () => {
     it('renders Footer by default when hideFooter is false', () => {
       const uiState = createMockUIState();
@@ -806,6 +831,32 @@ describe('Composer', () => {
       const { lastFrame } = renderComposer(uiState);
 
       expect(lastFrame()).toContain('ShortcutsHelp');
+    });
+
+    it('hides shortcuts hint when suggestions are visible above input in alternate buffer', () => {
+      composerTestControls.isAlternateBuffer = true;
+      composerTestControls.suggestionsVisible = true;
+
+      const uiState = createMockUIState({
+        cleanUiDetailsVisible: false,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).not.toContain('ShortcutsHint');
+    });
+
+    it('keeps shortcuts hint when suggestions are visible below input in regular buffer', () => {
+      composerTestControls.isAlternateBuffer = false;
+      composerTestControls.suggestionsVisible = true;
+
+      const uiState = createMockUIState({
+        cleanUiDetailsVisible: false,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).toContain('ShortcutsHint');
     });
   });
 });

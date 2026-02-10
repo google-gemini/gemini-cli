@@ -106,7 +106,10 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     uiState.currentModel.length > 0 &&
     contextTokenLimit > 0 &&
     uiState.sessionStats.lastPromptTokenCount / contextTokenLimit > 0.6;
+  const hideShortcutsHintForSuggestions =
+    suggestionsVisible && suggestionsPosition === 'above';
   const showShortcutsHint =
+    !hideShortcutsHintForSuggestions &&
     !hideMinimalModeHintWhileBusy &&
     !hasPendingActionRequired &&
     (!showUiDetails || !showLoadingIndicator);
