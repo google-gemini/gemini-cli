@@ -225,7 +225,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
               )}
               {showMinimalModeBleedThrough && minimalModeBleedThrough && (
                 <Text color={minimalModeBleedThrough.color}>
-                  {minimalModeBleedThrough.text}
+                  ● {minimalModeBleedThrough.text}
                 </Text>
               )}
               {hasMinimalStatusBleedThrough && (
