@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,6 +17,13 @@ const STRIKETHROUGH_MARKER_LENGTH = 2; // For "~~")
 const INLINE_CODE_MARKER_LENGTH = 1; // For "`"
 const UNDERLINE_TAG_START_LENGTH = 3; // For "<u>"
 const UNDERLINE_TAG_END_LENGTH = 4; // For "</u>"
+
+const LATEX_MAP: Record<string, string> = {
+  '$\\rightarrow$': '→',
+  '$\\leftarrow$': '←',
+  '$\\uparrow$': '↑',
+  '$\\downarrow$': '↓',
+};
 
 interface RenderInlineProps {
   text: string;
@@ -36,7 +43,7 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
   const nodes: React.ReactNode[] = [];
   let lastIndex = 0;
   const inlineRegex =
-    /(\*\*.*?\*\*|\*.*?\*|_.*?_|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>|https?:\/\/\S+)/g;
+    /(\*\*.*?\*\*|\*.*?\*|_.*?_|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>|https?:\/\/\S+|\$\\[a-z]+\$)/g;
   let match;
 
   while ((match = inlineRegex.exec(text)) !== null) {
@@ -143,6 +150,15 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
             {fullMatch}
           </Text>
         );
+      } else if (fullMatch.startsWith('$') && fullMatch.endsWith('$')) {
+        const replacement = LATEX_MAP[fullMatch];
+        if (replacement) {
+          renderedNode = (
+            <Text key={key} color={baseColor}>
+              {replacement}
+            </Text>
+          );
+        }
       }
     } catch (e) {
       debugLogger.warn('Error parsing inline markdown part:', fullMatch, e);
@@ -184,6 +200,10 @@ export const getPlainTextLength = (text: string): number => {
     .replace(/~~(.*?)~~/g, '$1')
     .replace(/`(.*?)`/g, '$1')
     .replace(/<u>(.*?)<\/u>/g, '$1')
-    .replace(/.*\[(.*?)\]\(.*\)/g, '$1');
+    .replace(/\[(.*?)\]\((.*?)\)/g, '$1 ($2)')
+    .replace(
+      /\$\\(rightarrow|leftarrow|uparrow|downarrow)\$/g,
+      (match) => LATEX_MAP[match] ?? match,
+    );
   return stringWidth(cleanText);
 };
