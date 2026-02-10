@@ -31,7 +31,9 @@ export const DefaultAppLayout: React.FC = () => {
       flexDirection="column"
       width={uiState.terminalWidth}
       height={isAlternateBuffer ? terminalHeight : undefined}
-      paddingBottom={isAlternateBuffer ? 1 : undefined}
+      paddingBottom={
+        isAlternateBuffer && !uiState.copyModeEnabled ? 1 : undefined
+      }
       flexShrink={0}
       flexGrow={0}
       overflow="hidden"
