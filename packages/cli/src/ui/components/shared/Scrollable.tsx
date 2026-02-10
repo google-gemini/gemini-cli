@@ -153,6 +153,7 @@ export const Scrollable: React.FC<ScrollableProps> = ({
 
   const scrollableEntry = useMemo(
     () => ({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       ref: ref as React.RefObject<DOMElement>,
       getScrollState,
       scrollBy: scrollByWithAnimation,
