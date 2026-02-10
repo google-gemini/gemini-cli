@@ -319,6 +319,16 @@ const SETTINGS_SCHEMA = {
             description: `Minimum retention period (safety limit, defaults to "${DEFAULT_MIN_RETENTION}")`,
             showInDialog: false,
           },
+          gracePeriodStart: {
+            type: 'string',
+            label: 'Grace Period Start',
+            category: 'General',
+            requiresRestart: false,
+            default: undefined as string | undefined,
+            description:
+              'Timestamp (ISO string) to start age checks from for existing files.',
+            showInDialog: false,
+          },
         },
         description: 'Settings for automatic session cleanup.',
       },

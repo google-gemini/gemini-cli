@@ -181,6 +181,9 @@ export interface SessionRetentionSettings {
 
   /** Minimum retention period (safety limit, defaults to "1d") */
   minRetention?: string;
+
+  /** Timestamp (ISO string or ms) to start age checks from for existing files. */
+  gracePeriodStart?: string;
 }
 
 export interface SettingsError {

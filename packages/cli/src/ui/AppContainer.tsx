@@ -141,6 +141,10 @@ import {
   QUEUE_ERROR_DISPLAY_DURATION_MS,
 } from './constants.js';
 import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialog.js';
+import {
+  type SessionRetentionChoice,
+  SessionRetentionWarningDialog,
+} from './components/SessionRetentionWarningDialog.js';
 import { NewAgentsChoice } from './components/NewAgentsNotification.js';
 import { isSlashCommand } from './utils/commandUtils.js';
 import { useTerminalTheme } from './hooks/useTerminalTheme.js';
@@ -241,6 +245,49 @@ export const AppContainer = (props: AppContainerProps) => {
   const [defaultBannerText, setDefaultBannerText] = useState('');
   const [warningBannerText, setWarningBannerText] = useState('');
   const [bannerVisible, setBannerVisible] = useState(true);
+
+  const [showRetentionWarning, setShowRetentionWarning] = useState(false);
+  const retentionCheckDone = useRef(false);
+
+  useEffect(() => {
+    if (retentionCheckDone.current) return;
+    retentionCheckDone.current = true;
+
+    // We only want to show this if the user hasn't explicitly set it in User or Workspace scope.
+    const userSettings = settings.user.settings;
+    const workspaceSettings = settings.workspace.settings;
+
+    const userRetention = userSettings.general?.sessionRetention;
+    const workspaceRetention = workspaceSettings.general?.sessionRetention;
+
+    // Check if it's completely undefined in both explicit scopes
+    if (userRetention === undefined && workspaceRetention === undefined) {
+      setShowRetentionWarning(true);
+    }
+  }, [settings]);
+
+  const handleRetentionConfirm = useCallback(
+    (choice: SessionRetentionChoice) => {
+      const now = new Date().toISOString();
+      const retentionSettings: any = {
+        enabled: true,
+        maxAge: '60d',
+      };
+
+      if (choice === 'graceful') {
+        retentionSettings.gracePeriodStart = now;
+      }
+
+      // Store in Workspace scope as requested
+      settings.setValue(
+        SettingScope.Workspace,
+        'general.sessionRetention',
+        retentionSettings,
+      );
+      setShowRetentionWarning(false);
+    },
+    [settings],
+  );
 
   const bannerData = useMemo(
     () => ({
@@ -2229,6 +2276,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
         config={config}
       />
     );
+  }
+
+  if (showRetentionWarning) {
+    return <SessionRetentionWarningDialog onConfirm={handleRetentionConfirm} />;
   }
 
   return (

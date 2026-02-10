@@ -198,7 +198,66 @@ async function identifySessionsToDelete(
   if (retentionConfig.maxAge) {
     try {
       const maxAgeMs = parseRetentionPeriod(retentionConfig.maxAge);
-      cutoffDate = new Date(now.getTime() - maxAgeMs);
+      const nowMs = now.getTime();
+
+      // If gracePeriodStart is set, we treat files as if they were created at
+      // max(file.mtime, gracePeriodStart) for the purpose of age check?
+      // actually, simpler:
+      // The deletion condition is:
+      // age > maxAge  AND  (now > gracePeriodStart + maxAge)
+      // Wait, if I have a file from 2020.
+      // gracePeriodStart = Today.
+      // I want it to survive for 60 days.
+      // So effectively, the file's "effective mtime" is max(real_mtime, gracePeriodStart).
+      // We check if (now - effective_mtime) > maxAge.
+
+      if (retentionConfig.gracePeriodStart) {
+        const graceStart = new Date(retentionConfig.gracePeriodStart).getTime();
+        if (!isNaN(graceStart)) {
+             // We can't set a single cutoff date because it depends on the file's mtime vs graceStart?
+             // Actually, we can.
+             // effectiveAge = now - max(mtime, graceStart)
+             // We want effectiveAge > maxAge
+             // now - max(mtime, graceStart) > maxAge
+             // max(mtime, graceStart) < now - maxAge
+             // mtime < now - maxAge  AND  graceStart < now - maxAge
+             // So, BOTH must be true.
+             // If graceStart is recent (today), then `graceStart < now - maxAge` is FALSE.
+             // So nothing gets deleted.
+             // This works perfectly!
+             // So checking `graceStart < now - maxAge` is a global gate.
+             // If we are within the grace period (globally), we delete NOTHING based on age?
+             // Wait, what if a file was created *after* graceStart?
+             // mtime (Post-Grace) < now - maxAge.
+             // If graceStart is today.
+             // File created tomorrow.
+             // now is tomorrow + 61 days.
+             // mtime < now - maxAge (True).
+             // graceStart < now - maxAge (True, because graceStart was 61 days ago).
+             // So it deletes.
+             // This logic holds up.
+             // We just need to ensure we use the SAME cutoff for all files?
+             // Yes, `cutoffDate` is `now - maxAge`.
+             // And we also verify `graceStart < cutoffDate`.
+             if (graceStart > nowMs - maxAgeMs) {
+                // We are still within the global grace period.
+                // UNLESS the file is somehow older than maxAge AND older than graceStart?
+                // No, if `graceStart > cutoffDate`, then `max(mtime, graceStart)` is at least `graceStart`.
+                // `graceStart > cutoffDate` means `graceStart > now - maxAge`.
+                // So `now - graceStart < maxAge`.
+                // So effective age is ALWAYS < maxAge.
+                // So NOTHING deletes.
+                cutoffDate = null; // Disable age cleanup
+             } else {
+                cutoffDate = new Date(nowMs - maxAgeMs);
+             }
+        } else {
+             cutoffDate = new Date(nowMs - maxAgeMs);
+        }
+      } else {
+        cutoffDate = new Date(nowMs - maxAgeMs);
+      }
+
     } catch {
       // This should not happen as validation should have caught it,
       // but handle gracefully just in case
