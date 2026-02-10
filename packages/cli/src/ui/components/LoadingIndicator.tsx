@@ -15,6 +15,7 @@ import { formatDuration } from '../utils/formatters.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 import { INTERACTIVE_SHELL_WAITING_PHRASE } from '../hooks/usePhraseCycler.js';
+import { shouldUseEmoji } from '../utils/terminalUtils.js';
 
 interface LoadingIndicatorProps {
   currentLoadingPhrase?: string;
@@ -58,7 +59,9 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   const hasThoughtIndicator =
     currentLoadingPhrase !== INTERACTIVE_SHELL_WAITING_PHRASE &&
     Boolean(thought?.subject?.trim());
-  const thinkingIndicator = hasThoughtIndicator ? 'Thinking: ' : '';
+  const thinkingIndicator = hasThoughtIndicator
+    ? `${shouldUseEmoji() ? '💬' : 'o'} `
+    : '';
 
   const cancelAndTimerContent =
     showCancelAndTimer &&
