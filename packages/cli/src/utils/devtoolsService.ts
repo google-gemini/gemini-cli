@@ -145,7 +145,7 @@ export async function setupInitialActivityLogger(config: Config) {
           onReconnectFailed,
         );
         ActivityLogger.getInstance().enableNetworkLogging();
-        connectedUrl = `http://${DEFAULT_DEVTOOLS_HOST}:${DEFAULT_DEVTOOLS_PORT}`;
+        connectedUrl = `http://localhost:${DEFAULT_DEVTOOLS_PORT}`;
         debugLogger.log(`DevTools (existing) at startup: ${connectedUrl}`);
       }
     } catch {
@@ -202,7 +202,7 @@ async function startDevToolsServerImpl(config: Config): Promise<string> {
   const capture = ActivityLogger.getInstance();
   capture.enableNetworkLogging();
 
-  return `http://${host}:${port}`;
+  return `http://localhost:${port}`;
 }
 
 /** Reset module-level state — test only. */

@@ -168,7 +168,7 @@ describe('devtoolsService', () => {
       // F12: should return URL immediately
       const url = await startDevToolsServer(config);
 
-      expect(url).toBe('http://127.0.0.1:25417');
+      expect(url).toBe('http://localhost:25417');
       expect(mockAddNetworkTransport).not.toHaveBeenCalled();
       expect(mockDevToolsInstance.start).not.toHaveBeenCalled();
     });
@@ -209,7 +209,7 @@ describe('devtoolsService', () => {
 
       const url = await promise;
 
-      expect(url).toBe('http://127.0.0.1:25417');
+      expect(url).toBe('http://localhost:25417');
       expect(mockAddNetworkTransport).toHaveBeenCalledWith(
         config,
         '127.0.0.1',
@@ -231,7 +231,7 @@ describe('devtoolsService', () => {
 
       const url = await promise;
 
-      expect(url).toBe('http://127.0.0.1:25417');
+      expect(url).toBe('http://localhost:25417');
       expect(mockAddNetworkTransport).toHaveBeenCalled();
       expect(
         mockActivityLoggerInstance.enableNetworkLogging,
@@ -252,8 +252,8 @@ describe('devtoolsService', () => {
       MockWebSocket.instances[0].simulateError();
 
       const [url1, url2] = await Promise.all([promise1, promise2]);
-      expect(url1).toBe('http://127.0.0.1:25417');
-      expect(url2).toBe('http://127.0.0.1:25417');
+      expect(url1).toBe('http://localhost:25417');
+      expect(url2).toBe('http://localhost:25417');
       // Only one probe + one server start
       expect(mockAddNetworkTransport).toHaveBeenCalledTimes(1);
     });
@@ -299,7 +299,7 @@ describe('devtoolsService', () => {
       const url = await promise;
 
       expect(mockDevToolsInstance.stop).toHaveBeenCalled();
-      expect(url).toBe('http://127.0.0.1:25417');
+      expect(url).toBe('http://localhost:25417');
       expect(mockAddNetworkTransport).toHaveBeenCalledWith(
         config,
         '127.0.0.1',
@@ -331,7 +331,7 @@ describe('devtoolsService', () => {
       const url = await promise;
 
       expect(mockDevToolsInstance.stop).not.toHaveBeenCalled();
-      expect(url).toBe('http://127.0.0.1:25418');
+      expect(url).toBe('http://localhost:25418');
       expect(mockAddNetworkTransport).toHaveBeenCalledWith(
         config,
         '127.0.0.1',
