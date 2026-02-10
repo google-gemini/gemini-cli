@@ -25,6 +25,7 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = ({
   description,
   status,
   resultDisplay,
+  outputFile,
 }) => {
   let denseResult: string | undefined;
 
@@ -54,22 +55,31 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = ({
   }
 
   return (
-    <Box marginLeft={3} flexDirection="row" flexWrap="wrap">
-      <ToolStatusIndicator status={status} name={name} />
-      <Box maxWidth={25} flexShrink={1} flexGrow={0}>
-        <Text color={theme.text.primary} bold wrap="truncate-end">
-          {name}
-        </Text>
+    <Box flexDirection="column">
+      <Box marginLeft={3} flexDirection="row" flexWrap="wrap">
+        <ToolStatusIndicator status={status} name={name} />
+        <Box maxWidth={25} flexShrink={1} flexGrow={0}>
+          <Text color={theme.text.primary} bold wrap="truncate-end">
+            {name}
+          </Text>
+        </Box>
+        <Box marginLeft={1} flexShrink={1} flexGrow={0}>
+          <Text color={theme.text.secondary} wrap="truncate-end">
+            {description}
+          </Text>
+        </Box>
+        {denseResult && (
+          <Box marginLeft={1} flexGrow={1}>
+            <Text color={theme.text.accent} wrap="wrap">
+              → {denseResult}
+            </Text>
+          </Box>
+        )}
       </Box>
-      <Box marginLeft={1} flexShrink={1} flexGrow={0}>
-        <Text color={theme.text.secondary} wrap="truncate-end">
-          {description}
-        </Text>
-      </Box>
-      {denseResult && (
-        <Box marginLeft={1} flexGrow={1}>
-          <Text color={theme.text.accent} wrap="wrap">
-            → {denseResult}
+      {outputFile && (
+        <Box marginLeft={6}>
+          <Text color={theme.text.secondary}>
+            (Output saved to: {outputFile})
           </Text>
         </Box>
       )}

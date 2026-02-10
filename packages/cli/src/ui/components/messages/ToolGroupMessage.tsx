@@ -165,7 +165,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       */
       width={terminalWidth}
       paddingRight={TOOL_MESSAGE_HORIZONTAL_MARGIN}
-      marginBottom={1}
+      marginBottom={borderBottomOverride === false ? 0 : 1}
     >
       {visibleToolCalls.map((tool, index) => {
         const isConfirming = toolAwaitingApproval?.callId === tool.callId;
@@ -218,106 +218,113 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
             ) : (
               <ToolMessage {...commonProps} />
             )}
-            <Box
-              borderLeft={true}
-              borderRight={true}
-              borderTop={false}
-              borderBottom={false}
-              borderColor={borderColor}
-              borderDimColor={borderDimColor}
-              flexDirection="column"
-              borderStyle="round"
-              paddingLeft={1}
-              paddingRight={1}
-            >
-              {tool.status === ToolCallStatus.Confirming &&
-                isConfirming &&
-                tool.confirmationDetails && (
-                  <ToolConfirmationMessage
-                    callId={tool.callId}
-                    confirmationDetails={tool.confirmationDetails}
-                    config={config}
-                    isFocused={isFocused}
-                    availableTerminalHeight={
-                      availableTerminalHeightPerToolMessage
-                    }
-                    terminalWidth={
-                      contentWidth - TOOL_CONFIRMATION_INTERNAL_PADDING
-                    }
-                  />
+            {((tool.status === ToolCallStatus.Confirming &&
+              isConfirming &&
+              tool.confirmationDetails) ||
+              tool.outputFile) && (
+              <Box
+                borderLeft={true}
+                borderRight={true}
+                borderTop={false}
+                borderBottom={false}
+                borderColor={borderColor}
+                borderDimColor={borderDimColor}
+                flexDirection="column"
+                borderStyle="round"
+                paddingLeft={1}
+                paddingRight={1}
+              >
+                {tool.status === ToolCallStatus.Confirming &&
+                  isConfirming &&
+                  tool.confirmationDetails && (
+                    <ToolConfirmationMessage
+                      callId={tool.callId}
+                      confirmationDetails={tool.confirmationDetails}
+                      config={config}
+                      isFocused={isFocused}
+                      availableTerminalHeight={
+                        availableTerminalHeightPerToolMessage
+                      }
+                      terminalWidth={
+                        contentWidth - TOOL_CONFIRMATION_INTERNAL_PADDING
+                      }
+                    />
+                  )}
+                {tool.outputFile && (
+                  <Box>
+                    <Text color={theme.text.primary}>
+                      Output too long and was saved to: {tool.outputFile}
+                    </Text>
+                  </Box>
                 )}
-              {tool.outputFile && (
-                <Box>
-                  <Text color={theme.text.primary}>
-                    Output too long and was saved to: {tool.outputFile}
-                  </Text>
-                </Box>
-              )}
-            </Box>
+              </Box>
+            )}
           </Box>
         );
       })}
-      {
-        /*
-          We have to keep the bottom border separate so it doesn't get
-          drawn over by the sticky header directly inside it.
-          Only render if the last tool was displayed in full/verbose mode,
-          or if explicitly overridden.
-         */
-        (() => {
-          if (visibleToolCalls.length === 0) {
-            if (borderBottomOverride !== undefined) {
-              return (
-                <Box
-                  height={0}
-                  width={contentWidth}
-                  borderLeft={true}
-                  borderRight={true}
-                  borderTop={false}
-                  borderBottom={borderBottomOverride}
-                  borderColor={borderColor}
-                  borderDimColor={borderDimColor}
-                  borderStyle="round"
-                />
-              );
-            }
-            return null;
-          }
-
-          const lastTool = visibleToolCalls[visibleToolCalls.length - 1];
-          const isShell = isShellTool(lastTool.name);
-          const isConfirming = lastTool.status === ToolCallStatus.Confirming;
-
-          // Logic: If dense view (not verbose, not shell, not confirming), hide border by default
-          const isDense = !isVerboseMode && !isShell && !isConfirming;
-          let showBottomBorder = !isDense;
+      {(() => {
+        if (visibleToolCalls.length === 0) {
+          // If we are in dense mode, we generally don't want to draw a border for an empty group.
+          // HOWEVER, if borderBottomOverride is true, it means the scheduler explicitly
+          // wants to close a box. Since dense tools don't have boxes, this must be closing
+          // a non-dense (e.g. shell) tool box. So we must allow it.
+          if (!isVerboseMode && borderBottomOverride !== true) return null;
 
           if (borderBottomOverride !== undefined) {
-            showBottomBorder = borderBottomOverride;
+            return (
+              <Box
+                height={0}
+                width={contentWidth}
+                borderLeft={true}
+                borderRight={true}
+                borderTop={false}
+                borderBottom={borderBottomOverride}
+                borderColor={borderColor}
+                borderDimColor={borderDimColor}
+                borderStyle="round"
+              />
+            );
           }
+          return null;
+        }
 
-          if (!showBottomBorder) return null;
+        const lastTool = visibleToolCalls[visibleToolCalls.length - 1];
+        const isShell = isShellTool(lastTool.name);
+        const isConfirming = lastTool.status === ToolCallStatus.Confirming;
 
-          return (
-            <Box
-              height={0}
-              width={contentWidth}
-              borderLeft={true}
-              borderRight={true}
-              borderTop={false}
-              borderBottom={true}
-              borderColor={borderColor}
-              borderDimColor={borderDimColor}
-              borderStyle="round"
-            />
-          );
-        })()
-      }
-      {(borderBottomOverride ?? true) && visibleToolCalls.length > 0 && (
-        <Box paddingX={1}>
-          <ShowMoreLines constrainHeight={constrainHeight} />
-        </Box>
-      )}
+        // Logic: If dense view (not verbose, not shell, not confirming), hide border by default
+        const isDense = !isVerboseMode && !isShell && !isConfirming;
+
+        if (isDense) return null;
+
+        let showBottomBorder = true;
+
+        if (borderBottomOverride !== undefined) {
+          showBottomBorder = borderBottomOverride;
+        }
+
+        if (!showBottomBorder) return null;
+
+        return (
+          <Box
+            height={0}
+            width={contentWidth}
+            borderLeft={true}
+            borderRight={true}
+            borderTop={false}
+            borderBottom={true}
+            borderColor={borderColor}
+            borderDimColor={borderDimColor}
+            borderStyle="round"
+          />
+        );
+      })()}
+      {!isVerboseMode
+        ? null
+        : (borderBottomOverride ?? true) &&
+          visibleToolCalls.length > 0 && (
+            <ShowMoreLines constrainHeight={constrainHeight} />
+          )}
     </Box>
   );
 };

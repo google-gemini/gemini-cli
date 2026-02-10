@@ -167,7 +167,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
           )}
         />
         {isThisShellFocused && config && (
-          <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>
+          <Box paddingLeft={STATUS_INDICATOR_WIDTH}>
             <ShellInputPrompt
               activeShellPtyId={activeShellPtyId ?? null}
               focus={embeddedShellFocused}
