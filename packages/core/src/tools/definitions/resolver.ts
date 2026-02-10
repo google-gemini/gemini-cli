@@ -10,13 +10,25 @@ import type { ToolDefinition } from './types.js';
 /**
  * Resolves the declaration for a tool.
  *
- * @param definition The tool definition containing the base declaration.
- * @param _modelId Optional model identifier (ignored in this plain refactor).
+ * @param definition The tool definition containing the base declaration and optional overrides.
+ * @param modelId Optional model identifier to apply specific overrides.
  * @returns The FunctionDeclaration to be sent to the API.
  */
 export function resolveToolDeclaration(
   definition: ToolDefinition,
-  _modelId?: string,
+  modelId?: string,
 ): FunctionDeclaration {
-  return definition.base;
+  if (!modelId || !definition.overrides) {
+    return definition.base;
+  }
+
+  const override = definition.overrides(modelId);
+  if (!override) {
+    return definition.base;
+  }
+
+  return {
+    ...definition.base,
+    ...override,
+  };
 }

@@ -12,4 +12,9 @@ import { type FunctionDeclaration } from '@google/genai';
 export interface ToolDefinition {
   /** The base declaration for the tool. */
   base: FunctionDeclaration;
+
+  /**
+   * Optional overrides for specific model families or versions.
+   */
+  overrides?: (modelId: string) => Partial<FunctionDeclaration> | undefined;
 }
