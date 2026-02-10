@@ -353,6 +353,7 @@ export class TestRig {
   originalFakeResponsesPath?: string;
   private _interactiveRuns: InteractiveRun[] = [];
   private _spawnedProcesses: ChildProcess[] = [];
+  private _initialized = false;
 
   setup(
     testName: string,
@@ -374,18 +375,25 @@ export class TestRig {
       console.log(`[TestRig] homeDir: ${this.homeDir}`);
     }
 
-    // Clean up existing directories from previous runs (e.g. retries)
-    if (fs.existsSync(this.testDir)) {
-      if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
-        console.log(`[TestRig] Cleaning up existing testDir: ${this.testDir}`);
+    if (!this._initialized) {
+      // Clean up existing directories from previous runs (e.g. retries)
+      if (fs.existsSync(this.testDir)) {
+        if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+          console.log(
+            `[TestRig] Cleaning up existing testDir: ${this.testDir}`,
+          );
+        }
+        fs.rmSync(this.testDir, { recursive: true, force: true });
       }
-      fs.rmSync(this.testDir, { recursive: true, force: true });
-    }
-    if (fs.existsSync(this.homeDir)) {
-      if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
-        console.log(`[TestRig] Cleaning up existing homeDir: ${this.homeDir}`);
+      if (fs.existsSync(this.homeDir)) {
+        if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+          console.log(
+            `[TestRig] Cleaning up existing homeDir: ${this.homeDir}`,
+          );
+        }
+        fs.rmSync(this.homeDir, { recursive: true, force: true });
       }
-      fs.rmSync(this.homeDir, { recursive: true, force: true });
+      this._initialized = true;
     }
 
     mkdirSync(this.testDir, { recursive: true });
