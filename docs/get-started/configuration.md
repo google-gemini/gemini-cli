@@ -106,6 +106,13 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable Vim keybindings
   - **Default:** `false`
 
+- **`general.defaultApprovalMode`** (enum):
+  - **Description:** The default approval mode for tool execution. 'default'
+    prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is
+    read-only mode. 'yolo' is not supported yet.
+  - **Default:** `"default"`
+  - **Values:** `"default"`, `"auto_edit"`, `"plan"`
+
 - **`general.devtools`** (boolean):
   - **Description:** Enable DevTools inspector on launch.
   - **Default:** `false`
@@ -187,6 +194,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Hide the window title bar
   - **Default:** `false`
   - **Requires restart:** Yes
+
+- **`ui.inlineThinkingMode`** (enum):
+  - **Description:** Display model thinking inline: off or full.
+  - **Default:** `"off"`
+  - **Values:** `"off"`, `"full"`
 
 - **`ui.showStatusInTitle`** (boolean):
   - **Description:** Show Gemini CLI model thoughts in the terminal window title
@@ -675,13 +687,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable shell output efficiency optimizations for better
     performance.
   - **Default:** `true`
-
-- **`tools.approvalMode`** (enum):
-  - **Description:** The default approval mode for tool execution. 'default'
-    prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is
-    read-only mode. 'yolo' is not supported yet.
-  - **Default:** `"default"`
-  - **Values:** `"default"`, `"auto_edit"`, `"plan"`
 
 - **`tools.core`** (array):
   - **Description:** Restrict the set of built-in tools with an allowlist. Match

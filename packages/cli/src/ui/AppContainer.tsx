@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -29,6 +29,7 @@ import {
   AuthState,
   type ConfirmationRequest,
   type PermissionConfirmationRequest,
+  type QuotaStats,
 } from './types.js';
 import { checkPermissions } from './hooks/atCommandProcessor.js';
 import { MessageType, StreamingState } from './types.js';
@@ -323,6 +324,16 @@ export const AppContainer = (props: AppContainerProps) => {
   const [currentModel, setCurrentModel] = useState(config.getModel());
 
   const [userTier, setUserTier] = useState<UserTierId | undefined>(undefined);
+  const [quotaStats, setQuotaStats] = useState<QuotaStats | undefined>(() => {
+    const remaining = config.getQuotaRemaining();
+    const limit = config.getQuotaLimit();
+    const resetTime = config.getQuotaResetTime();
+    return remaining !== undefined ||
+      limit !== undefined ||
+      resetTime !== undefined
+      ? { remaining, limit, resetTime }
+      : undefined;
+  });
 
   const [isConfigInitialized, setConfigInitialized] = useState(false);
 
@@ -425,9 +436,23 @@ export const AppContainer = (props: AppContainerProps) => {
       setCurrentModel(config.getModel());
     };
 
+    const handleQuotaChanged = (payload: {
+      remaining: number | undefined;
+      limit: number | undefined;
+      resetTime?: string;
+    }) => {
+      setQuotaStats({
+        remaining: payload.remaining,
+        limit: payload.limit,
+        resetTime: payload.resetTime,
+      });
+    };
+
     coreEvents.on(CoreEvent.ModelChanged, handleModelChanged);
+    coreEvents.on(CoreEvent.QuotaChanged, handleQuotaChanged);
     return () => {
       coreEvents.off(CoreEvent.ModelChanged, handleModelChanged);
+      coreEvents.off(CoreEvent.QuotaChanged, handleQuotaChanged);
     };
   }, [config]);
 
@@ -1158,11 +1183,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
   useLayoutEffect(() => {
     if (mainControlsRef.current) {
       const fullFooterMeasurement = measureElement(mainControlsRef.current);
-      if (
-        fullFooterMeasurement.height > 0 &&
-        fullFooterMeasurement.height !== controlsHeight
-      ) {
-        setControlsHeight(fullFooterMeasurement.height);
+      const roundedHeight = Math.round(fullFooterMeasurement.height);
+      if (roundedHeight > 0 && roundedHeight !== controlsHeight) {
+        setControlsHeight(roundedHeight);
       }
     }
   }, [buffer, terminalWidth, terminalHeight, controlsHeight]);
@@ -1887,9 +1910,12 @@ Logging in with Google... Restarting Gemini CLI to continue.
       queueErrorMessage,
       showApprovalModeIndicator,
       currentModel,
-      userTier,
-      proQuotaRequest,
-      validationRequest,
+      quota: {
+        userTier,
+        stats: quotaStats,
+        proQuotaRequest,
+        validationRequest,
+      },
       contextFileNames,
       errorCount,
       availableTerminalHeight,
@@ -1994,6 +2020,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       queueErrorMessage,
       showApprovalModeIndicator,
       userTier,
+      quotaStats,
       proQuotaRequest,
       validationRequest,
       contextFileNames,
