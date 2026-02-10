@@ -206,9 +206,10 @@ export class IDEServer {
       context.subscriptions.push(onDidChangeDiffSubscription);
 
       app.post('/mcp', async (req: Request, res: Response) => {
-        const rawSessionId = req.headers[MCP_SESSION_ID_HEADER];
-        const sessionId =
-          typeof rawSessionId === 'string' ? rawSessionId : undefined;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const sessionId = req.headers[MCP_SESSION_ID_HEADER] as
+          | string
+          | undefined;
         let transport: StreamableHTTPServerTransport;
 
         if (sessionId && this.transports[sessionId]) {
@@ -290,9 +291,10 @@ export class IDEServer {
       });
 
       const handleSessionRequest = async (req: Request, res: Response) => {
-        const rawSessionId = req.headers[MCP_SESSION_ID_HEADER];
-        const sessionId =
-          typeof rawSessionId === 'string' ? rawSessionId : undefined;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const sessionId = req.headers[MCP_SESSION_ID_HEADER] as
+          | string
+          | undefined;
         if (!sessionId || !this.transports[sessionId]) {
           this.log('Invalid or missing session ID');
           res.status(400).send('Invalid or missing session ID');
@@ -337,11 +339,8 @@ export class IDEServer {
       });
 
       this.server = app.listen(0, '127.0.0.1', async () => {
-        if (!this.server) {
-          resolve();
-          return;
-        }
-        const address = this.server.address();
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const address = (this.server as HTTPServer).address();
         if (address && typeof address !== 'string') {
           this.port = address.port;
           this.log(`IDE server listening on http://127.0.0.1:${this.port}`);

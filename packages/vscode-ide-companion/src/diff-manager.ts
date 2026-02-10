@@ -243,14 +243,12 @@ export class DiffManager {
     // Find and close the tab corresponding to the diff view
     for (const tabGroup of vscode.window.tabGroups.all) {
       for (const tab of tabGroup.tabs) {
-        const input = tab.input;
-        if (
-          input &&
-          typeof input === 'object' &&
-          'modified' in input &&
-          input.modified instanceof vscode.Uri &&
-          input.modified.toString() === rightDocUri.toString()
-        ) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const input = tab.input as {
+          modified?: vscode.Uri;
+          original?: vscode.Uri;
+        };
+        if (input && input.modified?.toString() === rightDocUri.toString()) {
           await vscode.window.tabGroups.close(tab);
           return;
         }
