@@ -9,6 +9,7 @@ import { Box, Text } from 'ink';
 import { theme } from '../../semantic-colors.js';
 import { ToolStatusIndicator } from '../messages/ToolShared.js';
 import { ToolCallStatus } from '../../types.js';
+import { checkExhaustive } from '@google/gemini-cli-core';
 
 /**
  * Props for the Card component.
@@ -24,6 +25,8 @@ export interface CardProps {
   children?: React.ReactNode;
   /** The styling and intent of the card. */
   status?: ToolCallStatus;
+  /** The width of the card. Defaults to 100%. */
+  width?: string | number;
 }
 
 export const Card: React.FC<CardProps> = ({
@@ -32,6 +35,7 @@ export const Card: React.FC<CardProps> = ({
   prefix = true,
   suffix,
   children,
+  width = '100%',
 }) => {
   const getColors = () => {
     switch (status) {
@@ -48,6 +52,7 @@ export const Card: React.FC<CardProps> = ({
       case ToolCallStatus.Executing:
         return { border: theme.border.default, text: theme.status.success };
       default:
+        checkExhaustive(status);
         return { border: theme.border.default, text: theme.text.primary };
     }
   };
@@ -55,7 +60,7 @@ export const Card: React.FC<CardProps> = ({
   const colors = getColors();
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" width={width}>
       <Box width="100%" flexDirection="row">
         {/* Top border section */}
         <Box
@@ -73,7 +78,6 @@ export const Card: React.FC<CardProps> = ({
             gap={1}
             justifyContent="flex-start"
           >
-            {/* TODO: Use shared ToolStatusIndicator component */}
             <Box marginRight={-2}>
               {prefix && <ToolStatusIndicator status={status} name={title} />}
             </Box>
@@ -105,7 +109,6 @@ export const Card: React.FC<CardProps> = ({
           borderColor={colors.border}
         ></Box>
       </Box>
-      {/* Content area */}
       <Box
         borderStyle="round"
         borderTop={false}
