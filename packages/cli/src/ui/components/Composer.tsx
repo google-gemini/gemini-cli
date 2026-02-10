@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { Box, useIsScreenReaderEnabled } from 'ink';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { StatusDisplay } from './StatusDisplay.js';
+import { ToastDisplay } from './ToastDisplay.js';
 import { ApprovalModeIndicator } from './ApprovalModeIndicator.js';
 import { ShellModeIndicator } from './ShellModeIndicator.js';
 import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
@@ -62,6 +63,13 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     Boolean(uiState.proQuotaRequest) ||
     Boolean(uiState.validationRequest) ||
     Boolean(uiState.customDialog);
+  const hasToast =
+    uiState.ctrlCPressedOnce ||
+    Boolean(uiState.warningMessage) ||
+    uiState.ctrlDPressedOnce ||
+    (uiState.showEscapePrompt &&
+      (uiState.buffer.text.length > 0 || uiState.history.length > 0)) ||
+    Boolean(uiState.queueErrorMessage);
   const showLoadingIndicator =
     (!uiState.embeddedShellFocused || uiState.isBackgroundShellVisible) &&
     uiState.streamingState === StreamingState.Responding &&
@@ -148,44 +156,48 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             alignItems="center"
             flexGrow={1}
           >
-            {!showLoadingIndicator && (
-              <Box
-                flexDirection={isNarrow ? 'column' : 'row'}
-                alignItems={isNarrow ? 'flex-start' : 'center'}
-              >
-                {showApprovalIndicator && (
-                  <ApprovalModeIndicator
-                    approvalMode={showApprovalModeIndicator}
-                    isPlanEnabled={config.isPlanEnabled()}
-                  />
-                )}
-                {uiState.shellModeActive && (
-                  <Box
-                    marginLeft={showApprovalIndicator && !isNarrow ? 1 : 0}
-                    marginTop={showApprovalIndicator && isNarrow ? 1 : 0}
-                  >
-                    <ShellModeIndicator />
-                  </Box>
-                )}
-                {showRawMarkdownIndicator && (
-                  <Box
-                    marginLeft={
-                      (showApprovalIndicator || uiState.shellModeActive) &&
-                      !isNarrow
-                        ? 1
-                        : 0
-                    }
-                    marginTop={
-                      (showApprovalIndicator || uiState.shellModeActive) &&
-                      isNarrow
-                        ? 1
-                        : 0
-                    }
-                  >
-                    <RawMarkdownIndicator />
-                  </Box>
-                )}
-              </Box>
+            {hasToast ? (
+              <ToastDisplay />
+            ) : (
+              !showLoadingIndicator && (
+                <Box
+                  flexDirection={isNarrow ? 'column' : 'row'}
+                  alignItems={isNarrow ? 'flex-start' : 'center'}
+                >
+                  {showApprovalIndicator && (
+                    <ApprovalModeIndicator
+                      approvalMode={showApprovalModeIndicator}
+                      isPlanEnabled={config.isPlanEnabled()}
+                    />
+                  )}
+                  {uiState.shellModeActive && (
+                    <Box
+                      marginLeft={showApprovalIndicator && !isNarrow ? 1 : 0}
+                      marginTop={showApprovalIndicator && isNarrow ? 1 : 0}
+                    >
+                      <ShellModeIndicator />
+                    </Box>
+                  )}
+                  {showRawMarkdownIndicator && (
+                    <Box
+                      marginLeft={
+                        (showApprovalIndicator || uiState.shellModeActive) &&
+                        !isNarrow
+                          ? 1
+                          : 0
+                      }
+                      marginTop={
+                        (showApprovalIndicator || uiState.shellModeActive) &&
+                        isNarrow
+                          ? 1
+                          : 0
+                      }
+                    >
+                      <RawMarkdownIndicator />
+                    </Box>
+                  )}
+                </Box>
+              )
             )}
           </Box>
 

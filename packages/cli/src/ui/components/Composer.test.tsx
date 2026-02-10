@@ -33,6 +33,14 @@ vi.mock('./LoadingIndicator.js', () => ({
   ),
 }));
 
+vi.mock('./StatusDisplay.js', () => ({
+  StatusDisplay: () => <Text>StatusDisplay</Text>,
+}));
+
+vi.mock('./ToastDisplay.js', () => ({
+  ToastDisplay: () => <Text>ToastDisplay</Text>,
+}));
+
 vi.mock('./ContextSummaryDisplay.js', () => ({
   ContextSummaryDisplay: () => <Text>ContextSummaryDisplay</Text>,
 }));
@@ -410,7 +418,7 @@ describe('Composer', () => {
   });
 
   describe('Context and Status Display', () => {
-    it('shows ContextSummaryDisplay in normal state', () => {
+    it('shows StatusDisplay and ApprovalModeIndicator in normal state', () => {
       const uiState = createMockUIState({
         ctrlCPressedOnce: false,
         ctrlDPressedOnce: false,
@@ -419,49 +427,36 @@ describe('Composer', () => {
 
       const { lastFrame } = renderComposer(uiState);
 
-      expect(lastFrame()).toContain('ContextSummaryDisplay');
+      const output = lastFrame();
+      expect(output).toContain('StatusDisplay');
+      expect(output).toContain('ApprovalModeIndicator');
+      expect(output).not.toContain('ToastDisplay');
     });
 
-    it('renders HookStatusDisplay instead of ContextSummaryDisplay with active hooks', () => {
-      const uiState = createMockUIState({
-        activeHooks: [{ name: 'test-hook', eventName: 'before-agent' }],
-      });
-
-      const { lastFrame } = renderComposer(uiState);
-
-      expect(lastFrame()).toContain('HookStatusDisplay');
-      expect(lastFrame()).not.toContain('ContextSummaryDisplay');
-    });
-
-    it('shows Ctrl+C exit prompt when ctrlCPressedOnce is true', () => {
+    it('shows ToastDisplay and hides ApprovalModeIndicator when a toast is present', () => {
       const uiState = createMockUIState({
         ctrlCPressedOnce: true,
       });
 
       const { lastFrame } = renderComposer(uiState);
 
-      expect(lastFrame()).toContain('Press Ctrl+C again to exit');
+      const output = lastFrame();
+      expect(output).toContain('ToastDisplay');
+      expect(output).not.toContain('ApprovalModeIndicator');
+      // StatusDisplay should still be present now!
+      expect(output).toContain('StatusDisplay');
     });
 
-    it('shows Ctrl+D exit prompt when ctrlDPressedOnce is true', () => {
+    it('shows ToastDisplay for other toast types', () => {
       const uiState = createMockUIState({
-        ctrlDPressedOnce: true,
+        warningMessage: 'Warning',
       });
 
       const { lastFrame } = renderComposer(uiState);
 
-      expect(lastFrame()).toContain('Press Ctrl+D again to exit');
-    });
-
-    it('shows escape prompt when showEscapePrompt is true', () => {
-      const uiState = createMockUIState({
-        showEscapePrompt: true,
-        history: [{ id: 1, type: 'user', text: 'test' }],
-      });
-
-      const { lastFrame } = renderComposer(uiState);
-
-      expect(lastFrame()).toContain('Press Esc again to rewind');
+      const output = lastFrame();
+      expect(output).toContain('ToastDisplay');
+      expect(output).not.toContain('ApprovalModeIndicator');
     });
   });
 
