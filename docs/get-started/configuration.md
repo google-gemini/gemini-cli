@@ -874,6 +874,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
+- **`experimental.extensionRegistry`** (boolean):
+  - **Description:** Enable extension registry explore UI.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.extensionReloading`** (boolean):
   - **Description:** Enables extension loading/unloading within the CLI session.
   - **Default:** `false`

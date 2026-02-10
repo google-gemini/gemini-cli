@@ -83,7 +83,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', undefined);
     mockConfig = {
       getToolRegistry: vi.fn().mockReturnValue({
-        getAllToolNames: vi.fn().mockReturnValue([]),
+        getAllToolNames: vi.fn().mockReturnValue(['grep_search', 'glob']),
         getAllTools: vi.fn().mockReturnValue([]),
       }),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
@@ -327,9 +327,21 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).toMatchSnapshot(); // Use snapshot for base prompt structure
   });
 
+  it('should redact grep and glob from the system prompt when they are disabled', () => {
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
+    vi.mocked(mockConfig.getToolRegistry().getAllToolNames).mockReturnValue([]);
+    const prompt = getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).not.toContain('`grep_search`');
+    expect(prompt).not.toContain('`glob`');
+    expect(prompt).toContain(
+      'Use search tools extensively to understand file structures, existing code patterns, and conventions.',
+    );
+  });
+
   it.each([
-    [[CodebaseInvestigatorAgent.name], true],
-    [[], false],
+    [[CodebaseInvestigatorAgent.name, 'grep_search', 'glob'], true],
+    [['grep_search', 'glob'], false],
   ])(
     'should handle CodebaseInvestigator with tools=%s',
     (toolNames, expectCodebaseInvestigator) => {
@@ -483,6 +495,29 @@ describe('Core System Prompt (prompts.ts)', () => {
         expect(prompt).toMatchSnapshot();
       });
     });
+
+    it('should include YOLO mode instructions in interactive mode', () => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.YOLO);
+      vi.mocked(mockConfig.isInteractive).mockReturnValue(true);
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).toContain('# Autonomous Mode (YOLO)');
+      expect(prompt).toContain('Only use the `ask_user` tool if');
+    });
+
+    it('should NOT include YOLO mode instructions in non-interactive mode', () => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.YOLO);
+      vi.mocked(mockConfig.isInteractive).mockReturnValue(false);
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).not.toContain('# Autonomous Mode (YOLO)');
+    });
+
+    it('should NOT include YOLO mode instructions for DEFAULT mode', () => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(
+        ApprovalMode.DEFAULT,
+      );
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).not.toContain('# Autonomous Mode (YOLO)');
+    });
   });
 
   describe('Platform-specific and Background Process instructions', () => {
@@ -550,13 +585,14 @@ describe('Core System Prompt (prompts.ts)', () => {
   });
 
   it('should include planning phase suggestion when enter_plan_mode tool is enabled', () => {
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
     vi.mocked(mockConfig.getToolRegistry().getAllToolNames).mockReturnValue([
       'enter_plan_mode',
     ]);
     const prompt = getCoreSystemPrompt(mockConfig);
 
     expect(prompt).toContain(
-      "For complex tasks, consider using the 'enter_plan_mode' tool to enter a dedicated planning phase before starting implementation.",
+      'For complex tasks, consider using the `enter_plan_mode` tool to enter a dedicated planning phase before starting implementation.',
     );
     expect(prompt).toMatchSnapshot();
   });

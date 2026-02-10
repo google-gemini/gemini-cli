@@ -1493,6 +1493,13 @@
           "default": true,
           "type": "boolean"
         },
+        "extensionRegistry": {
+          "title": "Extension Registry Explore UI",
+          "description": "Enable extension registry explore UI.",
+          "markdownDescription": "Enable extension registry explore UI.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "extensionReloading": {
           "title": "Extension Reloading",
           "description": "Enables extension loading/unloading within the CLI session.",
