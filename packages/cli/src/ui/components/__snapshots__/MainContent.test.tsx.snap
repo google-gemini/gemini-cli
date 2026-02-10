@@ -28,7 +28,7 @@ AppHeader
 │ Line 20                                                                                      │
 │                                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
- ShowMoreLines"
+ShowMoreLines"
 `;
 
 exports[`MainContent > MainContent Tool Output Height Logic > 'ASB mode - Unfocused shell' 1`] = `
@@ -53,7 +53,7 @@ AppHeader
 │ Line 19                                                                                    █ │
 │ Line 20                                                                                    █ │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
- ShowMoreLines"
+ShowMoreLines"
 `;
 
 exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Constrained height' 1`] = `
@@ -77,7 +77,7 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Con
 │ Line 19                                                                                      │
 │ Line 20                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
- ShowMoreLines"
+ShowMoreLines"
 `;
 
 exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Unconstrained height' 1`] = `
@@ -101,7 +101,7 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Unc
 │ Line 19                                                                                      │
 │ Line 20                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
- ShowMoreLines"
+ShowMoreLines"
 `;
 
 exports[`MainContent > does not constrain height in alternate buffer mode 1`] = `

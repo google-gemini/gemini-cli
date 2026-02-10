@@ -150,9 +150,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
           borderStyle="round"
         />
       </Box>
-      <Box paddingX={2} marginBottom={1}>
-        <ShowMoreLines constrainHeight={constrainHeight} />
-      </Box>
+      <ShowMoreLines constrainHeight={constrainHeight} />
     </OverflowProvider>
   );
 };
