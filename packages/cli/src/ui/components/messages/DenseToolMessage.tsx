@@ -11,9 +11,7 @@ import type { IndividualToolCallDisplay } from '../../types.js';
 import { ToolStatusIndicator } from './ToolShared.js';
 import { theme } from '../../semantic-colors.js';
 
-interface DenseToolMessageProps extends IndividualToolCallDisplay {
-  isFirst: boolean;
-}
+type DenseToolMessageProps = IndividualToolCallDisplay;
 
 interface FileDiffResult {
   fileDiff: string;

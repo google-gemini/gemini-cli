@@ -18,7 +18,6 @@ describe('DenseToolMessage', () => {
     status: ToolCallStatus.Success,
     resultDisplay: 'Success result',
     confirmationDetails: undefined,
-    isFirst: true,
   };
 
   it('renders correctly for a successful string result', () => {

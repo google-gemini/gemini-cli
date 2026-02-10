@@ -191,9 +191,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           tool.status !== ToolCallStatus.Confirming;
 
         if (useDenseView) {
-          return (
-            <DenseToolMessage key={tool.callId} {...tool} isFirst={isFirst} />
-          );
+          return <DenseToolMessage key={tool.callId} {...tool} />;
         }
 
         const commonProps = {
