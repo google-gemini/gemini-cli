@@ -5,6 +5,7 @@
  */
 
 import { render, persistentStateMock } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { Notifications } from './Notifications.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useAppContext, type AppState } from '../contexts/AppContext.js';
@@ -172,7 +173,7 @@ describe('Notifications', () => {
     render(<Notifications />);
 
     await act(async () => {
-      await vi.waitFor(() => {
+      await waitFor(() => {
         expect(persistentStateMock.set).toHaveBeenCalledWith(
           'hasSeenScreenReaderNudge',
           true,

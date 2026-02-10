@@ -12,6 +12,7 @@ import { StreamingContext } from '../contexts/StreamingContext.js';
 import { StreamingState } from '../types.js';
 import { vi } from 'vitest';
 import * as useTerminalSize from '../hooks/useTerminalSize.js';
+import * as terminalUtils from '../utils/terminalUtils.js';
 
 // Mock GeminiRespondingSpinner
 vi.mock('./GeminiRespondingSpinner.js', () => ({
@@ -34,7 +35,12 @@ vi.mock('../hooks/useTerminalSize.js', () => ({
   useTerminalSize: vi.fn(),
 }));
 
+vi.mock('../utils/terminalUtils.js', () => ({
+  shouldUseEmoji: vi.fn(() => true),
+}));
+
 const useTerminalSizeMock = vi.mocked(useTerminalSize.useTerminalSize);
+const shouldUseEmojiMock = vi.mocked(terminalUtils.shouldUseEmoji);
 
 const renderWithContext = (
   ui: React.ReactElement,
@@ -57,12 +63,12 @@ describe('<LoadingIndicator />', () => {
     elapsedTime: 5,
   };
 
-  it('should not render when streamingState is Idle', () => {
+  it('should render blank when streamingState is Idle and no loading phrase or thought', () => {
     const { lastFrame } = renderWithContext(
-      <LoadingIndicator {...defaultProps} />,
+      <LoadingIndicator elapsedTime={5} />,
       StreamingState.Idle,
     );
-    expect(lastFrame()).toBe('');
+    expect(lastFrame()?.trim()).toBe('');
   });
 
   it('should render spinner, phrase, and time when streamingState is Responding', () => {
@@ -143,10 +149,10 @@ describe('<LoadingIndicator />', () => {
 
   it('should transition correctly between states using rerender', () => {
     const { lastFrame, rerender, unmount } = renderWithContext(
-      <LoadingIndicator {...defaultProps} />,
+      <LoadingIndicator elapsedTime={5} />,
       StreamingState.Idle,
     );
-    expect(lastFrame()).toBe(''); // Initial: Idle
+    expect(lastFrame()?.trim()).toBe(''); // Initial: Idle (no loading phrase)
 
     // Transition to Responding
     rerender(
@@ -180,10 +186,10 @@ describe('<LoadingIndicator />', () => {
     // Transition back to Idle
     rerender(
       <StreamingContext.Provider value={StreamingState.Idle}>
-        <LoadingIndicator {...defaultProps} />
+        <LoadingIndicator elapsedTime={5} />
       </StreamingContext.Provider>,
     );
-    expect(lastFrame()).toBe('');
+    expect(lastFrame()?.trim()).toBe(''); // Idle with no loading phrase and no spinner
     unmount();
   });
 
@@ -217,9 +223,30 @@ describe('<LoadingIndicator />', () => {
     const output = lastFrame();
     expect(output).toBeDefined();
     if (output) {
+      expect(output).toContain('💬');
       expect(output).toContain('Thinking about something...');
       expect(output).not.toContain('and other stuff.');
     }
+    unmount();
+  });
+
+  it('should use ASCII fallback thought indicator when emoji is unavailable', () => {
+    shouldUseEmojiMock.mockReturnValue(false);
+    const props = {
+      thought: {
+        subject: 'Thinking with fallback',
+        description: 'details',
+      },
+      elapsedTime: 5,
+    };
+    const { lastFrame, unmount } = renderWithContext(
+      <LoadingIndicator {...props} />,
+      StreamingState.Responding,
+    );
+    const output = lastFrame();
+    expect(output).toContain('o Thinking with fallback');
+    expect(output).not.toContain('💬');
+    shouldUseEmojiMock.mockReturnValue(true);
     unmount();
   });
 
@@ -237,8 +264,21 @@ describe('<LoadingIndicator />', () => {
       StreamingState.Responding,
     );
     const output = lastFrame();
+    expect(output).toContain('💬');
     expect(output).toContain('This should be displayed');
     expect(output).not.toContain('This should not be displayed');
+    unmount();
+  });
+
+  it('should not display thought icon for non-thought loading phrases', () => {
+    const { lastFrame, unmount } = renderWithContext(
+      <LoadingIndicator
+        currentLoadingPhrase="some random tip..."
+        elapsedTime={3}
+      />,
+      StreamingState.Responding,
+    );
+    expect(lastFrame()).not.toContain('💬');
     unmount();
   });
 

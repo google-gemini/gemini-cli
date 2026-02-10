@@ -617,7 +617,8 @@ export function convertSessionToHistoryFormats(
       clientHistory.push({
         role: 'user',
         parts: Array.isArray(msg.content)
-          ? (msg.content as Part[])
+          ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            (msg.content as Part[])
           : [{ text: contentString }],
       });
     } else if (msg.type === 'gemini') {
@@ -670,6 +671,7 @@ export function convertSessionToHistoryFormats(
             } else if (Array.isArray(toolCall.result)) {
               // toolCall.result is an array containing properly formatted
               // function responses
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               functionResponseParts.push(...(toolCall.result as Part[]));
               continue;
             } else {

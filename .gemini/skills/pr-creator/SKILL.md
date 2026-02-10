@@ -14,25 +14,34 @@ repository's standards.
 
 Follow these steps to create a Pull Request:
 
-1.  **Branch Management**: Check the current branch to avoid working directly
-    on `main`.
+1.  **Branch Management**: **CRITICAL:** Ensure you are NOT working on the
+    `main` branch.
     - Run `git branch --show-current`.
-    - If the current branch is `main`, create and switch to a new descriptive
-      branch:
+    - If the current branch is `main`, you MUST create and switch to a new
+      descriptive branch:
       ```bash
       git checkout -b <new-branch-name>
       ```
 
-2.  **Locate Template**: Search for a pull request template in the repository.
+2.  **Commit Changes**: Verify that all intended changes are committed.
+    - Run `git status` to check for unstaged or uncommitted changes.
+    - If there are uncommitted changes, stage and commit them with a descriptive
+      message before proceeding. NEVER commit directly to `main`.
+      ```bash
+      git add .
+      git commit -m "type(scope): description"
+      ```
+
+3.  **Locate Template**: Search for a pull request template in the repository.
     - Check `.github/pull_request_template.md`
     - Check `.github/PULL_REQUEST_TEMPLATE.md`
     - If multiple templates exist (e.g., in `.github/PULL_REQUEST_TEMPLATE/`),
       ask the user which one to use or select the most appropriate one based on
       the context (e.g., `bug_fix.md` vs `feature.md`).
 
-3.  **Read Template**: Read the content of the identified template file.
+4.  **Read Template**: Read the content of the identified template file.
 
-4.  **Draft Description**: Create a PR description that strictly follows the
+5.  **Draft Description**: Create a PR description that strictly follows the
     template's structure.
     - **Headings**: Keep all headings from the template.
     - **Checklists**: Review each item. Mark with `[x]` if completed. If an item
@@ -44,14 +53,24 @@ Follow these steps to create a Pull Request:
     - **Related Issues**: Link any issues fixed or related to this PR (e.g.,
       "Fixes #123").
 
-5.  **Preflight Check**: Before creating the PR, run the workspace preflight
+6.  **Preflight Check**: Before creating the PR, run the workspace preflight
     script to ensure all build, lint, and test checks pass.
     ```bash
     npm run preflight
     ```
     If any checks fail, address the issues before proceeding to create the PR.
 
-6.  **Create PR**: Use the `gh` CLI to create the PR. To avoid shell escaping
+7.  **Push Branch**: Push the current branch to the remote repository.
+    **CRITICAL SAFETY RAIL:** Double-check your branch name before pushing.
+    NEVER push if the current branch is `main`.
+    ```bash
+    # Verify current branch is NOT main
+    git branch --show-current
+    # Push non-interactively
+    git push -u origin HEAD
+    ```
+
+8.  **Create PR**: Use the `gh` CLI to create the PR. To avoid shell escaping
     issues with multi-line Markdown, write the description to a temporary file
     first.
     ```bash
@@ -68,6 +87,7 @@ Follow these steps to create a Pull Request:
 
 ## Principles
 
+- **Safety First**: NEVER push to `main`. This is your highest priority.
 - **Compliance**: Never ignore the PR template. It exists for a reason.
 - **Completeness**: Fill out all relevant sections.
 - **Accuracy**: Don't check boxes for tasks you haven't done.

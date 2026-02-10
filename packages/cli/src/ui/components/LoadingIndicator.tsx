@@ -15,25 +15,36 @@ import { formatDuration } from '../utils/formatters.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 import { INTERACTIVE_SHELL_WAITING_PHRASE } from '../hooks/usePhraseCycler.js';
+import { shouldUseEmoji } from '../utils/terminalUtils.js';
 
 interface LoadingIndicatorProps {
   currentLoadingPhrase?: string;
   elapsedTime: number;
+  inline?: boolean;
   rightContent?: React.ReactNode;
   thought?: ThoughtSummary | null;
+  thoughtLabel?: string;
+  showCancelAndTimer?: boolean;
 }
 
 export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   currentLoadingPhrase,
   elapsedTime,
+  inline = false,
   rightContent,
   thought,
+  thoughtLabel,
+  showCancelAndTimer = true,
 }) => {
   const streamingState = useStreamingContext();
   const { columns: terminalWidth } = useTerminalSize();
   const isNarrow = isNarrowWidth(terminalWidth);
 
-  if (streamingState === StreamingState.Idle) {
+  if (
+    streamingState === StreamingState.Idle &&
+    !currentLoadingPhrase &&
+    !thought
+  ) {
     return null;
   }
 
@@ -42,12 +53,49 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   const primaryText =
     currentLoadingPhrase === INTERACTIVE_SHELL_WAITING_PHRASE
       ? currentLoadingPhrase
-      : thought?.subject || currentLoadingPhrase;
+      : thought?.subject
+        ? (thoughtLabel ?? thought.subject)
+        : currentLoadingPhrase;
+  const hasThoughtIndicator =
+    currentLoadingPhrase !== INTERACTIVE_SHELL_WAITING_PHRASE &&
+    Boolean(thought?.subject?.trim());
+  const thinkingIndicator = hasThoughtIndicator
+    ? `${shouldUseEmoji() ? '💬' : 'o'} `
+    : '';
 
   const cancelAndTimerContent =
+    showCancelAndTimer &&
     streamingState !== StreamingState.WaitingForConfirmation
       ? `(esc to cancel, ${elapsedTime < 60 ? `${elapsedTime}s` : formatDuration(elapsedTime * 1000)})`
       : null;
+
+  if (inline) {
+    return (
+      <Box>
+        <Box marginRight={1}>
+          <GeminiRespondingSpinner
+            nonRespondingDisplay={
+              streamingState === StreamingState.WaitingForConfirmation
+                ? '⠏'
+                : ''
+            }
+          />
+        </Box>
+        {primaryText && (
+          <Text color={theme.text.primary} italic wrap="truncate-end">
+            {thinkingIndicator}
+            {primaryText}
+          </Text>
+        )}
+        {cancelAndTimerContent && (
+          <>
+            <Box flexShrink={0} width={1} />
+            <Text color={theme.text.secondary}>{cancelAndTimerContent}</Text>
+          </>
+        )}
+      </Box>
+    );
+  }
 
   return (
     <Box paddingLeft={0} flexDirection="column">
@@ -68,7 +116,8 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
             />
           </Box>
           {primaryText && (
-            <Text color={theme.text.accent} wrap="truncate-end">
+            <Text color={theme.text.primary} italic wrap="truncate-end">
+              {thinkingIndicator}
               {primaryText}
             </Text>
           )}

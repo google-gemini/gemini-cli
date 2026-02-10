@@ -285,7 +285,6 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
     initialText: initialAnswer,
     viewport: { width: Math.max(1, bufferWidth), height: 1 },
     singleLine: true,
-    isValidPath: () => false,
   });
 
   const { text: textValue } = buffer;
@@ -362,7 +361,7 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
       </Box>
 
       <Box flexDirection="row" marginBottom={1}>
-        <Text color={theme.text.accent}>{'> '}</Text>
+        <Text color={theme.status.success}>{'> '}</Text>
         <TextInput
           buffer={buffer}
           placeholder={placeholder}
@@ -564,7 +563,6 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     initialText: initialCustomText,
     viewport: { width: Math.max(1, bufferWidth), height: 1 },
     singleLine: true,
-    isValidPath: () => false,
   });
 
   const customOptionText = customBuffer.text;
@@ -840,7 +838,9 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
               <Box flexDirection="row">
                 {showCheck && (
                   <Text
-                    color={isChecked ? theme.text.accent : theme.text.secondary}
+                    color={
+                      isChecked ? theme.status.success : theme.text.secondary
+                    }
                   >
                     [{isChecked ? 'x' : ' '}]
                   </Text>
@@ -872,7 +872,9 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
               <Box flexDirection="row">
                 {showCheck && (
                   <Text
-                    color={isChecked ? theme.text.accent : theme.text.secondary}
+                    color={
+                      isChecked ? theme.status.success : theme.text.secondary
+                    }
                   >
                     [{isChecked ? 'x' : ' '}]
                   </Text>

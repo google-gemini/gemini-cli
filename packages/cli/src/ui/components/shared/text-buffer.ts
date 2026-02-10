@@ -34,8 +34,8 @@ import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
 import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../../constants.js';
 
-const LARGE_PASTE_LINE_THRESHOLD = 5;
-const LARGE_PASTE_CHAR_THRESHOLD = 500;
+export const LARGE_PASTE_LINE_THRESHOLD = 5;
+export const LARGE_PASTE_CHAR_THRESHOLD = 500;
 
 // Regex to match paste placeholders like [Pasted Text: 6 lines] or [Pasted Text: 501 chars #2]
 export const PASTED_TEXT_PLACEHOLDER_REGEX =
@@ -757,7 +757,7 @@ interface UseTextBufferProps {
   stdin?: NodeJS.ReadStream | null; // For external editor
   setRawMode?: (mode: boolean) => void; // For external editor
   onChange?: (text: string) => void; // Callback for when text changes
-  isValidPath: (path: string) => boolean;
+  escapePastedPaths?: boolean;
   shellModeActive?: boolean; // Whether the text buffer is in shell mode
   inputFilter?: (text: string) => string; // Optional filter for input text
   singleLine?: boolean;
@@ -986,11 +986,15 @@ export function getTransformUnderCursor(
   row: number,
   col: number,
   spansByLine: Transformation[][],
+  options: { includeEdge?: boolean } = {},
 ): Transformation | null {
   const spans = spansByLine[row];
   if (!spans || spans.length === 0) return null;
   for (const span of spans) {
-    if (col >= span.logStart && col < span.logEnd) {
+    if (
+      col >= span.logStart &&
+      (options.includeEdge ? col <= span.logEnd : col < span.logEnd)
+    ) {
       return span;
     }
     if (col < span.logStart) break;
@@ -2678,7 +2682,7 @@ export function useTextBuffer({
   stdin,
   setRawMode,
   onChange,
-  isValidPath,
+  escapePastedPaths = false,
   shellModeActive = false,
   inputFilter,
   singleLine = false,
@@ -2795,7 +2799,8 @@ export function useTextBuffer({
       if (
         ch.length >= minLengthToInferAsDragDrop &&
         !shellModeActive &&
-        paste
+        paste &&
+        escapePastedPaths
       ) {
         let potentialPath = ch.trim();
         const quoteMatch = potentialPath.match(/^'(.*)'$/);
@@ -2805,7 +2810,7 @@ export function useTextBuffer({
 
         potentialPath = potentialPath.trim();
 
-        const processed = parsePastedPaths(potentialPath, isValidPath);
+        const processed = parsePastedPaths(potentialPath);
         if (processed) {
           textToInsert = processed;
         }
@@ -2827,7 +2832,7 @@ export function useTextBuffer({
         dispatch({ type: 'insert', payload: currentText, isPaste: paste });
       }
     },
-    [isValidPath, shellModeActive],
+    [shellModeActive, escapePastedPaths],
   );
 
   const newline = useCallback((): void => {
@@ -3087,6 +3092,7 @@ export function useTextBuffer({
       setRawMode?.(false);
       const { status, error } = spawnSync(command, args, {
         stdio: 'inherit',
+        shell: process.platform === 'win32',
       });
       if (error) throw error;
       if (typeof status === 'number' && status !== 0)
