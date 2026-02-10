@@ -76,9 +76,7 @@ describe('useLoadingIndicator', () => {
     vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
     const { result } = renderLoadingIndicatorHook(StreamingState.Idle);
     expect(result.current.elapsedTime).toBe(0);
-    expect(WITTY_LOADING_PHRASES).toContain(
-      result.current.currentLoadingPhrase,
-    );
+    expect(result.current.currentLoadingPhrase).toBeUndefined();
   });
 
   it('should show interactive shell waiting phrase when shouldShowFocusHint is true', async () => {
@@ -198,9 +196,7 @@ describe('useLoadingIndicator', () => {
     });
 
     expect(result.current.elapsedTime).toBe(0);
-    expect(WITTY_LOADING_PHRASES).toContain(
-      result.current.currentLoadingPhrase,
-    );
+    expect(result.current.currentLoadingPhrase).toBeUndefined();
 
     // Timer should not advance
     await act(async () => {

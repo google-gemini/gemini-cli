@@ -107,7 +107,7 @@ Set the theme to "Light".
 Set the theme to "Dark".
 </extension_context>
 
-What theme should I use?`,
+What theme should I use? Tell me just the name of the theme.`,
     assert: async (_rig, result) => {
       assertModelHasOutput(result);
       expect(result).toMatch(/Dark/i);

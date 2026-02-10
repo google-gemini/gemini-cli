@@ -121,7 +121,7 @@ export interface UIState {
   showEscapePrompt: boolean;
   shortcutsHelpVisible: boolean;
   elapsedTime: number;
-  currentLoadingPhrase: string;
+  currentLoadingPhrase: string | undefined;
   historyRemountKey: number;
   activeHooks: ActiveHook[];
   messageQueue: string[];

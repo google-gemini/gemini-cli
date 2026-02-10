@@ -28,7 +28,7 @@ export const UserShellMessage: React.FC<UserShellMessageProps> = ({
 
   return (
     <HalfLinePaddedBox
-      backgroundBaseColor={theme.border.default}
+      backgroundBaseColor={theme.text.secondary}
       backgroundOpacity={DEFAULT_BACKGROUND_OPACITY}
       useBackgroundColor={useBackgroundColor}
     >
