@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -75,7 +75,12 @@ describe('DialogManager', () => {
     terminalWidth: 80,
     confirmUpdateExtensionRequests: [],
     showIdeRestartPrompt: false,
-    proQuotaRequest: null,
+    quota: {
+      userTier: undefined,
+      stats: undefined,
+      proQuotaRequest: null,
+      validationRequest: null,
+    },
     shouldShowIdePrompt: false,
     isFolderTrustDialogOpen: false,
     loopDetectionConfirmationRequest: null,
@@ -99,8 +104,7 @@ describe('DialogManager', () => {
   it('renders nothing by default', () => {
     const { lastFrame } = renderWithProviders(
       <DialogManager {...defaultProps} />,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      { uiState: baseUiState as any },
+      { uiState: baseUiState as Partial<UIState> as UIState },
     );
     expect(lastFrame()).toBe('');
   });
@@ -115,12 +119,17 @@ describe('DialogManager', () => {
     ],
     [
       {
-        proQuotaRequest: {
-          failedModel: 'a',
-          fallbackModel: 'b',
-          message: 'c',
-          isTerminalQuotaError: false,
-          resolve: vi.fn(),
+        quota: {
+          userTier: undefined,
+          stats: undefined,
+          proQuotaRequest: {
+            failedModel: 'a',
+            fallbackModel: 'b',
+            message: 'c',
+            isTerminalQuotaError: false,
+            resolve: vi.fn(),
+          },
+          validationRequest: null,
         },
       },
       'ProQuotaDialog',
@@ -185,8 +194,10 @@ describe('DialogManager', () => {
       const { lastFrame } = renderWithProviders(
         <DialogManager {...defaultProps} />,
         {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          uiState: { ...baseUiState, ...uiStateOverride } as any,
+          uiState: {
+            ...baseUiState,
+            ...uiStateOverride,
+          } as Partial<UIState> as UIState,
         },
       );
       expect(lastFrame()).toContain(expectedComponent);

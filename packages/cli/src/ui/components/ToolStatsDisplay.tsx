@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -64,7 +64,7 @@ export const ToolStatsDisplay: React.FC = () => {
       <Box
         borderStyle="round"
         borderColor={theme.border.default}
-        paddingY={1}
+        paddingTop={1}
         paddingX={2}
       >
         <Text color={theme.text.primary}>
@@ -98,7 +98,7 @@ export const ToolStatsDisplay: React.FC = () => {
       borderStyle="round"
       borderColor={theme.border.default}
       flexDirection="column"
-      paddingY={1}
+      paddingTop={1}
       paddingX={2}
       width={70}
     >

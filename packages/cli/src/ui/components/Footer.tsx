@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,6 +17,7 @@ import process from 'node:process';
 import { ThemedGradient } from './ThemedGradient.js';
 import { MemoryUsageDisplay } from './MemoryUsageDisplay.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
+import { QuotaDisplay } from './QuotaDisplay.js';
 import { DebugProfiler } from './DebugProfiler.js';
 import { isDevelopment } from '../../utils/installationInfo.js';
 import { useUIState } from '../contexts/UIStateContext.js';
@@ -43,6 +44,7 @@ export const Footer: React.FC = () => {
     nightly,
     isTrustedFolder,
     terminalWidth,
+    quotaStats,
   } = {
     model: uiState.currentModel,
     targetDir: config.getTargetDir(),
@@ -56,6 +58,7 @@ export const Footer: React.FC = () => {
     nightly: uiState.nightly,
     isTrustedFolder: uiState.isTrustedFolder,
     terminalWidth: uiState.terminalWidth,
+    quotaStats: uiState.quota.stats,
   };
 
   const showMemoryUsage =
@@ -156,6 +159,17 @@ export const Footer: React.FC = () => {
                     promptTokenCount={promptTokenCount}
                     model={model}
                     terminalWidth={terminalWidth}
+                  />
+                </>
+              )}
+              {quotaStats && (
+                <>
+                  {' '}
+                  <QuotaDisplay
+                    remaining={quotaStats.remaining}
+                    limit={quotaStats.limit}
+                    resetTime={quotaStats.resetTime}
+                    terse={true}
                   />
                 </>
               )}
