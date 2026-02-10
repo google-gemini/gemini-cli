@@ -519,14 +519,11 @@ export class PolicyEngine {
   getExcludedTools(): Set<string> {
     const excludedTools = new Set<string>();
     const processedTools = new Set<string>();
+    let globalVerdict: PolicyDecision | undefined;
 
     for (const rule of this.rules) {
-      // We only care about global rules for exclusions
+      // We only care about rules without args pattern for exclusion from the model
       if (rule.argsPattern) {
-        continue;
-      }
-
-      if (!rule.toolName) {
         continue;
       }
 
@@ -537,19 +534,62 @@ export class PolicyEngine {
         }
       }
 
-      // If we've already processed this tool (found a higher priority rule), skip
-      if (processedTools.has(rule.toolName)) {
+      // Handle Global Rules
+      if (!rule.toolName) {
+        if (globalVerdict === undefined) {
+          globalVerdict = rule.decision;
+          if (globalVerdict !== PolicyDecision.DENY) {
+            // Global ALLOW/ASK found.
+            // Since rules are sorted by priority, this overrides any lower-priority rules.
+            // We can stop processing because nothing else will be excluded.
+            break;
+          }
+          // If Global DENY, we continue to find specific tools to add to excluded set
+        }
         continue;
       }
 
-      processedTools.add(rule.toolName);
+      const toolName = rule.toolName;
 
-      const effectiveDecision = this.applyNonInteractiveMode(rule.decision);
-      if (effectiveDecision === PolicyDecision.DENY) {
-        excludedTools.add(rule.toolName);
+      // Check if already processed (exact match)
+      if (processedTools.has(toolName)) {
+        continue;
+      }
+
+      // Check if covered by a processed wildcard
+      let coveredByWildcard = false;
+      for (const processed of processedTools) {
+        if (
+          processed.endsWith('__*') &&
+          toolName.startsWith(processed.slice(0, -3))
+        ) {
+          // It's covered by a higher-priority wildcard rule.
+          // If that wildcard rule resulted in exclusion, this tool should also be excluded.
+          if (excludedTools.has(processed)) {
+            excludedTools.add(toolName);
+          }
+          coveredByWildcard = true;
+          break;
+        }
+      }
+      if (coveredByWildcard) {
+        continue;
+      }
+
+      processedTools.add(toolName);
+
+      // Determine decision
+      let decision: PolicyDecision;
+      if (globalVerdict !== undefined) {
+        decision = globalVerdict;
+      } else {
+        decision = rule.decision;
+      }
+
+      if (decision === PolicyDecision.DENY) {
+        excludedTools.add(toolName);
       }
     }
-
     return excludedTools;
   }
 

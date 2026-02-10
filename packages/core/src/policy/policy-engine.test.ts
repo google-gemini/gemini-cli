@@ -2069,7 +2069,7 @@ describe('PolicyEngine', () => {
       expect(excluded.has('tool1')).toBe(false);
     });
 
-    it('should include ASK_USER tools in non-interactive mode', () => {
+    it('should NOT include ASK_USER tools in non-interactive mode', () => {
       const rules: PolicyRule[] = [
         { toolName: 'tool1', decision: PolicyDecision.ASK_USER },
       ];
@@ -2081,7 +2081,7 @@ describe('PolicyEngine', () => {
       // Non-interactive mode
       engine = new PolicyEngine({ rules, nonInteractive: true });
       excluded = engine.getExcludedTools();
-      expect(excluded.has('tool1')).toBe(true);
+      expect(excluded.has('tool1')).toBe(false);
     });
 
     it('should ignore rules with argsPattern', () => {
@@ -2126,6 +2126,31 @@ describe('PolicyEngine', () => {
       engine.setApprovalMode(ApprovalMode.DEFAULT);
       excluded = engine.getExcludedTools();
       expect(excluded.has('tool1')).toBe(false);
+    });
+
+    it('should respect wildcard ALLOW rules (e.g. YOLO mode)', () => {
+      const rules: PolicyRule[] = [
+        {
+          // Wildcard ALLOW (YOLO) - High Priority
+          decision: PolicyDecision.ALLOW,
+          priority: 999,
+          modes: [ApprovalMode.YOLO],
+        },
+        {
+          // Specific DENY - Low Priority
+          toolName: 'dangerous-tool',
+          decision: PolicyDecision.DENY,
+          priority: 10,
+        },
+      ];
+
+      // In DEFAULT mode, wildcard shouldn't apply, so tool is excluded
+      engine = new PolicyEngine({ rules, approvalMode: ApprovalMode.DEFAULT });
+      expect(engine.getExcludedTools().has('dangerous-tool')).toBe(true);
+
+      // In YOLO mode, wildcard SHOULD apply and override the specific deny
+      engine = new PolicyEngine({ rules, approvalMode: ApprovalMode.YOLO });
+      expect(engine.getExcludedTools().has('dangerous-tool')).toBe(false);
     });
   });
 
