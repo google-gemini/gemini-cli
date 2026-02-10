@@ -57,7 +57,11 @@ export class ActivityLogger extends EventEmitter {
   private requestStartTimes = new Map<string, number>();
   private networkLoggingEnabled = false;
 
-  private networkBuffer: Array<NetworkLog | PartialNetworkLog> = [];
+  private networkBufferMap = new Map<
+    string,
+    Array<NetworkLog | PartialNetworkLog>
+  >();
+  private networkBufferIds: string[] = [];
   private consoleBuffer: Array<ConsoleLogPayload & { timestamp: number }> = [];
   private readonly bufferLimit = 10;
 
@@ -85,13 +89,21 @@ export class ActivityLogger extends EventEmitter {
     network: Array<NetworkLog | PartialNetworkLog>;
     console: Array<ConsoleLogPayload & { timestamp: number }>;
   } {
-    const logs = {
-      network: [...this.networkBuffer],
+    const network: Array<NetworkLog | PartialNetworkLog> = [];
+    for (const id of this.networkBufferIds) {
+      const events = this.networkBufferMap.get(id);
+      if (events) network.push(...events);
+    }
+    return {
+      network,
       console: [...this.consoleBuffer],
     };
-    this.networkBuffer = [];
+  }
+
+  clearBufferedLogs(): void {
+    this.networkBufferMap.clear();
+    this.networkBufferIds = [];
     this.consoleBuffer = [];
-    return logs;
   }
 
   private stringifyHeaders(headers: unknown): Record<string, string> {
@@ -150,10 +162,19 @@ export class ActivityLogger extends EventEmitter {
 
   private safeEmitNetwork(payload: NetworkLog | PartialNetworkLog) {
     const sanitized = this.sanitizeNetworkLog(payload);
-    this.networkBuffer.push(sanitized);
-    if (this.networkBuffer.length > this.bufferLimit) {
-      this.networkBuffer.shift();
+    const id = sanitized.id;
+
+    if (!this.networkBufferMap.has(id)) {
+      this.networkBufferIds.push(id);
+      this.networkBufferMap.set(id, []);
+      // Evict oldest request group if over limit
+      if (this.networkBufferIds.length > this.bufferLimit) {
+        const evictId = this.networkBufferIds.shift()!;
+        this.networkBufferMap.delete(evictId);
+      }
     }
+    this.networkBufferMap.get(id)!.push(sanitized);
+
     this.emit('network', sanitized);
   }
 
@@ -688,6 +709,8 @@ function setupNetworkLogging(
       });
     }
 
+    capture.clearBufferedLogs();
+
     while (transportBuffer.length > 0) {
       const message = transportBuffer.shift()!;
       sendMessage(message);
@@ -768,7 +791,8 @@ export function initActivityLogger(
         port: number;
         onReconnectFailed?: () => void;
       }
-    | { mode: 'file'; filePath?: string },
+    | { mode: 'file'; filePath?: string }
+    | { mode: 'buffer' },
 ): void {
   const capture = ActivityLogger.getInstance();
   capture.enable();
@@ -782,9 +806,10 @@ export function initActivityLogger(
       options.onReconnectFailed,
     );
     capture.enableNetworkLogging();
-  } else {
+  } else if (options.mode === 'file') {
     setupFileLogging(capture, config, options.filePath);
   }
+  // buffer mode: no transport, just intercept + bridge
 
   bridgeCoreEvents(capture);
 }

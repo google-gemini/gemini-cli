@@ -125,14 +125,7 @@ export function setupInitialActivityLogger(config: Config) {
     initActivityLogger(config, { mode: 'file', filePath: target });
   } else {
     // Start in buffering mode (no transport attached yet)
-    initActivityLogger(config, {
-      mode: 'network',
-      host: '',
-      port: 0,
-    });
-    // Explicitly disable network logging so it buffers until promoted
-    const capture = ActivityLogger.getInstance();
-    capture.disableNetworkLogging();
+    initActivityLogger(config, { mode: 'buffer' });
   }
 }
 
