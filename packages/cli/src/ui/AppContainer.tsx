@@ -1464,17 +1464,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       if (result.userSelection === 'yes') {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleSlashCommand('/ide install');
-        settings.setValue(
-          SettingScope.User,
-          'hasSeenIdeIntegrationNudge',
-          true,
-        );
+        settings.setValue(SettingScope.User, 'ide.hasSeenNudge', true);
       } else if (result.userSelection === 'dismiss') {
-        settings.setValue(
-          SettingScope.User,
-          'hasSeenIdeIntegrationNudge',
-          true,
-        );
+        settings.setValue(SettingScope.User, 'ide.hasSeenNudge', true);
       }
       setIdePromptAnswered(true);
     },
@@ -1526,7 +1518,34 @@ Logging in with Google... Restarting Gemini CLI to continue.
       }
 
       if (keyMatchers[Command.SHOW_ERROR_DETAILS](key)) {
-        setShowErrorDetails((prev) => !prev);
+        if (settings.merged.general.devtools) {
+          void (async () => {
+            try {
+              const { startDevToolsServer } = await import(
+                '../utils/devtoolsService.js'
+              );
+              const { openBrowserSecurely, shouldLaunchBrowser } = await import(
+                '@google/gemini-cli-core'
+              );
+              const url = await startDevToolsServer(config);
+              if (shouldLaunchBrowser()) {
+                try {
+                  await openBrowserSecurely(url);
+                } catch (e) {
+                  setShowErrorDetails((prev) => !prev);
+                  debugLogger.warn('Failed to open browser securely:', e);
+                }
+              } else {
+                setShowErrorDetails((prev) => !prev);
+              }
+            } catch (e) {
+              setShowErrorDetails(true);
+              debugLogger.error('Failed to start DevTools server:', e);
+            }
+          })();
+        } else {
+          setShowErrorDetails((prev) => !prev);
+        }
         return true;
       } else if (keyMatchers[Command.SUSPEND_APP](key)) {
         const undoMessage = isITerm2()
@@ -1659,6 +1678,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       lastOutputTimeRef,
       tabFocusTimeoutRef,
       showTransientMessage,
+      settings.merged.general.devtools,
     ],
   );
 

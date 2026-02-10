@@ -519,10 +519,10 @@ export async function main() {
     adminControlsListner.setConfig(config);
 
     if (config.isInteractive() && settings.merged.general.devtools) {
-      const { registerActivityLogger } = await import(
+      const { setupInitialActivityLogger } = await import(
         './utils/devtoolsService.js'
       );
-      await registerActivityLogger(config);
+      await setupInitialActivityLogger(config);
     }
 
     // Register config for telemetry shutdown
@@ -603,12 +603,13 @@ export async function main() {
       }
 
       // This cleanup isn't strictly needed but may help in certain situations.
-      process.on('SIGTERM', () => {
+      const restoreRawMode = () => {
         process.stdin.setRawMode(wasRaw);
-      });
-      process.on('SIGINT', () => {
-        process.stdin.setRawMode(wasRaw);
-      });
+      };
+      process.off('SIGTERM', restoreRawMode);
+      process.on('SIGTERM', restoreRawMode);
+      process.off('SIGINT', restoreRawMode);
+      process.on('SIGINT', restoreRawMode);
     }
 
     await setupTerminalAndTheme(config, settings);
