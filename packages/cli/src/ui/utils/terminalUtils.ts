@@ -43,3 +43,25 @@ export function isITerm2(): boolean {
 export function resetITerm2Cache(): void {
   cachedIsITerm2 = undefined;
 }
+
+/**
+ * Returns true if the terminal likely supports emoji.
+ */
+export function shouldUseEmoji(): boolean {
+  const locale = (
+    process.env['LC_ALL'] ||
+    process.env['LC_CTYPE'] ||
+    process.env['LANG'] ||
+    ''
+  ).toLowerCase();
+  const supportsUtf8 = locale.includes('utf-8') || locale.includes('utf8');
+  if (!supportsUtf8) {
+    return false;
+  }
+
+  if (process.env['TERM'] === 'linux') {
+    return false;
+  }
+
+  return true;
+}
