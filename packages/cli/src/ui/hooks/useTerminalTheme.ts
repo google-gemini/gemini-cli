@@ -72,6 +72,7 @@ export function useTerminalTheme(
         DefaultLight.name,
         settings.merged.ui.preferredDarkTheme,
         settings.merged.ui.preferredLightTheme,
+        themeManager.getAvailableThemes().map((t) => t.name),
       );
 
       if (newTheme) {

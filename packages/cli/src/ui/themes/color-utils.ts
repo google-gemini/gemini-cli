@@ -324,6 +324,7 @@ export const DARK_THEME_LUMINANCE_THRESHOLD = 110;
  * @param defaultLightThemeName The name of the default light theme
  * @param preferredDarkThemeName The name of the user's preferred dark theme
  * @param preferredLightThemeName The name of the user's preferred light theme
+ * @param availableThemeNames An optional list of valid theme names for validation
  * @returns The name of the theme to switch to, or undefined if no switch is needed.
  */
 export function shouldSwitchTheme(
@@ -333,9 +334,19 @@ export function shouldSwitchTheme(
   defaultLightThemeName: string,
   preferredDarkThemeName?: string,
   preferredLightThemeName?: string,
+  availableThemeNames?: readonly string[],
 ): string | undefined {
-  const targetLightTheme = preferredLightThemeName || defaultLightThemeName;
-  const targetDarkTheme = preferredDarkThemeName || defaultThemeName;
+  const targetLightTheme =
+    preferredLightThemeName &&
+    availableThemeNames?.includes(preferredLightThemeName)
+      ? preferredLightThemeName
+      : defaultLightThemeName;
+
+  const targetDarkTheme =
+    preferredDarkThemeName &&
+    availableThemeNames?.includes(preferredDarkThemeName)
+      ? preferredDarkThemeName
+      : defaultThemeName;
 
   const isDarkActive =
     currentThemeName === defaultThemeName ||
