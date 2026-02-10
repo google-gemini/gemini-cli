@@ -5,9 +5,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig } from './test-helper.js';
+import { TestRig, normalizePath } from './test-helper.js';
 import { join } from 'node:path';
-import { writeFileSync } from 'node:fs';
 
 describe('Hooks Agent Flow', () => {
   let rig: TestRig;
@@ -283,7 +282,7 @@ describe('Hooks Agent Flow', () => {
                   hooks: [
                     {
                       type: 'command',
-                      command: `node "${baPath}"`,
+                      command: normalizePath(`node "${baPath}"`)!,
                       timeout: 5000,
                     },
                   ],
@@ -294,11 +293,13 @@ describe('Hooks Agent Flow', () => {
                   hooks: [
                     {
                       type: 'command',
-                      command: `node "${aaPath}"`,
+                      command: normalizePath(`node "${aaPath}"`)!,
                       timeout: 5000,
                     },
                   ],
                 },
+              ],
+            },
               ],
             },
           },
