@@ -850,7 +850,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             showSuggestions && activeSuggestionIndex > -1
               ? suggestions[activeSuggestionIndex].value
               : buffer.text;
-          inputHistory.handleSubmit(textToSubmit);
+          handleSubmit(textToSubmit);
           resetState();
           setActive(false);
           return true;
