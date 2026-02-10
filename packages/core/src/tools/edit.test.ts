@@ -446,7 +446,7 @@ describe('EditTool', () => {
       const invocation = tool.build(params);
       const result = await invocation.execute(new AbortController().signal);
 
-      expect(result.llmContent).toMatch(/Successfully modified file/);
+      expect(result.llmContent).toMatch(/SUCCESS: Modified/);
       expect(fs.readFileSync(filePath, 'utf8')).toBe(newContent);
       const display = result.returnDisplay as FileDiff;
       expect(display.fileDiff).toMatch(initialContent);
@@ -501,7 +501,7 @@ describe('EditTool', () => {
       const result = await invocation.execute(new AbortController().signal);
 
       expect(result.error).toBeUndefined();
-      expect(result.llmContent).toMatch(/Successfully modified file/);
+      expect(result.llmContent).toMatch(/SUCCESS: Modified/);
       expect(fs.readFileSync(filePath, 'utf8')).toBe(finalContent);
       expect(mockFixLLMEditWithInstruction).toHaveBeenCalledTimes(1);
     });
@@ -757,7 +757,7 @@ describe('EditTool', () => {
       expect(result.error).toBeUndefined();
       const finalContent = fs.readFileSync(filePath, 'utf8');
       expect(finalContent).toBe('match\nmatch\nreplacement\nreplacement');
-      expect(result.llmContent).toContain('(2 replacements)');
+      expect(result.llmContent).toContain('SUCCESS: Modified');
     });
 
     it('should return error if no match found after start_line', async () => {

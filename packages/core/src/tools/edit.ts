@@ -891,19 +891,61 @@ class EditToolInvocation
         };
       }
 
-      const llmSuccessMessageParts = [
-        editData.isNewFile
-          ? `Created new file: ${this.params.file_path} with provided content.`
-          : `Successfully modified file: ${this.params.file_path} (${editData.occurrences} replacements).`,
-      ];
-      if (this.params.modified_by_user) {
-        llmSuccessMessageParts.push(
-          `User modified the \`new_string\` content to be: ${this.params.new_string}.`,
+      let llmContent: string;
+      if (editData.isNewFile) {
+        llmContent = `Created new file: ${this.params.file_path} with provided content.`;
+      } else {
+        const diff = Diff.diffLines(
+          editData.currentContent ?? '',
+          editData.newContent,
         );
+        const newLines = editData.newContent.split('\n');
+
+        let currentLine = 0;
+        let firstChange = -1;
+        let lastChange = -1;
+
+        for (const part of diff) {
+          if (part.added || part.removed) {
+            if (firstChange === -1) firstChange = currentLine;
+            if (part.added) {
+              currentLine += part.count ?? 0;
+              lastChange = currentLine - 1;
+            } else {
+              lastChange = Math.max(lastChange, currentLine - 1);
+            }
+          } else {
+            currentLine += part.count ?? 0;
+          }
+        }
+
+        if (firstChange === -1) {
+          llmContent = `Successfully modified file: ${this.params.file_path} (${editData.occurrences} replacements).`;
+        } else {
+          if (lastChange < firstChange) lastChange = firstChange;
+
+          const start = Math.max(0, firstChange - 5);
+          const end = Math.min(newLines.length - 1, lastChange + 15);
+
+          const contextLines = newLines.slice(start, end + 1);
+          const contextText = contextLines.join('\n');
+
+          llmContent = `SUCCESS: Modified ${this.params.file_path}.
+Showing updated context (lines ${start + 1}-${end + 1}):
+
+${contextText}
+
+NOTE: Line numbers in the rest of the file may have shifted.
+Refer to the context above for updated positioning.`;
+        }
+      }
+
+      if (this.params.modified_by_user) {
+        llmContent += `\n\nUser modified the \`new_string\` content to be: ${this.params.new_string}.`;
       }
 
       return {
-        llmContent: llmSuccessMessageParts.join(' '),
+        llmContent,
         returnDisplay: displayResult,
       };
     } catch (error) {
