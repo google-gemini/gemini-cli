@@ -138,6 +138,21 @@ export function isPreviewModel(model: string): boolean {
 }
 
 /**
+ * Checks if the model is a Gemini 3 model.
+ *
+ * @param model The model name to check.
+ * @param previewFeaturesEnabled A boolean indicating if preview features are enabled.
+ * @returns True if the model is a Gemini 3 model.
+ */
+export function isGemini3Model(
+  model: string,
+  previewFeaturesEnabled: boolean = false,
+): boolean {
+  const resolved = resolveModel(model, previewFeaturesEnabled);
+  return /^gemini-3(\.|-|$)/.test(resolved);
+}
+
+/**
  * Checks if the model is a Gemini 2.x model.
  *
  * @param model The model name to check.

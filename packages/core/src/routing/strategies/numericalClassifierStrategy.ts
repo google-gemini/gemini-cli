@@ -12,7 +12,7 @@ import type {
   RoutingDecision,
   RoutingStrategy,
 } from '../routingStrategy.js';
-import { resolveClassifierModel } from '../../config/models.js';
+import { resolveClassifierModel, isGemini3Model } from '../../config/models.js';
 import { createUserContent, Type } from '@google/genai';
 import type { Config } from '../../config/config.js';
 import { debugLogger } from '../../utils/debugLogger.js';
@@ -134,7 +134,13 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
   ): Promise<RoutingDecision | null> {
     const startTime = Date.now();
     try {
+      const model = context.requestedModel ?? config.getModel();
+      const previewFeaturesEnabled = config.getPreviewFeatures();
       if (!(await config.getNumericalRoutingEnabled())) {
+        return null;
+      }
+
+      if (!isGemini3Model(model, previewFeaturesEnabled)) {
         return null;
       }
 
@@ -177,7 +183,7 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
         );
 
       const selectedModel = resolveClassifierModel(
-        config.getModel(),
+        model,
         modelAlias,
         config.getPreviewFeatures(),
       );
