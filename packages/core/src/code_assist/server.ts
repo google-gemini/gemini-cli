@@ -23,10 +23,20 @@ import type {
   StreamingLatency,
   RecordCodeAssistMetricsRequest,
 } from './types.js';
+import {
+  LongRunningOperationResponseSchema,
+  LoadCodeAssistResponseSchema,
+  FetchAdminControlsResponseSchema,
+  CodeAssistGlobalUserSettingResponseSchema,
+  RetrieveUserQuotaResponseSchema,
+  RecordCodeAssistMetricsResponseSchema,
+  UserTierId,
+} from './types.js';
 import type {
   ListExperimentsRequest,
   ListExperimentsResponse,
 } from './experiments/types.js';
+import { ListExperimentsResponseSchema } from './experiments/types.js';
 import type {
   CountTokensParameters,
   CountTokensResponse,
@@ -36,13 +46,15 @@ import type {
   GenerateContentResponse,
 } from '@google/genai';
 import * as readline from 'node:readline';
+import type { z } from 'zod';
 import type { ContentGenerator } from '../core/contentGenerator.js';
-import { UserTierId } from './types.js';
 import type {
   CaCountTokenResponse,
   CaGenerateContentResponse,
 } from './converter.js';
 import {
+  CaGenerateContentResponseSchema,
+  CaCountTokenResponseSchema,
   fromCountTokenResponse,
   fromGenerateContentResponse,
   toCountTokenRequest,
@@ -85,6 +97,7 @@ export class CodeAssistServer implements ContentGenerator {
           this.projectId,
           this.sessionId,
         ),
+        CaGenerateContentResponseSchema,
         req.config?.abortSignal,
       );
 
@@ -135,6 +148,7 @@ export class CodeAssistServer implements ContentGenerator {
         this.projectId,
         this.sessionId,
       ),
+      CaGenerateContentResponseSchema,
       req.config?.abortSignal,
     );
     const duration = formatProtoJsonDuration(Date.now() - start);
@@ -159,7 +173,11 @@ export class CodeAssistServer implements ContentGenerator {
   async onboardUser(
     req: OnboardUserRequest,
   ): Promise<LongRunningOperationResponse> {
-    return this.requestPost<LongRunningOperationResponse>('onboardUser', req);
+    return this.requestPost<LongRunningOperationResponse>(
+      'onboardUser',
+      req,
+      LongRunningOperationResponseSchema,
+    );
   }
 
   async getOperation(name: string): Promise<LongRunningOperationResponse> {
@@ -173,6 +191,7 @@ export class CodeAssistServer implements ContentGenerator {
       return await this.requestPost<LoadCodeAssistResponse>(
         'loadCodeAssist',
         req,
+        LoadCodeAssistResponseSchema,
       );
     } catch (e) {
       if (isVpcScAffectedUser(e)) {
@@ -191,6 +210,7 @@ export class CodeAssistServer implements ContentGenerator {
     return this.requestPost<FetchAdminControlsResponse>(
       'fetchAdminControls',
       req,
+      FetchAdminControlsResponseSchema,
     );
   }
 
@@ -206,6 +226,7 @@ export class CodeAssistServer implements ContentGenerator {
     return this.requestPost<CodeAssistGlobalUserSettingResponse>(
       'setCodeAssistGlobalUserSetting',
       req,
+      CodeAssistGlobalUserSettingResponseSchema,
     );
   }
 
@@ -213,6 +234,7 @@ export class CodeAssistServer implements ContentGenerator {
     const resp = await this.requestPost<CaCountTokenResponse>(
       'countTokens',
       toCountTokenRequest(req),
+      CaCountTokenResponseSchema,
     );
     return fromCountTokenResponse(resp);
   }
@@ -234,7 +256,11 @@ export class CodeAssistServer implements ContentGenerator {
       project: projectId,
       metadata: { ...metadata, duetProject: projectId },
     };
-    return this.requestPost<ListExperimentsResponse>('listExperiments', req);
+    return this.requestPost<ListExperimentsResponse>(
+      'listExperiments',
+      req,
+      ListExperimentsResponseSchema,
+    );
   }
 
   async retrieveUserQuota(
@@ -243,6 +269,7 @@ export class CodeAssistServer implements ContentGenerator {
     return this.requestPost<RetrieveUserQuotaResponse>(
       'retrieveUserQuota',
       req,
+      RetrieveUserQuotaResponseSchema,
     );
   }
 
@@ -282,12 +309,17 @@ export class CodeAssistServer implements ContentGenerator {
   async recordCodeAssistMetrics(
     request: RecordCodeAssistMetricsRequest,
   ): Promise<void> {
-    return this.requestPost<void>('recordCodeAssistMetrics', request);
+    return this.requestPost<void>(
+      'recordCodeAssistMetrics',
+      request,
+      RecordCodeAssistMetricsResponseSchema,
+    );
   }
 
   async requestPost<T>(
     method: string,
     req: object,
+    schema: z.ZodType<T>,
     signal?: AbortSignal,
   ): Promise<T> {
     const res = await this.client.request({
@@ -301,8 +333,7 @@ export class CodeAssistServer implements ContentGenerator {
       body: JSON.stringify(req),
       signal,
     });
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return res.data as T;
+    return schema.parse(res.data);
   }
 
   private async makeGetRequest<T>(
@@ -334,6 +365,7 @@ export class CodeAssistServer implements ContentGenerator {
   async requestStreamingPost<T>(
     method: string,
     req: object,
+    schema: z.ZodType<T>,
     signal?: AbortSignal,
   ): Promise<AsyncGenerator<T>> {
     const res = await this.client.request({
@@ -366,8 +398,7 @@ export class CodeAssistServer implements ContentGenerator {
           if (bufferedLines.length === 0) {
             continue; // no data to yield
           }
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          yield JSON.parse(bufferedLines.join('\n')) as T;
+          yield schema.parse(JSON.parse(bufferedLines.join('\n')));
           bufferedLines = []; // Reset the buffer after yielding
         }
         // Ignore other lines like comments or id fields

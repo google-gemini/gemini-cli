@@ -45,50 +45,43 @@ export interface LoadCodeAssistRequest {
 }
 
 /**
- * Represents LoadCodeAssistResponse proto json field
- * http://google3/google/internal/cloud/code/v1internal/cloudcode.proto;l=224
+ * UserTierId represents IDs returned from the Cloud Code Private API representing a user's tier
+ *
+ * This is a subset of all available tiers. Since the source list is frequently updated,
+ * only add a tierId here if specific client-side handling is required.
  */
-export interface LoadCodeAssistResponse {
-  currentTier?: GeminiUserTier | null;
-  allowedTiers?: GeminiUserTier[] | null;
-  ineligibleTiers?: IneligibleTier[] | null;
-  cloudaicompanionProject?: string | null;
-  paidTier?: GeminiUserTier | null;
-}
+export const UserTierId = {
+  FREE: 'free-tier',
+  LEGACY: 'legacy-tier',
+  STANDARD: 'standard-tier',
+} as const;
+
+export type UserTierId = (typeof UserTierId)[keyof typeof UserTierId] | string;
+
+/**
+ * PrivacyNotice reflects the structure received from the CodeAssist in regards to a tier
+ * privacy notice.
+ */
+export const PrivacyNoticeSchema = z.object({
+  showNotice: z.boolean(),
+  noticeText: z.string().optional(),
+});
+export type PrivacyNotice = z.infer<typeof PrivacyNoticeSchema>;
 
 /**
  * GeminiUserTier reflects the structure received from the CodeAssist when calling LoadCodeAssist.
  */
-export interface GeminiUserTier {
-  id: UserTierId;
-  name?: string;
-  description?: string;
-  // This value is used to declare whether a given tier requires the user to configure the project setting on the IDE settings or not.
-  userDefinedCloudaicompanionProject?: boolean | null;
-  isDefault?: boolean;
-  privacyNotice?: PrivacyNotice;
-  hasAcceptedTos?: boolean;
-  hasOnboardedPreviously?: boolean;
-}
-
-/**
- * Includes information specifying the reasons for a user's ineligibility for a specific tier.
- * @param reasonCode mnemonic code representing the reason for in-eligibility.
- * @param reasonMessage message to display to the user.
- * @param tierId id of the tier.
- * @param tierName name of the tier.
- */
-export interface IneligibleTier {
-  reasonCode: IneligibleTierReasonCode;
-  reasonMessage: string;
-  tierId: UserTierId;
-  tierName: string;
-  validationErrorMessage?: string;
-  validationUrl?: string;
-  validationUrlLinkText?: string;
-  validationLearnMoreUrl?: string;
-  validationLearnMoreLinkText?: string;
-}
+export const GeminiUserTierSchema = z.object({
+  id: z.string(),
+  name: z.string().optional(),
+  description: z.string().optional(),
+  userDefinedCloudaicompanionProject: z.boolean().nullable().optional(),
+  isDefault: z.boolean().optional(),
+  privacyNotice: PrivacyNoticeSchema.optional(),
+  hasAcceptedTos: z.boolean().optional(),
+  hasOnboardedPreviously: z.boolean().optional(),
+});
+export type GeminiUserTier = z.infer<typeof GeminiUserTierSchema>;
 
 /**
  * List of predefined reason codes when a tier is blocked from a specific tier.
@@ -107,29 +100,40 @@ export enum IneligibleTierReasonCode {
   VALIDATION_REQUIRED = 'VALIDATION_REQUIRED',
   // go/keep-sorted end
 }
-/**
- * UserTierId represents IDs returned from the Cloud Code Private API representing a user's tier
- *
- * http://google3/cloud/developer_experience/codeassist/shared/usertier/tiers.go
- * This is a subset of all available tiers. Since the source list is frequently updated,
- * only add a tierId here if specific client-side handling is required.
- */
-export const UserTierId = {
-  FREE: 'free-tier',
-  LEGACY: 'legacy-tier',
-  STANDARD: 'standard-tier',
-} as const;
-
-export type UserTierId = (typeof UserTierId)[keyof typeof UserTierId] | string;
 
 /**
- * PrivacyNotice reflects the structure received from the CodeAssist in regards to a tier
- * privacy notice.
+ * Includes information specifying the reasons for a user's ineligibility for a specific tier.
+ * @param reasonCode mnemonic code representing the reason for in-eligibility.
+ * @param reasonMessage message to display to the user.
+ * @param tierId id of the tier.
+ * @param tierName name of the tier.
  */
-export interface PrivacyNotice {
-  showNotice: boolean;
-  noticeText?: string;
-}
+export const IneligibleTierSchema = z.object({
+  reasonCode: z.nativeEnum(IneligibleTierReasonCode),
+  reasonMessage: z.string(),
+  tierId: z.string(),
+  tierName: z.string(),
+  validationErrorMessage: z.string().optional(),
+  validationUrl: z.string().optional(),
+  validationUrlLinkText: z.string().optional(),
+  validationLearnMoreUrl: z.string().optional(),
+  validationLearnMoreLinkText: z.string().optional(),
+});
+export type IneligibleTier = z.infer<typeof IneligibleTierSchema>;
+
+/**
+ * Represents LoadCodeAssistResponse proto json field
+ */
+export const LoadCodeAssistResponseSchema = z.object({
+  currentTier: GeminiUserTierSchema.nullable().optional(),
+  allowedTiers: z.array(GeminiUserTierSchema).nullable().optional(),
+  ineligibleTiers: z.array(IneligibleTierSchema).nullable().optional(),
+  cloudaicompanionProject: z.string().nullable().optional(),
+  paidTier: GeminiUserTierSchema.nullable().optional(),
+});
+export type LoadCodeAssistResponse = z.infer<
+  typeof LoadCodeAssistResponseSchema
+>;
 
 /**
  * Proto signature of OnboardUserRequest as payload to OnboardUser call
@@ -141,26 +145,31 @@ export interface OnboardUserRequest {
 }
 
 /**
- * Represents LongRunningOperation proto
- * http://google3/google/longrunning/operations.proto;rcl=698857719;l=107
- */
-export interface LongRunningOperationResponse {
-  name: string;
-  done?: boolean;
-  response?: OnboardUserResponse;
-}
-
-/**
  * Represents OnboardUserResponse proto
  * http://google3/google/internal/cloud/code/v1internal/cloudcode.proto;l=215
  */
-export interface OnboardUserResponse {
+export const OnboardUserResponseSchema = z.object({
   // tslint:disable-next-line:enforce-name-casing This is the name of the field in the proto.
-  cloudaicompanionProject?: {
-    id: string;
-    name: string;
-  };
-}
+  cloudaicompanionProject: z
+    .object({
+      id: z.string(),
+      name: z.string(),
+    })
+    .optional(),
+});
+export type OnboardUserResponse = z.infer<typeof OnboardUserResponseSchema>;
+
+/**
+ * Represents LongRunningOperation proto
+ */
+export const LongRunningOperationResponseSchema = z.object({
+  name: z.string(),
+  done: z.boolean().optional(),
+  response: OnboardUserResponseSchema.optional(),
+});
+export type LongRunningOperationResponse = z.infer<
+  typeof LongRunningOperationResponseSchema
+>;
 
 /**
  * Status code of user license status
@@ -193,10 +202,13 @@ export interface SetCodeAssistGlobalUserSettingRequest {
   freeTierDataCollectionOptin?: boolean;
 }
 
-export interface CodeAssistGlobalUserSettingResponse {
-  cloudaicompanionProject?: string;
-  freeTierDataCollectionOptin: boolean;
-}
+export const CodeAssistGlobalUserSettingResponseSchema = z.object({
+  cloudaicompanionProject: z.string().optional(),
+  freeTierDataCollectionOptin: z.boolean(),
+});
+export type CodeAssistGlobalUserSettingResponse = z.infer<
+  typeof CodeAssistGlobalUserSettingResponseSchema
+>;
 
 /**
  * Relevant fields that can be returned from a Google RPC response
@@ -219,17 +231,21 @@ export interface RetrieveUserQuotaRequest {
   userAgent?: string;
 }
 
-export interface BucketInfo {
-  remainingAmount?: string;
-  remainingFraction?: number;
-  resetTime?: string;
-  tokenType?: string;
-  modelId?: string;
-}
+export const BucketInfoSchema = z.object({
+  remainingAmount: z.string().optional(),
+  remainingFraction: z.number().optional(),
+  resetTime: z.string().optional(),
+  tokenType: z.string().optional(),
+  modelId: z.string().optional(),
+});
+export type BucketInfo = z.infer<typeof BucketInfoSchema>;
 
-export interface RetrieveUserQuotaResponse {
-  buckets?: BucketInfo[];
-}
+export const RetrieveUserQuotaResponseSchema = z.object({
+  buckets: z.array(BucketInfoSchema).optional(),
+});
+export type RetrieveUserQuotaResponse = z.infer<
+  typeof RetrieveUserQuotaResponseSchema
+>;
 
 export interface RecordCodeAssistMetricsRequest {
   project: string;
@@ -303,10 +319,6 @@ export interface FetchAdminControlsRequest {
   project: string;
 }
 
-export type FetchAdminControlsResponse = z.infer<
-  typeof FetchAdminControlsResponseSchema
->;
-
 const ExtensionsSettingSchema = z.object({
   extensionsEnabled: z.boolean().optional(),
 });
@@ -356,3 +368,9 @@ export const FetchAdminControlsResponseSchema = z.object({
   mcpSetting: McpSettingSchema.optional(),
   cliFeatureSetting: CliFeatureSettingSchema.optional(),
 });
+
+export type FetchAdminControlsResponse = z.infer<
+  typeof FetchAdminControlsResponseSchema
+>;
+
+export const RecordCodeAssistMetricsResponseSchema = z.any();

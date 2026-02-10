@@ -5,6 +5,7 @@
  */
 
 import { beforeEach, describe, it, expect, vi, afterEach } from 'vitest';
+import { z } from 'zod';
 import { CodeAssistServer } from './server.js';
 import { OAuth2Client } from 'google-auth-library';
 import { UserTierId, ActionStatus } from './types.js';
@@ -412,7 +413,7 @@ describe('CodeAssistServer', () => {
 
     mockRequest.mockResolvedValue({ data: mockStream });
 
-    const stream = await server.requestStreamingPost('testStream', {});
+    const stream = await server.requestStreamingPost('testStream', {}, z.any());
 
     setTimeout(() => {
       mockStream.push('this is a malformed line\n');
@@ -444,6 +445,7 @@ describe('CodeAssistServer', () => {
     expect(server.requestPost).toHaveBeenCalledWith(
       'onboardUser',
       expect.any(Object),
+      expect.anything(),
     );
     expect(response.name).toBe('operations/123');
   });
@@ -494,6 +496,7 @@ describe('CodeAssistServer', () => {
     expect(server.requestPost).toHaveBeenCalledWith(
       'loadCodeAssist',
       expect.any(Object),
+      expect.anything(),
     );
     expect(response).toEqual(mockResponse);
   });
@@ -546,6 +549,7 @@ describe('CodeAssistServer', () => {
     expect(server.requestPost).toHaveBeenCalledWith(
       'loadCodeAssist',
       expect.any(Object),
+      expect.anything(),
     );
     expect(response).toEqual({
       currentTier: { id: UserTierId.STANDARD },
@@ -564,6 +568,7 @@ describe('CodeAssistServer', () => {
     expect(server.requestPost).toHaveBeenCalledWith(
       'loadCodeAssist',
       expect.any(Object),
+      expect.anything(),
     );
   });
 
@@ -579,10 +584,14 @@ describe('CodeAssistServer', () => {
     };
     const response = await server.listExperiments(metadata);
 
-    expect(server.requestPost).toHaveBeenCalledWith('listExperiments', {
-      project: 'test-project',
-      metadata: { ideVersion: 'v0.1.0', duetProject: 'test-project' },
-    });
+    expect(server.requestPost).toHaveBeenCalledWith(
+      'listExperiments',
+      {
+        project: 'test-project',
+        metadata: { ideVersion: 'v0.1.0', duetProject: 'test-project' },
+      },
+      expect.anything(),
+    );
     expect(response).toEqual(mockResponse);
   });
 
@@ -609,7 +618,11 @@ describe('CodeAssistServer', () => {
 
     const response = await server.retrieveUserQuota(req);
 
-    expect(requestPostSpy).toHaveBeenCalledWith('retrieveUserQuota', req);
+    expect(requestPostSpy).toHaveBeenCalledWith(
+      'retrieveUserQuota',
+      req,
+      expect.anything(),
+    );
     expect(response).toEqual(mockResponse);
   });
 });

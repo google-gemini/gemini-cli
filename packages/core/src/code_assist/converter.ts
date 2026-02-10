@@ -14,10 +14,7 @@ import type {
   CountTokensResponse,
   GenerationConfigRoutingConfig,
   MediaResolution,
-  Candidate,
   ModelSelectionConfig,
-  GenerateContentResponsePromptFeedback,
-  GenerateContentResponseUsageMetadata,
   Part,
   SafetySetting,
   PartUnion,
@@ -27,6 +24,7 @@ import type {
   ToolConfig,
 } from '@google/genai';
 import { GenerateContentResponse } from '@google/genai';
+import { z } from 'zod';
 
 export interface CAGenerateContentRequest {
   model: string;
@@ -71,18 +69,22 @@ interface VertexGenerationConfig {
   thinkingConfig?: ThinkingConfig;
 }
 
-export interface CaGenerateContentResponse {
-  response: VertexGenerateContentResponse;
-  traceId?: string;
-}
+const AnySchema = z.any();
 
-interface VertexGenerateContentResponse {
-  candidates: Candidate[];
-  automaticFunctionCallingHistory?: Content[];
-  promptFeedback?: GenerateContentResponsePromptFeedback;
-  usageMetadata?: GenerateContentResponseUsageMetadata;
-  modelVersion?: string;
-}
+export const CaGenerateContentResponseSchema = z.object({
+  response: z.object({
+    candidates: z.array(AnySchema),
+    automaticFunctionCallingHistory: z.array(AnySchema).optional(),
+    promptFeedback: AnySchema.optional(),
+    usageMetadata: AnySchema.optional(),
+    modelVersion: z.string().optional(),
+  }),
+  traceId: z.string().optional(),
+});
+
+export type CaGenerateContentResponse = z.infer<
+  typeof CaGenerateContentResponseSchema
+>;
 
 export interface CaCountTokenRequest {
   request: VertexCountTokenRequest;
@@ -93,9 +95,11 @@ interface VertexCountTokenRequest {
   contents: Content[];
 }
 
-export interface CaCountTokenResponse {
-  totalTokens: number;
-}
+export const CaCountTokenResponseSchema = z.object({
+  totalTokens: z.number(),
+});
+
+export type CaCountTokenResponse = z.infer<typeof CaCountTokenResponseSchema>;
 
 export function toCountTokenRequest(
   req: CountTokensParameters,
