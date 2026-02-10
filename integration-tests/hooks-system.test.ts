@@ -1888,18 +1888,13 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
       expect(disabledHookLog).toBeUndefined();
     });
 
-    it('should respect disabled hooks across multiple operations', async () => {
-      rig.setup('should respect disabled hooks across multiple operations', {
-        fakeResponsesPath: join(
-          import.meta.dirname,
-          'hooks-system.disabled-via-command.responses',
-        ),
-      });
+    it.only('should respect disabled hooks across multiple operations', async () => {
+      // 1. First setup to get the test directory and prepare the hook scripts
+      rig.setup('should respect disabled hooks across multiple operations');
+      console.log(`[Test] testDir: ${rig.testDir}`);
 
-      // Create two hook scripts - one that will be disabled, one that won't
       const activeHookScript = `const fs = require('fs');
 console.log(JSON.stringify({decision: "allow", systemMessage: "Active hook executed"}));`;
-
       const disabledHookScript = `const fs = require('fs');
 console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook should not execute", reason: "This hook is disabled"}));`;
 
@@ -1909,11 +1904,14 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
       writeFileSync(activePath, activeHookScript);
       writeFileSync(disabledPath, disabledHookScript);
 
+      const normalizedDisabledCmd = normalizePath(`node "${disabledPath}"`);
+      console.log(`[Test] normalizedDisabledCmd: ${normalizedDisabledCmd}`);
+
       rig.setup('should respect disabled hooks across multiple operations', {
         settings: {
           hooksConfig: {
             enabled: true,
-            disabled: [normalizePath(`node "${disabledPath}"`)!], // Disable the second hook,
+            disabled: [normalizedDisabledCmd!], // Disable the second hook,
           },
           hooks: {
             BeforeTool: [
@@ -1926,7 +1924,7 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
                   },
                   {
                     type: 'command',
-                    command: normalizePath(`node "${disabledPath}"`),
+                    command: normalizedDisabledCmd!,
                     timeout: 5000,
                   },
                 ],

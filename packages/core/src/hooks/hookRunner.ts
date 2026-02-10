@@ -269,6 +269,12 @@ export class HookRunner {
         shellConfig.shell,
       );
 
+      if (process.env['CI'] === 'true' || process.env['VERBOSE'] === 'true') {
+        console.log(`[HookRunner] shellConfig: ${JSON.stringify(shellConfig)}`);
+        console.log(`[HookRunner] command: ${command}`);
+        console.log(`[HookRunner] cwd: ${input.cwd}`);
+      }
+
       // Set up environment variables
       const env = {
         ...sanitizeEnvironment(process.env, this.config.sanitizationConfig),
@@ -337,6 +343,12 @@ export class HookRunner {
       child.on('close', (exitCode) => {
         clearTimeout(timeoutHandle);
         const duration = Date.now() - startTime;
+
+        if (process.env['CI'] === 'true' || process.env['VERBOSE'] === 'true') {
+          console.log(`[HookRunner] Hook closed. exitCode: ${exitCode}, duration: ${duration}ms`);
+          console.log(`[HookRunner] stdout: ${stdout}`);
+          console.log(`[HookRunner] stderr: ${stderr}`);
+        }
 
         if (timedOut) {
           resolve({

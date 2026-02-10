@@ -1253,6 +1253,11 @@ export class TestRig {
     }[] = [];
 
     for (const logData of parsedLogs) {
+      if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+        if (logData.attributes?.['event.name']?.includes('tool')) {
+          console.log(`[TestRig] Found tool-related log: ${JSON.stringify(logData.attributes)}`);
+        }
+      }
       // Look for tool call logs
       if (
         logData.attributes &&
@@ -1410,6 +1415,11 @@ export class TestRig {
     }[] = [];
 
     for (const logData of parsedLogs) {
+      if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+        if (logData.attributes?.['event.name']?.includes('hook')) {
+          console.log(`[TestRig] Found hook-related log: ${JSON.stringify(logData.attributes)}`);
+        }
+      }
       // Look for tool call logs
       if (
         logData.attributes &&
