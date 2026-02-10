@@ -193,6 +193,14 @@ export default tseslint.config(
     },
   },
   {
+    // Rules that only apply to product code
+    files: ['packages/*/src/**/*.{ts,tsx}'],
+    ignores: ['**/*.test.ts', '**/*.test.tsx'],
+    rules: {
+      '@typescript-eslint/no-unsafe-type-assertion': 'error',
+    },
+  },
+  {
     // Allow os.homedir() in tests and paths.ts where it is used to implement the helper
     files: [
       '**/*.test.ts',

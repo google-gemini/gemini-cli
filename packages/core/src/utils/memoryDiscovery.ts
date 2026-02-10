@@ -54,6 +54,7 @@ async function findProjectRoot(startDir: string): Promise<string | null> {
         typeof error === 'object' &&
         error !== null &&
         'code' in error &&
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         (error as { code: string }).code === 'ENOENT';
 
       // Only log unexpected errors in non-test environments
@@ -63,6 +64,7 @@ async function findProjectRoot(startDir: string): Promise<string | null> {
 
       if (!isENOENT && !isTestEnv) {
         if (typeof error === 'object' && error !== null && 'code' in error) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           const fsError = error as { code: string; message: string };
           logger.warn(
             `Error checking for .git directory at ${gitPath}: ${fsError.message}`,
@@ -311,6 +313,7 @@ export function concatenateInstructions(
   return instructionContents
     .filter((item) => typeof item.content === 'string')
     .map((item) => {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const trimmedContent = (item.content as string).trim();
       if (trimmedContent.length === 0) {
         return null;
@@ -359,6 +362,7 @@ export async function loadGlobalMemory(
       .filter((item) => item.content !== null)
       .map((item) => ({
         path: item.filePath,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         content: item.content as string,
       })),
   };
@@ -456,6 +460,7 @@ export async function loadEnvironmentMemory(
       .filter((item) => item.content !== null)
       .map((item) => ({
         path: item.filePath,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         content: item.content as string,
       })),
   };
@@ -640,6 +645,7 @@ export async function loadJitSubdirectoryMemory(
       .filter((item) => item.content !== null)
       .map((item) => ({
         path: item.filePath,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         content: item.content as string,
       })),
   };

@@ -219,6 +219,7 @@ function ScrollableList<T>(
 
   const scrollableEntry = useMemo(
     () => ({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       ref: containerRef as React.RefObject<DOMElement>,
       getScrollState,
       scrollBy: scrollByWithAnimation,
@@ -254,6 +255,7 @@ function ScrollableList<T>(
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
 const ScrollableListWithForwardRef = forwardRef(ScrollableList) as <T>(
   props: ScrollableListProps<T> & { ref?: React.Ref<ScrollableListRef<T>> },
 ) => React.ReactElement;
