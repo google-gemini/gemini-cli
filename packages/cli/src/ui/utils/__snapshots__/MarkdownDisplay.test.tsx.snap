@@ -83,6 +83,8 @@ exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders tables correct
 "
 `;
 
+exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders text in secondary color using the <secondary> tag 1`] = `"Normal text dimmed text back to normal"`;
+
 exports[`<MarkdownDisplay /> > with 'Unix' line endings > renders unordered lists with different markers 1`] = `
 " - item A
  * item B
@@ -170,6 +172,8 @@ exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders tables corr
 └──────────┴──────────┘
 "
 `;
+
+exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders text in secondary color using the <secondary> tag 1`] = `"Normal text dimmed text back to normal"`;
 
 exports[`<MarkdownDisplay /> > with 'Windows' line endings > renders unordered lists with different markers 1`] = `
 " - item A

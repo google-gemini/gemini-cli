@@ -165,6 +165,15 @@ Paragraph 2.`.replace(/\n/g, eol);
       expect(lastFrame()).toMatchSnapshot();
     });
 
+    it('renders text in secondary color using the <secondary> tag', () => {
+      const text =
+        'Normal text <secondary>dimmed text</secondary> back to normal';
+      const { lastFrame } = renderWithProviders(
+        <MarkdownDisplay {...baseProps} text={text} />,
+      );
+      expect(lastFrame()).toMatchSnapshot();
+    });
+
     it('correctly parses a mix of markdown elements', () => {
       const text = `
 # Main Title
