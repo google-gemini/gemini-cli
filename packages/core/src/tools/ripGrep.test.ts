@@ -1682,18 +1682,41 @@ describe('RipGrepTool', () => {
         createMockSpawn({
           outputData:
             JSON.stringify({
+              type: 'context',
+              data: {
+                path: { text: 'fileA.txt' },
+                line_number: 1,
+                lines: { text: 'hello world\n' },
+              },
+            }) +
+            '\n' +
+            JSON.stringify({
               type: 'match',
               data: {
                 path: { text: 'fileA.txt' },
                 line_number: 2,
                 lines: { text: 'second line with world\n' },
-                lines_before: [{ text: 'hello world\n' }],
-                lines_after: [
-                  { text: 'third line\n' },
-                  { text: 'fourth line\n' },
-                ],
               },
-            }) + '\n',
+            }) +
+            '\n' +
+            JSON.stringify({
+              type: 'context',
+              data: {
+                path: { text: 'fileA.txt' },
+                line_number: 3,
+                lines: { text: 'third line\n' },
+              },
+            }) +
+            '\n' +
+            JSON.stringify({
+              type: 'context',
+              data: {
+                path: { text: 'fileA.txt' },
+                line_number: 4,
+                lines: { text: 'fourth line\n' },
+              },
+            }) +
+            '\n',
           exitCode: 0,
         }),
       );
@@ -1721,9 +1744,10 @@ describe('RipGrepTool', () => {
       );
       expect(result.llmContent).toContain('Found 1 match for pattern "world"');
       expect(result.llmContent).toContain('File: fileA.txt');
+      expect(result.llmContent).toContain('L1- hello world');
       expect(result.llmContent).toContain('L2: second line with world');
-      // Note: Ripgrep JSON output for context lines doesn't include line numbers for context lines directly
-      // The current parsing only extracts the matched line, so we only assert on that.
+      expect(result.llmContent).toContain('L3- third line');
+      expect(result.llmContent).toContain('L4- fourth line');
     });
   });
 
