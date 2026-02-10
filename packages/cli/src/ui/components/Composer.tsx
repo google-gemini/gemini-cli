@@ -34,6 +34,7 @@ import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
 import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 import { theme } from '../semantic-colors.js';
+import { TransientMessageType } from '../../utils/events.js';
 
 export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const config = useConfig();
@@ -85,7 +86,8 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const hasMinimalStatusBleedThrough =
     uiState.ctrlCPressedOnce ||
     uiState.ctrlDPressedOnce ||
-    Boolean(uiState.warningMessage) ||
+    (uiState.transientMessage?.type === TransientMessageType.Warning &&
+      Boolean(uiState.transientMessage.text)) ||
     Boolean(uiState.queueErrorMessage) ||
     (uiState.showEscapePrompt &&
       (uiState.buffer.text.length > 0 || uiState.history.length > 0));

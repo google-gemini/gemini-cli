@@ -206,6 +206,7 @@ const mockUIActions: UIActions = {
   setCleanUiDetailsVisible: vi.fn(),
   toggleCleanUiDetailsVisible: vi.fn(),
   revealCleanUiDetailsTemporarily: vi.fn(),
+  handleWarning: vi.fn(),
   setEmbeddedShellFocused: vi.fn(),
   dismissBackgroundShell: vi.fn(),
   setActiveBackgroundShellPid: vi.fn(),
