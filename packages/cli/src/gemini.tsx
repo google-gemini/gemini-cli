@@ -176,6 +176,52 @@ ${reason.stack}`
   });
 }
 
+/**
+ * Sets up signal handlers to ensure graceful shutdown and prevent orphaned
+ * processes, especially when the terminal is closed (SIGHUP).
+ */
+function setupSignalHandlers() {
+  const gracefulShutdown = async (signal: string) => {
+    debugLogger.debug(`Received ${signal}, shutting down gracefully...`);
+    try {
+      await runExitCleanup();
+    } catch (_) {
+      // Ignore errors during cleanup
+    }
+    process.exit(ExitCodes.SUCCESS);
+  };
+
+  process.on('SIGHUP', () => gracefulShutdown('SIGHUP'));
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+}
+
+/**
+ * Sets up a periodic TTY check to detect if we've lost our controlling terminal
+ * but somehow didn't receive or process SIGHUP.
+ * This is a defense-in-depth measure against CPU-spinning orphans.
+ */
+function setupTtyCheck() {
+  const ttyCheckInterval = setInterval(async () => {
+    if (
+      !process.stdin.isTTY &&
+      !process.stdout.isTTY &&
+      !process.env['SANDBOX']
+    ) {
+      debugLogger.warn('Lost controlling terminal, exiting...');
+      try {
+        await runExitCleanup();
+      } catch (_) {
+        // Ignore errors during cleanup
+      }
+      process.exit(ExitCodes.SUCCESS);
+    }
+  }, 5000);
+
+  // Don't keep the process alive just for this interval
+  ttyCheckInterval.unref();
+}
+
 export async function startInteractiveUI(
   config: Config,
   settings: LoadedSettings,
@@ -309,6 +355,7 @@ export async function main() {
   });
 
   setupUnhandledRejectionHandler();
+  setupSignalHandlers();
   const loadSettingsHandle = startupProfiler.start('load_settings');
   const settings = loadSettings();
   loadSettingsHandle?.end();
@@ -603,10 +650,7 @@ export async function main() {
       }
 
       // This cleanup isn't strictly needed but may help in certain situations.
-      process.on('SIGTERM', () => {
-        process.stdin.setRawMode(wasRaw);
-      });
-      process.on('SIGINT', () => {
+      registerSyncCleanup(() => {
         process.stdin.setRawMode(wasRaw);
       });
     }
@@ -661,6 +705,7 @@ export async function main() {
     cliStartupHandle?.end();
     // Render UI, passing necessary config values. Check that there is no command line question.
     if (config.isInteractive()) {
+      setupTtyCheck();
       await startInteractiveUI(
         config,
         settings,
