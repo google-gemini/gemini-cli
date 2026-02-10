@@ -195,6 +195,7 @@ export class ChatRecordingService {
       if (
         error instanceof Error &&
         'code' in error &&
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         (error as NodeJS.ErrnoException).code === 'ENOSPC'
       ) {
         this.conversationFile = null;
@@ -427,6 +428,7 @@ export class ChatRecordingService {
       this.conversation = JSON.parse(this.cachedLastConvData);
       return this.conversation!;
     } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         debugLogger.error('Error reading conversation file.', error);
         throw error;
@@ -481,6 +483,7 @@ export class ChatRecordingService {
       if (
         error instanceof Error &&
         'code' in error &&
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         (error as NodeJS.ErrnoException).code === 'ENOSPC'
       ) {
         this.conversationFile = null;

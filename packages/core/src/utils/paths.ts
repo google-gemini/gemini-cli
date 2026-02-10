@@ -16,10 +16,12 @@ export const GOOGLE_ACCOUNTS_FILENAME = 'google_accounts.json';
 
 /**
  * Special characters that need to be escaped in file paths for shell compatibility.
- * Includes: spaces, parentheses, brackets, braces, semicolons, ampersands, pipes,
- * asterisks, question marks, dollar signs, backticks, quotes, hash, and other shell metacharacters.
+ * Note that windows doesn't escape tilda.
  */
-export const SHELL_SPECIAL_CHARS = /[ \t()[\]{};|*?$`'"#&<>!~]/;
+export const SHELL_SPECIAL_CHARS =
+  process.platform === 'win32'
+    ? /[ \t()[\]{};|*?$`'"#&<>!]/
+    : /[ \t()[\]{};|*?$`'"#&<>!~]/;
 
 /**
  * Returns the home directory.
@@ -324,6 +326,16 @@ export function unescapePath(filePath: string): string {
  */
 export function getProjectHash(projectRoot: string): string {
   return crypto.createHash('sha256').update(projectRoot).digest('hex');
+}
+
+/**
+ * Normalizes a path for reliable comparison.
+ * - Resolves to an absolute path.
+ * - On Windows, converts to lowercase for case-insensitivity.
+ */
+export function normalizePath(p: string): string {
+  const resolved = path.resolve(p);
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
 }
 
 /**

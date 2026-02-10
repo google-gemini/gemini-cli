@@ -29,6 +29,7 @@ export function updateSettingsFilePreservingFormat(
 
   let parsed: Record<string, unknown>;
   try {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     parsed = parse(originalContent) as Record<string, unknown>;
   } catch (error) {
     coreEvents.emitFeedback(
@@ -61,7 +62,9 @@ function preserveCommentsOnPropertyDeletion(
   const beforeSym = Symbol.for(`before:${propName}`);
   const afterSym = Symbol.for(`after:${propName}`);
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const beforeComments = target[beforeSym] as unknown[] | undefined;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const afterComments = target[afterSym] as unknown[] | undefined;
 
   if (!beforeComments && !afterComments) return;
@@ -137,7 +140,9 @@ function applyKeyDiff(
 
     if (isObj && isBaseObj) {
       applyKeyDiff(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         baseVal as Record<string, unknown>,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         nextVal as Record<string, unknown>,
       );
     } else if (isArr && isBaseArr) {

@@ -18,6 +18,7 @@ export async function handleList(args: { all?: boolean }) {
   const config = await loadCliConfig(
     settings.merged,
     'skills-list-session',
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     {
       debug: false,
     } as Partial<CliArgs> as CliArgs,
@@ -72,6 +73,7 @@ export const listCommand: CommandModule = {
       default: false,
     }),
   handler: async (argv) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     await handleList({ all: argv['all'] as boolean });
     await exitCli();
   },
