@@ -115,7 +115,7 @@ ${
 
 ${renderOperationalGuidelines(options.operationalGuidelines)}
 
-${renderYoloInteractiveMode(options.interactiveYoloMode)}
+${renderInteractiveYoloMode(options.interactiveYoloMode)}
 
 ${renderSandbox(options.sandbox)}
 
@@ -296,7 +296,7 @@ You are running outside of a sandbox container, directly on the user's system. F
   }
 }
 
-export function renderYoloInteractiveMode(enabled?: boolean): string {
+export function renderInteractiveYoloMode(enabled?: boolean): string {
   if (!enabled) return '';
   return `
 # Autonomous Mode (YOLO)
