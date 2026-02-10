@@ -1295,10 +1295,9 @@ exports[`Core System Prompt (prompts.ts) > should include available_skills with 
 
 # Core Mandates
 
-## Security Protocols
+## Security & System Integrity
 - **Credential Protection:** Never log, print, or commit secrets, API keys, or sensitive credentials. Rigorously protect \`.env\` files, \`.git\`, and system configuration folders.
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
-- **Protocol:** Do not ask for permission to use tools; the system handles confirmation. Your responsibility is to justify the action, not to seek authorization.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -1387,11 +1386,6 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 6. **Solicit Feedback:** Provide instructions on how to start the application and request user feedback on the prototype.
 
 # Operational Guidelines
-
-## Shell Tool Efficiency
-
-- **Quiet Flags:** Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
-- **Pagination:** Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).
 
 ## Tone and Style
 
