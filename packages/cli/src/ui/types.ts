@@ -19,7 +19,7 @@ import type {
 import type { PartListUnion } from '@google/genai';
 import { type ReactNode } from 'react';
 
-export type { ThoughtSummary, SkillDefinition };
+export type { ThoughtSummary, SkillDefinition, ToolResultDisplay };
 
 export enum AuthState {
   // Attempting to authenticate or re-authenticate
@@ -101,6 +101,7 @@ export const emptyIcon = '  ';
 
 export interface HistoryItemBase {
   text?: string; // Text content for user/gemini/info/error messages
+  verbosity?: Verbosity;
 }
 
 export type HistoryItemUser = HistoryItemBase & {
@@ -132,6 +133,23 @@ export type HistoryItemError = HistoryItemBase & {
 
 export type HistoryItemWarning = HistoryItemBase & {
   type: 'warning';
+  text: string;
+};
+
+export type HistoryItemVerbose = HistoryItemBase & {
+  type: 'verbose';
+  text: string;
+  icon?: string;
+  color?: string;
+};
+
+export type HistoryItemDebug = HistoryItemBase & {
+  type: 'debug';
+  text: string;
+};
+
+export type HistoryItemTrace = HistoryItemBase & {
+  type: 'trace';
   text: string;
 };
 
@@ -318,6 +336,9 @@ export type HistoryItemWithoutId =
   | HistoryItemInfo
   | HistoryItemError
   | HistoryItemWarning
+  | HistoryItemVerbose
+  | HistoryItemDebug
+  | HistoryItemTrace
   | HistoryItemAbout
   | HistoryItemHelp
   | HistoryItemToolGroup
@@ -335,11 +356,16 @@ export type HistoryItemWithoutId =
   | HistoryItemChatList
   | HistoryItemHooksList;
 
+export type HistoryItemType = HistoryItemWithoutId['type'];
+
 export type HistoryItem = HistoryItemWithoutId & { id: number };
 
 // Message types used by internal command feedback (subset of HistoryItem types)
 export enum MessageType {
   INFO = 'info',
+  VERBOSE = 'verbose',
+  DEBUG = 'debug',
+  TRACE = 'trace',
   ERROR = 'error',
   WARNING = 'warning',
   USER = 'user',
@@ -360,10 +386,52 @@ export enum MessageType {
   HOOKS_LIST = 'hooks_list',
 }
 
+export enum Verbosity {
+  ERROR = 0,
+  WARN = 1,
+  INFO = 2,
+  VERBOSE = 3,
+  DEBUG = 4,
+  TRACE = 5,
+}
+
+export const VERBOSITY_MAPPING: Record<HistoryItemType, Verbosity> = {
+  error: Verbosity.ERROR,
+  warning: Verbosity.WARN,
+  info: Verbosity.INFO,
+  user: Verbosity.INFO,
+  gemini: Verbosity.INFO,
+  gemini_content: Verbosity.INFO,
+  tool_group: Verbosity.INFO,
+  user_shell: Verbosity.INFO,
+  about: Verbosity.INFO,
+  stats: Verbosity.INFO,
+  model_stats: Verbosity.INFO,
+  tool_stats: Verbosity.INFO,
+  model: Verbosity.INFO,
+  quit: Verbosity.INFO,
+  extensions_list: Verbosity.INFO,
+  tools_list: Verbosity.INFO,
+  skills_list: Verbosity.INFO,
+  agents_list: Verbosity.INFO,
+  mcp_status: Verbosity.INFO,
+  chat_list: Verbosity.INFO,
+  hooks_list: Verbosity.INFO,
+  help: Verbosity.INFO,
+  verbose: Verbosity.VERBOSE,
+  compression: Verbosity.VERBOSE,
+  debug: Verbosity.DEBUG,
+  trace: Verbosity.TRACE,
+};
+
 // Simplified message structure for internal feedback
 export type Message =
   | {
-      type: MessageType.INFO | MessageType.ERROR | MessageType.USER;
+      type:
+        | MessageType.INFO
+        | MessageType.VERBOSE
+        | MessageType.ERROR
+        | MessageType.USER;
       content: string; // Renamed from text for clarity in this context
       timestamp: Date;
     }

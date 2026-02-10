@@ -163,6 +163,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `"text"`
   - **Values:** `"text"`, `"json"`
 
+- **`output.verbosity`** (enum):
+  - **Description:** Show verbose output history. When enabled, output history
+    will include autonomous tool calls, additional logs, etc.
+  - **Default:** `"verbose"`
+  - **Values:** `"info"`, `"verbose"`
+
 #### `ui`
 
 - **`ui.theme`** (string):

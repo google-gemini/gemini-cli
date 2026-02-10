@@ -8,7 +8,7 @@ import type {
   HistoryItemWithoutId,
   IndividualToolCallDisplay,
 } from '../types.js';
-import { ToolCallStatus } from '../types.js';
+import { ToolCallStatus, Verbosity } from '../types.js';
 import { useCallback, useReducer, useRef, useEffect } from 'react';
 import type { AnsiOutput, Config, GeminiClient } from '@google/gemini-cli-core';
 import { isBinary, ShellExecutionService } from '@google/gemini-cli-core';
@@ -480,10 +480,14 @@ export const useShellCommandProcessor = (
             resultDisplay: finalOutput,
           };
 
+          // Add the complete, contextual result to the local UI history.
+          // We skip this for cancelled commands because useGeminiStream handles the
+          // immediate addition of the cancelled item to history to prevent flickering/duplicates.
           if (finalStatus !== ToolCallStatus.Canceled) {
             addItemToHistory(
               {
                 type: 'tool_group',
+                verbosity: Verbosity.INFO,
                 tools: [finalToolDisplay],
               } as HistoryItemWithoutId,
               userMessageTimestamp,

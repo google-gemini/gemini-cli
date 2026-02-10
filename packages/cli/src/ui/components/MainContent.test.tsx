@@ -7,13 +7,14 @@
 import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { MainContent } from './MainContent.js';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Box, Text } from 'ink';
 import type React from 'react';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { ToolCallStatus } from '../types.js';
 import { SHELL_COMMAND_NAME } from '../constants.js';
 import type { UIState } from '../contexts/UIStateContext.js';
+import type { HistoryItem } from '../types.js';
 
 // Mock dependencies
 vi.mock('../contexts/AppContext.js', async () => {
@@ -23,6 +24,23 @@ vi.mock('../contexts/AppContext.js', async () => {
     useAppContext: () => ({
       version: '1.0.0',
     }),
+  };
+});
+
+const mockSettings = {
+  merged: {
+    output: {
+      verbosity: 'info',
+    },
+  },
+};
+
+vi.mock('../contexts/SettingsContext.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../contexts/SettingsContext.js')>();
+  return {
+    ...actual,
+    useSettings: () => mockSettings,
   };
 });
 
@@ -78,6 +96,11 @@ describe('MainContent', () => {
 
   beforeEach(() => {
     vi.mocked(useAlternateBuffer).mockReturnValue(false);
+    mockSettings.merged.output.verbosity = 'info';
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
   });
 
   it('renders in normal buffer mode', async () => {
@@ -220,5 +243,39 @@ describe('MainContent', () => {
         expect(output).toMatchSnapshot();
       },
     );
+  });
+
+  it('filters out verbose items when verbosity is info', async () => {
+    const history: HistoryItem[] = [
+      { id: 1, type: 'user', text: 'Visible User Message' },
+      { id: 2, type: 'verbose', text: 'Hidden Verbose Log' },
+    ];
+    mockSettings.merged.output.verbosity = 'info';
+
+    const { lastFrame } = renderWithProviders(<MainContent />, {
+      uiState: { ...defaultMockUiState, history } as Partial<UIState>,
+    });
+    await waitFor(() => expect(lastFrame()).toContain('AppHeader'));
+    const output = lastFrame();
+
+    expect(output).toContain('Visible User Message');
+    expect(output).not.toContain('Hidden Verbose Log');
+  });
+
+  it('shows verbose items when verbosity is verbose', async () => {
+    const history: HistoryItem[] = [
+      { id: 1, type: 'user', text: 'Visible User Message' },
+      { id: 2, type: 'verbose', text: 'Visible Verbose Log' },
+    ];
+    mockSettings.merged.output.verbosity = 'verbose';
+
+    const { lastFrame } = renderWithProviders(<MainContent />, {
+      uiState: { ...defaultMockUiState, history } as Partial<UIState>,
+    });
+    await waitFor(() => expect(lastFrame()).toContain('AppHeader'));
+    const output = lastFrame();
+
+    expect(output).toContain('Visible User Message');
+    expect(output).toContain('Visible Verbose Log');
   });
 });

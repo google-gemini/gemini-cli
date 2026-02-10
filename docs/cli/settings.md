@@ -32,9 +32,10 @@ they appear in the UI.
 
 ### Output
 
-| UI Label      | Setting         | Description                                            | Default  |
-| ------------- | --------------- | ------------------------------------------------------ | -------- |
-| Output Format | `output.format` | The format of the CLI output. Can be `text` or `json`. | `"text"` |
+| UI Label               | Setting            | Description                                                                                                         | Default     |
+| ---------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------- | ----------- |
+| Output Format          | `output.format`    | The format of the CLI output. Can be `text` or `json`.                                                              | `"text"`    |
+| Verbose Output History | `output.verbosity` | Show verbose output history. When enabled, output history will include autonomous tool calls, additional logs, etc. | `"verbose"` |
 
 ### UI
 

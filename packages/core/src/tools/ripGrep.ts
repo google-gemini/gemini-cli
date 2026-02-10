@@ -475,10 +475,10 @@ class GrepToolInvocation extends BaseToolInvocation<
     if (resolvedPath === this.config.getTargetDir() || pathParam === '.') {
       description += ` within ./`;
     } else {
-      const relativePath = makeRelative(
-        resolvedPath,
-        this.config.getTargetDir(),
-      );
+      let relativePath = makeRelative(resolvedPath, this.config.getTargetDir());
+      if (!relativePath.startsWith('.') && !path.isAbsolute(relativePath)) {
+        relativePath = `.${path.sep}${relativePath}`;
+      }
       description += ` within ${shortenPath(relativePath)}`;
     }
     return description;

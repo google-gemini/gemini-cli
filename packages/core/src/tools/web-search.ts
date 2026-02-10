@@ -162,7 +162,7 @@ class WebSearchToolInvocation extends BaseToolInvocation<
 
       return {
         llmContent: `Web search results for "${this.params.query}":\n\n${modifiedResponseText}`,
-        returnDisplay: `Search results for "${this.params.query}" returned.`,
+        returnDisplay: 'Search results returned.',
         sources,
       };
     } catch (error: unknown) {

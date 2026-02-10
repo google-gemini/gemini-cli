@@ -171,6 +171,18 @@ describe('<HistoryItemDisplay />', () => {
     expect(lastFrame()).toContain('Agent powering down. Goodbye!');
   });
 
+  it('renders InfoMessage for "debug" type with gear icon', () => {
+    const item: HistoryItem = {
+      ...baseItem,
+      type: MessageType.DEBUG,
+      text: 'Debug info',
+    };
+    const { lastFrame } = renderWithProviders(
+      <HistoryItemDisplay {...baseItem} item={item} />,
+    );
+    expect(lastFrame()).toContain('⚙ Debug info');
+  });
+
   it('should escape ANSI codes in text content', () => {
     const historyItem: HistoryItem = {
       id: 1,

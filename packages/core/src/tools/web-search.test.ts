@@ -94,9 +94,7 @@ describe('WebSearchTool', () => {
       expect(result.llmContent).toBe(
         'Web search results for "successful query":\n\nHere are your results.',
       );
-      expect(result.returnDisplay).toBe(
-        'Search results for "successful query" returned.',
-      );
+      expect(result.returnDisplay).toBe('Search results returned.');
       expect(result.sources).toBeUndefined();
     });
 
@@ -177,9 +175,7 @@ Sources:
 [2] Google (https://google.com)`;
 
       expect(result.llmContent).toBe(expectedLlmContent);
-      expect(result.returnDisplay).toBe(
-        'Search results for "grounding query" returned.',
-      );
+      expect(result.returnDisplay).toBe('Search results returned.');
       expect(result.sources).toHaveLength(2);
     });
 
@@ -249,9 +245,7 @@ Sources:
 [3] Gemini CLI: your open-source AI agent (https://blog.google/technology/developers/introducing-gemini-cli-open-source-ai-agent/)`;
 
       expect(result.llmContent).toBe(expectedLlmContent);
-      expect(result.returnDisplay).toBe(
-        'Search results for "multibyte query" returned.',
-      );
+      expect(result.returnDisplay).toBe('Search results returned.');
       expect(result.sources).toHaveLength(3);
     });
   });

@@ -18,6 +18,8 @@ import { isShellTool, isThisShellFocused } from './ToolShared.js';
 import { ASK_USER_DISPLAY_NAME } from '@google/gemini-cli-core';
 import { ShowMoreLines } from '../ShowMoreLines.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
+import { useSettings } from '../../contexts/SettingsContext.js';
+import { DenseToolMessage } from './DenseToolMessage.js';
 
 interface ToolGroupMessageProps {
   groupId: number;
@@ -63,6 +65,8 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
   const config = useConfig();
   const { constrainHeight } = useUIState();
+  const { merged: settings } = useSettings();
+  const isVerboseMode = settings.output?.verbosity === 'verbose';
 
   const isEventDriven = config.isEventDrivenSchedulerEnabled();
 
@@ -161,11 +165,24 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       */
       width={terminalWidth}
       paddingRight={TOOL_MESSAGE_HORIZONTAL_MARGIN}
+      marginBottom={1}
     >
       {visibleToolCalls.map((tool, index) => {
         const isConfirming = toolAwaitingApproval?.callId === tool.callId;
         const isFirst = index === 0;
         const isShellToolCall = isShellTool(tool.name);
+
+        // Use dense view if not verbose, not a shell tool (for interactivity), and not confirming (needs prompt)
+        const useDenseView =
+          !isVerboseMode &&
+          !isShellToolCall &&
+          tool.status !== ToolCallStatus.Confirming;
+
+        if (useDenseView) {
+          return (
+            <DenseToolMessage key={tool.callId} {...tool} isFirst={isFirst} />
+          );
+        }
 
         const commonProps = {
           ...tool,
@@ -242,22 +259,59 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       })}
       {
         /*
-              We have to keep the bottom border separate so it doesn't get
-              drawn over by the sticky header directly inside it.
-             */
-        (visibleToolCalls.length > 0 || borderBottomOverride !== undefined) && (
-          <Box
-            height={0}
-            width={contentWidth}
-            borderLeft={true}
-            borderRight={true}
-            borderTop={false}
-            borderBottom={borderBottomOverride ?? true}
-            borderColor={borderColor}
-            borderDimColor={borderDimColor}
-            borderStyle="round"
-          />
-        )
+          We have to keep the bottom border separate so it doesn't get
+          drawn over by the sticky header directly inside it.
+          Only render if the last tool was displayed in full/verbose mode,
+          or if explicitly overridden.
+         */
+        (() => {
+          if (visibleToolCalls.length === 0) {
+            if (borderBottomOverride !== undefined) {
+              return (
+                <Box
+                  height={0}
+                  width={contentWidth}
+                  borderLeft={true}
+                  borderRight={true}
+                  borderTop={false}
+                  borderBottom={borderBottomOverride}
+                  borderColor={borderColor}
+                  borderDimColor={borderDimColor}
+                  borderStyle="round"
+                />
+              );
+            }
+            return null;
+          }
+
+          const lastTool = visibleToolCalls[visibleToolCalls.length - 1];
+          const isShell = isShellTool(lastTool.name);
+          const isConfirming = lastTool.status === ToolCallStatus.Confirming;
+
+          // Logic: If dense view (not verbose, not shell, not confirming), hide border by default
+          const isDense = !isVerboseMode && !isShell && !isConfirming;
+          let showBottomBorder = !isDense;
+
+          if (borderBottomOverride !== undefined) {
+            showBottomBorder = borderBottomOverride;
+          }
+
+          if (!showBottomBorder) return null;
+
+          return (
+            <Box
+              height={0}
+              width={contentWidth}
+              borderLeft={true}
+              borderRight={true}
+              borderTop={false}
+              borderBottom={true}
+              borderColor={borderColor}
+              borderDimColor={borderDimColor}
+              borderStyle="round"
+            />
+          );
+        })()
       }
       {(borderBottomOverride ?? true) && visibleToolCalls.length > 0 && (
         <Box paddingX={1}>

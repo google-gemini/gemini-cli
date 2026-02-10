@@ -19,7 +19,7 @@ import {
   type WaitingToolCall,
   type CancelledToolCall,
 } from '@google/gemini-cli-core';
-import { ToolCallStatus } from '../types.js';
+import { ToolCallStatus, Verbosity } from '../types.js';
 
 describe('toolMapping', () => {
   beforeEach(() => {
@@ -273,6 +273,28 @@ describe('toolMapping', () => {
       const result = mapToDisplay(toolCall);
       expect(result.tools[0].resultDisplay).toBeUndefined();
       expect(result.tools[0].status).toBe(ToolCallStatus.Pending);
+    });
+
+    it('sets verbosity to INFO for client-initiated tools', () => {
+      const toolCall: ScheduledToolCall = {
+        status: 'scheduled',
+        request: { ...mockRequest, isClientInitiated: true },
+        tool: mockTool,
+        invocation: mockInvocation,
+      };
+      const result = mapToDisplay(toolCall);
+      expect(result.verbosity).toBe(Verbosity.INFO);
+    });
+
+    it('sets verbosity to undefined (defaulting to VERBOSE) for autonomous tools', () => {
+      const toolCall: ScheduledToolCall = {
+        status: 'scheduled',
+        request: { ...mockRequest, isClientInitiated: false },
+        tool: mockTool,
+        invocation: mockInvocation,
+      };
+      const result = mapToDisplay(toolCall);
+      expect(result.verbosity).toBeUndefined();
     });
   });
 });

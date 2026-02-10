@@ -18,6 +18,7 @@ import { GeminiMessageContent } from './messages/GeminiMessageContent.js';
 import { CompressionMessage } from './messages/CompressionMessage.js';
 import { WarningMessage } from './messages/WarningMessage.js';
 import { Box } from 'ink';
+import { theme } from '../semantic-colors.js';
 import { AboutBox } from './AboutBox.js';
 import { StatsDisplay } from './StatsDisplay.js';
 import { ModelStatsDisplay } from './ModelStatsDisplay.js';
@@ -94,6 +95,27 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           text={itemForDisplay.text}
           icon={itemForDisplay.icon}
           color={itemForDisplay.color}
+        />
+      )}
+      {itemForDisplay.type === 'verbose' && (
+        <InfoMessage
+          text={itemForDisplay.text}
+          icon={itemForDisplay.icon || 'ℹ '}
+          color={theme.text.secondary}
+        />
+      )}
+      {itemForDisplay.type === 'debug' && (
+        <InfoMessage
+          text={itemForDisplay.text}
+          icon={'⚙ '}
+          color={theme.text.accent}
+        />
+      )}
+      {itemForDisplay.type === 'trace' && (
+        <InfoMessage
+          text={itemForDisplay.text}
+          icon={'🔍 '}
+          color={theme.text.accent}
         />
       )}
       {itemForDisplay.type === 'warning' && (

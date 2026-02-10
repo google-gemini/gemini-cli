@@ -66,16 +66,30 @@ export function useHistory({
       const newItem: HistoryItem = { ...itemData, id } as HistoryItem;
 
       setHistory((prevHistory) => {
-        if (prevHistory.length > 0) {
-          const lastItem = prevHistory[prevHistory.length - 1];
-          // Prevent adding duplicate consecutive user messages
-          if (
-            lastItem.type === 'user' &&
-            newItem.type === 'user' &&
-            lastItem.text === newItem.text
-          ) {
-            return prevHistory; // Don't add the duplicate
-          }
+        const lastItem =
+          prevHistory.length > 0 ? prevHistory[prevHistory.length - 1] : null;
+
+        // If the last item and the new item are both tool groups, merge them.
+        if (
+          lastItem &&
+          lastItem.type === 'tool_group' &&
+          newItem.type === 'tool_group'
+        ) {
+          const updatedLastItem: HistoryItem = {
+            ...lastItem,
+            tools: [...lastItem.tools, ...newItem.tools],
+          };
+          return [...prevHistory.slice(0, -1), updatedLastItem];
+        }
+
+        // Prevent adding duplicate consecutive user messages
+        if (
+          lastItem &&
+          lastItem.type === 'user' &&
+          newItem.type === 'user' &&
+          lastItem.text === newItem.text
+        ) {
+          return prevHistory; // Don't add the duplicate
         }
         return [...prevHistory, newItem];
       });
@@ -83,36 +97,38 @@ export function useHistory({
       // Record UI-specific messages, but don't do it if we're actually loading
       // an existing session.
       if (!isResuming && chatRecordingService) {
+        // Safe access to text property
+        const content = itemData.text || '';
+
         switch (itemData.type) {
           case 'compression':
+          case 'verbose':
           case 'info':
             chatRecordingService?.recordMessage({
               model: undefined,
               type: 'info',
-              content: itemData.text ?? '',
+              content: content || '',
             });
             break;
           case 'warning':
             chatRecordingService?.recordMessage({
               model: undefined,
               type: 'warning',
-              content: itemData.text ?? '',
+              content: content || '',
             });
             break;
           case 'error':
             chatRecordingService?.recordMessage({
               model: undefined,
               type: 'error',
-              content: itemData.text ?? '',
+              content: content || '',
             });
             break;
           case 'user':
-          case 'gemini':
-          case 'gemini_content':
-            // Core conversation recording handled by GeminiChat.
+            // User messages are recorded by the input handler
             break;
           default:
-            // Ignore the rest.
+            // Other types might not need recording or are recorded elsewhere
             break;
         }
       }
@@ -128,7 +144,6 @@ export function useHistory({
    * rendering all history items in <Static /> for performance reasons. Only use
    * if ABSOLUTELY NECESSARY
    */
-  //
   const updateItem = useCallback(
     (
       id: number,
