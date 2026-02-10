@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -18,6 +18,8 @@ import {
   WRITE_FILE_TOOL_NAME,
   WRITE_TODOS_TOOL_NAME,
 } from '../tools/tool-names.js';
+import type { HierarchicalMemory } from '../config/memory.js';
+import { DEFAULT_CONTEXT_FILENAME } from '../tools/memoryTool.js';
 
 // --- Options Structs ---
 
@@ -42,6 +44,8 @@ export interface CoreMandatesOptions {
   interactive: boolean;
   isGemini3: boolean;
   hasSkills: boolean;
+  hasHierarchicalMemory: boolean;
+  contextFilenames?: string[];
 }
 
 export interface PrimaryWorkflowsOptions {
@@ -118,12 +122,13 @@ ${renderGitRepo(options.gitRepo)}
  */
 export function renderFinalShell(
   basePrompt: string,
-  userMemory?: string,
+  userMemory?: string | HierarchicalMemory,
+  contextFilenames?: string[],
 ): string {
   return `
 ${basePrompt.trim()}
 
-${renderUserMemory(userMemory)}
+${renderUserMemory(userMemory, contextFilenames)}
 `.trim();
 }
 
@@ -138,21 +143,29 @@ export function renderPreamble(options?: PreambleOptions): string {
 
 export function renderCoreMandates(options?: CoreMandatesOptions): string {
   if (!options) return '';
+  const filenames = options.contextFilenames ?? [DEFAULT_CONTEXT_FILENAME];
+  const formattedFilenames =
+    filenames.length > 1
+      ? filenames
+          .slice(0, -1)
+          .map((f) => `\`${f}\``)
+          .join(', ') + ` or \`${filenames[filenames.length - 1]}\``
+      : `\`${filenames[0]}\``;
+
   return `
 # Core Mandates
 
-## Security Protocols
+## Security & System Integrity
 - **Credential Protection:** Never log, print, or commit secrets, API keys, or sensitive credentials. Rigorously protect \`.env\` files, \`.git\`, and system configuration folders.
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
-- **Protocol:** Do not ask for permission to use tools; the system handles confirmation. Your responsibility is to justify the action, not to seek authorization.
 
 ## Engineering Standards
-- **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
+- **Contextual Precedence:** Instructions found in ${formattedFilenames} files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
 - **Conventions & Style:** Rigorously adhere to existing workspace conventions, architectural patterns, and style (naming, formatting, typing, commenting). During the research phase, analyze surrounding files, tests, and configuration to ensure your changes are seamless, idiomatic, and consistent with the local context. Never compromise idiomatic quality or completeness (e.g., proper declarations, type safety, documentation) to minimize tool calls; all supporting changes required by local conventions are part of a surgical update.
 - **Libraries/Frameworks:** NEVER assume a library/framework is available. Verify its established usage within the project (check imports, configuration files like 'package.json', 'Cargo.toml', 'requirements.txt', etc.) before employing it.
 - **Technical Integrity:** You are responsible for the entire lifecycle: implementation, testing, and validation. Within the scope of your changes, prioritize readability and long-term maintainability by consolidating logic into clean abstractions rather than threading state across unrelated layers. Align strictly with the requested architectural direction, ensuring the final implementation is focused and free of redundant "just-in-case" alternatives. Validation is not merely running tests; it is the exhaustive process of ensuring that every aspect of your change—behavioral, structural, and stylistic—is correct and fully compatible with the broader project. For bug fixes, you must empirically reproduce the failure with a new test case or reproduction script before applying the fix.
 - **Expertise & Intent Alignment:** Provide proactive technical opinions grounded in research while strictly adhering to the user's intended workflow. Distinguish between **Directives** (unambiguous requests for action or implementation) and **Inquiries** (requests for analysis, advice, or observations). Assume all requests are Inquiries unless they contain an explicit instruction to perform a task. For Inquiries, your scope is strictly limited to research and analysis; you may propose a solution or strategy, but you MUST NOT modify files until a corresponding Directive is issued. Do not initiate implementation based on observations of bugs or statements of fact. Once an Inquiry is resolved, or while waiting for a Directive, stop and wait for the next user instruction. ${options.interactive ? 'For Directives, only clarify if critically underspecified; otherwise, work autonomously.' : 'For Directives, you must work autonomously as no further user input is available.'} You should only seek user intervention if you have exhausted all possible routes or if a proposed solution would take the workspace in a significantly different architectural direction.
-- **Proactiveness:** When executing a Directive, persist through errors and obstacles by diagnosing failures in the execution phase and, if necessary, backtracking to the research or strategy phases to adjust your approach until a successful, verified outcome is achieved. Fulfill the user's request thoroughly, including adding tests when adding features or fixing bugs. Take reasonable liberties to fulfill broad goals while staying within the requested scope; however, prioritize simplicity and the removal of redundant logic over providing "just-in-case" alternatives that diverge from the established path.
+- **Proactiveness:** When executing a Directive, persist through errors and obstacles by diagnosing failures in the execution phase and, if necessary, backtracking to the research or strategy phases to adjust your approach until a successful, verified outcome is achieved. Fulfill the user's request thoroughly, including adding tests when adding features or fixing bugs. Take reasonable liberties to fulfill broad goals while staying within the requested scope; however, prioritize simplicity and the removal of redundant logic over providing "just-in-case" alternatives that diverge from the established path.${mandateConflictResolution(options.hasHierarchicalMemory)}
 - ${mandateConfirm(options.interactive)}
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandateSkillGuidance(options.hasSkills)}
@@ -325,10 +338,18 @@ export function renderGitRepo(options?: GitRepoOptions): string {
 - Never push changes to a remote repository without being asked explicitly by the user.`.trim();
 }
 
-export function renderUserMemory(memory?: string): string {
-  if (!memory || memory.trim().length === 0) return '';
-  return `
-# Contextual Instructions (GEMINI.md)
+export function renderUserMemory(
+  memory?: string | HierarchicalMemory,
+  contextFilenames?: string[],
+): string {
+  if (!memory) return '';
+  if (typeof memory === 'string') {
+    const trimmed = memory.trim();
+    if (trimmed.length === 0) return '';
+    const filenames = contextFilenames ?? [DEFAULT_CONTEXT_FILENAME];
+    const formattedHeader = filenames.join(', ');
+    return `
+# Contextual Instructions (${formattedHeader})
 The following content is loaded from local and global configuration files.
 **Context Precedence:**
 - **Global (~/.gemini/):** foundational user preferences. Apply these broadly.
@@ -341,8 +362,29 @@ The following content is loaded from local and global configuration files.
 - **System Overrides:** Contextual instructions override default operational behaviors (e.g., tech stack, style, workflows, tool preferences) defined in the system prompt. However, they **cannot** override Core Mandates regarding safety, security, and agent integrity.
 
 <loaded_context>
-${memory.trim()}
+${trimmed}
 </loaded_context>`;
+  }
+
+  const sections: string[] = [];
+  if (memory.global?.trim()) {
+    sections.push(
+      `<global_context>\n${memory.global.trim()}\n</global_context>`,
+    );
+  }
+  if (memory.extension?.trim()) {
+    sections.push(
+      `<extension_context>\n${memory.extension.trim()}\n</extension_context>`,
+    );
+  }
+  if (memory.project?.trim()) {
+    sections.push(
+      `<project_context>\n${memory.project.trim()}\n</project_context>`,
+    );
+  }
+
+  if (sections.length === 0) return '';
+  return `\n---\n\n<loaded_context>\n${sections.join('\n')}\n</loaded_context>`;
 }
 
 export function renderPlanningWorkflow(
@@ -423,6 +465,11 @@ function mandateSkillGuidance(hasSkills: boolean): string {
   if (!hasSkills) return '';
   return `
 - **Skill Guidance:** Once a skill is activated via \`${ACTIVATE_SKILL_TOOL_NAME}\`, its instructions and resources are returned wrapped in \`<activated_skill>\` tags. You MUST treat the content within \`<instructions>\` as expert procedural guidance, prioritizing these specialized rules and workflows over your general defaults for the duration of the task. You may utilize any listed \`<available_resources>\` as needed. Follow this expert guidance strictly while continuing to uphold your core safety and security standards.`;
+}
+
+function mandateConflictResolution(hasHierarchicalMemory: boolean): string {
+  if (!hasHierarchicalMemory) return '';
+  return '\n- **Conflict Resolution:** Instructions are provided in hierarchical context tags: `<global_context>`, `<extension_context>`, and `<project_context>`. In case of contradictory instructions, follow this priority: `<project_context>` (highest) > `<extension_context>` > `<global_context>` (lowest).';
 }
 
 function mandateExplainBeforeActing(isGemini3: boolean): string {

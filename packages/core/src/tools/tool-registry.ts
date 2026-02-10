@@ -265,7 +265,9 @@ export class ToolRegistry {
         }
 
         if (priorityA === 2) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           const serverA = (toolA as DiscoveredMCPTool).serverName;
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           const serverB = (toolB as DiscoveredMCPTool).serverName;
           return serverA.localeCompare(serverB);
         }
@@ -319,6 +321,7 @@ export class ToolRegistry {
           'Tool discovery command is empty or contains only whitespace.',
         );
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const proc = spawn(cmdParts[0] as string, cmdParts.slice(1) as string[]);
       let stdout = '';
       const stdoutDecoder = new StringDecoder('utf8');
@@ -398,6 +401,7 @@ export class ToolRegistry {
           } else if (Array.isArray(tool['functionDeclarations'])) {
             functions.push(...tool['functionDeclarations']);
           } else if (tool['name']) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             functions.push(tool as FunctionDeclaration);
           }
         }
@@ -420,6 +424,7 @@ export class ToolRegistry {
             func.name,
             DISCOVERED_TOOL_PREFIX + func.name,
             func.description ?? '',
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             parameters as Record<string, unknown>,
             this.messageBus,
           ),
@@ -552,6 +557,7 @@ export class ToolRegistry {
   getToolsByServer(serverName: string): AnyDeclarativeTool[] {
     const serverTools: AnyDeclarativeTool[] = [];
     for (const tool of this.getActiveTools()) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       if ((tool as DiscoveredMCPTool)?.serverName === serverName) {
         serverTools.push(tool);
       }

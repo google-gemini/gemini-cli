@@ -12,9 +12,9 @@ import * as addFormats from 'ajv-formats';
 import { debugLogger } from './debugLogger.js';
 
 // Ajv's ESM/CJS interop: use 'any' for compatibility as recommended by Ajv docs
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
 const AjvClass = (AjvPkg as any).default || AjvPkg;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
 const Ajv2020Class = (Ajv2020Pkg as any).default || Ajv2020Pkg;
 
 const ajvOptions = {
@@ -34,7 +34,7 @@ const ajvDefault: Ajv = new AjvClass(ajvOptions);
 // Draft-2020-12 validator for MCP servers using rmcp
 const ajv2020: Ajv = new Ajv2020Class(ajvOptions);
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
 const addFormatsFunc = (addFormats as any).default || addFormats;
 addFormatsFunc(ajvDefault);
 addFormatsFunc(ajv2020);
@@ -90,6 +90,7 @@ export class SchemaValidator {
       // This matches LenientJsonSchemaValidator behavior in mcp-client.ts.
       debugLogger.warn(
         `Failed to compile schema (${
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           (schema as Record<string, unknown>)?.['$schema'] ?? '<no $schema>'
         }): ${error instanceof Error ? error.message : String(error)}. ` +
           'Skipping parameter validation.',
@@ -121,6 +122,7 @@ export class SchemaValidator {
       // Skip validation rather than blocking tool usage.
       debugLogger.warn(
         `Failed to validate schema (${
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           (schema as Record<string, unknown>)?.['$schema'] ?? '<no $schema>'
         }): ${error instanceof Error ? error.message : String(error)}. ` +
           'Skipping schema validation.',

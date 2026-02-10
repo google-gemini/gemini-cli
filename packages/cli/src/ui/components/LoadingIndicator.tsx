@@ -15,6 +15,7 @@ import { formatDuration } from '../utils/formatters.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 import { INTERACTIVE_SHELL_WAITING_PHRASE } from '../hooks/usePhraseCycler.js';
+import { shouldUseEmoji } from '../utils/terminalUtils.js';
 
 interface LoadingIndicatorProps {
   currentLoadingPhrase?: string;
@@ -22,6 +23,7 @@ interface LoadingIndicatorProps {
   inline?: boolean;
   rightContent?: React.ReactNode;
   thought?: ThoughtSummary | null;
+  thoughtLabel?: string;
   showCancelAndTimer?: boolean;
 }
 
@@ -31,49 +33,57 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   inline = false,
   rightContent,
   thought,
+  thoughtLabel,
   showCancelAndTimer = true,
 }) => {
   const streamingState = useStreamingContext();
   const { columns: terminalWidth } = useTerminalSize();
   const isNarrow = isNarrowWidth(terminalWidth);
 
+  if (
+    streamingState === StreamingState.Idle &&
+    !currentLoadingPhrase &&
+    !thought
+  ) {
+    return null;
+  }
+
   // Prioritize the interactive shell waiting phrase over the thought subject
   // because it conveys an actionable state for the user (waiting for input).
   const primaryText =
     currentLoadingPhrase === INTERACTIVE_SHELL_WAITING_PHRASE
       ? currentLoadingPhrase
-      : thought?.subject || currentLoadingPhrase || undefined;
-
-  const textColor =
-    streamingState === StreamingState.Idle
-      ? theme.text.secondary
-      : theme.text.primary;
-
-  const italic = streamingState === StreamingState.Responding;
+      : thought?.subject
+        ? (thoughtLabel ?? thought.subject)
+        : currentLoadingPhrase;
+  const hasThoughtIndicator =
+    currentLoadingPhrase !== INTERACTIVE_SHELL_WAITING_PHRASE &&
+    Boolean(thought?.subject?.trim());
+  const thinkingIndicator = hasThoughtIndicator
+    ? `${shouldUseEmoji() ? '💬' : 'o'} `
+    : '';
 
   const cancelAndTimerContent =
     showCancelAndTimer &&
-    streamingState !== StreamingState.WaitingForConfirmation &&
-    streamingState !== StreamingState.Idle
+    streamingState !== StreamingState.WaitingForConfirmation
       ? `(esc to cancel, ${elapsedTime < 60 ? `${elapsedTime}s` : formatDuration(elapsedTime * 1000)})`
       : null;
 
   if (inline) {
     return (
       <Box>
-        {streamingState !== StreamingState.Idle && (
-          <Box marginRight={1}>
-            <GeminiRespondingSpinner
-              nonRespondingDisplay={
-                streamingState === StreamingState.WaitingForConfirmation
-                  ? '⠏'
-                  : ''
-              }
-            />
-          </Box>
-        )}
+        <Box marginRight={1}>
+          <GeminiRespondingSpinner
+            nonRespondingDisplay={
+              streamingState === StreamingState.WaitingForConfirmation
+                ? '⠏'
+                : ''
+            }
+          />
+        </Box>
         {primaryText && (
-          <Text color={textColor} italic={italic} wrap="truncate-end">
+          <Text color={theme.text.accent} wrap="truncate-end">
+            {thinkingIndicator}
             {primaryText}
           </Text>
         )}
@@ -96,19 +106,18 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
         alignItems={isNarrow ? 'flex-start' : 'center'}
       >
         <Box>
-          {streamingState !== StreamingState.Idle && (
-            <Box marginRight={1}>
-              <GeminiRespondingSpinner
-                nonRespondingDisplay={
-                  streamingState === StreamingState.WaitingForConfirmation
-                    ? '⠏'
-                    : ''
-                }
-              />
-            </Box>
-          )}
+          <Box marginRight={1}>
+            <GeminiRespondingSpinner
+              nonRespondingDisplay={
+                streamingState === StreamingState.WaitingForConfirmation
+                  ? '⠏'
+                  : ''
+              }
+            />
+          </Box>
           {primaryText && (
-            <Text color={textColor} italic={italic} wrap="truncate-end">
+            <Text color={theme.text.accent} wrap="truncate-end">
+              {thinkingIndicator}
               {primaryText}
             </Text>
           )}

@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -30,6 +30,7 @@ import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { StreamingState, ToolCallStatus } from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
+import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 
 export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const config = useConfig();
@@ -38,6 +39,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const uiState = useUIState();
   const uiActions = useUIActions();
   const { vimEnabled, vimMode } = useVimMode();
+  const inlineThinkingMode = getInlineThinkingMode(settings);
   const terminalWidth = process.stdout.columns;
   const isNarrow = isNarrowWidth(terminalWidth);
   const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
@@ -59,8 +61,8 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     Boolean(uiState.authConsentRequest) ||
     (uiState.confirmUpdateExtensionRequests?.length ?? 0) > 0 ||
     Boolean(uiState.loopDetectionConfirmationRequest) ||
-    Boolean(uiState.proQuotaRequest) ||
-    Boolean(uiState.validationRequest) ||
+    Boolean(uiState.quota.proQuotaRequest) ||
+    Boolean(uiState.quota.validationRequest) ||
     Boolean(uiState.customDialog);
   const showLoadingIndicator =
     (!uiState.embeddedShellFocused || uiState.isBackgroundShellVisible) &&
@@ -116,6 +118,9 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                   config.getAccessibility()?.enableLoadingPhrases === false
                     ? undefined
                     : uiState.currentLoadingPhrase
+                }
+                thoughtLabel={
+                  inlineThinkingMode === 'full' ? 'Thinking ...' : undefined
                 }
                 elapsedTime={uiState.elapsedTime}
               />
