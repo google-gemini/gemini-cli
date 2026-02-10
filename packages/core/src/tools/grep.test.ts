@@ -487,7 +487,7 @@ describe('GrepTool', () => {
         max_matches_per_file: 1,
       };
       const invocation = grepTool.build(params);
-      const result = (await invocation.execute(abortSignal));
+      const result = await invocation.execute(abortSignal);
 
       // fileA.txt has 2 worlds, but should only return 1.
       // sub/fileC.txt has 1 world, so total matches = 2.
