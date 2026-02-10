@@ -58,7 +58,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   const hasThoughtIndicator =
     currentLoadingPhrase !== INTERACTIVE_SHELL_WAITING_PHRASE &&
     Boolean(thought?.subject?.trim());
-  const thinkingIndicator = hasThoughtIndicator ? '💬 ' : '';
+  const thinkingIndicator = hasThoughtIndicator ? 'Thinking: ' : '';
 
   const cancelAndTimerContent =
     showCancelAndTimer &&

@@ -36,7 +36,10 @@ import { HooksList } from './views/HooksList.js';
 import { ModelMessage } from './messages/ModelMessage.js';
 import { ThinkingMessage } from './messages/ThinkingMessage.js';
 import { HintMessage } from './messages/HintMessage.js';
-import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
+import {
+  getInlineThinkingMode,
+  type InlineThinkingMode,
+} from '../utils/inlineThinkingMode.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 
 interface HistoryItemDisplayProps {
@@ -47,6 +50,8 @@ interface HistoryItemDisplayProps {
   commands?: readonly SlashCommand[];
   availableTerminalHeightGemini?: number;
   isExpandable?: boolean;
+  isFirstThinking?: boolean;
+  isLastThinking?: boolean;
 }
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
@@ -57,6 +62,8 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   commands,
   availableTerminalHeightGemini,
   isExpandable,
+  isFirstThinking = false,
+  isLastThinking = false,
 }) => {
   const settings = useSettings();
   const inlineThinkingMode = getInlineThinkingMode(settings);
@@ -66,7 +73,12 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
     <Box flexDirection="column" key={itemForDisplay.id} width={terminalWidth}>
       {/* Render standard message types */}
       {itemForDisplay.type === 'thinking' && inlineThinkingMode !== 'off' && (
-        <ThinkingMessage thought={itemForDisplay.thought} />
+        <ThinkingMessage
+          thought={itemForDisplay.thought}
+          terminalWidth={terminalWidth}
+          isFirstThinking={isFirstThinking}
+          isLastThinking={isLastThinking}
+        />
       )}
       {itemForDisplay.type === 'hint' && (
         <HintMessage text={itemForDisplay.text} />
