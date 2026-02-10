@@ -18,12 +18,16 @@ import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as https from 'node:https';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(__dirname, '..');
 
 const MIN_PORT = 3001;
 const MAX_PORT = 3100;
 const STARTUP_TIMEOUT_MS = 10000;
 const POLL_INTERVAL_MS = 200;
-const PROXY_CERT_PATH = path.resolve('tools/gca-proxy/proxy-cert.pem');
+const PROXY_CERT_PATH = path.join(REPO_ROOT, 'tools/gca-proxy/proxy-cert.pem');
 
 /**
  * Find an available port in the given range
@@ -98,7 +102,7 @@ async function main() {
     // Start the proxy server (silent mode - no output to avoid TUI interference)
     console.log('🚀 Starting GCA Proxy server...');
     const proxyProcess = spawn('npx', ['tsx', 'src/server.ts'], {
-      cwd: 'tools/gca-proxy',
+      cwd: path.join(REPO_ROOT, 'tools/gca-proxy'),
       env: { ...process.env, PORT: String(port) },
       stdio: 'ignore', // Suppress all output to avoid interfering with CLI TUI
     });
@@ -133,7 +137,7 @@ async function main() {
     console.log('🤖 Starting Gemini CLI...\n');
     const cliProcess = spawn(
       'node',
-      ['scripts/start.js', ...process.argv.slice(2)],
+      [path.join(REPO_ROOT, 'scripts/start.js'), ...process.argv.slice(2)],
       {
         env: {
           ...process.env,
