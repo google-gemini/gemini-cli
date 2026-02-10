@@ -16,55 +16,61 @@ const CardDemo = () => {
         <Text bold>Card Component Demo</Text>
 
         <Box flexDirection="column" gap={1}>
-          <Text color="dim">Default (100% width, Pending status):</Text>
-          <Card title="Full Width Card" status={ToolCallStatus.Pending}>
-            <Text>
-              This is a standard card that takes up the full width of the
-              terminal container by default.
-            </Text>
-          </Card>
-
-          <Text color="dim">Fixed Width (40 characters, Success status):</Text>
           <Card
-            title="Fixed Width"
+            title="FindFiles"
+            suffix="**/*.ts"
             status={ToolCallStatus.Success}
-            width={40}
-            suffix="v1.0.0"
           >
-            <Text>This card has a fixed width of 40 characters.</Text>
+            <Text>Found 37 files</Text>
           </Card>
-
-          <Text color="dim">Error Status with Prefix:</Text>
           <Card
-            title="Database Error"
+            title="SearchText"
+            suffix="nano-banana"
+            status={ToolCallStatus.Canceled}
+          >
+            <Text>No matches found</Text>
+          </Card>
+          <Card
+            title="ReadFile"
+            suffix='{"file_path":"this_file_does_not_exist.txt"}'
             status={ToolCallStatus.Error}
-            width={80}
-            showStatusIndicator={true}
-            suffix="Connection Timeout"
           >
             <Text>
-              Failed to connect to the production database after 3 attempts.
+              {
+                'File not found:\n/users/root/src/gemini/this_file_does_not_exist.txt'
+              }
             </Text>
           </Card>
-
-          <Text color="dim">Canceled Status without Prefix:</Text>
           <Card
-            title="Operation Aborted"
-            status={ToolCallStatus.Canceled}
-            width={80}
-            showStatusIndicator={false}
+            title="Shell"
+            suffix="npm test -w @google/gemini-cli"
+            status={ToolCallStatus.Confirming}
           >
-            <Text>The user canceled the long-running task.</Text>
+            <Text>Apply this change?</Text>
           </Card>
-
-          <Text color="dim">Executing Status:</Text>
           <Card
-            title="Applying Changes"
+            title="Executing"
+            suffix="Lorem ipsum dolor sit amet"
             status={ToolCallStatus.Executing}
-            width={70}
           >
             <Text>
-              Refactoring the codebase to use the new Card component...
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+              eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut
+              enim ad minim veniam, quis nostrud exercitation ullamco laboris
+              nisi ut aliquip ex ea commodo consequat.
+            </Text>
+          </Card>
+          <Card
+            title="Executing"
+            suffix="Lorem ipsum dolor sit amet"
+            status={ToolCallStatus.Executing}
+            width={60}
+          >
+            <Text>
+              Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+              eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut
+              enim ad minim veniam, quis nostrud exercitation ullamco laboris
+              nisi ut aliquip ex ea commodo consequat.
             </Text>
           </Card>
         </Box>
