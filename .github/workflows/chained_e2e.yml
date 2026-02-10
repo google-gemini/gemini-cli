@@ -274,7 +274,7 @@ jobs:
           UV_THREADPOOL_SIZE: '32'
           NODE_ENV: 'test'
         shell: 'pwsh'
-        run: 'npx vitest run --root integration-tests hooks-system.test.ts hooks-agent-flow.test.ts --test-timeout 600000'
+        run: 'npx vitest run --root integration-tests hooks-system.test.ts hooks-agent-flow.test.ts --test-timeout 600000 --allowOnly'
 
   evals:
     name: 'Evals (ALWAYS_PASSING)'

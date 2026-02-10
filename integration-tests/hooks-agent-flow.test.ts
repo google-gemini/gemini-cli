@@ -300,8 +300,6 @@ describe('Hooks Agent Flow', () => {
                 },
               ],
             },
-              ],
-            },
           },
         },
       );
