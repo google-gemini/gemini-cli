@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -53,9 +53,14 @@ import { tokenLimit } from '../core/tokenLimits.js';
 import {
   DEFAULT_GEMINI_EMBEDDING_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
+  DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
+  isAutoModel,
   isPreviewModel,
+  PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL_AUTO,
+  resolveModel,
 } from './models.js';
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
@@ -87,20 +92,21 @@ import { ContextManager } from '../services/contextManager.js';
 import type { GenerateContentParameters } from '@google/genai';
 
 // Re-export OAuth config type
-export type { MCPOAuthConfig, AnyToolInvocation };
-import type { AnyToolInvocation } from '../tools/tools.js';
+export type { MCPOAuthConfig, AnyToolInvocation, AnyDeclarativeTool };
+import type { AnyToolInvocation, AnyDeclarativeTool } from '../tools/tools.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { Storage } from './storage.js';
 import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
 import { FileExclusions } from '../utils/ignorePatterns.js';
-import type { EventEmitter } from 'node:events';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { EventEmitter } from 'node:events';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import { ApprovalMode, type PolicyEngineConfig } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
 import type { UserTierId } from '../code_assist/types.js';
 import type { RetrieveUserQuotaResponse } from '../code_assist/types.js';
 import type { AdminControlsSettings } from '../code_assist/types.js';
+import type { HierarchicalMemory } from './memory.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
@@ -384,7 +390,7 @@ export interface ConfigParameters {
   mcpServerCommand?: string;
   mcpServers?: Record<string, MCPServerConfig>;
   mcpEnablementCallbacks?: McpEnablementCallbacks;
-  userMemory?: string;
+  userMemory?: string | HierarchicalMemory;
   geminiMdFileCount?: number;
   geminiMdFilePaths?: string[];
   approvalMode?: ApprovalMode;
@@ -519,7 +525,7 @@ export class Config {
   private readonly extensionsEnabled: boolean;
   private mcpServers: Record<string, MCPServerConfig> | undefined;
   private readonly mcpEnablementCallbacks?: McpEnablementCallbacks;
-  private userMemory: string;
+  private userMemory: string | HierarchicalMemory;
   private geminiMdFileCount: number;
   private geminiMdFilePaths: string[];
   private readonly showMemoryUsage: boolean;
@@ -563,6 +569,31 @@ export class Config {
   fallbackModelHandler?: FallbackModelHandler;
   validationHandler?: ValidationHandler;
   private quotaErrorOccurred: boolean = false;
+  private modelQuotas: Map<
+    string,
+    { remaining: number; limit: number; resetTime?: string }
+  > = new Map();
+  private lastRetrievedQuota?: RetrieveUserQuotaResponse;
+  private lastQuotaFetchTime = 0;
+  private lastEmittedQuotaRemaining: number | undefined;
+  private lastEmittedQuotaLimit: number | undefined;
+
+  private emitQuotaChangedEvent(): void {
+    const pooled = this.getPooledQuota();
+    if (
+      this.lastEmittedQuotaRemaining !== pooled.remaining ||
+      this.lastEmittedQuotaLimit !== pooled.limit
+    ) {
+      this.lastEmittedQuotaRemaining = pooled.remaining;
+      this.lastEmittedQuotaLimit = pooled.limit;
+      coreEvents.emitQuotaChanged(
+        pooled.remaining,
+        pooled.limit,
+        pooled.resetTime,
+      );
+    }
+  }
+
   private readonly summarizeToolOutput:
     | Record<string, SummarizeToolOutputSettings>
     | undefined;
@@ -1205,6 +1236,90 @@ export class Config {
     return this.quotaErrorOccurred;
   }
 
+  setQuota(
+    remaining: number | undefined,
+    limit: number | undefined,
+    modelId?: string,
+  ): void {
+    const activeModel = modelId ?? this.getActiveModel();
+    if (remaining !== undefined && limit !== undefined) {
+      const current = this.modelQuotas.get(activeModel);
+      if (
+        !current ||
+        current.remaining !== remaining ||
+        current.limit !== limit
+      ) {
+        this.modelQuotas.set(activeModel, { remaining, limit });
+        this.emitQuotaChangedEvent();
+      }
+    }
+  }
+
+  private getPooledQuota(): {
+    remaining?: number;
+    limit?: number;
+    resetTime?: string;
+  } {
+    const model = this.getModel();
+    if (!isAutoModel(model)) {
+      return {};
+    }
+
+    const isPreview =
+      model === PREVIEW_GEMINI_MODEL_AUTO ||
+      isPreviewModel(this.getActiveModel());
+    const proModel = isPreview ? PREVIEW_GEMINI_MODEL : DEFAULT_GEMINI_MODEL;
+    const flashModel = isPreview
+      ? PREVIEW_GEMINI_FLASH_MODEL
+      : DEFAULT_GEMINI_FLASH_MODEL;
+
+    const proQuota = this.modelQuotas.get(proModel);
+    const flashQuota = this.modelQuotas.get(flashModel);
+
+    if (proQuota || flashQuota) {
+      // For reset time, take the one that is furthest in the future (most conservative)
+      const resetTime = [proQuota?.resetTime, flashQuota?.resetTime]
+        .filter((t): t is string => !!t)
+        .sort()
+        .reverse()[0];
+
+      return {
+        remaining: (proQuota?.remaining ?? 0) + (flashQuota?.remaining ?? 0),
+        limit: (proQuota?.limit ?? 0) + (flashQuota?.limit ?? 0),
+        resetTime,
+      };
+    }
+
+    return {};
+  }
+
+  getQuotaRemaining(): number | undefined {
+    const pooled = this.getPooledQuota();
+    if (pooled.remaining !== undefined) {
+      return pooled.remaining;
+    }
+    const primaryModel = resolveModel(this.getModel());
+    return this.modelQuotas.get(primaryModel)?.remaining;
+  }
+
+  getQuotaLimit(): number | undefined {
+    const pooled = this.getPooledQuota();
+    if (pooled.limit !== undefined) {
+      return pooled.limit;
+    }
+    const primaryModel = resolveModel(this.getModel());
+    return this.modelQuotas.get(primaryModel)?.limit;
+  }
+
+  getQuotaResetTime(): string | undefined {
+    const pooled = this.getPooledQuota();
+    if (pooled.resetTime !== undefined) {
+      return pooled.resetTime;
+    }
+    const primaryModel = resolveModel(this.getModel());
+    return this.modelQuotas.get(primaryModel)?.resetTime;
+  }
+
   getEmbeddingModel(): string {
     return this.embeddingModel;
   }
@@ -1284,6 +1399,35 @@ export class Config {
       const quota = await codeAssistServer.retrieveUserQuota({
         project: codeAssistServer.projectId,
       });
+
+      if (quota.buckets) {
+        this.lastRetrievedQuota = quota;
+        this.lastQuotaFetchTime = Date.now();
+
+        for (const bucket of quota.buckets) {
+          if (
+            bucket.modelId &&
+            bucket.remainingAmount &&
+            bucket.remainingFraction != null
+          ) {
+            const remaining = parseInt(bucket.remainingAmount, 10);
+            const limit =
+              bucket.remainingFraction > 0
+                ? Math.round(remaining / bucket.remainingFraction)
+                : (this.modelQuotas.get(bucket.modelId)?.limit ?? 0);
+
+            if (!isNaN(remaining) && Number.isFinite(limit) && limit > 0) {
+              this.modelQuotas.set(bucket.modelId, {
+                remaining,
+                limit,
+                resetTime: bucket.resetTime,
+              });
+            }
+          }
+        }
+        this.emitQuotaChangedEvent();
+      }
+
       const hasAccess =
         quota.buckets?.some((b) => b.modelId === PREVIEW_GEMINI_MODEL) ?? false;
       this.setHasAccessToPreviewModel(hasAccess);
@@ -1292,6 +1436,41 @@ export class Config {
       debugLogger.debug('Failed to retrieve user quota', e);
       return undefined;
     }
+  }
+
+  async refreshUserQuotaIfStale(
+    staleMs = 30_000,
+  ): Promise<RetrieveUserQuotaResponse | undefined> {
+    const now = Date.now();
+    if (now - this.lastQuotaFetchTime > staleMs) {
+      return this.refreshUserQuota();
+    }
+    return this.lastRetrievedQuota;
+  }
+
+  getLastRetrievedQuota(): RetrieveUserQuotaResponse | undefined {
+    return this.lastRetrievedQuota;
+  }
+
+  getRemainingQuotaForModel(modelId: string):
+    | {
+        remainingAmount?: number;
+        remainingFraction?: number;
+        resetTime?: string;
+      }
+    | undefined {
+    const bucket = this.lastRetrievedQuota?.buckets?.find(
+      (b) => b.modelId === modelId,
+    );
+    if (!bucket) return undefined;
+
+    return {
+      remainingAmount: bucket.remainingAmount
+        ? parseInt(bucket.remainingAmount, 10)
+        : undefined,
+      remainingFraction: bucket.remainingFraction,
+      resetTime: bucket.resetTime,
+    };
   }
 
   getCoreTools(): string[] | undefined {
@@ -1379,14 +1558,13 @@ export class Config {
     this.mcpServers = mcpServers;
   }
 
-  getUserMemory(): string {
+  getUserMemory(): string | HierarchicalMemory {
     if (this.experimentalJitContext && this.contextManager) {
-      return [
-        this.contextManager.getGlobalMemory(),
-        this.contextManager.getEnvironmentMemory(),
-      ]
-        .filter(Boolean)
-        .join('\n\n');
+      return {
+        global: this.contextManager.getGlobalMemory(),
+        extension: this.contextManager.getExtensionMemory(),
+        project: this.contextManager.getEnvironmentMemory(),
+      };
     }
     return this.userMemory;
   }
@@ -1409,7 +1587,7 @@ export class Config {
     }
   }
 
-  setUserMemory(newUserMemory: string): void {
+  setUserMemory(newUserMemory: string | HierarchicalMemory): void {
     this.userMemory = newUserMemory;
   }
 
@@ -2160,10 +2338,12 @@ export class Config {
     const registry = new ToolRegistry(this, this.messageBus);
 
     // helper to create & register core tools that are enabled
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const registerCoreTool = (ToolClass: any, ...args: unknown[]) => {
-      const className = ToolClass.name;
-      const toolName = ToolClass.Name || className;
+    const maybeRegister = (
+      toolClass: { name: string; Name?: string },
+      registerFn: () => void,
+    ) => {
+      const className = toolClass.name;
+      const toolName = toolClass.Name || className;
       const coreTools = this.getCoreTools();
       // On some platforms, the className can be minified to _ClassName.
       const normalizedClassName = className.replace(/^_+/, '');
@@ -2180,15 +2360,16 @@ export class Config {
       }
 
       if (isEnabled) {
-        // Pass message bus to tools (required for policy engine integration)
-        const toolArgs = [...args, this.getMessageBus()];
-
-        registry.registerTool(new ToolClass(...toolArgs));
+        registerFn();
       }
     };
 
-    registerCoreTool(LSTool, this);
-    registerCoreTool(ReadFileTool, this);
+    maybeRegister(LSTool, () =>
+      registry.registerTool(new LSTool(this, this.messageBus)),
+    );
+    maybeRegister(ReadFileTool, () =>
+      registry.registerTool(new ReadFileTool(this, this.messageBus)),
+    );
 
     if (this.getUseRipgrep()) {
       let useRipgrep = false;
@@ -2199,30 +2380,60 @@ export class Config {
         errorString = String(error);
       }
       if (useRipgrep) {
-        registerCoreTool(RipGrepTool, this);
+        maybeRegister(RipGrepTool, () =>
+          registry.registerTool(new RipGrepTool(this, this.messageBus)),
+        );
       } else {
         logRipgrepFallback(this, new RipgrepFallbackEvent(errorString));
-        registerCoreTool(GrepTool, this);
+        maybeRegister(GrepTool, () =>
+          registry.registerTool(new GrepTool(this, this.messageBus)),
+        );
       }
     } else {
-      registerCoreTool(GrepTool, this);
+      maybeRegister(GrepTool, () =>
+        registry.registerTool(new GrepTool(this, this.messageBus)),
+      );
     }
 
-    registerCoreTool(GlobTool, this);
-    registerCoreTool(ActivateSkillTool, this);
-    registerCoreTool(EditTool, this);
-    registerCoreTool(WriteFileTool, this);
-    registerCoreTool(WebFetchTool, this);
-    registerCoreTool(ShellTool, this);
-    registerCoreTool(MemoryTool);
-    registerCoreTool(WebSearchTool, this);
-    registerCoreTool(AskUserTool);
+    maybeRegister(GlobTool, () =>
+      registry.registerTool(new GlobTool(this, this.messageBus)),
+    );
+    maybeRegister(ActivateSkillTool, () =>
+      registry.registerTool(new ActivateSkillTool(this, this.messageBus)),
+    );
+    maybeRegister(EditTool, () =>
+      registry.registerTool(new EditTool(this, this.messageBus)),
+    );
+    maybeRegister(WriteFileTool, () =>
+      registry.registerTool(new WriteFileTool(this, this.messageBus)),
+    );
+    maybeRegister(WebFetchTool, () =>
+      registry.registerTool(new WebFetchTool(this, this.messageBus)),
+    );
+    maybeRegister(ShellTool, () =>
+      registry.registerTool(new ShellTool(this, this.messageBus)),
+    );
+    maybeRegister(MemoryTool, () =>
+      registry.registerTool(new MemoryTool(this.messageBus)),
+    );
+    maybeRegister(WebSearchTool, () =>
+      registry.registerTool(new WebSearchTool(this, this.messageBus)),
+    );
+    maybeRegister(AskUserTool, () =>
+      registry.registerTool(new AskUserTool(this.messageBus)),
+    );
     if (this.getUseWriteTodos()) {
-      registerCoreTool(WriteTodosTool);
+      maybeRegister(WriteTodosTool, () =>
+        registry.registerTool(new WriteTodosTool(this.messageBus)),
+      );
     }
     if (this.isPlanEnabled()) {
-      registerCoreTool(ExitPlanModeTool, this);
-      registerCoreTool(EnterPlanModeTool, this);
+      maybeRegister(ExitPlanModeTool, () =>
+        registry.registerTool(new ExitPlanModeTool(this, this.messageBus)),
+      );
+      maybeRegister(EnterPlanModeTool, () =>
+        registry.registerTool(new EnterPlanModeTool(this, this.messageBus)),
+      );
     }
 
     // Register Subagents as Tools

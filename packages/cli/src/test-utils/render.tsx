@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -44,6 +44,7 @@ vi.mock('../ui/utils/terminalUtils.js', () => ({
   isLowColorDepth: vi.fn(() => false),
   getColorDepth: vi.fn(() => 24),
   isITerm2: vi.fn(() => false),
+  shouldUseEmoji: vi.fn(() => true),
 }));
 
 // Wrapper around ink-testing-library's render that ensures act() is called
@@ -151,6 +152,12 @@ const baseMockUiState = {
   activePtyId: undefined,
   backgroundShells: new Map(),
   backgroundShellHeight: 0,
+  quota: {
+    userTier: undefined,
+    stats: undefined,
+    proQuotaRequest: null,
+    validationRequest: null,
+  },
 };
 
 export const mockAppState: AppState = {
@@ -200,7 +207,6 @@ const mockUIActions: UIActions = {
   setActiveBackgroundShellPid: vi.fn(),
   setIsBackgroundShellListOpen: vi.fn(),
   setAuthContext: vi.fn(),
-  handleWarning: vi.fn(),
   handleRestart: vi.fn(),
   handleNewAgentsSelect: vi.fn(),
 };
