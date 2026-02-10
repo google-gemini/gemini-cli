@@ -1354,7 +1354,7 @@ export class TestRig {
       console.log(`[TestRig] Args: ${JSON.stringify(commandArgs)}`);
       // Only log keys to avoid leaking sensitive info
       console.log(
-        `[TestRig] Env Keys: ${Object.keys(ptyOptions.env).join(', ')}`,
+        `[TestRig] Env Keys: ${Object.keys(ptyOptions.env!).join(', ')}`,
       );
     }
     const ptyProcess = pty.spawn(executable, commandArgs, ptyOptions);

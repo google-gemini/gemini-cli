@@ -124,6 +124,43 @@ jobs:
           status: 'pending'
           context: 'E2E (Chained)'
 
+  e2e_linux:
+    name: 'E2E Test (Linux) - ${{ matrix.sandbox }}'
+    needs:
+      - 'merge_queue_skipper'
+      - 'parse_run_context'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    if: false
+    strategy:
+      fail-fast: false
+      matrix:
+        sandbox:
+          - 'sandbox:none'
+          - 'sandbox:docker'
+        node-version:
+          - '20.x'
+
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
+        with:
+          ref: '${{ needs.parse_run_context.outputs.sha }}'
+          repository: '${{ needs.parse_run_context.outputs.repository }}'
+
+  e2e_mac:
+    name: 'E2E Test (macOS)'
+    needs:
+      - 'merge_queue_skipper'
+      - 'parse_run_context'
+    runs-on: 'macos-latest'
+    if: false
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
+        with:
+          ref: '${{ needs.parse_run_context.outputs.sha }}'
+          repository: '${{ needs.parse_run_context.outputs.repository }}'
+
   e2e_windows:
     name: 'Slow E2E - Win'
     needs:
@@ -184,6 +221,20 @@ jobs:
           NODE_ENV: 'test'
         shell: 'pwsh'
         run: 'npx vitest run --root integration-tests hooks-system.test.ts'
+
+  evals:
+    name: 'Evals (ALWAYS_PASSING)'
+    needs:
+      - 'merge_queue_skipper'
+      - 'parse_run_context'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    if: false
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
+        with:
+          ref: '${{ needs.parse_run_context.outputs.sha }}'
+          repository: '${{ needs.parse_run_context.outputs.repository }}'
 
   e2e:
     name: 'E2E'
