@@ -106,6 +106,7 @@ available combinations.
 | Toggle YOLO (auto-approval) mode for tool calls.                                                      | `Ctrl + Y`                 |
 | Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only). | `Shift + Tab`              |
 | Expand a height-constrained response to show additional lines when not in alternate buffer mode.      | `Ctrl + O`<br />`Ctrl + S` |
+| Expand or collapse a paste placeholder when cursor is over placeholder.                               | `Ctrl + O`                 |
 | Toggle current background shell visibility.                                                           | `Ctrl + B`                 |
 | Toggle background shell list.                                                                         | `Ctrl + L`                 |
 | Kill the active background shell.                                                                     | `Ctrl + K`                 |
@@ -139,6 +140,7 @@ available combinations.
   single-line input, navigate backward or forward through prompt history.
 - `Number keys (1-9, multi-digit)` inside selection dialogs: Jump directly to
   the numbered radio option and confirm when the full number is entered.
-- `Double-click` on a paste placeholder (`[Pasted Text: X lines]`) in alternate
-  buffer mode: Expand to view full content inline. Double-click again to
-  collapse.
+- `Ctrl + O`: Expand or collapse paste placeholders (`[Pasted Text: X lines]`)
+  inline when the cursor is over the placeholder.
+- `Double-click` on a paste placeholder (alternate buffer mode only): Expand to
+  view full content inline. Double-click again to collapse.
