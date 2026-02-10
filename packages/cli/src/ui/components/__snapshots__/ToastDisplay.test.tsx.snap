@@ -10,4 +10,6 @@ exports[`ToastDisplay > renders Escape prompt when buffer is empty 1`] = `"Press
 
 exports[`ToastDisplay > renders Queue Error Message 1`] = `"Queue Error"`;
 
+exports[`ToastDisplay > renders hint message 1`] = `"This is a hint"`;
+
 exports[`ToastDisplay > renders warning message 1`] = `"This is a warning"`;

@@ -40,7 +40,7 @@ type UIStateOverrides = Partial<Omit<UIState, 'buffer'>> & {
 const createMockUIState = (overrides: UIStateOverrides = {}): UIState =>
   ({
     ctrlCPressedOnce: false,
-    warningMessage: null,
+    transientMessage: null,
     ctrlDPressedOnce: false,
     showEscapePrompt: false,
     shortcutsHelpVisible: false,

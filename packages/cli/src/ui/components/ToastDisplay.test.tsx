@@ -8,6 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { render } from '../../test-utils/render.js';
 import { ToastDisplay } from './ToastDisplay.js';
 import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
+import { TransientMessageType } from '../../utils/events.js';
 import type { TextBuffer } from './shared/text-buffer.js';
 
 // Use a type that allows partial buffer for mocking purposes
@@ -19,7 +20,7 @@ type UIStateOverrides = Partial<Omit<UIState, 'buffer'>> & {
 const createMockUIState = (overrides: UIStateOverrides = {}): UIState =>
   ({
     ctrlCPressedOnce: false,
-    warningMessage: null,
+    transientMessage: null,
     ctrlDPressedOnce: false,
     showEscapePrompt: false,
     queueErrorMessage: null,
@@ -51,7 +52,21 @@ describe('ToastDisplay', () => {
 
   it('renders warning message', () => {
     const uiState = createMockUIState({
-      warningMessage: 'This is a warning',
+      transientMessage: {
+        text: 'This is a warning',
+        type: TransientMessageType.Warning,
+      },
+    });
+    const { lastFrame } = renderToastDisplay(uiState);
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('renders hint message', () => {
+    const uiState = createMockUIState({
+      transientMessage: {
+        text: 'This is a hint',
+        type: TransientMessageType.Hint,
+      },
     });
     const { lastFrame } = renderToastDisplay(uiState);
     expect(lastFrame()).toMatchSnapshot();
