@@ -101,8 +101,11 @@ describe('Hooks System Integration', () => {
       const scriptPath = rig.createScript(
         'stderr_block_hook.cjs',
         `
-process.stderr.write('File writing blocked by security policy');
-process.exit(2);
+console.log(JSON.stringify({
+  decision: 'deny',
+  reason: 'File writing blocked by security policy'
+}));
+process.exit(0);
 `,
       );
 
