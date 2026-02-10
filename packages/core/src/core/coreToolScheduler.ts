@@ -18,7 +18,6 @@ import { PolicyDecision } from '../policy/types.js';
 import { logToolCall } from '../telemetry/loggers.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { ToolCallEvent } from '../telemetry/types.js';
-import { runInDevTraceSpan } from '../telemetry/trace.js';
 import { ToolModificationHandler } from '../scheduler/tool-modifier.js';
 import { getToolSuggestion } from '../utils/tool-utils.js';
 import type { ToolConfirmationRequest } from '../confirmation-bus/types.js';
@@ -45,7 +44,6 @@ import {
 import { ToolExecutor } from '../scheduler/tool-executor.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { getPolicyDenialError } from '../scheduler/policy.js';
-import { EDIT_TOOL_NAME } from '../tools/tool-names.js';
 
 export type {
   ToolCall,
@@ -161,6 +159,73 @@ export class CoreToolScheduler {
       // Store the handler in the WeakMap so we don't subscribe again
       CoreToolScheduler.subscribedMessageBuses.set(messageBus, sharedHandler);
     }
+  }
+
+  schedule(
+    request: ToolCallRequestInfo | ToolCallRequestInfo[],
+    signal: AbortSignal,
+  ): Promise<void> {
+    if (this.isRunning() || this.isScheduling) {
+      return new Promise((resolve, reject) => {
+        const abortHandler = () => {
+          // Find and remove the request from the queue
+          const index = this.requestQueue.findIndex(
+            (item) => item.request === request,
+          );
+          if (index > -1) {
+            this.requestQueue.splice(index, 1);
+            reject(new Error('Tool call cancelled while in queue.'));
+          }
+        };
+
+        signal.addEventListener('abort', abortHandler, { once: true });
+
+        this.requestQueue.push({
+          request,
+          signal,
+          resolve: () => {
+            signal.removeEventListener('abort', abortHandler);
+            resolve();
+          },
+          reject: (reason?: Error) => {
+            signal.removeEventListener('abort', abortHandler);
+            reject(reason);
+          },
+        });
+      });
+    }
+    return this._schedule(request, signal);
+  }
+
+  cancelAll(signal: AbortSignal): void {
+    if (this.isCancelling) {
+      return;
+    }
+    this.isCancelling = true;
+    // Cancel the currently active tool call, if there is one.
+    if (this.toolCalls.length > 0) {
+      const activeCall = this.toolCalls[0];
+      // Only cancel if it's in a cancellable state.
+      if (
+        activeCall.status === 'awaiting_approval' ||
+        activeCall.status === 'executing' ||
+        activeCall.status === 'scheduled' ||
+        activeCall.status === 'validating'
+      ) {
+        this.setStatusInternal(
+          activeCall.request.callId,
+          'cancelled',
+          signal,
+          'User cancelled the operation.',
+        );
+      }
+    }
+
+    // Clear the queue and mark all queued items as cancelled for completion reporting.
+    this._cancelAllQueuedCalls();
+
+    // Finalize the batch immediately.
+    void this.checkAndNotifyCompletion(signal);
   }
 
   private setStatusInternal(
@@ -396,128 +461,6 @@ export class CoreToolScheduler {
     }
   }
 
-  private reorderEditsBottomToTop(
-    requests: ToolCallRequestInfo[],
-  ): ToolCallRequestInfo[] {
-    const result = [...requests];
-
-    // Group replace calls by file path
-    const editGroups = new Map<
-      string,
-      Array<{ index: number; startLine: number }>
-    >();
-
-    for (let i = 0; i < requests.length; i++) {
-      const req = requests[i];
-      if (
-        req.name === EDIT_TOOL_NAME &&
-        req.args &&
-        typeof req.args === 'object'
-      ) {
-        const args = req.args;
-        const filePath = args['file_path'];
-        const startLine = args['start_line'];
-        if (typeof filePath === 'string' && typeof startLine === 'number') {
-          if (!editGroups.has(filePath)) {
-            editGroups.set(filePath, []);
-          }
-          editGroups.get(filePath)!.push({ index: i, startLine });
-        }
-      }
-    }
-
-    // For each file with multiple edits, reorder those specific slots to be bottom-to-top (descending start_line)
-    for (const [, edits] of editGroups.entries()) {
-      if (edits.length <= 1) continue;
-
-      // Sort original indices to know which slots to fill in the result array
-      const slots = edits.map((e) => e.index).sort((a, b) => a - b);
-
-      // Sort edits by startLine descending
-      const sortedEdits = [...edits].sort((a, b) => b.startLine - a.startLine);
-
-      // Place the sorted edits back into the original slots in the result array
-      for (let i = 0; i < slots.length; i++) {
-        result[slots[i]] = requests[sortedEdits[i].index];
-      }
-    }
-
-    return result;
-  }
-
-  schedule(
-    request: ToolCallRequestInfo | ToolCallRequestInfo[],
-    signal: AbortSignal,
-  ): Promise<void> {
-    return runInDevTraceSpan(
-      { name: 'schedule' },
-      async ({ metadata: spanMetadata }) => {
-        spanMetadata.input = request;
-        if (this.isRunning() || this.isScheduling) {
-          return new Promise((resolve, reject) => {
-            const abortHandler = () => {
-              // Find and remove the request from the queue
-              const index = this.requestQueue.findIndex(
-                (item) => item.request === request,
-              );
-              if (index > -1) {
-                this.requestQueue.splice(index, 1);
-                reject(new Error('Tool call cancelled while in queue.'));
-              }
-            };
-
-            signal.addEventListener('abort', abortHandler, { once: true });
-
-            this.requestQueue.push({
-              request,
-              signal,
-              resolve: () => {
-                signal.removeEventListener('abort', abortHandler);
-                resolve();
-              },
-              reject: (reason?: Error) => {
-                signal.removeEventListener('abort', abortHandler);
-                reject(reason);
-              },
-            });
-          });
-        }
-        return this._schedule(request, signal);
-      },
-    );
-  }
-
-  cancelAll(signal: AbortSignal): void {
-    if (this.isCancelling) {
-      return;
-    }
-    this.isCancelling = true;
-    // Cancel the currently active tool call, if there is one.
-    if (this.toolCalls.length > 0) {
-      const activeCall = this.toolCalls[0];
-      // Only cancel if it's in a cancellable state.
-      if (
-        activeCall.status === 'awaiting_approval' ||
-        activeCall.status === 'executing' ||
-        activeCall.status === 'scheduled' ||
-        activeCall.status === 'validating'
-      ) {
-        this.setStatusInternal(
-          activeCall.request.callId,
-          'cancelled',
-          signal,
-          'User cancelled the operation.',
-        );
-      }
-    }
-
-    // Clear the queue and mark all queued items as cancelled for completion reporting.
-    this._cancelAllQueuedCalls();
-
-    // Finalize the batch immediately.
-    void this.checkAndNotifyCompletion(signal);
-  }
-
   private async _schedule(
     request: ToolCallRequestInfo | ToolCallRequestInfo[],
     signal: AbortSignal,
@@ -530,11 +473,8 @@ export class CoreToolScheduler {
           'Cannot schedule new tool calls while other tool calls are actively running (executing or awaiting approval).',
         );
       }
-      let requestsToProcess = Array.isArray(request) ? request : [request];
+      const requestsToProcess = Array.isArray(request) ? request : [request];
       this.completedToolCallsForBatch = [];
-
-      // Reorder 'replace' calls for the same file from bottom to top
-      requestsToProcess = this.reorderEditsBottomToTop(requestsToProcess);
 
       const newToolCalls: ToolCall[] = requestsToProcess.map(
         (reqInfo): ToolCall => {

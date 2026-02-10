@@ -729,61 +729,6 @@ describe('EditTool', () => {
     );
   });
 
-  describe('start_line', () => {
-    const testFile = 'start_line_test.txt';
-    let filePath: string;
-
-    beforeEach(() => {
-      filePath = path.join(rootDir, testFile);
-    });
-
-    it('should skip occurrences before start_line and replace all after', async () => {
-      const content = 'match\nmatch\nmatch\nmatch';
-      fs.writeFileSync(filePath, content, 'utf8');
-
-      // Target the 3rd match (line 3). There is also a match on line 4.
-      const params: EditToolParams = {
-        file_path: filePath,
-        instruction: 'Replace the matches starting from line 3',
-        old_string: 'match',
-        new_string: 'replacement',
-        start_line: 3,
-        expected_replacements: 2,
-      };
-
-      const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
-
-      expect(result.error).toBeUndefined();
-      const finalContent = fs.readFileSync(filePath, 'utf8');
-      expect(finalContent).toBe('match\nmatch\nreplacement\nreplacement');
-      expect(result.llmContent).toContain('SUCCESS: Modified');
-    });
-
-    it('should return error if no match found after start_line', async () => {
-      // Create a file with 60 lines, matches only in the first 10.
-      const content =
-        Array(10).fill('match').join('\n') +
-        '\n' +
-        Array(50).fill('other').join('\n');
-      fs.writeFileSync(filePath, content, 'utf8');
-
-      // Target match after line 50. Matches are at 1-10.
-      const params: EditToolParams = {
-        file_path: filePath,
-        instruction: 'Replace match after line 50',
-        old_string: 'match',
-        new_string: 'replacement',
-        start_line: 50,
-      };
-
-      const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
-
-      expect(result.error?.type).toBe(ToolErrorType.EDIT_NO_OCCURRENCE_FOUND);
-    });
-  });
-
   describe('IDE mode', () => {
     const testFile = 'edit_me.txt';
     let filePath: string;
