@@ -324,6 +324,14 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
         return false; // Let InputPrompt handle completion
       }
 
+      // Let InputPrompt handle Ctrl+U (kill line left) and Ctrl+K (kill line right)
+      if (
+        normalizedKey.ctrl &&
+        (normalizedKey.name === 'u' || normalizedKey.name === 'k')
+      ) {
+        return false;
+      }
+
       // Let InputPrompt handle Ctrl+V for clipboard image pasting
       if (normalizedKey.ctrl && normalizedKey.name === 'v') {
         return false; // Let InputPrompt handle clipboard functionality
