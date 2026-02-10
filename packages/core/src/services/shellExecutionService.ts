@@ -23,6 +23,8 @@ import { installBrowserShims } from '../utils/browser-shims.js';
 import {
   serializeTerminalToObject,
   type AnsiOutput,
+  type AnsiLine,
+  type AnsiToken,
 } from '../utils/terminalSerializer.js';
 import {
   sanitizeEnvironment,
@@ -130,6 +132,7 @@ interface ActivePty {
   ptyProcess: IPty;
   headlessTerminal: Terminal;
   maxSerializedLines?: number;
+  serializationCache: Map<number, AnsiLine>;
 }
 
 interface ActiveChildProcess {
@@ -204,6 +207,63 @@ export class ShellExecutionService {
     number,
     Set<(event: ShellOutputEvent) => void>
   >();
+
+  private static terminalInitializationPromise: Promise<void> | null = null;
+
+  static {
+    installBrowserShims();
+  }
+
+  private static getFullBufferText(
+    terminal: Terminal,
+    scrollbackLimit?: number,
+  ): string {
+    const buffer = terminal.buffer.active;
+    const lines: string[] = [];
+
+    const scrollbackLength = terminal.getScrollbackLength();
+    const rows = terminal.rows;
+    const totalRelevantLines = scrollbackLength + rows;
+
+    for (let i = 0; i < totalRelevantLines; i++) {
+      const line = buffer.getLine(i);
+      if (!line) {
+        continue;
+      }
+
+      const lineContent = line.translateToString(false);
+
+      if (line.isWrapped && lines.length > 0) {
+        lines[lines.length - 1] += lineContent;
+      } else {
+        lines.push(lineContent);
+      }
+    }
+
+    // Remove trailing empty lines
+    while (lines.length > 0 && lines[lines.length - 1].trim() === '') {
+      lines.pop();
+    }
+
+    if (scrollbackLimit !== undefined && lines.length > scrollbackLimit) {
+      return lines.slice(lines.length - scrollbackLimit).join('\n');
+    }
+
+    return lines.join('\n');
+  }
+
+  private static initializeGhostty(): Promise<void> {
+    if (!this.terminalInitializationPromise) {
+      this.terminalInitializationPromise = init();
+    }
+    return this.terminalInitializationPromise;
+  }
+
+  /** @internal */
+  static resetInitializationForTesting(): void {
+    this.terminalInitializationPromise = null;
+  }
+
   /**
    * Executes a shell command using `node-pty`, capturing all output and lifecycle events.
    *
@@ -580,10 +640,8 @@ export class ShellExecutionService {
       const result = new Promise<ShellExecutionResult>((resolve) => {
         this.activeResolvers.set(ptyProcess.pid, resolve);
 
-        installBrowserShims();
-
         const initializeTerminal = async () => {
-          await init();
+          await ShellExecutionService.initializeGhostty();
 
           const scrollback =
             shellExecutionConfig.scrollback ?? SCROLLBACK_LIMIT;
@@ -602,12 +660,17 @@ export class ShellExecutionService {
             ptyProcess,
             headlessTerminal,
             maxSerializedLines: shellExecutionConfig.maxSerializedLines,
+            serializationCache: new Map(),
           });
 
           return headlessTerminal;
         };
 
-        const terminalPromise = initializeTerminal();
+        let headlessTerminalInstance: Terminal | null = null;
+        const terminalPromise = initializeTerminal().then((t) => {
+          headlessTerminalInstance = t;
+          return t;
+        });
 
         let processingChain = Promise.resolve();
         let decoder: TextDecoder | null = null;
@@ -623,20 +686,22 @@ export class ShellExecutionService {
         let hasStartedOutput = false;
         let renderTimeout: NodeJS.Timeout | null = null;
 
-        const renderFn = async () => {
+        const renderFn = (isFinal = false) => {
           renderTimeout = null;
 
-          if (!isStreamingRawContent) {
+          if (!isStreamingRawContent || !headlessTerminalInstance) {
             return;
           }
 
-          const headlessTerminal = await terminalPromise;
+          const headlessTerminal = headlessTerminalInstance;
+          const activePty = ShellExecutionService.activePtys.get(ptyProcess.pid);
+          if (!activePty) return;
 
           if (!shellExecutionConfig.disableDynamicLineTrimming) {
-            if (!hasStartedOutput) {
+            if (!hasStartedOutput && !isFinal) {
               const scrollbackLimit =
                 shellExecutionConfig.scrollback ?? SCROLLBACK_LIMIT;
-              const bufferText = getFullBufferText(
+              const bufferText = ShellExecutionService.getFullBufferText(
                 headlessTerminal,
                 scrollbackLimit,
               );
@@ -648,14 +713,15 @@ export class ShellExecutionService {
           }
 
           const buffer = headlessTerminal.buffer.active;
-          const endLine = buffer.length;
+          const endLine =
+            headlessTerminal.getScrollbackLength() + headlessTerminal.rows;
           const scrollbackLimit =
             shellExecutionConfig.scrollback ?? SCROLLBACK_LIMIT;
           const startLine = Math.max(
             0,
             endLine -
               Math.min(
-                scrollbackLimit + rows,
+                scrollbackLimit + headlessTerminal.rows,
                 shellExecutionConfig.maxSerializedLines ?? 2000,
               ),
           );
@@ -666,11 +732,16 @@ export class ShellExecutionService {
               headlessTerminal,
               startLine,
               endLine,
+              activePty.serializationCache,
             );
           } else {
             newOutput = (
-              serializeTerminalToObject(headlessTerminal, startLine, endLine) ||
-              []
+              serializeTerminalToObject(
+                headlessTerminal,
+                startLine,
+                endLine,
+                activePty.serializationCache,
+              ) || []
             ).map((line) =>
               line.map((token) => {
                 token.fg = '';
@@ -707,7 +778,35 @@ export class ShellExecutionService {
             ? newOutput
             : trimmedOutput;
 
-          if (output !== finalOutput) {
+          const isLineEqual = (lineA: AnsiLine, lineB: AnsiLine): boolean => {
+            if (lineA === lineB) return true;
+            if (lineA.length !== lineB.length) return false;
+            return lineA.every((token: AnsiToken, i: number) => {
+              const other = lineB[i];
+              return (
+                token.text === other.text &&
+                token.fg === other.fg &&
+                token.bg === other.bg &&
+                token.bold === other.bold &&
+                token.italic === other.italic &&
+                token.underline === other.underline &&
+                token.dim === other.dim &&
+                token.inverse === other.inverse
+              );
+            });
+          };
+
+          const hasChanged =
+            isFinal ||
+            !output ||
+            !Array.isArray(output) ||
+            output.length !== finalOutput.length ||
+            finalOutput.some((line, i) => {
+              const prevLine = (output as AnsiOutput)[i];
+              return !prevLine || !isLineEqual(line, prevLine);
+            });
+
+          if (hasChanged) {
             output = finalOutput;
             const event: ShellOutputEvent = {
               type: 'data',
@@ -723,9 +822,7 @@ export class ShellExecutionService {
             if (renderTimeout) {
               clearTimeout(renderTimeout);
             }
-            renderFn().catch(() => {
-              // Ignore errors during final render
-            });
+            renderFn(true);
             return;
           }
 
@@ -734,19 +831,19 @@ export class ShellExecutionService {
           }
 
           renderTimeout = setTimeout(() => {
-            renderFn().catch(() => {
-              // Ignore errors during render
-            });
+            renderFn(false);
             renderTimeout = null;
-          }, 68);
+          }, 100);
         };
 
         terminalPromise.then((headlessTerminal) => {
-          headlessTerminal.onScroll(() => {
-            if (!isWriting) {
-              render();
-            }
-          });
+          if (typeof (headlessTerminal as any).onScroll === 'function') {
+            (headlessTerminal as any).onScroll(() => {
+              if (!isWriting) {
+                render();
+              }
+            });
+          }
         });
 
         const handleOutput = (data: Buffer) => {
@@ -785,13 +882,21 @@ export class ShellExecutionService {
                       resolve();
                       return;
                     }
-                    isWriting = true;
-                    const headlessTerminal = await terminalPromise;
-                    headlessTerminal.write(decodedChunk, () => {
-                      render();
-                      isWriting = false;
-                      resolve();
-                    });
+
+                    const writeToTerminal = (term: Terminal) => {
+                      isWriting = true;
+                      term.write(decodedChunk, () => {
+                        render();
+                        isWriting = false;
+                        resolve();
+                      });
+                    };
+
+                    if (headlessTerminalInstance) {
+                      writeToTerminal(headlessTerminalInstance);
+                    } else {
+                      terminalPromise.then(writeToTerminal);
+                    }
                   } else {
                     const totalBytes = outputChunks.reduce(
                       (sum, chunk) => sum + chunk.length,
@@ -822,7 +927,7 @@ export class ShellExecutionService {
           ({ exitCode, signal }: { exitCode: number; signal?: number }) => {
             exited = true;
             abortSignal.removeEventListener('abort', abortHandler);
-            this.activePtys.delete(ptyProcess.pid);
+
             // Attempt to destroy the PTY to ensure FD is closed
             try {
               (ptyProcess as IPty & { destroy?: () => void }).destroy?.();
@@ -832,6 +937,10 @@ export class ShellExecutionService {
 
             const finalize = async () => {
               render(true);
+              if (renderTimeout) {
+                clearTimeout(renderTimeout);
+                renderTimeout = null;
+              }
 
               // Store exit info for late subscribers (e.g. backgrounding race condition)
               this.exitedPtyInfo.set(ptyProcess.pid, { exitCode, signal });

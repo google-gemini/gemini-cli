@@ -89,12 +89,6 @@ export const BackgroundShellDisplay = ({
       return;
     }
 
-    // Set initial output from the shell object
-    const shell = shells.get(activePid);
-    if (shell) {
-      setOutput(shell.output);
-    }
-
     subscribedRef.current = false;
 
     // Subscribe to live updates for the active shell
@@ -123,7 +117,7 @@ export const BackgroundShellDisplay = ({
       unsubscribe();
       subscribedRef.current = false;
     };
-  }, [activePid, shells]);
+  }, [activePid]);
 
   // Sync highlightedPid with activePid when list opens
   useEffect(() => {
@@ -382,6 +376,21 @@ export const BackgroundShellDisplay = ({
   };
 
   const renderOutput = () => {
+    if (activeShell?.isBinary) {
+      return (
+        <Box flexDirection="column" padding={1}>
+          <Text color={theme.status.warning}>
+            [Binary output detected. Halting stream...]
+          </Text>
+          {activeShell.binaryBytesReceived > 0 && (
+            <Text>
+              Received: {Math.round(activeShell.binaryBytesReceived / 1024)} KB
+            </Text>
+          )}
+        </Box>
+      );
+    }
+
     const lines = typeof output === 'string' ? output.split('\n') : output;
 
     return (

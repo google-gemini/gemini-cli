@@ -18,24 +18,9 @@ import {
   type GeminiCLIExtension,
   coreEvents,
 } from '@google/gemini-cli-core';
-import { EXTENSION_SETTINGS_FILENAME } from './variables.js';
+import { EXTENSION_SETTINGS_FILENAME, EXTENSIONS_CONFIG_FILENAME } from './variables.js';
 import { ExtensionManager } from '../extension-manager.js';
 import { createTestMergedSettings } from '../settings.js';
-
-vi.mock('node:fs', async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const actual = await importOriginal<any>();
-  return {
-    ...actual,
-    default: {
-      ...actual.default,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      existsSync: vi.fn((...args: any[]) => actual.existsSync(...args)),
-    },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    existsSync: vi.fn((...args: any[]) => actual.existsSync(...args)),
-  };
-});
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -49,9 +34,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       log: vi.fn(),
     },
     coreEvents: {
-      emitFeedback: vi.fn(), // Mock emitFeedback
-      on: vi.fn(),
-      off: vi.fn(),
+      ...actual.coreEvents,
+      emitFeedback: vi.fn(),
     },
   };
 });
@@ -68,7 +52,6 @@ vi.mock('os', async (importOriginal) => {
 describe('extensionUpdates', () => {
   let tempHomeDir: string;
   let tempWorkspaceDir: string;
-  let extensionDir: string;
   let mockKeychainData: Record<string, Record<string, string>>;
 
   beforeEach(() => {
@@ -111,18 +94,7 @@ describe('extensionUpdates', () => {
     tempWorkspaceDir = fs.mkdtempSync(
       path.join(os.tmpdir(), 'gemini-cli-test-workspace-'),
     );
-    extensionDir = path.join(tempHomeDir, '.gemini', 'extensions', 'test-ext');
 
-    // Mock ExtensionStorage to rely on our temp extension dir
-    vi.spyOn(ExtensionStorage.prototype, 'getExtensionDir').mockReturnValue(
-      extensionDir,
-    );
-    // Mock getEnvFilePath is checking extensionDir/variables.env? No, it used ExtensionStorage logic.
-    // getEnvFilePath in extensionSettings.ts:
-    // if workspace, process.cwd()/.env (we need to mock process.cwd or move tempWorkspaceDir there)
-    // if user, ExtensionStorage(name).getEnvFilePath() -> joins extensionDir + '.env'
-
-    fs.mkdirSync(extensionDir, { recursive: true });
     vi.mocked(os.homedir).mockReturnValue(tempHomeDir);
     vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
   });
@@ -133,10 +105,19 @@ describe('extensionUpdates', () => {
     vi.restoreAllMocks();
   });
 
+  const createExtension = (config: ExtensionConfig, sourceDir: string) => {
+    fs.mkdirSync(sourceDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(sourceDir, EXTENSIONS_CONFIG_FILENAME),
+      JSON.stringify(config),
+    );
+  };
+
   describe('getMissingSettings', () => {
     it('should return empty list if all settings are present', async () => {
+      const extensionName = 'test-ext';
       const config: ExtensionConfig = {
-        name: 'test-ext',
+        name: extensionName,
         version: '1.0.0',
         settings: [
           { name: 's1', description: 'd1', envVar: 'VAR1' },
@@ -145,13 +126,17 @@ describe('extensionUpdates', () => {
       };
       const extensionId = '12345';
 
+      const extensionStorage = new ExtensionStorage(extensionName);
+      const extensionDir = extensionStorage.getExtensionDir();
+      fs.mkdirSync(extensionDir, { recursive: true });
+
       // Setup User Env
-      const userEnvPath = path.join(extensionDir, EXTENSION_SETTINGS_FILENAME);
+      const userEnvPath = extensionStorage.getEnvFilePath();
       fs.writeFileSync(userEnvPath, 'VAR1=val1');
 
       // Setup Keychain
       const userKeychain = new KeychainTokenStorage(
-        `Gemini CLI Extensions test-ext ${extensionId}`,
+        `Gemini CLI Extensions ${extensionName} ${extensionId}`,
       );
       await userKeychain.setSecret('VAR2', 'val2');
 
@@ -167,7 +152,7 @@ describe('extensionUpdates', () => {
       const config: ExtensionConfig = {
         name: 'test-ext',
         version: '1.0.0',
-        settings: [{ name: 's1', description: 'd1', envVar: 'VAR1' }],
+        settings: [{ name: 's1', description: 'd1', envVar: 'UNIQUE_VAR_1' }],
       };
       const extensionId = '12345';
 
@@ -185,7 +170,7 @@ describe('extensionUpdates', () => {
         name: 'test-ext',
         version: '1.0.0',
         settings: [
-          { name: 's2', description: 'd2', envVar: 'VAR2', sensitive: true },
+          { name: 's2', description: 'd2', envVar: 'UNIQUE_VAR_2', sensitive: true },
         ],
       };
       const extensionId = '12345';
@@ -203,7 +188,7 @@ describe('extensionUpdates', () => {
       const config: ExtensionConfig = {
         name: 'test-ext',
         version: '1.0.0',
-        settings: [{ name: 's1', description: 'd1', envVar: 'VAR1' }],
+        settings: [{ name: 's1', description: 'd1', envVar: 'UNIQUE_VAR_3' }],
       };
       const extensionId = '12345';
 
@@ -212,7 +197,7 @@ describe('extensionUpdates', () => {
         tempWorkspaceDir,
         EXTENSION_SETTINGS_FILENAME,
       );
-      fs.writeFileSync(workspaceEnvPath, 'VAR1=val1');
+      fs.writeFileSync(workspaceEnvPath, 'UNIQUE_VAR_3=val1');
 
       const missing = await getMissingSettings(
         config,
@@ -225,82 +210,76 @@ describe('extensionUpdates', () => {
 
   describe('ExtensionManager integration', () => {
     it('should warn about missing settings after update', async () => {
-      // Mock ExtensionManager methods to avoid FS/Network usage
+      const extensionName = 'test-ext';
+      const sourceDir = path.join(tempWorkspaceDir, 'test-ext-source');
       const newConfig: ExtensionConfig = {
-        name: 'test-ext',
+        name: extensionName,
         version: '1.1.0',
-        settings: [{ name: 's1', description: 'd1', envVar: 'VAR1' }],
+        settings: [{ name: 's1', description: 'd1', envVar: 'UNIQUE_VAR_4' }],
       };
 
       const previousConfig: ExtensionConfig = {
-        name: 'test-ext',
+        name: extensionName,
         version: '1.0.0',
         settings: [],
       };
 
+      createExtension(newConfig, sourceDir);
+
       const installMetadata: ExtensionInstallMetadata = {
-        source: extensionDir,
+        source: sourceDir,
         type: 'local',
         autoUpdate: true,
       };
 
       const manager = new ExtensionManager({
         workspaceDir: tempWorkspaceDir,
-
         settings: createTestMergedSettings({
           telemetry: { enabled: false },
           experimental: { extensionConfig: true },
+          hooksConfig: { enabled: false },
         }),
         requestConsent: vi.fn().mockResolvedValue(true),
-        requestSetting: null, // Simulate non-interactive
+        requestSetting: null,
       });
 
-      // Mock methods called by installOrUpdateExtension
-      vi.spyOn(manager, 'loadExtensionConfig').mockResolvedValue(newConfig);
+      // We still need to mock some things because a full "live" load involves many moving parts (themes, MCP, etc.)
+      // but we are using much more of the real manager logic.
       vi.spyOn(manager, 'getExtensions').mockReturnValue([
         {
-          name: 'test-ext',
+          name: extensionName,
           version: '1.0.0',
           installMetadata,
-          path: extensionDir,
-          // Mocks for other required props
-          contextFiles: [],
-          mcpServers: {},
-          hooks: undefined,
+          path: sourceDir, // Mocking the path to point to our temp source
           isActive: true,
           id: 'test-id',
           settings: [],
           resolvedSettings: [],
           skills: [],
+          contextFiles: [],
+          mcpServers: {},
         } as unknown as GeminiCLIExtension,
       ]);
-      vi.spyOn(manager, 'uninstallExtension').mockResolvedValue(undefined);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      vi.spyOn(manager as any, 'loadExtension').mockResolvedValue(
-        {} as unknown as GeminiCLIExtension,
-      );
-      vi.spyOn(manager, 'enableExtension').mockResolvedValue(undefined);
 
-      // Mock fs.promises for the operations inside installOrUpdateExtension
-      vi.spyOn(fs.promises, 'mkdir').mockResolvedValue(undefined);
-      vi.spyOn(fs.promises, 'writeFile').mockResolvedValue(undefined);
-      vi.spyOn(fs.promises, 'rm').mockResolvedValue(undefined);
-      vi.mocked(fs.existsSync).mockReturnValue(false); // No hooks
-      try {
-        await manager.installOrUpdateExtension(installMetadata, previousConfig);
-      } catch (_) {
-        // Ignore errors from copyExtension or others, we just want to verify the warning
-      }
+      // Mock things that would touch global state or fail in restricted environment
+      vi.spyOn(manager as any, 'loadExtension').mockResolvedValue({
+        name: extensionName,
+        id: 'test-id',
+      } as unknown as GeminiCLIExtension);
+      vi.spyOn(manager, 'enableExtension').mockResolvedValue(undefined);
+      vi.spyOn(manager, 'uninstallExtension').mockResolvedValue(undefined);
+
+      await manager.installOrUpdateExtension(installMetadata, previousConfig);
 
       expect(debugLogger.warn).toHaveBeenCalledWith(
         expect.stringContaining(
-          'Extension "test-ext" has missing settings: s1',
+          `Extension "${extensionName}" has missing settings: s1`,
         ),
       );
       expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
         'warning',
         expect.stringContaining(
-          'Please run "gemini extensions config test-ext [setting-name]"',
+          `Please run "gemini extensions config ${extensionName} [setting-name]"`,
         ),
       );
     });

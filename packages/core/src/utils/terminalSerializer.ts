@@ -153,6 +153,7 @@ export function serializeTerminalToObject(
   terminal: Terminal,
   startLine?: number,
   endLine?: number,
+  cache?: Map<number, AnsiLine>,
 ): AnsiOutput {
   const buffer = terminal.buffer.active;
   const cursorX = buffer.cursorX;
@@ -169,7 +170,24 @@ export function serializeTerminalToObject(
   const effectiveStart = startLine ?? buffer.viewportY;
   const effectiveEnd = endLine ?? buffer.viewportY + terminal.rows;
 
+  const absoluteCursorY = buffer.baseY + cursorY;
+
   for (let y = effectiveStart; y < effectiveEnd; y++) {
+    // Skip dirty check for the cursor line as it always needs re-serialization
+    if (
+      cache &&
+      terminal &&
+      y !== absoluteCursorY &&
+      typeof (terminal as any).isRowDirty === 'function' &&
+      (terminal as any).isRowDirty(y) === false
+    ) {
+      const cached = cache.get(y);
+      if (cached) {
+        result.push(cached);
+        continue;
+      }
+    }
+
     const line = buffer.getLine(y);
     const currentLine: AnsiLine = [];
     if (!line) {
@@ -222,6 +240,9 @@ export function serializeTerminalToObject(
       currentLine.push(token);
     }
 
+    if (cache && y !== absoluteCursorY) {
+      cache.set(y, currentLine);
+    }
     result.push(currentLine);
   }
 

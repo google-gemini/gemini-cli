@@ -303,4 +303,23 @@ export function installBrowserShims(): void {
       clearTimeout(id);
     };
   }
+
+  // Silence noisy ghostty-vt warnings in Node.js environment
+  if (!(console.log as any).__isShimmed) {
+    const originalLog = console.log;
+    const shimmedLog = (...args: any[]) => {
+      const isGhosttyWarning =
+        args.length > 0 &&
+        typeof args[0] === 'string' &&
+        args[0].includes('[ghostty-vt]') &&
+        args.some((arg) => typeof arg === 'string' && arg.includes('warning'));
+
+      if (isGhosttyWarning) {
+        return;
+      }
+      originalLog.apply(console, args);
+    };
+    (shimmedLog as any).__isShimmed = true;
+    console.log = shimmedLog;
+  }
 }

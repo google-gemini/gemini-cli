@@ -166,7 +166,10 @@ describe('ShellExecutionService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockSerializeTerminalToObject.mockReturnValue([]);
+    ShellExecutionService.resetInitializationForTesting();
+    mockSerializeTerminalToObject.mockImplementation(() =>
+      createMockSerializeTerminalToObjectReturnValue(''),
+    );
     mockIsBinary.mockReturnValue(false);
     mockPlatform.mockReturnValue('linux');
     mockResolveExecutable.mockImplementation(async (exe: string) => exe);
@@ -198,12 +201,16 @@ describe('ShellExecutionService', () => {
     mockHeadlessTerminal = {
       resize: vi.fn(),
       scrollLines: vi.fn(),
+      scrollToTop: vi.fn(),
+      onScroll: vi.fn(),
+      getScrollbackLength: vi.fn().mockReturnValue(0),
+      rows: 24,
       buffer: {
         active: {
           viewportY: 0,
         },
       },
-    };
+    } as any;
 
     mockPtySpawn.mockReturnValue(mockPtyProcess);
   });
@@ -435,6 +442,7 @@ describe('ShellExecutionService', () => {
         ptyProcess: mockPtyProcess as any,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         headlessTerminal: mockHeadlessTerminal as any,
+        serializationCache: new Map(),
       });
     });
 
