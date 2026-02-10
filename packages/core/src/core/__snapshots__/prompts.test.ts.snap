@@ -512,10 +512,9 @@ exports[`Core System Prompt (prompts.ts) > should append userMemory with separat
 
 # Core Mandates
 
-## Security Protocols
+## Security & System Integrity
 - **Credential Protection:** Never log, print, or commit secrets, API keys, or sensitive credentials. Rigorously protect \`.env\` files, \`.git\`, and system configuration folders.
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
-- **Protocol:** Do not ask for permission to use tools; the system handles confirmation. Your responsibility is to justify the action, not to seek authorization.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -643,10 +642,9 @@ exports[`Core System Prompt (prompts.ts) > should handle CodebaseInvestigator wi
 
 # Core Mandates
 
-## Security Protocols
+## Security & System Integrity
 - **Credential Protection:** Never log, print, or commit secrets, API keys, or sensitive credentials. Rigorously protect \`.env\` files, \`.git\`, and system configuration folders.
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
-- **Protocol:** Do not ask for permission to use tools; the system handles confirmation. Your responsibility is to justify the action, not to seek authorization.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -735,10 +733,9 @@ exports[`Core System Prompt (prompts.ts) > should handle CodebaseInvestigator wi
 
 # Core Mandates
 
-## Security Protocols
+## Security & System Integrity
 - **Credential Protection:** Never log, print, or commit secrets, API keys, or sensitive credentials. Rigorously protect \`.env\` files, \`.git\`, and system configuration folders.
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
-- **Protocol:** Do not ask for permission to use tools; the system handles confirmation. Your responsibility is to justify the action, not to seek authorization.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -1296,10 +1293,9 @@ exports[`Core System Prompt (prompts.ts) > should include correct sandbox instru
 
 # Core Mandates
 
-## Security Protocols
+## Security & System Integrity
 - **Credential Protection:** Never log, print, or commit secrets, API keys, or sensitive credentials. Rigorously protect \`.env\` files, \`.git\`, and system configuration folders.
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
-- **Protocol:** Do not ask for permission to use tools; the system handles confirmation. Your responsibility is to justify the action, not to seek authorization.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -1414,10 +1410,9 @@ exports[`Core System Prompt (prompts.ts) > should include correct sandbox instru
 
 # Core Mandates
 
-## Security Protocols
+## Security & System Integrity
 - **Credential Protection:** Never log, print, or commit secrets, API keys, or sensitive credentials. Rigorously protect \`.env\` files, \`.git\`, and system configuration folders.
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
-- **Protocol:** Do not ask for permission to use tools; the system handles confirmation. Your responsibility is to justify the action, not to seek authorization.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -1532,10 +1527,9 @@ exports[`Core System Prompt (prompts.ts) > should include correct sandbox instru
 
 # Core Mandates
 
-## Security Protocols
+## Security & System Integrity
 - **Credential Protection:** Never log, print, or commit secrets, API keys, or sensitive credentials. Rigorously protect \`.env\` files, \`.git\`, and system configuration folders.
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
-- **Protocol:** Do not ask for permission to use tools; the system handles confirmation. Your responsibility is to justify the action, not to seek authorization.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -1758,10 +1752,9 @@ exports[`Core System Prompt (prompts.ts) > should include sub-agents in XML for 
 
 # Core Mandates
 
-## Security Protocols
+## Security & System Integrity
 - **Credential Protection:** Never log, print, or commit secrets, API keys, or sensitive credentials. Rigorously protect \`.env\` files, \`.git\`, and system configuration folders.
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
-- **Protocol:** Do not ask for permission to use tools; the system handles confirmation. Your responsibility is to justify the action, not to seek authorization.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -2111,10 +2104,9 @@ exports[`Core System Prompt (prompts.ts) > should return the base prompt when us
 
 # Core Mandates
 
-## Security Protocols
+## Security & System Integrity
 - **Credential Protection:** Never log, print, or commit secrets, API keys, or sensitive credentials. Rigorously protect \`.env\` files, \`.git\`, and system configuration folders.
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
-- **Protocol:** Do not ask for permission to use tools; the system handles confirmation. Your responsibility is to justify the action, not to seek authorization.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -2225,10 +2217,9 @@ exports[`Core System Prompt (prompts.ts) > should return the base prompt when us
 
 # Core Mandates
 
-## Security Protocols
+## Security & System Integrity
 - **Credential Protection:** Never log, print, or commit secrets, API keys, or sensitive credentials. Rigorously protect \`.env\` files, \`.git\`, and system configuration folders.
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
-- **Protocol:** Do not ask for permission to use tools; the system handles confirmation. Your responsibility is to justify the action, not to seek authorization.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -2450,10 +2441,9 @@ exports[`Core System Prompt (prompts.ts) > should use chatty system prompt for p
 
 # Core Mandates
 
-## Security Protocols
+## Security & System Integrity
 - **Credential Protection:** Never log, print, or commit secrets, API keys, or sensitive credentials. Rigorously protect \`.env\` files, \`.git\`, and system configuration folders.
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
-- **Protocol:** Do not ask for permission to use tools; the system handles confirmation. Your responsibility is to justify the action, not to seek authorization.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
@@ -2564,10 +2554,9 @@ exports[`Core System Prompt (prompts.ts) > should use chatty system prompt for p
 
 # Core Mandates
 
-## Security Protocols
+## Security & System Integrity
 - **Credential Protection:** Never log, print, or commit secrets, API keys, or sensitive credentials. Rigorously protect \`.env\` files, \`.git\`, and system configuration folders.
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
-- **Protocol:** Do not ask for permission to use tools; the system handles confirmation. Your responsibility is to justify the action, not to seek authorization.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in \`GEMINI.md\` files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
