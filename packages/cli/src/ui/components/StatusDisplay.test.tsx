@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -11,6 +11,8 @@ import { StatusDisplay } from './StatusDisplay.js';
 import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
 import { ConfigContext } from '../contexts/ConfigContext.js';
 import { SettingsContext } from '../contexts/SettingsContext.js';
+import type { Config } from '@google/gemini-cli-core';
+import type { LoadedSettings } from '../../config/settings.js';
 import { createMockSettings } from '../../test-utils/settings.js';
 import type { TextBuffer } from './shared/text-buffer.js';
 
@@ -67,7 +69,6 @@ const createMockConfig = (overrides = {}) => ({
   ...overrides,
 });
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const renderStatusDisplay = (
   props: { hideContextSummary: boolean } = { hideContextSummary: false },
   uiState: UIState = createMockUIState(),
@@ -75,15 +76,14 @@ const renderStatusDisplay = (
   config = createMockConfig(),
 ) =>
   render(
-    <ConfigContext.Provider value={config as any}>
-      <SettingsContext.Provider value={settings as any}>
+    <ConfigContext.Provider value={config as unknown as Config}>
+      <SettingsContext.Provider value={settings as unknown as LoadedSettings}>
         <UIStateContext.Provider value={uiState}>
           <StatusDisplay {...props} />
         </UIStateContext.Provider>
       </SettingsContext.Provider>
     </ConfigContext.Provider>,
   );
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 describe('StatusDisplay', () => {
   const originalEnv = process.env;
