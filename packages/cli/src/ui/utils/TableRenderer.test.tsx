@@ -257,14 +257,48 @@ describe('TableRenderer', () => {
     expect(output).toMatchSnapshot();
   });
 
-  it('handles non-ASCII characters (emojis and Asian scripts) correctly', () => {
-    const headers = ['Emoji 😃', 'Asian 汉字', 'Mixed 🚀 Text'];
-    const rows = [
-      ['Start 🌟 End', '你好世界', 'Rocket 🚀 Man'],
-      ['Thumbs 👍 Up', 'こんにちは', 'Fire 🔥'],
-    ];
-    const terminalWidth = 60;
-
+  it.each([
+    {
+      name: 'handles non-ASCII characters (emojis and Asian scripts) correctly',
+      headers: ['Emoji 😃', 'Asian 汉字', 'Mixed 🚀 Text'],
+      rows: [
+        ['Start 🌟 End', '你好世界', 'Rocket 🚀 Man'],
+        ['Thumbs 👍 Up', 'こんにちは', 'Fire 🔥'],
+      ],
+      terminalWidth: 60,
+      expected: ['Emoji 😃', 'Asian 汉字', '你好世界'],
+    },
+    {
+      name: 'renders a table with only emojis and text correctly',
+      headers: ['Happy 😀', 'Rocket 🚀', 'Heart ❤️'],
+      rows: [
+        ['Smile 😃', 'Fire 🔥', 'Love 💖'],
+        ['Cool 😎', 'Star ⭐', 'Blue 💙'],
+      ],
+      terminalWidth: 60,
+      expected: ['Happy 😀', 'Smile 😃', 'Fire 🔥'],
+    },
+    {
+      name: 'renders a table with only Asian characters and text correctly',
+      headers: ['Chinese 中文', 'Japanese 日本語', 'Korean 한국어'],
+      rows: [
+        ['你好', 'こんにちは', '안녕하세요'],
+        ['世界', '世界', '세계'],
+      ],
+      terminalWidth: 60,
+      expected: ['Chinese 中文', '你好', 'こんにちは'],
+    },
+    {
+      name: 'renders a table with mixed emojis, Asian characters, and text correctly',
+      headers: ['Mixed 😃 中文', 'Complex 🚀 日本語', 'Text 📝 한국어'],
+      rows: [
+        ['你好 😃', 'こんにちは 🚀', '안녕하세요 📝'],
+        ['World 🌍', 'Code 💻', 'Pizza 🍕'],
+      ],
+      terminalWidth: 80,
+      expected: ['Mixed 😃 中文', '你好 😃', 'こんにちは 🚀'],
+    },
+  ])('$name', ({ headers, rows, terminalWidth, expected }) => {
     const { lastFrame } = renderWithProviders(
       <TableRenderer
         headers={headers}
@@ -275,82 +309,9 @@ describe('TableRenderer', () => {
     );
 
     const output = lastFrame();
-    expect(output).toContain('Emoji 😃');
-    expect(output).toContain('Asian 汉字');
-    expect(output).toContain('你好世界');
-    expect(output).toMatchSnapshot();
-  });
-
-  // The output isn't correct in the VS Code terminal due to ink issues with ❤️
-  it('renders a table with only emojis and text correctly', () => {
-    const headers = ['Happy 😀', 'Rocket 🚀', 'Heart ❤️'];
-    const rows = [
-      ['Smile 😃', 'Fire 🔥', 'Love 💖'],
-      ['Cool 😎', 'Star ⭐', 'Blue 💙'],
-    ];
-    const terminalWidth = 60;
-
-    const { lastFrame } = renderWithProviders(
-      <TableRenderer
-        headers={headers}
-        rows={rows}
-        terminalWidth={terminalWidth}
-      />,
-      { width: terminalWidth },
-    );
-
-    const output = lastFrame();
-    expect(output).toContain('Happy 😀');
-    expect(output).toContain('Smile 😃');
-    expect(output).toContain('Fire 🔥');
-    expect(output).toMatchSnapshot();
-  });
-
-  it('renders a table with only Asian characters and text correctly', () => {
-    const headers = ['Chinese 中文', 'Japanese 日本語', 'Korean 한국어'];
-    const rows = [
-      ['你好', 'こんにちは', '안녕하세요'],
-      ['世界', '世界', '세계'],
-    ];
-    const terminalWidth = 60;
-
-    const { lastFrame } = renderWithProviders(
-      <TableRenderer
-        headers={headers}
-        rows={rows}
-        terminalWidth={terminalWidth}
-      />,
-      { width: terminalWidth },
-    );
-
-    const output = lastFrame();
-    expect(output).toContain('Chinese 中文');
-    expect(output).toContain('你好');
-    expect(output).toContain('こんにちは');
-    expect(output).toMatchSnapshot();
-  });
-
-  it('renders a table with mixed emojis, Asian characters, and text correctly', () => {
-    const headers = ['Mixed 😃 中文', 'Complex 🚀 日本語', 'Text 📝 한국어'];
-    const rows = [
-      ['你好 😃', 'こんにちは 🚀', '안녕하세요 📝'],
-      ['World 🌍', 'Code 💻', 'Pizza 🍕'],
-    ];
-    const terminalWidth = 80;
-
-    const { lastFrame } = renderWithProviders(
-      <TableRenderer
-        headers={headers}
-        rows={rows}
-        terminalWidth={terminalWidth}
-      />,
-      { width: terminalWidth },
-    );
-
-    const output = lastFrame();
-    expect(output).toContain('Mixed 😃 中文');
-    expect(output).toContain('你好 😃');
-    expect(output).toContain('こんにちは 🚀');
+    expected.forEach((text) => {
+      expect(output).toContain(text);
+    });
     expect(output).toMatchSnapshot();
   });
 });

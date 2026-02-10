@@ -25,6 +25,8 @@ interface TableRendererProps {
 }
 
 const MIN_COLUMN_WIDTH = 5;
+const COLUMN_PADDING = 2;
+const TABLE_MARGIN = 2;
 
 const calculateWidths = (text: string) => {
   const styledChars = toStyledCharacters(text);
@@ -81,15 +83,18 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
 
     // --- Calculate Available Space ---
     // Fixed overhead: borders (n+1) + padding (2n)
-    const fixedOverhead = cleanedHeaders.length + 1 + cleanedHeaders.length * 2;
-    const availableWidth = Math.max(0, terminalWidth - fixedOverhead - 2);
+    const fixedOverhead =
+      cleanedHeaders.length + 1 + cleanedHeaders.length * COLUMN_PADDING;
+    const availableWidth = Math.max(
+      0,
+      terminalWidth - fixedOverhead - TABLE_MARGIN,
+    );
 
     // --- Allocation Algorithm ---
     const totalMinWidth = constraints.reduce((sum, c) => sum + c.minWidth, 0);
     let finalContentWidths: number[];
 
     if (totalMinWidth > availableWidth) {
-      // Case A: Not enough space even for minimums.
       // We must scale all the columns except the ones that are very short(<=5 characters)
       const shortColumns = constraints.filter(
         (c) => c.maxWidth <= MIN_COLUMN_WIDTH,
@@ -112,7 +117,6 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
         return Math.floor(c.minWidth * scale);
       });
     } else {
-      // Case B: We have space! Distribute the surplus.
       const surplus = availableWidth - totalMinWidth;
       const totalGrowthNeed = constraints.reduce(
         (sum, c) => sum + (c.maxWidth - c.minWidth),
@@ -165,7 +169,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     const wrappedRows = rows.map((row) => wrapAndProcessRow(row));
 
     // Use the TIGHTEST widths that fit the wrapped content + padding
-    const adjustedWidths = actualColumnWidths.map((w) => w + 2);
+    const adjustedWidths = actualColumnWidths.map((w) => w + COLUMN_PADDING);
 
     return { wrappedHeaders, wrappedRows, adjustedWidths };
   }, [cleanedHeaders, rows, terminalWidth]);
@@ -176,7 +180,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     width: number,
     isHeader = false,
   ): React.ReactNode => {
-    const contentWidth = Math.max(0, width - 2);
+    const contentWidth = Math.max(0, width - COLUMN_PADDING);
     // Use pre-calculated width to avoid re-parsing
     const displayWidth = content.width;
     const paddingNeeded = Math.max(0, contentWidth - displayWidth);
@@ -239,9 +243,10 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   // Handles the wrapping logic for a logical data row
   const renderDataRow = (
     wrappedCells: ProcessedLine[][],
-    rowIndex: number,
+    rowIndex?: number,
     isHeader = false,
   ): React.ReactNode => {
+    const key = isHeader ? 'header' : `${rowIndex}`;
     const maxHeight = Math.max(...wrappedCells.map((lines) => lines.length), 1);
 
     const visualRows: React.ReactNode[] = [];
@@ -250,7 +255,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
         (lines) => lines[i] || { text: '', width: 0 },
       );
       visualRows.push(
-        <React.Fragment key={`${rowIndex}-${i}`}>
+        <React.Fragment key={`${key}-${i}`}>
           {renderVisualRow(visualRowCells, isHeader)}
         </React.Fragment>,
       );
