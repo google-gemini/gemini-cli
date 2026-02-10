@@ -43,7 +43,7 @@ describe('FileDiscoveryService', () => {
       // Let's check the effect of the parser instead of mocking it.
       expect(service.shouldIgnoreFile('node_modules/foo.js')).toBe(true);
       expect(service.shouldIgnoreFile('src/foo.js')).toBe(false);
-    }, 10000);
+    });
 
     it('should not load git repo patterns when not in a git repo', async () => {
       // No .git directory
@@ -52,7 +52,7 @@ describe('FileDiscoveryService', () => {
 
       // .gitignore is not loaded in non-git repos
       expect(service.shouldIgnoreFile('node_modules/foo.js')).toBe(false);
-    }, 10000);
+    });
 
     it('should load .geminiignore patterns even when not in a git repo', async () => {
       await createTestFile(GEMINI_IGNORE_FILE_NAME, 'secrets.txt');
@@ -60,7 +60,7 @@ describe('FileDiscoveryService', () => {
 
       expect(service.shouldIgnoreFile('secrets.txt')).toBe(true);
       expect(service.shouldIgnoreFile('src/index.js')).toBe(false);
-    }, 10000);
+    });
 
     it('should call applyFilterFilesOptions in constructor', () => {
       const resolveSpy = vi.spyOn(

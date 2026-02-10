@@ -318,7 +318,7 @@ describe('ReadFileTool', () => {
         },
       });
       expect(result.returnDisplay).toBe('Read image file: image.png');
-    }, 10000);
+    });
 
     it('should handle PDF file and return appropriate content', async () => {
       const pdfPath = path.join(tempRootDir, 'document.pdf');
