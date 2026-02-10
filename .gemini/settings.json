@@ -1,0 +1,11 @@
+{
+  "experimental": {
+    "toolOutputMasking": {
+      "enabled": true
+    },
+    "plan": true
+  },
+  "general": {
+    "devtools": true
+  }
+}

@@ -45,6 +45,8 @@ import type {
   HookCallEvent,
   ApprovalModeSwitchEvent,
   ApprovalModeDurationEvent,
+  PlanExecutionEvent,
+  ToolOutputMaskingEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
@@ -106,6 +108,8 @@ export enum EventNames {
   HOOK_CALL = 'hook_call',
   APPROVAL_MODE_SWITCH = 'approval_mode_switch',
   APPROVAL_MODE_DURATION = 'approval_mode_duration',
+  PLAN_EXECUTION = 'plan_execution',
+  TOOL_OUTPUT_MASKING = 'tool_output_masking',
 }
 
 export interface LogResponse {
@@ -446,6 +450,7 @@ export class ClearcutLogger {
     if (this.config?.getDebugMode()) {
       debugLogger.log('Flushing log events to Clearcut.');
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const eventsToSend = this.events.toArray() as LogEventEntry[][];
     this.events.clear();
 
@@ -489,6 +494,7 @@ export class ClearcutLogger {
       }
     } catch (e: unknown) {
       if (this.config?.getDebugMode()) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         debugLogger.warn('Error flushing log events:', e as Error);
       }
 
@@ -1209,14 +1215,42 @@ export class ClearcutLogger {
           EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_THRESHOLD,
         value: JSON.stringify(event.threshold),
       },
+    ];
+
+    const logEvent = this.createLogEvent(
+      EventNames.TOOL_OUTPUT_TRUNCATED,
+      data,
+    );
+    this.enqueueLogEvent(logEvent);
+    this.flushIfNeeded();
+  }
+
+  logToolOutputMaskingEvent(event: ToolOutputMaskingEvent): void {
+    const data: EventValue[] = [
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_TRUNCATED_LINES,
-        value: JSON.stringify(event.lines),
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_MASKING_TOKENS_BEFORE,
+        value: event.tokens_before.toString(),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_MASKING_TOKENS_AFTER,
+        value: event.tokens_after.toString(),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_MASKING_MASKED_COUNT,
+        value: event.masked_count.toString(),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_TOOL_OUTPUT_MASKING_TOTAL_PRUNABLE_TOKENS,
+        value: event.total_prunable_tokens.toString(),
       },
     ];
 
     this.enqueueLogEvent(
-      this.createLogEvent(EventNames.TOOL_OUTPUT_TRUNCATED, data),
+      this.createLogEvent(EventNames.TOOL_OUTPUT_MASKING, data),
     );
     this.flushIfNeeded();
   }
@@ -1540,6 +1574,18 @@ export class ClearcutLogger {
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.APPROVAL_MODE_DURATION, data),
     );
+    this.flushIfNeeded();
+  }
+
+  logPlanExecutionEvent(event: PlanExecutionEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_APPROVAL_MODE,
+        value: event.approval_mode,
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.PLAN_EXECUTION, data));
     this.flushIfNeeded();
   }
 

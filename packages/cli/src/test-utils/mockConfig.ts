@@ -13,6 +13,7 @@ import { createTestMergedSettings } from '../config/settings.js';
  * Creates a mocked Config object with default values and allows overrides.
  */
 export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   ({
     getSandbox: vi.fn(() => undefined),
     getQuestion: vi.fn(() => ''),
@@ -20,6 +21,7 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     setTerminalBackground: vi.fn(),
     storage: {
       getProjectTempDir: vi.fn().mockReturnValue('/tmp/gemini-test'),
+      initialize: vi.fn().mockResolvedValue(undefined),
     },
     getDebugMode: vi.fn(() => false),
     getProjectRoot: vi.fn(() => '/'),
@@ -44,7 +46,6 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     setRemoteAdminSettings: vi.fn(),
     isYoloModeDisabled: vi.fn(() => false),
     isPlanEnabled: vi.fn(() => false),
-    isEventDrivenSchedulerEnabled: vi.fn(() => false),
     getCoreTools: vi.fn(() => []),
     getAllowedTools: vi.fn(() => []),
     getApprovalMode: vi.fn(() => 'default'),
@@ -151,8 +152,8 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getAllowedMcpServers: vi.fn().mockReturnValue([]),
     getBlockedMcpServers: vi.fn().mockReturnValue([]),
     getExperiments: vi.fn().mockReturnValue(undefined),
-    getPreviewFeatures: vi.fn().mockReturnValue(false),
     getHasAccessToPreviewModel: vi.fn().mockReturnValue(false),
+    validatePathAccess: vi.fn().mockReturnValue(null),
     ...overrides,
   }) as unknown as Config;
 
@@ -163,9 +164,11 @@ export function createMockSettings(
   overrides: Record<string, unknown> = {},
 ): LoadedSettings {
   const merged = createTestMergedSettings(
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     (overrides['merged'] as Partial<Settings>) || {},
   );
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return {
     system: { settings: {} },
     systemDefaults: { settings: {} },

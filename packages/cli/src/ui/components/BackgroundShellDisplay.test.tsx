@@ -5,7 +5,7 @@
  */
 
 import { render } from '../../test-utils/render.js';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BackgroundShellDisplay } from './BackgroundShellDisplay.js';
 import { type BackgroundShell } from '../hooks/shellCommandProcessor.js';
 import { ShellExecutionService } from '@google/gemini-cli-core';
@@ -20,16 +20,12 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const mockDismissBackgroundShell = vi.fn();
 const mockSetActiveBackgroundShellPid = vi.fn();
 const mockSetIsBackgroundShellListOpen = vi.fn();
-const mockHandleWarning = vi.fn();
-const mockSetEmbeddedShellFocused = vi.fn();
 
 vi.mock('../contexts/UIActionsContext.js', () => ({
   useUIActions: () => ({
     dismissBackgroundShell: mockDismissBackgroundShell,
     setActiveBackgroundShellPid: mockSetActiveBackgroundShellPid,
     setIsBackgroundShellListOpen: mockSetIsBackgroundShellListOpen,
-    handleWarning: mockHandleWarning,
-    setEmbeddedShellFocused: mockSetEmbeddedShellFocused,
   }),
 }));
 
@@ -102,6 +98,10 @@ vi.mock('./shared/ScrollableList.js', () => ({
     ),
   ),
 }));
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 const createMockKey = (overrides: Partial<Key>): Key => ({
   name: '',
@@ -404,56 +404,5 @@ describe('<BackgroundShellDisplay />', () => {
     });
 
     expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('unfocuses the shell when Shift+Tab is pressed', async () => {
-    render(
-      <ScrollProvider>
-        <BackgroundShellDisplay
-          shells={mockShells}
-          activePid={shell1.pid}
-          width={80}
-          height={24}
-          isFocused={true}
-          isListOpenProp={false}
-        />
-      </ScrollProvider>,
-    );
-    await act(async () => {
-      await delay(0);
-    });
-
-    act(() => {
-      simulateKey({ name: 'tab', shift: true });
-    });
-
-    expect(mockSetEmbeddedShellFocused).toHaveBeenCalledWith(false);
-  });
-
-  it('shows a warning when Tab is pressed', async () => {
-    render(
-      <ScrollProvider>
-        <BackgroundShellDisplay
-          shells={mockShells}
-          activePid={shell1.pid}
-          width={80}
-          height={24}
-          isFocused={true}
-          isListOpenProp={false}
-        />
-      </ScrollProvider>,
-    );
-    await act(async () => {
-      await delay(0);
-    });
-
-    act(() => {
-      simulateKey({ name: 'tab' });
-    });
-
-    expect(mockHandleWarning).toHaveBeenCalledWith(
-      'Press Shift+Tab to focus out.',
-    );
-    expect(mockSetEmbeddedShellFocused).not.toHaveBeenCalled();
   });
 });

@@ -24,8 +24,8 @@ export const ContextUsageDisplay = ({
 
   return (
     <Text color={theme.text.secondary}>
-      ({percentageLeft}
-      {label})
+      {percentageLeft}
+      {label}
     </Text>
   );
 };

@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -8,9 +8,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import type { Config } from '../config/config.js';
+import type { HierarchicalMemory } from '../config/memory.js';
 import { GEMINI_DIR } from '../utils/paths.js';
 import { ApprovalMode } from '../policy/types.js';
 import * as snippets from './snippets.js';
+import * as legacySnippets from './snippets.legacy.js';
 import {
   resolvePathFromEnv,
   applySubstitutions,
@@ -23,8 +25,13 @@ import {
   PLAN_MODE_TOOLS,
   WRITE_TODOS_TOOL_NAME,
   READ_FILE_TOOL_NAME,
+  ENTER_PLAN_MODE_TOOL_NAME,
+  GLOB_TOOL_NAME,
+  GREP_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { resolveModel, isPreviewModel } from '../config/models.js';
+import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
+import { getAllGeminiMdFilenames } from '../tools/memoryTool.js';
 
 /**
  * Orchestrates prompt generation by gathering context and building options.
@@ -35,7 +42,7 @@ export class PromptProvider {
    */
   getCoreSystemPrompt(
     config: Config,
-    userMemory?: string,
+    userMemory?: string | HierarchicalMemory,
     interactiveOverride?: boolean,
   ): string {
     const systemMdResolution = resolvePathFromEnv(
@@ -45,14 +52,38 @@ export class PromptProvider {
     const interactiveMode = interactiveOverride ?? config.isInteractive();
     const approvalMode = config.getApprovalMode?.() ?? ApprovalMode.DEFAULT;
     const isPlanMode = approvalMode === ApprovalMode.PLAN;
+    const isYoloMode = approvalMode === ApprovalMode.YOLO;
     const skills = config.getSkillManager().getSkills();
     const toolNames = config.getToolRegistry().getAllToolNames();
+    const enabledToolNames = new Set(toolNames);
+    const approvedPlanPath = config.getApprovedPlanPath();
 
-    const desiredModel = resolveModel(
-      config.getActiveModel(),
-      config.getPreviewFeatures(),
-    );
+    const desiredModel = resolveModel(config.getActiveModel());
     const isGemini3 = isPreviewModel(desiredModel);
+    const activeSnippets = isGemini3 ? snippets : legacySnippets;
+    const contextFilenames = getAllGeminiMdFilenames();
+
+    // --- Context Gathering ---
+    let planModeToolsList = PLAN_MODE_TOOLS.filter((t) =>
+      enabledToolNames.has(t),
+    )
+      .map((t) => `- \`${t}\``)
+      .join('\n');
+
+    // Add read-only MCP tools to the list
+    if (isPlanMode) {
+      const allTools = config.getToolRegistry().getAllTools();
+      const readOnlyMcpTools = allTools.filter(
+        (t): t is DiscoveredMCPTool =>
+          t instanceof DiscoveredMCPTool && !!t.isReadOnly,
+      );
+      if (readOnlyMcpTools.length > 0) {
+        const mcpToolsList = readOnlyMcpTools
+          .map((t) => `- \`${t.name}\` (${t.serverName})`)
+          .join('\n');
+        planModeToolsList += `\n${mcpToolsList}`;
+      }
+    }
 
     let basePrompt: string;
 
@@ -66,16 +97,28 @@ export class PromptProvider {
         throw new Error(`missing system prompt file '${systemMdPath}'`);
       }
       basePrompt = fs.readFileSync(systemMdPath, 'utf8');
-      const skillsPrompt = snippets.renderAgentSkills(
+      const skillsPrompt = activeSnippets.renderAgentSkills(
         skills.map((s) => ({
           name: s.name,
           description: s.description,
           location: s.location,
         })),
       );
-      basePrompt = applySubstitutions(basePrompt, config, skillsPrompt);
+      basePrompt = applySubstitutions(
+        basePrompt,
+        config,
+        skillsPrompt,
+        isGemini3,
+      );
     } else {
       // --- Standard Composition ---
+      const hasHierarchicalMemory =
+        typeof userMemory === 'object' &&
+        userMemory !== null &&
+        (!!userMemory.global?.trim() ||
+          !!userMemory.extension?.trim() ||
+          !!userMemory.project?.trim());
+
       const options: snippets.SystemPromptOptions = {
         preamble: this.withSection('preamble', () => ({
           interactive: interactiveMode,
@@ -84,9 +127,17 @@ export class PromptProvider {
           interactive: interactiveMode,
           isGemini3,
           hasSkills: skills.length > 0,
+          hasHierarchicalMemory,
+          contextFilenames,
         })),
-        agentContexts: this.withSection('agentContexts', () =>
-          config.getAgentRegistry().getDirectoryContext(),
+        subAgents: this.withSection('agentContexts', () =>
+          config
+            .getAgentRegistry()
+            .getAllDefinitions()
+            .map((d) => ({
+              name: d.name,
+              description: d.description,
+            })),
         ),
         agentSkills: this.withSection(
           'agentSkills',
@@ -103,22 +154,27 @@ export class PromptProvider {
           'primaryWorkflows',
           () => ({
             interactive: interactiveMode,
-            enableCodebaseInvestigator: toolNames.includes(
+            enableCodebaseInvestigator: enabledToolNames.has(
               CodebaseInvestigatorAgent.name,
             ),
-            enableWriteTodosTool: toolNames.includes(WRITE_TODOS_TOOL_NAME),
+            enableWriteTodosTool: enabledToolNames.has(WRITE_TODOS_TOOL_NAME),
+            enableEnterPlanModeTool: enabledToolNames.has(
+              ENTER_PLAN_MODE_TOOL_NAME,
+            ),
+            enableGrep: enabledToolNames.has(GREP_TOOL_NAME),
+            enableGlob: enabledToolNames.has(GLOB_TOOL_NAME),
+            approvedPlan: approvedPlanPath
+              ? { path: approvedPlanPath }
+              : undefined,
           }),
           !isPlanMode,
         ),
         planningWorkflow: this.withSection(
           'planningWorkflow',
           () => ({
-            planModeToolsList: PLAN_MODE_TOOLS.filter((t) =>
-              new Set(toolNames).has(t),
-            )
-              .map((t) => `- \`${t}\``)
-              .join('\n'),
+            planModeToolsList,
             plansDir: config.storage.getProjectTempPlansDir(),
+            approvedPlanPath: config.getApprovedPlanPath(),
           }),
           isPlanMode,
         ),
@@ -128,24 +184,40 @@ export class PromptProvider {
             interactive: interactiveMode,
             isGemini3,
             enableShellEfficiency: config.getEnableShellOutputEfficiency(),
+            interactiveShellEnabled: config.isInteractiveShellEnabled(),
           }),
         ),
         sandbox: this.withSection('sandbox', () => getSandboxMode()),
+        interactiveYoloMode: this.withSection(
+          'interactiveYoloMode',
+          () => true,
+          isYoloMode && interactiveMode,
+        ),
         gitRepo: this.withSection(
           'git',
           () => ({ interactive: interactiveMode }),
           isGitRepository(process.cwd()) ? true : false,
         ),
-        finalReminder: this.withSection('finalReminder', () => ({
-          readFileToolName: READ_FILE_TOOL_NAME,
-        })),
-      };
+        finalReminder: isGemini3
+          ? undefined
+          : this.withSection('finalReminder', () => ({
+              readFileToolName: READ_FILE_TOOL_NAME,
+            })),
+      } as snippets.SystemPromptOptions;
 
-      basePrompt = snippets.getCoreSystemPrompt(options);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const getCoreSystemPrompt = activeSnippets.getCoreSystemPrompt as (
+        options: snippets.SystemPromptOptions,
+      ) => string;
+      basePrompt = getCoreSystemPrompt(options);
     }
 
     // --- Finalization (Shell) ---
-    const finalPrompt = snippets.renderFinalShell(basePrompt, userMemory);
+    const finalPrompt = activeSnippets.renderFinalShell(
+      basePrompt,
+      userMemory,
+      contextFilenames,
+    );
 
     // Sanitize erratic newlines from composition
     const sanitizedPrompt = finalPrompt.replace(/\n{3,}/g, '\n\n');
@@ -160,8 +232,11 @@ export class PromptProvider {
     return sanitizedPrompt;
   }
 
-  getCompressionPrompt(): string {
-    return snippets.getCompressionPrompt();
+  getCompressionPrompt(config: Config): string {
+    const desiredModel = resolveModel(config.getActiveModel());
+    const isGemini3 = isPreviewModel(desiredModel);
+    const activeSnippets = isGemini3 ? snippets : legacySnippets;
+    return activeSnippets.getCompressionPrompt();
   }
 
   private withSection<T>(
