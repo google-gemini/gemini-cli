@@ -15,6 +15,7 @@ import {
   updateSetting,
   ExtensionSettingScope,
   getScopedEnvContents,
+  getMissingSettings,
 } from './extensionSettings.js';
 import type { ExtensionConfig } from '../extension.js';
 import { ExtensionStorage } from './storage.js';
@@ -889,6 +890,106 @@ describe('extensionSettings', () => {
       const expectedEnvPath = path.join(extensionDir, '.env');
       const actualContent = await fsPromises.readFile(expectedEnvPath, 'utf-8');
       expect(actualContent).toContain('VAR1="value with \\"quotes\\""');
+    });
+  });
+
+  describe('getMissingSettings', () => {
+    it('should return empty list if all settings are present', async () => {
+      const extensionName = 'test-ext';
+      const config: ExtensionConfig = {
+        name: extensionName,
+        version: '1.0.0',
+        settings: [
+          { name: 's1', description: 'd1', envVar: 'VAR1' },
+          { name: 's2', description: 'd2', envVar: 'VAR2', sensitive: true },
+        ],
+      };
+      const extensionId = '12345';
+
+      const extensionStorage = new ExtensionStorage(extensionName);
+      // We already mocked getExtensionDir to return extensionDir in beforeEach
+      fs.mkdirSync(extensionDir, { recursive: true });
+
+      // Setup User Env
+      const userEnvPath = extensionStorage.getEnvFilePath();
+      fs.writeFileSync(userEnvPath, 'VAR1=val1');
+
+      // Setup Keychain
+      const userKeychain = new KeychainTokenStorage(
+        `Gemini CLI Extensions ${extensionName} ${extensionId}`,
+      );
+      await userKeychain.setSecret('VAR2', 'val2');
+
+      const missing = await getMissingSettings(
+        config,
+        extensionId,
+        tempWorkspaceDir,
+      );
+      expect(missing).toEqual([]);
+    });
+
+    it('should identify missing non-sensitive settings', async () => {
+      const config: ExtensionConfig = {
+        name: 'test-ext',
+        version: '1.0.0',
+        settings: [{ name: 's1', description: 'd1', envVar: 'UNIQUE_VAR_1' }],
+      };
+      const extensionId = '12345';
+
+      const missing = await getMissingSettings(
+        config,
+        extensionId,
+        tempWorkspaceDir,
+      );
+      expect(missing).toHaveLength(1);
+      expect(missing[0].name).toBe('s1');
+    });
+
+    it('should identify missing sensitive settings', async () => {
+      const config: ExtensionConfig = {
+        name: 'test-ext',
+        version: '1.0.0',
+        settings: [
+          {
+            name: 's2',
+            description: 'd2',
+            envVar: 'UNIQUE_VAR_2',
+            sensitive: true,
+          },
+        ],
+      };
+      const extensionId = '12345';
+
+      const missing = await getMissingSettings(
+        config,
+        extensionId,
+        tempWorkspaceDir,
+      );
+      expect(missing).toHaveLength(1);
+      expect(missing[0].name).toBe('s2');
+    });
+
+    it('should respect settings present in workspace', async () => {
+      const config: ExtensionConfig = {
+        name: 'test-ext',
+        version: '1.0.0',
+        settings: [{ name: 's1', description: 'd1', envVar: 'UNIQUE_VAR_3' }],
+      };
+      const extensionId = '12345';
+
+      // Setup Workspace Env
+      const workspaceEnvPath = path.join(
+        tempWorkspaceDir,
+        EXTENSION_SETTINGS_FILENAME,
+      );
+      fs.writeFileSync(workspaceEnvPath, 'UNIQUE_VAR_3=val1');
+
+      const missing = await getMissingSettings(
+        config,
+        extensionId,
+        tempWorkspaceDir,
+      );
+      expect(missing).toEqual([]);
     });
   });
 });

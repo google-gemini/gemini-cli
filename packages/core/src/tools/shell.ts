@@ -451,7 +451,18 @@ export class ShellToolInvocation extends BaseToolInvocation<
   }
 }
 
-function getShellToolDescription(enableInteractiveShell: boolean): string {
+function getShellToolDescription(
+  enableInteractiveShell: boolean,
+  enableEfficiency: boolean,
+): string {
+  const efficiencyGuidelines = enableEfficiency
+    ? `
+
+      Efficiency Guidelines:
+      - Quiet Flags: Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
+      - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).`
+    : '';
+
   const returnedInfo = `
 
       The following information is returned:
@@ -467,12 +478,12 @@ function getShellToolDescription(enableInteractiveShell: boolean): string {
     const backgroundInstructions = enableInteractiveShell
       ? 'To run a command in the background, set the `is_background` parameter to true. Do NOT use PowerShell background constructs.'
       : 'Command can start background processes using PowerShell constructs such as `Start-Process -NoNewWindow` or `Start-Job`.';
-    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. ${backgroundInstructions}${returnedInfo}`;
+    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. ${backgroundInstructions}${efficiencyGuidelines}${returnedInfo}`;
   } else {
     const backgroundInstructions = enableInteractiveShell
       ? 'To run a command in the background, set the `is_background` parameter to true. Do NOT use `&` to background commands.'
       : 'Command can start background processes using `&`.';
-    return `This tool executes a given shell command as \`bash -c <command>\`. ${backgroundInstructions} Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${returnedInfo}`;
+    return `This tool executes a given shell command as \`bash -c <command>\`. ${backgroundInstructions} Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${efficiencyGuidelines}${returnedInfo}`;
   }
 }
 
@@ -500,7 +511,10 @@ export class ShellTool extends BaseDeclarativeTool<
     super(
       ShellTool.Name,
       'Shell',
-      getShellToolDescription(config.getEnableInteractiveShell()),
+      getShellToolDescription(
+        config.getEnableInteractiveShell(),
+        config.getEnableShellOutputEfficiency(),
+      ),
       Kind.Execute,
       {
         type: 'object',
