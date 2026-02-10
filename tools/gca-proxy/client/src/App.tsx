@@ -24,6 +24,7 @@ import {
   CssBaseline,
   ThemeProvider,
   createTheme,
+  LinearProgress,
 } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
@@ -44,6 +45,8 @@ interface PendingRequest {
   path: string;
   body: unknown;
   receivedAt: string;
+  streaming?: boolean;
+  liveChunks?: unknown[];
   upstreamResponse?: {
     statusCode: number;
     headers: Record<string, string>;
@@ -60,10 +63,15 @@ function App() {
   const [editedChunks, setEditedChunks] = useState<string>('');
   const [statusCode, setStatusCode] = useState(200);
   const [connected, setConnected] = useState(false);
+  // Track which requests are still streaming from upstream
+  const [streamingIds, setStreamingIds] = useState<Set<string>>(new Set());
   const wsRef = useRef<WebSocket | null>(null);
 
   const selected = pending.find((p) => p.id === selectedId);
-  const isStreaming = selected?.upstreamResponse?.chunks !== undefined;
+  const isStreaming =
+    selected?.upstreamResponse?.chunks !== undefined ||
+    (selected?.liveChunks && selected.liveChunks.length > 0);
+  const isStillStreaming = selectedId ? streamingIds.has(selectedId) : false;
 
   // WebSocket connection
   useEffect(() => {
@@ -89,7 +97,6 @@ function App() {
               setPending(msg.data);
               break;
             case 'request_intercepted':
-              // Update with full details
               setPending((prev) => {
                 const existing = prev.find((p) => p.id === msg.data.id);
                 if (existing) {
@@ -97,10 +104,48 @@ function App() {
                     p.id === msg.data.id ? { ...p, ...msg.data } : p,
                   );
                 }
-                return [...prev, msg.data];
+                return [...prev, { ...msg.data, liveChunks: [] }];
               });
+              // Mark as streaming if indicated
+              if (msg.data.streaming) {
+                setStreamingIds((prev) => new Set([...prev, msg.data.id]));
+              }
               // Auto-select if nothing selected
               setSelectedId((cur) => cur ?? msg.data.id);
+              break;
+
+            case 'chunk_preview':
+              // Live chunk arrived - append to the request's liveChunks
+              setPending((prev) =>
+                prev.map((p) =>
+                  p.id === msg.data.id
+                    ? {
+                        ...p,
+                        liveChunks: [...(p.liveChunks || []), msg.data.chunk],
+                      }
+                    : p,
+                ),
+              );
+              break;
+
+            case 'upstream_complete':
+              // Streaming done - update with full upstream response
+              setPending((prev) =>
+                prev.map((p) =>
+                  p.id === msg.data.id
+                    ? {
+                        ...p,
+                        upstreamResponse: msg.data.upstreamResponse,
+                        liveChunks: undefined,
+                      }
+                    : p,
+                ),
+              );
+              setStreamingIds((prev) => {
+                const next = new Set(prev);
+                next.delete(msg.data.id);
+                return next;
+              });
               break;
           }
         } catch (e) {
@@ -128,7 +173,7 @@ function App() {
     };
   }, []);
 
-  // Update edited response when selection changes
+  // Update edited response when upstream completes
   useEffect(() => {
     if (selected?.upstreamResponse) {
       if (selected.upstreamResponse.chunks) {
@@ -144,7 +189,18 @@ function App() {
       }
       setStatusCode(selected.upstreamResponse.statusCode);
     }
-  }, [selected]);
+  }, [selected?.upstreamResponse]);
+
+  // Auto-update the editor with live chunks while streaming (read-only preview)
+  useEffect(() => {
+    if (
+      isStillStreaming &&
+      selected?.liveChunks &&
+      selected.liveChunks.length > 0
+    ) {
+      setEditedChunks(JSON.stringify(selected.liveChunks, null, 2));
+    }
+  }, [isStillStreaming, selected?.liveChunks]);
 
   const toggleEndpoint = useCallback(
     (endpoint: string) => {
@@ -161,7 +217,7 @@ function App() {
   );
 
   const releaseRequest = useCallback(() => {
-    if (!selectedId) return;
+    if (!selectedId || isStillStreaming) return;
 
     try {
       const msg: {
@@ -189,7 +245,19 @@ function App() {
     } catch (e) {
       alert('Invalid JSON: ' + e);
     }
-  }, [selectedId, statusCode, isStreaming, editedChunks, editedResponse]);
+  }, [
+    selectedId,
+    statusCode,
+    isStreaming,
+    isStillStreaming,
+    editedChunks,
+    editedResponse,
+  ]);
+
+  const chunkCount =
+    selected?.liveChunks?.length ||
+    selected?.upstreamResponse?.chunks?.length ||
+    0;
 
   return (
     <ThemeProvider theme={darkTheme}>
@@ -291,6 +359,14 @@ function App() {
                             <Typography variant="body2" sx={{ fontSize: 11 }}>
                               {req.path.replace('/v1internal', '')}
                             </Typography>
+                            {streamingIds.has(req.id) && (
+                              <Chip
+                                label="streaming"
+                                size="small"
+                                color="info"
+                                sx={{ fontSize: 9, height: 18 }}
+                              />
+                            )}
                           </Box>
                         }
                         secondary={new Date(
@@ -353,6 +429,30 @@ function App() {
 
                 <Divider />
 
+                {/* Streaming Status */}
+                {isStillStreaming && (
+                  <Box>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        mb: 0.5,
+                      }}
+                    >
+                      <Chip
+                        label="⏳ Streaming from upstream..."
+                        color="info"
+                        size="small"
+                      />
+                      <Typography variant="body2" color="text.secondary">
+                        {chunkCount} chunks received
+                      </Typography>
+                    </Box>
+                    <LinearProgress color="info" />
+                  </Box>
+                )}
+
                 {/* Response Editor */}
                 <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
                   <TextField
@@ -362,10 +462,23 @@ function App() {
                     onChange={(e) => setStatusCode(Number(e.target.value))}
                     size="small"
                     sx={{ width: 100 }}
+                    disabled={isStillStreaming}
                   />
                   <Chip
-                    label={isStreaming ? 'SSE Streaming' : 'JSON Response'}
-                    color={isStreaming ? 'secondary' : 'default'}
+                    label={
+                      isStillStreaming
+                        ? `Streaming (${chunkCount} chunks)`
+                        : isStreaming
+                          ? 'SSE Streaming'
+                          : 'JSON Response'
+                    }
+                    color={
+                      isStillStreaming
+                        ? 'info'
+                        : isStreaming
+                          ? 'secondary'
+                          : 'default'
+                    }
                     size="small"
                   />
                   <Box sx={{ flex: 1 }} />
@@ -374,15 +487,18 @@ function App() {
                     color="success"
                     onClick={releaseRequest}
                     startIcon={<PlayArrowIcon />}
+                    disabled={isStillStreaming}
                   >
-                    Continue
+                    {isStillStreaming ? 'Waiting...' : 'Continue'}
                   </Button>
                 </Box>
 
                 <Typography variant="body2" color="text.secondary">
-                  {isStreaming
-                    ? 'Response Chunks (edit array):'
-                    : 'Response Body (edit JSON):'}
+                  {isStillStreaming
+                    ? 'Live preview (read-only while streaming):'
+                    : isStreaming
+                      ? 'Response Chunks (edit array):'
+                      : 'Response Body (edit JSON):'}
                 </Typography>
 
                 <TextField
@@ -396,6 +512,7 @@ function App() {
                       : setEditedResponse(e.target.value)
                   }
                   size="small"
+                  InputProps={{ readOnly: isStillStreaming }}
                   sx={{
                     flex: 1,
                     '& .MuiInputBase-input': {
