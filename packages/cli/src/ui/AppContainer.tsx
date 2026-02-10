@@ -1095,9 +1095,15 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const handleApprovalModeChangeWithUiReveal = useCallback(
     (mode: ApprovalMode) => {
       void handleApprovalModeChange(mode);
-      revealCleanUiDetailsTemporarily(APPROVAL_MODE_REVEAL_DURATION_MS);
+      if (cleanUiDetailsVisible) {
+        revealCleanUiDetailsTemporarily(APPROVAL_MODE_REVEAL_DURATION_MS);
+      }
     },
-    [handleApprovalModeChange, revealCleanUiDetailsTemporarily],
+    [
+      handleApprovalModeChange,
+      cleanUiDetailsVisible,
+      revealCleanUiDetailsTemporarily,
+    ],
   );
 
   // Auto-accept indicator

@@ -13,7 +13,7 @@ export const ShortcutsHint: React.FC = () => {
   const { cleanUiDetailsVisible, shortcutsHelpVisible } = useUIState();
 
   if (!cleanUiDetailsVisible) {
-    return <Text color={theme.text.secondary}> press tab for more </Text>;
+    return <Text color={theme.text.secondary}> press tab twice for more </Text>;
   }
 
   const highlightColor = shortcutsHelpVisible

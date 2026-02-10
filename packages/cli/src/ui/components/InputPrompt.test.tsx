@@ -2951,7 +2951,7 @@ describe('InputPrompt', () => {
   describe('Tab clean UI toggle', () => {
     it.each([
       {
-        name: 'should toggle clean UI details on Tab when no suggestions or ghost text',
+        name: 'should toggle clean UI details on double-Tab when no suggestions or ghost text',
         showSuggestions: false,
         ghostText: '',
         suggestions: [],
@@ -3000,12 +3000,15 @@ describe('InputPrompt', () => {
           <InputPrompt {...props} />,
           {
             uiActions,
-            uiState: { activePtyId: 1 },
+            uiState: {},
           },
         );
 
         await act(async () => {
           stdin.write('\t');
+          if (expectedUiToggle) {
+            stdin.write('\t');
+          }
         });
 
         await waitFor(() => {
@@ -3025,7 +3028,7 @@ describe('InputPrompt', () => {
       },
     );
 
-    it('should reveal clean UI details on Shift+Tab when hidden', async () => {
+    it('should not reveal clean UI details on Shift+Tab when hidden', async () => {
       mockedUseCommandCompletion.mockReturnValue({
         ...mockCommandCompletion,
         showSuggestions: false,
@@ -3053,7 +3056,9 @@ describe('InputPrompt', () => {
       });
 
       await waitFor(() => {
-        expect(uiActions.revealCleanUiDetailsTemporarily).toHaveBeenCalled();
+        expect(
+          uiActions.revealCleanUiDetailsTemporarily,
+        ).not.toHaveBeenCalled();
       });
       unmount();
     });

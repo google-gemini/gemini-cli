@@ -22,6 +22,7 @@ const buildShortcutItems = (): ShortcutItem[] => {
 
   return [
     { key: '!', description: 'shell mode' },
+    { key: 'Tab Tab', description: 'toggle clean UI' },
     { key: 'Shift+Tab', description: 'cycle mode' },
     { key: 'Ctrl+V', description: 'paste images' },
     { key: '@', description: 'select file or folder' },

@@ -101,11 +101,15 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     uiState.currentModel.length > 0 &&
     contextTokenLimit > 0 &&
     uiState.sessionStats.lastPromptTokenCount / contextTokenLimit > 0.6;
+  const showShortcutsHint =
+    !hasPendingActionRequired && (!showUiDetails || !showLoadingIndicator);
   const showMinimalBleedThroughRow =
     !showUiDetails &&
     (Boolean(modeBleedThrough) ||
       hasMinimalStatusBleedThrough ||
       showMinimalContextBleedThrough);
+  const showMinimalMetaRow =
+    !showUiDetails && (showMinimalBleedThroughRow || showShortcutsHint);
 
   return (
     <Box
@@ -169,11 +173,10 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             flexDirection="column"
             alignItems={isNarrow ? 'flex-start' : 'flex-end'}
           >
-            {!hasPendingActionRequired &&
-              (!showUiDetails || !showLoadingIndicator) && <ShortcutsHint />}
+            {showUiDetails && showShortcutsHint && <ShortcutsHint />}
           </Box>
         </Box>
-        {showMinimalBleedThroughRow && (
+        {showMinimalMetaRow && (
           <Box
             justifyContent="space-between"
             width="100%"
@@ -198,16 +201,31 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                 </Box>
               )}
             </Box>
-            {showMinimalContextBleedThrough && (
+            {(showMinimalContextBleedThrough || showShortcutsHint) && (
               <Box
-                marginTop={isNarrow ? 1 : 0}
+                marginTop={isNarrow && showMinimalBleedThroughRow ? 1 : 0}
+                flexDirection={isNarrow ? 'column' : 'row'}
                 alignItems={isNarrow ? 'flex-start' : 'flex-end'}
               >
-                <ContextUsageDisplay
-                  promptTokenCount={uiState.sessionStats.lastPromptTokenCount}
-                  model={uiState.currentModel}
-                  terminalWidth={uiState.terminalWidth}
-                />
+                {showMinimalContextBleedThrough && (
+                  <ContextUsageDisplay
+                    promptTokenCount={uiState.sessionStats.lastPromptTokenCount}
+                    model={uiState.currentModel}
+                    terminalWidth={uiState.terminalWidth}
+                  />
+                )}
+                {showShortcutsHint && (
+                  <Box
+                    marginLeft={
+                      showMinimalContextBleedThrough && !isNarrow ? 1 : 0
+                    }
+                    marginTop={
+                      showMinimalContextBleedThrough && isNarrow ? 1 : 0
+                    }
+                  >
+                    <ShortcutsHint />
+                  </Box>
+                )}
               </Box>
             )}
           </Box>
