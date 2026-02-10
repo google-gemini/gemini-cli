@@ -4,7 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { AgentCard, Message, MessageSendParams, Task } from '@a2a-js/sdk';
+import type {
+  AgentCard,
+  Message,
+  MessageSendParams,
+  Task,
+  TaskStatusUpdateEvent,
+  TaskArtifactUpdateEvent,
+} from '@a2a-js/sdk';
 import {
   type Client,
   ClientFactory,
@@ -18,7 +25,11 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import { debugLogger } from '../utils/debugLogger.js';
 
-export type SendMessageResult = Message | Task;
+export type SendMessageResult =
+  | Message
+  | Task
+  | TaskStatusUpdateEvent
+  | TaskArtifactUpdateEvent;
 
 /**
  * Manages A2A clients and caches loaded agent information.
@@ -110,18 +121,18 @@ export class A2AClientManager {
   }
 
   /**
-   * Sends a message to a loaded agent.
+   * Sends a message to a loaded agent and returns a stream of responses.
    * @param agentName The name of the agent to send the message to.
    * @param message The message content.
    * @param options Optional context and task IDs to maintain conversation state.
-   * @returns The response from the agent (Message or Task).
+   * @returns An async iterable of responses from the agent (Message or Task).
    * @throws Error if the agent returns an error response.
    */
-  async sendMessage(
+  async *sendMessageStream(
     agentName: string,
     message: string,
     options?: { contextId?: string; taskId?: string },
-  ): Promise<SendMessageResult> {
+  ): AsyncIterable<SendMessageResult> {
     const client = this.clients.get(agentName);
     if (!client) {
       throw new Error(`Agent '${agentName}' not found.`);
@@ -137,19 +148,19 @@ export class A2AClientManager {
         taskId: options?.taskId,
       },
       configuration: {
-        blocking: true,
+        blocking: false,
       },
     };
 
     try {
-      return await client.sendMessage(messageParams);
+      yield* client.sendMessageStream(messageParams);
     } catch (error: unknown) {
-      const prefix = `A2AClient SendMessage Error [${agentName}]`;
+      const prefix = `A2AClient SendMessageStream Error [${agentName}]`;
       if (error instanceof Error) {
         throw new Error(`${prefix}: ${error.message}`, { cause: error });
       }
       throw new Error(
-        `${prefix}: Unexpected error during sendMessage: ${String(error)}`,
+        `${prefix}: Unexpected error during sendMessageStream: ${String(error)}`,
       );
     }
   }

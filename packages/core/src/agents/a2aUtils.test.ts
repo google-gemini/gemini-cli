@@ -9,10 +9,56 @@ import {
   extractMessageText,
   extractTaskText,
   extractIdsFromResponse,
+  getDelta,
+  isTerminalState,
+  extractAnyText,
 } from './a2aUtils.js';
-import type { Message, Task, TextPart, DataPart, FilePart } from '@a2a-js/sdk';
+import type {
+  Message,
+  Task,
+  TextPart,
+  DataPart,
+  FilePart,
+  TaskStatusUpdateEvent,
+} from '@a2a-js/sdk';
 
 describe('a2aUtils', () => {
+  describe('getDelta', () => {
+    it('should return the full string if previous is empty', () => {
+      expect(getDelta('hello', '')).toBe('hello');
+    });
+
+    it('should return the delta if current starts with previous', () => {
+      expect(getDelta('hello world', 'hello')).toBe(' world');
+    });
+
+    it('should return the full current string if it does not start with previous', () => {
+      expect(getDelta('world', 'hello')).toBe('world');
+    });
+
+    it('should return an empty string if current is same as previous', () => {
+      expect(getDelta('hello', 'hello')).toBe('');
+    });
+  });
+
+  describe('isTerminalState', () => {
+    it('should return true for completed, failed, canceled, and rejected', () => {
+      expect(isTerminalState('completed')).toBe(true);
+      expect(isTerminalState('failed')).toBe(true);
+      expect(isTerminalState('canceled')).toBe(true);
+      expect(isTerminalState('rejected')).toBe(true);
+    });
+
+    it('should return false for working, submitted, input-required, auth-required, and unknown', () => {
+      expect(isTerminalState('working')).toBe(false);
+      expect(isTerminalState('submitted')).toBe(false);
+      expect(isTerminalState('input-required')).toBe(false);
+      expect(isTerminalState('auth-required')).toBe(false);
+      expect(isTerminalState('unknown')).toBe(false);
+      expect(isTerminalState(undefined)).toBe(false);
+    });
+  });
+
   describe('extractIdsFromResponse', () => {
     it('should extract IDs from a message response', () => {
       const message: Message = {
@@ -25,7 +71,11 @@ describe('a2aUtils', () => {
       };
 
       const result = extractIdsFromResponse(message);
-      expect(result).toEqual({ contextId: 'ctx-1', taskId: 'task-1' });
+      expect(result).toEqual({
+        contextId: 'ctx-1',
+        taskId: 'task-1',
+        clearTaskId: false,
+      });
     });
 
     it('should extract IDs from an in-progress task response', () => {
@@ -37,7 +87,81 @@ describe('a2aUtils', () => {
       };
 
       const result = extractIdsFromResponse(task);
-      expect(result).toEqual({ contextId: 'ctx-2', taskId: 'task-2' });
+      expect(result).toEqual({
+        contextId: 'ctx-2',
+        taskId: 'task-2',
+        clearTaskId: false,
+      });
+    });
+
+    it('should set clearTaskId true for terminal task response', () => {
+      const task: Task = {
+        id: 'task-3',
+        contextId: 'ctx-3',
+        kind: 'task',
+        status: { state: 'completed' },
+      };
+
+      const result = extractIdsFromResponse(task);
+      expect(result.clearTaskId).toBe(true);
+    });
+
+    it('should set clearTaskId true for terminal status update', () => {
+      const update = {
+        contextId: 'ctx-4',
+        status: { state: 'failed' },
+      };
+
+      const result = extractIdsFromResponse(
+        update as unknown as TaskStatusUpdateEvent,
+      );
+      expect(result.contextId).toBe('ctx-4');
+      expect(result.clearTaskId).toBe(true);
+    });
+  });
+
+  describe('extractAnyText', () => {
+    it('should extract text from message', () => {
+      const message: Message = {
+        kind: 'message',
+        role: 'agent',
+        messageId: 'm1',
+        parts: [{ kind: 'text', text: 'hello' } as TextPart],
+      };
+      expect(extractAnyText(message)).toBe('hello');
+    });
+
+    it('should extract text from task status message', () => {
+      const task: Task = {
+        id: 't1',
+        kind: 'task',
+        status: {
+          state: 'working',
+          message: {
+            kind: 'message',
+            role: 'agent',
+            messageId: 'm2',
+            parts: [{ kind: 'text', text: 'working...' } as TextPart],
+          },
+        },
+      };
+      expect(extractAnyText(task)).toBe('working...');
+    });
+
+    it('should extract text from status update event', () => {
+      const update = {
+        status: {
+          message: {
+            kind: 'message',
+            role: 'agent',
+            messageId: 'm3',
+            parts: [{ kind: 'text', text: 'update' } as TextPart],
+          },
+        },
+      };
+      expect(extractAnyText(update as unknown as TaskStatusUpdateEvent)).toBe(
+        'update',
+      );
     });
   });
 

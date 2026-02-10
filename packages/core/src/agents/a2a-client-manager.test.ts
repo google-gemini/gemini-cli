@@ -52,14 +52,14 @@ describe('A2AClientManager', () => {
   let manager: A2AClientManager;
 
   // Stable mocks initialized once
-  const sendMessageMock = vi.fn();
+  const sendMessageStreamMock = vi.fn();
   const getTaskMock = vi.fn();
   const cancelTaskMock = vi.fn();
   const getAgentCardMock = vi.fn();
   const authFetchMock = vi.fn();
 
   const mockClient = {
-    sendMessage: sendMessageMock,
+    sendMessageStream: sendMessageStreamMock,
     getTask: getTaskMock,
     cancelTask: cancelTaskMock,
     getAgentCard: getAgentCardMock,
@@ -177,21 +177,33 @@ describe('A2AClientManager', () => {
     });
   });
 
-  describe('sendMessage', () => {
+  describe('sendMessageStream', () => {
     beforeEach(async () => {
       await manager.loadAgent('TestAgent', 'http://test.agent');
     });
 
-    it('should send a message to the correct agent', async () => {
-      sendMessageMock.mockResolvedValue({
+    it('should send a message and return a stream', async () => {
+      const mockResult = {
         kind: 'message',
         messageId: 'a',
         parts: [],
         role: 'agent',
-      } as SendMessageResult);
+      } as SendMessageResult;
 
-      await manager.sendMessage('TestAgent', 'Hello');
-      expect(sendMessageMock).toHaveBeenCalledWith(
+      sendMessageStreamMock.mockResolvedValue(
+        (async function* () {
+          yield mockResult;
+        })(),
+      );
+
+      const stream = manager.sendMessageStream('TestAgent', 'Hello');
+      const results = [];
+      for await (const res of stream) {
+        results.push(res);
+      }
+
+      expect(results).toEqual([mockResult]);
+      expect(sendMessageStreamMock).toHaveBeenCalledWith(
         expect.objectContaining({
           message: expect.anything(),
         }),
@@ -199,53 +211,57 @@ describe('A2AClientManager', () => {
     });
 
     it('should use contextId and taskId when provided', async () => {
-      sendMessageMock.mockResolvedValue({
-        kind: 'message',
-        messageId: 'a',
-        parts: [],
-        role: 'agent',
-      } as SendMessageResult);
+      sendMessageStreamMock.mockResolvedValue(
+        (async function* () {
+          yield {
+            kind: 'message',
+            messageId: 'a',
+            parts: [],
+            role: 'agent',
+          } as SendMessageResult;
+        })(),
+      );
 
       const expectedContextId = 'user-context-id';
       const expectedTaskId = 'user-task-id';
 
-      await manager.sendMessage('TestAgent', 'Hello', {
+      const stream = manager.sendMessageStream('TestAgent', 'Hello', {
         contextId: expectedContextId,
         taskId: expectedTaskId,
       });
 
-      const call = sendMessageMock.mock.calls[0][0];
+       
+      for await (const _ of stream) {
+        // consume stream
+      }
+
+      const call = sendMessageStreamMock.mock.calls[0][0];
       expect(call.message.contextId).toBe(expectedContextId);
       expect(call.message.taskId).toBe(expectedTaskId);
     });
 
-    it('should return result from client', async () => {
-      const mockResult = {
-        contextId: 'server-context-id',
-        id: 'ctx-1',
-        kind: 'task',
-        status: { state: 'working' },
-      };
-
-      sendMessageMock.mockResolvedValueOnce(mockResult as SendMessageResult);
-
-      const response = await manager.sendMessage('TestAgent', 'Hello');
-
-      expect(response).toEqual(mockResult);
-    });
-
     it('should throw prefixed error on failure', async () => {
-      sendMessageMock.mockRejectedValueOnce(new Error('Network error'));
+      sendMessageStreamMock.mockRejectedValueOnce(new Error('Network error'));
 
-      await expect(manager.sendMessage('TestAgent', 'Hello')).rejects.toThrow(
-        'A2AClient SendMessage Error [TestAgent]: Network error',
+      const stream = manager.sendMessageStream('TestAgent', 'Hello');
+      await expect(async () => {
+         
+        for await (const _ of stream) {
+          // consume
+        }
+      }).rejects.toThrow(
+        'A2AClient SendMessageStream Error [TestAgent]: Network error',
       );
     });
 
     it('should throw an error if the agent is not found', async () => {
-      await expect(
-        manager.sendMessage('NonExistentAgent', 'Hello'),
-      ).rejects.toThrow("Agent 'NonExistentAgent' not found.");
+      const stream = manager.sendMessageStream('NonExistentAgent', 'Hello');
+      await expect(async () => {
+         
+        for await (const _ of stream) {
+          // consume
+        }
+      }).rejects.toThrow("Agent 'NonExistentAgent' not found.");
     });
   });
 

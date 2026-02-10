@@ -11,7 +11,9 @@ import type {
   TextPart,
   DataPart,
   FilePart,
+  TaskStatusUpdateEvent,
 } from '@a2a-js/sdk';
+import type { SendMessageResult } from './a2a-client-manager.js';
 
 /**
  * Extracts a human-readable text representation from a Message object.
@@ -111,35 +113,96 @@ function isFilePart(part: Part): part is FilePart {
 }
 
 /**
- * Extracts contextId and taskId from a Message or Task response.
+ * Returns true if the given state is a terminal state for a task.
+ */
+export function isTerminalState(
+  state:
+    | 'submitted'
+    | 'working'
+    | 'input-required'
+    | 'completed'
+    | 'canceled'
+    | 'failed'
+    | 'rejected'
+    | 'auth-required'
+    | 'unknown'
+    | undefined,
+): boolean {
+  return (
+    state === 'completed' ||
+    state === 'failed' ||
+    state === 'canceled' ||
+    state === 'rejected'
+  );
+}
+
+/**
+ * Extracts contextId and taskId from a Message, Task, or Update response.
  * Follows the pattern from the A2A CLI sample to maintain conversational continuity.
  */
-export function extractIdsFromResponse(result: Message | Task): {
+export function extractIdsFromResponse(result: SendMessageResult): {
   contextId?: string;
   taskId?: string;
+  clearTaskId?: boolean;
 } {
   let contextId: string | undefined;
   let taskId: string | undefined;
+  let clearTaskId = false;
 
-  if (result.kind === 'message') {
-    taskId = result.taskId;
-    contextId = result.contextId;
-  } else if (result.kind === 'task') {
-    taskId = result.id;
-    contextId = result.contextId;
+  if ('kind' in result) {
+    if (result.kind === 'message') {
+      taskId = result.taskId;
+      contextId = result.contextId;
+    } else if (result.kind === 'task') {
+      taskId = result.id;
+      contextId = result.contextId;
 
-    // If the task is in a final state (and not input-required), we clear the taskId
-    // so that the next interaction starts a fresh task (or keeps context without being bound to the old task).
-    if (
-      result.status &&
-      result.status.state !== 'input-required' &&
-      (result.status.state === 'completed' ||
-        result.status.state === 'failed' ||
-        result.status.state === 'canceled')
-    ) {
-      taskId = undefined;
+      if (isTerminalState(result.status?.state)) {
+        clearTaskId = true;
+      }
+    }
+  } else if ('status' in result) {
+    // TaskStatusUpdateEvent
+    const update = result as TaskStatusUpdateEvent;
+    contextId = update.contextId;
+
+    if (isTerminalState(update.status?.state)) {
+      clearTaskId = true;
     }
   }
 
-  return { contextId, taskId };
+  return { contextId, taskId, clearTaskId };
+}
+
+/**
+ * Extracts a human-readable text representation from a Message, Task, or Update response.
+ */
+export function extractAnyText(result: SendMessageResult): string {
+  if ('kind' in result) {
+    if (result.kind === 'message') {
+      return extractMessageText(result);
+    }
+    if (result.kind === 'task') {
+      return extractTaskText(result);
+    }
+  }
+
+  if ('status' in result && result.status?.message) {
+    // TaskStatusUpdateEvent
+    return extractMessageText(result.status.message);
+  }
+
+  // Fallback for Artifact updates or unknown types
+  return '';
+}
+
+/**
+ * Calculates the delta between the current text and the previous text.
+ * Returns the delta if current starts with previous, otherwise returns current.
+ */
+export function getDelta(current: string, previous: string): string {
+  if (current.startsWith(previous)) {
+    return current.slice(previous.length);
+  }
+  return current;
 }

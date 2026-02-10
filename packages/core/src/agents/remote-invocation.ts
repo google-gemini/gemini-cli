@@ -19,13 +19,15 @@ import type {
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { A2AClientManager } from './a2a-client-manager.js';
 import {
-  extractMessageText,
-  extractTaskText,
   extractIdsFromResponse,
+  getDelta,
+  extractAnyText,
 } from './a2aUtils.js';
 import { GoogleAuth } from 'google-auth-library';
 import type { AuthenticationHandler } from '@a2a-js/sdk/client';
 import { debugLogger } from '../utils/debugLogger.js';
+import type { AnsiOutput } from '../utils/terminalSerializer.js';
+import type { SendMessageResult } from './a2a-client-manager.js';
 
 /**
  * Authentication handler implementation using Google Application Default Credentials (ADC).
@@ -123,7 +125,10 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
     };
   }
 
-  async execute(_signal: AbortSignal): Promise<ToolResult> {
+  async execute(
+    _signal: AbortSignal,
+    updateOutput?: (output: string | AnsiOutput) => void,
+  ): Promise<ToolResult> {
     // 1. Ensure the agent is loaded (cached by manager)
     // We assume the user has provided an access token via some mechanism (TODO),
     // or we rely on ADC.
@@ -146,7 +151,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
 
       const message = this.params.query;
 
-      const response = await this.clientManager.sendMessage(
+      const stream = this.clientManager.sendMessageStream(
         this.definition.name,
         message,
         {
@@ -155,32 +160,58 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         },
       );
 
-      // Extracts IDs, taskID will be undefined if the task is completed/failed/canceled.
-      const { contextId, taskId } = extractIdsFromResponse(response);
+      let lastText = '';
+      let finalResponse: SendMessageResult | undefined;
 
-      this.contextId = contextId ?? this.contextId;
-      this.taskId = taskId;
+      for await (const chunk of stream) {
+        finalResponse = chunk;
+        const currentText = extractAnyText(chunk);
+
+        if (currentText && currentText !== lastText) {
+          if (updateOutput) {
+            const delta = getDelta(currentText, lastText);
+            if (delta) {
+              updateOutput(delta);
+            }
+          }
+          lastText = currentText;
+        }
+
+        const {
+          contextId: newContextId,
+          taskId: newTaskId,
+          clearTaskId,
+        } = extractIdsFromResponse(chunk);
+
+        if (newContextId) {
+          this.contextId = newContextId;
+        }
+
+        if (newTaskId) {
+          this.taskId = newTaskId;
+        }
+
+        if (clearTaskId) {
+          this.taskId = undefined;
+        }
+      }
+
+      if (!finalResponse) {
+        throw new Error('No response from remote agent.');
+      }
 
       RemoteAgentInvocation.sessionState.set(this.definition.name, {
         contextId: this.contextId,
         taskId: this.taskId,
       });
 
-      // Extract the output text
-      const outputText =
-        response.kind === 'task'
-          ? extractTaskText(response)
-          : response.kind === 'message'
-            ? extractMessageText(response)
-            : JSON.stringify(response);
-
       debugLogger.debug(
-        `[RemoteAgent] Response from ${this.definition.name}:\n${JSON.stringify(response, null, 2)}`,
+        `[RemoteAgent] Final response from ${this.definition.name}:\n${JSON.stringify(finalResponse, null, 2)}`,
       );
 
       return {
-        llmContent: [{ text: outputText }],
-        returnDisplay: outputText,
+        llmContent: [{ text: lastText }],
+        returnDisplay: lastText,
       };
     } catch (error: unknown) {
       const errorMessage = `Error calling remote agent: ${error instanceof Error ? error.message : String(error)}`;
