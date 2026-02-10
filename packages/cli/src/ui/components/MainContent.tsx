@@ -191,7 +191,10 @@ export const MainContent = () => {
   }
 
   return (
-    <>
+    <Box
+      key={`regular-main-content-${uiState.historyRemountKey}`}
+      flexDirection="column"
+    >
       <AppHeader
         key="app-header"
         version={version}
@@ -199,6 +202,6 @@ export const MainContent = () => {
       />
       {historyItems}
       {pendingItems}
-    </>
+    </Box>
   );
 };
