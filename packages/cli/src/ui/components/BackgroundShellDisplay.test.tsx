@@ -5,7 +5,7 @@
  */
 
 import { render } from '../../test-utils/render.js';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BackgroundShellDisplay } from './BackgroundShellDisplay.js';
 import { type BackgroundShell } from '../hooks/shellCommandProcessor.js';
 import { ShellExecutionService } from '@google/gemini-cli-core';
@@ -20,16 +20,12 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const mockDismissBackgroundShell = vi.fn();
 const mockSetActiveBackgroundShellPid = vi.fn();
 const mockSetIsBackgroundShellListOpen = vi.fn();
-const mockHandleWarning = vi.fn();
-const mockSetEmbeddedShellFocused = vi.fn();
 
 vi.mock('../contexts/UIActionsContext.js', () => ({
   useUIActions: () => ({
     dismissBackgroundShell: mockDismissBackgroundShell,
     setActiveBackgroundShellPid: mockSetActiveBackgroundShellPid,
     setIsBackgroundShellListOpen: mockSetIsBackgroundShellListOpen,
-    handleWarning: mockHandleWarning,
-    setEmbeddedShellFocused: mockSetEmbeddedShellFocused,
   }),
 }));
 
@@ -102,6 +98,10 @@ vi.mock('./shared/ScrollableList.js', () => ({
     ),
   ),
 }));
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 const createMockKey = (overrides: Partial<Key>): Key => ({
   name: '',

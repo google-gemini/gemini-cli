@@ -408,9 +408,13 @@ export class TestRig {
         ui: {
           useAlternateBuffer: true,
         },
-        model: {
-          name: DEFAULT_GEMINI_MODEL,
-        },
+        ...(env['GEMINI_TEST_TYPE'] === 'integration'
+          ? {
+              model: {
+                name: DEFAULT_GEMINI_MODEL,
+              },
+            }
+          : {}),
         sandbox:
           env['GEMINI_SANDBOX'] !== 'false' ? env['GEMINI_SANDBOX'] : false,
         // Don't show the IDE connection dialog when running from VsCode
@@ -485,6 +489,7 @@ export class TestRig {
         key !== 'GEMINI_MODEL' &&
         key !== 'GEMINI_DEBUG' &&
         key !== 'GEMINI_CLI_TEST_VAR' &&
+        key !== 'GEMINI_CLI_INTEGRATION_TEST' &&
         !key.startsWith('GEMINI_CLI_ACTIVITY_LOG')
       ) {
         delete cleanEnv[key];

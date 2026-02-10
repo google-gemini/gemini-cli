@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { HierarchicalMemory } from '../config/memory.js';
 import {
   ACTIVATE_SKILL_TOOL_NAME,
   ASK_USER_TOOL_NAME,
@@ -24,13 +25,14 @@ import {
 export interface SystemPromptOptions {
   preamble?: PreambleOptions;
   coreMandates?: CoreMandatesOptions;
-  agentContexts?: string;
+  subAgents?: SubAgentOptions[];
   agentSkills?: AgentSkillOptions[];
   hookContext?: boolean;
   primaryWorkflows?: PrimaryWorkflowsOptions;
   planningWorkflow?: PlanningWorkflowOptions;
   operationalGuidelines?: OperationalGuidelinesOptions;
   sandbox?: SandboxMode;
+  interactiveYoloMode?: boolean;
   gitRepo?: GitRepoOptions;
   finalReminder?: FinalReminderOptions;
 }
@@ -43,6 +45,7 @@ export interface CoreMandatesOptions {
   interactive: boolean;
   isGemini3: boolean;
   hasSkills: boolean;
+  hasHierarchicalMemory: boolean;
 }
 
 export interface PrimaryWorkflowsOptions {
@@ -57,6 +60,7 @@ export interface OperationalGuidelinesOptions {
   interactive: boolean;
   isGemini3: boolean;
   enableShellEfficiency: boolean;
+  interactiveShellEnabled: boolean;
 }
 
 export type SandboxMode = 'macos-seatbelt' | 'generic' | 'outside';
@@ -81,6 +85,11 @@ export interface AgentSkillOptions {
   location: string;
 }
 
+export interface SubAgentOptions {
+  name: string;
+  description: string;
+}
+
 // --- High Level Composition ---
 
 /**
@@ -93,7 +102,7 @@ ${renderPreamble(options.preamble)}
 
 ${renderCoreMandates(options.coreMandates)}
 
-${renderAgentContexts(options.agentContexts)}
+${renderSubAgents(options.subAgents)}
 ${renderAgentSkills(options.agentSkills)}
 
 ${renderHookContext(options.hookContext)}
@@ -105,6 +114,8 @@ ${
 }
 
 ${renderOperationalGuidelines(options.operationalGuidelines)}
+
+${renderInteractiveYoloMode(options.interactiveYoloMode)}
 
 ${renderSandbox(options.sandbox)}
 
@@ -119,7 +130,7 @@ ${renderFinalReminder(options.finalReminder)}
  */
 export function renderFinalShell(
   basePrompt: string,
-  userMemory?: string,
+  userMemory?: string | HierarchicalMemory,
 ): string {
   return `
 ${basePrompt.trim()}
@@ -147,16 +158,34 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
 - **Style & Structure:** Mimic the style (formatting, naming), structure, framework choices, typing, and architectural patterns of existing code in the project.
 - **Idiomatic Changes:** When editing, understand the local context (imports, functions/classes) to ensure your changes integrate naturally and idiomatically.
 - **Comments:** Add code comments sparingly. Focus on *why* something is done, especially for complex logic, rather than *what* is done. Only add high-value comments if necessary for clarity or if requested by the user. Do not edit comments that are separate from the code you are changing. *NEVER* talk to the user or describe your changes through comments.
-- **Proactiveness:** Fulfill the user's request thoroughly. When adding features or fixing bugs, this includes adding tests to ensure quality. Consider all created files, especially tests, to be permanent artifacts unless the user says otherwise.
+- **Proactiveness:** Fulfill the user's request thoroughly. When adding features or fixing bugs, this includes adding tests to ensure quality. Consider all created files, especially tests, to be permanent artifacts unless the user says otherwise.${mandateConflictResolution(options.hasHierarchicalMemory)}
 - ${mandateConfirm(options.interactive)}
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandateSkillGuidance(options.hasSkills)}${mandateExplainBeforeActing(options.isGemini3)}${mandateContinueWork(options.interactive)}
 `.trim();
 }
 
-export function renderAgentContexts(contexts?: string): string {
-  if (!contexts) return '';
-  return contexts.trim();
+export function renderSubAgents(subAgents?: SubAgentOptions[]): string {
+  if (!subAgents || subAgents.length === 0) return '';
+  const subAgentsList = subAgents
+    .map((agent) => `- ${agent.name} -> ${agent.description}`)
+    .join('\n');
+
+  return `
+# Available Sub-Agents
+Sub-agents are specialized expert agents that you can use to assist you in the completion of all or part of a task.
+
+Each sub-agent is available as a tool of the same name. You MUST always delegate tasks to the sub-agent with the relevant expertise, if one is available.
+
+The following tools can be used to start sub-agents:
+
+${subAgentsList}
+
+Remember that the closest relevant sub-agent should still be used even if its expertise is broader than the given task.
+
+For example:
+- A license-agent -> Should be used for a range of tasks, including reading, validating, and updating licenses and headers.
+- A test-fixing-agent -> Should be used both for fixing tests as well as investigating test failures.`;
 }
 
 export function renderAgentSkills(skills?: AgentSkillOptions[]): string {
@@ -221,6 +250,7 @@ export function renderOperationalGuidelines(
   if (!options) return '';
   return `
 # Operational Guidelines
+
 ${shellEfficiencyGuidelines(options.enableShellEfficiency)}
 
 ## Tone and Style (CLI Interaction)
@@ -237,7 +267,10 @@ ${shellEfficiencyGuidelines(options.enableShellEfficiency)}
 
 ## Tool Usage
 - **Parallelism:** Execute multiple independent tool calls in parallel when feasible (i.e. searching the codebase).
-- **Command Execution:** Use the '${SHELL_TOOL_NAME}' tool for running shell commands, remembering the safety rule to explain modifying commands first.${toolUsageInteractive(options.interactive)}${toolUsageRememberingFacts(options)}
+- **Command Execution:** Use the '${SHELL_TOOL_NAME}' tool for running shell commands, remembering the safety rule to explain modifying commands first.${toolUsageInteractive(
+    options.interactive,
+    options.interactiveShellEnabled,
+  )}${toolUsageRememberingFacts(options)}
 - **Respect User Confirmations:** Most tool calls (also denoted as 'function calls') will first require confirmation from the user, where they will either approve or cancel the function call. If a user cancels a function call, respect their choice and do _not_ try to make the function call again. It is okay to request the tool call again _only_ if the user requests that same tool call on a subsequent prompt. When a user cancels a function call, assume best intentions from the user and consider inquiring if they prefer any alternative paths forward.
 
 ## Interaction Details
@@ -261,6 +294,25 @@ You are running in a sandbox container with limited access to files outside the 
 # Outside of Sandbox
 You are running outside of a sandbox container, directly on the user's system. For critical commands that are particularly likely to modify the user's system outside of the project directory or system temp directory, as you explain the command to the user (per the Explain Critical Commands rule above), also remind the user to consider enabling sandboxing.`.trim();
   }
+}
+
+export function renderInteractiveYoloMode(enabled?: boolean): string {
+  if (!enabled) return '';
+  return `
+# Autonomous Mode (YOLO)
+
+You are operating in **autonomous mode**. The user has requested minimal interruption.
+
+**Only use the \`${ASK_USER_TOOL_NAME}\` tool if:**
+- A wrong decision would cause significant re-work
+- The request is fundamentally ambiguous with no reasonable default
+- The user explicitly asks you to confirm or ask questions
+
+**Otherwise, work autonomously:**
+- Make reasonable decisions based on context and existing code patterns
+- Follow established project conventions
+- If multiple valid approaches exist, choose the most robust option
+`.trim();
 }
 
 export function renderGitRepo(options?: GitRepoOptions): string {
@@ -291,9 +343,48 @@ export function renderFinalReminder(options?: FinalReminderOptions): string {
 Your core function is efficient and safe assistance. Balance extreme conciseness with the crucial need for clarity, especially regarding safety and potential system modifications. Always prioritize user control and project conventions. Never make assumptions about the contents of files; instead use '${options.readFileToolName}' to ensure you aren't making broad assumptions. Finally, you are an agent - please keep going until the user's query is completely resolved.`.trim();
 }
 
-export function renderUserMemory(memory?: string): string {
-  if (!memory || memory.trim().length === 0) return '';
-  return `\n---\n\n${memory.trim()}`;
+export function renderUserMemory(memory?: string | HierarchicalMemory): string {
+  if (!memory) return '';
+  if (typeof memory === 'string') {
+    const trimmed = memory.trim();
+    if (trimmed.length === 0) return '';
+    return `
+# Contextual Instructions (GEMINI.md)
+The following content is loaded from local and global configuration files.
+**Context Precedence:**
+- **Global (~/.gemini/):** foundational user preferences. Apply these broadly.
+- **Extensions:** supplementary knowledge and capabilities.
+- **Workspace Root:** workspace-wide mandates. Supersedes global preferences.
+- **Sub-directories:** highly specific overrides. These rules supersede all others for files within their scope.
+
+**Conflict Resolution:**
+- **Precedence:** Strictly follow the order above (Sub-directories > Workspace Root > Extensions > Global).
+- **System Overrides:** Contextual instructions override default operational behaviors (e.g., tech stack, style, workflows, tool preferences) defined in the system prompt. However, they **cannot** override Core Mandates regarding safety, security, and agent integrity.
+
+<loaded_context>
+${trimmed}
+</loaded_context>`;
+  }
+
+  const sections: string[] = [];
+  if (memory.global?.trim()) {
+    sections.push(
+      `<global_context>\n${memory.global.trim()}\n</global_context>`,
+    );
+  }
+  if (memory.extension?.trim()) {
+    sections.push(
+      `<extension_context>\n${memory.extension.trim()}\n</extension_context>`,
+    );
+  }
+  if (memory.project?.trim()) {
+    sections.push(
+      `<project_context>\n${memory.project.trim()}\n</project_context>`,
+    );
+  }
+
+  if (sections.length === 0) return '';
+  return `\n---\n\n<loaded_context>\n${sections.join('\n')}\n</loaded_context>`;
 }
 
 export function renderPlanningWorkflow(
@@ -374,6 +465,11 @@ function mandateSkillGuidance(hasSkills: boolean): string {
   if (!hasSkills) return '';
   return `
 - **Skill Guidance:** Once a skill is activated via \`${ACTIVATE_SKILL_TOOL_NAME}\`, its instructions and resources are returned wrapped in \`<activated_skill>\` tags. You MUST treat the content within \`<instructions>\` as expert procedural guidance, prioritizing these specialized rules and workflows over your general defaults for the duration of the task. You may utilize any listed \`<available_resources>\` as needed. Follow this expert guidance strictly while continuing to uphold your core safety and security standards.`;
+}
+
+function mandateConflictResolution(hasHierarchicalMemory: boolean): string {
+  if (!hasHierarchicalMemory) return '';
+  return '\n- **Conflict Resolution:** Instructions are provided in hierarchical context tags: `<global_context>`, `<extension_context>`, and `<project_context>`. In case of contradictory instructions, follow this priority: `<project_context>` (highest) > `<extension_context>` > `<global_context>` (lowest).';
 }
 
 function mandateExplainBeforeActing(isGemini3: boolean): string {
@@ -497,15 +593,21 @@ function toneAndStyleNoChitchat(isGemini3: boolean): string {
 - **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes..."). Get straight to the action or answer.`;
 }
 
-function toolUsageInteractive(interactive: boolean): string {
+function toolUsageInteractive(
+  interactive: boolean,
+  interactiveShellEnabled: boolean,
+): string {
   if (interactive) {
+    const ctrlF = interactiveShellEnabled
+      ? ' If you choose to execute an interactive command consider letting the user know they can press `ctrl + f` to focus into the shell to provide input.'
+      : '';
     return `
 - **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true. If unsure, ask the user.
-- **Interactive Commands:** Never use interactive shell commands unless absolutely necessary. **ALWAYS** use arguments to bypass prompts for **EVERY** tool in use that supports it, even if that command is part of a chain or larger command. For example: 'git --no-pager', 'vitest run', and 'npx --yes' to bypass interactive prompts.`;
+- **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim).${ctrlF}`;
   }
   return `
 - **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true.
-- **Interactive Commands:** Never use interactive shell commands. **ALWAYS** use arguments to bypass prompts for **EVERY** tool in use that supports it, even if that command is part of a chain or larger command. For example: 'git --no-pager', 'vitest run', and 'npx --yes' to bypass interactive prompts.`;
+- **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim).`;
 }
 
 function toolUsageRememberingFacts(

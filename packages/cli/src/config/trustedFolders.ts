@@ -6,6 +6,8 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as crypto from 'node:crypto';
+import { lock } from 'proper-lockfile';
 import {
   FatalConfigError,
   getErrorMessage,
@@ -13,9 +15,13 @@ import {
   ideContextStore,
   GEMINI_DIR,
   homedir,
+  isHeadlessMode,
+  coreEvents,
 } from '@google/gemini-cli-core';
 import type { Settings } from './settings.js';
 import stripJsonComments from 'strip-json-comments';
+
+const { promises: fsPromises } = fs;
 
 export const TRUSTED_FOLDERS_FILENAME = 'trustedFolders.json';
 
@@ -41,6 +47,7 @@ export function isTrustLevel(
 ): value is TrustLevel {
   return (
     typeof value === 'string' &&
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     Object.values(TrustLevel).includes(value as TrustLevel)
   );
 }
@@ -66,6 +73,13 @@ export interface TrustResult {
 }
 
 const realPathCache = new Map<string, string>();
+
+/**
+ * Parses the trusted folders JSON content, stripping comments.
+ */
+function parseTrustedFoldersJson(content: string): unknown {
+  return JSON.parse(stripJsonComments(content));
+}
 
 /**
  * FOR TESTING PURPOSES ONLY.
@@ -150,19 +164,68 @@ export class LoadedTrustedFolders {
     return undefined;
   }
 
-  setValue(path: string, trustLevel: TrustLevel): void {
-    const originalTrustLevel = this.user.config[path];
-    this.user.config[path] = trustLevel;
+  async setValue(folderPath: string, trustLevel: TrustLevel): Promise<void> {
+    if (this.errors.length > 0) {
+      const errorMessages = this.errors.map(
+        (error) => `Error in ${error.path}: ${error.message}`,
+      );
+      throw new FatalConfigError(
+        `Cannot update trusted folders because the configuration file is invalid:\n${errorMessages.join('\n')}\nPlease fix the file manually before trying to update it.`,
+      );
+    }
+
+    const dirPath = path.dirname(this.user.path);
+    if (!fs.existsSync(dirPath)) {
+      await fsPromises.mkdir(dirPath, { recursive: true });
+    }
+
+    // lockfile requires the file to exist
+    if (!fs.existsSync(this.user.path)) {
+      await fsPromises.writeFile(this.user.path, JSON.stringify({}, null, 2), {
+        mode: 0o600,
+      });
+    }
+
+    const release = await lock(this.user.path, {
+      retries: {
+        retries: 10,
+        minTimeout: 100,
+      },
+    });
+
     try {
-      saveTrustedFolders(this.user);
-    } catch (e) {
-      // Revert the in-memory change if the save failed.
-      if (originalTrustLevel === undefined) {
-        delete this.user.config[path];
-      } else {
-        this.user.config[path] = originalTrustLevel;
+      // Re-read the file to handle concurrent updates
+      const content = await fsPromises.readFile(this.user.path, 'utf-8');
+      let config: Record<string, TrustLevel>;
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        config = parseTrustedFoldersJson(content) as Record<string, TrustLevel>;
+      } catch (error) {
+        coreEvents.emitFeedback(
+          'error',
+          `Failed to parse trusted folders file at ${this.user.path}. The file may be corrupted.`,
+          error,
+        );
+        config = {};
       }
-      throw e;
+
+      const originalTrustLevel = config[folderPath];
+      config[folderPath] = trustLevel;
+      this.user.config[folderPath] = trustLevel;
+
+      try {
+        saveTrustedFolders({ ...this.user, config });
+      } catch (e) {
+        // Revert the in-memory change if the save failed.
+        if (originalTrustLevel === undefined) {
+          delete this.user.config[folderPath];
+        } else {
+          this.user.config[folderPath] = originalTrustLevel;
+        }
+        throw e;
+      }
+    } finally {
+      await release();
     }
   }
 }
@@ -190,10 +253,8 @@ export function loadTrustedFolders(): LoadedTrustedFolders {
   try {
     if (fs.existsSync(userPath)) {
       const content = fs.readFileSync(userPath, 'utf-8');
-      const parsed = JSON.parse(stripJsonComments(content)) as Record<
-        string,
-        string
-      >;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const parsed = parseTrustedFoldersJson(content) as Record<string, string>;
 
       if (
         typeof parsed !== 'object' ||
@@ -241,11 +302,26 @@ export function saveTrustedFolders(
     fs.mkdirSync(dirPath, { recursive: true });
   }
 
-  fs.writeFileSync(
-    trustedFoldersFile.path,
-    JSON.stringify(trustedFoldersFile.config, null, 2),
-    { encoding: 'utf-8', mode: 0o600 },
-  );
+  const content = JSON.stringify(trustedFoldersFile.config, null, 2);
+  const tempPath = `${trustedFoldersFile.path}.tmp.${crypto.randomUUID()}`;
+
+  try {
+    fs.writeFileSync(tempPath, content, {
+      encoding: 'utf-8',
+      mode: 0o600,
+    });
+    fs.renameSync(tempPath, trustedFoldersFile.path);
+  } catch (error) {
+    // Clean up temp file if it was created but rename failed
+    if (fs.existsSync(tempPath)) {
+      try {
+        fs.unlinkSync(tempPath);
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+    throw error;
+  }
 }
 
 /** Is folder trust feature enabled per the current applied settings */
@@ -282,6 +358,10 @@ export function isWorkspaceTrusted(
   workspaceDir: string = process.cwd(),
   trustConfig?: Record<string, TrustLevel>,
 ): TrustResult {
+  if (isHeadlessMode()) {
+    return { isTrusted: true, source: undefined };
+  }
+
   if (!isFolderTrustEnabled(settings)) {
     return { isTrusted: true, source: undefined };
   }
