@@ -460,17 +460,17 @@ export class HookRunner {
         decision: 'allow',
         systemMessage: text,
       };
-    } else if (exitCode === EXIT_CODE_BLOCKING_ERROR) {
-      // Blocking error
-      return {
-        decision: 'deny',
-        reason: text,
-      };
-    } else {
-      // Non-blocking error (EXIT_CODE_NON_BLOCKING_ERROR or any other code)
+    } else if (exitCode === EXIT_CODE_NON_BLOCKING_ERROR) {
+      // Non-blocking error (EXIT_CODE_NON_BLOCKING_ERROR = 1)
       return {
         decision: 'allow',
         systemMessage: `Warning: ${text}`,
+      };
+    } else {
+      // All other non-zero exit codes (including 2) are blocking
+      return {
+        decision: 'deny',
+        reason: text,
       };
     }
   }
