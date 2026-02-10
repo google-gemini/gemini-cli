@@ -65,7 +65,11 @@ export function sanitizeTestName(name: string) {
  * On Windows, this converts backslashes to forward slashes.
  */
 export function normalizePath(p: string): string {
-  return p.replace(/\\/g, '/');
+  const result = p.replace(/\\/g, '/');
+  if (process.env['CI'] === 'true' || process.env['VERBOSE'] === 'true') {
+    console.log(`[normalizePath] "${p}" -> "${result}"`);
+  }
+  return result;
 }
 
 // Helper to create detailed error messages

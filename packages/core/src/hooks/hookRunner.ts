@@ -339,6 +339,12 @@ export class HookRunner {
         stderr += data.toString();
       });
 
+      child.on('exit', (code, signal) => {
+        if (process.env['CI'] === 'true' || process.env['VERBOSE'] === 'true') {
+          console.log(`[HookRunner] Hook exit. code: ${code}, signal: ${signal}`);
+        }
+      });
+
       // Handle process exit
       child.on('close', (exitCode) => {
         clearTimeout(timeoutHandle);
@@ -405,6 +411,10 @@ export class HookRunner {
       child.on('error', (error) => {
         clearTimeout(timeoutHandle);
         const duration = Date.now() - startTime;
+
+        if (process.env['CI'] === 'true' || process.env['VERBOSE'] === 'true') {
+          console.log(`[HookRunner] Hook process error: ${error.message}`);
+        }
 
         resolve({
           hookConfig,
