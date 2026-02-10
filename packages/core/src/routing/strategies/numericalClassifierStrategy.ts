@@ -121,7 +121,7 @@ function getComplexityThreshold(sessionId: string): number {
   // 50% split:
   // 0-49: Strict (80)
   // 50-99: Control (50)
-  return normalized < 50 ? 80 : 50;
+  return normalized < 50 ? 60 : 30;
 }
 
 export class NumericalClassifierStrategy implements RoutingStrategy {
@@ -222,7 +222,7 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
     } else {
       // Fallback to deterministic A/B test
       threshold = getComplexityThreshold(sessionId);
-      groupLabel = threshold === 80 ? 'Strict' : 'Control';
+      groupLabel = threshold === 60 ? 'Strict' : 'Control';
     }
 
     const modelAlias = score >= threshold ? PRO_MODEL : FLASH_MODEL;
