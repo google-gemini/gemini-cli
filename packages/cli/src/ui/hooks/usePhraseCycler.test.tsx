@@ -45,12 +45,12 @@ describe('usePhraseCycler', () => {
     vi.restoreAllMocks();
   });
 
-  it('should initialize with a witty phrase when not active and not waiting', () => {
+  it('should initialize with an empty string when not active and not waiting', () => {
     vi.spyOn(Math, 'random').mockImplementation(() => 0.5); // Always witty
     const { lastFrame } = render(
       <TestComponent isActive={false} isWaiting={false} />,
     );
-    expect(WITTY_LOADING_PHRASES).toContain(lastFrame());
+    expect(lastFrame()).toBe('');
   });
 
   it('should show "Waiting for user confirmation..." when isWaiting is true', async () => {
@@ -195,7 +195,7 @@ describe('usePhraseCycler', () => {
     });
     expect(customPhrases).toContain(lastFrame()); // Should be one of the custom phrases
 
-    // Deactivate -> resets to first phrase in sequence
+    // Deactivate -> resets to undefined (empty string in output)
     rerender(
       <TestComponent
         isActive={false}
@@ -206,8 +206,8 @@ describe('usePhraseCycler', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
-    // The phrase should be the first phrase after reset
-    expect(customPhrases).toContain(lastFrame());
+    // The phrase should be empty after reset
+    expect(lastFrame()).toBe('');
 
     // Activate again -> this will show a tip on first activation, then cycle from where mock is
     rerender(

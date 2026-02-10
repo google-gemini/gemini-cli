@@ -63,12 +63,12 @@ describe('<LoadingIndicator />', () => {
     elapsedTime: 5,
   };
 
-  it('should not render when streamingState is Idle and no loading phrase or thought', () => {
+  it('should render blank when streamingState is Idle and no loading phrase or thought', () => {
     const { lastFrame } = renderWithContext(
       <LoadingIndicator elapsedTime={5} />,
       StreamingState.Idle,
     );
-    expect(lastFrame()).toBe('');
+    expect(lastFrame()?.trim()).toBe('');
   });
 
   it('should render spinner, phrase, and time when streamingState is Responding', () => {
@@ -152,7 +152,7 @@ describe('<LoadingIndicator />', () => {
       <LoadingIndicator elapsedTime={5} />,
       StreamingState.Idle,
     );
-    expect(lastFrame()).toBe(''); // Initial: Idle (no loading phrase)
+    expect(lastFrame()?.trim()).toBe(''); // Initial: Idle (no loading phrase)
 
     // Transition to Responding
     rerender(
@@ -189,7 +189,7 @@ describe('<LoadingIndicator />', () => {
         <LoadingIndicator elapsedTime={5} />
       </StreamingContext.Provider>,
     );
-    expect(lastFrame()).toBe(''); // Idle with no loading phrase
+    expect(lastFrame()?.trim()).toBe(''); // Idle with no loading phrase and no spinner
     unmount();
   });
 

@@ -82,7 +82,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
           />
         </Box>
         {primaryText && (
-          <Text color={theme.text.accent} wrap="truncate-end">
+          <Text color={theme.text.primary} italic wrap="truncate-end">
             {thinkingIndicator}
             {primaryText}
           </Text>
@@ -116,7 +116,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
             />
           </Box>
           {primaryText && (
-            <Text color={theme.text.accent} wrap="truncate-end">
+            <Text color={theme.text.primary} italic wrap="truncate-end">
               {thinkingIndicator}
               {primaryText}
             </Text>

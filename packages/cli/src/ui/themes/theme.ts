@@ -15,6 +15,7 @@ import {
 } from './color-utils.js';
 
 import type { CustomTheme } from '@google/gemini-cli-core';
+import { DEFAULT_BORDER_OPACITY } from '../constants.js';
 
 export type { CustomTheme };
 
@@ -136,7 +137,11 @@ export class Theme {
         },
       },
       border: {
-        default: this.colors.Gray,
+        default: interpolateColor(
+          this.colors.Background,
+          this.colors.Gray,
+          DEFAULT_BORDER_OPACITY,
+        ),
         focused: this.colors.AccentBlue,
       },
       ui: {
@@ -401,7 +406,13 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
       },
     },
     border: {
-      default: customTheme.border?.default ?? colors.Gray,
+      default:
+        customTheme.border?.default ??
+        interpolateColor(
+          colors.Background,
+          colors.Gray,
+          DEFAULT_BORDER_OPACITY,
+        ),
       focused: customTheme.border?.focused ?? colors.AccentBlue,
     },
     ui: {
