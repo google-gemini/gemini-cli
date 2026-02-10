@@ -52,9 +52,7 @@ describe('Hooks Agent Flow', () => {
 
       await rig.setup('should inject additional context via BeforeAgent hook', {
         settings: {
-          hooksConfig: {
-            enabled: true,
-          },
+          enableHooks: true,
           hooks: {
             BeforeAgent: [
               {
@@ -116,9 +114,7 @@ describe('Hooks Agent Flow', () => {
 
       rig.setup('should receive prompt and response in AfterAgent hook', {
         settings: {
-          hooksConfig: {
-            enabled: true,
-          },
+          enableHooks: true,
           hooks: {
             AfterAgent: [
               {
@@ -273,9 +269,7 @@ describe('Hooks Agent Flow', () => {
         'should fire BeforeAgent and AfterAgent exactly once per turn despite tool calls',
         {
           settings: {
-            hooksConfig: {
-              enabled: true,
-            },
+            enableHooks: true,
             hooks: {
               BeforeAgent: [
                 {

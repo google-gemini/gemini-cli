@@ -43,10 +43,8 @@ describe('Hooks System Integration', () => {
         'should block tool execution when hook returns block decision',
         {
           settings: {
-            hooksConfig: {
-              enabled: true,
-            },
-            hooks: {
+          enableHooks: true,
+          hooks: {
               BeforeTool: [
                 {
                   matcher: 'write_file',
@@ -87,7 +85,7 @@ describe('Hooks System Integration', () => {
       expect(hookTelemetryFound).toBeTruthy();
     });
 
-    it.only('should block tool execution and use stderr as reason when hook exits with code 2', async () => {
+    it('should block tool execution and use stderr as reason when hook exits with code 2', async () => {
       rig.setup(
         'should block tool execution and use stderr as reason when hook exits with code 2',
         {
@@ -115,10 +113,8 @@ process.exit(0);
         'should block tool execution and use stderr as reason when hook exits with code 2',
         {
           settings: {
-            hooksConfig: {
-              enabled: true,
-            },
-            hooks: {
+          enableHooks: true,
+          hooks: {
               BeforeTool: [
                 {
                   matcher: 'write_file',
@@ -188,10 +184,8 @@ process.exit(0);
         'should allow tool execution when hook returns allow decision',
         {
           settings: {
-            hooksConfig: {
-              enabled: true,
-            },
-            hooks: {
+          enableHooks: true,
+          hooks: {
               BeforeTool: [
                 {
                   matcher: 'write_file',
@@ -245,9 +239,7 @@ process.exit(0);
       const command = `node "${scriptPath}"`;
       rig.setup('should add additional context from AfterTool hooks', {
         settings: {
-          hooksConfig: {
-            enabled: true,
-          },
+          enableHooks: true,
           hooks: {
             AfterTool: [
               {
@@ -322,9 +314,7 @@ console.log(JSON.stringify({
 
       rig.setup('should modify LLM requests with BeforeModel hooks', {
         settings: {
-          hooksConfig: {
-            enabled: true,
-          },
+          enableHooks: true,
           hooks: {
             BeforeModel: [
               {
@@ -386,10 +376,8 @@ console.log(JSON.stringify({
         'should block model execution when BeforeModel hook returns deny decision',
         {
           settings: {
-            hooksConfig: {
-              enabled: true,
-            },
-            hooks: {
+          enableHooks: true,
+          hooks: {
               BeforeModel: [
                 {
                   sequential: true,
@@ -434,10 +422,8 @@ console.log(JSON.stringify({
         'should block model execution when BeforeModel hook returns block decision',
         {
           settings: {
-            hooksConfig: {
-              enabled: true,
-            },
-            hooks: {
+          enableHooks: true,
+          hooks: {
               BeforeModel: [
                 {
                   sequential: true,
@@ -501,10 +487,8 @@ console.log(JSON.stringify({
 
         rig.setup('should modify LLM responses with AfterModel hooks', {
           settings: {
-            hooksConfig: {
-              enabled: true,
-            },
-            hooks: {
+          enableHooks: true,
+          hooks: {
               AfterModel: [
                 {
                   hooks: [
@@ -562,9 +546,7 @@ console.log(JSON.stringify({
       rig.setup('should modify tool selection with BeforeToolSelection hooks', {
         settings: {
           debugMode: true,
-          hooksConfig: {
-            enabled: true,
-          },
+          enableHooks: true,
           hooks: {
             BeforeToolSelection: [
               {
@@ -629,9 +611,7 @@ console.log(JSON.stringify({
 
       rig.setup('should augment prompts with BeforeAgent hooks', {
         settings: {
-          hooksConfig: {
-            enabled: true,
-          },
+          enableHooks: true,
           hooks: {
             BeforeAgent: [
               {
@@ -683,9 +663,7 @@ console.log(JSON.stringify({
             approval: 'ASK', // Disable YOLO mode to show permission prompts
             confirmationRequired: ['run_shell_command'],
           },
-          hooksConfig: {
-            enabled: true,
-          },
+          enableHooks: true,
           hooks: {
             Notification: [
               {
@@ -787,9 +765,7 @@ console.log(JSON.stringify({
 
       rig.setup('should execute hooks sequentially when configured', {
         settings: {
-          hooksConfig: {
-            enabled: true,
-          },
+          enableHooks: true,
           hooks: {
             BeforeAgent: [
               {
@@ -871,9 +847,7 @@ try {
 
       rig.setup('should provide correct input format to hooks', {
         settings: {
-          hooksConfig: {
-            enabled: true,
-          },
+          enableHooks: true,
           hooks: {
             BeforeTool: [
               {
@@ -928,10 +902,8 @@ try {
         'should treat mixed stdout (text + JSON) as system message and allow execution when exit code is 0',
         {
           settings: {
-            hooksConfig: {
-              enabled: true,
-            },
-            hooks: {
+          enableHooks: true,
+          hooks: {
               BeforeTool: [
                 {
                   matcher: 'write_file',
@@ -995,9 +967,7 @@ try {
 
       rig.setup('should handle hooks for all major event types', {
         settings: {
-          hooksConfig: {
-            enabled: true,
-          },
+          enableHooks: true,
           hooks: {
             BeforeAgent: [
               {
@@ -1118,9 +1088,7 @@ try {
 
       rig.setup('should handle hook failures gracefully', {
         settings: {
-          hooksConfig: {
-            enabled: true,
-          },
+          enableHooks: true,
           hooks: {
             BeforeTool: [
               {
@@ -1179,9 +1147,7 @@ try {
 
       rig.setup('should generate telemetry events for hook executions', {
         settings: {
-          hooksConfig: {
-            enabled: true,
-          },
+          enableHooks: true,
           hooks: {
             BeforeTool: [
               {
@@ -1229,9 +1195,7 @@ try {
 
       rig.setup('should fire SessionStart hook on app startup', {
         settings: {
-          hooksConfig: {
-            enabled: true,
-          },
+          enableHooks: true,
           hooks: {
             SessionStart: [
               {
@@ -1307,9 +1271,7 @@ console.log(JSON.stringify({
 
       rig.setup('should fire SessionStart hook and inject context', {
         settings: {
-          hooksConfig: {
-            enabled: true,
-          },
+          enableHooks: true,
           hooks: {
             SessionStart: [
               {
@@ -1392,10 +1354,8 @@ console.log(JSON.stringify({
         'should fire SessionStart hook and display systemMessage in interactive mode',
         {
           settings: {
-            hooksConfig: {
-              enabled: true,
-            },
-            hooks: {
+          enableHooks: true,
+          hooks: {
               SessionStart: [
                 {
                   matcher: 'startup',
@@ -1476,10 +1436,8 @@ console.log(JSON.stringify({
         'should fire SessionEnd and SessionStart hooks on /clear command',
         {
           settings: {
-            hooksConfig: {
-              enabled: true,
-            },
-            hooks: {
+          enableHooks: true,
+          hooks: {
               SessionEnd: [
                 {
                   matcher: '*',
@@ -1659,9 +1617,7 @@ console.log(JSON.stringify({
 
       rig.setup('should fire PreCompress hook on automatic compression', {
         settings: {
-          hooksConfig: {
-            enabled: true,
-          },
+          enableHooks: true,
           hooks: {
             PreCompress: [
               {
@@ -1680,7 +1636,7 @@ console.log(JSON.stringify({
           // Configure automatic compression with a very low threshold
           // This will trigger auto-compression after the first response
           contextCompression: {
-            enabled: true,
+             // enabled: true,
             targetTokenCount: 10, // Very low threshold to trigger compression
           },
         },
@@ -1737,9 +1693,7 @@ console.log(JSON.stringify({
 
       rig.setup('should fire SessionEnd hook on graceful exit', {
         settings: {
-          hooksConfig: {
-            enabled: true,
-          },
+          enableHooks: true,
           hooks: {
             SessionEnd: [
               {
@@ -1840,10 +1794,8 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
 
       rig.setup('should not execute hooks disabled in settings file', {
         settings: {
-          hooksConfig: {
-            enabled: true,
-            disabled: [normalizePath(`node "${disabledPath}"`)], // Disable the second hook
-          },
+          enableHooks: true,
+          disabledHooks: [normalizePath(`node "${disabledPath}"`)], // Disable the second hook
           hooks: {
             BeforeTool: [
               {
@@ -1915,10 +1867,8 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
 
       rig.setup('should respect disabled hooks across multiple operations', {
         settings: {
-          hooksConfig: {
-            enabled: true,
-            disabled: [normalizedDisabledCmd!], // Disable the second hook,
-          },
+          enableHooks: true,
+          disabledHooks: [normalizedDisabledCmd!], // Disable the second hook,
           hooks: {
             BeforeTool: [
               {
@@ -2019,9 +1969,7 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
           'hooks-system.input-modification.responses',
         ),
         settings: {
-          hooksConfig: {
-            enabled: true,
-          },
+          enableHooks: true,
           hooks: {
             BeforeTool: [
               {
@@ -2107,9 +2055,7 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
           'hooks-system.before-tool-stop.responses',
         ),
         settings: {
-          hooksConfig: {
-            enabled: true,
-          },
+          enableHooks: true,
           hooks: {
             BeforeTool: [
               {
