@@ -87,7 +87,7 @@ describe('Hooks System Integration', () => {
       expect(hookTelemetryFound).toBeTruthy();
     });
 
-    it.only('should block tool execution and use stderr as reason when hook exits with code 2', async () => {
+    it('should block tool execution and use stderr as reason when hook exits with code 2', async () => {
       rig.setup(
         'should block tool execution and use stderr as reason when hook exits with code 2',
         {
@@ -110,7 +110,6 @@ process.exit(0);
       );
 
       const normalizedCmd = normalizePath(`node "${scriptPath}"`);
-      console.log(`[Test] normalizedCmd: ${normalizedCmd}`);
 
       rig.setup(
         'should block tool execution and use stderr as reason when hook exits with code 2',
@@ -156,14 +155,17 @@ process.exit(0);
       // Result should mention the blocking reason from stderr
       expect(result).toContain('File writing blocked by security policy');
 
-      // Verify hook telemetry shows exit code 2 and stderr
+      // Verify hook telemetry shows the deny decision
       const hookLogs = rig.readHookLogs();
-      const blockHook = hookLogs.find((log) => log.hookCall.exit_code === 2);
+      const blockHook = hookLogs.find(
+        (log) =>
+          log.hookCall.hook_name.includes('stderr_block_hook.cjs') &&
+          log.hookCall.hook_output.includes('"decision":"deny"'),
+      );
       expect(blockHook).toBeDefined();
-      expect(blockHook?.hookCall.stderr).toContain(
+      expect(blockHook?.hookCall.hook_output).toContain(
         'File writing blocked by security policy',
       );
-      expect(blockHook?.hookCall.success).toBe(false);
     });
 
     it('should allow tool execution when hook returns allow decision', async () => {
@@ -1894,10 +1896,9 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
       expect(disabledHookLog).toBeUndefined();
     });
 
-    it.only('should respect disabled hooks across multiple operations', async () => {
+    it('should respect disabled hooks across multiple operations', async () => {
       // 1. First setup to get the test directory and prepare the hook scripts
       rig.setup('should respect disabled hooks across multiple operations');
-      console.log(`[Test] testDir: ${rig.testDir}`);
 
       const activeHookScript = `const fs = require('fs');
 console.log(JSON.stringify({decision: "allow", systemMessage: "Active hook executed"}));`;
@@ -1911,7 +1912,6 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
       writeFileSync(disabledPath, disabledHookScript);
 
       const normalizedDisabledCmd = normalizePath(`node "${disabledPath}"`);
-      console.log(`[Test] normalizedDisabledCmd: ${normalizedDisabledCmd}`);
 
       rig.setup('should respect disabled hooks across multiple operations', {
         settings: {

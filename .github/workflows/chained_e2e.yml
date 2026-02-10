@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - 'main'
-      - 'ntm/repro-hook-flakiness'
   merge_group:
   workflow_run:
     workflows: ['Trigger E2E']
@@ -131,7 +130,8 @@ jobs:
       - 'merge_queue_skipper'
       - 'parse_run_context'
     runs-on: 'gemini-cli-ubuntu-16-core'
-    if: false
+    if: |
+      always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
     strategy:
       fail-fast: false
       matrix:
@@ -148,19 +148,73 @@ jobs:
           ref: '${{ needs.parse_run_context.outputs.sha }}'
           repository: '${{ needs.parse_run_context.outputs.repository }}'
 
+      - name: 'Set up Node.js ${{ matrix.node-version }}'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
+        with:
+          node-version: '${{ matrix.node-version }}'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build project'
+        run: 'npm run build'
+
+      - name: 'Set up Docker'
+        if: "${{matrix.sandbox == 'sandbox:docker'}}"
+        uses: 'docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435' # ratchet:docker/setup-buildx-action@v3
+
+      - name: 'Run E2E tests'
+        env:
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          KEEP_OUTPUT: 'true'
+          VERBOSE: 'true'
+          BUILD_SANDBOX_FLAGS: '--cache-from type=gha --cache-to type=gha,mode=max'
+        shell: 'bash'
+        run: |
+          if [[ "${{ matrix.sandbox }}" == "sandbox:docker" ]]; then
+            npm run test:integration:sandbox:docker
+          else
+            npm run test:integration:sandbox:none
+          fi
+
   e2e_mac:
     name: 'E2E Test (macOS)'
     needs:
       - 'merge_queue_skipper'
       - 'parse_run_context'
     runs-on: 'macos-latest'
-    if: false
+    if: |
+      always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
         with:
           ref: '${{ needs.parse_run_context.outputs.sha }}'
           repository: '${{ needs.parse_run_context.outputs.repository }}'
+
+      - name: 'Set up Node.js 20.x'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build project'
+        run: 'npm run build'
+
+      - name: 'Fix rollup optional dependencies on macOS'
+        if: "${{runner.os == 'macOS'}}"
+        run: |
+          npm cache clean --force
+      - name: 'Run E2E tests (non-Windows)'
+        if: "${{runner.os != 'Windows'}}"
+        env:
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          KEEP_OUTPUT: 'true'
+          SANDBOX: 'sandbox:none'
+          VERBOSE: 'true'
+        run: 'npm run test:integration:sandbox:none'
 
   e2e_windows:
     name: 'Slow E2E - Win'
@@ -221,7 +275,7 @@ jobs:
           UV_THREADPOOL_SIZE: '32'
           NODE_ENV: 'test'
         shell: 'pwsh'
-        run: 'npx vitest run --root integration-tests hooks-system.test.ts --allowOnly'
+        run: 'npm run test:integration:sandbox:none'
 
   evals:
     name: 'Evals (ALWAYS_PASSING)'
@@ -229,7 +283,8 @@ jobs:
       - 'merge_queue_skipper'
       - 'parse_run_context'
     runs-on: 'gemini-cli-ubuntu-16-core'
-    if: false
+    if: |
+      always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
@@ -237,22 +292,42 @@ jobs:
           ref: '${{ needs.parse_run_context.outputs.sha }}'
           repository: '${{ needs.parse_run_context.outputs.repository }}'
 
+      - name: 'Set up Node.js 20.x'
+        uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build project'
+        run: 'npm run build'
+
+      - name: 'Run Evals (Required to pass)'
+        env:
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+        run: 'npm run test:always_passing_evals'
+
   e2e:
     name: 'E2E'
     if: |
       always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
     needs:
-      - 'e2e_windows'
+      - 'e2e_linux'
+      - 'e2e_mac'
+      - 'evals'
       - 'merge_queue_skipper'
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Check E2E test results'
         run: |
-          if [[ ${{ needs.e2e_windows.result }} != 'success' ]]; then
-            echo "Windows E2E job failed."
+          if [[ ${{ needs.e2e_linux.result }} != 'success' || \
+               ${{ needs.e2e_mac.result }} != 'success' || \
+               ${{ needs.evals.result }} != 'success' ]]; then
+            echo "One or more E2E jobs failed."
             exit 1
           fi
-          echo "Windows E2E job passed!"
+          echo "All required E2E jobs passed!"
 
   set_workflow_status:
     runs-on: 'gemini-cli-ubuntu-16-core'

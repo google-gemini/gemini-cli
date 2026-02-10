@@ -60,18 +60,6 @@ export function sanitizeTestName(name: string) {
     .replace(/-+/g, '-');
 }
 
-/**
- * Normalizes a path for use in command-line arguments.
- * On Windows, this converts backslashes to forward slashes.
- */
-export function normalizePath(p: string): string {
-  const result = p.replace(/\\/g, '/');
-  if (process.env['CI'] === 'true' || process.env['VERBOSE'] === 'true') {
-    console.log(`[normalizePath] "${p}" -> "${result}"`);
-  }
-  return result;
-}
-
 // Helper to create detailed error messages
 export function createToolCallErrorMessage(
   expectedTools: string | string[],
@@ -373,43 +361,30 @@ export class TestRig {
     this.testDir = join(testFileDir, sanitizedName);
     this.homeDir = join(testFileDir, sanitizedName + '-home');
 
-    if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
-      console.log(`[TestRig] Setting up test: ${testName}`);
-      console.log(`[TestRig] testDir: ${this.testDir}`);
-      console.log(`[TestRig] homeDir: ${this.homeDir}`);
-    }
-
     if (!this._initialized) {
       // Clean up existing directories from previous runs (e.g. retries)
-      const cleanDir = (dir: string, name: string) => {
+      const cleanDir = (dir: string) => {
         if (fs.existsSync(dir)) {
-          if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
-            console.log(`[TestRig] Cleaning up existing ${name}: ${dir}`);
-          }
           for (let i = 0; i < 5; i++) {
             try {
               fs.rmSync(dir, { recursive: true, force: true });
               return;
             } catch (err) {
               if (i === 4) throw err;
-              if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
-                console.log(
-                  `[TestRig] Failed to clean ${name} (attempt ${i + 1}): ${err}`,
-                );
-              }
-              // Use timeout on windows, sleep on others
               const sleepCmd =
                 process.platform === 'win32' ? 'timeout /t 1' : 'sleep 1';
               try {
                 execSync(sleepCmd);
-              } catch {}
+              } catch {
+                /* ignore */
+              }
             }
           }
         }
       };
 
-      cleanDir(this.testDir, 'testDir');
-      cleanDir(this.homeDir, 'homeDir');
+      cleanDir(this.testDir);
+      cleanDir(this.homeDir);
       this._initialized = true;
     }
 
@@ -490,17 +465,6 @@ export class TestRig {
     const filePath = join(this.testDir!, fileName);
     writeFileSync(filePath, content);
     return filePath;
-  }
-
-  createScript(fileName: string, content: string) {
-    if (!this.testDir) {
-      throw new Error(
-        'TestRig.setup must be called before creating files or scripts',
-      );
-    }
-    const scriptPath = join(this.testDir, fileName);
-    writeFileSync(scriptPath, content);
-    return normalizePath(scriptPath);
   }
 
   mkdir(dir: string) {
@@ -609,11 +573,6 @@ export class TestRig {
     });
     this._spawnedProcesses.push(child);
 
-    if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
-      console.log(`[TestRig] Running: ${command} ${commandArgs.join(' ')}`);
-      console.log(`[TestRig] CWD: ${this.testDir}`);
-    }
-
     let stdout = '';
     let stderr = '';
 
@@ -642,8 +601,7 @@ export class TestRig {
       }
     });
 
-    const isWinCI = os.platform() === 'win32' && process.env['CI'] === 'true';
-    const timeout = options.timeout ?? (isWinCI ? 600000 : 300000); // 10 mins on Win CI, 5 mins otherwise
+    const timeout = options.timeout ?? 300000;
     const promise = new Promise<string>((resolve, reject) => {
       const timer = setTimeout(() => {
         child.kill('SIGKILL');
@@ -814,8 +772,7 @@ export class TestRig {
       }
     });
 
-    const isWinCI = os.platform() === 'win32' && process.env['CI'] === 'true';
-    const timeout = options.timeout ?? (isWinCI ? 600000 : 300000); // 10 mins on Win CI, 5 mins otherwise
+    const timeout = options.timeout ?? 300000;
     const promise = new Promise<string>((resolve, reject) => {
       const timer = setTimeout(() => {
         child.kill('SIGKILL');
@@ -1257,11 +1214,6 @@ export class TestRig {
     }[] = [];
 
     for (const logData of parsedLogs) {
-      if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
-        if (logData.attributes?.['event.name']?.includes('tool')) {
-          console.log(`[TestRig] Found tool-related log: ${JSON.stringify(logData.attributes)}`);
-        }
-      }
       // Look for tool call logs
       if (
         logData.attributes &&
@@ -1359,18 +1311,21 @@ export class TestRig {
 
     const envVars = this._getCleanEnv(options?.env);
 
-    // Ensure PATH is included for pty
-    if (!envVars['PATH'] && process.env['PATH']) {
-      envVars['PATH'] = process.env['PATH'];
-    }
-
-    // Add critical Windows environment variables if missing
+    // node-pty on windows often needs these to spawn correctly
     if (process.platform === 'win32') {
-      ['SystemRoot', 'COMSPEC', 'windir', 'PATHEXT'].forEach((key) => {
-        if (!envVars[key] && process.env[key]) {
-          envVars[key] = process.env[key];
+      const windowsCriticalVars = [
+        'SystemRoot',
+        'COMSPEC',
+        'windir',
+        'PATHEXT',
+        'TEMP',
+        'TMP',
+      ];
+      for (const v of windowsCriticalVars) {
+        if (process.env[v] && !envVars[v]) {
+          envVars[v] = process.env[v]!;
         }
-      });
+      }
     }
 
     const ptyOptions: pty.IPtyForkOptions = {
@@ -1384,14 +1339,6 @@ export class TestRig {
     };
 
     const executable = command === 'node' ? process.execPath : command;
-    if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
-      console.log(`[TestRig] Spawning PTY: ${executable}`);
-      console.log(`[TestRig] Args: ${JSON.stringify(commandArgs)}`);
-      // Only log keys to avoid leaking sensitive info
-      console.log(
-        `[TestRig] Env Keys: ${Object.keys(ptyOptions.env!).join(', ')}`,
-      );
-    }
     const ptyProcess = pty.spawn(executable, commandArgs, ptyOptions);
 
     const run = new InteractiveRun(ptyProcess);
@@ -1419,11 +1366,6 @@ export class TestRig {
     }[] = [];
 
     for (const logData of parsedLogs) {
-      if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
-        if (logData.attributes?.['event.name']?.includes('hook')) {
-          console.log(`[TestRig] Found hook-related log: ${JSON.stringify(logData.attributes)}`);
-        }
-      }
       // Look for tool call logs
       if (
         logData.attributes &&
@@ -1467,4 +1409,12 @@ export class TestRig {
     }
     throw new Error(`pollCommand timed out after ${timeout}ms`);
   }
+}
+
+/**
+ * Normalizes a path for cross-platform matching (replaces backslashes with forward slashes).
+ */
+export function normalizePath(p: string | undefined): string | undefined {
+  if (!p) return p;
+  return p.replace(/\\/g, '/');
 }
