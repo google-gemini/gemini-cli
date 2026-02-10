@@ -31,8 +31,6 @@ export interface BaseSelectionListProps<
   showScrollArrows?: boolean;
   maxItemsToShow?: number;
   wrapAround?: boolean;
-  focusKey?: string;
-  priority?: boolean;
   renderItem: (item: TItem, context: RenderItemContext) => React.ReactNode;
 }
 
@@ -63,8 +61,6 @@ export function BaseSelectionList<
   showScrollArrows = false,
   maxItemsToShow = 10,
   wrapAround = true,
-  focusKey,
-  priority,
   renderItem,
 }: BaseSelectionListProps<T, TItem>): React.JSX.Element {
   const { activeIndex } = useSelectionList({
@@ -75,8 +71,6 @@ export function BaseSelectionList<
     isFocused,
     showNumbers,
     wrapAround,
-    focusKey,
-    priority,
   });
 
   const [scrollOffset, setScrollOffset] = useState(0);
@@ -100,7 +94,7 @@ export function BaseSelectionList<
   return (
     <Box flexDirection="column">
       {/* Use conditional coloring instead of conditional rendering */}
-      {showScrollArrows && items.length > maxItemsToShow && (
+      {showScrollArrows && (
         <Text
           color={scrollOffset > 0 ? theme.text.primary : theme.text.secondary}
         >
@@ -117,8 +111,8 @@ export function BaseSelectionList<
         let numberColor = theme.text.primary;
 
         if (isSelected) {
-          titleColor = theme.status.success;
-          numberColor = theme.status.success;
+          titleColor = theme.ui.focus;
+          numberColor = theme.ui.focus;
         } else if (item.disabled) {
           titleColor = theme.text.secondary;
           numberColor = theme.text.secondary;
@@ -141,7 +135,7 @@ export function BaseSelectionList<
             {/* Radio button indicator */}
             <Box minWidth={2} flexShrink={0}>
               <Text
-                color={isSelected ? theme.status.success : theme.text.primary}
+                color={isSelected ? theme.ui.focus : theme.text.primary}
                 aria-hidden
               >
                 {isSelected ? '●' : ' '}
@@ -149,7 +143,7 @@ export function BaseSelectionList<
             </Box>
 
             {/* Item number */}
-            {showNumbers && !item.hideNumber && (
+            {showNumbers && (
               <Box
                 marginRight={1}
                 flexShrink={0}
@@ -172,7 +166,7 @@ export function BaseSelectionList<
         );
       })}
 
-      {showScrollArrows && items.length > maxItemsToShow && (
+      {showScrollArrows && (
         <Text
           color={
             scrollOffset + maxItemsToShow < items.length

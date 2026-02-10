@@ -8,6 +8,7 @@ import type React from 'react';
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../colors.js';
+import { theme } from '../semantic-colors.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import path from 'node:path';
@@ -436,7 +437,7 @@ const SessionItem = ({
     if (isDisabled) {
       return Colors.Gray;
     }
-    return isActive ? Colors.AccentPurple : c;
+    return isActive ? theme.ui.focus : c;
   };
 
   const prefix = isActive ? '❯ ' : '  ';
@@ -775,12 +776,10 @@ export const useSessionBrowserInput = (
           state.setSearchQuery('');
           state.setActiveIndex(0);
           state.setScrollOffset(0);
-          return true;
         } else if (key.name === 'backspace') {
           state.setSearchQuery((prev) => prev.slice(0, -1));
           state.setActiveIndex(0);
           state.setScrollOffset(0);
-          return true;
         } else if (
           key.sequence &&
           key.sequence.length === 1 &&
@@ -791,7 +790,6 @@ export const useSessionBrowserInput = (
           state.setSearchQuery((prev) => prev + key.sequence);
           state.setActiveIndex(0);
           state.setScrollOffset(0);
-          return true;
         }
       } else {
         // Navigation mode input handling.  We're keeping the letter-based controls for non-search
@@ -799,33 +797,27 @@ export const useSessionBrowserInput = (
         if (key.sequence === 'g') {
           state.setActiveIndex(0);
           state.setScrollOffset(0);
-          return true;
         } else if (key.sequence === 'G') {
           state.setActiveIndex(state.totalSessions - 1);
           state.setScrollOffset(
             Math.max(0, state.totalSessions - SESSIONS_PER_PAGE),
           );
-          return true;
         }
         // Sorting controls.
         else if (key.sequence === 's') {
           cycleSortOrder();
-          return true;
         } else if (key.sequence === 'r') {
           state.setSortReverse(!state.sortReverse);
-          return true;
         }
         // Searching and exit controls.
         else if (key.sequence === '/') {
           state.setIsSearchMode(true);
-          return true;
         } else if (
           key.sequence === 'q' ||
           key.sequence === 'Q' ||
           key.name === 'escape'
         ) {
           onExit();
-          return true;
         }
         // Delete session control.
         else if (key.sequence === 'x' || key.sequence === 'X') {
@@ -855,15 +847,12 @@ export const useSessionBrowserInput = (
                 );
               });
           }
-          return true;
         }
         // less-like u/d controls.
         else if (key.sequence === 'u') {
           moveSelection(-Math.round(SESSIONS_PER_PAGE / 2));
-          return true;
         } else if (key.sequence === 'd') {
           moveSelection(Math.round(SESSIONS_PER_PAGE / 2));
-          return true;
         }
       }
 
@@ -878,21 +867,15 @@ export const useSessionBrowserInput = (
         if (!selectedSession.isCurrentSession) {
           onResumeSession(selectedSession);
         }
-        return true;
       } else if (key.name === 'up') {
         moveSelection(-1);
-        return true;
       } else if (key.name === 'down') {
         moveSelection(1);
-        return true;
       } else if (key.name === 'pageup') {
         moveSelection(-SESSIONS_PER_PAGE);
-        return true;
       } else if (key.name === 'pagedown') {
         moveSelection(SESSIONS_PER_PAGE);
-        return true;
       }
-      return false;
     },
     { isActive: true },
   );

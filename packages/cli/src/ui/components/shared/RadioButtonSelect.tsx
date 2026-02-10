@@ -44,8 +44,6 @@ export interface RadioButtonSelectProps<T> {
   maxItemsToShow?: number;
   /** Whether to show numbers next to items. */
   showNumbers?: boolean;
-  /** Whether the hook should have priority over normal subscribers. */
-  priority?: boolean;
   /** Optional custom renderer for items. */
   renderItem?: (
     item: RadioSelectItem<T>,
@@ -68,7 +66,6 @@ export function RadioButtonSelect<T>({
   showScrollArrows = false,
   maxItemsToShow = 10,
   showNumbers = true,
-  priority,
   renderItem,
 }: RadioButtonSelectProps<T>): React.JSX.Element {
   return (
@@ -81,7 +78,6 @@ export function RadioButtonSelect<T>({
       showNumbers={showNumbers}
       showScrollArrows={showScrollArrows}
       maxItemsToShow={maxItemsToShow}
-      priority={priority}
       renderItem={
         renderItem ||
         ((item, { titleColor }) => {
