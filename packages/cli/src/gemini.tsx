@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+// Initialize i18n before any React components
+import './i18n/index.js';
+
 import React from 'react';
 import { render } from 'ink';
 import { AppContainer } from './ui/AppContainer.js';
