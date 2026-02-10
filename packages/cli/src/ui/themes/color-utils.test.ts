@@ -436,6 +436,7 @@ describe('Color Utils', () => {
           DEFAULT_LIGHT_THEME,
           undefined,
           'preferred-light',
+          [DEFAULT_THEME, DEFAULT_LIGHT_THEME, 'preferred-light'],
         ),
       ).toBe('preferred-light');
     });
@@ -449,6 +450,7 @@ describe('Color Utils', () => {
           DEFAULT_LIGHT_THEME,
           'preferred-dark',
           undefined,
+          [DEFAULT_THEME, DEFAULT_LIGHT_THEME, 'preferred-dark'],
         ),
       ).toBe('preferred-dark');
     });
@@ -462,6 +464,12 @@ describe('Color Utils', () => {
           DEFAULT_LIGHT_THEME,
           'preferred-dark',
           'preferred-light',
+          [
+            DEFAULT_THEME,
+            DEFAULT_LIGHT_THEME,
+            'preferred-dark',
+            'preferred-light',
+          ],
         ),
       ).toBe('preferred-light');
     });
@@ -475,8 +483,61 @@ describe('Color Utils', () => {
           DEFAULT_LIGHT_THEME,
           'preferred-dark',
           'preferred-light',
+          [
+            DEFAULT_THEME,
+            DEFAULT_LIGHT_THEME,
+            'preferred-dark',
+            'preferred-light',
+          ],
         ),
       ).toBe('preferred-dark');
+    });
+
+    it('should fallback to default light theme if preferred light theme does not exist in available themes', () => {
+      expect(
+        shouldSwitchTheme(
+          DEFAULT_THEME,
+          LIGHT_THRESHOLD + 1,
+          DEFAULT_THEME,
+          DEFAULT_LIGHT_THEME,
+          undefined,
+          'invalid-light-theme',
+          [DEFAULT_THEME, DEFAULT_LIGHT_THEME],
+        ),
+      ).toBe(DEFAULT_LIGHT_THEME);
+    });
+
+    it('should fallback to default dark theme if preferred dark theme does not exist in available themes', () => {
+      expect(
+        shouldSwitchTheme(
+          DEFAULT_LIGHT_THEME,
+          DARK_THRESHOLD - 1,
+          DEFAULT_THEME,
+          DEFAULT_LIGHT_THEME,
+          'invalid-dark-theme',
+          undefined,
+          [DEFAULT_THEME, DEFAULT_LIGHT_THEME],
+        ),
+      ).toBe(DEFAULT_THEME);
+    });
+
+    it('should NOT switch if current theme is not default or preferred dark when luminance is high', () => {
+      expect(
+        shouldSwitchTheme(
+          'other-theme',
+          LIGHT_THRESHOLD + 1,
+          DEFAULT_THEME,
+          DEFAULT_LIGHT_THEME,
+          'preferred-dark',
+          'preferred-light',
+          [
+            DEFAULT_THEME,
+            DEFAULT_LIGHT_THEME,
+            'preferred-dark',
+            'preferred-light',
+          ],
+        ),
+      ).toBeUndefined();
     });
   });
 });
