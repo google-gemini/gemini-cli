@@ -33,6 +33,7 @@ export interface SystemPromptOptions {
   planningWorkflow?: PlanningWorkflowOptions;
   operationalGuidelines?: OperationalGuidelinesOptions;
   sandbox?: SandboxMode;
+  interactiveYoloMode?: boolean;
   gitRepo?: GitRepoOptions;
 }
 
@@ -53,6 +54,8 @@ export interface PrimaryWorkflowsOptions {
   enableCodebaseInvestigator: boolean;
   enableWriteTodosTool: boolean;
   enableEnterPlanModeTool: boolean;
+  enableGrep: boolean;
+  enableGlob: boolean;
   approvedPlan?: { path: string };
 }
 
@@ -110,6 +113,8 @@ ${
 }
 
 ${renderOperationalGuidelines(options.operationalGuidelines)}
+
+${renderInteractiveYoloMode(options.interactiveYoloMode)}
 
 ${renderSandbox(options.sandbox)}
 
@@ -312,6 +317,25 @@ export function renderSandbox(mode?: SandboxMode): string {
   return '';
 }
 
+export function renderInteractiveYoloMode(enabled?: boolean): string {
+  if (!enabled) return '';
+  return `
+# Autonomous Mode (YOLO)
+
+You are operating in **autonomous mode**. The user has requested minimal interruption.
+
+**Only use the \`${ASK_USER_TOOL_NAME}\` tool if:**
+- A wrong decision would cause significant re-work
+- The request is fundamentally ambiguous with no reasonable default
+- The user explicitly asks you to confirm or ask questions
+
+**Otherwise, work autonomously:**
+- Make reasonable decisions based on context and existing code patterns
+- Follow established project conventions
+- If multiple valid approaches exist, choose the most robust option
+`.trim();
+}
+
 export function renderGitRepo(options?: GitRepoOptions): string {
   if (!options) return '';
   return `
@@ -486,10 +510,29 @@ function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
     suggestion = ` For complex tasks, consider using the ${formatToolName(ENTER_PLAN_MODE_TOOL_NAME)} tool to enter a dedicated planning phase before starting implementation.`;
   }
 
-  if (options.enableCodebaseInvestigator) {
-    return `1. **Research:** Systematically map the codebase and validate assumptions. Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery when the task involves **complex refactoring, codebase exploration or system-wide analysis**. For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), use ${formatToolName(GREP_TOOL_NAME)} or ${formatToolName(GLOB_TOOL_NAME)} directly in parallel. Use ${formatToolName(READ_FILE_TOOL_NAME)} to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
+  const searchTools: string[] = [];
+  if (options.enableGrep) searchTools.push(formatToolName(GREP_TOOL_NAME));
+  if (options.enableGlob) searchTools.push(formatToolName(GLOB_TOOL_NAME));
+
+  let searchSentence =
+    ' Use search tools extensively to understand file structures, existing code patterns, and conventions.';
+  if (searchTools.length > 0) {
+    const toolsStr = searchTools.join(' and ');
+    const toolOrTools = searchTools.length > 1 ? 'tools' : 'tool';
+    searchSentence = ` Use ${toolsStr} search ${toolOrTools} extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions.`;
   }
-  return `1. **Research:** Systematically map the codebase and validate assumptions. Use ${formatToolName(GREP_TOOL_NAME)} and ${formatToolName(GLOB_TOOL_NAME)} search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions. Use ${formatToolName(READ_FILE_TOOL_NAME)} to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
+
+  if (options.enableCodebaseInvestigator) {
+    let subAgentSearch = '';
+    if (searchTools.length > 0) {
+      const toolsStr = searchTools.join(' or ');
+      subAgentSearch = ` For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), use ${toolsStr} directly in parallel.`;
+    }
+
+    return `1. **Research:** Systematically map the codebase and validate assumptions. Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery when the task involves **complex refactoring, codebase exploration or system-wide analysis**.${subAgentSearch} Use ${formatToolName(READ_FILE_TOOL_NAME)} to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
+  }
+
+  return `1. **Research:** Systematically map the codebase and validate assumptions.${searchSentence} Use ${formatToolName(READ_FILE_TOOL_NAME)} to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
 }
 
 function workflowStepStrategy(options: PrimaryWorkflowsOptions): string {
