@@ -32,6 +32,7 @@ export interface SystemPromptOptions {
   planningWorkflow?: PlanningWorkflowOptions;
   operationalGuidelines?: OperationalGuidelinesOptions;
   sandbox?: SandboxMode;
+  interactiveYoloMode?: boolean;
   gitRepo?: GitRepoOptions;
   finalReminder?: FinalReminderOptions;
 }
@@ -113,6 +114,8 @@ ${
 }
 
 ${renderOperationalGuidelines(options.operationalGuidelines)}
+
+${renderInteractiveYoloMode(options.interactiveYoloMode)}
 
 ${renderSandbox(options.sandbox)}
 
@@ -291,6 +294,25 @@ You are running in a sandbox container with limited access to files outside the 
 # Outside of Sandbox
 You are running outside of a sandbox container, directly on the user's system. For critical commands that are particularly likely to modify the user's system outside of the project directory or system temp directory, as you explain the command to the user (per the Explain Critical Commands rule above), also remind the user to consider enabling sandboxing.`.trim();
   }
+}
+
+export function renderInteractiveYoloMode(enabled?: boolean): string {
+  if (!enabled) return '';
+  return `
+# Autonomous Mode (YOLO)
+
+You are operating in **autonomous mode**. The user has requested minimal interruption.
+
+**Only use the \`${ASK_USER_TOOL_NAME}\` tool if:**
+- A wrong decision would cause significant re-work
+- The request is fundamentally ambiguous with no reasonable default
+- The user explicitly asks you to confirm or ask questions
+
+**Otherwise, work autonomously:**
+- Make reasonable decisions based on context and existing code patterns
+- Follow established project conventions
+- If multiple valid approaches exist, choose the most robust option
+`.trim();
 }
 
 export function renderGitRepo(options?: GitRepoOptions): string {

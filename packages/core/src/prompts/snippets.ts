@@ -33,6 +33,7 @@ export interface SystemPromptOptions {
   planningWorkflow?: PlanningWorkflowOptions;
   operationalGuidelines?: OperationalGuidelinesOptions;
   sandbox?: SandboxMode;
+  interactiveYoloMode?: boolean;
   gitRepo?: GitRepoOptions;
 }
 
@@ -53,6 +54,8 @@ export interface PrimaryWorkflowsOptions {
   enableCodebaseInvestigator: boolean;
   enableWriteTodosTool: boolean;
   enableEnterPlanModeTool: boolean;
+  enableGrep: boolean;
+  enableGlob: boolean;
   approvedPlan?: { path: string };
 }
 
@@ -111,6 +114,8 @@ ${
 
 ${renderOperationalGuidelines(options.operationalGuidelines)}
 
+${renderInteractiveYoloMode(options.interactiveYoloMode)}
+
 ${renderSandbox(options.sandbox)}
 
 ${renderGitRepo(options.gitRepo)}
@@ -165,7 +170,8 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
 - **Libraries/Frameworks:** NEVER assume a library/framework is available. Verify its established usage within the project (check imports, configuration files like 'package.json', 'Cargo.toml', 'requirements.txt', etc.) before employing it.
 - **Technical Integrity:** You are responsible for the entire lifecycle: implementation, testing, and validation. Within the scope of your changes, prioritize readability and long-term maintainability by consolidating logic into clean abstractions rather than threading state across unrelated layers. Align strictly with the requested architectural direction, ensuring the final implementation is focused and free of redundant "just-in-case" alternatives. Validation is not merely running tests; it is the exhaustive process of ensuring that every aspect of your change—behavioral, structural, and stylistic—is correct and fully compatible with the broader project. For bug fixes, you must empirically reproduce the failure with a new test case or reproduction script before applying the fix.
 - **Expertise & Intent Alignment:** Provide proactive technical opinions grounded in research while strictly adhering to the user's intended workflow. Distinguish between **Directives** (unambiguous requests for action or implementation) and **Inquiries** (requests for analysis, advice, or observations). Assume all requests are Inquiries unless they contain an explicit instruction to perform a task. For Inquiries, your scope is strictly limited to research and analysis; you may propose a solution or strategy, but you MUST NOT modify files until a corresponding Directive is issued. Do not initiate implementation based on observations of bugs or statements of fact. Once an Inquiry is resolved, or while waiting for a Directive, stop and wait for the next user instruction. ${options.interactive ? 'For Directives, only clarify if critically underspecified; otherwise, work autonomously.' : 'For Directives, you must work autonomously as no further user input is available.'} You should only seek user intervention if you have exhausted all possible routes or if a proposed solution would take the workspace in a significantly different architectural direction.
-- **Proactiveness:** When executing a Directive, persist through errors and obstacles by diagnosing failures in the execution phase and, if necessary, backtracking to the research or strategy phases to adjust your approach until a successful, verified outcome is achieved. Fulfill the user's request thoroughly, including adding tests when adding features or fixing bugs. Take reasonable liberties to fulfill broad goals while staying within the requested scope; however, prioritize simplicity and the removal of redundant logic over providing "just-in-case" alternatives that diverge from the established path.${mandateConflictResolution(options.hasHierarchicalMemory)}
+- **Proactiveness:** When executing a Directive, persist through errors and obstacles by diagnosing failures in the execution phase and, if necessary, backtracking to the research or strategy phases to adjust your approach until a successful, verified outcome is achieved. Fulfill the user's request thoroughly, including adding tests when adding features or fixing bugs. Take reasonable liberties to fulfill broad goals while staying within the requested scope; however, prioritize simplicity and the removal of redundant logic over providing "just-in-case" alternatives that diverge from the established path.
+- **Testing:** ALWAYS search for and update related tests after making a code change. You must add a new test case to the existing test file (if one exists) or create a new test file to verify your changes.${mandateConflictResolution(options.hasHierarchicalMemory)}
 - ${mandateConfirm(options.interactive)}
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandateSkillGuidance(options.hasSkills)}
@@ -310,6 +316,25 @@ export function renderSandbox(mode?: SandboxMode): string {
       You are running in a sandbox container with limited access to files outside the project directory or system temp directory, and with limited access to host system resources such as ports. If you encounter failures that could be due to sandboxing (e.g. if a command fails with 'Operation not permitted' or similar error), when you report the error to the user, also explain why you think it could be due to sandboxing, and how the user may need to adjust their sandbox configuration.`.trim();
   }
   return '';
+}
+
+export function renderInteractiveYoloMode(enabled?: boolean): string {
+  if (!enabled) return '';
+  return `
+# Autonomous Mode (YOLO)
+
+You are operating in **autonomous mode**. The user has requested minimal interruption.
+
+**Only use the \`${ASK_USER_TOOL_NAME}\` tool if:**
+- A wrong decision would cause significant re-work
+- The request is fundamentally ambiguous with no reasonable default
+- The user explicitly asks you to confirm or ask questions
+
+**Otherwise, work autonomously:**
+- Make reasonable decisions based on context and existing code patterns
+- Follow established project conventions
+- If multiple valid approaches exist, choose the most robust option
+`.trim();
 }
 
 export function renderGitRepo(options?: GitRepoOptions): string {
@@ -486,10 +511,29 @@ function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
     suggestion = ` For complex tasks, consider using the ${formatToolName(ENTER_PLAN_MODE_TOOL_NAME)} tool to enter a dedicated planning phase before starting implementation.`;
   }
 
-  if (options.enableCodebaseInvestigator) {
-    return `1. **Research:** Systematically map the codebase and validate assumptions. Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery when the task involves **complex refactoring, codebase exploration or system-wide analysis**. For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), use ${formatToolName(GREP_TOOL_NAME)} or ${formatToolName(GLOB_TOOL_NAME)} directly in parallel. Use ${formatToolName(READ_FILE_TOOL_NAME)} to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
+  const searchTools: string[] = [];
+  if (options.enableGrep) searchTools.push(formatToolName(GREP_TOOL_NAME));
+  if (options.enableGlob) searchTools.push(formatToolName(GLOB_TOOL_NAME));
+
+  let searchSentence =
+    ' Use search tools extensively to understand file structures, existing code patterns, and conventions.';
+  if (searchTools.length > 0) {
+    const toolsStr = searchTools.join(' and ');
+    const toolOrTools = searchTools.length > 1 ? 'tools' : 'tool';
+    searchSentence = ` Use ${toolsStr} search ${toolOrTools} extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions.`;
   }
-  return `1. **Research:** Systematically map the codebase and validate assumptions. Use ${formatToolName(GREP_TOOL_NAME)} and ${formatToolName(GLOB_TOOL_NAME)} search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions. Use ${formatToolName(READ_FILE_TOOL_NAME)} to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
+
+  if (options.enableCodebaseInvestigator) {
+    let subAgentSearch = '';
+    if (searchTools.length > 0) {
+      const toolsStr = searchTools.join(' or ');
+      subAgentSearch = ` For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), use ${toolsStr} directly in parallel.`;
+    }
+
+    return `1. **Research:** Systematically map the codebase and validate assumptions. Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery when the task involves **complex refactoring, codebase exploration or system-wide analysis**.${subAgentSearch} Use ${formatToolName(READ_FILE_TOOL_NAME)} to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
+  }
+
+  return `1. **Research:** Systematically map the codebase and validate assumptions.${searchSentence} Use ${formatToolName(READ_FILE_TOOL_NAME)} to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
 }
 
 function workflowStepStrategy(options: PrimaryWorkflowsOptions): string {
