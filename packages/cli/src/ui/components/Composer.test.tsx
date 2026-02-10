@@ -25,6 +25,7 @@ vi.mock('../contexts/VimModeContext.js', () => ({
 }));
 import { ApprovalMode } from '@google/gemini-cli-core';
 import { StreamingState, ToolCallStatus } from '../types.js';
+import { TransientMessageType } from '../../utils/events.js';
 
 // Mock child components
 vi.mock('./LoadingIndicator.js', () => ({
@@ -449,7 +450,10 @@ describe('Composer', () => {
 
     it('shows ToastDisplay for other toast types', () => {
       const uiState = createMockUIState({
-        warningMessage: 'Warning',
+        transientMessage: {
+          text: 'Warning',
+          type: TransientMessageType.Warning,
+        },
       });
 
       const { lastFrame } = renderComposer(uiState);

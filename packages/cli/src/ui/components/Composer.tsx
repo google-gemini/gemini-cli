@@ -39,7 +39,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const uiState = useUIState();
   const uiActions = useUIActions();
   const { vimEnabled, vimMode } = useVimMode();
-  const terminalWidth = process.stdout.columns;
+  const terminalWidth = uiState.terminalWidth;
   const isNarrow = isNarrowWidth(terminalWidth);
   const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
   const [suggestionsVisible, setSuggestionsVisible] = useState(false);
@@ -65,7 +65,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     Boolean(uiState.customDialog);
   const hasToast =
     uiState.ctrlCPressedOnce ||
-    Boolean(uiState.warningMessage) ||
+    Boolean(uiState.transientMessage) ||
     uiState.ctrlDPressedOnce ||
     (uiState.showEscapePrompt &&
       (uiState.buffer.text.length > 0 || uiState.history.length > 0)) ||

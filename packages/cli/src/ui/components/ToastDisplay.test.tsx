@@ -5,36 +5,21 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { render } from '../../test-utils/render.js';
+import { renderWithProviders } from '../../test-utils/render.js';
 import { ToastDisplay } from './ToastDisplay.js';
-import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
 import { TransientMessageType } from '../../utils/events.js';
-import type { TextBuffer } from './shared/text-buffer.js';
+import { type UIState } from '../contexts/UIStateContext.js';
+import { type TextBuffer } from './shared/text-buffer.js';
+import { type HistoryItem } from '../types.js';
 
-// Use a type that allows partial buffer for mocking purposes
-type UIStateOverrides = Partial<Omit<UIState, 'buffer'>> & {
-  buffer?: Partial<TextBuffer>;
-};
-
-// Create mock context providers
-const createMockUIState = (overrides: UIStateOverrides = {}): UIState =>
-  ({
-    ctrlCPressedOnce: false,
-    transientMessage: null,
-    ctrlDPressedOnce: false,
-    showEscapePrompt: false,
-    queueErrorMessage: null,
-    buffer: { text: '' },
-    history: [{ id: 1, type: 'user', text: 'test' }],
-    ...overrides,
-  }) as UIState;
-
-const renderToastDisplay = (uiState: UIState = createMockUIState()) =>
-  render(
-    <UIStateContext.Provider value={uiState}>
-      <ToastDisplay />
-    </UIStateContext.Provider>,
-  );
+const renderToastDisplay = (uiState: Partial<UIState> = {}) =>
+  renderWithProviders(<ToastDisplay />, {
+    uiState: {
+      buffer: { text: '' } as unknown as TextBuffer,
+      history: [] as HistoryItem[],
+      ...uiState,
+    },
+  });
 
 describe('ToastDisplay', () => {
   it('renders nothing by default', () => {
@@ -43,66 +28,59 @@ describe('ToastDisplay', () => {
   });
 
   it('renders Ctrl+C prompt', () => {
-    const uiState = createMockUIState({
+    const { lastFrame } = renderToastDisplay({
       ctrlCPressedOnce: true,
     });
-    const { lastFrame } = renderToastDisplay(uiState);
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders warning message', () => {
-    const uiState = createMockUIState({
+    const { lastFrame } = renderToastDisplay({
       transientMessage: {
         text: 'This is a warning',
         type: TransientMessageType.Warning,
       },
     });
-    const { lastFrame } = renderToastDisplay(uiState);
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders hint message', () => {
-    const uiState = createMockUIState({
+    const { lastFrame } = renderToastDisplay({
       transientMessage: {
         text: 'This is a hint',
         type: TransientMessageType.Hint,
       },
     });
-    const { lastFrame } = renderToastDisplay(uiState);
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders Ctrl+D prompt', () => {
-    const uiState = createMockUIState({
+    const { lastFrame } = renderToastDisplay({
       ctrlDPressedOnce: true,
     });
-    const { lastFrame } = renderToastDisplay(uiState);
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders Escape prompt when buffer is empty', () => {
-    const uiState = createMockUIState({
+    const { lastFrame } = renderToastDisplay({
       showEscapePrompt: true,
-      buffer: { text: '' },
+      history: [{ id: 1, type: 'user', text: 'test' }] as HistoryItem[],
     });
-    const { lastFrame } = renderToastDisplay(uiState);
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders Escape prompt when buffer is NOT empty', () => {
-    const uiState = createMockUIState({
+    const { lastFrame } = renderToastDisplay({
       showEscapePrompt: true,
-      buffer: { text: 'some text' },
+      buffer: { text: 'some text' } as unknown as TextBuffer,
     });
-    const { lastFrame } = renderToastDisplay(uiState);
     expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders Queue Error Message', () => {
-    const uiState = createMockUIState({
+    const { lastFrame } = renderToastDisplay({
       queueErrorMessage: 'Queue Error',
     });
-    const { lastFrame } = renderToastDisplay(uiState);
     expect(lastFrame()).toMatchSnapshot();
   });
 });
