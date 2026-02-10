@@ -109,6 +109,7 @@ export * from './services/gitService.js';
 export * from './services/chatRecordingService.js';
 export * from './services/fileSystemService.js';
 export * from './services/sessionSummaryUtils.js';
+export * from './services/insightsService.js';
 export * from './services/contextManager.js';
 export * from './skills/skillManager.js';
 export * from './skills/skillLoader.js';
