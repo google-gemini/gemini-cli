@@ -168,7 +168,7 @@ export async function parseArguments(
             'Additional policy files or directories to load (comma-separated or multiple --policy)',
           coerce: (policies: string[]) =>
             // Handle comma-separated values
-            policies.flatMap((p) => p.split(',').map((p) => p.trim())),
+            policies.flatMap((p) => p.split(',').map((s) => s.trim()).filter(Boolean)),
         })
         .option('experimental-acp', {
           type: 'boolean',
