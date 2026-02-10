@@ -44,6 +44,7 @@ vi.mock('../ui/utils/terminalUtils.js', () => ({
   isLowColorDepth: vi.fn(() => false),
   getColorDepth: vi.fn(() => 24),
   isITerm2: vi.fn(() => false),
+  shouldUseEmoji: vi.fn(() => true),
 }));
 
 // Wrapper around ink-testing-library's render that ensures act() is called
@@ -120,6 +121,9 @@ const configProxy = new Proxy({} as Config, {
     if (prop === 'getTargetDir') {
       return () =>
         '/Users/test/project/foo/bar/and/some/more/directories/to/make/it/long';
+    }
+    if (prop === 'getUseBackgroundColor') {
+      return () => true;
     }
     const internal = getMockConfigInternal();
     if (prop in internal) {

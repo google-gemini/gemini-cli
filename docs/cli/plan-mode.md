@@ -1,4 +1,4 @@
-# Plan Mode (experimental) <!-- omit in toc -->
+# Plan Mode (experimental)
 
 Plan Mode is a safe, read-only mode for researching and designing complex
 changes. It prevents modifications while you research, design and plan an
@@ -36,7 +36,7 @@ implementation strategy.
 You can configure Gemini CLI to start directly in Plan Mode by default:
 
 1.  Type `/settings` in the CLI.
-2.  Search for `Approval Mode`.
+2.  Search for `Default Approval Mode`.
 3.  Set the value to `Plan`.
 
 Other ways to start in Plan Mode:
@@ -46,8 +46,8 @@ Other ways to start in Plan Mode:
 
   ```json
   {
-    "tools": {
-      "approvalMode": "plan"
+    "general": {
+      "defaultApprovalMode": "plan"
     }
   }
   ```

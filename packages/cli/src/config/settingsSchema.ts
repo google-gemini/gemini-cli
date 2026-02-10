@@ -179,6 +179,24 @@ const SETTINGS_SCHEMA = {
         description: 'Enable Vim keybindings',
         showInDialog: true,
       },
+      defaultApprovalMode: {
+        type: 'enum',
+        label: 'Default Approval Mode',
+        category: 'General',
+        requiresRestart: false,
+        default: 'default',
+        description: oneLine`
+          The default approval mode for tool execution.
+          'default' prompts for approval, 'auto_edit' auto-approves edit tools,
+          and 'plan' is read-only mode. 'yolo' is not supported yet.
+        `,
+        showInDialog: true,
+        options: [
+          { value: 'default', label: 'Default' },
+          { value: 'auto_edit', label: 'Auto Edit' },
+          { value: 'plan', label: 'Plan' },
+        ],
+      },
       devtools: {
         type: 'boolean',
         label: 'DevTools',
@@ -391,6 +409,19 @@ const SETTINGS_SCHEMA = {
         default: false,
         description: 'Hide the window title bar',
         showInDialog: true,
+      },
+      inlineThinkingMode: {
+        type: 'enum',
+        label: 'Inline Thinking',
+        category: 'UI',
+        requiresRestart: false,
+        default: 'off',
+        description: 'Display model thinking inline: off or full.',
+        showInDialog: true,
+        options: [
+          { value: 'off', label: 'Off' },
+          { value: 'full', label: 'Full' },
+        ],
       },
       showStatusInTitle: {
         type: 'boolean',
@@ -1070,24 +1101,7 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
-      approvalMode: {
-        type: 'enum',
-        label: 'Approval Mode',
-        category: 'Tools',
-        requiresRestart: false,
-        default: 'default',
-        description: oneLine`
-          The default approval mode for tool execution.
-          'default' prompts for approval, 'auto_edit' auto-approves edit tools,
-          and 'plan' is read-only mode. 'yolo' is not supported yet.
-        `,
-        showInDialog: true,
-        options: [
-          { value: 'default', label: 'Default' },
-          { value: 'auto_edit', label: 'Auto Edit' },
-          { value: 'plan', label: 'Plan' },
-        ],
-      },
+
       core: {
         type: 'array',
         label: 'Core Tools',

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render } from '../../test-utils/render.js';
 import { Box, Text } from 'ink';
 import { Composer } from './Composer.js';
@@ -26,14 +26,39 @@ vi.mock('../contexts/VimModeContext.js', () => ({
 import { ApprovalMode } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
 import { StreamingState, ToolCallStatus } from '../types.js';
+import { TransientMessageType } from '../../utils/events.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import type { SessionMetrics } from '../contexts/SessionContext.js';
 
 // Mock child components
 vi.mock('./LoadingIndicator.js', () => ({
-  LoadingIndicator: ({ thought }: { thought?: string }) => (
-    <Text>LoadingIndicator{thought ? `: ${thought}` : ''}</Text>
-  ),
+  LoadingIndicator: ({
+    thought,
+    thoughtLabel,
+  }: {
+    thought?: { subject?: string } | string;
+    thoughtLabel?: string;
+  }) => {
+    const fallbackText =
+      typeof thought === 'string' ? thought : thought?.subject;
+    const text = thoughtLabel ?? fallbackText;
+    return <Text>LoadingIndicator{text ? `: ${text}` : ''}</Text>;
+  },
+}));
+
+vi.mock('./StatusDisplay.js', () => ({
+  StatusDisplay: () => <Text>StatusDisplay</Text>,
+}));
+
+vi.mock('./ToastDisplay.js', () => ({
+  ToastDisplay: () => <Text>ToastDisplay</Text>,
+  shouldShowToast: (uiState: UIState) =>
+    uiState.ctrlCPressedOnce ||
+    Boolean(uiState.transientMessage) ||
+    uiState.ctrlDPressedOnce ||
+    (uiState.showEscapePrompt &&
+      (uiState.buffer.text.length > 0 || uiState.history.length > 0)) ||
+    Boolean(uiState.queueErrorMessage),
 }));
 
 vi.mock('./ContextSummaryDisplay.js', () => ({
@@ -207,6 +232,10 @@ const renderComposer = (
   );
 
 describe('Composer', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   describe('Footer Display Settings', () => {
     it('renders Footer by default when hideFooter is false', () => {
       const uiState = createMockUIState();
@@ -287,7 +316,25 @@ describe('Composer', () => {
       const { lastFrame } = renderComposer(uiState);
 
       const output = lastFrame();
-      expect(output).toContain('LoadingIndicator');
+      expect(output).toContain('LoadingIndicator: Processing');
+    });
+
+    it('renders generic thinking text in loading indicator when full inline thinking is enabled', () => {
+      const uiState = createMockUIState({
+        streamingState: StreamingState.Responding,
+        thought: {
+          subject: 'Detailed in-history thought',
+          description: 'Full text is already in history',
+        },
+      });
+      const settings = createMockSettings({
+        ui: { inlineThinkingMode: 'full' },
+      });
+
+      const { lastFrame } = renderComposer(uiState, settings);
+
+      const output = lastFrame();
+      expect(output).toContain('LoadingIndicator: Thinking ...');
     });
 
     it('keeps shortcuts hint visible while loading', () => {
@@ -421,7 +468,7 @@ describe('Composer', () => {
   });
 
   describe('Context and Status Display', () => {
-    it('shows ContextSummaryDisplay in normal state', () => {
+    it('shows StatusDisplay and ApprovalModeIndicator in normal state', () => {
       const uiState = createMockUIState({
         ctrlCPressedOnce: false,
         ctrlDPressedOnce: false,
@@ -430,49 +477,38 @@ describe('Composer', () => {
 
       const { lastFrame } = renderComposer(uiState);
 
-      expect(lastFrame()).toContain('ContextSummaryDisplay');
+      const output = lastFrame();
+      expect(output).toContain('StatusDisplay');
+      expect(output).toContain('ApprovalModeIndicator');
+      expect(output).not.toContain('ToastDisplay');
     });
 
-    it('renders HookStatusDisplay instead of ContextSummaryDisplay with active hooks', () => {
-      const uiState = createMockUIState({
-        activeHooks: [{ name: 'test-hook', eventName: 'before-agent' }],
-      });
-
-      const { lastFrame } = renderComposer(uiState);
-
-      expect(lastFrame()).toContain('HookStatusDisplay');
-      expect(lastFrame()).not.toContain('ContextSummaryDisplay');
-    });
-
-    it('shows Ctrl+C exit prompt when ctrlCPressedOnce is true', () => {
+    it('shows ToastDisplay and hides ApprovalModeIndicator when a toast is present', () => {
       const uiState = createMockUIState({
         ctrlCPressedOnce: true,
       });
 
       const { lastFrame } = renderComposer(uiState);
 
-      expect(lastFrame()).toContain('Press Ctrl+C again to exit');
+      const output = lastFrame();
+      expect(output).toContain('ToastDisplay');
+      expect(output).not.toContain('ApprovalModeIndicator');
+      expect(output).toContain('StatusDisplay');
     });
 
-    it('shows Ctrl+D exit prompt when ctrlDPressedOnce is true', () => {
+    it('shows ToastDisplay for other toast types', () => {
       const uiState = createMockUIState({
-        ctrlDPressedOnce: true,
+        transientMessage: {
+          text: 'Warning',
+          type: TransientMessageType.Warning,
+        },
       });
 
       const { lastFrame } = renderComposer(uiState);
 
-      expect(lastFrame()).toContain('Press Ctrl+D again to exit');
-    });
-
-    it('shows escape prompt when showEscapePrompt is true', () => {
-      const uiState = createMockUIState({
-        showEscapePrompt: true,
-        history: [{ id: 1, type: 'user', text: 'test' }],
-      });
-
-      const { lastFrame } = renderComposer(uiState);
-
-      expect(lastFrame()).toContain('Press Esc again to rewind');
+      const output = lastFrame();
+      expect(output).toContain('ToastDisplay');
+      expect(output).not.toContain('ApprovalModeIndicator');
     });
   });
 
