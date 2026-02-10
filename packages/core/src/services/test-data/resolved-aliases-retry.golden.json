@@ -104,6 +104,13 @@
       "topP": 1
     }
   },
+  "gemini-3-flash-base": {
+    "model": "gemini-3-flash-preview",
+    "generateContentConfig": {
+      "temperature": 0,
+      "topP": 1
+    }
+  },
   "classifier": {
     "model": "gemini-2.5-flash-lite",
     "generateContentConfig": {
@@ -153,7 +160,7 @@
     }
   },
   "web-search": {
-    "model": "gemini-2.5-flash",
+    "model": "gemini-3-flash-preview",
     "generateContentConfig": {
       "temperature": 0,
       "topP": 1,
@@ -165,7 +172,7 @@
     }
   },
   "web-fetch": {
-    "model": "gemini-2.5-flash",
+    "model": "gemini-3-flash-preview",
     "generateContentConfig": {
       "temperature": 0,
       "topP": 1,
@@ -177,21 +184,21 @@
     }
   },
   "web-fetch-fallback": {
-    "model": "gemini-2.5-flash",
+    "model": "gemini-3-flash-preview",
     "generateContentConfig": {
       "temperature": 0,
       "topP": 1
     }
   },
   "loop-detection": {
-    "model": "gemini-2.5-flash",
+    "model": "gemini-3-flash-preview",
     "generateContentConfig": {
       "temperature": 0,
       "topP": 1
     }
   },
   "loop-detection-double-check": {
-    "model": "gemini-2.5-pro",
+    "model": "gemini-3-pro-preview",
     "generateContentConfig": {
       "temperature": 0,
       "topP": 1
