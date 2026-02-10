@@ -367,6 +367,15 @@ export class TestRig {
       env['INTEGRATION_TEST_FILE_DIR'] || join(os.tmpdir(), 'gemini-cli-tests');
     this.testDir = join(testFileDir, sanitizedName);
     this.homeDir = join(testFileDir, sanitizedName + '-home');
+
+    // Clean up existing directories from previous runs (e.g. retries)
+    if (fs.existsSync(this.testDir)) {
+      fs.rmSync(this.testDir, { recursive: true, force: true });
+    }
+    if (fs.existsSync(this.homeDir)) {
+      fs.rmSync(this.homeDir, { recursive: true, force: true });
+    }
+
     mkdirSync(this.testDir, { recursive: true });
     mkdirSync(this.homeDir, { recursive: true });
     if (options.fakeResponsesPath) {
@@ -1306,6 +1315,15 @@ export class TestRig {
     // Ensure PATH is included for pty
     if (!envVars['PATH'] && process.env['PATH']) {
       envVars['PATH'] = process.env['PATH'];
+    }
+
+    // Add critical Windows environment variables if missing
+    if (process.platform === 'win32') {
+      ['SystemRoot', 'COMSPEC', 'windir', 'PATHEXT'].forEach((key) => {
+        if (!envVars[key] && process.env[key]) {
+          envVars[key] = process.env[key];
+        }
+      });
     }
 
     const ptyOptions: pty.IPtyForkOptions = {

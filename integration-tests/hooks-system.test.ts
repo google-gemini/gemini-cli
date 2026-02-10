@@ -1831,7 +1831,7 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
         settings: {
           hooksConfig: {
             enabled: true,
-            disabled: [`node "${disabledPath}"`], // Disable the second hook
+            disabled: [normalizePath(`node "${disabledPath}"`)], // Disable the second hook
           },
           hooks: {
             BeforeTool: [
