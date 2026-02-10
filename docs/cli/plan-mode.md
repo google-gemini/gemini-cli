@@ -1,4 +1,4 @@
-# Plan Mode (experimental) <!-- omit in toc -->
+# Plan Mode (experimental)
 
 Plan Mode is a safe, read-only mode for researching and designing complex
 changes. It prevents modifications while you research, design and plan an
