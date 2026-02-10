@@ -354,21 +354,6 @@ export function getErrorReplaceResult(
       raw: `Failed to edit, 0 occurrences found for old_string in ${params.file_path}. Ensure you're not escaping content incorrectly and check whitespace, indentation, and context. Use ${READ_FILE_TOOL_NAME} tool to verify.`,
       type: ToolErrorType.EDIT_NO_OCCURRENCE_FOUND,
     };
-  } else if (occurrences !== expectedReplacements) {
-    const occurrenceTerm =
-      expectedReplacements === 1 ? 'occurrence' : 'occurrences';
-
-    error = {
-      display: `Failed to edit, expected ${expectedReplacements} ${occurrenceTerm} but found ${occurrences}.`,
-      raw: `Failed to edit, Expected ${expectedReplacements} ${occurrenceTerm} but found ${occurrences} for old_string in file: ${params.file_path}`,
-      type: ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
-    };
-  } else if (finalOldString === finalNewString) {
-    error = {
-      display: `No changes to apply. The old_string and new_string are identical.`,
-      raw: `No changes to apply. The old_string and new_string are identical in file: ${params.file_path}`,
-      type: ToolErrorType.EDIT_NO_CHANGE,
-    };
   }
   return error;
 }
@@ -643,6 +628,23 @@ class EditToolInvocation
       abortSignal,
     });
 
+    // Check for idempotency: if the replacement isn't found, but the new string is already there,
+    // consider it a success (no-op).
+    if (replacementResult.occurrences === 0) {
+      const normalizedNew = params.new_string.replace(/\r\n/g, '\n');
+      const normalizedContent = currentContent.replace(/\r\n/g, '\n');
+      if (normalizedContent.includes(normalizedNew)) {
+        return {
+          currentContent,
+          newContent: currentContent,
+          occurrences: 0,
+          isNewFile: false,
+          error: undefined,
+          originalLineEnding,
+        };
+      }
+    }
+
     const initialError = getErrorReplaceResult(
       params,
       replacementResult.occurrences,
@@ -909,7 +911,11 @@ class EditToolInvocation
         }
 
         if (firstChange === -1) {
-          llmContent = `Successfully modified file: ${this.params.file_path} (${editData.occurrences} replacements).`;
+          if (editData.occurrences === 0) {
+            llmContent = `No changes made to file: ${this.params.file_path}. The content is already present.`;
+          } else {
+            llmContent = `File content already matches the request: ${this.params.file_path} (${editData.occurrences} replacements found).`;
+          }
         } else {
           if (lastChange < firstChange) lastChange = firstChange;
 

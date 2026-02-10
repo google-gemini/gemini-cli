@@ -540,7 +540,7 @@ describe('EditTool', () => {
       expect(finalContent).toBe(newContentWithCRLF);
     });
 
-    it('should return NO_CHANGE if FixLLMEditWithInstruction determines no changes are needed', async () => {
+    it('should return success (idempotent) if new_string is already present, avoiding LLM correction', async () => {
       const initialContent = 'The price is $100.';
       fs.writeFileSync(filePath, initialContent, 'utf8');
 
@@ -554,23 +554,15 @@ describe('EditTool', () => {
         new_string: 'price is $100',
       };
 
-      mockFixLLMEditWithInstruction.mockResolvedValueOnce({
-        noChangesRequired: true,
-        search: '',
-        replace: '',
-        explanation: 'The price is already correctly set to $100.',
-      });
-
+      // We expect the tool to detect idempotency and NOT call the LLM fixer
+      
       const invocation = tool.build(params);
       const result = await invocation.execute(new AbortController().signal);
 
-      expect(result.error?.type).toBe(
-        ToolErrorType.EDIT_NO_CHANGE_LLM_JUDGEMENT,
-      );
-      expect(result.llmContent).toMatch(
-        /A secondary check by an LLM determined/,
-      );
-      expect(fs.readFileSync(filePath, 'utf8')).toBe(initialContent); // File is unchanged
+      expect(result.error).toBeUndefined();
+      expect(result.llmContent).toMatch(/No changes made/);
+      expect(fs.readFileSync(filePath, 'utf8')).toBe(initialContent);
+      expect(mockFixLLMEditWithInstruction).not.toHaveBeenCalled();
     });
   });
 
@@ -653,12 +645,6 @@ describe('EditTool', () => {
         params: { old_string: 'not-found', new_string: 'new' },
         expectedError: ToolErrorType.EDIT_NO_OCCURRENCE_FOUND,
       },
-      {
-        name: 'EXPECTED_OCCURRENCE_MISMATCH',
-        setup: (fp: string) => fs.writeFileSync(fp, 'one one two', 'utf8'),
-        params: { old_string: 'one', new_string: 'new' },
-        expectedError: ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
-      },
     ])(
       'should return $name error',
       async ({ setup, params, expectedError }) => {
@@ -691,16 +677,18 @@ describe('EditTool', () => {
         finalContent: 'bar bar bar',
       },
       {
-        name: 'fail when occurrences do not match expected_replacements',
+        name: 'succeed even when occurrences do not match expected_replacements',
         content: 'foo foo foo',
         expected: 2,
-        shouldSucceed: false,
+        shouldSucceed: true,
+        finalContent: 'bar bar bar',
       },
       {
-        name: 'default to 1 expected replacement if not specified',
+        name: 'succeed (default to replace all) if expected replacement not specified',
         content: 'foo foo',
         expected: undefined,
-        shouldSucceed: false,
+        shouldSucceed: true,
+        finalContent: 'bar bar',
       },
     ])(
       'should $name',
