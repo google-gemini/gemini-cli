@@ -11,6 +11,7 @@ import * as os from 'node:os';
 import { RipGrepTool } from '../packages/core/src/tools/ripGrep.js';
 import { Config } from '../packages/core/src/config/config.js';
 import { WorkspaceContext } from '../packages/core/src/utils/workspaceContext.js';
+import { createMockMessageBus } from '../packages/core/src/test-utils/mock-message-bus.js';
 
 // Mock Config to provide necessary context
 class MockConfig {
@@ -66,7 +67,7 @@ describe('ripgrep-real-direct', () => {
     await fs.writeFile(path.join(tempDir, 'file3.txt'), 'goodbye moon\n');
 
     const config = new MockConfig(tempDir) as unknown as Config;
-    tool = new RipGrepTool(config);
+    tool = new RipGrepTool(config, createMockMessageBus());
   });
 
   afterAll(async () => {
@@ -107,5 +108,25 @@ describe('ripgrep-real-direct', () => {
     expect(result.llmContent).toContain('Found 1 match');
     expect(result.llmContent).toContain('script.js');
     expect(result.llmContent).not.toContain('file1.txt');
+  });
+
+  it('should support context parameters', async () => {
+    // Create a file with multiple lines
+    await fs.writeFile(
+      path.join(tempDir, 'context.txt'),
+      'line1\nline2\nline3 match\nline4\nline5\n',
+    );
+
+    const invocation = tool.build({
+      pattern: 'match',
+      context: 1,
+    });
+    const result = await invocation.execute(new AbortController().signal);
+
+    expect(result.llmContent).toContain('Found 1 match');
+    expect(result.llmContent).toContain('context.txt');
+    expect(result.llmContent).toContain('L2- line2');
+    expect(result.llmContent).toContain('L3: line3 match');
+    expect(result.llmContent).toContain('L4- line4');
   });
 });
