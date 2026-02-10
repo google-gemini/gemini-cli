@@ -10,8 +10,7 @@ import { makeRelative, shortenPath } from '../utils/paths.js';
 import type { ToolInvocation, ToolLocation, ToolResult } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
-
-import type { PartUnion } from '@google/genai';
+import type { FunctionDeclaration, PartUnion } from '@google/genai';
 import {
   processSingleFileContent,
   getSpecificMimeType,
@@ -23,6 +22,10 @@ import { logFileOperation } from '../telemetry/loggers.js';
 import { FileOperationEvent } from '../telemetry/types.js';
 import { READ_FILE_TOOL_NAME } from './tool-names.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
+import {
+  isPreviewModel,
+  supportsMultimodalFunctionResponse,
+} from '../config/models.js';
 
 /**
  * Parameters for the ReadFile tool
@@ -76,6 +79,11 @@ class ReadFileToolInvocation extends BaseToolInvocation<
   }
 
   async execute(): Promise<ToolResult> {
+    const activeModel = this.config.getActiveModel();
+    const isGemini3 =
+      supportsMultimodalFunctionResponse(activeModel) ||
+      isPreviewModel(activeModel);
+
     const validationError = this.config.validatePathAccess(this.resolvedPath);
     if (validationError) {
       return {
@@ -92,8 +100,8 @@ class ReadFileToolInvocation extends BaseToolInvocation<
       this.resolvedPath,
       this.config.getTargetDir(),
       this.config.getFileSystemService(),
-      this.params.offset,
-      this.params.limit,
+      isGemini3 ? undefined : this.params.offset,
+      isGemini3 ? undefined : this.params.limit,
     );
 
     if (result.error) {
@@ -109,18 +117,32 @@ class ReadFileToolInvocation extends BaseToolInvocation<
 
     let llmContent: PartUnion;
     if (result.isTruncated) {
-      const [start, end] = result.linesShown!;
-      const total = result.originalLineCount!;
-      const nextOffset = this.params.offset
-        ? this.params.offset + end - start + 1
-        : end;
-      llmContent = `
+      if (isGemini3) {
+        const total = result.originalLineCount!;
+        llmContent = `
+IMPORTANT: The file content has been truncated.
+Status: Showing the first 2000 lines of ${total} total lines.
+Action: 
+- To find specific patterns, use the 'grep_search' tool.
+- To read a specific line range, use 'run_shell_command' with 'sed'. For example: 'sed -n "500,600p" ${this.params.file_path}'.
+- You can also use other Unix utilities like 'awk', 'head', or 'tail' via 'run_shell_command'.
+
+--- FILE CONTENT (truncated) ---
+${result.llmContent}`;
+      } else {
+        const [start, end] = result.linesShown!;
+        const total = result.originalLineCount!;
+        const nextOffset = this.params.offset
+          ? this.params.offset + end - start + 1
+          : end;
+        llmContent = `
 IMPORTANT: The file content has been truncated.
 Status: Showing lines ${start}-${end} of ${total} total lines.
 Action: To read more of the file, you can use the 'offset' and 'limit' parameters in a subsequent 'read_file' call. For example, to read the next section of the file, use offset: ${nextOffset}.
 
 --- FILE CONTENT (truncated) ---
 ${result.llmContent}`;
+      }
     } else {
       llmContent = result.llmContent || '';
     }
@@ -169,7 +191,7 @@ export class ReadFileTool extends BaseDeclarativeTool<
     super(
       ReadFileTool.Name,
       'ReadFile',
-      `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files. For text files, it can read specific line ranges.`,
+      '', // Description is dynamic in getter
       Kind.Read,
       {
         properties: {
@@ -199,6 +221,45 @@ export class ReadFileTool extends BaseDeclarativeTool<
       config.getTargetDir(),
       config.getFileFilteringOptions(),
     );
+  }
+
+  override get schema(): FunctionDeclaration {
+    const activeModel = this.config.getActiveModel();
+    const isGemini3 =
+      supportsMultimodalFunctionResponse(activeModel) ||
+      isPreviewModel(activeModel);
+
+    const properties: Record<string, unknown> = {
+      file_path: {
+        description: 'The path to the file to read.',
+        type: 'string',
+      },
+    };
+
+    if (!isGemini3) {
+      properties.offset = {
+        description:
+          "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
+        type: 'number',
+      };
+      properties.limit = {
+        description:
+          "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (if feasible, up to a default limit).",
+        type: 'number',
+      };
+    }
+
+    return {
+      name: this.name,
+      description: isGemini3
+        ? `Reads and returns the content of a specified file. If the file is large (exceeding 2000 lines), the content will be truncated to the first 2000 lines. The tool's response will clearly indicate if truncation has occurred. To examine specific sections of large files, use the 'run_shell_command' tool with standard Unix utilities like 'grep', 'sed', 'awk', 'head', or 'tail'. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files.`
+        : `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files. For text files, it can read specific line ranges.`,
+      parametersJsonSchema: {
+        properties,
+        required: ['file_path'],
+        type: 'object',
+      },
+    };
   }
 
   protected override validateToolParamValues(

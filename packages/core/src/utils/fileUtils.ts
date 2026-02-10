@@ -406,7 +406,8 @@ export interface ProcessedFileReadResult {
 export async function processSingleFileContent(
   filePath: string,
   rootDirectory: string,
-  fileSystemService: FileSystemService,
+  // TODO: remove unused vars from other areas
+  _fileSystemService?: FileSystemService,
   offset?: number,
   limit?: number,
 ): Promise<ProcessedFileReadResult> {

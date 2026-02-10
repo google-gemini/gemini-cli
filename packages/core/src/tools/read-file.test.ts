@@ -40,6 +40,7 @@ describe('ReadFileTool', () => {
       getFileSystemService: () => new StandardFileSystemService(),
       getTargetDir: () => tempRootDir,
       getWorkspaceContext: () => createMockWorkspaceContext(tempRootDir),
+      getActiveModel: vi.fn().mockReturnValue('gemini-2.5-pro'),
       getFileFilteringOptions: () => ({
         respectGitIgnore: true,
         respectGeminiIgnore: true,
@@ -75,6 +76,40 @@ describe('ReadFileTool', () => {
     if (fs.existsSync(tempRootDir)) {
       await fsp.rm(tempRootDir, { recursive: true, force: true });
     }
+  });
+
+  describe('schema', () => {
+    it('should include pagination parameters for Gemini 2.5', () => {
+      vi.mocked(tool['config'].getActiveModel).mockReturnValue(
+        'gemini-2.5-pro',
+      );
+      const schema = tool.schema;
+      const properties = (
+        schema.parametersJsonSchema as {
+          properties: Record<string, unknown>;
+        }
+      ).properties;
+      expect(properties).toHaveProperty('offset');
+      expect(properties).toHaveProperty('limit');
+      expect(schema.description).toContain('offset');
+      expect(schema.description).toContain('limit');
+    });
+
+    it('should NOT include pagination parameters for Gemini 3', () => {
+      vi.mocked(tool['config'].getActiveModel).mockReturnValue(
+        'gemini-3-pro-preview',
+      );
+      const schema = tool.schema;
+      const properties = (
+        schema.parametersJsonSchema as {
+          properties: Record<string, unknown>;
+        }
+      ).properties;
+      expect(properties).not.toHaveProperty('offset');
+      expect(properties).not.toHaveProperty('limit');
+      expect(schema.description).toContain('grep');
+      expect(schema.description).toContain('sed');
+    });
   });
 
   describe('build', () => {
@@ -421,6 +456,28 @@ describe('ReadFileTool', () => {
       );
     });
 
+    it('should use first-2000-lines truncation and shell-tool guidance for Gemini 3', async () => {
+      vi.mocked(tool['config'].getActiveModel).mockReturnValue(
+        'gemini-3-pro-preview',
+      );
+      const filePath = path.join(tempRootDir, 'large.txt');
+      const lines = Array.from({ length: 2500 }, (_, i) => `Line ${i + 1}`);
+      await fsp.writeFile(filePath, lines.join('\n'), 'utf-8');
+
+      const params: ReadFileToolParams = {
+        file_path: filePath,
+        offset: 10, // Should be ignored
+        limit: 5, // Should be ignored
+      };
+      const invocation = tool.build(params);
+
+      const result = await invocation.execute(abortSignal);
+      expect(result.llmContent).toContain('Showing the first 2000 lines');
+      expect(result.llmContent).toContain("use the 'grep_search' tool");
+      expect(result.llmContent).toContain('Line 1');
+      expect(result.llmContent).not.toContain('Line 2001');
+    });
+
     it('should successfully read files from project temp directory', async () => {
       const tempDir = path.join(tempRootDir, '.temp');
       await fsp.mkdir(tempDir, { recursive: true });
@@ -447,6 +504,7 @@ describe('ReadFileTool', () => {
           getFileSystemService: () => new StandardFileSystemService(),
           getTargetDir: () => tempRootDir,
           getWorkspaceContext: () => new WorkspaceContext(tempRootDir),
+          getActiveModel: () => 'gemini-2.5-pro',
           getFileFilteringOptions: () => ({
             respectGitIgnore: true,
             respectGeminiIgnore: true,
@@ -520,6 +578,7 @@ describe('ReadFileTool', () => {
           getFileSystemService: () => new StandardFileSystemService(),
           getTargetDir: () => tempRootDir,
           getWorkspaceContext: () => new WorkspaceContext(tempRootDir),
+          getActiveModel: () => 'gemini-2.5-pro',
           getFileFilteringOptions: () => ({
             respectGitIgnore: true,
             respectGeminiIgnore: false,
