@@ -66,7 +66,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   const config = useConfig();
   const { constrainHeight } = useUIState();
   const { merged: settings } = useSettings();
-  const isVerboseMode = settings.output?.verbosity === 'verbose';
+  const compactMode = settings.ui.enableCompactToolOutput;
 
   const isEventDriven = config.isEventDrivenSchedulerEnabled();
 
@@ -74,18 +74,30 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   // pre-execution states (Confirming, Pending) from the History log.
   // They live in the Global Queue or wait for their turn.
   const visibleToolCalls = useMemo(() => {
-    if (!isEventDriven) {
-      return toolCalls;
-    }
-    // Only show tools that are actually running or finished.
-    // We explicitly exclude Pending and Confirming to ensure they only
-    // appear in the Global Queue until they are approved and start executing.
-    return toolCalls.filter(
-      (t) =>
-        t.status !== ToolCallStatus.Pending &&
-        t.status !== ToolCallStatus.Confirming,
-    );
-  }, [toolCalls, isEventDriven]);
+    // Standard filtering for Event Driven mode
+    const filteredTools = isEventDriven
+      ? toolCalls.filter(
+          (t) =>
+            t.status !== ToolCallStatus.Pending &&
+            t.status !== ToolCallStatus.Confirming,
+        )
+      : toolCalls;
+
+    // Additional filtering for compact mode:
+    // In compact mode, we hide 'Pending' tools from the history log to avoid flickering
+    // unless we are in a non-compact (boxed) view where we want to show the placeholder.
+    return filteredTools.filter((tool) => {
+      const isShellToolCall = isShellTool(tool.name);
+      const useDenseView =
+        compactMode &&
+        !isShellToolCall &&
+        tool.status !== ToolCallStatus.Confirming;
+
+      if (!useDenseView) return true;
+      // In dense view, we only show tools that have started or finished.
+      return tool.status !== ToolCallStatus.Pending;
+    });
+  }, [toolCalls, isEventDriven, compactMode]);
 
   const isEmbeddedShellFocused = visibleToolCalls.some((t) =>
     isThisShellFocused(
@@ -172,9 +184,9 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         const isFirst = index === 0;
         const isShellToolCall = isShellTool(tool.name);
 
-        // Use dense view if not verbose, not a shell tool (for interactivity), and not confirming (needs prompt)
+        // Use dense view if compact mode is enabled, not a shell tool (for interactivity), and not confirming (needs prompt)
         const useDenseView =
-          !isVerboseMode &&
+          compactMode &&
           !isShellToolCall &&
           tool.status !== ToolCallStatus.Confirming;
 
@@ -268,7 +280,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           // HOWEVER, if borderBottomOverride is true, it means the scheduler explicitly
           // wants to close a box. Since dense tools don't have boxes, this must be closing
           // a non-dense (e.g. shell) tool box. So we must allow it.
-          if (!isVerboseMode && borderBottomOverride !== true) return null;
+          if (compactMode && borderBottomOverride !== true) return null;
 
           if (borderBottomOverride !== undefined) {
             return (
@@ -292,8 +304,8 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         const isShell = isShellTool(lastTool.name);
         const isConfirming = lastTool.status === ToolCallStatus.Confirming;
 
-        // Logic: If dense view (not verbose, not shell, not confirming), hide border by default
-        const isDense = !isVerboseMode && !isShell && !isConfirming;
+        // Logic: If dense view (compact mode, not shell, not confirming), hide border by default
+        const isDense = compactMode && !isShell && !isConfirming;
 
         if (isDense) return null;
 
@@ -319,7 +331,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           />
         );
       })()}
-      {!isVerboseMode
+      {compactMode
         ? null
         : (borderBottomOverride ?? true) &&
           visibleToolCalls.length > 0 && (

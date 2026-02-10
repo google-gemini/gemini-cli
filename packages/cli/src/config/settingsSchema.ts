@@ -606,6 +606,16 @@ const SETTINGS_SCHEMA = {
         description: 'Show the spinner during operations.',
         showInDialog: true,
       },
+      enableCompactToolOutput: {
+        type: 'boolean',
+        label: 'Enable Compact Tool Output',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Render tool outputs in a compact, single-line format when possible.',
+        showInDialog: true,
+      },
       customWittyPhrases: {
         type: 'array',
         label: 'Custom Witty Phrases',

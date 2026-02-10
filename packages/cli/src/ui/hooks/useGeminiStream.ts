@@ -358,7 +358,7 @@ export const useGeminiStream = (
     addItem,
   ]);
 
-  const isVerboseMode = settings.merged.output?.verbosity === 'verbose';
+  const enableCompactToolOutput = settings.merged.ui.enableCompactToolOutput;
 
   const pendingToolGroupItems = useMemo((): HistoryItemWithoutId[] => {
     const remainingTools = toolCalls.filter(
@@ -381,7 +381,8 @@ export const useGeminiStream = (
     // Once all tools are terminal and pushed, the last history item handles the closing border.
     // NOTE: In dense mode, we skip this if there are no shell tools (which require boxes).
     const requiresBoxLayout =
-      isVerboseMode || toolCalls.some((tc) => isShellTool(tc.request.name));
+      !enableCompactToolOutput ||
+      toolCalls.some((tc) => isShellTool(tc.request.name));
 
     if (!requiresBoxLayout) {
       return items;
@@ -431,7 +432,7 @@ export const useGeminiStream = (
     }
 
     return items;
-  }, [toolCalls, pushedToolCallIds, isVerboseMode]);
+  }, [toolCalls, pushedToolCallIds, enableCompactToolOutput]);
 
   const activeToolPtyId = useMemo(() => {
     const executingShellTool = toolCalls.find(
