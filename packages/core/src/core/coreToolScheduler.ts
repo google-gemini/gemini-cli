@@ -18,7 +18,6 @@ import { PolicyDecision } from '../policy/types.js';
 import { logToolCall } from '../telemetry/loggers.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { ToolCallEvent } from '../telemetry/types.js';
-import { runInDevTraceSpan } from '../telemetry/trace.js';
 import { ToolModificationHandler } from '../scheduler/tool-modifier.js';
 import { getToolSuggestion } from '../utils/tool-utils.js';
 import type { ToolConfirmationRequest } from '../confirmation-bus/types.js';
@@ -160,6 +159,73 @@ export class CoreToolScheduler {
       // Store the handler in the WeakMap so we don't subscribe again
       CoreToolScheduler.subscribedMessageBuses.set(messageBus, sharedHandler);
     }
+  }
+
+  schedule(
+    request: ToolCallRequestInfo | ToolCallRequestInfo[],
+    signal: AbortSignal,
+  ): Promise<void> {
+    if (this.isRunning() || this.isScheduling) {
+      return new Promise((resolve, reject) => {
+        const abortHandler = () => {
+          // Find and remove the request from the queue
+          const index = this.requestQueue.findIndex(
+            (item) => item.request === request,
+          );
+          if (index > -1) {
+            this.requestQueue.splice(index, 1);
+            reject(new Error('Tool call cancelled while in queue.'));
+          }
+        };
+
+        signal.addEventListener('abort', abortHandler, { once: true });
+
+        this.requestQueue.push({
+          request,
+          signal,
+          resolve: () => {
+            signal.removeEventListener('abort', abortHandler);
+            resolve();
+          },
+          reject: (reason?: Error) => {
+            signal.removeEventListener('abort', abortHandler);
+            reject(reason);
+          },
+        });
+      });
+    }
+    return this._schedule(request, signal);
+  }
+
+  cancelAll(signal: AbortSignal): void {
+    if (this.isCancelling) {
+      return;
+    }
+    this.isCancelling = true;
+    // Cancel the currently active tool call, if there is one.
+    if (this.toolCalls.length > 0) {
+      const activeCall = this.toolCalls[0];
+      // Only cancel if it's in a cancellable state.
+      if (
+        activeCall.status === 'awaiting_approval' ||
+        activeCall.status === 'executing' ||
+        activeCall.status === 'scheduled' ||
+        activeCall.status === 'validating'
+      ) {
+        this.setStatusInternal(
+          activeCall.request.callId,
+          'cancelled',
+          signal,
+          'User cancelled the operation.',
+        );
+      }
+    }
+
+    // Clear the queue and mark all queued items as cancelled for completion reporting.
+    this._cancelAllQueuedCalls();
+
+    // Finalize the batch immediately.
+    void this.checkAndNotifyCompletion(signal);
   }
 
   private setStatusInternal(
@@ -399,79 +465,6 @@ export class CoreToolScheduler {
       }
       return new Error(String(e));
     }
-  }
-
-  schedule(
-    request: ToolCallRequestInfo | ToolCallRequestInfo[],
-    signal: AbortSignal,
-  ): Promise<void> {
-    return runInDevTraceSpan(
-      { name: 'schedule' },
-      async ({ metadata: spanMetadata }) => {
-        spanMetadata.input = request;
-        if (this.isRunning() || this.isScheduling) {
-          return new Promise((resolve, reject) => {
-            const abortHandler = () => {
-              // Find and remove the request from the queue
-              const index = this.requestQueue.findIndex(
-                (item) => item.request === request,
-              );
-              if (index > -1) {
-                this.requestQueue.splice(index, 1);
-                reject(new Error('Tool call cancelled while in queue.'));
-              }
-            };
-
-            signal.addEventListener('abort', abortHandler, { once: true });
-
-            this.requestQueue.push({
-              request,
-              signal,
-              resolve: () => {
-                signal.removeEventListener('abort', abortHandler);
-                resolve();
-              },
-              reject: (reason?: Error) => {
-                signal.removeEventListener('abort', abortHandler);
-                reject(reason);
-              },
-            });
-          });
-        }
-        return this._schedule(request, signal);
-      },
-    );
-  }
-
-  cancelAll(signal: AbortSignal): void {
-    if (this.isCancelling) {
-      return;
-    }
-    this.isCancelling = true;
-    // Cancel the currently active tool call, if there is one.
-    if (this.toolCalls.length > 0) {
-      const activeCall = this.toolCalls[0];
-      // Only cancel if it's in a cancellable state.
-      if (
-        activeCall.status === 'awaiting_approval' ||
-        activeCall.status === 'executing' ||
-        activeCall.status === 'scheduled' ||
-        activeCall.status === 'validating'
-      ) {
-        this.setStatusInternal(
-          activeCall.request.callId,
-          'cancelled',
-          signal,
-          'User cancelled the operation.',
-        );
-      }
-    }
-
-    // Clear the queue and mark all queued items as cancelled for completion reporting.
-    this._cancelAllQueuedCalls();
-
-    // Finalize the batch immediately.
-    void this.checkAndNotifyCompletion(signal);
   }
 
   private async _schedule(

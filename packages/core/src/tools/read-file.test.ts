@@ -215,7 +215,13 @@ describe('ReadFileTool', () => {
       const invocation = tool.build(params);
 
       expect(await invocation.execute(abortSignal)).toEqual({
-        llmContent: fileContent,
+        llmContent: `
+--- TOOL METADATA (NOT PART OF FILE CONTENT) ---
+Status: Showing lines 1-1 of 1 total lines.
+--- END TOOL METADATA ---
+
+--- FILE CONTENT ---
+${fileContent}`,
         returnDisplay: '',
       });
     });
@@ -245,7 +251,13 @@ describe('ReadFileTool', () => {
       const invocation = tool.build(params);
 
       expect(await invocation.execute(abortSignal)).toEqual({
-        llmContent: fileContent,
+        llmContent: `
+--- TOOL METADATA (NOT PART OF FILE CONTENT) ---
+Status: Showing lines 1-1 of 1 total lines.
+--- END TOOL METADATA ---
+
+--- FILE CONTENT ---
+${fileContent}`,
         returnDisplay: '',
       });
     });
@@ -389,7 +401,13 @@ describe('ReadFileTool', () => {
       const invocation = tool.build(params);
 
       const result = await invocation.execute(abortSignal);
-      expect(result.llmContent).toBe('');
+      expect(result.llmContent).toBe(`
+--- TOOL METADATA (NOT PART OF FILE CONTENT) ---
+Status: Showing lines 1-1 of 1 total lines.
+--- END TOOL METADATA ---
+
+--- FILE CONTENT ---
+`);
       expect(result.returnDisplay).toBe('');
     });
 
@@ -432,7 +450,11 @@ describe('ReadFileTool', () => {
       const invocation = tool.build(params);
 
       const result = await invocation.execute(abortSignal);
-      expect(result.llmContent).toBe(tempFileContent);
+      expect(result.llmContent).toBe(`
+Status: Showing lines 1-1 of 1 total lines.
+
+--- FILE CONTENT ---
+${tempFileContent}`);
       expect(result.returnDisplay).toBe('');
     });
 

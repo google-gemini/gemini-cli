@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import * as crypto from 'node:crypto';
 import * as Diff from 'diff';
+import levenshtein from 'fast-levenshtein';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -44,6 +45,11 @@ import { logEditCorrectionEvent } from '../telemetry/loggers.js';
 import { correctPath } from '../utils/pathCorrector.js';
 import { EDIT_TOOL_NAME, READ_FILE_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
+
+// Threshold for fuzzy matching (0.0 to 1.0, where 1.0 is exact match)
+// Lowered to 0.80 to handle intra-line whitespace differences better (like Aider)
+const FUZZY_MATCH_THRESHOLD = 0.8;
+
 interface ReplacementContext {
   params: EditToolParams;
   currentContent: string;
@@ -102,12 +108,15 @@ function restoreTrailingNewline(
 }
 
 /**
- * Escapes characters with special meaning in regular expressions.
- * @param str The string to escape.
- * @returns The escaped string.
+ * Calculates the similarity ratio between two strings using Levenshtein distance.
+ * @returns A number between 0 and 1, where 1 is identical.
  */
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+function calculateSimilarity(s1: string, s2: string): number {
+  if (s1 === s2) return 1.0;
+  const distance = levenshtein.get(s1, s2);
+  const maxLength = Math.max(s1.length, s2.length);
+  if (maxLength === 0) return 1.0;
+  return 1 - distance / maxLength;
 }
 
 async function calculateExactReplacement(
@@ -139,123 +148,151 @@ async function calculateExactReplacement(
   return null;
 }
 
-async function calculateFlexibleReplacement(
+interface FuzzyMatch {
+  index: number;
+  score: number;
+  content: string; // The original content of the matched window
+}
+
+async function calculateFuzzyReplacement(
   context: ReplacementContext,
 ): Promise<ReplacementResult | null> {
   const { currentContent, params } = context;
   const { old_string, new_string } = params;
 
   const normalizedCode = currentContent;
-  const normalizedSearch = old_string.replace(/\r\n/g, '\n');
-  const normalizedReplace = new_string.replace(/\r\n/g, '\n');
+  const searchBlock = old_string.replace(/\r\n/g, '\n');
+  const replaceBlock = new_string.replace(/\r\n/g, '\n');
 
-  const sourceLines = normalizedCode.match(/.*(?:\n|$)/g)?.slice(0, -1) ?? [];
-  const searchLinesStripped = normalizedSearch
-    .split('\n')
-    .map((line: string) => line.trim());
-  const replaceLines = normalizedReplace.split('\n');
+  const fileLines = normalizedCode.split('\n');
+  const searchLines = searchBlock.split('\n');
 
-  let flexibleOccurrences = 0;
-  let i = 0;
-  while (i <= sourceLines.length - searchLinesStripped.length) {
-    const window = sourceLines.slice(i, i + searchLinesStripped.length);
-    const windowStripped = window.map((line: string) => line.trim());
-    const isMatch = windowStripped.every(
-      (line: string, index: number) => line === searchLinesStripped[index],
-    );
+  // Use trimmed lines for similarity to handle indentation differences
+  const searchLinesTrimmed = searchLines.map((l) => l.trim());
+  const searchBlockTrimmed = searchLinesTrimmed.join('\n');
 
-    if (isMatch) {
-      flexibleOccurrences++;
-      const firstLineInMatch = window[0];
-      const indentationMatch = firstLineInMatch.match(/^([ \t]*)/);
-      const indentation = indentationMatch ? indentationMatch[1] : '';
-      const newBlockWithIndent = replaceLines.map(
-        (line: string) => `${indentation}${line}`,
-      );
-      sourceLines.splice(
-        i,
-        searchLinesStripped.length,
-        newBlockWithIndent.join('\n'),
-      );
-      i += replaceLines.length;
-    } else {
-      i++;
+  if (searchLines.length === 0 || fileLines.length < searchLines.length) {
+    return null;
+  }
+
+  // Optimization: Pre-calculate the first line of the search block for heuristic check
+  const firstSearchLineTrimmed = searchLinesTrimmed[0];
+
+  const startIndex = 0;
+  const maxIndex = fileLines.length - searchLines.length;
+
+  const matches: FuzzyMatch[] = [];
+
+  for (let i = startIndex; i <= maxIndex; i++) {
+    // Heuristic: Check if the first line matches somewhat before computing full Levenshtein
+    if (searchLines.length > 0) {
+      const currentFirstLineTrimmed = fileLines[i].trim();
+      if (currentFirstLineTrimmed !== firstSearchLineTrimmed) {
+        if (
+          calculateSimilarity(currentFirstLineTrimmed, firstSearchLineTrimmed) <
+          0.6
+        ) {
+          continue;
+        }
+      }
+    }
+
+    const windowLines = fileLines.slice(i, i + searchLines.length);
+    const windowContentTrimmed = windowLines.map((l) => l.trim()).join('\n');
+
+    const score = calculateSimilarity(windowContentTrimmed, searchBlockTrimmed);
+
+    if (score >= FUZZY_MATCH_THRESHOLD) {
+      // Check for overlap with the previous match
+      const prevMatch = matches[matches.length - 1];
+
+      // Overlap condition: current index `i` is within the range of previous match [prev.index, prev.index + length)
+      if (prevMatch && i < prevMatch.index + searchLines.length) {
+        if (score > prevMatch.score) {
+          // This match is better than the previous overlapping one, replace it
+          matches[matches.length - 1] = {
+            index: i,
+            score,
+            content: windowLines.join('\n'),
+          };
+        }
+        // If score <= prevMatch.score, we ignore this one (greedy approach for best local match)
+      } else {
+        // No overlap, add as new match
+        matches.push({
+          index: i,
+          score,
+          content: windowLines.join('\n'),
+        });
+      }
     }
   }
 
-  if (flexibleOccurrences > 0) {
-    let modifiedCode = sourceLines.join('');
-    modifiedCode = restoreTrailingNewline(currentContent, modifiedCode);
-    return {
-      newContent: modifiedCode,
-      occurrences: flexibleOccurrences,
-      finalOldString: normalizedSearch,
-      finalNewString: normalizedReplace,
-    };
-  }
-
-  return null;
-}
-
-async function calculateRegexReplacement(
-  context: ReplacementContext,
-): Promise<ReplacementResult | null> {
-  const { currentContent, params } = context;
-  const { old_string, new_string } = params;
-
-  // Normalize line endings for consistent processing.
-  const normalizedSearch = old_string.replace(/\r\n/g, '\n');
-  const normalizedReplace = new_string.replace(/\r\n/g, '\n');
-
-  // This logic is ported from your Python implementation.
-  // It builds a flexible, multi-line regex from a search string.
-  const delimiters = ['(', ')', ':', '[', ']', '{', '}', '>', '<', '='];
-
-  let processedString = normalizedSearch;
-  for (const delim of delimiters) {
-    processedString = processedString.split(delim).join(` ${delim} `);
-  }
-
-  // Split by any whitespace and remove empty strings.
-  const tokens = processedString.split(/\s+/).filter(Boolean);
-
-  if (tokens.length === 0) {
+  if (matches.length === 0) {
     return null;
   }
 
-  const escapedTokens = tokens.map(escapeRegex);
-  // Join tokens with `\s*` to allow for flexible whitespace between them.
-  const pattern = escapedTokens.join('\\s*');
+  // Apply replacements from bottom to top to preserve indices
+  // Matches should already be sorted by index ascending, so reverse them
+  const matchesToReplace = matches.reverse();
 
-  // The final pattern captures leading whitespace (indentation) and then matches the token pattern.
-  // 'm' flag enables multi-line mode, so '^' matches the start of any line.
-  const finalPattern = `^([ \t]*)${pattern}`;
-  const flexibleRegex = new RegExp(finalPattern, 'm');
+  // We need to accumulate the new file lines
+  // Since we are operating on `fileLines` array, we can use splicing if we work backwards
+  // Or just reconstruct the array.
 
-  const match = flexibleRegex.exec(currentContent);
+  const finalFileLines = [...fileLines];
+  let finalOldString = ''; // For reporting, if multiple, this might be ambiguous. We'll use the first one found (last in reverse list) or all?
+  // The tool interface expects `finalOldString` to be "the exact literal text".
+  // If we replaced multiple different fuzzy matches, this is tricky.
+  // We will return the content of the *first* match found (top of file) for reporting purposes, or join them?
+  // Usually `finalOldString` is used to verify if change happened.
+  // We'll use the content of the best match (highest score) or just the first one.
 
-  if (!match) {
-    return null;
+  // Let's collect all replaced contents for `finalOldString` if needed, but usually just one is expected for display?
+  // We'll concatenate them with newlines if multiple? No that breaks diff.
+  // We'll return the original search block if multiple, or the actual match if single.
+  // Let's stick to the content of the first match (matches[0] before reverse).
+  finalOldString = matches[0].content;
+
+  for (const match of matchesToReplace) {
+    const matchedLines = finalFileLines.slice(
+      match.index,
+      match.index + searchLines.length,
+    );
+
+    // Calculate indentation for this specific match
+    const matchedFirstLine = matchedLines[0];
+    const matchIndentMatch = matchedFirstLine.match(/^(\s*)/);
+    const matchIndent = matchIndentMatch ? matchIndentMatch[1] : '';
+
+    const searchIndentMatch = searchLines[0].match(/^(\s*)/);
+    const searchIndent = searchIndentMatch ? searchIndentMatch[1] : '';
+
+    const replaceLines = replaceBlock.split('\n');
+    const finalReplaceLines = replaceLines.map((line) => {
+      if (line.trim() === '') return '';
+      if (searchIndent === '' && matchIndent !== '') {
+        return matchIndent + line;
+      }
+      return line;
+    });
+
+    // Replace lines in the array
+    finalFileLines.splice(
+      match.index,
+      searchLines.length,
+      ...finalReplaceLines,
+    );
   }
 
-  const indentation = match[1] || '';
-  const newLines = normalizedReplace.split('\n');
-  const newBlockWithIndent = newLines
-    .map((line) => `${indentation}${line}`)
-    .join('\n');
-
-  // Use replace with the regex to substitute the matched content.
-  // Since the regex doesn't have the 'g' flag, it will only replace the first occurrence.
-  const modifiedCode = currentContent.replace(
-    flexibleRegex,
-    newBlockWithIndent,
-  );
+  let modifiedCode = finalFileLines.join('\n');
+  modifiedCode = restoreTrailingNewline(currentContent, modifiedCode);
 
   return {
-    newContent: restoreTrailingNewline(currentContent, modifiedCode),
-    occurrences: 1, // This method is designed to find and replace only the first occurrence.
-    finalOldString: normalizedSearch,
-    finalNewString: normalizedReplace,
+    newContent: modifiedCode,
+    occurrences: matches.length,
+    finalOldString, // Return the content of the first match found
+    finalNewString: replaceBlock, // This is technically slightly inaccurate if we indented it multiple times differently
   };
 }
 
@@ -277,6 +314,7 @@ export async function calculateReplacement(
     };
   }
 
+  // 1. Exact Match
   const exactResult = await calculateExactReplacement(context);
   if (exactResult) {
     const event = new EditStrategyEvent('exact');
@@ -284,18 +322,13 @@ export async function calculateReplacement(
     return exactResult;
   }
 
-  const flexibleResult = await calculateFlexibleReplacement(context);
-  if (flexibleResult) {
-    const event = new EditStrategyEvent('flexible');
+  // 2. Fuzzy Match (includes flexible whitespace matching)
+  // This replaces the old 'flexible' and 'regex' strategies with a more robust Aider-like approach
+  const fuzzyResult = await calculateFuzzyReplacement(context);
+  if (fuzzyResult) {
+    const event = new EditStrategyEvent('fuzzy');
     logEditStrategy(config, event);
-    return flexibleResult;
-  }
-
-  const regexResult = await calculateRegexReplacement(context);
-  if (regexResult) {
-    const event = new EditStrategyEvent('regex');
-    logEditStrategy(config, event);
-    return regexResult;
+    return fuzzyResult;
   }
 
   return {
@@ -320,21 +353,6 @@ export function getErrorReplaceResult(
       display: `Failed to edit, could not find the string to replace.`,
       raw: `Failed to edit, 0 occurrences found for old_string in ${params.file_path}. Ensure you're not escaping content incorrectly and check whitespace, indentation, and context. Use ${READ_FILE_TOOL_NAME} tool to verify.`,
       type: ToolErrorType.EDIT_NO_OCCURRENCE_FOUND,
-    };
-  } else if (occurrences !== expectedReplacements) {
-    const occurrenceTerm =
-      expectedReplacements === 1 ? 'occurrence' : 'occurrences';
-
-    error = {
-      display: `Failed to edit, expected ${expectedReplacements} ${occurrenceTerm} but found ${occurrences}.`,
-      raw: `Failed to edit, Expected ${expectedReplacements} ${occurrenceTerm} but found ${occurrences} for old_string in file: ${params.file_path}`,
-      type: ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
-    };
-  } else if (finalOldString === finalNewString) {
-    error = {
-      display: `No changes to apply. The old_string and new_string are identical.`,
-      raw: `No changes to apply. The old_string and new_string are identical in file: ${params.file_path}`,
-      type: ToolErrorType.EDIT_NO_CHANGE,
     };
   }
   return error;
@@ -610,6 +628,23 @@ class EditToolInvocation
       abortSignal,
     });
 
+    // Check for idempotency: if the replacement isn't found, but the new string is already there,
+    // consider it a success (no-op).
+    if (replacementResult.occurrences === 0) {
+      const normalizedNew = params.new_string.replace(/\r\n/g, '\n');
+      const normalizedContent = currentContent.replace(/\r\n/g, '\n');
+      if (normalizedContent.includes(normalizedNew)) {
+        return {
+          currentContent,
+          newContent: currentContent,
+          occurrences: 0,
+          isNewFile: false,
+          error: undefined,
+          originalLineEnding,
+        };
+      }
+    }
+
     const initialError = getErrorReplaceResult(
       params,
       replacementResult.occurrences,
@@ -847,19 +882,65 @@ class EditToolInvocation
         };
       }
 
-      const llmSuccessMessageParts = [
-        editData.isNewFile
-          ? `Created new file: ${this.params.file_path} with provided content.`
-          : `Successfully modified file: ${this.params.file_path} (${editData.occurrences} replacements).`,
-      ];
-      if (this.params.modified_by_user) {
-        llmSuccessMessageParts.push(
-          `User modified the \`new_string\` content to be: ${this.params.new_string}.`,
+      let llmContent: string;
+      if (editData.isNewFile) {
+        llmContent = `Created new file: ${this.params.file_path} with provided content.`;
+      } else {
+        const diff = Diff.diffLines(
+          editData.currentContent ?? '',
+          editData.newContent,
         );
+        const newLines = editData.newContent.split('\n');
+
+        let currentLine = 0;
+        let firstChange = -1;
+        let lastChange = -1;
+
+        for (const part of diff) {
+          if (part.added || part.removed) {
+            if (firstChange === -1) firstChange = currentLine;
+            if (part.added) {
+              currentLine += part.count ?? 0;
+              lastChange = currentLine - 1;
+            } else {
+              lastChange = Math.max(lastChange, currentLine - 1);
+            }
+          } else {
+            currentLine += part.count ?? 0;
+          }
+        }
+
+        if (firstChange === -1) {
+          if (editData.occurrences === 0) {
+            llmContent = `No changes made to file: ${this.params.file_path}. The content is already present.`;
+          } else {
+            llmContent = `File content already matches the request: ${this.params.file_path} (${editData.occurrences} replacements found).`;
+          }
+        } else {
+          if (lastChange < firstChange) lastChange = firstChange;
+
+          const start = Math.max(0, firstChange - 5);
+          const end = Math.min(newLines.length - 1, lastChange + 15);
+
+          const contextLines = newLines.slice(start, end + 1);
+          const contextText = contextLines.join('\n');
+
+          llmContent = `SUCCESS: Modified ${this.params.file_path}.
+Showing updated context (lines ${start + 1}-${end + 1}):
+
+${contextText}
+
+NOTE: Line numbers in the rest of the file may have shifted.
+Refer to the context above for updated positioning.`;
+        }
+      }
+
+      if (this.params.modified_by_user) {
+        llmContent += `\n\nUser modified the \`new_string\` content to be: ${this.params.new_string}.`;
       }
 
       return {
-        llmContent: llmSuccessMessageParts.join(' '),
+        llmContent,
         returnDisplay: displayResult,
       };
     } catch (error) {
@@ -906,7 +987,7 @@ export class EditTool
     super(
       EditTool.Name,
       'Edit',
-      `Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when \`expected_replacements\` is specified. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${READ_FILE_TOOL_NAME} tool to examine the file's current content before attempting a text replacement.
+      `Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when \`expected_replacements\` is specified. This tool requires providing significant context around the change to ensure precise targeting. Always use the ${READ_FILE_TOOL_NAME} tool (using 'offset' and 'limit' to get enough lines of context around the match) to examine the file's current content before attempting a text replacement.
       
       The user has the ability to modify the \`new_string\` content. If modified, this will be stated in the response.
       
@@ -1008,7 +1089,7 @@ A good instruction should concisely answer:
     );
   }
 
-  getModifyContext(_: AbortSignal): ModifyContext<EditToolParams> {
+  getModifyContext(signal: AbortSignal): ModifyContext<EditToolParams> {
     return {
       getFilePath: (params: EditToolParams) => params.file_path,
       getCurrentContent: async (params: EditToolParams): Promise<string> => {
@@ -1023,15 +1104,28 @@ A good instruction should concisely answer:
       },
       getProposedContent: async (params: EditToolParams): Promise<string> => {
         try {
-          const currentContent = await this.config
+          let currentContent = await this.config
             .getFileSystemService()
             .readTextFile(params.file_path);
-          return applyReplacement(
+
+          const originalLineEnding = detectLineEnding(currentContent);
+          currentContent = currentContent.replace(/\r\n/g, '\n');
+
+          if (params.old_string === '' && currentContent === '') {
+            return params.new_string;
+          }
+
+          const result = await calculateReplacement(this.config, {
+            params,
             currentContent,
-            params.old_string,
-            params.new_string,
-            params.old_string === '' && currentContent === '',
-          );
+            abortSignal: signal,
+          });
+
+          let finalContent = result.newContent;
+          if (originalLineEnding === '\r\n') {
+            finalContent = finalContent.replace(/\n/g, '\r\n');
+          }
+          return finalContent;
         } catch (err) {
           if (!isNodeError(err) || err.code !== 'ENOENT') throw err;
           return '';
