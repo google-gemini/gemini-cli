@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { escapeRegex, buildArgsPatterns } from './utils.js';
+import { escapeRegex, buildArgsPatterns, isSafeRegExp } from './utils.js';
 
 describe('policy/utils', () => {
   describe('escapeRegex', () => {
@@ -20,6 +20,44 @@ describe('policy/utils', () => {
     it('should return the same string if no special characters are present', () => {
       const input = 'abcABC123';
       expect(escapeRegex(input)).toBe(input);
+    });
+  });
+
+  describe('isSafeRegExp', () => {
+    it('should return true for simple regexes', () => {
+      expect(isSafeRegExp('abc')).toBe(true);
+      expect(isSafeRegExp('^abc$')).toBe(true);
+      expect(isSafeRegExp('a|b')).toBe(true);
+    });
+
+    it('should return true for safe quantifiers', () => {
+      expect(isSafeRegExp('a+')).toBe(true);
+      expect(isSafeRegExp('a*')).toBe(true);
+      expect(isSafeRegExp('a?')).toBe(true);
+      expect(isSafeRegExp('a{1,3}')).toBe(true);
+    });
+
+    it('should return true for safe groups', () => {
+      expect(isSafeRegExp('(abc)*')).toBe(true);
+      expect(isSafeRegExp('(a|b)+')).toBe(true);
+    });
+
+    it('should return false for invalid regexes', () => {
+      expect(isSafeRegExp('([a-z)')).toBe(false);
+      expect(isSafeRegExp('*')).toBe(false);
+    });
+
+    it('should return false for extremely long regexes', () => {
+      expect(isSafeRegExp('a'.repeat(2049))).toBe(false);
+    });
+
+    it('should return false for nested quantifiers (potential ReDoS)', () => {
+      expect(isSafeRegExp('(a+)+')).toBe(false);
+      expect(isSafeRegExp('(a+)*')).toBe(false);
+      expect(isSafeRegExp('(a*)+')).toBe(false);
+      expect(isSafeRegExp('(a*)*')).toBe(false);
+      expect(isSafeRegExp('(a|b+)+')).toBe(false);
+      expect(isSafeRegExp('(.*)+')).toBe(false);
     });
   });
 
