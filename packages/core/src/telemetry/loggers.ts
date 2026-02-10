@@ -88,12 +88,16 @@ export function logCliConfiguration(
 ): void {
   void ClearcutLogger.getInstance(config)?.logStartSessionEvent(event);
   bufferTelemetryEvent(() => {
-    const logger = logs.getLogger(SERVICE_NAME);
-    const logRecord: LogRecord = {
-      body: event.toLogBody(),
-      attributes: event.toOpenTelemetryAttributes(config),
-    };
-    logger.emit(logRecord);
+    // Wait for experiments to load before emitting so we capture experimentIds
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    config.getExperimentsAsync().then(() => {
+      const logger = logs.getLogger(SERVICE_NAME);
+      const logRecord: LogRecord = {
+        body: event.toLogBody(),
+        attributes: event.toOpenTelemetryAttributes(config),
+      };
+      logger.emit(logRecord);
+    });
   });
 }
 
@@ -780,11 +784,15 @@ export function logStartupStats(
   event: StartupStatsEvent,
 ): void {
   bufferTelemetryEvent(() => {
-    const logger = logs.getLogger(SERVICE_NAME);
-    const logRecord: LogRecord = {
-      body: event.toLogBody(),
-      attributes: event.toOpenTelemetryAttributes(config),
-    };
-    logger.emit(logRecord);
+    // Wait for experiments to load before emitting so we capture experimentIds
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    config.getExperimentsAsync().then(() => {
+      const logger = logs.getLogger(SERVICE_NAME);
+      const logRecord: LogRecord = {
+        body: event.toLogBody(),
+        attributes: event.toOpenTelemetryAttributes(config),
+      };
+      logger.emit(logRecord);
+    });
   });
 }
