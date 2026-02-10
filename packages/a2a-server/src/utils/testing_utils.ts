@@ -20,8 +20,6 @@ import {
 import { createMockMessageBus } from '@google/gemini-cli-core/src/test-utils/mock-message-bus.js';
 import type { Config, Storage } from '@google/gemini-cli-core';
 import { expect, vi } from 'vitest';
-import os from 'node:os';
-import path from 'node:path';
 
 export function createMockConfig(
   overrides: Partial<Config> = {},
@@ -45,8 +43,8 @@ export function createMockConfig(
     getCheckpointingEnabled: vi.fn().mockReturnValue(false),
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     storage: {
-      getProjectTempDir: () => os.tmpdir(),
-      getProjectTempCheckpointsDir: () => path.join(os.tmpdir(), 'checkpoints'),
+      getProjectTempDir: () => '/tmp',
+      getProjectTempCheckpointsDir: () => '/tmp/checkpoints',
     } as Storage,
     getTruncateToolOutputThreshold: () =>
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,

@@ -6,7 +6,6 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as os from 'node:os';
 import {
   beforeAll,
   afterAll,
@@ -30,7 +29,7 @@ describe('ExtensionManager theme loading', () => {
 
   beforeAll(async () => {
     tempHomeDir = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), 'gemini-cli-test-'),
+      path.join(fs.realpathSync('/tmp'), 'gemini-cli-test-'),
     );
   });
 
