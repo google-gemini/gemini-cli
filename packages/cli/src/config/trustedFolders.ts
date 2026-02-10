@@ -47,6 +47,7 @@ export function isTrustLevel(
 ): value is TrustLevel {
   return (
     typeof value === 'string' &&
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     Object.values(TrustLevel).includes(value as TrustLevel)
   );
 }
@@ -197,6 +198,7 @@ export class LoadedTrustedFolders {
       const content = await fsPromises.readFile(this.user.path, 'utf-8');
       let config: Record<string, TrustLevel>;
       try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         config = parseTrustedFoldersJson(content) as Record<string, TrustLevel>;
       } catch (error) {
         coreEvents.emitFeedback(
@@ -251,6 +253,7 @@ export function loadTrustedFolders(): LoadedTrustedFolders {
   try {
     if (fs.existsSync(userPath)) {
       const content = fs.readFileSync(userPath, 'utf-8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const parsed = parseTrustedFoldersJson(content) as Record<string, string>;
 
       if (

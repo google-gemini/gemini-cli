@@ -210,14 +210,14 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
       if (this._eventBacklog.length >= CoreEventEmitter.MAX_BACKLOG_SIZE) {
         this._eventBacklog.shift();
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       this._eventBacklog.push({ event, args } as EventBacklogItem);
     } else {
-      (
-        this.emit as <K extends keyof CoreEvents>(
-          event: K,
-          ...args: CoreEvents[K]
-        ) => boolean
-      )(event, ...args);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      (this.emit as (event: K, ...args: CoreEvents[K]) => boolean)(
+        event,
+        ...args,
+      );
     }
   }
 
@@ -342,12 +342,11 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
     const backlog = [...this._eventBacklog];
     this._eventBacklog.length = 0; // Clear in-place
     for (const item of backlog) {
-      (
-        this.emit as <K extends keyof CoreEvents>(
-          event: K,
-          ...args: CoreEvents[K]
-        ) => boolean
-      )(item.event, ...item.args);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      (this.emit as (event: keyof CoreEvents, ...args: unknown[]) => boolean)(
+        item.event,
+        ...item.args,
+      );
     }
   }
 }

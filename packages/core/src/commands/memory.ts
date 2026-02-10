@@ -5,11 +5,12 @@
  */
 
 import type { Config } from '../config/config.js';
+import { flattenMemory } from '../config/memory.js';
 import { refreshServerHierarchicalMemory } from '../utils/memoryDiscovery.js';
 import type { MessageActionReturn, ToolActionReturn } from './types.js';
 
 export function showMemory(config: Config): MessageActionReturn {
-  const memoryContent = config.getUserMemory() || '';
+  const memoryContent = flattenMemory(config.getUserMemory());
   const fileCount = config.getGeminiMdFileCount() || 0;
   let content: string;
 
@@ -51,11 +52,11 @@ export async function refreshMemory(
 
   if (config.isJitContextEnabled()) {
     await config.getContextManager()?.refresh();
-    memoryContent = config.getUserMemory();
+    memoryContent = flattenMemory(config.getUserMemory());
     fileCount = config.getGeminiMdFileCount();
   } else {
     const result = await refreshServerHierarchicalMemory(config);
-    memoryContent = result.memoryContent;
+    memoryContent = flattenMemory(result.memoryContent);
     fileCount = result.fileCount;
   }
 

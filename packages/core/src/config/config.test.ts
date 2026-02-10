@@ -188,7 +188,15 @@ vi.mock('../utils/fetch.js', () => ({
   setGlobalProxy: mockSetGlobalProxy,
 }));
 
-vi.mock('../services/contextManager.js');
+vi.mock('../services/contextManager.js', () => ({
+  ContextManager: vi.fn().mockImplementation(() => ({
+    refresh: vi.fn(),
+    getGlobalMemory: vi.fn().mockReturnValue(''),
+    getExtensionMemory: vi.fn().mockReturnValue(''),
+    getEnvironmentMemory: vi.fn().mockReturnValue(''),
+    getLoadedPaths: vi.fn().mockReturnValue(new Set()),
+  })),
+}));
 
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { tokenLimit } from '../core/tokenLimits.js';
@@ -2235,25 +2243,21 @@ describe('Config Quota & Preview Model Access', () => {
 
 describe('Config JIT Initialization', () => {
   let config: Config;
-  let mockContextManager: {
-    refresh: Mock;
-    getGlobalMemory: Mock;
-    getEnvironmentMemory: Mock;
-    getLoadedPaths: Mock;
-  };
+  let mockContextManager: ContextManager;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockContextManager = {
       refresh: vi.fn(),
       getGlobalMemory: vi.fn().mockReturnValue('Global Memory'),
+      getExtensionMemory: vi.fn().mockReturnValue('Extension Memory'),
       getEnvironmentMemory: vi
         .fn()
         .mockReturnValue('Environment Memory\n\nMCP Instructions'),
       getLoadedPaths: vi.fn().mockReturnValue(new Set(['/path/to/GEMINI.md'])),
-    };
-    vi.mocked(ContextManager).mockImplementation(
-      () => mockContextManager as Partial<ContextManager> as ContextManager,
+    } as unknown as ContextManager;
+    (ContextManager as unknown as Mock).mockImplementation(
+      () => mockContextManager,
     );
   });
 
@@ -2273,9 +2277,11 @@ describe('Config JIT Initialization', () => {
 
     expect(ContextManager).toHaveBeenCalledWith(config);
     expect(mockContextManager.refresh).toHaveBeenCalled();
-    expect(config.getUserMemory()).toBe(
-      'Global Memory\n\nEnvironment Memory\n\nMCP Instructions',
-    );
+    expect(config.getUserMemory()).toEqual({
+      global: 'Global Memory',
+      extension: 'Extension Memory',
+      project: 'Environment Memory\n\nMCP Instructions',
+    });
 
     // Verify state update (delegated to ContextManager)
     expect(config.getGeminiMdFileCount()).toBe(1);

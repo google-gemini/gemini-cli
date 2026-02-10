@@ -106,6 +106,7 @@ import { HookSystem } from '../hooks/index.js';
 import type { UserTierId } from '../code_assist/types.js';
 import type { RetrieveUserQuotaResponse } from '../code_assist/types.js';
 import type { AdminControlsSettings } from '../code_assist/types.js';
+import type { HierarchicalMemory } from './memory.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
@@ -389,7 +390,7 @@ export interface ConfigParameters {
   mcpServerCommand?: string;
   mcpServers?: Record<string, MCPServerConfig>;
   mcpEnablementCallbacks?: McpEnablementCallbacks;
-  userMemory?: string;
+  userMemory?: string | HierarchicalMemory;
   geminiMdFileCount?: number;
   geminiMdFilePaths?: string[];
   approvalMode?: ApprovalMode;
@@ -524,7 +525,7 @@ export class Config {
   private readonly extensionsEnabled: boolean;
   private mcpServers: Record<string, MCPServerConfig> | undefined;
   private readonly mcpEnablementCallbacks?: McpEnablementCallbacks;
-  private userMemory: string;
+  private userMemory: string | HierarchicalMemory;
   private geminiMdFileCount: number;
   private geminiMdFilePaths: string[];
   private readonly showMemoryUsage: boolean;
@@ -1557,14 +1558,13 @@ export class Config {
     this.mcpServers = mcpServers;
   }
 
-  getUserMemory(): string {
+  getUserMemory(): string | HierarchicalMemory {
     if (this.experimentalJitContext && this.contextManager) {
-      return [
-        this.contextManager.getGlobalMemory(),
-        this.contextManager.getEnvironmentMemory(),
-      ]
-        .filter(Boolean)
-        .join('\n\n');
+      return {
+        global: this.contextManager.getGlobalMemory(),
+        extension: this.contextManager.getExtensionMemory(),
+        project: this.contextManager.getEnvironmentMemory(),
+      };
     }
     return this.userMemory;
   }
@@ -1587,7 +1587,7 @@ export class Config {
     }
   }
 
-  setUserMemory(newUserMemory: string): void {
+  setUserMemory(newUserMemory: string | HierarchicalMemory): void {
     this.userMemory = newUserMemory;
   }
 
@@ -2338,21 +2338,12 @@ export class Config {
     const registry = new ToolRegistry(this, this.messageBus);
 
     // helper to create & register core tools that are enabled
-    type CoreToolConstructor = (
-      | (new (bus: MessageBus) => AnyDeclarativeTool)
-      | (new (
-          config: Config,
-          bus: MessageBus,
-          ...args: unknown[]
-        ) => AnyDeclarativeTool)
-    ) & { Name?: string };
-
-    const registerCoreTool = (
-      ToolClass: CoreToolConstructor,
-      ...args: unknown[]
+    const maybeRegister = (
+      toolClass: { name: string; Name?: string },
+      registerFn: () => void,
     ) => {
-      const className = ToolClass.name;
-      const toolName = ToolClass.Name || className;
+      const className = toolClass.name;
+      const toolName = toolClass.Name || className;
       const coreTools = this.getCoreTools();
       // On some platforms, the className can be minified to _ClassName.
       const normalizedClassName = className.replace(/^_+/, '');
@@ -2369,27 +2360,16 @@ export class Config {
       }
 
       if (isEnabled) {
-        // Pass config and message bus to tools (required for policy engine integration)
-        if (ToolClass.length === 1) {
-          const Constructor = ToolClass as new (
-            bus: MessageBus,
-          ) => AnyDeclarativeTool;
-          registry.registerTool(new Constructor(this.messageBus));
-        } else {
-          const Constructor = ToolClass as new (
-            config: Config,
-            bus: MessageBus,
-            ...args: unknown[]
-          ) => AnyDeclarativeTool;
-          registry.registerTool(
-            new Constructor(this, this.messageBus, ...args),
-          );
-        }
+        registerFn();
       }
     };
 
-    registerCoreTool(LSTool, this);
-    registerCoreTool(ReadFileTool, this);
+    maybeRegister(LSTool, () =>
+      registry.registerTool(new LSTool(this, this.messageBus)),
+    );
+    maybeRegister(ReadFileTool, () =>
+      registry.registerTool(new ReadFileTool(this, this.messageBus)),
+    );
 
     if (this.getUseRipgrep()) {
       let useRipgrep = false;
@@ -2400,30 +2380,60 @@ export class Config {
         errorString = String(error);
       }
       if (useRipgrep) {
-        registerCoreTool(RipGrepTool, this);
+        maybeRegister(RipGrepTool, () =>
+          registry.registerTool(new RipGrepTool(this, this.messageBus)),
+        );
       } else {
         logRipgrepFallback(this, new RipgrepFallbackEvent(errorString));
-        registerCoreTool(GrepTool, this);
+        maybeRegister(GrepTool, () =>
+          registry.registerTool(new GrepTool(this, this.messageBus)),
+        );
       }
     } else {
-      registerCoreTool(GrepTool, this);
+      maybeRegister(GrepTool, () =>
+        registry.registerTool(new GrepTool(this, this.messageBus)),
+      );
     }
 
-    registerCoreTool(GlobTool, this);
-    registerCoreTool(ActivateSkillTool, this);
-    registerCoreTool(EditTool, this);
-    registerCoreTool(WriteFileTool, this);
-    registerCoreTool(WebFetchTool, this);
-    registerCoreTool(ShellTool, this);
-    registerCoreTool(MemoryTool);
-    registerCoreTool(WebSearchTool, this);
-    registerCoreTool(AskUserTool);
+    maybeRegister(GlobTool, () =>
+      registry.registerTool(new GlobTool(this, this.messageBus)),
+    );
+    maybeRegister(ActivateSkillTool, () =>
+      registry.registerTool(new ActivateSkillTool(this, this.messageBus)),
+    );
+    maybeRegister(EditTool, () =>
+      registry.registerTool(new EditTool(this, this.messageBus)),
+    );
+    maybeRegister(WriteFileTool, () =>
+      registry.registerTool(new WriteFileTool(this, this.messageBus)),
+    );
+    maybeRegister(WebFetchTool, () =>
+      registry.registerTool(new WebFetchTool(this, this.messageBus)),
+    );
+    maybeRegister(ShellTool, () =>
+      registry.registerTool(new ShellTool(this, this.messageBus)),
+    );
+    maybeRegister(MemoryTool, () =>
+      registry.registerTool(new MemoryTool(this.messageBus)),
+    );
+    maybeRegister(WebSearchTool, () =>
+      registry.registerTool(new WebSearchTool(this, this.messageBus)),
+    );
+    maybeRegister(AskUserTool, () =>
+      registry.registerTool(new AskUserTool(this.messageBus)),
+    );
     if (this.getUseWriteTodos()) {
-      registerCoreTool(WriteTodosTool);
+      maybeRegister(WriteTodosTool, () =>
+        registry.registerTool(new WriteTodosTool(this.messageBus)),
+      );
     }
     if (this.isPlanEnabled()) {
-      registerCoreTool(ExitPlanModeTool, this);
-      registerCoreTool(EnterPlanModeTool, this);
+      maybeRegister(ExitPlanModeTool, () =>
+        registry.registerTool(new ExitPlanModeTool(this, this.messageBus)),
+      );
+      maybeRegister(EnterPlanModeTool, () =>
+        registry.registerTool(new EnterPlanModeTool(this, this.messageBus)),
+      );
     }
 
     // Register Subagents as Tools
