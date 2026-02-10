@@ -78,6 +78,7 @@ export function useHistory({
           const updatedLastItem: HistoryItem = {
             ...lastItem,
             tools: [...lastItem.tools, ...newItem.tools],
+            borderBottom: newItem.borderBottom,
           };
           return [...prevHistory.slice(0, -1), updatedLastItem];
         }

@@ -323,4 +323,29 @@ describe('useHistoryManager', () => {
     expect(thirdItem.type).toBe('tool_group');
     expect(thirdItem.tools).toHaveLength(1);
   });
+
+  it('should update borderBottom when merging tool groups', () => {
+    const { result } = renderHook(() => useHistory());
+    const timestamp = Date.now();
+    const toolGroup1: HistoryItemWithoutId = {
+      type: 'tool_group',
+      tools: [{ callId: '1', name: 'tool-a' } as IndividualToolCallDisplay],
+      borderBottom: false,
+    };
+    const toolGroup2: HistoryItemWithoutId = {
+      type: 'tool_group',
+      tools: [{ callId: '2', name: 'tool-b' } as IndividualToolCallDisplay],
+      borderBottom: true,
+    };
+
+    act(() => {
+      result.current.addItem(toolGroup1, timestamp);
+      result.current.addItem(toolGroup2, timestamp + 1);
+    });
+
+    expect(result.current.history).toHaveLength(1);
+    const mergedItem = result.current.history[0] as HistoryItemToolGroup;
+    expect(mergedItem.tools).toHaveLength(2);
+    expect(mergedItem.borderBottom).toBe(true);
+  });
 });

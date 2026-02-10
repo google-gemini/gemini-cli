@@ -80,6 +80,8 @@ import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
 import type { LoadedSettings } from '../../config/settings.js';
 
+import { isShellTool } from '../components/messages/ToolShared.js';
+
 type ToolResponseWithParts = ToolCallResponseInfo & {
   llmContent?: PartListUnion;
 };
@@ -356,6 +358,8 @@ export const useGeminiStream = (
     addItem,
   ]);
 
+  const isVerboseMode = settings.merged.output?.verbosity === 'verbose';
+
   const pendingToolGroupItems = useMemo((): HistoryItemWithoutId[] => {
     const remainingTools = toolCalls.filter(
       (tc) => !pushedToolCallIds.has(tc.request.callId),
@@ -375,6 +379,14 @@ export const useGeminiStream = (
     // Always show a bottom border slice if we have ANY tools in the batch
     // and we haven't finished pushing the whole batch to history yet.
     // Once all tools are terminal and pushed, the last history item handles the closing border.
+    // NOTE: In dense mode, we skip this if there are no shell tools (which require boxes).
+    const requiresBoxLayout =
+      isVerboseMode || toolCalls.some((tc) => isShellTool(tc.request.name));
+
+    if (!requiresBoxLayout) {
+      return items;
+    }
+
     const allTerminal =
       toolCalls.length > 0 &&
       toolCalls.every(
@@ -419,7 +431,7 @@ export const useGeminiStream = (
     }
 
     return items;
-  }, [toolCalls, pushedToolCallIds]);
+  }, [toolCalls, pushedToolCallIds, isVerboseMode]);
 
   const activeToolPtyId = useMemo(() => {
     const executingShellTool = toolCalls.find(
