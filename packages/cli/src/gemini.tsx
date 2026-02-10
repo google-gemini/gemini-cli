@@ -522,7 +522,7 @@ export async function main() {
       const { setupInitialActivityLogger } = await import(
         './utils/devtoolsService.js'
       );
-      setupInitialActivityLogger(config);
+      await setupInitialActivityLogger(config);
     }
 
     // Register config for telemetry shutdown

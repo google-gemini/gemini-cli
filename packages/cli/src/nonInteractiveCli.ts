@@ -75,7 +75,7 @@ export async function runNonInteractive({
       const { setupInitialActivityLogger } = await import(
         './utils/devtoolsService.js'
       );
-      setupInitialActivityLogger(config);
+      await setupInitialActivityLogger(config);
     }
 
     const { stdout: workingStdout } = createWorkingStdio();

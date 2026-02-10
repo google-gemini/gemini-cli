@@ -114,32 +114,85 @@ describe('devtoolsService', () => {
   });
 
   describe('setupInitialActivityLogger', () => {
-    it('initializes in buffer mode (no transport)', () => {
+    it('stays in buffer mode when no existing server found', async () => {
       const config = createMockConfig();
-      setupInitialActivityLogger(config);
+      const promise = setupInitialActivityLogger(config);
+
+      // Probe fires immediately — no server running
+      await vi.waitFor(() => expect(MockWebSocket.instances.length).toBe(1));
+      MockWebSocket.instances[0].simulateError();
+
+      await promise;
 
       expect(mockInitActivityLogger).toHaveBeenCalledWith(config, {
         mode: 'buffer',
       });
+      expect(mockAddNetworkTransport).not.toHaveBeenCalled();
     });
 
-    it('initializes in file mode when target env var is set', () => {
+    it('attaches transport when existing server found at startup', async () => {
+      const config = createMockConfig();
+      const promise = setupInitialActivityLogger(config);
+
+      await vi.waitFor(() => expect(MockWebSocket.instances.length).toBe(1));
+      MockWebSocket.instances[0].simulateOpen();
+
+      await promise;
+
+      expect(mockInitActivityLogger).toHaveBeenCalledWith(config, {
+        mode: 'buffer',
+      });
+      expect(mockAddNetworkTransport).toHaveBeenCalledWith(
+        config,
+        '127.0.0.1',
+        25417,
+        expect.any(Function),
+      );
+      expect(
+        mockActivityLoggerInstance.enableNetworkLogging,
+      ).toHaveBeenCalled();
+    });
+
+    it('F12 short-circuits when startup already connected', async () => {
+      const config = createMockConfig();
+
+      // Startup: probe succeeds
+      const setupPromise = setupInitialActivityLogger(config);
+      await vi.waitFor(() => expect(MockWebSocket.instances.length).toBe(1));
+      MockWebSocket.instances[0].simulateOpen();
+      await setupPromise;
+
+      mockAddNetworkTransport.mockClear();
+      mockActivityLoggerInstance.enableNetworkLogging.mockClear();
+
+      // F12: should return URL immediately
+      const url = await startDevToolsServer(config);
+
+      expect(url).toBe('http://127.0.0.1:25417');
+      expect(mockAddNetworkTransport).not.toHaveBeenCalled();
+      expect(mockDevToolsInstance.start).not.toHaveBeenCalled();
+    });
+
+    it('initializes in file mode when target env var is set', async () => {
       process.env['GEMINI_CLI_ACTIVITY_LOG_TARGET'] = '/tmp/test.jsonl';
       const config = createMockConfig();
-      setupInitialActivityLogger(config);
+      await setupInitialActivityLogger(config);
 
       expect(mockInitActivityLogger).toHaveBeenCalledWith(config, {
         mode: 'file',
         filePath: '/tmp/test.jsonl',
       });
+      // No probe attempted
+      expect(MockWebSocket.instances.length).toBe(0);
     });
 
-    it('does nothing in file mode when config.storage is missing', () => {
+    it('does nothing in file mode when config.storage is missing', async () => {
       process.env['GEMINI_CLI_ACTIVITY_LOG_TARGET'] = '/tmp/test.jsonl';
       const config = createMockConfig({ storage: undefined });
-      setupInitialActivityLogger(config);
+      await setupInitialActivityLogger(config);
 
       expect(mockInitActivityLogger).not.toHaveBeenCalled();
+      expect(MockWebSocket.instances.length).toBe(0);
     });
   });
 

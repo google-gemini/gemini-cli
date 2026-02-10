@@ -25,6 +25,7 @@ const DEFAULT_DEVTOOLS_HOST = '127.0.0.1';
 const MAX_PROMOTION_ATTEMPTS = 3;
 let promotionAttempts = 0;
 let serverStartPromise: Promise<string> | null = null;
+let connectedUrl: string | null = null;
 
 /**
  * Probe whether a DevTools server is already listening on the given host:port.
@@ -115,10 +116,11 @@ async function handlePromotion(config: Config) {
 }
 
 /**
- * Initializes the activity logger in buffering mode.
- * Interception starts immediately, but the DevTools server is not started yet.
+ * Initializes the activity logger.
+ * Interception starts immediately in buffering mode.
+ * If an existing DevTools server is found, attaches transport eagerly.
  */
-export function setupInitialActivityLogger(config: Config) {
+export async function setupInitialActivityLogger(config: Config) {
   const target = process.env['GEMINI_CLI_ACTIVITY_LOG_TARGET'];
 
   if (target) {
@@ -127,6 +129,28 @@ export function setupInitialActivityLogger(config: Config) {
   } else {
     // Start in buffering mode (no transport attached yet)
     initActivityLogger(config, { mode: 'buffer' });
+
+    // Eagerly probe for an existing DevTools server
+    try {
+      const existing = await probeDevTools(
+        DEFAULT_DEVTOOLS_HOST,
+        DEFAULT_DEVTOOLS_PORT,
+      );
+      if (existing) {
+        const onReconnectFailed = () => handlePromotion(config);
+        addNetworkTransport(
+          config,
+          DEFAULT_DEVTOOLS_HOST,
+          DEFAULT_DEVTOOLS_PORT,
+          onReconnectFailed,
+        );
+        ActivityLogger.getInstance().enableNetworkLogging();
+        connectedUrl = `http://${DEFAULT_DEVTOOLS_HOST}:${DEFAULT_DEVTOOLS_PORT}`;
+        debugLogger.log(`DevTools (existing) at startup: ${connectedUrl}`);
+      }
+    } catch {
+      // Probe failed silently — stay in buffer mode
+    }
   }
 }
 
@@ -136,6 +160,7 @@ export function setupInitialActivityLogger(config: Config) {
  * Deduplicates concurrent calls — returns the same promise if already in flight.
  */
 export function startDevToolsServer(config: Config): Promise<string> {
+  if (connectedUrl) return Promise.resolve(connectedUrl);
   if (serverStartPromise) return serverStartPromise;
   serverStartPromise = startDevToolsServerImpl(config);
   return serverStartPromise;
@@ -184,4 +209,5 @@ async function startDevToolsServerImpl(config: Config): Promise<string> {
 export function resetForTesting() {
   promotionAttempts = 0;
   serverStartPromise = null;
+  connectedUrl = null;
 }
