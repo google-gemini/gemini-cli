@@ -24,6 +24,7 @@ import {
   splitCommands,
   hasRedirection,
 } from '../utils/shell-utils.js';
+import { getToolAliases } from '../tools/tool-names.js';
 
 function ruleMatches(
   rule: PolicyRule | SafetyCheckerRule,
@@ -311,6 +312,7 @@ export class PolicyEngine {
 
     if (toolName && SHELL_TOOL_NAMES.includes(toolName)) {
       isShellCommand = true;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const args = toolCall.args as { command?: string; dir_path?: string };
       command = args?.command;
       shellDirPath = args?.dir_path;
@@ -322,12 +324,18 @@ export class PolicyEngine {
 
     // For tools with a server name, we want to try matching both the
     // original name and the fully qualified name (server__tool).
-    const toolCallsToTry: FunctionCall[] = [toolCall];
-    if (serverName && toolCall.name && !toolCall.name.includes('__')) {
-      toolCallsToTry.push({
-        ...toolCall,
-        name: `${serverName}__${toolCall.name}`,
-      });
+    // We also want to check legacy aliases for the tool name.
+    const toolNamesToTry = toolCall.name ? getToolAliases(toolCall.name) : [];
+
+    const toolCallsToTry: FunctionCall[] = [];
+    for (const name of toolNamesToTry) {
+      toolCallsToTry.push({ ...toolCall, name });
+      if (serverName && !name.includes('__')) {
+        toolCallsToTry.push({
+          ...toolCall,
+          name: `${serverName}__${name}`,
+        });
+      }
     }
 
     for (const rule of this.rules) {

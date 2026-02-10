@@ -140,6 +140,7 @@ interface GrepMatch {
   filePath: string;
   lineNumber: number;
   line: string;
+  isContext?: boolean;
 }
 
 class GrepToolInvocation extends BaseToolInvocation<
@@ -164,7 +165,10 @@ class GrepToolInvocation extends BaseToolInvocation<
       const pathParam = this.params.dir_path || '.';
 
       const searchDirAbs = path.resolve(this.config.getTargetDir(), pathParam);
-      const validationError = this.config.validatePathAccess(searchDirAbs);
+      const validationError = this.config.validatePathAccess(
+        searchDirAbs,
+        'read',
+      );
       if (validationError) {
         return {
           llmContent: validationError,
@@ -264,8 +268,6 @@ class GrepToolInvocation extends BaseToolInvocation<
         return { llmContent: noMatchMsg, returnDisplay: `No matches found` };
       }
 
-      const wasTruncated = allMatches.length >= totalMaxMatches;
-
       const matchesByFile = allMatches.reduce(
         (acc, match) => {
           const fileKey = match.filePath;
@@ -279,16 +281,19 @@ class GrepToolInvocation extends BaseToolInvocation<
         {} as Record<string, GrepMatch[]>,
       );
 
-      const matchCount = allMatches.length;
+      const matchesOnly = allMatches.filter((m) => !m.isContext);
+      const matchCount = matchesOnly.length;
       const matchTerm = matchCount === 1 ? 'match' : 'matches';
+
+      const wasTruncated = matchCount >= totalMaxMatches;
 
       let llmContent = `Found ${matchCount} ${matchTerm} for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}${wasTruncated ? ` (results limited to ${totalMaxMatches} matches for performance)` : ''}:\n---\n`;
 
       for (const filePath in matchesByFile) {
         llmContent += `File: ${filePath}\n`;
         matchesByFile[filePath].forEach((match) => {
-          const trimmedLine = match.line.trim();
-          llmContent += `L${match.lineNumber}: ${trimmedLine}\n`;
+          const separator = match.isContext ? '-' : ':';
+          llmContent += `L${match.lineNumber}${separator} ${match.line}\n`;
         });
         llmContent += '---\n';
       }
@@ -366,6 +371,10 @@ class GrepToolInvocation extends BaseToolInvocation<
     }
 
     if (!no_ignore) {
+      if (!this.config.getFileFilteringRespectGitIgnore()) {
+        rgArgs.push('--no-ignore-vcs', '--no-ignore-exclude');
+      }
+
       const fileExclusions = new FileExclusions(this.config);
       const excludes = fileExclusions.getGlobExcludes([
         ...COMMON_DIRECTORY_EXCLUDES,
@@ -395,11 +404,15 @@ class GrepToolInvocation extends BaseToolInvocation<
         allowedExitCodes: [0, 1],
       });
 
+      let matchesFound = 0;
       for await (const line of generator) {
         const match = this.parseRipgrepJsonLine(line, absolutePath);
         if (match) {
           results.push(match);
-          if (results.length >= maxMatches) {
+          if (!match.isContext) {
+            matchesFound++;
+          }
+          if (matchesFound >= maxMatches) {
             break;
           }
         }
@@ -418,11 +431,11 @@ class GrepToolInvocation extends BaseToolInvocation<
   ): GrepMatch | null {
     try {
       const json = JSON.parse(line);
-      if (json.type === 'match') {
-        const match = json.data;
+      if (json.type === 'match' || json.type === 'context') {
+        const data = json.data;
         // Defensive check: ensure text properties exist (skips binary/invalid encoding)
-        if (match.path?.text && match.lines?.text) {
-          const absoluteFilePath = path.resolve(basePath, match.path.text);
+        if (data.path?.text && data.lines?.text) {
+          const absoluteFilePath = path.resolve(basePath, data.path.text);
           const relativeCheck = path.relative(basePath, absoluteFilePath);
           if (
             relativeCheck === '..' ||
@@ -436,8 +449,9 @@ class GrepToolInvocation extends BaseToolInvocation<
 
           return {
             filePath: relativeFilePath || path.basename(absoluteFilePath),
-            lineNumber: match.line_number,
-            line: match.lines.text.trimEnd(),
+            lineNumber: data.line_number,
+            line: data.lines.text.trimEnd(),
+            isContext: json.type === 'context',
           };
         }
       }
@@ -495,7 +509,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
     super(
       RipGrepTool.Name,
       'SearchText',
-      'FAST, optimized search powered by `ripgrep`. PREFERRED over standard `run_shell_command("grep ...")` due to better performance and automatic output limiting (max 20k matches).',
+      'Searches for a regular expression pattern within file contents. Max 100 matches.',
       Kind.Search,
       {
         properties: {
@@ -566,10 +580,12 @@ export class RipGrepTool extends BaseDeclarativeTool<
   protected override validateToolParamValues(
     params: RipGrepToolParams,
   ): string | null {
-    try {
-      new RegExp(params.pattern);
-    } catch (error) {
-      return `Invalid regular expression pattern provided: ${params.pattern}. Error: ${getErrorMessage(error)}`;
+    if (!params.fixed_strings) {
+      try {
+        new RegExp(params.pattern);
+      } catch (error) {
+        return `Invalid regular expression pattern provided: ${params.pattern}. Error: ${getErrorMessage(error)}`;
+      }
     }
 
     // Only validate path if one is provided
@@ -578,7 +594,10 @@ export class RipGrepTool extends BaseDeclarativeTool<
         this.config.getTargetDir(),
         params.dir_path,
       );
-      const validationError = this.config.validatePathAccess(resolvedPath);
+      const validationError = this.config.validatePathAccess(
+        resolvedPath,
+        'read',
+      );
       if (validationError) {
         return validationError;
       }

@@ -72,14 +72,14 @@ export function useApprovalModeIndicator({
         const currentMode = config.getApprovalMode();
         switch (currentMode) {
           case ApprovalMode.DEFAULT:
+            nextApprovalMode = config.isPlanEnabled()
+              ? ApprovalMode.PLAN
+              : ApprovalMode.AUTO_EDIT;
+            break;
+          case ApprovalMode.PLAN:
             nextApprovalMode = ApprovalMode.AUTO_EDIT;
             break;
           case ApprovalMode.AUTO_EDIT:
-            nextApprovalMode = config.isPlanEnabled()
-              ? ApprovalMode.PLAN
-              : ApprovalMode.DEFAULT;
-            break;
-          case ApprovalMode.PLAN:
             nextApprovalMode = ApprovalMode.DEFAULT;
             break;
           case ApprovalMode.YOLO:
@@ -102,6 +102,7 @@ export function useApprovalModeIndicator({
             addItem(
               {
                 type: MessageType.INFO,
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                 text: (e as Error).message,
               },
               Date.now(),

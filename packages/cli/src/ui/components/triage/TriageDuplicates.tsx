@@ -80,7 +80,7 @@ const VISIBLE_LINES_COLLAPSED = 6;
 const VISIBLE_LINES_EXPANDED = 20;
 const VISIBLE_LINES_DETAIL = 25;
 const VISIBLE_CANDIDATES = 5;
-const MAX_CONCURRENT_ANALYSIS = 3;
+const MAX_CONCURRENT_ANALYSIS = 10;
 
 const getReactionCount = (issue: Issue | Candidate | undefined) => {
   if (!issue || !issue.reactionGroups) return 0;
@@ -157,6 +157,7 @@ export const TriageDuplicates = ({
         '--json',
         'number,title,body,state,stateReason,labels,url,comments,author,reactionGroups',
       ]);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return JSON.parse(stdout) as Candidate;
     } catch (err) {
       debugLogger.error(
@@ -280,6 +281,7 @@ Return a JSON object with:
         promptId: 'triage-duplicates',
       });
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const rec = response as unknown as GeminiRecommendation;
 
       let canonical: Candidate | undefined;
@@ -336,7 +338,7 @@ Return a JSON object with:
       const issuesToAnalyze = state.issues
         .slice(
           state.currentIndex,
-          state.currentIndex + MAX_CONCURRENT_ANALYSIS + 2,
+          state.currentIndex + MAX_CONCURRENT_ANALYSIS + 20,
         ) // Look ahead a bit
         .filter(
           (issue) =>

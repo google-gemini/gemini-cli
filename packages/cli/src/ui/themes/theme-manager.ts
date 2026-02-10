@@ -63,6 +63,14 @@ class ThemeManager {
     this.activeTheme = DEFAULT_THEME;
   }
 
+  isDefaultTheme(themeName: string | undefined): boolean {
+    return (
+      themeName === undefined ||
+      themeName === DEFAULT_THEME.name ||
+      themeName === DefaultLight.name
+    );
+  }
+
   /**
    * Loads custom themes from settings.
    * @param customThemesSettings Custom themes from settings.
@@ -375,6 +383,7 @@ class ThemeManager {
 
       // 3. Read, parse, and validate the theme file.
       const themeContent = fs.readFileSync(canonicalPath, 'utf-8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const customThemeConfig = JSON.parse(themeContent) as CustomTheme;
 
       const validation = validateCustomTheme(customThemeConfig);

@@ -10,7 +10,11 @@ import { type Dirent } from 'node:fs';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 import { z } from 'zod';
-import type { AgentDefinition } from './types.js';
+import {
+  type AgentDefinition,
+  DEFAULT_MAX_TURNS,
+  DEFAULT_MAX_TIME_MINUTES,
+} from './types.js';
 import { isValidToolName } from '../tools/tool-names.js';
 import { FRONTMATTER_REGEX } from '../skills/skillLoader.js';
 import { getErrorMessage } from '../utils/errors.js';
@@ -181,6 +185,7 @@ export async function parseAgentMarkdown(
   } catch (error) {
     throw new AgentLoadError(
       filePath,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       `YAML frontmatter parsing failed: ${(error as Error).message}`,
     );
   }
@@ -290,8 +295,8 @@ export function markdownToAgentDefinition(
       },
     },
     runConfig: {
-      maxTurns: markdown.max_turns,
-      maxTimeMinutes: markdown.timeout_mins || 5,
+      maxTurns: markdown.max_turns ?? DEFAULT_MAX_TURNS,
+      maxTimeMinutes: markdown.timeout_mins ?? DEFAULT_MAX_TIME_MINUTES,
     },
     toolConfig: markdown.tools
       ? {
@@ -324,12 +329,14 @@ export async function loadAgentsFromDirectory(
     dirEntries = await fs.readdir(dir, { withFileTypes: true });
   } catch (error) {
     // If directory doesn't exist, just return empty
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       return result;
     }
     result.errors.push(
       new AgentLoadError(
         dir,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         `Could not list directory: ${(error as Error).message}`,
       ),
     );
@@ -360,6 +367,7 @@ export async function loadAgentsFromDirectory(
         result.errors.push(
           new AgentLoadError(
             filePath,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             `Unexpected error: ${(error as Error).message}`,
           ),
         );

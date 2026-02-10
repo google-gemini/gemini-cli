@@ -12,6 +12,8 @@ import type { PolicySettings } from './types.js';
 import { ApprovalMode, PolicyDecision, InProcessCheckerType } from './types.js';
 import { isDirectorySecure } from '../utils/security.js';
 
+vi.unmock('../config/storage.js');
+
 vi.mock('../utils/security.js', () => ({
   isDirectorySecure: vi.fn().mockResolvedValue({ secure: true }),
 }));
@@ -315,8 +317,8 @@ describe('createPolicyEngineConfig', () => {
       (r) => r.decision === PolicyDecision.ALLOW && !r.toolName,
     );
     expect(rule).toBeDefined();
-    // Priority 999 in default tier → 1.999
-    expect(rule?.priority).toBeCloseTo(1.999, 5);
+    // Priority 998 in default tier → 1.998 (999 reserved for ask_user exception)
+    expect(rule?.priority).toBeCloseTo(1.998, 5);
   });
 
   it('should allow edit tool in AUTO_EDIT mode', async () => {
@@ -327,7 +329,10 @@ describe('createPolicyEngineConfig', () => {
       ApprovalMode.AUTO_EDIT,
     );
     const rule = config.rules?.find(
-      (r) => r.toolName === 'replace' && r.decision === PolicyDecision.ALLOW,
+      (r) =>
+        r.toolName === 'replace' &&
+        r.decision === PolicyDecision.ALLOW &&
+        r.modes?.includes(ApprovalMode.AUTO_EDIT),
     );
     expect(rule).toBeDefined();
     // Priority 15 in default tier → 1.015
@@ -577,8 +582,8 @@ describe('createPolicyEngineConfig', () => {
       (r) => !r.toolName && r.decision === PolicyDecision.ALLOW,
     );
     expect(wildcardRule).toBeDefined();
-    // Priority 999 in default tier → 1.999
-    expect(wildcardRule?.priority).toBeCloseTo(1.999, 5);
+    // Priority 998 in default tier → 1.998 (999 reserved for ask_user exception)
+    expect(wildcardRule?.priority).toBeCloseTo(1.998, 5);
 
     // Write tool ASK_USER rules are present (from write.toml)
     const writeToolRules = config.rules?.filter(

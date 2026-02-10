@@ -50,9 +50,9 @@ export class AskUserTool extends BaseDeclarativeTool<
                 },
                 header: {
                   type: 'string',
-                  maxLength: 12,
+                  maxLength: 16,
                   description:
-                    'Very short label displayed as a chip/tag (max 12 chars). Examples: "Auth method", "Library", "Approach".',
+                    'MUST be 16 characters or fewer or the call will fail. Very short label displayed as a chip/tag. Use abbreviations: "Auth" not "Authentication", "Config" not "Configuration". Examples: "Auth method", "Library", "Approach", "Database".',
                 },
                 type: {
                   type: 'string',
@@ -90,7 +90,7 @@ export class AskUserTool extends BaseDeclarativeTool<
                 placeholder: {
                   type: 'string',
                   description:
-                    "Only applies when type='text'. Hint text shown in the input field.",
+                    "Hint text shown in the input field. For type='text', shown in the main input. For type='choice', shown in the 'Other' custom input.",
                 },
               },
             },

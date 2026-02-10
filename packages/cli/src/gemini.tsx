@@ -67,7 +67,7 @@ import {
   getVersion,
   ValidationCancelledError,
   ValidationRequiredError,
-  type FetchAdminControlsResponse,
+  type AdminControlsSettings,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -98,6 +98,7 @@ import { deleteSession, listSessions } from './utils/sessions.js';
 import { createPolicyUpdater } from './config/policy.js';
 import { ScrollProvider } from './ui/contexts/ScrollProvider.js';
 import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
+import { TerminalProvider } from './ui/contexts/TerminalContext.js';
 
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { profiler } from './ui/components/DebugProfiler.js';
@@ -228,19 +229,21 @@ export async function startInteractiveUI(
               settings.merged.general.debugKeystrokeLogging
             }
           >
-            <ScrollProvider>
-              <SessionStatsProvider>
-                <VimModeProvider settings={settings}>
-                  <AppContainer
-                    config={config}
-                    startupWarnings={startupWarnings}
-                    version={version}
-                    resumedSessionData={resumedSessionData}
-                    initializationResult={initializationResult}
-                  />
-                </VimModeProvider>
-              </SessionStatsProvider>
-            </ScrollProvider>
+            <TerminalProvider>
+              <ScrollProvider>
+                <SessionStatsProvider>
+                  <VimModeProvider settings={settings}>
+                    <AppContainer
+                      config={config}
+                      startupWarnings={startupWarnings}
+                      version={version}
+                      resumedSessionData={resumedSessionData}
+                      initializationResult={initializationResult}
+                    />
+                  </VimModeProvider>
+                </SessionStatsProvider>
+              </ScrollProvider>
+            </TerminalProvider>
           </MouseProvider>
         </KeypressProvider>
       </SettingsContext.Provider>
@@ -507,13 +510,19 @@ export async function main() {
       projectHooks: settings.workspace.settings.hooks,
     });
     loadConfigHandle?.end();
+
+    // Initialize storage immediately after loading config to ensure that
+    // storage-related operations (like listing or resuming sessions) have
+    // access to the project identifier.
+    await config.storage.initialize();
+
     adminControlsListner.setConfig(config);
 
-    if (config.isInteractive() && config.storage && config.getDebugMode()) {
-      const { registerActivityLogger } = await import(
-        './utils/activityLogger.js'
+    if (config.isInteractive() && settings.merged.general.devtools) {
+      const { setupInitialActivityLogger } = await import(
+        './utils/devtoolsService.js'
       );
-      registerActivityLogger(config);
+      await setupInitialActivityLogger(config);
     }
 
     // Register config for telemetry shutdown
@@ -594,12 +603,13 @@ export async function main() {
       }
 
       // This cleanup isn't strictly needed but may help in certain situations.
-      process.on('SIGTERM', () => {
+      const restoreRawMode = () => {
         process.stdin.setRawMode(wasRaw);
-      });
-      process.on('SIGINT', () => {
-        process.stdin.setRawMode(wasRaw);
-      });
+      };
+      process.off('SIGTERM', restoreRawMode);
+      process.on('SIGTERM', restoreRawMode);
+      process.off('SIGINT', restoreRawMode);
+      process.on('SIGINT', restoreRawMode);
     }
 
     await setupTerminalAndTheme(config, settings);
@@ -806,13 +816,14 @@ export function initializeOutputListenersAndFlush() {
 }
 
 function setupAdminControlsListener() {
-  let pendingSettings: FetchAdminControlsResponse | undefined;
+  let pendingSettings: AdminControlsSettings | undefined;
   let config: Config | undefined;
 
   const messageHandler = (msg: unknown) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const message = msg as {
       type?: string;
-      settings?: FetchAdminControlsResponse;
+      settings?: AdminControlsSettings;
     };
     if (message?.type === 'admin-settings' && message.settings) {
       if (config) {

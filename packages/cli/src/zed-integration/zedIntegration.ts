@@ -37,10 +37,11 @@ import {
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
 import { AcpFileSystemService } from './fileSystemService.js';
+import { getAcpErrorMessage } from './acpErrors.js';
 import { Readable, Writable } from 'node:stream';
 import type { Content, Part, FunctionCall } from '@google/genai';
 import type { LoadedSettings } from '../config/settings.js';
-import { SettingScope } from '../config/settings.js';
+import { SettingScope, loadSettings } from '../config/settings.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { z } from 'zod';
@@ -61,6 +62,7 @@ export async function runZedIntegration(
 ) {
   const { stdout: workingStdout } = createWorkingStdio();
   const stdout = Writable.toWeb(workingStdout) as WritableStream;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const stdin = Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>;
 
   const stream = acp.ndJsonStream(stdout, stdin);
@@ -139,7 +141,14 @@ export class GeminiAgent {
     // Refresh auth with the requested method
     // This will reuse existing credentials if they're valid,
     // or perform new authentication if needed
-    await this.config.refreshAuth(method);
+    try {
+      await this.config.refreshAuth(method);
+    } catch (e) {
+      throw new acp.RequestError(
+        getErrorStatus(e) || 401,
+        getAcpErrorMessage(e),
+      );
+    }
     this.settings.setValue(
       SettingScope.User,
       'security.auth.selectedType',
@@ -152,11 +161,46 @@ export class GeminiAgent {
     mcpServers,
   }: acp.NewSessionRequest): Promise<acp.NewSessionResponse> {
     const sessionId = randomUUID();
-    const config = await this.initializeSessionConfig(
+    const loadedSettings = loadSettings(cwd);
+    const config = await this.newSessionConfig(
       sessionId,
       cwd,
       mcpServers,
+      loadedSettings,
     );
+
+    const authType =
+      loadedSettings.merged.security.auth.selectedType || AuthType.USE_GEMINI;
+
+    let isAuthenticated = false;
+    let authErrorMessage = '';
+    try {
+      await config.refreshAuth(authType);
+      isAuthenticated = true;
+
+      // Extra validation for Gemini API key
+      const contentGeneratorConfig = config.getContentGeneratorConfig();
+      if (
+        authType === AuthType.USE_GEMINI &&
+        (!contentGeneratorConfig || !contentGeneratorConfig.apiKey)
+      ) {
+        isAuthenticated = false;
+        authErrorMessage = 'Gemini API key is missing or not configured.';
+      }
+    } catch (e) {
+      isAuthenticated = false;
+      authErrorMessage = getAcpErrorMessage(e);
+      debugLogger.error(
+        `Authentication failed: ${e instanceof Error ? e.stack : e}`,
+      );
+    }
+
+    if (!isAuthenticated) {
+      throw new acp.RequestError(
+        401,
+        authErrorMessage || 'Authentication required.',
+      );
+    }
 
     if (this.clientCapabilities?.fs) {
       const acpFileSystemService = new AcpFileSystemService(
@@ -167,6 +211,9 @@ export class GeminiAgent {
       );
       config.setFileSystemService(acpFileSystemService);
     }
+
+    await config.initialize();
+    startupProfiler.flush(config);
 
     const geminiClient = config.getGeminiClient();
     const chat = await geminiClient.startChat();
@@ -264,8 +311,10 @@ export class GeminiAgent {
     sessionId: string,
     cwd: string,
     mcpServers: acp.McpServer[],
+    loadedSettings?: LoadedSettings,
   ): Promise<Config> {
-    const mergedMcpServers = { ...this.settings.merged.mcpServers };
+    const currentSettings = loadedSettings || this.settings;
+    const mergedMcpServers = { ...currentSettings.merged.mcpServers };
 
     for (const server of mcpServers) {
       if (
@@ -300,7 +349,10 @@ export class GeminiAgent {
       }
     }
 
-    const settings = { ...this.settings.merged, mcpServers: mergedMcpServers };
+    const settings = {
+      ...currentSettings.merged,
+      mcpServers: mergedMcpServers,
+    };
 
     const config = await loadCliConfig(settings, sessionId, this.argv, { cwd });
 
@@ -431,10 +483,7 @@ export class Session {
       const functionCalls: FunctionCall[] = [];
 
       try {
-        const model = resolveModel(
-          this.config.getModel(),
-          this.config.getPreviewFeatures(),
-        );
+        const model = resolveModel(this.config.getModel());
         const responseStream = await chat.sendMessageStream(
           { model },
           nextMessage?.parts ?? [],
@@ -497,7 +546,10 @@ export class Session {
           return { stopReason: 'cancelled' };
         }
 
-        throw error;
+        throw new acp.RequestError(
+          getErrorStatus(error) || 500,
+          getAcpErrorMessage(error),
+        );
       }
 
       if (functionCalls.length > 0) {
@@ -1182,6 +1234,9 @@ function toPermissionOptions(
       ];
     case 'ask_user':
       // askuser doesn't need "always allow" options since it's asking questions
+      return [...basicPermissionOptions];
+    case 'exit_plan_mode':
+      // exit_plan_mode doesn't need "always allow" options since it's a plan approval flow
       return [...basicPermissionOptions];
     default: {
       const unreachable: never = confirmation;

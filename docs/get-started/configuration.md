@@ -98,16 +98,23 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `general`
 
-- **`general.previewFeatures`** (boolean):
-  - **Description:** Enable preview features (e.g., preview models).
-  - **Default:** `false`
-
 - **`general.preferredEditor`** (string):
   - **Description:** The preferred editor to open files in.
   - **Default:** `undefined`
 
 - **`general.vimMode`** (boolean):
   - **Description:** Enable Vim keybindings
+  - **Default:** `false`
+
+- **`general.defaultApprovalMode`** (enum):
+  - **Description:** The default approval mode for tool execution. 'default'
+    prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is
+    read-only mode. 'yolo' is not supported yet.
+  - **Default:** `"default"`
+  - **Values:** `"default"`, `"auto_edit"`, `"plan"`
+
+- **`general.devtools`** (boolean):
+  - **Description:** Enable DevTools inspector on launch.
   - **Default:** `false`
 
 - **`general.enableAutoUpdate`** (boolean):
@@ -170,6 +177,15 @@ their corresponding top-level category object in your `settings.json` file.
     available options.
   - **Default:** `undefined`
 
+- **`ui.autoThemeSwitching`** (boolean):
+  - **Description:** Automatically switch between default light and dark themes
+    based on terminal background color.
+  - **Default:** `true`
+
+- **`ui.terminalBackgroundPollingInterval`** (number):
+  - **Description:** Interval in seconds to poll the terminal background color.
+  - **Default:** `60`
+
 - **`ui.customThemes`** (object):
   - **Description:** Custom theme definitions.
   - **Default:** `{}`
@@ -178,6 +194,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Hide the window title bar
   - **Default:** `false`
   - **Requires restart:** Yes
+
+- **`ui.inlineThinkingMode`** (enum):
+  - **Description:** Display model thinking inline: off or full.
+  - **Default:** `"off"`
+  - **Values:** `"off"`, `"full"`
 
 - **`ui.showStatusInTitle`** (boolean):
   - **Description:** Show Gemini CLI model thoughts in the terminal window title
@@ -324,6 +345,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** The fraction of context usage at which to trigger context
     compression (e.g. 0.2, 0.3).
   - **Default:** `0.5`
+  - **Requires restart:** Yes
+
+- **`model.disableLoopDetection`** (boolean):
+  - **Description:** Disable automatic detection and prevention of infinite
+    loops.
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`model.skipNextSpeakerCheck`** (boolean):
@@ -661,18 +688,6 @@ their corresponding top-level category object in your `settings.json` file.
     performance.
   - **Default:** `true`
 
-- **`tools.autoAccept`** (boolean):
-  - **Description:** Automatically accept and execute tool calls that are
-    considered safe (e.g., read-only operations).
-  - **Default:** `false`
-
-- **`tools.approvalMode`** (enum):
-  - **Description:** The default approval mode for tool execution. 'default'
-    prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is
-    read-only mode. 'yolo' is not supported yet.
-  - **Default:** `"default"`
-  - **Values:** `"default"`, `"auto_edit"`, `"plan"`
-
 - **`tools.core`** (array):
   - **Description:** Restrict the set of built-in tools with an allowlist. Match
     semantics mirror tools.allowed; see the built-in tools documentation for
@@ -710,20 +725,10 @@ their corresponding top-level category object in your `settings.json` file.
     implementation. Provides faster search performance.
   - **Default:** `true`
 
-- **`tools.enableToolOutputTruncation`** (boolean):
-  - **Description:** Enable truncation of large tool outputs.
-  - **Default:** `true`
-  - **Requires restart:** Yes
-
 - **`tools.truncateToolOutputThreshold`** (number):
-  - **Description:** Truncate tool output if it is larger than this many
-    characters. Set to -1 to disable.
-  - **Default:** `4000000`
-  - **Requires restart:** Yes
-
-- **`tools.truncateToolOutputLines`** (number):
-  - **Description:** The number of lines to keep when truncating tool output.
-  - **Default:** `1000`
+  - **Description:** Maximum characters to show when truncating large tool
+    outputs. Set to 0 or negative to disable truncation.
+  - **Default:** `40000`
   - **Requires restart:** Yes
 
 - **`tools.disableLLMCorrection`** (boolean):
@@ -782,7 +787,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`security.folderTrust.enabled`** (boolean):
   - **Description:** Setting to track whether Folder trust is enabled.
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`security.environmentVariableRedaction.allowed`** (array):
@@ -856,12 +861,12 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`experimental.extensionConfig`** (boolean):
   - **Description:** Enable requesting and fetching of extension settings.
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
-- **`experimental.enableEventDrivenScheduler`** (boolean):
-  - **Description:** Enables event-driven scheduler within the CLI session.
-  - **Default:** `true`
+- **`experimental.extensionRegistry`** (boolean):
+  - **Description:** Enable extension registry explore UI.
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`experimental.extensionReloading`** (boolean):
@@ -984,6 +989,10 @@ their corresponding top-level category object in your `settings.json` file.
 - **`admin.mcp.enabled`** (boolean):
   - **Description:** If false, disallows MCP servers from being used.
   - **Default:** `true`
+
+- **`admin.mcp.config`** (object):
+  - **Description:** Admin-configured MCP servers.
+  - **Default:** `{}`
 
 - **`admin.skills.enabled`** (boolean):
   - **Description:** If false, disallows agent skills from being used.
@@ -1166,6 +1175,13 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - Specifies the default Gemini model to use.
   - Overrides the hardcoded default
   - Example: `export GEMINI_MODEL="gemini-3-flash-preview"`
+- **`GEMINI_CLI_HOME`**:
+  - Specifies the root directory for Gemini CLI's user-level configuration and
+    storage.
+  - By default, this is the user's system home directory. The CLI will create a
+    `.gemini` folder inside this directory.
+  - Useful for shared compute environments or keeping CLI state isolated.
+  - Example: `export GEMINI_CLI_HOME="/path/to/user/config"`
 - **`GOOGLE_API_KEY`**:
   - Your Google Cloud API key.
   - Required for using Vertex AI in express mode.

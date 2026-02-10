@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -21,7 +21,6 @@ import { act, useContext, type ReactElement } from 'react';
 import { AppContainer } from './AppContainer.js';
 import { SettingsContext } from './contexts/SettingsContext.js';
 import { type TrackedToolCall } from './hooks/useReactToolScheduler.js';
-import { MessageType } from './types.js';
 import {
   type Config,
   makeFakeConfig,
@@ -29,8 +28,6 @@ import {
   type UserFeedbackPayload,
   type ResumedSessionData,
   AuthType,
-  UserAccountManager,
-  type ContentGeneratorConfig,
   type AgentDefinition,
 } from '@google/gemini-cli-core';
 
@@ -45,11 +42,6 @@ const mockCoreEvents = vi.hoisted(() => ({
 // Mock IdeClient
 const mockIdeClient = vi.hoisted(() => ({
   getInstance: vi.fn().mockReturnValue(new Promise(() => {})),
-}));
-
-// Mock UserAccountManager
-const mockUserAccountManager = vi.hoisted(() => ({
-  getCachedGoogleAccount: vi.fn().mockReturnValue(null),
 }));
 
 // Mock stdout
@@ -81,9 +73,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     })),
     enableMouseEvents: vi.fn(),
     disableMouseEvents: vi.fn(),
-    UserAccountManager: vi
-      .fn()
-      .mockImplementation(() => mockUserAccountManager),
     FileDiscoveryService: vi.fn().mockImplementation(() => ({
       initialize: vi.fn(),
     })),
@@ -156,7 +145,30 @@ vi.mock('./contexts/SessionContext.js');
 vi.mock('./components/shared/text-buffer.js');
 vi.mock('./hooks/useLogger.js');
 vi.mock('./hooks/useInputHistoryStore.js');
+vi.mock('./hooks/atCommandProcessor.js');
 vi.mock('./hooks/useHookDisplayState.js');
+vi.mock('./hooks/useBanner.js', () => ({
+  useBanner: vi.fn((bannerData) => ({
+    bannerText: (
+      bannerData.warningText ||
+      bannerData.defaultText ||
+      ''
+    ).replace(/\\n/g, '\n'),
+  })),
+}));
+vi.mock('./hooks/useShellInactivityStatus.js', () => ({
+  useShellInactivityStatus: vi.fn(() => ({
+    shouldShowFocusHint: false,
+    inactivityStatus: 'none',
+  })),
+}));
+vi.mock('./hooks/useTerminalTheme.js', () => ({
+  useTerminalTheme: vi.fn(),
+}));
+
+import { useHookDisplayState } from './hooks/useHookDisplayState.js';
+import { useTerminalTheme } from './hooks/useTerminalTheme.js';
+import { useShellInactivityStatus } from './hooks/useShellInactivityStatus.js';
 
 // Mock external utilities
 vi.mock('../utils/events.js');
@@ -185,7 +197,6 @@ import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
-import { useHookDisplayState } from './hooks/useHookDisplayState.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { measureElement } from 'ink';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
@@ -260,6 +271,8 @@ describe('AppContainer State Management', () => {
   const mockedUseKeypress = useKeypress as Mock;
   const mockedUseInputHistoryStore = useInputHistoryStore as Mock;
   const mockedUseHookDisplayState = useHookDisplayState as Mock;
+  const mockedUseTerminalTheme = useTerminalTheme as Mock;
+  const mockedUseShellInactivityStatus = useShellInactivityStatus as Mock;
 
   const DEFAULT_GEMINI_STREAM_MOCK = {
     streamingState: 'idle',
@@ -388,6 +401,11 @@ describe('AppContainer State Management', () => {
       currentLoadingPhrase: '',
     });
     mockedUseHookDisplayState.mockReturnValue([]);
+    mockedUseTerminalTheme.mockReturnValue(undefined);
+    mockedUseShellInactivityStatus.mockReturnValue({
+      shouldShowFocusHint: false,
+      inactivityStatus: 'none',
+    });
 
     // Mock Config
     mockConfig = makeFakeConfig();
@@ -421,7 +439,6 @@ describe('AppContainer State Management', () => {
           ...defaultMergedSettings.ui,
           showStatusInTitle: false,
           hideWindowTitle: false,
-          showUserIdentity: true,
         },
         useAlternateBuffer: false,
       },
@@ -490,162 +507,6 @@ describe('AppContainer State Management', () => {
       expect(() => {
         renderAppContainer({ config: debugConfig });
       }).not.toThrow();
-    });
-  });
-
-  describe('Authentication Check', () => {
-    it('displays correct message for LOGIN_WITH_GOOGLE auth type', async () => {
-      // Explicitly mock implementation to ensure we control the instance
-      (UserAccountManager as unknown as Mock).mockImplementation(
-        () => mockUserAccountManager,
-      );
-
-      mockUserAccountManager.getCachedGoogleAccount.mockReturnValue(
-        'test@example.com',
-      );
-      const mockAddItem = vi.fn();
-      mockedUseHistory.mockReturnValue({
-        history: [],
-        addItem: mockAddItem,
-        updateItem: vi.fn(),
-        clearItems: vi.fn(),
-        loadHistory: vi.fn(),
-      });
-
-      // Explicitly enable showUserIdentity
-      mockSettings.merged.ui = {
-        ...mockSettings.merged.ui,
-        showUserIdentity: true,
-      };
-
-      // Need to ensure config.getContentGeneratorConfig() returns appropriate authType
-      const authConfig = makeFakeConfig();
-      // Mock getTargetDir as well since makeFakeConfig might not set it up fully for the component
-      vi.spyOn(authConfig, 'getTargetDir').mockReturnValue('/test/workspace');
-      vi.spyOn(authConfig, 'initialize').mockResolvedValue(undefined);
-      vi.spyOn(authConfig, 'getExtensionLoader').mockReturnValue(
-        mockExtensionManager,
-      );
-
-      vi.spyOn(authConfig, 'getContentGeneratorConfig').mockReturnValue({
-        authType: AuthType.LOGIN_WITH_GOOGLE,
-      } as unknown as ContentGeneratorConfig);
-      vi.spyOn(authConfig, 'getUserTierName').mockReturnValue('Standard Tier');
-
-      let unmount: () => void;
-      await act(async () => {
-        const result = renderAppContainer({ config: authConfig });
-        unmount = result.unmount;
-      });
-
-      await waitFor(() => {
-        expect(UserAccountManager).toHaveBeenCalled();
-        expect(
-          mockUserAccountManager.getCachedGoogleAccount,
-        ).toHaveBeenCalled();
-        expect(mockAddItem).toHaveBeenCalledWith(
-          expect.objectContaining({
-            text: 'Logged in with Google: test@example.com (Plan: Standard Tier)',
-          }),
-        );
-      });
-      await act(async () => {
-        unmount!();
-      });
-    });
-    it('displays correct message for USE_GEMINI auth type', async () => {
-      // Explicitly mock implementation to ensure we control the instance
-      (UserAccountManager as unknown as Mock).mockImplementation(
-        () => mockUserAccountManager,
-      );
-
-      mockUserAccountManager.getCachedGoogleAccount.mockReturnValue(null);
-      const mockAddItem = vi.fn();
-      mockedUseHistory.mockReturnValue({
-        history: [],
-        addItem: mockAddItem,
-        updateItem: vi.fn(),
-        clearItems: vi.fn(),
-        loadHistory: vi.fn(),
-      });
-
-      const authConfig = makeFakeConfig();
-      vi.spyOn(authConfig, 'getTargetDir').mockReturnValue('/test/workspace');
-      vi.spyOn(authConfig, 'initialize').mockResolvedValue(undefined);
-      vi.spyOn(authConfig, 'getExtensionLoader').mockReturnValue(
-        mockExtensionManager,
-      );
-
-      vi.spyOn(authConfig, 'getContentGeneratorConfig').mockReturnValue({
-        authType: AuthType.USE_GEMINI,
-      } as unknown as ContentGeneratorConfig);
-      vi.spyOn(authConfig, 'getUserTierName').mockReturnValue('Standard Tier');
-
-      let unmount: () => void;
-      await act(async () => {
-        const result = renderAppContainer({ config: authConfig });
-        unmount = result.unmount;
-      });
-
-      await waitFor(() => {
-        expect(mockAddItem).toHaveBeenCalledWith(
-          expect.objectContaining({
-            text: expect.stringContaining('Authenticated with gemini-api-key'),
-          }),
-        );
-      });
-      await act(async () => {
-        unmount!();
-      });
-    });
-
-    it('does not display authentication message if showUserIdentity is false', async () => {
-      mockUserAccountManager.getCachedGoogleAccount.mockReturnValue(
-        'test@example.com',
-      );
-      const mockAddItem = vi.fn();
-      mockedUseHistory.mockReturnValue({
-        history: [],
-        addItem: mockAddItem,
-        updateItem: vi.fn(),
-        clearItems: vi.fn(),
-        loadHistory: vi.fn(),
-      });
-
-      mockSettings.merged.ui = {
-        ...mockSettings.merged.ui,
-        showUserIdentity: false,
-      };
-
-      const authConfig = makeFakeConfig();
-      vi.spyOn(authConfig, 'getTargetDir').mockReturnValue('/test/workspace');
-      vi.spyOn(authConfig, 'initialize').mockResolvedValue(undefined);
-      vi.spyOn(authConfig, 'getExtensionLoader').mockReturnValue(
-        mockExtensionManager,
-      );
-
-      vi.spyOn(authConfig, 'getContentGeneratorConfig').mockReturnValue({
-        authType: AuthType.LOGIN_WITH_GOOGLE,
-      } as unknown as ContentGeneratorConfig);
-
-      let unmount: () => void;
-      await act(async () => {
-        const result = renderAppContainer({ config: authConfig });
-        unmount = result.unmount;
-      });
-
-      // Give it some time to potentially call addItem
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      expect(mockAddItem).not.toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: MessageType.INFO,
-        }),
-      );
-
-      await act(async () => {
-        unmount!();
-      });
     });
   });
 
@@ -1111,7 +972,7 @@ describe('AppContainer State Management', () => {
       });
       await waitFor(() => {
         // Assert that the context value is as expected
-        expect(capturedUIState.proQuotaRequest).toBeNull();
+        expect(capturedUIState.quota.proQuotaRequest).toBeNull();
       });
       unmount!();
     });
@@ -1136,7 +997,7 @@ describe('AppContainer State Management', () => {
       });
       await waitFor(() => {
         // Assert: The mock request is correctly passed through the context
-        expect(capturedUIState.proQuotaRequest).toEqual(mockRequest);
+        expect(capturedUIState.quota.proQuotaRequest).toEqual(mockRequest);
       });
       unmount!();
     });
@@ -1407,8 +1268,15 @@ describe('AppContainer State Management', () => {
     });
 
     describe('Shell Focus Action Required', () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         vi.useFakeTimers();
+        // Use real implementation for these tests to verify title updates
+        const actual = await vi.importActual<
+          typeof import('./hooks/useShellInactivityStatus.js')
+        >('./hooks/useShellInactivityStatus.js');
+        mockedUseShellInactivityStatus.mockImplementation(
+          actual.useShellInactivityStatus,
+        );
       });
 
       afterEach(() => {
@@ -2101,6 +1969,160 @@ describe('AppContainer State Management', () => {
         unmount();
       });
     });
+
+    describe('Focus Handling (Tab / Shift+Tab)', () => {
+      beforeEach(() => {
+        // Mock activePtyId to enable focus
+        mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
+          activePtyId: 1,
+        });
+      });
+
+      it('should focus shell input on Tab', async () => {
+        await setupKeypressTest();
+
+        pressKey({ name: 'tab', shift: false });
+
+        expect(capturedUIState.embeddedShellFocused).toBe(true);
+        unmount();
+      });
+
+      it('should unfocus shell input on Shift+Tab', async () => {
+        await setupKeypressTest();
+
+        // Focus first
+        pressKey({ name: 'tab', shift: false });
+        expect(capturedUIState.embeddedShellFocused).toBe(true);
+
+        // Unfocus via Shift+Tab
+        pressKey({ name: 'tab', shift: true });
+        expect(capturedUIState.embeddedShellFocused).toBe(false);
+        unmount();
+      });
+
+      it('should auto-unfocus when activePtyId becomes null', async () => {
+        // Start with active pty and focused
+        mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
+          activePtyId: 1,
+        });
+
+        const renderResult = render(getAppContainer());
+        await act(async () => {
+          vi.advanceTimersByTime(0);
+        });
+
+        // Focus it
+        act(() => {
+          handleGlobalKeypress({
+            name: 'tab',
+            shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
+          } as Key);
+        });
+        expect(capturedUIState.embeddedShellFocused).toBe(true);
+
+        // Now mock activePtyId becoming null
+        mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
+          activePtyId: null,
+        });
+
+        // Rerender to trigger useEffect
+        await act(async () => {
+          renderResult.rerender(getAppContainer());
+        });
+
+        expect(capturedUIState.embeddedShellFocused).toBe(false);
+        renderResult.unmount();
+      });
+
+      it('should focus background shell on Tab when already visible (not toggle it off)', async () => {
+        const mockToggleBackgroundShell = vi.fn();
+        mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
+          activePtyId: null,
+          isBackgroundShellVisible: true,
+          backgroundShells: new Map([[123, { pid: 123, status: 'running' }]]),
+          toggleBackgroundShell: mockToggleBackgroundShell,
+        });
+
+        await setupKeypressTest();
+
+        // Initially not focused
+        expect(capturedUIState.embeddedShellFocused).toBe(false);
+
+        // Press Tab
+        pressKey({ name: 'tab', shift: false });
+
+        // Should be focused
+        expect(capturedUIState.embeddedShellFocused).toBe(true);
+        // Should NOT have toggled (closed) the shell
+        expect(mockToggleBackgroundShell).not.toHaveBeenCalled();
+
+        unmount();
+      });
+    });
+
+    describe('Background Shell Toggling (CTRL+B)', () => {
+      it('should toggle background shell on Ctrl+B even if visible but not focused', async () => {
+        const mockToggleBackgroundShell = vi.fn();
+        mockedUseGeminiStream.mockReturnValue({
+          ...DEFAULT_GEMINI_STREAM_MOCK,
+          activePtyId: null,
+          isBackgroundShellVisible: true,
+          backgroundShells: new Map([[123, { pid: 123, status: 'running' }]]),
+          toggleBackgroundShell: mockToggleBackgroundShell,
+        });
+
+        await setupKeypressTest();
+
+        // Initially not focused, but visible
+        expect(capturedUIState.embeddedShellFocused).toBe(false);
+
+        // Press Ctrl+B
+        pressKey({ name: 'b', ctrl: true });
+
+        // Should have toggled (closed) the shell
+        expect(mockToggleBackgroundShell).toHaveBeenCalled();
+        // Should be unfocused
+        expect(capturedUIState.embeddedShellFocused).toBe(false);
+
+        unmount();
+      });
+
+      it('should show and focus background shell on Ctrl+B if hidden', async () => {
+        const mockToggleBackgroundShell = vi.fn();
+        const geminiStreamMock = {
+          ...DEFAULT_GEMINI_STREAM_MOCK,
+          activePtyId: null,
+          isBackgroundShellVisible: false,
+          backgroundShells: new Map([[123, { pid: 123, status: 'running' }]]),
+          toggleBackgroundShell: mockToggleBackgroundShell,
+        };
+        mockedUseGeminiStream.mockReturnValue(geminiStreamMock);
+
+        await setupKeypressTest();
+
+        // Update the mock state when toggled to simulate real behavior
+        mockToggleBackgroundShell.mockImplementation(() => {
+          geminiStreamMock.isBackgroundShellVisible = true;
+        });
+
+        // Press Ctrl+B
+        pressKey({ name: 'b', ctrl: true });
+
+        // Should have toggled (shown) the shell
+        expect(mockToggleBackgroundShell).toHaveBeenCalled();
+        // Should be focused
+        expect(capturedUIState.embeddedShellFocused).toBe(true);
+
+        unmount();
+      });
+    });
   });
 
   describe('Copy Mode (CTRL+S)', () => {
@@ -2740,5 +2762,68 @@ describe('AppContainer State Management', () => {
       expect(clearTerminalCalls).toHaveLength(0);
       compUnmount();
     });
+  });
+
+  describe('Permission Handling', () => {
+    it('shows permission dialog when checkPermissions returns paths', async () => {
+      const { checkPermissions } = await import(
+        './hooks/atCommandProcessor.js'
+      );
+      vi.mocked(checkPermissions).mockResolvedValue(['/test/file.txt']);
+
+      let unmount: () => void;
+      await act(async () => (unmount = renderAppContainer().unmount));
+
+      await waitFor(() => expect(capturedUIActions).toBeTruthy());
+
+      await act(async () =>
+        capturedUIActions.handleFinalSubmit('read @file.txt'),
+      );
+
+      expect(capturedUIState.permissionConfirmationRequest).not.toBeNull();
+      expect(capturedUIState.permissionConfirmationRequest?.files).toEqual([
+        '/test/file.txt',
+      ]);
+      await act(async () => unmount!());
+    });
+
+    it.each([true, false])(
+      'handles permissions when allowed is %s',
+      async (allowed) => {
+        const { checkPermissions } = await import(
+          './hooks/atCommandProcessor.js'
+        );
+        vi.mocked(checkPermissions).mockResolvedValue(['/test/file.txt']);
+        const addReadOnlyPathSpy = vi.spyOn(
+          mockConfig.getWorkspaceContext(),
+          'addReadOnlyPath',
+        );
+        const { submitQuery } = mockedUseGeminiStream();
+
+        let unmount: () => void;
+        await act(async () => (unmount = renderAppContainer().unmount));
+
+        await waitFor(() => expect(capturedUIActions).toBeTruthy());
+
+        await act(async () =>
+          capturedUIActions.handleFinalSubmit('read @file.txt'),
+        );
+
+        await act(async () =>
+          capturedUIState.permissionConfirmationRequest?.onComplete({
+            allowed,
+          }),
+        );
+
+        if (allowed) {
+          expect(addReadOnlyPathSpy).toHaveBeenCalledWith('/test/file.txt');
+        } else {
+          expect(addReadOnlyPathSpy).not.toHaveBeenCalled();
+        }
+        expect(submitQuery).toHaveBeenCalledWith('read @file.txt');
+        expect(capturedUIState.permissionConfirmationRequest).toBeNull();
+        await act(async () => unmount!());
+      },
+    );
   });
 });
