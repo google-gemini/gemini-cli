@@ -44,6 +44,7 @@ import * as modifiableToolModule from '../tools/modifiable-tool.js';
 import { DEFAULT_GEMINI_MODEL } from '../config/models.js';
 import type { PolicyEngine } from '../policy/policy-engine.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
+import { EDIT_TOOL_NAME, SHELL_TOOL_NAME } from '../tools/tool-names.js';
 
 vi.mock('fs/promises', () => ({
   writeFile: vi.fn(),
@@ -2262,6 +2263,125 @@ describe('CoreToolScheduler Sequential Execution', () => {
       expect(result.response.error.message).toBe(
         `Tool execution denied by policy. ${customDenyMessage}`,
       );
+    });
+  });
+
+  describe('Edit reordering', () => {
+    it('should reorder multiple replace calls to the same file from bottom to top', async () => {
+      const executeFn = vi.fn().mockResolvedValue({ llmContent: 'success' });
+      const mockReplaceTool = new MockTool({
+        name: EDIT_TOOL_NAME,
+        execute: executeFn,
+      });
+      const mockShellTool = new MockTool({
+        name: SHELL_TOOL_NAME,
+        execute: executeFn,
+      });
+
+      const mockToolRegistry = {
+        getTool: (name: string) => {
+          if (name === EDIT_TOOL_NAME) return mockReplaceTool;
+          if (name === SHELL_TOOL_NAME) return mockShellTool;
+          return undefined;
+        },
+        getToolByName: (name: string) => {
+          if (name === EDIT_TOOL_NAME) return mockReplaceTool;
+          if (name === SHELL_TOOL_NAME) return mockShellTool;
+          return undefined;
+        },
+        getFunctionDeclarations: () => [],
+        tools: new Map(),
+        discovery: {},
+        registerTool: () => {},
+        getToolByDisplayName: () => undefined,
+        getTools: () => [],
+        discoverTools: async () => {},
+        getAllTools: () => [],
+        getToolsByServer: () => [],
+      } as unknown as ToolRegistry;
+
+      const onAllToolCallsComplete = vi.fn();
+      const onToolCallsUpdate = vi.fn();
+
+      const mockConfig = createMockConfig({
+        getToolRegistry: () => mockToolRegistry,
+        getApprovalMode: () => ApprovalMode.YOLO,
+        isInteractive: () => false,
+      });
+      const mockMessageBus = createMockMessageBus();
+      mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+      mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+      mockConfig.getHookSystem = vi
+        .fn()
+        .mockReturnValue(new HookSystem(mockConfig));
+
+      const scheduler = new CoreToolScheduler({
+        config: mockConfig,
+        onAllToolCallsComplete,
+        onToolCallsUpdate,
+        getPreferredEditor: () => 'vscode',
+      });
+
+      const abortController = new AbortController();
+      const requests = [
+        {
+          callId: '1',
+          name: EDIT_TOOL_NAME,
+          args: {
+            file_path: 'test.txt',
+            start_line: 10,
+            old_string: 'a',
+            new_string: 'b',
+          },
+          isClientInitiated: false,
+          prompt_id: 'p1',
+        },
+        {
+          callId: '2',
+          name: SHELL_TOOL_NAME,
+          args: { command: 'echo hello' },
+          isClientInitiated: false,
+          prompt_id: 'p1',
+        },
+        {
+          callId: '3',
+          name: EDIT_TOOL_NAME,
+          args: {
+            file_path: 'test.txt',
+            start_line: 20,
+            old_string: 'c',
+            new_string: 'd',
+          },
+          isClientInitiated: false,
+          prompt_id: 'p1',
+        },
+        {
+          callId: '4',
+          name: EDIT_TOOL_NAME,
+          args: {
+            file_path: 'other.txt',
+            start_line: 5,
+            old_string: 'e',
+            new_string: 'f',
+          },
+          isClientInitiated: false,
+          prompt_id: 'p1',
+        },
+      ];
+
+      await scheduler.schedule(requests, abortController.signal);
+
+      await vi.waitFor(() => {
+        expect(onAllToolCallsComplete).toHaveBeenCalled();
+      });
+
+      expect(executeFn).toHaveBeenCalledTimes(4);
+      const calls = executeFn.mock.calls;
+      // Reordered: req 3 (A:20), req 2 (Shell), req 1 (A:10), req 4 (Other:5)
+      expect(calls[0][0]).toEqual(requests[2].args); // req 3 (A:20)
+      expect(calls[1][0]).toEqual(requests[1].args); // req 2 (Shell)
+      expect(calls[2][0]).toEqual(requests[0].args); // req 1 (A:10)
+      expect(calls[3][0]).toEqual(requests[3].args); // req 4 (Other:5)
     });
   });
 });

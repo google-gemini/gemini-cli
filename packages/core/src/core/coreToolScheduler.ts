@@ -45,6 +45,7 @@ import {
 import { ToolExecutor } from '../scheduler/tool-executor.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { getPolicyDenialError } from '../scheduler/policy.js';
+import { EDIT_TOOL_NAME } from '../tools/tool-names.js';
 
 export type {
   ToolCall,
@@ -395,6 +396,55 @@ export class CoreToolScheduler {
     }
   }
 
+  private reorderEditsBottomToTop(
+    requests: ToolCallRequestInfo[],
+  ): ToolCallRequestInfo[] {
+    const result = [...requests];
+
+    // Group replace calls by file path
+    const editGroups = new Map<
+      string,
+      Array<{ index: number; startLine: number }>
+    >();
+
+    for (let i = 0; i < requests.length; i++) {
+      const req = requests[i];
+      if (
+        req.name === EDIT_TOOL_NAME &&
+        req.args &&
+        typeof req.args === 'object'
+      ) {
+        const args = req.args;
+        const filePath = args['file_path'];
+        const startLine = args['start_line'];
+        if (typeof filePath === 'string' && typeof startLine === 'number') {
+          if (!editGroups.has(filePath)) {
+            editGroups.set(filePath, []);
+          }
+          editGroups.get(filePath)!.push({ index: i, startLine });
+        }
+      }
+    }
+
+    // For each file with multiple edits, reorder those specific slots to be bottom-to-top (descending start_line)
+    for (const [, edits] of editGroups.entries()) {
+      if (edits.length <= 1) continue;
+
+      // Sort original indices to know which slots to fill in the result array
+      const slots = edits.map((e) => e.index).sort((a, b) => a - b);
+
+      // Sort edits by startLine descending
+      const sortedEdits = [...edits].sort((a, b) => b.startLine - a.startLine);
+
+      // Place the sorted edits back into the original slots in the result array
+      for (let i = 0; i < slots.length; i++) {
+        result[slots[i]] = requests[sortedEdits[i].index];
+      }
+    }
+
+    return result;
+  }
+
   schedule(
     request: ToolCallRequestInfo | ToolCallRequestInfo[],
     signal: AbortSignal,
@@ -480,8 +530,11 @@ export class CoreToolScheduler {
           'Cannot schedule new tool calls while other tool calls are actively running (executing or awaiting approval).',
         );
       }
-      const requestsToProcess = Array.isArray(request) ? request : [request];
+      let requestsToProcess = Array.isArray(request) ? request : [request];
       this.completedToolCallsForBatch = [];
+
+      // Reorder 'replace' calls for the same file from bottom to top
+      requestsToProcess = this.reorderEditsBottomToTop(requestsToProcess);
 
       const newToolCalls: ToolCall[] = requestsToProcess.map(
         (reqInfo): ToolCall => {
