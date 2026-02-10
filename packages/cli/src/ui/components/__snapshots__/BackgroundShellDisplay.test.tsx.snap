@@ -54,3 +54,14 @@ exports[`<BackgroundShellDisplay /> > scrolls to active shell when list opens 1`
 │ ● 2. tail -f log.txt (PID: 1002)                                                                 │
 └──────────────────────────────────────────────────────────────────────────────────────────────────┘"
 `;
+
+exports[`<BackgroundShellDisplay /> > selects the current process and closes the list when Ctrl+L is pressed in list view 1`] = `
+"┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
+│  1: npm sta...  (PID: 1001) (Focused)             Close (Ctrl+B) | Kill (Ctrl+K) | List (Ctrl+L) │
+│                                                                                                  │
+│ Select Process (Enter to select, Ctrl+K to kill, Esc to cancel):                                 │
+│                                                                                                  │
+│ ● 1. npm start (PID: 1001)                                                                       │
+│   2. tail -f log.txt (PID: 1002)                                                                 │
+└──────────────────────────────────────────────────────────────────────────────────────────────────┘"
+`;

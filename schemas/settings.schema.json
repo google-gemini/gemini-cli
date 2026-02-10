@@ -42,6 +42,21 @@
           "default": false,
           "type": "boolean"
         },
+        "defaultApprovalMode": {
+          "title": "Default Approval Mode",
+          "description": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet.",
+          "markdownDescription": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `default`",
+          "default": "default",
+          "type": "string",
+          "enum": ["default", "auto_edit", "plan"]
+        },
+        "devtools": {
+          "title": "DevTools",
+          "description": "Enable DevTools inspector on launch.",
+          "markdownDescription": "Enable DevTools inspector on launch.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "enableAutoUpdate": {
           "title": "Enable Auto Update",
           "description": "Enable automatic updates.",
@@ -193,6 +208,14 @@
           "markdownDescription": "Hide the window title bar\n\n- Category: `UI`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
+        },
+        "inlineThinkingMode": {
+          "title": "Inline Thinking",
+          "description": "Display model thinking inline: off or full.",
+          "markdownDescription": "Display model thinking inline: off or full.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `off`",
+          "default": "off",
+          "type": "string",
+          "enum": ["off", "full"]
         },
         "showStatusInTitle": {
           "title": "Show Thoughts in Title",
@@ -1126,14 +1149,6 @@
           },
           "additionalProperties": false
         },
-        "approvalMode": {
-          "title": "Approval Mode",
-          "description": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet.",
-          "markdownDescription": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `default`",
-          "default": "default",
-          "type": "string",
-          "enum": ["default", "auto_edit", "plan"]
-        },
         "core": {
           "title": "Core Tools",
           "description": "Restrict the set of built-in tools with an allowlist. Match semantics mirror tools.allowed; see the built-in tools documentation for available names.",
@@ -1463,13 +1478,6 @@
           "title": "Extension Configuration",
           "description": "Enable requesting and fetching of extension settings.",
           "markdownDescription": "Enable requesting and fetching of extension settings.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
-          "default": true,
-          "type": "boolean"
-        },
-        "enableEventDrivenScheduler": {
-          "title": "Event Driven Scheduler",
-          "description": "Enables event-driven scheduler within the CLI session.",
-          "markdownDescription": "Enables event-driven scheduler within the CLI session.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
