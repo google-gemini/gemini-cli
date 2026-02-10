@@ -32,6 +32,9 @@ const mockSettings = {
     output: {
       verbosity: 'info',
     },
+    ui: {
+      enableCompactToolOutput: false,
+    },
   },
 };
 
@@ -97,6 +100,7 @@ describe('MainContent', () => {
   beforeEach(() => {
     vi.mocked(useAlternateBuffer).mockReturnValue(false);
     mockSettings.merged.output.verbosity = 'info';
+    mockSettings.merged.ui.enableCompactToolOutput = false;
   });
 
   afterEach(() => {

@@ -5,6 +5,7 @@
  */
 
 import { renderWithProviders } from '../../../test-utils/render.js';
+import { createMockSettings } from '../../../test-utils/settings.js';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { ToolGroupMessage } from './ToolGroupMessage.js';
 import { ToolCallStatus } from '../../types.js';
@@ -98,6 +99,11 @@ describe('ToolMessage Sticky Header Regression', () => {
       {
         width: terminalWidth,
         uiState: { terminalWidth },
+        settings: createMockSettings({
+          ui: {
+            enableCompactToolOutput: false,
+          },
+        }),
       },
     );
 
@@ -184,6 +190,11 @@ describe('ToolMessage Sticky Header Regression', () => {
       {
         width: terminalWidth,
         uiState: { terminalWidth },
+        settings: createMockSettings({
+          ui: {
+            enableCompactToolOutput: false,
+          },
+        }),
       },
     );
 

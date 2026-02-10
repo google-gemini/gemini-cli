@@ -26,9 +26,8 @@ AppHeader
 │ Line 18                                                                                      │
 │ Line 19                                                                                      │
 │ Line 20                                                                                      │
-│                                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
- ShowMoreLines
+ShowMoreLines
 "
 `;
 
@@ -54,7 +53,7 @@ AppHeader
 │ Line 19                                                                                    █ │
 │ Line 20                                                                                    █ │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
- ShowMoreLines
+ShowMoreLines
 "
 `;
 
@@ -79,7 +78,7 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Con
 │ Line 19                                                                                      │
 │ Line 20                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
- ShowMoreLines
+ShowMoreLines
 "
 `;
 
@@ -104,7 +103,7 @@ exports[`MainContent > MainContent Tool Output Height Logic > 'Normal mode - Unc
 │ Line 19                                                                                      │
 │ Line 20                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
- ShowMoreLines
+ShowMoreLines
 "
 `;
 

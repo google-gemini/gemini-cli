@@ -14,5 +14,6 @@ exports[`ToolConfirmationMessage Overflow > should display "press ctrl-o" hint w
 │   4. No, suggest changes (esc)                                           │
 │                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────╯
- Press ctrl-o to show more lines"
+ Press ctrl-o to show more lines
+"
 `;

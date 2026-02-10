@@ -11,6 +11,7 @@ import type {
   Config,
 } from '@google/gemini-cli-core';
 import { renderWithProviders } from '../../../test-utils/render.js';
+import { createMockSettings } from '../../../test-utils/settings.js';
 import { useToolActions } from '../../contexts/ToolActionsContext.js';
 import {
   StreamingState,
@@ -101,6 +102,11 @@ describe('ToolConfirmationMessage Overflow', () => {
           streamingState: StreamingState.WaitingForConfirmation,
           constrainHeight: true,
         },
+        settings: createMockSettings({
+          ui: {
+            enableCompactToolOutput: false,
+          },
+        }),
       },
     );
 

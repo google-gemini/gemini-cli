@@ -7,6 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { ToolGroupMessage } from './ToolGroupMessage.js';
 import { renderWithProviders } from '../../../test-utils/render.js';
+import { createMockSettings } from '../../../test-utils/settings.js';
 import {
   StreamingState,
   ToolCallStatus,
@@ -50,6 +51,11 @@ describe('ToolResultDisplay Overflow', () => {
           constrainHeight: true,
         },
         useAlternateBuffer: false,
+        settings: createMockSettings({
+          ui: {
+            enableCompactToolOutput: false,
+          },
+        }),
       },
     );
 
