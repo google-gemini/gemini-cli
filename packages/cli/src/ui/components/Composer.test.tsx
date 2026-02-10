@@ -459,7 +459,6 @@ describe('Composer', () => {
       const output = lastFrame();
       expect(output).toContain('ToastDisplay');
       expect(output).not.toContain('ApprovalModeIndicator');
-      // StatusDisplay should still be present now!
       expect(output).toContain('StatusDisplay');
     });
 
