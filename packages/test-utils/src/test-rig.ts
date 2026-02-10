@@ -368,11 +368,23 @@ export class TestRig {
     this.testDir = join(testFileDir, sanitizedName);
     this.homeDir = join(testFileDir, sanitizedName + '-home');
 
+    if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+      console.log(`[TestRig] Setting up test: ${testName}`);
+      console.log(`[TestRig] testDir: ${this.testDir}`);
+      console.log(`[TestRig] homeDir: ${this.homeDir}`);
+    }
+
     // Clean up existing directories from previous runs (e.g. retries)
     if (fs.existsSync(this.testDir)) {
+      if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+        console.log(`[TestRig] Cleaning up existing testDir: ${this.testDir}`);
+      }
       fs.rmSync(this.testDir, { recursive: true, force: true });
     }
     if (fs.existsSync(this.homeDir)) {
+      if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+        console.log(`[TestRig] Cleaning up existing homeDir: ${this.homeDir}`);
+      }
       fs.rmSync(this.homeDir, { recursive: true, force: true });
     }
 
@@ -1337,6 +1349,14 @@ export class TestRig {
     };
 
     const executable = command === 'node' ? process.execPath : command;
+    if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+      console.log(`[TestRig] Spawning PTY: ${executable}`);
+      console.log(`[TestRig] Args: ${JSON.stringify(commandArgs)}`);
+      // Only log keys to avoid leaking sensitive info
+      console.log(
+        `[TestRig] Env Keys: ${Object.keys(ptyOptions.env).join(', ')}`,
+      );
+    }
     const ptyProcess = pty.spawn(executable, commandArgs, ptyOptions);
 
     const run = new InteractiveRun(ptyProcess);
