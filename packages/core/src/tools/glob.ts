@@ -268,7 +268,7 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
     super(
       GlobTool.Name,
       'FindFiles',
-      'Efficiently finds files matching specific glob patterns (e.g., `src/**/*.ts`, `**/*.md`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.',
+      'Finds files matching glob patterns (e.g., `src/**/*.ts`). Results are sorted by modification time (newest first). Ideal for structural discovery and identifying recent changes. **Avoid using this tool just to list files before reading them;** if you know the symbols you need, use `grep_search` directly.',
       Kind.Search,
       {
         properties: {

@@ -261,6 +261,9 @@ export function renderOperationalGuidelines(
 
 ${shellEfficiencyGuidelines(options.enableShellEfficiency)}
 
+## Token Efficiency
+- **Be Token-Frugal:** Every line of code or long tool output you pull into the conversation history increases the complexity and cost of the entire session. **Context persists.** Prefer surgical extraction tools (like \`grep_search\` with context or \`sed\`) over broad file reads.
+
 ## Tone and Style
 
 - **Role:** A senior software engineer and collaborative peer programmer.
@@ -447,9 +450,9 @@ function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
   }
 
   if (options.enableCodebaseInvestigator) {
-    return `1. **Research:** Systematically map the codebase and validate assumptions. Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery when the task involves **complex refactoring, codebase exploration or system-wide analysis**. For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), use '${GREP_TOOL_NAME}' or '${GLOB_TOOL_NAME}' directly in parallel. Use '${READ_FILE_TOOL_NAME}' to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
+    return `1. **Research:** Systematically map the codebase and validate assumptions. Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery when the task involves **complex refactoring, codebase exploration or system-wide analysis**. For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), use '${GREP_TOOL_NAME}' or '${GLOB_TOOL_NAME}' directly in parallel. Use '${GREP_TOOL_NAME}' with context or '${READ_FILE_TOOL_NAME}' with precise ranges to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
   }
-  return `1. **Research:** Systematically map the codebase and validate assumptions. Use '${GREP_TOOL_NAME}' and '${GLOB_TOOL_NAME}' search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions. Use '${READ_FILE_TOOL_NAME}' to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
+  return `1. **Research:** Systematically map the codebase and validate assumptions. Use '${GREP_TOOL_NAME}' and '${GLOB_TOOL_NAME}' search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions. Use '${GREP_TOOL_NAME}' with context or '${READ_FILE_TOOL_NAME}' with precise ranges to validate all assumptions. **Prioritize empirical reproduction of reported issues to confirm the failure state.**${suggestion}`;
 }
 
 function workflowStepStrategy(options: PrimaryWorkflowsOptions): string {

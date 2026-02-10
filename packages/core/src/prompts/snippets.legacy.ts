@@ -315,7 +315,7 @@ export function renderFinalReminder(options?: FinalReminderOptions): string {
   if (!options) return '';
   return `
 # Final Reminder
-Your core function is efficient and safe assistance. Balance extreme conciseness with the crucial need for clarity, especially regarding safety and potential system modifications. Always prioritize user control and project conventions. Never make assumptions about the contents of files; instead use '${options.readFileToolName}' to ensure you aren't making broad assumptions. Finally, you are an agent - please keep going until the user's query is completely resolved.`.trim();
+Your core function is efficient and safe assistance. Balance extreme conciseness with the crucial need for clarity, especially regarding safety and potential system modifications. Always prioritize user control and project conventions. Never make assumptions about the contents of files; instead use appropriate search and extraction tools to ensure you aren't making broad assumptions. Finally, you are an agent - please keep going until the user's query is completely resolved.`.trim();
 }
 
 export function renderUserMemory(memory?: string): string {
@@ -417,10 +417,10 @@ function mandateContinueWork(interactive: boolean): string {
 
 function workflowStepUnderstand(options: PrimaryWorkflowsOptions): string {
   if (options.enableCodebaseInvestigator) {
-    return `1. **Understand & Strategize:** Think about the user's request and the relevant codebase context. When the task involves **complex refactoring, codebase exploration or system-wide analysis**, your **first and primary action** must be to delegate to the 'codebase_investigator' agent using the 'codebase_investigator' tool. Use it to build a comprehensive understanding of the code, its structure, and dependencies. For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), you should use '${GREP_TOOL_NAME}' or '${GLOB_TOOL_NAME}' directly.`;
+    return `1. **Understand & Strategize:** Think about the user's request and the relevant codebase context. When the task involves **complex refactoring, codebase exploration or system-wide analysis**, your **first and primary action** must be to delegate to the 'codebase_investigator' agent using the 'codebase_investigator' tool. Use it to build a comprehensive understanding of the code, its structure, and dependencies. For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), you should use '${GREP_TOOL_NAME}' or '${GLOB_TOOL_NAME}' directly. Use '${GREP_TOOL_NAME}' with context or '${READ_FILE_TOOL_NAME}' with precise ranges to validate any assumptions you may have.`;
   }
   return `1. **Understand:** Think about the user's request and the relevant codebase context. Use '${GREP_TOOL_NAME}' and '${GLOB_TOOL_NAME}' search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions.
-Use '${READ_FILE_TOOL_NAME}' to understand context and validate any assumptions you may have. If you need to read multiple files, you should make multiple parallel calls to '${READ_FILE_TOOL_NAME}'.`;
+Use '${GREP_TOOL_NAME}' with context or '${READ_FILE_TOOL_NAME}' with precise ranges to understand context and validate any assumptions you may have. If you need to read multiple files, you should make multiple parallel calls to these tools.`;
 }
 
 function workflowStepPlan(options: PrimaryWorkflowsOptions): string {

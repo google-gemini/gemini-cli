@@ -95,7 +95,7 @@ describe('ReadFileTool', () => {
       expect(schema.description).toContain('limit');
     });
 
-    it('should NOT include pagination parameters for Gemini 3', () => {
+    it('should include line range parameters for Gemini 3', () => {
       vi.mocked(tool['config'].getActiveModel).mockReturnValue(
         'gemini-3-pro-preview',
       );
@@ -105,9 +105,11 @@ describe('ReadFileTool', () => {
           properties: Record<string, unknown>;
         }
       ).properties;
+      expect(properties).toHaveProperty('start_line');
+      expect(properties).toHaveProperty('end_line');
       expect(properties).not.toHaveProperty('offset');
       expect(properties).not.toHaveProperty('limit');
-      expect(schema.description).toContain('grep');
+      expect(schema.description).toContain('grep_search');
       expect(schema.description).toContain('sed');
     });
   });
@@ -182,6 +184,33 @@ describe('ReadFileTool', () => {
       };
       expect(() => tool.build(params)).toThrow(
         'Limit must be a positive number',
+      );
+    });
+
+    it('should throw error if start_line is less than 1', () => {
+      const params: ReadFileToolParams = {
+        file_path: path.join(tempRootDir, 'test.txt'),
+        start_line: 0,
+      };
+      expect(() => tool.build(params)).toThrow('start_line must be at least 1');
+    });
+
+    it('should throw error if end_line is less than 1', () => {
+      const params: ReadFileToolParams = {
+        file_path: path.join(tempRootDir, 'test.txt'),
+        end_line: 0,
+      };
+      expect(() => tool.build(params)).toThrow('end_line must be at least 1');
+    });
+
+    it('should throw error if start_line is greater than end_line', () => {
+      const params: ReadFileToolParams = {
+        file_path: path.join(tempRootDir, 'test.txt'),
+        start_line: 10,
+        end_line: 5,
+      };
+      expect(() => tool.build(params)).toThrow(
+        'start_line cannot be greater than end_line',
       );
     });
   });
@@ -456,6 +485,31 @@ describe('ReadFileTool', () => {
       );
     });
 
+    it('should support start_line and end_line for text files', async () => {
+      const filePath = path.join(tempRootDir, 'lines.txt');
+      const lines = Array.from({ length: 20 }, (_, i) => `Line ${i + 1}`);
+      const fileContent = lines.join('\n');
+      await fsp.writeFile(filePath, fileContent, 'utf-8');
+
+      const params: ReadFileToolParams = {
+        file_path: filePath,
+        start_line: 5,
+        end_line: 10,
+      };
+      const invocation = tool.build(params);
+
+      const result = await invocation.execute(abortSignal);
+      expect(result.llmContent).toContain(
+        'IMPORTANT: The file content has been truncated',
+      );
+      expect(result.llmContent).toContain(
+        'Status: Showing lines 5-10 of 20 total lines',
+      );
+      expect(result.llmContent).toContain('Line 5');
+      expect(result.llmContent).toContain('Line 10');
+      expect(result.returnDisplay).toBe('Read lines 5-10 of 20 from lines.txt');
+    });
+
     it('should use first-2000-lines truncation and shell-tool guidance for Gemini 3', async () => {
       vi.mocked(tool['config'].getActiveModel).mockReturnValue(
         'gemini-3-pro-preview',
@@ -472,7 +526,7 @@ describe('ReadFileTool', () => {
       const invocation = tool.build(params);
 
       const result = await invocation.execute(abortSignal);
-      expect(result.llmContent).toContain('Showing the first 2000 lines');
+      expect(result.llmContent).toContain('Showing lines 1-2000');
       expect(result.llmContent).toContain("use the 'grep_search' tool");
       expect(result.llmContent).toContain('Line 1');
       expect(result.llmContent).not.toContain('Line 2001');

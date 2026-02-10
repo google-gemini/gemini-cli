@@ -463,16 +463,19 @@ function getShellToolDescription(enableInteractiveShell: boolean): string {
       Background PIDs: Only included if background processes were started.
       Process Group PGID: Only included if available.`;
 
+  const efficiencyGuidance =
+    "Output is limited to the last 2,000 lines. **This is the preferred tool for surgical extraction of code blocks.** Use `sed -n '50,100p' file` for ranges, or `sed -n '/class X/,/^}/p' file` for semantic blocks. Avoid 'cat' on large files to prevent context bloat.";
+
   if (os.platform() === 'win32') {
     const backgroundInstructions = enableInteractiveShell
       ? 'To run a command in the background, set the `is_background` parameter to true. Do NOT use PowerShell background constructs.'
       : 'Command can start background processes using PowerShell constructs such as `Start-Process -NoNewWindow` or `Start-Job`.';
-    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. ${backgroundInstructions}${returnedInfo}`;
+    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. ${backgroundInstructions} ${efficiencyGuidance}${returnedInfo}`;
   } else {
     const backgroundInstructions = enableInteractiveShell
       ? 'To run a command in the background, set the `is_background` parameter to true. Do NOT use `&` to background commands.'
       : 'Command can start background processes using `&`.';
-    return `This tool executes a given shell command as \`bash -c <command>\`. ${backgroundInstructions} Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${returnedInfo}`;
+    return `This tool executes a given shell command as \`bash -c <command>\`. ${backgroundInstructions} Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`. ${efficiencyGuidance}${returnedInfo}`;
   }
 }
 

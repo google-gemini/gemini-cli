@@ -37,7 +37,7 @@ export interface ReadFileToolParams {
   file_path: string;
 
   /**
-   * The line number to start reading from (optional)
+   * The line number to start reading from (optional, 0-based)
    */
   offset?: number;
 
@@ -45,6 +45,16 @@ export interface ReadFileToolParams {
    * The number of lines to read (optional)
    */
   limit?: number;
+
+  /**
+   * The line number to start reading from (optional, 1-based)
+   */
+  start_line?: number;
+
+  /**
+   * The line number to end reading at (optional, 1-based, inclusive)
+   */
+  end_line?: number;
 }
 
 class ReadFileToolInvocation extends BaseToolInvocation<
@@ -75,7 +85,12 @@ class ReadFileToolInvocation extends BaseToolInvocation<
   }
 
   override toolLocations(): ToolLocation[] {
-    return [{ path: this.resolvedPath, line: this.params.offset }];
+    return [
+      {
+        path: this.resolvedPath,
+        line: this.params.start_line ?? this.params.offset,
+      },
+    ];
   }
 
   async execute(): Promise<ToolResult> {
@@ -102,6 +117,8 @@ class ReadFileToolInvocation extends BaseToolInvocation<
       this.config.getFileSystemService(),
       isGemini3 ? undefined : this.params.offset,
       isGemini3 ? undefined : this.params.limit,
+      this.params.start_line,
+      this.params.end_line,
     );
 
     if (result.error) {
@@ -117,21 +134,21 @@ class ReadFileToolInvocation extends BaseToolInvocation<
 
     let llmContent: PartUnion;
     if (result.isTruncated) {
+      const [start, end] = result.linesShown!;
+      const total = result.originalLineCount!;
+
       if (isGemini3) {
-        const total = result.originalLineCount!;
         llmContent = `
 IMPORTANT: The file content has been truncated.
-Status: Showing the first 2000 lines of ${total} total lines.
+Status: Showing lines ${start}-${end} of ${total} total lines.
 Action: 
 - To find specific patterns, use the 'grep_search' tool.
-- To read a specific line range, use 'run_shell_command' with 'sed'. For example: 'sed -n "500,600p" ${this.params.file_path}'.
+- For surgical extraction of code blocks (especially ranges larger than 2,000 lines), prefer 'run_shell_command' with 'sed'. For example: 'sed -n "500,600p" ${this.params.file_path}'.
 - You can also use other Unix utilities like 'awk', 'head', or 'tail' via 'run_shell_command'.
 
 --- FILE CONTENT (truncated) ---
 ${result.llmContent}`;
       } else {
-        const [start, end] = result.linesShown!;
-        const total = result.originalLineCount!;
         const nextOffset = this.params.offset
           ? this.params.offset + end - start + 1
           : end;
@@ -236,7 +253,17 @@ export class ReadFileTool extends BaseDeclarativeTool<
       },
     };
 
-    if (!isGemini3) {
+    if (isGemini3) {
+      properties['start_line'] = {
+        description: 'Optional: The 1-based line number to start reading from.',
+        type: 'number',
+      };
+      properties['end_line'] = {
+        description:
+          'Optional: The 1-based line number to end reading at (inclusive).',
+        type: 'number',
+      };
+    } else {
       properties['offset'] = {
         description:
           "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
@@ -252,8 +279,8 @@ export class ReadFileTool extends BaseDeclarativeTool<
     return {
       name: this.name,
       description: isGemini3
-        ? `Reads and returns the content of a specified file. If the file is large (exceeding 2000 lines), the content will be truncated to the first 2000 lines. The tool's response will clearly indicate if truncation has occurred. To examine specific sections of large files, use the 'run_shell_command' tool with standard Unix utilities like 'grep', 'sed', 'awk', 'head', or 'tail'. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files.`
-        : `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files. For text files, it can read specific line ranges.`,
+        ? `Reads a specific range of a file (up to 2,000 lines). **Important:** For high token efficiency, avoid reading large files in their entirety. Use 'grep_search' to find symbols or 'run_shell_command' with 'sed' for surgical block extraction instead of broad file reads. Handles text, images, audio, and PDF files.`
+        : `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images, audio, and PDF files. For text files, it can read specific line ranges.`,
       parametersJsonSchema: {
         properties,
         required: ['file_path'],
@@ -284,6 +311,19 @@ export class ReadFileTool extends BaseDeclarativeTool<
     }
     if (params.limit !== undefined && params.limit <= 0) {
       return 'Limit must be a positive number';
+    }
+    if (params.start_line !== undefined && params.start_line < 1) {
+      return 'start_line must be at least 1';
+    }
+    if (params.end_line !== undefined && params.end_line < 1) {
+      return 'end_line must be at least 1';
+    }
+    if (
+      params.start_line !== undefined &&
+      params.end_line !== undefined &&
+      params.start_line > params.end_line
+    ) {
+      return 'start_line cannot be greater than end_line';
     }
 
     const fileFilteringOptions = this.config.getFileFilteringOptions();
