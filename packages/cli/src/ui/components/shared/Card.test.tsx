@@ -7,10 +7,14 @@
 import { render } from '../../../test-utils/render.js';
 import { Card } from './Card.js';
 import { Text } from 'ink';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { ToolCallStatus } from '../../types.js';
 
 describe('Card', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it.each([
     {
       status: ToolCallStatus.Pending,
@@ -47,11 +51,25 @@ describe('Card', () => {
       prefix: true,
       body: 'Listed 39 item(s).',
     },
+    {
+      status: ToolCallStatus.Pending,
+      title: 'Fixed Width Card',
+      suffix: undefined,
+      prefix: true,
+      width: 40,
+      body: 'This card has a fixed width of 40 characters.',
+    },
   ] as const)(
-    'renders a $status card with prefix=$prefix',
-    ({ status, title, suffix, prefix, body }) => {
+    "renders '$title' card with status=$status and prefix=$prefix",
+    ({ status, title, suffix, prefix, body, width }) => {
       const { lastFrame } = render(
-        <Card status={status} title={title} suffix={suffix} prefix={prefix}>
+        <Card
+          status={status}
+          title={title}
+          suffix={suffix}
+          prefix={prefix}
+          width={width}
+        >
           <Text>{body}</Text>
         </Card>,
       );
