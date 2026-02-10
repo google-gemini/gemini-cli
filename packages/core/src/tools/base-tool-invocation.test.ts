@@ -5,7 +5,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { BaseToolInvocation, type ToolResult } from './tools.js';
+import {
+  BaseToolInvocation,
+  type ToolResult,
+  ToolConfirmationOutcome,
+} from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import {
   type Message,
@@ -131,5 +135,20 @@ describe('BaseToolInvocation', () => {
     } catch {
       // ignore abort error
     }
+  });
+
+  it('should publish ALLOW_SESSION_REDIRECTION message when outcome is ProceedAlwaysRedirection', async () => {
+    const tool = new TestBaseToolInvocation({}, messageBus, 'test-tool');
+
+    // Access protected method for testing
+    await (
+      tool as unknown as {
+        publishPolicyUpdate(outcome: ToolConfirmationOutcome): Promise<void>;
+      }
+    ).publishPolicyUpdate(ToolConfirmationOutcome.ProceedAlwaysRedirection);
+
+    expect(messageBus.publish).toHaveBeenCalledWith({
+      type: MessageBusType.ALLOW_SESSION_REDIRECTION,
+    });
   });
 });
