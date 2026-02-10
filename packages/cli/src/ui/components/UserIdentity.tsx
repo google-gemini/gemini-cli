@@ -37,25 +37,26 @@ export const UserIdentity: React.FC<UserIdentityProps> = ({ config }) => {
   }
 
   return (
-    <Box marginTop={1} flexDirection="column">
+    <Box flexDirection="column">
+      {/* User Email /auth */}
       <Box>
         <Text color={theme.text.primary}>
           {authType === AuthType.LOGIN_WITH_GOOGLE ? (
-            <Text>
-              <Text bold>Logged in with Google{email ? ':' : ''}</Text>
-              {email ? ` ${email}` : ''}
-            </Text>
+            <Text>{email ?? 'Logged in with Google'}</Text>
           ) : (
             `Authenticated with ${authType}`
           )}
         </Text>
         <Text color={theme.text.secondary}> /auth</Text>
       </Box>
-      {tierName && (
+
+      {/* Tier Name /upgrade */}
+      <Box>
         <Text color={theme.text.primary}>
-          <Text bold>Plan:</Text> {tierName}
+          {tierName ?? 'Gemini Code Assist for individuals'}
         </Text>
-      )}
+        <Text color={theme.text.secondary}> /upgrade</Text>
+      </Box>
     </Box>
   );
 };
