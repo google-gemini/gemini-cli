@@ -179,6 +179,15 @@ const SETTINGS_SCHEMA = {
         description: 'Enable Vim keybindings',
         showInDialog: true,
       },
+      devtools: {
+        type: 'boolean',
+        label: 'DevTools',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        description: 'Enable DevTools inspector on launch.',
+        showInDialog: false,
+      },
       enableAutoUpdate: {
         type: 'boolean',
         label: 'Enable Auto Update',
@@ -1512,15 +1521,6 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: true,
         description: 'Enable requesting and fetching of extension settings.',
-        showInDialog: false,
-      },
-      enableEventDrivenScheduler: {
-        type: 'boolean',
-        label: 'Event Driven Scheduler',
-        category: 'Experimental',
-        requiresRestart: true,
-        default: true,
-        description: 'Enables event-driven scheduler within the CLI session.',
         showInDialog: false,
       },
       extensionReloading: {

@@ -117,6 +117,7 @@ export class CoderAgentExecutor implements AgentExecutor {
     const agentSettings = persistedState._agentSettings;
     const config = await this.getConfig(agentSettings, sdkTask.id);
     const contextId: string =
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       (metadata['_contextId'] as string) || sdkTask.contextId;
     const runtimeTask = await Task.create(
       sdkTask.id,
@@ -140,6 +141,7 @@ export class CoderAgentExecutor implements AgentExecutor {
     agentSettingsInput?: AgentSettings,
     eventBus?: ExecutionEventBus,
   ): Promise<TaskWrapper> {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const agentSettings = agentSettingsInput || ({} as AgentSettings);
     const config = await this.getConfig(agentSettings, taskId);
     const runtimeTask = await Task.create(
@@ -290,6 +292,7 @@ export class CoderAgentExecutor implements AgentExecutor {
     const contextId: string =
       userMessage.contextId ||
       sdkTask?.contextId ||
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       (sdkTask?.metadata?.['_contextId'] as string) ||
       uuidv4();
 
@@ -385,6 +388,7 @@ export class CoderAgentExecutor implements AgentExecutor {
       }
     } else {
       logger.info(`[CoderAgentExecutor] Creating new task ${taskId}.`);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const agentSettings = userMessage.metadata?.[
         'coderAgent'
       ] as AgentSettings;

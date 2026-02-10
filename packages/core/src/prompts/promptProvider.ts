@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -11,6 +11,7 @@ import type { Config } from '../config/config.js';
 import { GEMINI_DIR } from '../utils/paths.js';
 import { ApprovalMode } from '../policy/types.js';
 import * as snippets from './snippets.js';
+import * as legacySnippets from './snippets.legacy.js';
 import {
   resolvePathFromEnv,
   applySubstitutions,
@@ -27,6 +28,7 @@ import {
 } from '../tools/tool-names.js';
 import { resolveModel, isPreviewModel } from '../config/models.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
+import { getAllGeminiMdFilenames } from '../tools/memoryTool.js';
 
 /**
  * Orchestrates prompt generation by gathering context and building options.
@@ -54,6 +56,8 @@ export class PromptProvider {
 
     const desiredModel = resolveModel(config.getActiveModel());
     const isGemini3 = isPreviewModel(desiredModel);
+    const activeSnippets = isGemini3 ? snippets : legacySnippets;
+    const contextFilenames = getAllGeminiMdFilenames();
 
     // --- Context Gathering ---
     let planModeToolsList = PLAN_MODE_TOOLS.filter((t) =>
@@ -89,14 +93,19 @@ export class PromptProvider {
         throw new Error(`missing system prompt file '${systemMdPath}'`);
       }
       basePrompt = fs.readFileSync(systemMdPath, 'utf8');
-      const skillsPrompt = snippets.renderAgentSkills(
+      const skillsPrompt = activeSnippets.renderAgentSkills(
         skills.map((s) => ({
           name: s.name,
           description: s.description,
           location: s.location,
         })),
       );
-      basePrompt = applySubstitutions(basePrompt, config, skillsPrompt);
+      basePrompt = applySubstitutions(
+        basePrompt,
+        config,
+        skillsPrompt,
+        isGemini3,
+      );
     } else {
       // --- Standard Composition ---
       const options: snippets.SystemPromptOptions = {
@@ -107,9 +116,16 @@ export class PromptProvider {
           interactive: interactiveMode,
           isGemini3,
           hasSkills: skills.length > 0,
+          contextFilenames,
         })),
-        agentContexts: this.withSection('agentContexts', () =>
-          config.getAgentRegistry().getDirectoryContext(),
+        subAgents: this.withSection('agentContexts', () =>
+          config
+            .getAgentRegistry()
+            .getAllDefinitions()
+            .map((d) => ({
+              name: d.displayName || d.name,
+              description: d.description,
+            })),
         ),
         agentSkills: this.withSection(
           'agentSkills',
@@ -154,6 +170,7 @@ export class PromptProvider {
             interactive: interactiveMode,
             isGemini3,
             enableShellEfficiency: config.getEnableShellOutputEfficiency(),
+            interactiveShellEnabled: config.isInteractiveShellEnabled(),
           }),
         ),
         sandbox: this.withSection('sandbox', () => getSandboxMode()),
@@ -162,16 +179,26 @@ export class PromptProvider {
           () => ({ interactive: interactiveMode }),
           isGitRepository(process.cwd()) ? true : false,
         ),
-        finalReminder: this.withSection('finalReminder', () => ({
-          readFileToolName: READ_FILE_TOOL_NAME,
-        })),
-      };
+        finalReminder: isGemini3
+          ? undefined
+          : this.withSection('finalReminder', () => ({
+              readFileToolName: READ_FILE_TOOL_NAME,
+            })),
+      } as snippets.SystemPromptOptions;
 
-      basePrompt = snippets.getCoreSystemPrompt(options);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const getCoreSystemPrompt = activeSnippets.getCoreSystemPrompt as (
+        options: snippets.SystemPromptOptions,
+      ) => string;
+      basePrompt = getCoreSystemPrompt(options);
     }
 
     // --- Finalization (Shell) ---
-    const finalPrompt = snippets.renderFinalShell(basePrompt, userMemory);
+    const finalPrompt = activeSnippets.renderFinalShell(
+      basePrompt,
+      userMemory,
+      contextFilenames,
+    );
 
     // Sanitize erratic newlines from composition
     const sanitizedPrompt = finalPrompt.replace(/\n{3,}/g, '\n\n');
@@ -186,8 +213,11 @@ export class PromptProvider {
     return sanitizedPrompt;
   }
 
-  getCompressionPrompt(): string {
-    return snippets.getCompressionPrompt();
+  getCompressionPrompt(config: Config): string {
+    const desiredModel = resolveModel(config.getActiveModel());
+    const isGemini3 = isPreviewModel(desiredModel);
+    const activeSnippets = isGemini3 ? snippets : legacySnippets;
+    return activeSnippets.getCompressionPrompt();
   }
 
   private withSection<T>(

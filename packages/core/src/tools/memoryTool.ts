@@ -11,7 +11,6 @@ import {
   Kind,
   ToolConfirmationOutcome,
 } from './tools.js';
-import type { FunctionDeclaration } from '@google/genai';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { Storage } from '../config/storage.js';
@@ -26,41 +25,14 @@ import { ToolErrorType } from './tool-error.js';
 import { MEMORY_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
-const memoryToolSchemaData: FunctionDeclaration = {
-  name: MEMORY_TOOL_NAME,
-  description:
-    'Saves a specific piece of information, fact, or user preference to your long-term memory. Use this when the user explicitly asks you to remember something, or when they state a clear, concise fact or preference that seems important to retain for future interactions. Examples: "Always lint after building", "Never run sudo commands", "Remember my address".',
-  parametersJsonSchema: {
-    type: 'object',
-    properties: {
-      fact: {
-        type: 'string',
-        description:
-          'The specific fact or piece of information to remember. Should be a clear, self-contained statement.',
-      },
-    },
-    required: ['fact'],
-    additionalProperties: false,
-  },
-};
-
 const memoryToolDescription = `
-Saves a specific piece of information or fact to your long-term memory.
+Saves concise global user context (preferences, facts) for use across ALL workspaces.
 
-Use this tool:
+### CRITICAL: GLOBAL CONTEXT ONLY
+NEVER save workspace-specific context, local paths, or commands (e.g. "The entry point is src/index.js", "The test command is npm test"). These are local to the current workspace and must NOT be saved globally. EXCLUSIVELY for context relevant across ALL workspaces.
 
-- When the user explicitly asks you to remember something (e.g., "Remember that I like pineapple on pizza", "Please save this: my cat's name is Whiskers").
-- When the user states a clear, concise fact about themselves, their preferences, or their environment that seems important for you to retain for future interactions to provide a more personalized and effective assistance.
-
-Do NOT use this tool:
-
-- To remember conversational context that is only relevant for the current session.
-- To save long, complex, or rambling pieces of text. The fact should be relatively short and to the point.
-- If you are unsure whether the information is a fact worth remembering long-term. If in doubt, you can ask the user, "Should I remember that for you?"
-
-## Parameters
-
-- \`fact\` (string, required): The specific fact or piece of information to remember. This should be a clear, self-contained statement. For example, if the user says "My favorite color is blue", the fact would be "My favorite color is blue".`;
+- Use for "Remember X" or clear personal facts.
+- Do NOT use for session context.`;
 
 export const DEFAULT_CONTEXT_FILENAME = 'GEMINI.md';
 export const MEMORY_SECTION_HEADER = '## Gemini Added Memories';
@@ -122,6 +94,7 @@ async function readMemoryFileContent(): Promise<string> {
   try {
     return await fs.readFile(getGlobalMemoryFilePath(), 'utf-8');
   } catch (err) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const error = err as Error & { code?: string };
     if (!(error instanceof Error) || error.code !== 'ENOENT') throw err;
     return '';
@@ -313,9 +286,21 @@ export class MemoryTool
     super(
       MemoryTool.Name,
       'SaveMemory',
-      memoryToolDescription,
+      memoryToolDescription +
+        ' Examples: "Always lint after building", "Never run sudo commands", "Remember my address".',
       Kind.Think,
-      memoryToolSchemaData.parametersJsonSchema as Record<string, unknown>,
+      {
+        type: 'object',
+        properties: {
+          fact: {
+            type: 'string',
+            description:
+              'The specific fact or piece of information to remember. Should be a clear, self-contained statement.',
+          },
+        },
+        required: ['fact'],
+        additionalProperties: false,
+      },
       messageBus,
       true,
       false,

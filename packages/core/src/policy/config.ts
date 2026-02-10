@@ -397,6 +397,7 @@ export function createPolicyUpdater(
               const fileContent = await fs.readFile(policyFile, 'utf-8');
               existingData = toml.parse(fileContent) as { rule?: TomlRule[] };
             } catch (error) {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
                 debugLogger.warn(
                   `Failed to parse ${policyFile}, overwriting with new policy.`,
@@ -440,6 +441,7 @@ export function createPolicyUpdater(
 
             // Serialize back to TOML
             // @iarna/toml stringify might not produce beautiful output but it handles escaping correctly
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             const newContent = toml.stringify(existingData as toml.JsonMap);
 
             // Atomic write: write to a unique tmp file then rename to the target file.

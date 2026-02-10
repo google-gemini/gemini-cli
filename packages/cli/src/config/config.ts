@@ -35,6 +35,7 @@ import {
   coreEvents,
   GEMINI_MODEL_ALIAS_AUTO,
   getAdminErrorMessage,
+  isHeadlessMode,
   Config,
   applyAdminAllowlist,
   getAdminBlockedMcpServersMessage,
@@ -280,6 +281,7 @@ export async function parseArguments(
     .check((argv) => {
       // The 'query' positional can be a string (for one arg) or string[] (for multiple).
       // This guard safely checks if any positional argument was provided.
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const query = argv['query'] as string | string[] | undefined;
       const hasPositionalQuery = Array.isArray(query)
         ? query.length > 0
@@ -297,6 +299,7 @@ export async function parseArguments(
       if (
         argv['outputFormat'] &&
         !['text', 'json', 'stream-json'].includes(
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           argv['outputFormat'] as string,
         )
       ) {
@@ -345,6 +348,7 @@ export async function parseArguments(
   }
 
   // Normalize query args: handle both quoted "@path file" and unquoted @path file
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const queryArg = (result as { query?: string | string[] | undefined }).query;
   const q: string | undefined = Array.isArray(queryArg)
     ? queryArg.join(' ')
@@ -352,7 +356,7 @@ export async function parseArguments(
 
   // -p/--prompt forces non-interactive mode; positional args default to interactive in TTY
   if (q && !result['prompt']) {
-    if (process.stdin.isTTY) {
+    if (!isHeadlessMode()) {
       startupMessages.push(
         'Positional arguments now default to interactive mode. To run in non-interactive mode, use the --prompt (-p) flag.',
       );
@@ -368,6 +372,7 @@ export async function parseArguments(
 
   // The import format is now only controlled by settings.memoryImportFormat
   // We no longer accept it as a CLI argument
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return result as unknown as CliArgs;
 }
 
@@ -436,7 +441,11 @@ export async function loadCliConfig(
 
   const ideMode = settings.ide?.enabled ?? false;
 
-  const folderTrust = settings.security?.folderTrust?.enabled ?? false;
+  const folderTrust =
+    process.env['GEMINI_CLI_INTEGRATION_TEST'] === 'true' ||
+    process.env['VITEST'] === 'true'
+      ? false
+      : (settings.security?.folderTrust?.enabled ?? false);
   const trustedFolder = isWorkspaceTrusted(settings, cwd)?.isTrusted ?? false;
 
   // Set the context filename in the server's memoryTool module BEFORE loading memory
@@ -472,6 +481,7 @@ export async function loadCliConfig(
     requestSetting: promptForSetting,
     workspaceDir: cwd,
     enabledExtensionOverrides: argv.extensions,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     eventEmitter: coreEvents as EventEmitter<ExtensionEvents>,
     clientVersion: await getVersion(),
   });
@@ -575,6 +585,7 @@ export async function loadCliConfig(
   let telemetrySettings;
   try {
     telemetrySettings = await resolveTelemetrySettings({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       env: process.env as unknown as Record<string, string | undefined>,
       settings: settings.telemetry,
     });
@@ -592,7 +603,9 @@ export async function loadCliConfig(
   const interactive =
     !!argv.promptInteractive ||
     !!argv.experimentalAcp ||
-    (process.stdin.isTTY && !argv.query && !argv.prompt && !argv.isCommand);
+    (!isHeadlessMode({ prompt: argv.prompt }) &&
+      !argv.query &&
+      !argv.isCommand);
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
   const allowedToolsSet = new Set(allowedTools);
@@ -777,8 +790,7 @@ export async function loadCliConfig(
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.experimental?.plan,
-    enableEventDrivenScheduler:
-      settings.experimental?.enableEventDrivenScheduler,
+    enableEventDrivenScheduler: true,
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
@@ -803,6 +815,7 @@ export async function loadCliConfig(
     eventEmitter: coreEvents,
     useWriteTodos: argv.useWriteTodos ?? settings.useWriteTodos,
     output: {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
     fakeResponses: argv.fakeResponses,

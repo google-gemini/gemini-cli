@@ -316,10 +316,14 @@ describe('Server Config (config.ts)', () => {
         '../tools/mcp-client-manager.js'
       );
       let mcpStarted = false;
+      let resolveMcp: (value: unknown) => void;
+      const mcpPromise = new Promise((resolve) => {
+        resolveMcp = resolve;
+      });
 
       (McpClientManager as unknown as Mock).mockImplementation(() => ({
         startConfiguredMcpServers: vi.fn().mockImplementation(async () => {
-          await new Promise((resolve) => setTimeout(resolve, 50));
+          await mcpPromise;
           mcpStarted = true;
         }),
         getMcpInstructions: vi.fn(),
@@ -330,8 +334,9 @@ describe('Server Config (config.ts)', () => {
       // Should return immediately, before MCP finishes
       expect(mcpStarted).toBe(false);
 
-      // Wait for it to eventually finish to avoid open handles
-      await new Promise((resolve) => setTimeout(resolve, 60));
+      // Now let it finish
+      resolveMcp!(undefined);
+      await new Promise((resolve) => setTimeout(resolve, 0));
       expect(mcpStarted).toBe(true);
     });
 
@@ -2333,10 +2338,11 @@ describe('syncPlanModeTools', () => {
     expect(registeredTool).toBeInstanceOf(ExitPlanModeTool);
   });
 
-  it('should register EnterPlanModeTool and unregister ExitPlanModeTool when NOT in PLAN mode', async () => {
+  it('should register EnterPlanModeTool and unregister ExitPlanModeTool when NOT in PLAN mode and experimental.plan is enabled', async () => {
     const config = new Config({
       ...baseParams,
       approvalMode: ApprovalMode.DEFAULT,
+      plan: true,
     });
     const registry = new ToolRegistry(config, config.getMessageBus());
     vi.spyOn(config, 'getToolRegistry').mockReturnValue(registry);
@@ -2358,6 +2364,27 @@ describe('syncPlanModeTools', () => {
     const registeredTool = registerSpy.mock.calls[0][0];
     const { EnterPlanModeTool } = await import('../tools/enter-plan-mode.js');
     expect(registeredTool).toBeInstanceOf(EnterPlanModeTool);
+  });
+
+  it('should NOT register EnterPlanModeTool when experimental.plan is disabled', async () => {
+    const config = new Config({
+      ...baseParams,
+      approvalMode: ApprovalMode.DEFAULT,
+      plan: false,
+    });
+    const registry = new ToolRegistry(config, config.getMessageBus());
+    vi.spyOn(config, 'getToolRegistry').mockReturnValue(registry);
+
+    const registerSpy = vi.spyOn(registry, 'registerTool');
+    vi.spyOn(registry, 'getTool').mockReturnValue(undefined);
+
+    config.syncPlanModeTools();
+
+    const { EnterPlanModeTool } = await import('../tools/enter-plan-mode.js');
+    const registeredTool = registerSpy.mock.calls.find(
+      (call) => call[0] instanceof EnterPlanModeTool,
+    );
+    expect(registeredTool).toBeUndefined();
   });
 
   it('should call geminiClient.setTools if initialized', async () => {

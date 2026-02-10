@@ -234,6 +234,7 @@ export async function loadPoliciesFromToml(
         .filter((entry) => entry.isFile() && entry.name.endsWith('.toml'))
         .map((entry) => entry.name);
     } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const error = e as NodeJS.ErrnoException;
       if (error.code === 'ENOENT') {
         // Directory doesn't exist, skip it (not an error)
@@ -262,6 +263,7 @@ export async function loadPoliciesFromToml(
         try {
           parsed = toml.parse(fileContent);
         } catch (e) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           const error = e as Error;
           errors.push({
             filePath,
@@ -356,6 +358,7 @@ export async function loadPoliciesFromToml(
                   try {
                     new RegExp(argsPattern);
                   } catch (e) {
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                     const error = e as Error;
                     errors.push({
                       filePath,
@@ -426,6 +429,7 @@ export async function loadPoliciesFromToml(
                 const safetyCheckerRule: SafetyCheckerRule = {
                   toolName: effectiveToolName,
                   priority: checker.priority,
+                  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                   checker: checker.checker as SafetyCheckerConfig,
                   modes: checker.modes,
                 };
@@ -434,6 +438,7 @@ export async function loadPoliciesFromToml(
                   try {
                     new RegExp(argsPattern);
                   } catch (e) {
+                    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                     const error = e as Error;
                     errors.push({
                       filePath,
@@ -470,6 +475,7 @@ export async function loadPoliciesFromToml(
 
         checkers.push(...parsedCheckers);
       } catch (e) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const error = e as NodeJS.ErrnoException;
         // Catch-all for unexpected errors
         if (error.code !== 'ENOENT') {

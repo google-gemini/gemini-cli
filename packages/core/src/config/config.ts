@@ -1433,8 +1433,39 @@ export class Config {
     return this.toolOutputMasking.enabled;
   }
 
-  getToolOutputMaskingConfig(): ToolOutputMaskingConfig {
-    return this.toolOutputMasking;
+  async getToolOutputMaskingConfig(): Promise<ToolOutputMaskingConfig> {
+    await this.ensureExperimentsLoaded();
+
+    const remoteProtection =
+      this.experiments?.flags[ExperimentFlags.MASKING_PROTECTION_THRESHOLD]
+        ?.intValue;
+    const remotePrunable =
+      this.experiments?.flags[ExperimentFlags.MASKING_PRUNABLE_THRESHOLD]
+        ?.intValue;
+    const remoteProtectLatest =
+      this.experiments?.flags[ExperimentFlags.MASKING_PROTECT_LATEST_TURN]
+        ?.boolValue;
+
+    const parsedProtection = remoteProtection
+      ? parseInt(remoteProtection, 10)
+      : undefined;
+    const parsedPrunable = remotePrunable
+      ? parseInt(remotePrunable, 10)
+      : undefined;
+
+    return {
+      enabled: this.toolOutputMasking.enabled,
+      toolProtectionThreshold:
+        parsedProtection !== undefined && !isNaN(parsedProtection)
+          ? parsedProtection
+          : this.toolOutputMasking.toolProtectionThreshold,
+      minPrunableTokensThreshold:
+        parsedPrunable !== undefined && !isNaN(parsedPrunable)
+          ? parsedPrunable
+          : this.toolOutputMasking.minPrunableTokensThreshold,
+      protectLatestTurn:
+        remoteProtectLatest ?? this.toolOutputMasking.protectLatestTurn,
+    };
   }
 
   getGeminiMdFileCount(): number {
@@ -1509,8 +1540,14 @@ export class Config {
       if (registry.getTool(EXIT_PLAN_MODE_TOOL_NAME)) {
         registry.unregisterTool(EXIT_PLAN_MODE_TOOL_NAME);
       }
-      if (!registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
-        registry.registerTool(new EnterPlanModeTool(this, this.messageBus));
+      if (this.planEnabled) {
+        if (!registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
+          registry.registerTool(new EnterPlanModeTool(this, this.messageBus));
+        }
+      } else {
+        if (registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
+          registry.unregisterTool(ENTER_PLAN_MODE_TOOL_NAME);
+        }
       }
     }
 
@@ -1843,9 +1880,22 @@ export class Config {
    * Validates if a path is allowed and returns a detailed error message if not.
    *
    * @param absolutePath The absolute path to validate.
+   * @param checkType The type of access to check ('read' or 'write'). Defaults to 'write' for safety.
    * @returns An error message string if the path is disallowed, null otherwise.
    */
-  validatePathAccess(absolutePath: string): string | null {
+  validatePathAccess(
+    absolutePath: string,
+    checkType: 'read' | 'write' = 'write',
+  ): string | null {
+    // For read operations, check read-only paths first
+    if (checkType === 'read') {
+      if (this.getWorkspaceContext().isPathReadable(absolutePath)) {
+        return null;
+      }
+    }
+
+    // Then check standard allowed paths (Workspace + Temp)
+    // This covers 'write' checks and acts as a fallback/temp-dir check for 'read'
     if (this.isPathAllowed(absolutePath)) {
       return null;
     }

@@ -6,7 +6,13 @@ exports[`ToolResultDisplay > keeps markdown if in alternate buffer even with ava
 
 exports[`ToolResultDisplay > renders ANSI output result 1`] = `"ansi content"`;
 
-exports[`ToolResultDisplay > renders file diff result 1`] = `"DiffRenderer: test.ts - diff content"`;
+exports[`ToolResultDisplay > renders file diff result 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────╮
+│                                                                          │
+│ No changes detected.                                                     │
+│                                                                          │
+╰──────────────────────────────────────────────────────────────────────────╯"
+`;
 
 exports[`ToolResultDisplay > renders nothing for todos result 1`] = `""`;
 
