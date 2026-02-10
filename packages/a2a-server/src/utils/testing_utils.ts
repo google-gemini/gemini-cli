@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as path from 'node:path';
 import type {
   Task as SDKTask,
   TaskStatusUpdateEvent,
@@ -16,6 +17,7 @@ import {
   GeminiClient,
   HookSystem,
   PolicyDecision,
+  tmpdir,
 } from '@google/gemini-cli-core';
 import { createMockMessageBus } from '@google/gemini-cli-core/src/test-utils/mock-message-bus.js';
 import type { Config, Storage } from '@google/gemini-cli-core';
@@ -24,6 +26,7 @@ import { expect, vi } from 'vitest';
 export function createMockConfig(
   overrides: Partial<Config> = {},
 ): Partial<Config> {
+  const tmpDir = tmpdir();
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const mockConfig = {
     getToolRegistry: vi.fn().mockReturnValue({
@@ -39,12 +42,12 @@ export function createMockConfig(
     getWorkspaceContext: vi.fn().mockReturnValue({
       isPathWithinWorkspace: () => true,
     }),
-    getTargetDir: () => '/test',
+    getTargetDir: () => tmpDir,
     getCheckpointingEnabled: vi.fn().mockReturnValue(false),
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     storage: {
-      getProjectTempDir: () => '/tmp',
-      getProjectTempCheckpointsDir: () => '/tmp/checkpoints',
+      getProjectTempDir: () => tmpDir,
+      getProjectTempCheckpointsDir: () => path.join(tmpDir, 'checkpoints'),
     } as Storage,
     getTruncateToolOutputThreshold: () =>
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
