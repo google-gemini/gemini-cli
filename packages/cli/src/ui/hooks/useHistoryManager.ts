@@ -103,7 +103,6 @@ export function useHistory({
 
         switch (itemData.type) {
           case 'compression':
-          case 'verbose':
           case 'info':
             chatRecordingService?.recordMessage({
               model: undefined,

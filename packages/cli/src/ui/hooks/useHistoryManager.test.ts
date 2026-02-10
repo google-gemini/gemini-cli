@@ -261,28 +261,6 @@ describe('useHistoryManager', () => {
     });
   });
 
-  it('should store all items regardless of verbosity level (filtering is done at render time)', () => {
-    // @ts-expect-error - verbosity prop was removed, but we want to ensure it's ignored if passed by mistake
-    const { result } = renderHook(() => useHistory({ verbosity: 'info' }));
-    const timestamp = Date.now();
-    const verboseItem: HistoryItemWithoutId = {
-      type: 'verbose',
-      text: 'Hidden detail',
-      verbosity: 3, // Verbosity.VERBOSE
-    };
-
-    act(() => {
-      result.current.addItem(verboseItem, timestamp);
-    });
-
-    expect(result.current.history).toHaveLength(1);
-    expect(result.current.history[0]).toEqual(
-      expect.objectContaining({
-        text: 'Hidden detail',
-      }),
-    );
-  });
-
   it('should merge consecutive tool_group items', () => {
     const { result } = renderHook(() => useHistory());
     const timestamp = Date.now();

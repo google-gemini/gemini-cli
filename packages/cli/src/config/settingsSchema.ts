@@ -328,21 +328,6 @@ const SETTINGS_SCHEMA = {
           { value: 'json', label: 'JSON' },
         ],
       },
-      // Defined as enum type to support the addition of more verbosity levels
-      verbosity: {
-        type: 'enum',
-        label: 'Verbose Output History',
-        category: 'General',
-        requiresRestart: false,
-        default: 'verbose',
-        description:
-          'Show verbose output history. When enabled, output history will include autonomous tool calls, additional logs, etc.',
-        showInDialog: true,
-        options: [
-          { value: 'info', label: 'false' },
-          { value: 'verbose', label: 'true' },
-        ],
-      },
     },
   },
 

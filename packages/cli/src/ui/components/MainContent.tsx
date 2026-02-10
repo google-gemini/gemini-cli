@@ -20,8 +20,6 @@ import { MAX_GEMINI_MESSAGE_LINES } from '../constants.js';
 import { useConfirmingTool } from '../hooks/useConfirmingTool.js';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
 import { useConfig } from '../contexts/ConfigContext.js';
-import { VERBOSITY_MAPPING, Verbosity } from '../types.js';
-import { useSettings } from '../contexts/SettingsContext.js';
 
 const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
 const MemoizedAppHeader = memo(AppHeader);
@@ -34,7 +32,6 @@ export const MainContent = () => {
   const { version } = useAppContext();
   const uiState = useUIState();
   const config = useConfig();
-  const settings = useSettings();
   const isAlternateBuffer = useAlternateBuffer();
 
   const confirmingTool = useConfirmingTool();
@@ -56,24 +53,9 @@ export const MainContent = () => {
     availableTerminalHeight,
   } = uiState;
 
-  const currentVerbosity =
-    VERBOSITY_MAPPING[settings.merged.output?.verbosity ?? 'info'] ??
-    Verbosity.INFO;
-
-  const filteredHistory = useMemo(
-    () =>
-      uiState.history.filter((item) => {
-        const itemType = item.type;
-        const itemVerbosity =
-          item.verbosity ?? VERBOSITY_MAPPING[itemType] ?? Verbosity.INFO;
-        return itemVerbosity <= currentVerbosity;
-      }),
-    [uiState.history, currentVerbosity],
-  );
-
   const historyItems = useMemo(
     () =>
-      filteredHistory.map((h) => (
+      uiState.history.map((h) => (
         <MemoizedHistoryItemDisplay
           terminalWidth={mainAreaWidth}
           availableTerminalHeight={staticAreaMaxItemHeight}
@@ -85,7 +67,7 @@ export const MainContent = () => {
         />
       )),
     [
-      filteredHistory,
+      uiState.history,
       mainAreaWidth,
       staticAreaMaxItemHeight,
       uiState.slashCommands,
@@ -134,10 +116,10 @@ export const MainContent = () => {
   const virtualizedData = useMemo(
     () => [
       { type: 'header' as const },
-      ...filteredHistory.map((item) => ({ type: 'history' as const, item })),
+      ...uiState.history.map((item) => ({ type: 'history' as const, item })),
       { type: 'pending' as const },
     ],
-    [filteredHistory],
+    [uiState.history],
   );
 
   const renderItem = useCallback(

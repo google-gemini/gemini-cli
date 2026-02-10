@@ -153,14 +153,6 @@
           "default": "text",
           "type": "string",
           "enum": ["text", "json"]
-        },
-        "verbosity": {
-          "title": "Verbose Output History",
-          "description": "Show verbose output history. When enabled, output history will include autonomous tool calls, additional logs, etc.",
-          "markdownDescription": "Show verbose output history. When enabled, output history will include autonomous tool calls, additional logs, etc.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `verbose`",
-          "default": "verbose",
-          "type": "string",
-          "enum": ["info", "verbose"]
         }
       },
       "additionalProperties": false

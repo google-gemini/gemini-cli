@@ -862,7 +862,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const performMemoryRefresh = useCallback(async () => {
     historyManager.addItem(
       {
-        type: MessageType.VERBOSE,
+        type: MessageType.INFO,
         text: 'Refreshing hierarchical memory (GEMINI.md or other context files)...',
       },
       Date.now(),
@@ -873,7 +873,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
       historyManager.addItem(
         {
-          type: MessageType.VERBOSE,
+          type: MessageType.INFO,
           text: `Memory refreshed successfully. ${
             memoryContent.length > 0
               ? `Loaded ${memoryContent.length} characters from ${fileCount} file(s).`
