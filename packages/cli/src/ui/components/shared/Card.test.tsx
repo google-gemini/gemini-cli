@@ -20,54 +20,54 @@ describe('Card', () => {
       status: ToolCallStatus.Pending,
       title: 'Gemini CLI update available',
       suffix: '0.26.0 → 0.27.0',
-      prefix: true,
+      showStatusIndicator: true,
       body: 'Installed via Homebrew. Please update with "brew upgrade gemini-cli".',
     },
     {
       status: ToolCallStatus.Canceled,
       title: 'Delegate to agent',
       suffix: "Delegating to agent 'cli_help'",
-      prefix: true,
+      showStatusIndicator: true,
       body: '🤖💭 Execution limit reached (ERROR_NO_COMPLETE_TASK_CALL). Attempting one final recovery turn with a grace period.',
     },
     {
       status: ToolCallStatus.Error,
       title: 'Error',
       suffix: '429 You exceeded your current quota',
-      prefix: true,
+      showStatusIndicator: true,
       body: 'Go to https://aistudio.google.com/apikey to upgrade your quota tier, or submit a quota increase request in https://ai.google.dev/gemini-api/docs/rate-limits',
     },
     {
       status: ToolCallStatus.Confirming,
       title: 'Shell',
       suffix: 'node -v && which gemini',
-      prefix: true,
+      showStatusIndicator: true,
       body: "ls /usr/local/bin | grep 'xattr'",
     },
     {
       status: ToolCallStatus.Success,
       title: 'ReadFolder',
       suffix: '/usr/local/bin',
-      prefix: true,
+      showStatusIndicator: true,
       body: 'Listed 39 item(s).',
     },
     {
       status: ToolCallStatus.Pending,
       title: 'Fixed Width Card',
       suffix: undefined,
-      prefix: true,
+      showStatusIndicator: true,
       width: 40,
       body: 'This card has a fixed width of 40 characters.',
     },
   ] as const)(
-    "renders '$title' card with status=$status and prefix=$prefix",
-    ({ status, title, suffix, prefix, body, width }) => {
+    "renders '$title' card with status=$status and showStatusIndicator=$showStatusIndicator",
+    ({ status, title, suffix, showStatusIndicator, body, width }) => {
       const { lastFrame } = render(
         <Card
           status={status}
           title={title}
           suffix={suffix}
-          prefix={prefix}
+          showStatusIndicator={showStatusIndicator}
           width={width}
         >
           <Text>{body}</Text>
