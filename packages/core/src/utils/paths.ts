@@ -329,6 +329,16 @@ export function getProjectHash(projectRoot: string): string {
 }
 
 /**
+ * Normalizes a path for reliable comparison.
+ * - Resolves to an absolute path.
+ * - On Windows, converts to lowercase for case-insensitivity.
+ */
+export function normalizePath(p: string): string {
+  const resolved = path.resolve(p);
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+}
+
+/**
  * Checks if a path is a subpath of another path.
  * @param parentPath The parent path.
  * @param childPath The child path.

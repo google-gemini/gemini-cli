@@ -55,6 +55,7 @@ import {
   coreEvents,
   CoreEvent,
   refreshServerHierarchicalMemory,
+  flattenMemory,
   type MemoryChangedPayload,
   writeToStdout,
   disableMouseEvents,
@@ -871,12 +872,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
       const { memoryContent, fileCount } =
         await refreshServerHierarchicalMemory(config);
 
+      const flattenedMemory = flattenMemory(memoryContent);
+
       historyManager.addItem(
         {
           type: MessageType.INFO,
           text: `Memory refreshed successfully. ${
-            memoryContent.length > 0
-              ? `Loaded ${memoryContent.length} characters from ${fileCount} file(s).`
+            flattenedMemory.length > 0
+              ? `Loaded ${flattenedMemory.length} characters from ${fileCount} file(s).`
               : 'No memory content found.'
           }`,
         },
@@ -884,7 +887,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       );
       if (config.getDebugMode()) {
         debugLogger.log(
-          `[DEBUG] Refreshed memory content in config: ${memoryContent.substring(
+          `[DEBUG] Refreshed memory content in config: ${flattenedMemory.substring(
             0,
             200,
           )}...`,
