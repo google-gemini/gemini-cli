@@ -564,8 +564,8 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
 
   const customBuffer = useTextBuffer({
     initialText: initialCustomText,
-    viewport: { width: Math.max(1, bufferWidth), height: 1 },
-    singleLine: true,
+    viewport: { width: Math.max(1, bufferWidth), height: 3 },
+    singleLine: false,
   });
 
   const customOptionText = customBuffer.text;
