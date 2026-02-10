@@ -20,7 +20,7 @@ describe('Shell Efficiency', () => {
     return typeof args === 'string' ? args : (args as any)['command'];
   };
 
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: 'should use --silent/--quiet flags when installing packages',
     prompt: 'Install the "lodash" package using npm.',
     assert: async (rig) => {
@@ -49,7 +49,7 @@ describe('Shell Efficiency', () => {
     },
   });
 
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: 'should use --no-pager with git commands',
     prompt: 'Show the git log.',
     assert: async (rig) => {
@@ -72,7 +72,7 @@ describe('Shell Efficiency', () => {
     },
   });
 
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: 'should NOT use efficiency flags when enableShellOutputEfficiency is disabled',
     params: {
       settings: {

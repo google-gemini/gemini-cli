@@ -20,5 +20,8 @@ export default defineConfig({
         maxThreads: 16,
       },
     },
+    env: {
+      GEMINI_TEST_TYPE: 'integration',
+    },
   },
 });
