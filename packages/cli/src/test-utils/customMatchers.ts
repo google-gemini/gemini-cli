@@ -21,7 +21,7 @@ import type { TextBuffer } from '../ui/components/shared/text-buffer.js';
 const invalidCharsRegex = /[\b\x1b]/;
 
 function toHaveOnlyValidCharacters(this: Assertion, buffer: TextBuffer) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
   const { isNot } = this as any;
   let pass = true;
   const invalidLines: Array<{ line: number; content: string }> = [];
@@ -50,6 +50,7 @@ function toHaveOnlyValidCharacters(this: Assertion, buffer: TextBuffer) {
   };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
 expect.extend({
   toHaveOnlyValidCharacters,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

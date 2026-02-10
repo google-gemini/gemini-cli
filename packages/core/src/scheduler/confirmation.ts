@@ -70,6 +70,7 @@ export async function awaitConfirmation(
       MessageBusType.TOOL_CONFIRMATION_RESPONSE,
       { signal },
     )) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const response = msg as ToolConfirmationResponse;
       if (response.correlationId === correlationId) {
         return {
@@ -84,6 +85,7 @@ export async function awaitConfirmation(
       }
     }
   } catch (error) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     if (signal.aborted || (error as Error).name === 'AbortError') {
       throw new Error('Operation cancelled');
     }
@@ -232,6 +234,7 @@ async function handleExternalModification(
   }
 
   const result = await modifier.handleModifyWithEditor(
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     state.firstActiveCall as WaitingToolCall,
     editor,
     signal,
@@ -258,6 +261,7 @@ async function handleInlineModification(
 ): Promise<void> {
   const { state, modifier } = deps;
   const result = await modifier.applyInlineModify(
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     state.firstActiveCall as WaitingToolCall,
     payload,
     signal,

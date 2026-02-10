@@ -177,7 +177,8 @@ export class LoggingContentGenerator implements ContentGenerator {
         this.config.getContentGeneratorConfig()?.authType,
         errorType,
         isStructuredError(error)
-          ? (error as StructuredError).status
+          ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            (error as StructuredError).status
           : undefined,
       ),
     );

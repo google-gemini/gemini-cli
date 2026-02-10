@@ -208,6 +208,7 @@ function toContent(content: ContentUnion): Content {
   // it's a Part
   return {
     role: 'user',
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     parts: [toPart(content as Part)],
   };
 }

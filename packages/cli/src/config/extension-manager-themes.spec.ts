@@ -85,6 +85,7 @@ describe('ExtensionManager theme loading', () => {
 
     await extensionManager.loadExtensions();
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const mockConfig = {
       getEnableExtensionReloading: () => false,
       getMcpClientManager: () => ({
@@ -170,6 +171,7 @@ describe('ExtensionManager theme loading', () => {
 
     await extensionManager.loadExtensions();
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const mockConfig = {
       getWorkingDir: () => tempHomeDir,
       shouldLoadMemoryFromIncludeDirectories: () => false,

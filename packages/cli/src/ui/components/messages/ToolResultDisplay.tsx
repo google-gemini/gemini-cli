@@ -121,6 +121,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
     // where Container grows -> List renders more -> Container grows.
     const limit = maxLines ?? availableHeight ?? ACTIVE_SHELL_MAX_LINES;
     const listHeight = Math.min(
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       (truncatedResultDisplay as AnsiOutput).length,
       limit,
     );
@@ -129,6 +130,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
       <Box width={childWidth} flexDirection="column" maxHeight={listHeight}>
         <ScrollableList
           width={childWidth}
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           data={truncatedResultDisplay as AnsiOutput}
           renderItem={renderVirtualizedAnsiLine}
           estimatedItemHeight={() => 1}
@@ -184,7 +186,9 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   ) {
     content = (
       <DiffRenderer
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         diffContent={(truncatedResultDisplay as FileDiffResult).fileDiff}
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         filename={(truncatedResultDisplay as FileDiffResult).fileName}
         availableTerminalHeight={availableHeight}
         terminalWidth={childWidth}
@@ -197,6 +201,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
 
     content = (
       <AnsiOutputText
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         data={truncatedResultDisplay as AnsiOutput}
         availableTerminalHeight={
           isAlternateBuffer ? undefined : availableHeight

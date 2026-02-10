@@ -174,6 +174,7 @@ export async function revertFileChanges(
             try {
               currentContent = await fs.readFile(filePath, 'utf8');
             } catch (e) {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               const error = e as Error;
               if ('code' in error && error.code === 'ENOENT') {
                 // File does not exist, which is fine in some revert scenarios.

@@ -189,6 +189,7 @@ export class ToolOutputMaskingService {
       await fsPromises.writeFile(filePath, content, 'utf-8');
 
       const originalResponse =
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         (part.functionResponse.response as Record<string, unknown>) || {};
 
       const totalLines = content.split('\n').length;
@@ -268,6 +269,7 @@ export class ToolOutputMaskingService {
 
   private getToolOutputContent(part: Part): string | null {
     if (!part.functionResponse) return null;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const response = part.functionResponse.response as Record<string, unknown>;
     if (!response) return null;
 
@@ -286,6 +288,7 @@ export class ToolOutputMaskingService {
   }
 
   private formatShellPreview(response: Record<string, unknown>): string {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const content = (response['output'] || response['stdout'] || '') as string;
     if (typeof content !== 'string') {
       return typeof content === 'object'

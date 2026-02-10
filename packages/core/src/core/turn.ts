@@ -384,7 +384,8 @@ export class Turn {
         error !== null &&
         'status' in error &&
         typeof (error as { status: unknown }).status === 'number'
-          ? (error as { status: number }).status
+          ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            (error as { status: number }).status
           : undefined;
       const structuredError: StructuredError = {
         message: getErrorMessage(error),

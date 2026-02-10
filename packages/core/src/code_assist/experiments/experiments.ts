@@ -44,6 +44,7 @@ export async function getExperiments(
             'Invalid format for experiments file: `flags` and `experimentIds` must be arrays if present.',
           );
         }
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         return parseExperiments(response as ListExperimentsResponse);
       } catch (e) {
         debugLogger.debug('Failed to read experiments from GEMINI_EXP', e);

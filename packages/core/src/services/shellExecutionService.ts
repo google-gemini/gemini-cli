@@ -510,6 +510,7 @@ export class ShellExecutionService {
 
       return { pid: child.pid, result };
     } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const error = e as Error;
       return {
         pid: undefined,
@@ -778,6 +779,7 @@ export class ShellExecutionService {
             this.activePtys.delete(ptyProcess.pid);
             // Attempt to destroy the PTY to ensure FD is closed
             try {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               (ptyProcess as IPty & { destroy?: () => void }).destroy?.();
             } catch {
               // Ignore errors during cleanup
@@ -860,6 +862,7 @@ export class ShellExecutionService {
 
       return { pid: ptyProcess.pid, result };
     } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const error = e as Error;
       if (error.message.includes('posix_spawnp failed')) {
         onOutputEvent({
@@ -1105,6 +1108,7 @@ export class ShellExecutionService {
       } catch (e) {
         // Ignore errors if the pty has already exited, which can happen
         // due to a race condition between the exit event and this call.
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const err = e as { code?: string; message?: string };
         const isEsrch = err.code === 'ESRCH';
         const isWindowsPtyError = err.message?.includes(

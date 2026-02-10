@@ -104,6 +104,7 @@ export class GcpLogExporter implements LogRecordExporter {
     } catch (error) {
       resultCallback({
         code: ExportResultCode.FAILED,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         error: error as Error,
       });
     }

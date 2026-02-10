@@ -22,6 +22,7 @@ import { MockTool } from '../test-utils/mock-tool.js';
 describe('Circular Reference Handling', () => {
   it('should handle circular references in tool function arguments', () => {
     // Create a mock config
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const mockConfig = {
       getTelemetryEnabled: () => true,
       getUsageStatisticsEnabled: () => true,
@@ -78,6 +79,7 @@ describe('Circular Reference Handling', () => {
   });
 
   it('should handle normal objects without circular references', () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const mockConfig = {
       getTelemetryEnabled: () => true,
       getUsageStatisticsEnabled: () => true,

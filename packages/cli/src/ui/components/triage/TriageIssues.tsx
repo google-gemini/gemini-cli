@@ -225,6 +225,7 @@ Return a JSON object with:
         promptId: 'triage-issues',
       });
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return response as unknown as AnalysisResult;
     },
     [config],

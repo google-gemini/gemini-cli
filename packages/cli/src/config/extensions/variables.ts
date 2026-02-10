@@ -52,9 +52,11 @@ export function recursivelyHydrateStrings<T>(
   values: VariableContext,
 ): T {
   if (typeof obj === 'string') {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return hydrateString(obj, values) as unknown as T;
   }
   if (Array.isArray(obj)) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return obj.map((item) =>
       recursivelyHydrateStrings(item, values),
     ) as unknown as T;
@@ -64,11 +66,13 @@ export function recursivelyHydrateStrings<T>(
     for (const key in obj) {
       if (Object.prototype.hasOwnProperty.call(obj, key)) {
         newObj[key] = recursivelyHydrateStrings(
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           (obj as Record<string, unknown>)[key],
           values,
         );
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return newObj as T;
   }
   return obj;

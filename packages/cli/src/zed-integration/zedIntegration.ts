@@ -62,6 +62,7 @@ export async function runZedIntegration(
 ) {
   const { stdout: workingStdout } = createWorkingStdio();
   const stdout = Writable.toWeb(workingStdout) as WritableStream;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const stdin = Readable.toWeb(process.stdin) as ReadableStream<Uint8Array>;
 
   const stream = acp.ndJsonStream(stdout, stdin);

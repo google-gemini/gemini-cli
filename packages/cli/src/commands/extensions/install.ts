@@ -99,10 +99,15 @@ export const installCommand: CommandModule = {
       }),
   handler: async (argv) => {
     await handleInstall({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       source: argv['source'] as string,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       ref: argv['ref'] as string | undefined,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       autoUpdate: argv['auto-update'] as boolean | undefined,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       allowPreRelease: argv['pre-release'] as boolean | undefined,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       consent: argv['consent'] as boolean | undefined,
     });
     await exitCli();

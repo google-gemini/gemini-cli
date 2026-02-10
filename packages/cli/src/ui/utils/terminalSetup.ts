@@ -245,6 +245,7 @@ async function configureVSCodeStyle(
 
     const results = targetBindings.map((target) => {
       const hasOurBinding = keybindings.some((kb) => {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const binding = kb as {
           command?: string;
           args?: { text?: string };
@@ -258,6 +259,7 @@ async function configureVSCodeStyle(
       });
 
       const existingBinding = keybindings.find((kb) => {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const binding = kb as { key?: string };
         return binding.key === target.key;
       });

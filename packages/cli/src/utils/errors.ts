@@ -38,6 +38,7 @@ interface ErrorWithCode extends Error {
  * Extracts the appropriate error code from an error object.
  */
 function extractErrorCode(error: unknown): string | number {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const errorWithCode = error as ErrorWithCode;
 
   // Prioritize exitCode for FatalError types, fall back to other codes

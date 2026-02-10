@@ -213,6 +213,7 @@ const resumeCommand: SlashCommand = {
         continue;
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       uiHistory.push({
         type: (item.role && rolemap[item.role]) || MessageType.GEMINI,
         text,

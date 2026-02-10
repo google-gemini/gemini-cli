@@ -51,13 +51,17 @@ export const createMockSettings = (
   } = overrides;
 
   const loaded = new LoadedSettings(
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     (system as any) || { path: '', settings: {}, originalSettings: {} },
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     (systemDefaults as any) || { path: '', settings: {}, originalSettings: {} },
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     (user as any) || {
       path: '',
       settings: settingsOverrides,
       originalSettings: settingsOverrides,
     },
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     (workspace as any) || { path: '', settings: {}, originalSettings: {} },
     isTrusted ?? true,
     errors || [],
@@ -71,6 +75,7 @@ export const createMockSettings = (
   // Assign any function overrides (e.g., vi.fn() for methods)
   for (const key in overrides) {
     if (typeof overrides[key] === 'function') {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       (loaded as any)[key] = overrides[key];
     }
   }

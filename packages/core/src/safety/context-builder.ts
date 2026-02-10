@@ -23,6 +23,7 @@ export class ContextBuilder {
     return {
       environment: {
         cwd: process.cwd(),
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         workspaces: this.config
           .getWorkspaceContext()
           .getDirectories() as string[],
@@ -44,11 +45,12 @@ export class ContextBuilder {
 
     for (const key of requiredKeys) {
       if (key in fullContext) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
         (minimalContext as any)[key] = fullContext[key];
       }
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return minimalContext as SafetyCheckInput['context'];
   }
 }

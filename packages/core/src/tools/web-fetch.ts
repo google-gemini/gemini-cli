@@ -194,6 +194,7 @@ ${textContent}
         returnDisplay: `Content for ${url} processed using fallback fetch.`,
       };
     } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const error = e as Error;
       const errorMessage = `Error during fallback fetch for ${url}: ${error.message}`;
       return {
@@ -291,6 +292,7 @@ ${textContent}
       const sources = groundingMetadata?.groundingChunks as
         | GroundingChunkItem[]
         | undefined;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const groundingSupports = groundingMetadata?.groundingSupports as
         | GroundingSupportItem[]
         | undefined;

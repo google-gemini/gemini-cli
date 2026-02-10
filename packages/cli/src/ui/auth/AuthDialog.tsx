@@ -88,8 +88,10 @@ export function AuthDialog({
   const defaultAuthTypeEnv = process.env['GEMINI_DEFAULT_AUTH_TYPE'];
   if (
     defaultAuthTypeEnv &&
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     Object.values(AuthType).includes(defaultAuthTypeEnv as AuthType)
   ) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     defaultAuthType = defaultAuthTypeEnv as AuthType;
   }
 

@@ -111,6 +111,7 @@ export function stableStringify(obj: unknown): string {
       const pairs: string[] = [];
 
       for (const key of sortedKeys) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const value = (currentObj as Record<string, unknown>)[key];
         // Skip undefined and function values in objects (per JSON spec)
         if (value !== undefined && typeof value !== 'function') {

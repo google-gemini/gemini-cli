@@ -118,6 +118,7 @@ async function handleExecuteCommand(
       const eventHandler = (event: AgentExecutionEvent) => {
         const jsonRpcResponse = {
           jsonrpc: '2.0',
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           id: 'taskId' in event ? event.taskId : (event as Message).messageId,
           result: event,
         };
@@ -206,6 +207,7 @@ export async function createApp() {
     expressApp.post('/tasks', async (req, res) => {
       try {
         const taskId = uuidv4();
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const agentSettings = req.body.agentSettings as
           | AgentSettings
           | undefined;

@@ -175,6 +175,7 @@ export class ActivateSkillTool extends BaseDeclarativeTool<
     } else {
       schema = z.object({
         name: z
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           .enum(skillNames as [string, ...string[]])
           .describe('The name of the skill to activate.'),
       });

@@ -102,6 +102,7 @@ export function convertToFunctionResponse(
   if (inlineDataParts.length > 0) {
     if (isMultimodalFRSupported) {
       // Nest inlineData if supported by the model
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       (part.functionResponse as unknown as { parts: Part[] }).parts =
         inlineDataParts;
     } else {
@@ -151,6 +152,7 @@ export function getFunctionCalls(
   }
   const functionCallParts = parts
     .filter((part) => !!part.functionCall)
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     .map((part) => part.functionCall as FunctionCall);
   return functionCallParts.length > 0 ? functionCallParts : undefined;
 }
@@ -163,6 +165,7 @@ export function getFunctionCallsFromParts(
   }
   const functionCallParts = parts
     .filter((part) => !!part.functionCall)
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     .map((part) => part.functionCall as FunctionCall);
   return functionCallParts.length > 0 ? functionCallParts : undefined;
 }

@@ -273,6 +273,7 @@ function parseRetentionPeriod(period: string): number {
     );
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return value * MULTIPLIERS[unit as keyof typeof MULTIPLIERS];
 }
 
@@ -293,6 +294,7 @@ function validateRetentionConfig(
     try {
       maxAgeMs = parseRetentionPeriod(retentionConfig.maxAge);
     } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return (error as Error | string).toString();
     }
 

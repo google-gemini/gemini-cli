@@ -21,6 +21,7 @@ class EditorSettingsManager {
   private readonly availableEditors: EditorDisplay[];
 
   constructor() {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const editorTypes = Object.keys(
       EDITOR_DISPLAY_NAMES,
     ).sort() as EditorType[];
