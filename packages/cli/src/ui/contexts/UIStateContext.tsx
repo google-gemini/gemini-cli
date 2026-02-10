@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -10,6 +10,7 @@ import type {
   ThoughtSummary,
   ConsoleMessageItem,
   ConfirmationRequest,
+  QuotaStats,
   LoopDetectionConfirmationRequest,
   HistoryItemWithoutId,
   StreamingState,
@@ -27,6 +28,7 @@ import type {
   ValidationIntent,
   AgentDefinition,
 } from '@google/gemini-cli-core';
+import { type TransientMessageType } from '../../utils/events.js';
 import type { DOMElement } from 'ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
 import type { ExtensionUpdateState } from '../state/extensions.js';
@@ -52,6 +54,13 @@ import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import { type RestartReason } from '../hooks/useIdeTrustListener.js';
 import type { TerminalBackgroundColor } from '../utils/terminalCapabilityManager.js';
 import type { BackgroundShell } from '../hooks/shellCommandProcessor.js';
+
+export interface QuotaState {
+  userTier: UserTierId | undefined;
+  stats: QuotaStats | undefined;
+  proQuotaRequest: ProQuotaDialogRequest | null;
+  validationRequest: ValidationDialogRequest | null;
+}
 
 export interface UIState {
   history: HistoryItem[];
@@ -119,9 +128,7 @@ export interface UIState {
   queueErrorMessage: string | null;
   showApprovalModeIndicator: ApprovalMode;
   // Quota-related state
-  userTier: UserTierId | undefined;
-  proQuotaRequest: ProQuotaDialogRequest | null;
-  validationRequest: ValidationDialogRequest | null;
+  quota: QuotaState;
   currentModel: string;
   contextFileNames: string[];
   errorCount: number;
@@ -152,7 +159,6 @@ export interface UIState {
   showDebugProfiler: boolean;
   showFullTodos: boolean;
   copyModeEnabled: boolean;
-  warningMessage: string | null;
   bannerData: {
     defaultText: string;
     warningText: string;
@@ -167,6 +173,10 @@ export interface UIState {
   isBackgroundShellListOpen: boolean;
   adminSettingsChanged: boolean;
   newAgents: AgentDefinition[] | null;
+  transientMessage: {
+    text: string;
+    type: TransientMessageType;
+  } | null;
 }
 
 export const UIStateContext = createContext<UIState | null>(null);
