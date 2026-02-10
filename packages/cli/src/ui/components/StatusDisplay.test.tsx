@@ -91,6 +91,7 @@ describe('StatusDisplay', () => {
   afterEach(() => {
     process.env = { ...originalEnv };
     delete process.env['GEMINI_SYSTEM_MD'];
+    vi.restoreAllMocks();
   });
 
   it('renders nothing by default if context summary is hidden via props', () => {

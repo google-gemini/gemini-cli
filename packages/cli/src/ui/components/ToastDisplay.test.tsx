@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { ToastDisplay } from './ToastDisplay.js';
 import { TransientMessageType } from '../../utils/events.js';
@@ -15,13 +15,17 @@ import { type HistoryItem } from '../types.js';
 const renderToastDisplay = (uiState: Partial<UIState> = {}) =>
   renderWithProviders(<ToastDisplay />, {
     uiState: {
-      buffer: { text: '' } as unknown as TextBuffer,
+      buffer: { text: '' } as TextBuffer,
       history: [] as HistoryItem[],
       ...uiState,
     },
   });
 
 describe('ToastDisplay', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('renders nothing by default', () => {
     const { lastFrame } = renderToastDisplay();
     expect(lastFrame()).toBe('');
@@ -72,7 +76,7 @@ describe('ToastDisplay', () => {
   it('renders Escape prompt when buffer is NOT empty', () => {
     const { lastFrame } = renderToastDisplay({
       showEscapePrompt: true,
-      buffer: { text: 'some text' } as unknown as TextBuffer,
+      buffer: { text: 'some text' } as TextBuffer,
     });
     expect(lastFrame()).toMatchSnapshot();
   });

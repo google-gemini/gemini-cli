@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render } from '../../test-utils/render.js';
 import { Box, Text } from 'ink';
 import { Composer } from './Composer.js';
@@ -216,6 +216,10 @@ const renderComposer = (
   );
 
 describe('Composer', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   describe('Footer Display Settings', () => {
     it('renders Footer by default when hideFooter is false', () => {
       const uiState = createMockUIState();
