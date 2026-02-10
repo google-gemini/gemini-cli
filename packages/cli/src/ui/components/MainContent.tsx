@@ -8,6 +8,7 @@ import { Box, Static } from 'ink';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useAppContext } from '../contexts/AppContext.js';
+import { useSettings } from '../contexts/SettingsContext.js';
 import { AppHeader } from './AppHeader.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import {
@@ -20,6 +21,7 @@ import { MAX_GEMINI_MESSAGE_LINES } from '../constants.js';
 import { useConfirmingTool } from '../hooks/useConfirmingTool.js';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
 import { useConfig } from '../contexts/ConfigContext.js';
+import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 
 const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
 const MemoizedAppHeader = memo(AppHeader);
@@ -31,6 +33,7 @@ const MemoizedAppHeader = memo(AppHeader);
 export const MainContent = () => {
   const { version } = useAppContext();
   const uiState = useUIState();
+  const settings = useSettings();
   const config = useConfig();
   const isAlternateBuffer = useAlternateBuffer();
 
@@ -53,6 +56,8 @@ export const MainContent = () => {
     availableTerminalHeight,
   } = uiState;
 
+  const inlineThinkingMode = getInlineThinkingMode(settings);
+
   const historyItems = useMemo(
     () =>
       uiState.history.map((h) => (
@@ -64,6 +69,7 @@ export const MainContent = () => {
           item={h}
           isPending={false}
           commands={uiState.slashCommands}
+          inlineThinkingMode={inlineThinkingMode}
         />
       )),
     [
@@ -71,6 +77,7 @@ export const MainContent = () => {
       mainAreaWidth,
       staticAreaMaxItemHeight,
       uiState.slashCommands,
+      inlineThinkingMode,
     ],
   );
 
@@ -81,7 +88,8 @@ export const MainContent = () => {
           <HistoryItemDisplay
             key={i}
             availableTerminalHeight={
-              uiState.constrainHeight && !isAlternateBuffer
+              (uiState.constrainHeight && !isAlternateBuffer) ||
+              isAlternateBuffer
                 ? availableTerminalHeight
                 : undefined
             }
@@ -91,6 +99,7 @@ export const MainContent = () => {
             isFocused={!uiState.isEditorDialogOpen}
             activeShellPtyId={uiState.activePtyId}
             embeddedShellFocused={uiState.embeddedShellFocused}
+            inlineThinkingMode={inlineThinkingMode}
           />
         ))}
         {showConfirmationQueue && confirmingTool && (
@@ -104,6 +113,7 @@ export const MainContent = () => {
       isAlternateBuffer,
       availableTerminalHeight,
       mainAreaWidth,
+      inlineThinkingMode,
       uiState.isEditorDialogOpen,
       uiState.activePtyId,
       uiState.embeddedShellFocused,
@@ -135,20 +145,27 @@ export const MainContent = () => {
             item={item.item}
             isPending={false}
             commands={uiState.slashCommands}
+            inlineThinkingMode={inlineThinkingMode}
           />
         );
       } else {
         return pendingItems;
       }
     },
-    [version, mainAreaWidth, uiState.slashCommands, pendingItems],
+    [
+      version,
+      mainAreaWidth,
+      uiState.slashCommands,
+      inlineThinkingMode,
+      pendingItems,
+    ],
   );
 
   if (isAlternateBuffer) {
     return (
       <ScrollableList
         ref={scrollableListRef}
-        hasFocus={!uiState.isEditorDialogOpen}
+        hasFocus={!uiState.isEditorDialogOpen && !uiState.embeddedShellFocused}
         width={uiState.terminalWidth}
         data={virtualizedData}
         renderItem={renderItem}

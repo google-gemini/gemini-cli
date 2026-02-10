@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -78,7 +78,7 @@ export function useQuotaAndFallback({
         const messageLines = [
           `Usage limit reached for ${usageLimitReachedModel}.`,
           error.retryDelayMs ? getResetTimeMessage(error.retryDelayMs) : null,
-          `/stats for usage details`,
+          `/stats model for usage details`,
           `/model to switch models.`,
           `/auth to switch to API key.`,
         ].filter(Boolean);

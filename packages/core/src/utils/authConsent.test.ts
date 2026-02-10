@@ -12,8 +12,12 @@ import { coreEvents } from './events.js';
 import { getConsentForOauth } from './authConsent.js';
 import { FatalAuthenticationError } from './errors.js';
 import { writeToStdout } from './stdio.js';
+import { isHeadlessMode } from './headless.js';
 
 vi.mock('node:readline');
+vi.mock('./headless.js', () => ({
+  isHeadlessMode: vi.fn(),
+}));
 vi.mock('./stdio.js', () => ({
   writeToStdout: vi.fn(),
   createWorkingStdio: vi.fn(() => ({
@@ -49,16 +53,12 @@ describe('getConsentForOauth', () => {
     mockEmitConsentRequest.mockRestore();
   });
 
-  it('should use readline when no listeners are present and stdin is a TTY', async () => {
+  it('should use readline when no listeners are present and not headless', async () => {
     vi.restoreAllMocks();
     const mockListenerCount = vi
       .spyOn(coreEvents, 'listenerCount')
       .mockReturnValue(0);
-    const originalIsTTY = process.stdin.isTTY;
-    Object.defineProperty(process.stdin, 'isTTY', {
-      value: true,
-      configurable: true,
-    });
+    (isHeadlessMode as Mock).mockReturnValue(false);
 
     const mockReadline = {
       on: vi.fn((event, callback) => {
@@ -81,31 +81,19 @@ describe('getConsentForOauth', () => {
     );
 
     mockListenerCount.mockRestore();
-    Object.defineProperty(process.stdin, 'isTTY', {
-      value: originalIsTTY,
-      configurable: true,
-    });
   });
 
-  it('should throw FatalAuthenticationError when no listeners and not a TTY', async () => {
+  it('should throw FatalAuthenticationError when no listeners and headless', async () => {
     vi.restoreAllMocks();
     const mockListenerCount = vi
       .spyOn(coreEvents, 'listenerCount')
       .mockReturnValue(0);
-    const originalIsTTY = process.stdin.isTTY;
-    Object.defineProperty(process.stdin, 'isTTY', {
-      value: false,
-      configurable: true,
-    });
+    (isHeadlessMode as Mock).mockReturnValue(true);
 
     await expect(getConsentForOauth('Login required.')).rejects.toThrow(
       FatalAuthenticationError,
     );
 
     mockListenerCount.mockRestore();
-    Object.defineProperty(process.stdin, 'isTTY', {
-      value: originalIsTTY,
-      configurable: true,
-    });
   });
 });

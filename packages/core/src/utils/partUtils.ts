@@ -30,6 +30,7 @@ export function partToString(
   }
 
   // Cast to Part, assuming it might contain project-specific fields
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const part = value as Part & {
     videoMetadata?: unknown;
     thought?: string;

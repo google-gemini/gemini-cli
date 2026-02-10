@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   getFileDiffFromResultDisplay,
-  computeAddedAndRemovedLines,
+  computeModelAddedAndRemovedLines,
 } from './fileDiffUtils.js';
 import type { FileDiff, ToolResultDisplay } from '../tools/tools.js';
 
@@ -57,7 +57,7 @@ describe('fileDiffUtils', () => {
 
   describe('computeAddedAndRemovedLines', () => {
     it('returns 0 added and 0 removed if stats is undefined', () => {
-      expect(computeAddedAndRemovedLines(undefined)).toEqual({
+      expect(computeModelAddedAndRemovedLines(undefined)).toEqual({
         addedLines: 0,
         removedLines: 0,
       });
@@ -75,10 +75,10 @@ describe('fileDiffUtils', () => {
         user_removed_chars: 10,
       };
 
-      const result = computeAddedAndRemovedLines(stats);
+      const result = computeModelAddedAndRemovedLines(stats);
       expect(result).toEqual({
-        addedLines: 12, // 10 + 2
-        removedLines: 6, // 5 + 1
+        addedLines: 10,
+        removedLines: 5,
       });
     });
 
@@ -94,7 +94,7 @@ describe('fileDiffUtils', () => {
         user_removed_chars: 0,
       };
 
-      const result = computeAddedAndRemovedLines(stats);
+      const result = computeModelAddedAndRemovedLines(stats);
       expect(result).toEqual({
         addedLines: 0,
         removedLines: 0,

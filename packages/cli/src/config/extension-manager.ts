@@ -188,7 +188,10 @@ export class ExtensionManager extends ExtensionLoader {
           )
         ) {
           const trustedFolders = loadTrustedFolders();
-          trustedFolders.setValue(this.workspaceDir, TrustLevel.TRUST_FOLDER);
+          await trustedFolders.setValue(
+            this.workspaceDir,
+            TrustLevel.TRUST_FOLDER,
+          );
         } else {
           throw new Error(
             `Could not install extension because the current workspace at ${this.workspaceDir} is not trusted.`,
@@ -727,6 +730,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
         if (Object.keys(hookEnv).length > 0) {
           for (const eventName of Object.keys(hooks)) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             const eventHooks = hooks[eventName as HookEventName];
             if (eventHooks) {
               for (const definition of eventHooks) {
@@ -823,13 +827,16 @@ Would you like to attempt to install via "git clone" instead?`,
     }
     try {
       const configContent = await fs.promises.readFile(configFilePath, 'utf-8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const rawConfig = JSON.parse(configContent) as ExtensionConfig;
       if (!rawConfig.name || !rawConfig.version) {
         throw new Error(
           `Invalid configuration in ${configFilePath}: missing ${!rawConfig.name ? '"name"' : '"version"'}`,
         );
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const config = recursivelyHydrateStrings(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         rawConfig as unknown as JsonObject,
         {
           extensionPath: extensionDir,
@@ -875,6 +882,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
       // Hydrate variables in the hooks configuration
       const hydratedHooks = recursivelyHydrateStrings(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         rawHooks.hooks as unknown as JsonObject,
         {
           ...context,
@@ -885,6 +893,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
       return hydratedHooks;
     } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       if ((e as NodeJS.ErrnoException).code === 'ENOENT') {
         return undefined; // File not found is not an error here.
       }

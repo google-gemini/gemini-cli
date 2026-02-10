@@ -104,6 +104,7 @@ export function doesToolInvocationMatch(
         // This invocation has no command - nothing to check.
         continue;
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       command = String((invocation.params as { command: string }).command);
     }
 

@@ -35,8 +35,10 @@ export function getHookSource(input: Record<string, unknown>): HookSource {
   const source = input['hook_source'];
   if (
     typeof source === 'string' &&
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     VALID_HOOK_SOURCES.includes(source as HookSource)
   ) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return source as HookSource;
   }
   return 'project';

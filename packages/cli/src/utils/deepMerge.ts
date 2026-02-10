@@ -67,6 +67,7 @@ function mergeRecursively(
     } else if (isPlainObject(srcValue)) {
       target[key] = {};
       mergeRecursively(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         target[key] as MergeableObject,
         srcValue,
         getMergeStrategyForPath,

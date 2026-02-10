@@ -77,6 +77,7 @@ export async function loadConfig(
     cwd: workspaceDir,
     telemetry: {
       enabled: settings.telemetry?.enabled,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       target: settings.telemetry?.target as TelemetryTarget,
       otlpEndpoint:
         process.env['OTEL_EXPORTER_OTLP_ENDPOINT'] ??

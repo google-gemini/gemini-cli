@@ -34,8 +34,16 @@ export const QUEUE_ERROR_DISPLAY_DURATION_MS = 3000;
 export const SHELL_ACTION_REQUIRED_TITLE_DELAY_MS = 30000;
 export const SHELL_SILENT_WORKING_TITLE_DELAY_MS = 120000;
 
-export const DEFAULT_BACKGROUND_OPACITY = 0.08;
+export const DEFAULT_BACKGROUND_OPACITY = 0.16;
+export const DEFAULT_INPUT_BACKGROUND_OPACITY = 0.24;
+export const DEFAULT_BORDER_OPACITY = 0.2;
 
 export const KEYBOARD_SHORTCUTS_URL =
   'https://geminicli.com/docs/cli/keyboard-shortcuts/';
 export const LRU_BUFFER_PERF_CACHE_LIMIT = 20000;
+
+// Max lines to show for active shell output when not focused
+export const ACTIVE_SHELL_MAX_LINES = 15;
+
+// Max lines to preserve in history for completed shell commands
+export const COMPLETED_SHELL_MAX_LINES = 15;

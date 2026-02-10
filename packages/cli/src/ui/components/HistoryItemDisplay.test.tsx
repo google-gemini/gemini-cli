@@ -232,6 +232,42 @@ describe('<HistoryItemDisplay />', () => {
     );
   });
 
+  describe('thinking items', () => {
+    it('renders thinking item when enabled', () => {
+      const item: HistoryItem = {
+        ...baseItem,
+        type: 'thinking',
+        thought: { subject: 'Thinking', description: 'test' },
+      };
+      const { lastFrame } = renderWithProviders(
+        <HistoryItemDisplay
+          {...baseItem}
+          item={item}
+          inlineThinkingMode="full"
+        />,
+      );
+
+      expect(lastFrame()).toContain('Thinking');
+    });
+
+    it('does not render thinking item when disabled', () => {
+      const item: HistoryItem = {
+        ...baseItem,
+        type: 'thinking',
+        thought: { subject: 'Thinking', description: 'test' },
+      };
+      const { lastFrame } = renderWithProviders(
+        <HistoryItemDisplay
+          {...baseItem}
+          item={item}
+          inlineThinkingMode="off"
+        />,
+      );
+
+      expect(lastFrame()).toBe('');
+    });
+  });
+
   describe.each([true, false])(
     'gemini items (alternateBuffer=%s)',
     (useAlternateBuffer) => {

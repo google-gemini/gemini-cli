@@ -64,6 +64,25 @@ describe('StorageMigration', () => {
     expect(fs.existsSync(path.join(newPath, 'old.txt'))).toBe(false);
   });
 
+  it('migrates even if new path contains .project_root (ProjectRegistry initialization)', async () => {
+    const oldPath = path.join(tempDir, 'old-hash');
+    const newPath = path.join(tempDir, 'new-slug');
+    fs.mkdirSync(oldPath);
+    fs.mkdirSync(newPath);
+    fs.writeFileSync(path.join(oldPath, 'history.db'), 'data');
+    fs.writeFileSync(path.join(newPath, '.project_root'), 'path');
+
+    await StorageMigration.migrateDirectory(oldPath, newPath);
+
+    expect(fs.existsSync(path.join(newPath, 'history.db'))).toBe(true);
+    expect(fs.readFileSync(path.join(newPath, 'history.db'), 'utf8')).toBe(
+      'data',
+    );
+    expect(fs.readFileSync(path.join(newPath, '.project_root'), 'utf8')).toBe(
+      'path',
+    );
+  });
+
   it('creates parent directory for new path if it does not exist', async () => {
     const oldPath = path.join(tempDir, 'old-hash');
     const newPath = path.join(tempDir, 'sub', 'new-slug');

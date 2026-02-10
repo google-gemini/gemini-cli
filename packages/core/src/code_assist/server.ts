@@ -301,6 +301,7 @@ export class CodeAssistServer implements ContentGenerator {
       body: JSON.stringify(req),
       signal,
     });
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return res.data as T;
   }
 
@@ -318,6 +319,7 @@ export class CodeAssistServer implements ContentGenerator {
       responseType: 'json',
       signal,
     });
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return res.data as T;
   }
 
@@ -351,6 +353,7 @@ export class CodeAssistServer implements ContentGenerator {
 
     return (async function* (): AsyncGenerator<T> {
       const rl = readline.createInterface({
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         input: res.data as NodeJS.ReadableStream,
         crlfDelay: Infinity, // Recognizes '\r\n' and '\n' as line breaks
       });
@@ -363,6 +366,7 @@ export class CodeAssistServer implements ContentGenerator {
           if (bufferedLines.length === 0) {
             continue; // no data to yield
           }
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           yield JSON.parse(bufferedLines.join('\n')) as T;
           bufferedLines = []; // Reset the buffer after yielding
         }
@@ -390,11 +394,13 @@ export class CodeAssistServer implements ContentGenerator {
 
 function isVpcScAffectedUser(error: unknown): boolean {
   if (error && typeof error === 'object' && 'response' in error) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const gaxiosError = error as {
       response?: {
         data?: unknown;
       };
     };
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const response = gaxiosError.response?.data as
       | GoogleRpcResponse
       | undefined;

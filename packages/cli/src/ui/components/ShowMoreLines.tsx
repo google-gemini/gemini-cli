@@ -31,7 +31,7 @@ export const ShowMoreLines = ({ constrainHeight }: ShowMoreLinesProps) => {
   }
 
   return (
-    <Box>
+    <Box paddingX={1}>
       <Text color={theme.text.secondary} wrap="truncate">
         Press ctrl-o to show more lines
       </Text>

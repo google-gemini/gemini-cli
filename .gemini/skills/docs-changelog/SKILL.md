@@ -99,9 +99,16 @@ Write concise summaries including the primary PR and author
 
 4. Do not add the "New Contributors" section.
 
-5. Update the "Full changelog:" link with the previous version and the new
-version, unless it is a patch or a bug fix, in which case simply update the
-link's new version and keep the previous version the same.
+5. Update the "Full changelog:" link by doing one of following:
+
+   If it is a patch or bug fix with few changes, retain the original link
+   but replace the latter version with the new version. For example, if the
+   patch is version is "v0.28.1", replace the latter version:
+   "https://github.com/google-gemini/gemini-cli/compare/v0.27.0...v0.28.0" with
+   "https://github.com/google-gemini/gemini-cli/compare/v0.27.0...v0.28.1".
+   
+   Otherwise, for minor and major version changes, replace the link with the
+   one included at the end of the changelog data.
 
 6. Ensure lines are wrapped to 80 characters.
 

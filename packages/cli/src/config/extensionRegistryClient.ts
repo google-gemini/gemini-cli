@@ -105,6 +105,7 @@ export class ExtensionRegistryClient {
           throw new Error(`Failed to fetch extensions: ${response.statusText}`);
         }
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         return (await response.json()) as RegistryExtension[];
       } catch (error) {
         // Clear the promise on failure so that subsequent calls can try again

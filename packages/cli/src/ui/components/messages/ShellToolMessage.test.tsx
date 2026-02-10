@@ -4,55 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { act } from 'react';
 import {
   ShellToolMessage,
   type ShellToolMessageProps,
 } from './ShellToolMessage.js';
 import { StreamingState, ToolCallStatus } from '../../types.js';
-import { Text } from 'ink';
 import type { Config } from '@google/gemini-cli-core';
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { waitFor } from '../../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SHELL_TOOL_NAME } from '@google/gemini-cli-core';
-import { SHELL_COMMAND_NAME } from '../../constants.js';
-import { StreamingContext } from '../../contexts/StreamingContext.js';
-
-vi.mock('../TerminalOutput.js', () => ({
-  TerminalOutput: function MockTerminalOutput({
-    cursor,
-  }: {
-    cursor: { x: number; y: number } | null;
-  }) {
-    return (
-      <Text>
-        MockCursor:({cursor?.x},{cursor?.y})
-      </Text>
-    );
-  },
-}));
-
-// Mock child components or utilities if they are complex or have side effects
-vi.mock('../GeminiRespondingSpinner.js', () => ({
-  GeminiRespondingSpinner: ({
-    nonRespondingDisplay,
-  }: {
-    nonRespondingDisplay?: string;
-  }) => {
-    const streamingState = React.useContext(StreamingContext)!;
-    if (streamingState === StreamingState.Responding) {
-      return <Text>MockRespondingSpinner</Text>;
-    }
-    return nonRespondingDisplay ? <Text>{nonRespondingDisplay}</Text> : null;
-  },
-}));
-
-vi.mock('../../utils/MarkdownDisplay.js', () => ({
-  MarkdownDisplay: function MockMarkdownDisplay({ text }: { text: string }) {
-    return <Text>MockMarkdown:{text}</Text>;
-  },
-}));
+import { SHELL_COMMAND_NAME, ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
 
 describe('<ShellToolMessage />', () => {
   const baseProps: ShellToolMessageProps = {
@@ -72,52 +35,36 @@ describe('<ShellToolMessage />', () => {
     } as unknown as Config,
   };
 
+  const LONG_OUTPUT = Array.from(
+    { length: 100 },
+    (_, i) => `Line ${i + 1}`,
+  ).join('\n');
+
   const mockSetEmbeddedShellFocused = vi.fn();
   const uiActions = {
     setEmbeddedShellFocused: mockSetEmbeddedShellFocused,
   };
 
+  const renderShell = (
+    props: Partial<ShellToolMessageProps> = {},
+    options: Parameters<typeof renderWithProviders>[1] = {},
+  ) =>
+    renderWithProviders(<ShellToolMessage {...baseProps} {...props} />, {
+      uiActions,
+      ...options,
+    });
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   describe('interactive shell focus', () => {
-    const shellProps: ShellToolMessageProps = {
-      ...baseProps,
-    };
-
-    it('clicks inside the shell area sets focus to true', async () => {
-      const { stdin, lastFrame, simulateClick } = renderWithProviders(
-        <ShellToolMessage {...shellProps} />,
-        {
-          mouseEventsEnabled: true,
-          uiActions,
-        },
-      );
-
-      await waitFor(() => {
-        expect(lastFrame()).toContain('A shell command'); // Wait for render
-      });
-
-      await simulateClick(stdin, 2, 2); // Click at column 2, row 2 (1-based)
-
-      await waitFor(() => {
-        expect(mockSetEmbeddedShellFocused).toHaveBeenCalledWith(true);
-      });
-    });
-
-    it('handles focus for SHELL_TOOL_NAME (core shell tool)', async () => {
-      const coreShellProps: ShellToolMessageProps = {
-        ...shellProps,
-        name: SHELL_TOOL_NAME,
-      };
-
-      const { stdin, lastFrame, simulateClick } = renderWithProviders(
-        <ShellToolMessage {...coreShellProps} />,
-        {
-          mouseEventsEnabled: true,
-          uiActions,
-        },
+    it.each([
+      ['SHELL_COMMAND_NAME', SHELL_COMMAND_NAME],
+      ['SHELL_TOOL_NAME', SHELL_TOOL_NAME],
+    ])('clicks inside the shell area sets focus for %s', async (_, name) => {
+      const { stdin, lastFrame, simulateClick } = renderShell(
+        { name },
+        { mouseEventsEnabled: true },
       );
 
       await waitFor(() => {
@@ -128,6 +75,137 @@ describe('<ShellToolMessage />', () => {
 
       await waitFor(() => {
         expect(mockSetEmbeddedShellFocused).toHaveBeenCalledWith(true);
+      });
+    });
+    it('resets focus when shell finishes', async () => {
+      let updateStatus: (s: ToolCallStatus) => void = () => {};
+
+      const Wrapper = () => {
+        const [status, setStatus] = React.useState(ToolCallStatus.Executing);
+        updateStatus = setStatus;
+        return (
+          <ShellToolMessage
+            {...baseProps}
+            status={status}
+            embeddedShellFocused={true}
+            activeShellPtyId={1}
+            ptyId={1}
+          />
+        );
+      };
+
+      const { lastFrame } = renderWithProviders(<Wrapper />, {
+        uiActions,
+        uiState: { streamingState: StreamingState.Idle },
+      });
+
+      // Verify it is initially focused
+      await waitFor(() => {
+        expect(lastFrame()).toContain('(Shift+Tab to unfocus)');
+      });
+
+      // Now update status to Success
+      await act(async () => {
+        updateStatus(ToolCallStatus.Success);
+      });
+
+      // Should call setEmbeddedShellFocused(false) because isThisShellFocused became false
+      await waitFor(() => {
+        expect(mockSetEmbeddedShellFocused).toHaveBeenCalledWith(false);
+        expect(lastFrame()).not.toContain('(Shift+Tab to unfocus)');
+      });
+    });
+  });
+
+  describe('Snapshots', () => {
+    it.each([
+      [
+        'renders in Executing state',
+        { status: ToolCallStatus.Executing },
+        undefined,
+      ],
+      [
+        'renders in Success state (history mode)',
+        { status: ToolCallStatus.Success },
+        undefined,
+      ],
+      [
+        'renders in Error state',
+        { status: ToolCallStatus.Error, resultDisplay: 'Error output' },
+        undefined,
+      ],
+      [
+        'renders in Alternate Buffer mode while focused',
+        {
+          status: ToolCallStatus.Executing,
+          embeddedShellFocused: true,
+          activeShellPtyId: 1,
+          ptyId: 1,
+        },
+        { useAlternateBuffer: true },
+      ],
+      [
+        'renders in Alternate Buffer mode while unfocused',
+        {
+          status: ToolCallStatus.Executing,
+          embeddedShellFocused: false,
+          activeShellPtyId: 1,
+          ptyId: 1,
+        },
+        { useAlternateBuffer: true },
+      ],
+    ])('%s', async (_, props, options) => {
+      const { lastFrame } = renderShell(props, options);
+      await waitFor(() => {
+        expect(lastFrame()).toMatchSnapshot();
+      });
+    });
+  });
+
+  describe('Height Constraints', () => {
+    it.each([
+      [
+        'respects availableTerminalHeight when it is smaller than ACTIVE_SHELL_MAX_LINES',
+        10,
+        8,
+        false,
+      ],
+      [
+        'uses ACTIVE_SHELL_MAX_LINES when availableTerminalHeight is large',
+        100,
+        ACTIVE_SHELL_MAX_LINES,
+        false,
+      ],
+      [
+        'uses full availableTerminalHeight when focused in alternate buffer mode',
+        100,
+        98, // 100 - 2
+        true,
+      ],
+      [
+        'defaults to ACTIVE_SHELL_MAX_LINES when availableTerminalHeight is undefined',
+        undefined,
+        ACTIVE_SHELL_MAX_LINES,
+        false,
+      ],
+    ])('%s', async (_, availableTerminalHeight, expectedMaxLines, focused) => {
+      const { lastFrame } = renderShell(
+        {
+          resultDisplay: LONG_OUTPUT,
+          renderOutputAsMarkdown: false,
+          availableTerminalHeight,
+          activeShellPtyId: 1,
+          ptyId: focused ? 1 : 2,
+          status: ToolCallStatus.Executing,
+          embeddedShellFocused: focused,
+        },
+        { useAlternateBuffer: true },
+      );
+
+      await waitFor(() => {
+        const frame = lastFrame();
+        expect(frame!.match(/Line \d+/g)?.length).toBe(expectedMaxLines);
+        expect(frame).toMatchSnapshot();
       });
     });
   });

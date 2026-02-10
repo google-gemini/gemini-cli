@@ -563,4 +563,19 @@ describe('ReadFileTool', () => {
       });
     });
   });
+
+  describe('getSchema', () => {
+    it('should return the base schema when no modelId is provided', () => {
+      const schema = tool.getSchema();
+      expect(schema.name).toBe(ReadFileTool.Name);
+      expect(schema.description).toMatchSnapshot();
+    });
+
+    it('should return the schema from the resolver when modelId is provided', () => {
+      const modelId = 'gemini-2.0-flash';
+      const schema = tool.getSchema(modelId);
+      expect(schema.name).toBe(ReadFileTool.Name);
+      expect(schema.description).toMatchSnapshot();
+    });
+  });
 });

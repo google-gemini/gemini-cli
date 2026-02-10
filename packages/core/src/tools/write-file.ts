@@ -48,6 +48,8 @@ import { getSpecificMimeType } from '../utils/fileUtils.js';
 import { getLanguageFromFilePath } from '../utils/language-detection.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { WRITE_FILE_DEFINITION } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -445,24 +447,9 @@ export class WriteFileTool
     super(
       WriteFileTool.Name,
       'WriteFile',
-      `Writes content to a specified file in the local filesystem.
-
-      The user has the ability to modify \`content\`. If modified, this will be stated in the response.`,
+      WRITE_FILE_DEFINITION.base.description!,
       Kind.Edit,
-      {
-        properties: {
-          file_path: {
-            description: 'The path to the file to write to.',
-            type: 'string',
-          },
-          content: {
-            description: 'The content to write to the file.',
-            type: 'string',
-          },
-        },
-        required: ['file_path', 'content'],
-        type: 'object',
-      },
+      WRITE_FILE_DEFINITION.base.parametersJsonSchema,
       messageBus,
       true,
       false,
@@ -512,6 +499,10 @@ export class WriteFileTool
       this.name,
       this.displayName,
     );
+  }
+
+  override getSchema(modelId?: string) {
+    return resolveToolDeclaration(WRITE_FILE_DEFINITION, modelId);
   }
 
   getModifyContext(

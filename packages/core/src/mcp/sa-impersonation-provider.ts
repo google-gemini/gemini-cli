@@ -114,6 +114,7 @@ export class ServiceAccountImpersonationProvider implements McpAuthProvider {
       coreEvents.emitFeedback(
         'error',
         'Failed to obtain authentication token.',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         e as Error,
       );
       return undefined;

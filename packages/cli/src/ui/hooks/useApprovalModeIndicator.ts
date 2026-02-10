@@ -102,6 +102,7 @@ export function useApprovalModeIndicator({
             addItem(
               {
                 type: MessageType.INFO,
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                 text: (e as Error).message,
               },
               Date.now(),

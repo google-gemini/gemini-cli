@@ -99,7 +99,6 @@ export const TriageIssues = ({
   const commentBuffer = useTextBuffer({
     initialText: '',
     viewport: { width: 80, height: 5 },
-    isValidPath: () => false,
   });
 
   const currentIssue = state.issues[state.currentIndex];
@@ -226,6 +225,7 @@ Return a JSON object with:
         promptId: 'triage-issues',
       });
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return response as unknown as AnalysisResult;
     },
     [config],

@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -16,6 +16,9 @@ import {
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { Table, type Column } from './Table.js';
 import { useSettings } from '../contexts/SettingsContext.js';
+import { getDisplayString, isAutoModel } from '@google/gemini-cli-core';
+import type { QuotaStats } from '../types.js';
+import { QuotaStatsInfo } from './QuotaStatsInfo.js';
 
 interface StatRowData {
   metric: string;
@@ -29,14 +32,23 @@ interface ModelStatsDisplayProps {
   selectedAuthType?: string;
   userEmail?: string;
   tier?: string;
+  currentModel?: string;
+  quotaStats?: QuotaStats;
 }
 
 export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
   selectedAuthType,
   userEmail,
   tier,
+  currentModel,
+  quotaStats,
 }) => {
   const { stats } = useSessionStats();
+
+  const pooledRemaining = quotaStats?.remaining;
+  const pooledLimit = quotaStats?.limit;
+  const pooledResetTime = quotaStats?.resetTime;
+
   const { models } = stats.metrics;
   const settings = useSettings();
   const showUserIdentity = settings.merged.ui.showUserIdentity;
@@ -49,7 +61,7 @@ export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
       <Box
         borderStyle="round"
         borderColor={theme.border.default}
-        paddingY={1}
+        paddingTop={1}
         paddingX={2}
       >
         <Text color={theme.text.primary}>
@@ -223,16 +235,21 @@ export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
     })),
   ];
 
+  const isAuto = currentModel && isAutoModel(currentModel);
+  const statsTitle = isAuto
+    ? `${getDisplayString(currentModel)} Stats For Nerds`
+    : 'Model Stats For Nerds';
+
   return (
     <Box
       borderStyle="round"
       borderColor={theme.border.default}
       flexDirection="column"
-      paddingY={1}
+      paddingTop={1}
       paddingX={2}
     >
       <Text bold color={theme.text.accent}>
-        Model Stats For Nerds
+        {statsTitle}
       </Text>
       <Box height={1} />
 
@@ -258,7 +275,17 @@ export const ModelStatsDisplay: React.FC<ModelStatsDisplayProps> = ({
           <Text color={theme.text.primary}>{tier}</Text>
         </Box>
       )}
-      {showUserIdentity && (selectedAuthType || tier) && <Box height={1} />}
+      {isAuto &&
+        pooledRemaining !== undefined &&
+        pooledLimit !== undefined &&
+        pooledLimit > 0 && (
+          <QuotaStatsInfo
+            remaining={pooledRemaining}
+            limit={pooledLimit}
+            resetTime={pooledResetTime}
+          />
+        )}
+      {(showUserIdentity || isAuto) && <Box height={1} />}
 
       <Table data={rows} columns={columns} />
     </Box>

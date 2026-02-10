@@ -48,6 +48,7 @@ export class RecordingContentGenerator implements ContentGenerator {
     );
     const recordedResponse: FakeResponse = {
       method: 'generateContent',
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       response: {
         candidates: response.candidates,
         usageMetadata: response.usageMetadata,
@@ -73,6 +74,7 @@ export class RecordingContentGenerator implements ContentGenerator {
 
     async function* stream(filePath: string) {
       for await (const response of realResponses) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         (recordedResponse.response as GenerateContentResponse[]).push({
           candidates: response.candidates,
           usageMetadata: response.usageMetadata,

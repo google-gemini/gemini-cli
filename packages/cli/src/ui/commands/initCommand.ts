@@ -48,6 +48,7 @@ export const initCommand: SlashCommand = {
       );
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return result as SlashCommandActionReturn;
   },
 };

@@ -1,0 +1,198 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`<ShellToolMessage /> > Height Constraints > defaults to ACTIVE_SHELL_MAX_LINES when availableTerminalHeight is undefined 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ⊷  Shell Command A shell command                                             │
+│                                                                              │
+│ Line 86                                                                      │
+│ Line 87                                                                      │
+│ Line 88                                                                      │
+│ Line 89                                                                      │
+│ Line 90                                                                      │
+│ Line 91                                                                      │
+│ Line 92                                                                      │
+│ Line 93                                                                      │
+│ Line 94                                                                      │
+│ Line 95                                                                      │
+│ Line 96                                                                      │
+│ Line 97                                                                      │
+│ Line 98                                                                    ▄ │
+│ Line 99                                                                    █ │
+│ Line 100                                                                   █ │"
+`;
+
+exports[`<ShellToolMessage /> > Height Constraints > respects availableTerminalHeight when it is smaller than ACTIVE_SHELL_MAX_LINES 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ⊷  Shell Command A shell command                                             │
+│                                                                              │
+│ Line 93                                                                      │
+│ Line 94                                                                      │
+│ Line 95                                                                      │
+│ Line 96                                                                      │
+│ Line 97                                                                      │
+│ Line 98                                                                      │
+│ Line 99                                                                      │
+│ Line 100                                                                   █ │"
+`;
+
+exports[`<ShellToolMessage /> > Height Constraints > uses ACTIVE_SHELL_MAX_LINES when availableTerminalHeight is large 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ⊷  Shell Command A shell command                                             │
+│                                                                              │
+│ Line 86                                                                      │
+│ Line 87                                                                      │
+│ Line 88                                                                      │
+│ Line 89                                                                      │
+│ Line 90                                                                      │
+│ Line 91                                                                      │
+│ Line 92                                                                      │
+│ Line 93                                                                      │
+│ Line 94                                                                      │
+│ Line 95                                                                      │
+│ Line 96                                                                      │
+│ Line 97                                                                      │
+│ Line 98                                                                    ▄ │
+│ Line 99                                                                    █ │
+│ Line 100                                                                   █ │"
+`;
+
+exports[`<ShellToolMessage /> > Height Constraints > uses full availableTerminalHeight when focused in alternate buffer mode 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ⊷  Shell Command A shell command                      (Shift+Tab to unfocus) │
+│                                                                              │
+│ Line 3                                                                       │
+│ Line 4                                                                       │
+│ Line 5                                                                     █ │
+│ Line 6                                                                     █ │
+│ Line 7                                                                     █ │
+│ Line 8                                                                     █ │
+│ Line 9                                                                     █ │
+│ Line 10                                                                    █ │
+│ Line 11                                                                    █ │
+│ Line 12                                                                    █ │
+│ Line 13                                                                    █ │
+│ Line 14                                                                    █ │
+│ Line 15                                                                    █ │
+│ Line 16                                                                    █ │
+│ Line 17                                                                    █ │
+│ Line 18                                                                    █ │
+│ Line 19                                                                    █ │
+│ Line 20                                                                    █ │
+│ Line 21                                                                    █ │
+│ Line 22                                                                    █ │
+│ Line 23                                                                    █ │
+│ Line 24                                                                    █ │
+│ Line 25                                                                    █ │
+│ Line 26                                                                    █ │
+│ Line 27                                                                    █ │
+│ Line 28                                                                    █ │
+│ Line 29                                                                    █ │
+│ Line 30                                                                    █ │
+│ Line 31                                                                    █ │
+│ Line 32                                                                    █ │
+│ Line 33                                                                    █ │
+│ Line 34                                                                    █ │
+│ Line 35                                                                    █ │
+│ Line 36                                                                    █ │
+│ Line 37                                                                    █ │
+│ Line 38                                                                    █ │
+│ Line 39                                                                    █ │
+│ Line 40                                                                    █ │
+│ Line 41                                                                    █ │
+│ Line 42                                                                    █ │
+│ Line 43                                                                    █ │
+│ Line 44                                                                    █ │
+│ Line 45                                                                    █ │
+│ Line 46                                                                    █ │
+│ Line 47                                                                    █ │
+│ Line 48                                                                    █ │
+│ Line 49                                                                    █ │
+│ Line 50                                                                    █ │
+│ Line 51                                                                    █ │
+│ Line 52                                                                    █ │
+│ Line 53                                                                    █ │
+│ Line 54                                                                    █ │
+│ Line 55                                                                    █ │
+│ Line 56                                                                    █ │
+│ Line 57                                                                    █ │
+│ Line 58                                                                    █ │
+│ Line 59                                                                    █ │
+│ Line 60                                                                    █ │
+│ Line 61                                                                    █ │
+│ Line 62                                                                    █ │
+│ Line 63                                                                    █ │
+│ Line 64                                                                    █ │
+│ Line 65                                                                    █ │
+│ Line 66                                                                    █ │
+│ Line 67                                                                    █ │
+│ Line 68                                                                    █ │
+│ Line 69                                                                    █ │
+│ Line 70                                                                    █ │
+│ Line 71                                                                    █ │
+│ Line 72                                                                    █ │
+│ Line 73                                                                    █ │
+│ Line 74                                                                    █ │
+│ Line 75                                                                    █ │
+│ Line 76                                                                    █ │
+│ Line 77                                                                    █ │
+│ Line 78                                                                    █ │
+│ Line 79                                                                    █ │
+│ Line 80                                                                    █ │
+│ Line 81                                                                    █ │
+│ Line 82                                                                    █ │
+│ Line 83                                                                    █ │
+│ Line 84                                                                    █ │
+│ Line 85                                                                    █ │
+│ Line 86                                                                    █ │
+│ Line 87                                                                    █ │
+│ Line 88                                                                    █ │
+│ Line 89                                                                    █ │
+│ Line 90                                                                    █ │
+│ Line 91                                                                    █ │
+│ Line 92                                                                    █ │
+│ Line 93                                                                    █ │
+│ Line 94                                                                    █ │
+│ Line 95                                                                    █ │
+│ Line 96                                                                    █ │
+│ Line 97                                                                    █ │
+│ Line 98                                                                    █ │
+│ Line 99                                                                    █ │
+│ Line 100                                                                   █ │
+│                                                                              │"
+`;
+
+exports[`<ShellToolMessage /> > Snapshots > renders in Alternate Buffer mode while focused 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ⊷  Shell Command A shell command                      (Shift+Tab to unfocus) │
+│                                                                              │
+│ Test result                                                                  │
+│                                                                              │"
+`;
+
+exports[`<ShellToolMessage /> > Snapshots > renders in Alternate Buffer mode while unfocused 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ⊷  Shell Command A shell command                                             │
+│                                                                              │
+│ Test result                                                                  │"
+`;
+
+exports[`<ShellToolMessage /> > Snapshots > renders in Error state 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ x  Shell Command A shell command                                             │
+│                                                                              │
+│ Error output                                                                 │"
+`;
+
+exports[`<ShellToolMessage /> > Snapshots > renders in Executing state 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ⊷  Shell Command A shell command                                             │
+│                                                                              │
+│ Test result                                                                  │"
+`;
+
+exports[`<ShellToolMessage /> > Snapshots > renders in Success state (history mode) 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ✓  Shell Command A shell command                                             │
+│                                                                              │
+│ Test result                                                                  │"
+`;

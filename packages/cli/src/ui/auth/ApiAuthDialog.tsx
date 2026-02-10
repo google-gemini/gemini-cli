@@ -49,7 +49,6 @@ export function ApiAuthDialog({
       width: viewportWidth,
       height: 4,
     },
-    isValidPath: () => false, // No path validation needed for API key
     inputFilter: (text) =>
       text.replace(/[^a-zA-Z0-9_-]/g, '').replace(/[\r\n]/g, ''),
     singleLine: true,

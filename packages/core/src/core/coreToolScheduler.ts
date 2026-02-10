@@ -224,6 +224,7 @@ export class CoreToolScheduler {
             tool: toolInstance,
             invocation,
             status: 'success',
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             response: auxiliaryData as ToolCallResponseInfo,
             durationMs,
             outcome,
@@ -237,6 +238,7 @@ export class CoreToolScheduler {
             request: currentCall.request,
             status: 'error',
             tool: toolInstance,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             response: auxiliaryData as ToolCallResponseInfo,
             durationMs,
             outcome,
@@ -247,6 +249,7 @@ export class CoreToolScheduler {
             request: currentCall.request,
             tool: toolInstance,
             status: 'awaiting_approval',
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             confirmationDetails: auxiliaryData as ToolCallConfirmationDetails,
             startTime: existingStartTime,
             outcome,
@@ -347,6 +350,7 @@ export class CoreToolScheduler {
 
       const invocationOrError = this.buildInvocation(
         call.tool,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         args as Record<string, unknown>,
       );
       if (invocationOrError instanceof Error) {
@@ -356,6 +360,7 @@ export class CoreToolScheduler {
           ToolErrorType.INVALID_TOOL_PARAMS,
         );
         return {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           request: { ...call.request, args: args as Record<string, unknown> },
           status: 'error',
           tool: call.tool,
@@ -365,6 +370,7 @@ export class CoreToolScheduler {
 
       return {
         ...call,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         request: { ...call.request, args: args as Record<string, unknown> },
         invocation: invocationOrError,
       };
@@ -749,6 +755,7 @@ export class CoreToolScheduler {
       this.cancelAll(signal);
       return; // `cancelAll` calls `checkAndNotifyCompletion`, so we can exit here.
     } else if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const waitingToolCall = toolCall as WaitingToolCall;
 
       const editorType = this.getPreferredEditor();
@@ -756,6 +763,7 @@ export class CoreToolScheduler {
         return;
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       this.setStatusInternal(callId, 'awaiting_approval', signal, {
         ...waitingToolCall.confirmationDetails,
         isModifying: true,
@@ -770,12 +778,14 @@ export class CoreToolScheduler {
       // Restore status (isModifying: false) and update diff if result exists
       if (result) {
         this.setArgsInternal(callId, result.updatedParams);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         this.setStatusInternal(callId, 'awaiting_approval', signal, {
           ...waitingToolCall.confirmationDetails,
           fileDiff: result.updatedDiff,
           isModifying: false,
         } as ToolCallConfirmationDetails);
       } else {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         this.setStatusInternal(callId, 'awaiting_approval', signal, {
           ...waitingToolCall.confirmationDetails,
           isModifying: false,
@@ -786,13 +796,16 @@ export class CoreToolScheduler {
       // re-confirmation.
       if (payload && 'newContent' in payload && toolCall) {
         const result = await this.toolModifier.applyInlineModify(
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           toolCall as WaitingToolCall,
           payload,
           signal,
         );
         if (result) {
           this.setArgsInternal(callId, result.updatedParams);
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           this.setStatusInternal(callId, 'awaiting_approval', signal, {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             ...(toolCall as WaitingToolCall).confirmationDetails,
             fileDiff: result.updatedDiff,
           } as ToolCallConfirmationDetails);

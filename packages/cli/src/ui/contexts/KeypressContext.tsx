@@ -80,6 +80,7 @@ const KEY_INFO_MAP: Record<
   OQ: { name: 'f2' },
   OR: { name: 'f3' },
   OS: { name: 'f4' },
+  OZ: { name: 'tab', shift: true }, // SS3 Shift+Tab variant for Windows terminals
   '[[5~': { name: 'pageup' },
   '[[6~': { name: 'pagedown' },
   '[9u': { name: 'tab' },

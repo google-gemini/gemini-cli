@@ -37,7 +37,7 @@ export const UserIdentity: React.FC<UserIdentityProps> = ({ config }) => {
   }
 
   return (
-    <Box marginY={1} flexDirection="column">
+    <Box marginTop={1} flexDirection="column">
       <Box>
         <Text color={theme.text.primary}>
           {authType === AuthType.LOGIN_WITH_GOOGLE ? (

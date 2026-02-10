@@ -145,7 +145,7 @@ export class DiffManager {
 
     if (uriToClose) {
       const rightDoc = await vscode.workspace.openTextDocument(uriToClose);
-      const modifiedContent = rightDoc.getText();
+      const modifiedContent = rightDoc.getText() ?? '';
       await this.closeDiffEditor(uriToClose);
       return modifiedContent;
     }
@@ -162,7 +162,7 @@ export class DiffManager {
     }
 
     const rightDoc = await vscode.workspace.openTextDocument(rightDocUri);
-    const modifiedContent = rightDoc.getText();
+    const modifiedContent = rightDoc.getText() ?? '';
     await this.closeDiffEditor(rightDocUri);
 
     this.onDidChangeEmitter.fire(
@@ -188,7 +188,7 @@ export class DiffManager {
     }
 
     const rightDoc = await vscode.workspace.openTextDocument(rightDocUri);
-    const modifiedContent = rightDoc.getText();
+    const modifiedContent = rightDoc.getText() ?? '';
     await this.closeDiffEditor(rightDocUri);
 
     this.onDidChangeEmitter.fire(
@@ -243,6 +243,7 @@ export class DiffManager {
     // Find and close the tab corresponding to the diff view
     for (const tabGroup of vscode.window.tabGroups.all) {
       for (const tab of tabGroup.tabs) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const input = tab.input as {
           modified?: vscode.Uri;
           original?: vscode.Uri;

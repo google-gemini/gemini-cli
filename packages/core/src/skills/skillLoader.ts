@@ -42,6 +42,7 @@ function parseFrontmatter(
   try {
     const parsed = yaml.load(content);
     if (parsed && typeof parsed === 'object') {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const { name, description } = parsed as Record<string, unknown>;
       if (typeof name === 'string' && typeof description === 'string') {
         return { name, description };

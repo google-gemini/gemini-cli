@@ -71,6 +71,7 @@ export const configureCommand: CommandModule<object, ConfigureArgs> = {
         extensionManager,
         name,
         setting,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         scope as ExtensionSettingScope,
       );
     }
@@ -79,6 +80,7 @@ export const configureCommand: CommandModule<object, ConfigureArgs> = {
       await configureExtension(
         extensionManager,
         name,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         scope as ExtensionSettingScope,
       );
     }
@@ -86,6 +88,7 @@ export const configureCommand: CommandModule<object, ConfigureArgs> = {
     else {
       await configureAllExtensions(
         extensionManager,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         scope as ExtensionSettingScope,
       );
     }

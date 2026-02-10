@@ -123,6 +123,7 @@ function getNestedValue(
   for (const key of path) {
     if (current === null || current === undefined) return undefined;
     if (typeof current !== 'object') return undefined;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     current = (current as Record<string, unknown>)[key];
   }
   return current;
@@ -144,8 +145,10 @@ function setNestedValue(
     if (current[key] === undefined || current[key] === null) {
       current[key] = {};
     } else {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       current[key] = { ...(current[key] as Record<string, unknown>) };
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     current = current[key] as Record<string, unknown>;
   }
 
@@ -265,6 +268,7 @@ export function AgentConfigDialog({
     () =>
       AGENT_CONFIG_FIELDS.map((field) => {
         const currentValue = getNestedValue(
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           pendingOverride as Record<string, unknown>,
           field.path,
         );
@@ -300,6 +304,7 @@ export function AgentConfigDialog({
           displayValue,
           isGreyedOut: currentValue === undefined,
           scopeMessage: undefined,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           rawValue: rawValue as string | number | boolean | undefined,
         };
       }),
@@ -320,6 +325,7 @@ export function AgentConfigDialog({
       if (!field || field.type !== 'boolean') return;
 
       const currentValue = getNestedValue(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         pendingOverride as Record<string, unknown>,
         field.path,
       );
@@ -329,6 +335,7 @@ export function AgentConfigDialog({
       const newValue = !effectiveValue;
 
       const newOverride = setNestedValue(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         pendingOverride as Record<string, unknown>,
         field.path,
         newValue,
@@ -369,6 +376,7 @@ export function AgentConfigDialog({
 
       // Update pending override locally
       const newOverride = setNestedValue(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         pendingOverride as Record<string, unknown>,
         field.path,
         parsed,
@@ -391,6 +399,7 @@ export function AgentConfigDialog({
 
       // Remove the override (set to undefined)
       const newOverride = setNestedValue(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         pendingOverride as Record<string, unknown>,
         field.path,
         undefined,

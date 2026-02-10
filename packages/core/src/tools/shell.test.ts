@@ -130,6 +130,7 @@ describe('ShellTool', () => {
       getGeminiClient: vi.fn().mockReturnValue({}),
       getShellToolInactivityTimeout: vi.fn().mockReturnValue(1000),
       getEnableInteractiveShell: vi.fn().mockReturnValue(false),
+      getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       sanitizationConfig: {},
     } as unknown as Config;
 
@@ -633,6 +634,15 @@ describe('ShellTool', () => {
       const shellTool = new ShellTool(mockConfig, createMockMessageBus());
       expect(shellTool.description).toMatchSnapshot();
     });
+
+    it('should not include efficiency guidelines when disabled', () => {
+      mockPlatform.mockReturnValue('linux');
+      vi.mocked(mockConfig.getEnableShellOutputEfficiency).mockReturnValue(
+        false,
+      );
+      const shellTool = new ShellTool(mockConfig, createMockMessageBus());
+      expect(shellTool.description).not.toContain('Efficiency Guidelines:');
+    });
   });
 
   describe('llmContent output format', () => {
@@ -813,6 +823,21 @@ describe('ShellTool', () => {
       if (details && details.type === 'exec') {
         expect(details.rootCommand).toBe('ls, grep');
       }
+    });
+  });
+
+  describe('getSchema', () => {
+    it('should return the base schema when no modelId is provided', () => {
+      const schema = shellTool.getSchema();
+      expect(schema.name).toBe(SHELL_TOOL_NAME);
+      expect(schema.description).toMatchSnapshot();
+    });
+
+    it('should return the schema from the resolver when modelId is provided', () => {
+      const modelId = 'gemini-2.0-flash';
+      const schema = shellTool.getSchema(modelId);
+      expect(schema.name).toBe(SHELL_TOOL_NAME);
+      expect(schema.description).toMatchSnapshot();
     });
   });
 });

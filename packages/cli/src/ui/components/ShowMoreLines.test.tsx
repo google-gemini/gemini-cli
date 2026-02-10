@@ -9,17 +9,21 @@ import { ShowMoreLines } from './ShowMoreLines.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useOverflowState } from '../contexts/OverflowContext.js';
 import { useStreamingContext } from '../contexts/StreamingContext.js';
+import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { StreamingState } from '../types.js';
 
 vi.mock('../contexts/OverflowContext.js');
 vi.mock('../contexts/StreamingContext.js');
+vi.mock('../hooks/useAlternateBuffer.js');
 
 describe('ShowMoreLines', () => {
   const mockUseOverflowState = vi.mocked(useOverflowState);
   const mockUseStreamingContext = vi.mocked(useStreamingContext);
+  const mockUseAlternateBuffer = vi.mocked(useAlternateBuffer);
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUseAlternateBuffer.mockReturnValue(false);
   });
 
   it.each([

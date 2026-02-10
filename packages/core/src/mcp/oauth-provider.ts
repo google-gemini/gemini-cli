@@ -143,6 +143,7 @@ export class MCPOAuthProvider {
       );
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return (await response.json()) as OAuthClientRegistrationResponse;
   }
 
@@ -377,6 +378,7 @@ export class MCPOAuthProvider {
         }
 
         server.listen(listenPort, () => {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           const address = server.address() as net.AddressInfo;
           serverPort = address.port;
           debugLogger.log(
@@ -580,6 +582,7 @@ export class MCPOAuthProvider {
 
     // Try to parse as JSON first, fall back to form-urlencoded
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return JSON.parse(responseText) as OAuthTokenResponse;
     } catch {
       // Parse form-urlencoded response
@@ -702,6 +705,7 @@ export class MCPOAuthProvider {
 
     // Try to parse as JSON first, fall back to form-urlencoded
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return JSON.parse(responseText) as OAuthTokenResponse;
     } catch {
       // Parse form-urlencoded response

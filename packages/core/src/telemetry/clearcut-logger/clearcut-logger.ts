@@ -450,6 +450,7 @@ export class ClearcutLogger {
     if (this.config?.getDebugMode()) {
       debugLogger.log('Flushing log events to Clearcut.');
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const eventsToSend = this.events.toArray() as LogEventEntry[][];
     this.events.clear();
 
@@ -493,6 +494,7 @@ export class ClearcutLogger {
       }
     } catch (e: unknown) {
       if (this.config?.getDebugMode()) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         debugLogger.warn('Error flushing log events:', e as Error);
       }
 
