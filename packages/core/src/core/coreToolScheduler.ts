@@ -965,6 +965,11 @@ export class CoreToolScheduler {
 
       // The active tool is finished. Move it to the completed batch.
       const completedCall = activeCall as CompletedToolCall;
+
+      if (process.env['CI'] === 'true' || process.env['VERBOSE'] === 'true') {
+        console.log(`[CoreToolScheduler] Completed tool call: ${completedCall.request.name}, status: ${completedCall.status}`);
+      }
+
       this.completedToolCallsForBatch.push(completedCall);
       logToolCall(this.config, new ToolCallEvent(completedCall));
 
