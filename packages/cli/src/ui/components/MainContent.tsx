@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Box, Static } from 'ink';
+import { Box } from 'ink';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useAppContext } from '../contexts/AppContext.js';
@@ -197,9 +197,7 @@ export const MainContent = () => {
         version={version}
         showDetails={showHeaderDetails}
       />
-      <Static key={uiState.historyRemountKey} items={[...historyItems]}>
-        {(item) => item}
-      </Static>
+      {historyItems}
       {pendingItems}
     </>
   );
