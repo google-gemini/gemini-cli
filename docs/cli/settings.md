@@ -64,6 +64,7 @@ they appear in the UI.
 | Use Background Color                 | `ui.useBackgroundColor`                 | Whether to use background colors in the UI.                                                                                                                       | `true`  |
 | Incremental Rendering                | `ui.incrementalRendering`               | Enable incremental rendering for the UI. This option will reduce flickering but may cause rendering artifacts. Only supported when useAlternateBuffer is enabled. | `true`  |
 | Show Spinner                         | `ui.showSpinner`                        | Show the spinner during operations.                                                                                                                               | `true`  |
+| Enable Compact Tool Output           | `ui.enableCompactToolOutput`            | Render tool outputs in a compact, single-line format when possible.                                                                                               | `true`  |
 | Enable Loading Phrases               | `ui.accessibility.enableLoadingPhrases` | Enable loading phrases during operations.                                                                                                                         | `true`  |
 | Screen Reader Mode                   | `ui.accessibility.screenReader`         | Render output in plain-text to be more screen reader accessible                                                                                                   | `false` |
 
