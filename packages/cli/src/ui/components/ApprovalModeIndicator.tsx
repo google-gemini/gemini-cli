@@ -25,26 +25,26 @@ export const ApprovalModeIndicator: React.FC<ApprovalModeIndicatorProps> = ({
   switch (approvalMode) {
     case ApprovalMode.AUTO_EDIT:
       textColor = theme.status.warning;
-      textContent = 'auto-edit';
-      subText = 'shift + tab to enter default mode';
+      textContent = 'auto-accept edits';
+      subText = 'shift+tab to manual';
       break;
     case ApprovalMode.PLAN:
       textColor = theme.status.success;
       textContent = 'plan';
-      subText = 'shift + tab to enter auto-edit mode';
+      subText = 'shift+tab to accept edits';
       break;
     case ApprovalMode.YOLO:
       textColor = theme.status.error;
       textContent = 'YOLO';
-      subText = 'shift + tab to enter auto-edit mode';
+      subText = 'ctrl+y';
       break;
     case ApprovalMode.DEFAULT:
     default:
       textColor = theme.text.accent;
       textContent = '';
       subText = isPlanEnabled
-        ? 'shift + tab to enter plan mode'
-        : 'shift + tab to enter auto-edit mode';
+        ? 'shift+tab to plan'
+        : 'shift+tab to accept edits';
       break;
   }
 
