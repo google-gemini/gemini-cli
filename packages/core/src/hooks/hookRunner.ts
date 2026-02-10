@@ -35,7 +35,6 @@ const DEFAULT_HOOK_TIMEOUT = 60000;
  * Exit code constants for hook execution
  */
 const EXIT_CODE_SUCCESS = 0;
-const EXIT_CODE_BLOCKING_ERROR = 2;
 const EXIT_CODE_NON_BLOCKING_ERROR = 1;
 
 /**
