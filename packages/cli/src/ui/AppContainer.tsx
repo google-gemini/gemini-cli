@@ -1543,24 +1543,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
                   await openBrowserSecurely(url);
                 } catch (e) {
                   setShowErrorDetails(true);
-                  historyManager.addItem(
-                    {
-                      type: MessageType.INFO,
-                      text: `Failed to open browser. DevTools available at: ${url}`,
-                    },
-                    Date.now(),
-                  );
                   debugLogger.warn('Failed to open browser securely:', e);
                 }
               } else {
                 setShowErrorDetails(true);
-                historyManager.addItem(
-                  {
-                    type: MessageType.INFO,
-                    text: `DevTools available at: ${url}`,
-                  },
-                  Date.now(),
-                );
               }
             } catch (e) {
               setShowErrorDetails(true);
@@ -1702,7 +1688,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       lastOutputTimeRef,
       tabFocusTimeoutRef,
       showTransientMessage,
-      historyManager,
       settings.merged.general.devtools,
     ],
   );
