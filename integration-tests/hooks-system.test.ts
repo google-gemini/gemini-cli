@@ -302,8 +302,7 @@ console.log(JSON.stringify({
   }
 }));`;
 
-      const scriptPath = join(rig.testDir!, 'before_model_hook.cjs');
-      writeFileSync(scriptPath, hookScript);
+      const scriptPath = rig.createScript('before_model_hook.cjs', hookScript);
 
       rig.setup('should modify LLM requests with BeforeModel hooks', {
         settings: {
@@ -316,7 +315,7 @@ console.log(JSON.stringify({
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${scriptPath}"`,
+                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
                     timeout: 5000,
                   },
                 ],
@@ -361,8 +360,10 @@ console.log(JSON.stringify({
   decision: "deny",
   reason: "Model execution blocked by security policy"
 }));`;
-      const scriptPath = join(rig.testDir!, 'before_model_deny_hook.cjs');
-      writeFileSync(scriptPath, hookScript);
+      const scriptPath = rig.createScript(
+        'before_model_deny_hook.cjs',
+        hookScript,
+      );
 
       rig.setup(
         'should block model execution when BeforeModel hook returns deny decision',
@@ -377,7 +378,7 @@ console.log(JSON.stringify({
                   hooks: [
                     {
                       type: 'command',
-                      command: `node "${scriptPath}"`,
+                      command: `node "${scriptPath.replace(/\\/g, '/')}"`,
                       timeout: 5000,
                     },
                   ],
@@ -406,8 +407,10 @@ console.log(JSON.stringify({
   decision: "block",
   reason: "Model execution blocked by security policy"
 }));`;
-      const scriptPath = join(rig.testDir!, 'before_model_block_hook.cjs');
-      writeFileSync(scriptPath, hookScript);
+      const scriptPath = rig.createScript(
+        'before_model_block_hook.cjs',
+        hookScript,
+      );
 
       rig.setup(
         'should block model execution when BeforeModel hook returns block decision',
@@ -422,7 +425,7 @@ console.log(JSON.stringify({
                   hooks: [
                     {
                       type: 'command',
-                      command: `node "${scriptPath}"`,
+                      command: `node "${scriptPath.replace(/\\/g, '/')}"`,
                       timeout: 5000,
                     },
                   ],
@@ -475,8 +478,7 @@ console.log(JSON.stringify({
   }
 }));`;
 
-        const scriptPath = join(rig.testDir!, 'after_model_hook.cjs');
-        writeFileSync(scriptPath, hookScript);
+        const scriptPath = rig.createScript('after_model_hook.cjs', hookScript);
 
         rig.setup('should modify LLM responses with AfterModel hooks', {
           settings: {
@@ -489,7 +491,7 @@ console.log(JSON.stringify({
                   hooks: [
                     {
                       type: 'command',
-                      command: `node "${scriptPath}"`,
+                      command: `node "${scriptPath.replace(/\\/g, '/')}"`,
                       timeout: 5000,
                     },
                   ],
@@ -515,14 +517,7 @@ console.log(JSON.stringify({
 
   describe('BeforeToolSelection Hooks - Tool Configuration', () => {
     it('should modify tool selection with BeforeToolSelection hooks', async () => {
-      rig.setup('should modify tool selection with BeforeToolSelection hooks', {
-        fakeResponsesPath: join(
-          import.meta.dirname,
-          'hooks-system.before-tool-selection.responses',
-        ),
-      });
-
-      // Write hook script to file (inline node -e has quoting issues on Windows)
+      // Create a hook script to file
       const hookScript = `console.log(JSON.stringify({
   hookSpecificOutput: {
     hookEventName: 'BeforeToolSelection',
@@ -532,8 +527,18 @@ console.log(JSON.stringify({
     }
   }
 }));`;
-      const scriptPath = join(rig.testDir!, 'before_tool_selection_hook.cjs');
-      writeFileSync(scriptPath, hookScript);
+
+      rig.setup('should modify tool selection with BeforeToolSelection hooks', {
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.before-tool-selection.responses',
+        ),
+      });
+
+      const scriptPath = rig.createScript(
+        'before_tool_selection_hook.cjs',
+        hookScript,
+      );
 
       rig.setup('should modify tool selection with BeforeToolSelection hooks', {
         settings: {
@@ -584,12 +589,6 @@ console.log(JSON.stringify({
 
   describe('BeforeAgent Hooks - Prompt Augmentation', () => {
     it('should augment prompts with BeforeAgent hooks', async () => {
-      rig.setup('should augment prompts with BeforeAgent hooks', {
-        fakeResponsesPath: join(
-          import.meta.dirname,
-          'hooks-system.before-agent.responses',
-        ),
-      });
       // Create a hook script that adds context to the prompt
       const hookScript = `const fs = require('fs');
 console.log(JSON.stringify({
@@ -600,8 +599,14 @@ console.log(JSON.stringify({
   }
 }));`;
 
-      const scriptPath = join(rig.testDir!, 'before_agent_hook.cjs');
-      writeFileSync(scriptPath, hookScript);
+      rig.setup('should augment prompts with BeforeAgent hooks', {
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.before-agent.responses',
+        ),
+      });
+
+      const scriptPath = rig.createScript('before_agent_hook.cjs', hookScript);
 
       rig.setup('should augment prompts with BeforeAgent hooks', {
         settings: {
@@ -614,7 +619,7 @@ console.log(JSON.stringify({
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${scriptPath}"`,
+                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
                     timeout: 5000,
                   },
                 ],
@@ -839,8 +844,10 @@ try {
   console.log(JSON.stringify({decision: "block", reason: "Invalid JSON"}));
 }`;
 
-      const scriptPath = join(rig.testDir!, 'input_validation_hook.cjs');
-      writeFileSync(scriptPath, hookScript);
+      const scriptPath = rig.createScript(
+        'input_validation_hook.cjs',
+        hookScript,
+      );
 
       rig.setup('should provide correct input format to hooks', {
         settings: {
@@ -853,7 +860,7 @@ try {
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${scriptPath}"`,
+                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
                     timeout: 5000,
                   },
                 ],
@@ -1267,8 +1274,10 @@ console.log(JSON.stringify({
         ),
       });
 
-      const scriptPath = join(rig.testDir!, 'session_start_context_hook.cjs');
-      writeFileSync(scriptPath, hookScript);
+      const scriptPath = rig.createScript(
+        'session_start_context_hook.cjs',
+        hookScript,
+      );
 
       rig.setup('should fire SessionStart hook and inject context', {
         settings: {
@@ -1282,7 +1291,7 @@ console.log(JSON.stringify({
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${scriptPath}"`,
+                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
                     timeout: 5000,
                   },
                 ],
@@ -1347,11 +1356,10 @@ console.log(JSON.stringify({
         },
       );
 
-      const scriptPath = join(
-        rig.testDir!,
+      const scriptPath = rig.createScript(
         'session_start_interactive_hook.cjs',
+        hookScript,
       );
-      writeFileSync(scriptPath, hookScript);
 
       rig.setup(
         'should fire SessionStart hook and display systemMessage in interactive mode',
@@ -1367,7 +1375,7 @@ console.log(JSON.stringify({
                   hooks: [
                     {
                       type: 'command',
-                      command: `node "${scriptPath}"`,
+                      command: `node "${scriptPath.replace(/\\/g, '/')}"`,
                       timeout: 5000,
                     },
                   ],
@@ -1965,13 +1973,7 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
         hookOutput,
       )}));`;
 
-      const scriptPath = join(rig.testDir!, 'input_override_hook.js');
-      writeFileSync(scriptPath, hookScript);
-
-      // Ensure path is properly escaped for command line usage on all platforms
-      // On Windows, backslashes in the command string need to be handled carefully
-      // Using forward slashes works well with Node.js on all platforms
-      const commandPath = scriptPath.replace(/\\/g, '/');
+      const scriptPath = rig.createScript('input_override_hook.js', hookScript);
 
       // 2. Full setup with settings and fake responses
       rig.setup('should override tool input parameters via BeforeTool hook', {
@@ -1990,7 +1992,7 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${commandPath}"`,
+                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
                     timeout: 5000,
                   },
                 ],
@@ -2056,9 +2058,10 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
       )}));`;
 
       rig.setup('should stop agent execution via BeforeTool hook');
-      const scriptPath = join(rig.testDir!, 'before_tool_stop_hook.js');
-      writeFileSync(scriptPath, hookScript);
-      const commandPath = scriptPath.replace(/\\/g, '/');
+      const scriptPath = rig.createScript(
+        'before_tool_stop_hook.js',
+        hookScript,
+      );
 
       rig.setup('should stop agent execution via BeforeTool hook', {
         fakeResponsesPath: join(
@@ -2076,7 +2079,7 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${commandPath}"`,
+                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
                     timeout: 5000,
                   },
                 ],
