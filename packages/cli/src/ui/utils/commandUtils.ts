@@ -194,6 +194,7 @@ const writeAll = (stream: Writable, data: string): Promise<void> =>
     // On Windows, writing directly to the underlying file descriptor bypasses
     // application-level stream interception (e.g., by the Ink UI framework).
     // This ensures the raw OSC-52 escape sequence reaches the terminal host uncorrupted.
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const fd = (stream as unknown as { fd?: number }).fd;
     if (
       process.platform === 'win32' &&
@@ -214,6 +215,7 @@ const writeAll = (stream: Writable, data: string): Promise<void> =>
 
     const onError = (err: unknown) => {
       cleanup();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       reject(err as Error);
     };
     const onDrain = () => {
@@ -251,6 +253,7 @@ export const copyToClipboard = async (text: string): Promise<void> => {
     await writeAll(tty!.stream, payload);
 
     if (tty!.closeAfter) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       (tty!.stream as fs.WriteStream).end();
     }
     return;

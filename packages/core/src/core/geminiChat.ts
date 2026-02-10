@@ -560,6 +560,7 @@ export class GeminiChat {
           beforeModelResult.modifiedContents &&
           Array.isArray(beforeModelResult.modifiedContents)
         ) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           contentsToUse = beforeModelResult.modifiedContents as Content[];
         }
 
@@ -577,6 +578,7 @@ export class GeminiChat {
           toolSelectionResult.tools &&
           Array.isArray(toolSelectionResult.tools)
         ) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           config.tools = toolSelectionResult.tools as Tool[];
         }
       }
@@ -820,6 +822,7 @@ export class GeminiChat {
         (candidate) => candidate.finishReason,
       );
       if (candidateWithReason) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         finishReason = candidateWithReason.finishReason as FinishReason;
       }
 
