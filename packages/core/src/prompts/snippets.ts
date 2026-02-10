@@ -187,11 +187,7 @@ export function renderSubAgents(subAgents?: SubAgentOptions[]): string {
   return `
 # Available Sub-Agents
 
-Sub-agents are specialized expert agents that you can use to assist you in the completion of all or part of a task.
-
-Each sub-agent is available as a tool of the same name. You MUST always delegate tasks to the sub-agent with the relevant expertise, if one is available.
-
-The following tools can be used to start sub-agents:
+Sub-agents are specialized expert agents. Each sub-agent is available as a tool of the same name. You MUST delegate tasks to the sub-agent with the most relevant expertise.
 
 <available_subagents>
 ${subAgentsXml}

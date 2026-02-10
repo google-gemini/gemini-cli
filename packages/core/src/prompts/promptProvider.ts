@@ -132,7 +132,7 @@ export class PromptProvider {
             .getAgentRegistry()
             .getAllDefinitions()
             .map((d) => ({
-              name: d.displayName || d.name,
+              name: d.name,
               description: d.description,
             })),
         ),
