@@ -17,6 +17,8 @@
         "type": "number"
       }
     },
-    "required": ["file_path"]
+    "required": [
+      "file_path"
+    ]
   }
 }

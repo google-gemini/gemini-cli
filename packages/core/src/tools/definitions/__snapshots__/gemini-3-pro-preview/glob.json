@@ -25,6 +25,8 @@
         "type": "boolean"
       }
     },
-    "required": ["pattern"]
+    "required": [
+      "pattern"
+    ]
   }
 }
