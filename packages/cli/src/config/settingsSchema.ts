@@ -1584,6 +1584,55 @@ const SETTINGS_SCHEMA = {
         description: 'Enable planning features (Plan Mode and tools).',
         showInDialog: true,
       },
+      gemmaModelRouter: {
+        type: 'object',
+        label: 'Gemma Model Router',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: {},
+        description: 'Enable Gemma model router (experimental).',
+        showInDialog: true,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Gemma Model Router',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: false,
+            description: 'Enable the Gemma Model Router.',
+            showInDialog: true,
+          },
+          classifier: {
+            type: 'object',
+            label: 'Classifier',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: {},
+            description: 'Classifier configuration.',
+            showInDialog: false,
+            properties: {
+              host: {
+                type: 'string',
+                label: 'Host',
+                category: 'Experimental',
+                requiresRestart: true,
+                default: 'http://localhost:9379',
+                description: 'The host of the classifier.',
+                showInDialog: false,
+              },
+              model: {
+                type: 'string',
+                label: 'Model',
+                category: 'Experimental',
+                requiresRestart: true,
+                default: 'gemma3-1b-gpu-custom',
+                description: 'The model to use for the classifier.',
+                showInDialog: false,
+              },
+            },
+          },
+        },
+      },
     },
   },
 
@@ -2329,7 +2378,9 @@ type InferSettings<T extends SettingsSchema> = {
         : T[K]['default']
       : T[K]['default'] extends boolean
         ? boolean
-        : T[K]['default'];
+        : T[K]['default'] extends string
+          ? string
+          : T[K]['default'];
 };
 
 type InferMergedSettings<T extends SettingsSchema> = {
@@ -2341,7 +2392,9 @@ type InferMergedSettings<T extends SettingsSchema> = {
         : T[K]['default']
       : T[K]['default'] extends boolean
         ? boolean
-        : T[K]['default'];
+        : T[K]['default'] extends string
+          ? string
+          : T[K]['default'];
 };
 
 export type Settings = InferSettings<SettingsSchemaType>;

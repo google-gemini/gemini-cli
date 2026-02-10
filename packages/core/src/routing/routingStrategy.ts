@@ -7,6 +7,7 @@
 import type { Content, PartListUnion } from '@google/genai';
 import type { BaseLlmClient } from '../core/baseLlmClient.js';
 import type { Config } from '../config/config.js';
+import type { LocalLiteRtLmClient } from '../core/localLiteRtLmClient.js';
 
 /**
  * The output of a routing decision. It specifies which model to use and why.
@@ -58,6 +59,7 @@ export interface RoutingStrategy {
     context: RoutingContext,
     config: Config,
     baseLlmClient: BaseLlmClient,
+    localLiteRtLmClient: LocalLiteRtLmClient,
   ): Promise<RoutingDecision | null>;
 }
 
@@ -74,5 +76,6 @@ export interface TerminalStrategy extends RoutingStrategy {
     context: RoutingContext,
     config: Config,
     baseLlmClient: BaseLlmClient,
+    localLiteRtLmClient: LocalLiteRtLmClient,
   ): Promise<RoutingDecision>;
 }
