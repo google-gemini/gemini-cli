@@ -38,9 +38,9 @@ import type { LoadedSettings } from './config/settings.js';
 // Mock core modules
 vi.mock('./ui/hooks/atCommandProcessor.js');
 
-const mockRegisterActivityLogger = vi.hoisted(() => vi.fn());
+const mockSetupInitialActivityLogger = vi.hoisted(() => vi.fn());
 vi.mock('./utils/devtoolsService.js', () => ({
-  registerActivityLogger: mockRegisterActivityLogger,
+  setupInitialActivityLogger: mockSetupInitialActivityLogger,
 }));
 
 const mockCoreEvents = vi.hoisted(() => ({
@@ -286,7 +286,7 @@ describe('runNonInteractive', () => {
       prompt_id: 'prompt-id-activity-logger',
     });
 
-    expect(mockRegisterActivityLogger).toHaveBeenCalledWith(mockConfig);
+    expect(mockSetupInitialActivityLogger).toHaveBeenCalledWith(mockConfig);
     vi.unstubAllEnvs();
   });
 
@@ -309,7 +309,7 @@ describe('runNonInteractive', () => {
       prompt_id: 'prompt-id-activity-logger-off',
     });
 
-    expect(mockRegisterActivityLogger).not.toHaveBeenCalled();
+    expect(mockSetupInitialActivityLogger).not.toHaveBeenCalled();
     vi.unstubAllEnvs();
   });
 
