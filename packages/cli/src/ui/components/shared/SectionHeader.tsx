@@ -26,7 +26,11 @@ export const SectionHeader: React.FC<{ title: string; subtitle?: string }> = ({
       <Text color={theme.text.primary} bold wrap="truncate-end">
         {title}
       </Text>
-      {subtitle && <Text color={theme.text.secondary}> {subtitle}</Text>}
+      {subtitle && (
+        <Text color={theme.text.secondary} wrap="truncate-end">
+          {subtitle}
+        </Text>
+      )}
     </Box>
   </Box>
 );

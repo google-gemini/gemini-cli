@@ -33,7 +33,7 @@ describe('<SectionHeader />', () => {
     {
       description: 'renders correctly with a subtitle',
       title: 'Shortcuts',
-      subtitle: 'See /help for more',
+      subtitle: ' See /help for more',
       width: 40,
     },
   ])('$description', async ({ title, subtitle, width }) => {
