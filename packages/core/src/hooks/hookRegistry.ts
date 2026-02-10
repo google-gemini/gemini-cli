@@ -233,6 +233,13 @@ please review the project settings (.gemini/settings.json) and remove them.`;
         } as HookRegistryEntry);
         const isDisabled = disabledHooks.includes(hookName);
 
+        if (process.env['CI'] === 'true' || process.env['VERBOSE'] === 'true') {
+          if (isDisabled) {
+          }
+          if (disabledHooks.length > 0) {
+          }
+        }
+
         // Add source to hook config
         hookConfig.source = source;
 

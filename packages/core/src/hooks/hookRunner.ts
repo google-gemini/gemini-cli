@@ -268,6 +268,9 @@ export class HookRunner {
         shellConfig.shell,
       );
 
+      if (process.env['CI'] === 'true' || process.env['VERBOSE'] === 'true') {
+      }
+
       // Set up environment variables
       const env = {
         ...sanitizeEnvironment(process.env, this.config.sanitizationConfig),
@@ -332,10 +335,18 @@ export class HookRunner {
         stderr += data.toString();
       });
 
+      child.on('exit', (code, signal) => {
+        if (process.env['CI'] === 'true' || process.env['VERBOSE'] === 'true') {
+        }
+      });
+
       // Handle process exit
       child.on('close', (exitCode) => {
         clearTimeout(timeoutHandle);
         const duration = Date.now() - startTime;
+
+        if (process.env['CI'] === 'true' || process.env['VERBOSE'] === 'true') {
+        }
 
         if (timedOut) {
           resolve({
@@ -428,6 +439,8 @@ export class HookRunner {
     text: string,
     exitCode: number,
   ): HookOutput {
+    if (process.env['CI'] === 'true' || process.env['VERBOSE'] === 'true') {
+    }
     if (exitCode === EXIT_CODE_SUCCESS) {
       // Success - treat as system message or additional context
       return {

@@ -361,6 +361,9 @@ export class TestRig {
     this.testDir = join(testFileDir, sanitizedName);
     this.homeDir = join(testFileDir, sanitizedName + '-home');
 
+    if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+    }
+
     if (!this._initialized) {
       // Clean up existing directories from previous runs (e.g. retries)
       const cleanDir = (dir: string) => {
@@ -583,6 +586,9 @@ export class TestRig {
       env: this._getCleanEnv(options.env),
     });
     this._spawnedProcesses.push(child);
+
+    if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+    }
 
     let stdout = '';
     let stderr = '';
@@ -838,9 +844,19 @@ export class TestRig {
   }
 
   async cleanup() {
+    if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+    }
+
     // Kill any interactive runs that are still active
     for (const run of this._interactiveRuns) {
       try {
+        if (process.platform === 'win32') {
+          // @ts-ignore - access private ptyProcess
+          const pid = run.ptyProcess?.pid;
+          if (pid) {
+            execSync(`taskkill /F /T /PID ${pid}`, { stdio: 'ignore' });
+          }
+        }
         await run.kill();
       } catch (error) {
         if (env['VERBOSE'] === 'true') {
@@ -854,6 +870,9 @@ export class TestRig {
     for (const child of this._spawnedProcesses) {
       if (child.exitCode === null && child.signalCode === null) {
         try {
+          if (process.platform === 'win32' && child.pid) {
+            execSync(`taskkill /F /T /PID ${child.pid}`, { stdio: 'ignore' });
+          }
           child.kill('SIGKILL');
         } catch (error) {
           if (env['VERBOSE'] === 'true') {
@@ -876,20 +895,24 @@ export class TestRig {
     // Clean up test directory and home directory
     if (this.testDir && !env['KEEP_OUTPUT']) {
       try {
+        if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+        }
         fs.rmSync(this.testDir, { recursive: true, force: true });
       } catch (error) {
         // Ignore cleanup errors
-        if (env['VERBOSE'] === 'true') {
+        if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
           console.warn('Cleanup warning:', (error as Error).message);
         }
       }
     }
     if (this.homeDir && !env['KEEP_OUTPUT']) {
       try {
+        if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+        }
         fs.rmSync(this.homeDir, { recursive: true, force: true });
       } catch (error) {
         // Ignore cleanup errors
-        if (env['VERBOSE'] === 'true') {
+        if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
           console.warn('Cleanup warning:', (error as Error).message);
         }
       }
@@ -1225,6 +1248,10 @@ export class TestRig {
     }[] = [];
 
     for (const logData of parsedLogs) {
+      if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+        if (logData.attributes?.['event.name']?.includes('tool')) {
+        }
+      }
       // Look for tool call logs
       if (
         logData.attributes &&
@@ -1377,6 +1404,10 @@ export class TestRig {
     }[] = [];
 
     for (const logData of parsedLogs) {
+      if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+        if (logData.attributes?.['event.name']?.includes('hook')) {
+        }
+      }
       // Look for tool call logs
       if (
         logData.attributes &&

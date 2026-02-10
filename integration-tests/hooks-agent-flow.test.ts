@@ -113,10 +113,9 @@ describe('Hooks Agent Flow', () => {
       }
       `;
 
-      const scriptPath = join(rig.testDir!, 'after_agent_verify.cjs');
-      writeFileSync(scriptPath, hookScript);
+      const scriptPath = rig.createScript('after_agent_verify.cjs', hookScript);
 
-      await rig.setup('should receive prompt and response in AfterAgent hook', {
+      rig.setup('should receive prompt and response in AfterAgent hook', {
         settings: {
           hooksConfig: {
             enabled: true,
@@ -127,7 +126,7 @@ describe('Hooks Agent Flow', () => {
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${scriptPath}"`,
+                    command: normalizePath(`node "${scriptPath}"`)!,
                     timeout: 5000,
                   },
                 ],
@@ -157,7 +156,7 @@ describe('Hooks Agent Flow', () => {
     });
 
     it('should process clearContext in AfterAgent hook output', async () => {
-      await rig.setup('should process clearContext in AfterAgent hook output', {
+      rig.setup('should process clearContext in AfterAgent hook output', {
         fakeResponsesPath: join(
           import.meta.dirname,
           'hooks-system.after-agent.responses',
@@ -176,11 +175,10 @@ describe('Hooks Agent Flow', () => {
         fs.writeFileSync(${JSON.stringify(messageCountFile)}, JSON.stringify(counts));
         console.log(JSON.stringify({ decision: 'allow' }));
       `;
-      const beforeModelScriptPath = join(
-        rig.testDir!,
+      const beforeModelScriptPath = rig.createScript(
         'before_model_counter.cjs',
+        beforeModelScript,
       );
-      writeFileSync(beforeModelScriptPath, beforeModelScript);
 
       const afterAgentScript = `
         console.log(JSON.stringify({
@@ -192,10 +190,12 @@ describe('Hooks Agent Flow', () => {
           }
         }));
       `;
-      const afterAgentScriptPath = join(rig.testDir!, 'after_agent_clear.cjs');
-      writeFileSync(afterAgentScriptPath, afterAgentScript);
+      const afterAgentScriptPath = rig.createScript(
+        'after_agent_clear.cjs',
+        afterAgentScript,
+      );
 
-      await rig.setup('should process clearContext in AfterAgent hook output', {
+      rig.setup('should process clearContext in AfterAgent hook output', {
         settings: {
           hooks: {
             enabled: true,
@@ -204,7 +204,7 @@ describe('Hooks Agent Flow', () => {
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${beforeModelScriptPath}"`,
+                    command: normalizePath(`node "${beforeModelScriptPath}"`)!,
                     timeout: 5000,
                   },
                 ],
@@ -215,7 +215,7 @@ describe('Hooks Agent Flow', () => {
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${afterAgentScriptPath}"`,
+                    command: normalizePath(`node "${afterAgentScriptPath}"`)!,
                     timeout: 5000,
                   },
                 ],
