@@ -19,6 +19,7 @@ import {
   showMemory,
   addMemory,
   listMemoryFiles,
+  flattenMemory,
 } from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -33,7 +34,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     refreshMemory: vi.fn(async (config) => {
       if (config.isJitContextEnabled()) {
         await config.getContextManager()?.refresh();
-        const memoryContent = config.getUserMemory() || '';
+        const memoryContent = original.flattenMemory(config.getUserMemory());
         const fileCount = config.getGeminiMdFileCount() || 0;
         return {
           type: 'message',
@@ -85,7 +86,7 @@ describe('memoryCommand', () => {
       mockGetGeminiMdFileCount = vi.fn();
 
       vi.mocked(showMemory).mockImplementation((config) => {
-        const memoryContent = config.getUserMemory() || '';
+        const memoryContent = flattenMemory(config.getUserMemory());
         const fileCount = config.getGeminiMdFileCount() || 0;
         let content;
         if (memoryContent.length > 0) {
