@@ -122,7 +122,7 @@ export interface UIState {
   shortcutsHelpVisible: boolean;
   cleanUiDetailsVisible: boolean;
   elapsedTime: number;
-  currentLoadingPhrase: string;
+  currentLoadingPhrase: string | undefined;
   historyRemountKey: number;
   activeHooks: ActiveHook[];
   messageQueue: string[];
