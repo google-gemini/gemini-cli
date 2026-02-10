@@ -61,6 +61,7 @@ export class MCPOAuthTokenStorage implements TokenStorage {
     try {
       const tokenFile = this.getTokenFilePath();
       const data = await fs.readFile(tokenFile, 'utf-8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const tokens = JSON.parse(data) as OAuthCredentials[];
 
       for (const credential of tokens) {
@@ -68,6 +69,7 @@ export class MCPOAuthTokenStorage implements TokenStorage {
       }
     } catch (error) {
       // File doesn't exist or is invalid, return empty map
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         coreEvents.emitFeedback(
           'error',
@@ -222,6 +224,7 @@ export class MCPOAuthTokenStorage implements TokenStorage {
       const tokenFile = this.getTokenFilePath();
       await fs.unlink(tokenFile);
     } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         coreEvents.emitFeedback(
           'error',

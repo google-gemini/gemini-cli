@@ -68,6 +68,7 @@ function getNetworkErrorCode(error: unknown): string | undefined {
       return undefined;
     }
     if ('code' in obj && typeof (obj as { code: unknown }).code === 'string') {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return (obj as { code: string }).code;
     }
     return undefined;
@@ -196,6 +197,7 @@ export async function retryWithBackoff<T>(
 
       if (
         shouldRetryOnContent &&
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         shouldRetryOnContent(result as GenerateContentResponse)
       ) {
         const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
@@ -327,6 +329,7 @@ export async function retryWithBackoff<T>(
       // Generic retry logic for other errors
       if (
         attempt >= maxAttempts ||
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         !shouldRetryOnError(error as Error, retryFetchErrors)
       ) {
         throw error;

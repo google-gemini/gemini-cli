@@ -93,6 +93,7 @@ function loadExtension(extensionDir: string): GeminiCLIExtension | null {
 
   try {
     const configContent = fs.readFileSync(configFilePath, 'utf-8');
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const config = JSON.parse(configContent) as ExtensionConfig;
     if (!config.name || !config.version) {
       logger.error(
@@ -107,6 +108,7 @@ function loadExtension(extensionDir: string): GeminiCLIExtension | null {
       .map((contextFileName) => path.join(extensionDir, contextFileName))
       .filter((contextFilePath) => fs.existsSync(contextFilePath));
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return {
       name: config.name,
       version: config.version,
@@ -140,6 +142,7 @@ export function loadInstallMetadata(
   const metadataFilePath = path.join(extensionDir, INSTALL_METADATA_FILENAME);
   try {
     const configContent = fs.readFileSync(metadataFilePath, 'utf-8');
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const metadata = JSON.parse(configContent) as ExtensionInstallMetadata;
     return metadata;
   } catch (e) {

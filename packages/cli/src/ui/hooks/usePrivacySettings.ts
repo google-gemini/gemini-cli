@@ -106,6 +106,7 @@ async function getRemoteDataCollectionOptIn(
     return resp.freeTierDataCollectionOptin;
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'response' in error) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const gaxiosError = error as {
         response?: {
           status?: unknown;

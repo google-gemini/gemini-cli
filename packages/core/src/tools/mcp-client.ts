@@ -875,6 +875,7 @@ class LenientJsonSchemaValidator implements jsonSchemaValidator {
       );
       return (input: unknown) => ({
         valid: true as const,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         data: input as T,
         errorMessage: undefined,
       });
@@ -889,6 +890,7 @@ export function populateMcpServerCommand(
 ): Record<string, MCPServerConfig> {
   if (mcpServerCommand) {
     const cmd = mcpServerCommand;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const args = parse(cmd, process.env) as string[];
     if (args.some((arg) => typeof arg !== 'string')) {
       throw new Error('failed to parse mcpServerCommand: ' + cmd);
@@ -1068,6 +1070,7 @@ export async function discoverTools(
           'error',
           `Error discovering tool: '${
             toolDef.name
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           }' from MCP server '${mcpServerName}': ${(error as Error).message}`,
           error,
         );
@@ -1121,6 +1124,7 @@ class McpCallableTool implements CallableTool {
       const result = await this.client.callTool(
         {
           name: call.name!,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           arguments: call.args as Record<string, unknown>,
         },
         undefined,
@@ -1550,6 +1554,7 @@ export async function connectToMcpServer(
       return { client: mcpClient, transport };
     } catch (error) {
       await transport.close();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       firstAttemptError = error as Error;
       throw error;
     }
@@ -1589,6 +1594,7 @@ export async function connectToMcpServer(
         );
         return { client: mcpClient, transport: sseTransport };
       } catch (sseFallbackError) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         sseError = sseFallbackError as Error;
 
         // If SSE also returned 401, handle OAuth below
@@ -1929,6 +1935,7 @@ export async function createTransport(
     let transport: Transport = new StdioClientTransport({
       command: mcpServerConfig.command,
       args: mcpServerConfig.args || [],
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       env: sanitizeEnvironment(
         {
           ...process.env,
@@ -1965,7 +1972,7 @@ export async function createTransport(
 
       const underlyingTransport =
         transport instanceof XcodeMcpBridgeFixTransport
-          ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ? // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
             (transport as any).transport
           : transport;
 

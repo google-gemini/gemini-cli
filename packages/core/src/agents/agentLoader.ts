@@ -185,6 +185,7 @@ export async function parseAgentMarkdown(
   } catch (error) {
     throw new AgentLoadError(
       filePath,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       `YAML frontmatter parsing failed: ${(error as Error).message}`,
     );
   }
@@ -328,12 +329,14 @@ export async function loadAgentsFromDirectory(
     dirEntries = await fs.readdir(dir, { withFileTypes: true });
   } catch (error) {
     // If directory doesn't exist, just return empty
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       return result;
     }
     result.errors.push(
       new AgentLoadError(
         dir,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         `Could not list directory: ${(error as Error).message}`,
       ),
     );
@@ -364,6 +367,7 @@ export async function loadAgentsFromDirectory(
         result.errors.push(
           new AgentLoadError(
             filePath,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             `Unexpected error: ${(error as Error).message}`,
           ),
         );

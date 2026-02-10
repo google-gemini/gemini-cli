@@ -23,6 +23,7 @@ function buildZodSchemaFromJsonSchema(def: any): z.ZodTypeAny {
   }
 
   if (def.type === 'string') {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     if (def.enum) return z.enum(def.enum as [string, ...string[]]);
     return z.string();
   }
@@ -40,7 +41,7 @@ function buildZodSchemaFromJsonSchema(def: any): z.ZodTypeAny {
     let schema;
     if (def.properties) {
       const shape: Record<string, z.ZodTypeAny> = {};
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
       for (const [key, propDef] of Object.entries(def.properties) as any) {
         let propSchema = buildZodSchemaFromJsonSchema(propDef);
         if (
@@ -86,9 +87,11 @@ function buildEnumSchema(
   }
   const values = options.map((opt) => opt.value);
   if (values.every((v) => typeof v === 'string')) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return z.enum(values as [string, ...string[]]);
   } else if (values.every((v) => typeof v === 'number')) {
     return z.union(
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       values.map((v) => z.literal(v)) as [
         z.ZodLiteral<number>,
         z.ZodLiteral<number>,
@@ -97,6 +100,7 @@ function buildEnumSchema(
     );
   } else {
     return z.union(
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       values.map((v) => z.literal(v)) as [
         z.ZodLiteral<unknown>,
         z.ZodLiteral<unknown>,

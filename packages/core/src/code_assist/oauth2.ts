@@ -115,6 +115,7 @@ async function initOauthClient(
 
   if (
     credentials &&
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     (credentials as { type?: string }).type ===
       'external_account_authorized_user'
   ) {
@@ -602,6 +603,7 @@ export function getAvailablePort(): Promise<number> {
       }
       const server = net.createServer();
       server.listen(0, () => {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const address = server.address()! as net.AddressInfo;
         port = address.port;
       });

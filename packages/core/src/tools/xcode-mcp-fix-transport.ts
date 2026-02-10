@@ -75,7 +75,7 @@ export class XcodeMcpBridgeFixTransport
     // We can cast because we verified 'result' is in response,
     // but TS might still be picky if the type is a strict union.
     // Let's treat it safely.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
     const result = response.result as any;
 
     // Check if we have content but missing structuredContent

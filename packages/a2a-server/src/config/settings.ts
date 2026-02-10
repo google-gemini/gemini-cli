@@ -67,6 +67,7 @@ export function loadSettings(workspaceDir: string): Settings {
   try {
     if (fs.existsSync(USER_SETTINGS_PATH)) {
       const userContent = fs.readFileSync(USER_SETTINGS_PATH, 'utf-8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const parsedUserSettings = JSON.parse(
         stripJsonComments(userContent),
       ) as Settings;
@@ -89,6 +90,7 @@ export function loadSettings(workspaceDir: string): Settings {
   try {
     if (fs.existsSync(workspaceSettingsPath)) {
       const projectContent = fs.readFileSync(workspaceSettingsPath, 'utf-8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const parsedWorkspaceSettings = JSON.parse(
         stripJsonComments(projectContent),
       ) as Settings;
@@ -139,10 +141,12 @@ function resolveEnvVarsInObject<T>(obj: T): T {
   }
 
   if (typeof obj === 'string') {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return resolveEnvVarsInString(obj) as unknown as T;
   }
 
   if (Array.isArray(obj)) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return obj.map((item) => resolveEnvVarsInObject(item)) as unknown as T;
   }
 

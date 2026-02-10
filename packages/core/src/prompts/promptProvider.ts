@@ -183,11 +183,11 @@ export class PromptProvider {
             })),
       } as snippets.SystemPromptOptions;
 
-      basePrompt = (
-        activeSnippets.getCoreSystemPrompt as (
-          options: snippets.SystemPromptOptions,
-        ) => string
-      )(options);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const getCoreSystemPrompt = activeSnippets.getCoreSystemPrompt as (
+        options: snippets.SystemPromptOptions,
+      ) => string;
+      basePrompt = getCoreSystemPrompt(options);
     }
 
     // --- Finalization (Shell) ---

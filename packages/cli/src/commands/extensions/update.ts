@@ -155,7 +155,9 @@ export const updateCommand: CommandModule = {
       }),
   handler: async (argv) => {
     await handleUpdate({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       name: argv['name'] as string | undefined,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       all: argv['all'] as boolean | undefined,
     });
     await exitCli();

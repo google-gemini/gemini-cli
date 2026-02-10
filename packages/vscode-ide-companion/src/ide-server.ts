@@ -206,6 +206,7 @@ export class IDEServer {
       context.subscriptions.push(onDidChangeDiffSubscription);
 
       app.post('/mcp', async (req: Request, res: Response) => {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const sessionId = req.headers[MCP_SESSION_ID_HEADER] as
           | string
           | undefined;
@@ -290,6 +291,7 @@ export class IDEServer {
       });
 
       const handleSessionRequest = async (req: Request, res: Response) => {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const sessionId = req.headers[MCP_SESSION_ID_HEADER] as
           | string
           | undefined;
@@ -337,6 +339,7 @@ export class IDEServer {
       });
 
       this.server = app.listen(0, '127.0.0.1', async () => {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const address = (this.server as HTTPServer).address();
         if (address && typeof address !== 'string') {
           this.port = address.port;

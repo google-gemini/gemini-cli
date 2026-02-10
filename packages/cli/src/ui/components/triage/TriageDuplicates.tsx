@@ -157,6 +157,7 @@ export const TriageDuplicates = ({
         '--json',
         'number,title,body,state,stateReason,labels,url,comments,author,reactionGroups',
       ]);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return JSON.parse(stdout) as Candidate;
     } catch (err) {
       debugLogger.error(
@@ -280,6 +281,7 @@ Return a JSON object with:
         promptId: 'triage-duplicates',
       });
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const rec = response as unknown as GeminiRecommendation;
 
       let canonical: Candidate | undefined;

@@ -65,8 +65,10 @@ function getStringReferences(parts: AnyPart[]): StringReference[] {
     } else if (part instanceof GenericPart) {
       if (part.type === 'executableCode' && typeof part['code'] === 'string') {
         refs.push({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           get: () => part['code'] as string,
           set: (val: string) => (part['code'] = val),
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           len: () => (part['code'] as string).length,
         });
       } else if (
@@ -74,8 +76,10 @@ function getStringReferences(parts: AnyPart[]): StringReference[] {
         typeof part['output'] === 'string'
       ) {
         refs.push({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           get: () => part['output'] as string,
           set: (val: string) => (part['output'] = val),
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           len: () => (part['output'] as string).length,
         });
       }

@@ -259,10 +259,12 @@ export function SettingsDialog({
         key,
         label: definition?.label || key,
         description: definition?.description,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         type: type as 'boolean' | 'number' | 'string' | 'enum',
         displayValue,
         isGreyedOut,
         scopeMessage,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         rawValue: rawValue as string | number | boolean | undefined,
       };
     });
@@ -283,8 +285,10 @@ export function SettingsDialog({
       const currentValue = getEffectiveValue(key, pendingSettings, {});
       let newValue: SettingsValue;
       if (definition?.type === 'boolean') {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         newValue = !(currentValue as boolean);
         setPendingSettings((prev) =>
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           setPendingSettingValue(key, newValue as boolean, prev),
         );
       } else if (definition?.type === 'enum' && definition.options) {
@@ -377,6 +381,7 @@ export function SettingsDialog({
         // Record pending change globally
         setGlobalPendingChanges((prev) => {
           const next = new Map(prev);
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           next.set(key, newValue as PendingValue);
           return next;
         });

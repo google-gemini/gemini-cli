@@ -476,6 +476,7 @@ export class Scheduler {
     if (signal.aborted) throw new Error('Operation cancelled');
     this.state.updateStatus(callId, 'executing');
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const activeCall = this.state.firstActiveCall as ExecutingToolCall;
 
     const result = await runWithToolCallContext(

@@ -147,7 +147,8 @@ export class ActivityLogger extends EventEmitter {
           ? input
           : input instanceof URL
             ? input.toString()
-            : (input as any).url;
+            : // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              (input as any).url;
       if (url.includes('127.0.0.1') || url.includes('localhost'))
         return originalFetch(input, init);
 
@@ -311,6 +312,7 @@ export class ActivityLogger extends EventEmitter {
       req.write = function (chunk: any, ...etc: any[]) {
         if (chunk) {
           const encoding =
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             typeof etc[0] === 'string' ? (etc[0] as BufferEncoding) : undefined;
           requestChunks.push(
             Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, encoding),
@@ -322,6 +324,7 @@ export class ActivityLogger extends EventEmitter {
       req.end = function (this: any, chunk: any, ...etc: any[]) {
         if (chunk && typeof chunk !== 'function') {
           const encoding =
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             typeof etc[0] === 'string' ? (etc[0] as BufferEncoding) : undefined;
           requestChunks.push(
             Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, encoding),

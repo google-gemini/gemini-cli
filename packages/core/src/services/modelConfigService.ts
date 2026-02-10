@@ -245,6 +245,7 @@ export class ModelConfigService {
         let matchedLevel = 0; // Default to Global
         const isMatch = matchEntries.every(([key, value]) => {
           if (key === 'model') {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             const level = modelToLevel.get(value as string);
             if (level === undefined) return false;
             matchedLevel = level;
@@ -253,6 +254,7 @@ export class ModelConfigService {
           if (key === 'overrideScope' && value === 'core') {
             return context.overrideScope === 'core' || !context.overrideScope;
           }
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           return context[key as keyof ModelConfigKey] === value;
         });
 
@@ -291,6 +293,7 @@ export class ModelConfigService {
       );
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return {
       model: resolved.model,
       generateContentConfig: resolved.generateContentConfig,
@@ -321,7 +324,9 @@ export class ModelConfigService {
     config2: GenerateContentConfig | undefined,
   ): GenerateContentConfig {
     return ModelConfigService.genericDeepMerge(
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       config1 as Record<string, unknown> | undefined,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       config2 as Record<string, unknown> | undefined,
     ) as GenerateContentConfig;
   }

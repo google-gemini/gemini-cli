@@ -42,6 +42,7 @@ export async function* performRestore<
         content: 'Restored project to the state before the tool call.',
       };
     } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const error = e as Error;
       if (error.message.includes('unable to read tree')) {
         yield {

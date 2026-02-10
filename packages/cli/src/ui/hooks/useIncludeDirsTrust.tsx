@@ -38,6 +38,7 @@ async function finishAddingDirectories(
       await refreshServerHierarchicalMemory(config);
     }
   } catch (error) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     errors.push(`Error refreshing memory: ${(error as Error).message}`);
   }
 

@@ -51,6 +51,7 @@ export class FakeContentGenerator implements ContentGenerator {
     const responses = fileContent
       .split('\n')
       .filter((line) => line.trim() !== '')
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       .map((line) => JSON.parse(line) as FakeResponse);
     return new FakeContentGenerator(responses);
   }
@@ -71,6 +72,7 @@ export class FakeContentGenerator implements ContentGenerator {
         `Unexpected response type, next response was for ${response.method} but expected ${method}`,
       );
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return response.response as R;
   }
 

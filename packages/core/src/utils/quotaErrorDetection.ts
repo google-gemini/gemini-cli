@@ -20,7 +20,9 @@ export function isApiError(error: unknown): error is ApiError {
     typeof error === 'object' &&
     error !== null &&
     'error' in error &&
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     typeof (error as ApiError).error === 'object' &&
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     'message' in (error as ApiError).error
   );
 }
@@ -30,6 +32,7 @@ export function isStructuredError(error: unknown): error is StructuredError {
     typeof error === 'object' &&
     error !== null &&
     'message' in error &&
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     typeof (error as StructuredError).message === 'string'
   );
 }

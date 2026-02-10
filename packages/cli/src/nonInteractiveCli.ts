@@ -250,6 +250,7 @@ export async function runNonInteractive({
         // Otherwise, slashCommandResult falls through to the default prompt
         // handling.
         if (slashCommandResult) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           query = slashCommandResult as Part[];
         }
       }
@@ -271,6 +272,7 @@ export async function runNonInteractive({
             error || 'Exiting due to an error processing the @ command.',
           );
         }
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         query = processedQuery as Part[];
       }
 

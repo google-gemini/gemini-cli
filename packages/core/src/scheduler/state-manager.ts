@@ -370,6 +370,7 @@ export class SchedulerStateManager {
       confirmationDetails = data.confirmationDetails;
     } else {
       // TODO: Remove legacy callback shape once event-driven migration is complete
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       confirmationDetails = data as ToolCallConfirmationDetails;
     }
 
@@ -489,6 +490,7 @@ export class SchedulerStateManager {
 
   private toExecuting(call: ToolCall, data?: unknown): ExecutingToolCall {
     this.validateHasToolAndInvocation(call, 'executing');
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const execData = data as Partial<ExecutingToolCall> | undefined;
     const liveOutput =
       execData?.liveOutput ??

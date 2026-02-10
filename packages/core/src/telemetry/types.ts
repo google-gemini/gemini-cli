@@ -316,6 +316,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
         }
       }
     } else {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       this.function_name = function_name as string;
       this.function_args = function_args!;
       this.duration_ms = duration_ms!;

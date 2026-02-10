@@ -62,6 +62,7 @@ export class MockMessageBus {
       if (!this.subscriptions.has(type)) {
         this.subscriptions.set(type, new Set());
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       this.subscriptions.get(type)!.add(listener as (message: Message) => void);
     },
   );
@@ -73,6 +74,7 @@ export class MockMessageBus {
     <T extends Message>(type: T['type'], listener: (message: T) => void) => {
       const listeners = this.subscriptions.get(type);
       if (listeners) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         listeners.delete(listener as (message: Message) => void);
       }
     },
@@ -101,6 +103,7 @@ export class MockMessageBus {
  * Create a mock MessageBus for testing
  */
 export function createMockMessageBus(): MessageBus {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return new MockMessageBus() as unknown as MessageBus;
 }
 
@@ -110,5 +113,6 @@ export function createMockMessageBus(): MessageBus {
 export function getMockMessageBusInstance(
   messageBus: MessageBus,
 ): MockMessageBus {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return messageBus as unknown as MockMessageBus;
 }

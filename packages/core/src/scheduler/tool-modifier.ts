@@ -48,6 +48,7 @@ export class ToolModificationHandler {
       typeof toolCall.request.args
     >(
       toolCall.request.args,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       modifyContext as ModifyContext<typeof toolCall.request.args>,
       editorType,
       signal,
@@ -76,6 +77,7 @@ export class ToolModificationHandler {
       return undefined;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const modifyContext = toolCall.tool.getModifyContext(
       signal,
     ) as ModifyContext<typeof toolCall.request.args>;

@@ -95,6 +95,7 @@ export class GCSTaskStore implements TaskStore {
     await this.ensureBucketInitialized();
     const taskId = task.id;
     const persistedState = getPersistedState(
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       task.metadata as PersistedTaskMetadata,
     );
 

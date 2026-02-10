@@ -107,6 +107,7 @@ async function generateJsonWithTimeout<T>(
         timeoutSignal,
       ]),
     });
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return result as T;
   } catch (err) {
     debugLogger.debug(

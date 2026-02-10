@@ -243,6 +243,7 @@ export class DiffManager {
     // Find and close the tab corresponding to the diff view
     for (const tabGroup of vscode.window.tabGroups.all) {
       for (const tab of tabGroup.tabs) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const input = tab.input as {
           modified?: vscode.Uri;
           original?: vscode.Uri;

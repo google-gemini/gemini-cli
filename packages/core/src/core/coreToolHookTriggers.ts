@@ -73,6 +73,7 @@ export async function executeToolWithHooks(
   setPidCallback?: (pid: number) => void,
   config?: Config,
 ): Promise<ToolResult> {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const toolInput = (invocation.params || {}) as Record<string, unknown>;
   let inputWasModified = false;
   let modifiedKeys: string[] = [];

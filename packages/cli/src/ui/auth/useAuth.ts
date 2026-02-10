@@ -113,6 +113,7 @@ export const useAuthCommand = (
       const defaultAuthType = process.env['GEMINI_DEFAULT_AUTH_TYPE'];
       if (
         defaultAuthType &&
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         !Object.values(AuthType).includes(defaultAuthType as AuthType)
       ) {
         onAuthError(
