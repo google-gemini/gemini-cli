@@ -28,6 +28,7 @@
 
 # Ask-user tool always requires user interaction, even in YOLO mode.
 # This ensures the model can gather user preferences/decisions when needed.
+# Note: In non-interactive mode, this decision is converted to DENY by the policy engine.
 [[rule]]
 toolName = "ask_user"
 decision = "ask_user"

@@ -33,7 +33,7 @@ export interface SystemPromptOptions {
   planningWorkflow?: PlanningWorkflowOptions;
   operationalGuidelines?: OperationalGuidelinesOptions;
   sandbox?: SandboxMode;
-  yoloMode?: boolean;
+  interactiveYoloMode?: boolean;
   gitRepo?: GitRepoOptions;
 }
 
@@ -112,7 +112,7 @@ ${
 
 ${renderOperationalGuidelines(options.operationalGuidelines)}
 
-${renderYoloMode(options.yoloMode)}
+${renderInteractiveYoloMode(options.interactiveYoloMode)}
 
 ${renderSandbox(options.sandbox)}
 
@@ -315,7 +315,7 @@ export function renderSandbox(mode?: SandboxMode): string {
   return '';
 }
 
-export function renderYoloMode(enabled?: boolean): string {
+export function renderInteractiveYoloMode(enabled?: boolean): string {
   if (!enabled) return '';
   return `
 # Autonomous Mode (YOLO)

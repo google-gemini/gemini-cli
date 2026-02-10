@@ -184,8 +184,8 @@ export class PromptProvider {
           }),
         ),
         sandbox: this.withSection('sandbox', () => getSandboxMode()),
-        yoloMode: this.withSection(
-          'yoloMode',
+        interactiveYoloMode: this.withSection(
+          'interactiveYoloMode',
           () => true,
           isYoloMode && interactiveMode,
         ),
