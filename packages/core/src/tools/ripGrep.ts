@@ -516,6 +516,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
           pattern: {
             description:
               "The pattern to search for. By default, treated as a Rust-flavored regular expression. Use '\\b' for precise symbol matching (e.g., '\\bMatchMe\\b').",
+            minLength: 1,
             type: 'string',
           },
           dir_path: {
@@ -541,16 +542,22 @@ export class RipGrepTool extends BaseDeclarativeTool<
           context: {
             description:
               'Show this many lines of context around each match (equivalent to grep -C). Defaults to 0 if omitted.',
+            maximum: 10,
+            minimum: 0,
             type: 'integer',
           },
           after: {
             description:
               'Show this many lines after each match (equivalent to grep -A). Defaults to 0 if omitted.',
+            maximum: 10,
+            minimum: 0,
             type: 'integer',
           },
           before: {
             description:
               'Show this many lines before each match (equivalent to grep -B). Defaults to 0 if omitted.',
+            maximum: 10,
+            minimum: 0,
             type: 'integer',
           },
           no_ignore: {
@@ -580,10 +587,12 @@ export class RipGrepTool extends BaseDeclarativeTool<
   protected override validateToolParamValues(
     params: RipGrepToolParams,
   ): string | null {
-    try {
-      new RegExp(params.pattern);
-    } catch (error) {
-      return `Invalid regular expression pattern provided: ${params.pattern}. Error: ${getErrorMessage(error)}`;
+    if (!params.fixed_strings) {
+      try {
+        new RegExp(params.pattern);
+      } catch (error) {
+        return `Invalid regular expression pattern provided: ${params.pattern}. Error: ${getErrorMessage(error)}`;
+      }
     }
 
     // Only validate path if one is provided

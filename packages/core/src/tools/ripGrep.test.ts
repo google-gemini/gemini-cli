@@ -1408,42 +1408,45 @@ describe('RipGrepTool', () => {
       expect(result.llmContent).toContain('L1: HELLO world');
     });
 
-    it.each([
-      {
-        name: 'fixed_strings parameter',
-        params: { pattern: 'hello.world', fixed_strings: true },
-        mockOutput: {
-          path: { text: 'fileA.txt' },
-          line_number: 1,
-          lines: { text: 'hello.world\n' },
-        },
-        expectedArgs: ['--fixed-strings'],
-        expectedPattern: 'hello.world',
-      },
-    ])(
-      'should handle $name',
-      async ({ params, mockOutput, expectedArgs, expectedPattern }) => {
-        mockSpawn.mockImplementationOnce(
-          createMockSpawn({
-            outputData:
-              JSON.stringify({ type: 'match', data: mockOutput }) + '\n',
-            exitCode: 0,
-          }),
-        );
+    it('should handle fixed_strings parameter', async () => {
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileA.txt' },
+                line_number: 1,
+                lines: { text: 'hello.world\n' },
+              },
+            }) + '\n',
+          exitCode: 0,
+        }),
+      );
 
-        const invocation = grepTool.build(params);
-        const result = await invocation.execute(abortSignal);
+      const invocation = grepTool.build({
+        pattern: 'hello.world',
+        fixed_strings: true,
+      });
+      const result = await invocation.execute(abortSignal);
 
-        expect(mockSpawn).toHaveBeenLastCalledWith(
-          expect.anything(),
-          expect.arrayContaining(expectedArgs),
-          expect.anything(),
-        );
-        expect(result.llmContent).toContain(
-          `Found 1 match for pattern "${expectedPattern}"`,
-        );
-      },
-    );
+      expect(mockSpawn).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.arrayContaining(['--fixed-strings']),
+        expect.anything(),
+      );
+      expect(result.llmContent).toContain(
+        'Found 1 match for pattern "hello.world"',
+      );
+    });
+
+    it('should allow invalid regex patterns when fixed_strings is true', () => {
+      const params: RipGrepToolParams = {
+        pattern: '[[',
+        fixed_strings: true,
+      };
+      expect(grepTool.validateToolParams(params)).toBeNull();
+    });
 
     it('should handle no_ignore parameter', async () => {
       mockSpawn.mockImplementationOnce(
