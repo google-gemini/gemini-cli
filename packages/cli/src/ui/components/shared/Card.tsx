@@ -19,8 +19,8 @@ export interface CardProps {
   title: string;
   /** Optional text to display after the title (e.g., version, status). */
   suffix?: string;
-  /** Optional icon or text to display before the title. */
-  prefix?: boolean;
+  /** Optional indicator to display before the title. */
+  showStatusIndicator?: boolean;
   /** The content to be displayed inside the card. */
   children?: React.ReactNode;
   /** The styling and intent of the card. */
@@ -32,7 +32,7 @@ export interface CardProps {
 export const Card: React.FC<CardProps> = ({
   status = ToolCallStatus.Pending,
   title,
-  prefix = true,
+  showStatusIndicator = true,
   suffix,
   children,
   width = '100%',
@@ -78,8 +78,10 @@ export const Card: React.FC<CardProps> = ({
             gap={1}
             justifyContent="flex-start"
           >
-            <Box marginRight={-2}>
-              {prefix && <ToolStatusIndicator status={status} name={title} />}
+            <Box marginRight={showStatusIndicator ? -2 : -1}>
+              {showStatusIndicator && (
+                <ToolStatusIndicator status={status} name={title} />
+              )}
             </Box>
             <Text bold color={colors.text}>
               {title}
