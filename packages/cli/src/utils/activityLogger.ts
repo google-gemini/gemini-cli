@@ -85,6 +85,26 @@ export class ActivityLogger extends EventEmitter {
     return this.networkLoggingEnabled;
   }
 
+  /**
+   * Atomically returns and clears all buffered logs.
+   * Prevents data loss from events emitted between get and clear.
+   */
+  drainBufferedLogs(): {
+    network: Array<NetworkLog | PartialNetworkLog>;
+    console: Array<ConsoleLogPayload & { timestamp: number }>;
+  } {
+    const network: Array<NetworkLog | PartialNetworkLog> = [];
+    for (const id of this.networkBufferIds) {
+      const events = this.networkBufferMap.get(id);
+      if (events) network.push(...events);
+    }
+    const console = [...this.consoleBuffer];
+    this.networkBufferMap.clear();
+    this.networkBufferIds = [];
+    this.consoleBuffer = [];
+    return { network, console };
+  }
+
   getBufferedLogs(): {
     network: Array<NetworkLog | PartialNetworkLog>;
     console: Array<ConsoleLogPayload & { timestamp: number }>;
@@ -158,6 +178,11 @@ export class ActivityLogger extends EventEmitter {
     }
 
     return sanitized;
+  }
+
+  /** @internal Emit a network event — public for testing only. */
+  emitNetworkEvent(payload: NetworkLog | PartialNetworkLog) {
+    this.safeEmitNetwork(payload);
   }
 
   private safeEmitNetwork(payload: NetworkLog | PartialNetworkLog) {
@@ -325,6 +350,8 @@ export class ActivityLogger extends EventEmitter {
   }
 
   private patchNodeHttp() {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const self = this;
     const originalRequest = http.request;
     const originalHttpsRequest = https.request;
 
@@ -377,12 +404,14 @@ export class ActivityLogger extends EventEmitter {
           requestChunks.push(
             Buffer.isBuffer(chunk)
               ? chunk
-              : // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                Buffer.from(chunk as any, encoding as any),
+              : Buffer.from(
+                  chunk as string,
+                  encoding as BufferEncoding | undefined,
+                ),
           );
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return oldWrite.apply(this, [chunk as any, ...etc] as any);
+        return oldWrite.apply(this, [chunk, ...etc] as any);
       };
 
       req.end = function (
@@ -395,20 +424,20 @@ export class ActivityLogger extends EventEmitter {
           requestChunks.push(
             Buffer.isBuffer(chunk)
               ? chunk
-              : // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                Buffer.from(chunk as any, encoding as any),
+              : Buffer.from(
+                  chunk as string,
+                  encoding as BufferEncoding | undefined,
+                ),
           );
         }
         const body = Buffer.concat(requestChunks).toString('utf8');
 
-        ActivityLogger.getInstance().safeEmitNetwork({
+        self.safeEmitNetwork({
           id,
           timestamp: Date.now(),
           method: req.method || 'GET',
           url,
-          headers: ActivityLogger.getInstance().stringifyHeaders(
-            req.getHeaders(),
-          ),
+          headers: self.stringifyHeaders(req.getHeaders()),
           body,
           pending: true,
         });
@@ -425,7 +454,7 @@ export class ActivityLogger extends EventEmitter {
           responseChunks.push(chunkBuffer);
 
           // Emit chunk update for streaming
-          ActivityLogger.getInstance().safeEmitNetwork({
+          self.safeEmitNetwork({
             id,
             pending: true,
             chunk: {
@@ -442,19 +471,16 @@ export class ActivityLogger extends EventEmitter {
 
           const processBuffer = (finalBuffer: Buffer) => {
             const resBody = finalBuffer.toString('utf8');
-            const startTime =
-              ActivityLogger.getInstance().requestStartTimes.get(id);
+            const startTime = self.requestStartTimes.get(id);
             const durationMs = startTime ? Date.now() - startTime : 0;
-            ActivityLogger.getInstance().requestStartTimes.delete(id);
+            self.requestStartTimes.delete(id);
 
-            ActivityLogger.getInstance().safeEmitNetwork({
+            self.safeEmitNetwork({
               id,
               pending: false,
               response: {
                 status: res.statusCode || 0,
-                headers: ActivityLogger.getInstance().stringifyHeaders(
-                  res.headers,
-                ),
+                headers: self.stringifyHeaders(res.headers),
                 body: resBody,
                 durationMs,
               },
@@ -476,9 +502,9 @@ export class ActivityLogger extends EventEmitter {
       });
 
       req.on('error', (err: Error) => {
-        ActivityLogger.getInstance().requestStartTimes.delete(id);
+        self.requestStartTimes.delete(id);
         const message = err.message;
-        ActivityLogger.getInstance().safeEmitNetwork({
+        self.safeEmitNetwork({
           id,
           pending: false,
           error: message,
@@ -678,7 +704,7 @@ function setupNetworkLogging(
       return;
     }
 
-    const { network, console: consoleLogs } = capture.getBufferedLogs();
+    const { network, console: consoleLogs } = capture.drainBufferedLogs();
     const allInitialLogs: Array<{
       type: 'network' | 'console';
       payload: NetworkLog | PartialNetworkLog | ConsoleLogPayload;
@@ -708,8 +734,6 @@ function setupNetworkLogging(
         timestamp: Date.now(),
       });
     }
-
-    capture.clearBufferedLogs();
 
     while (transportBuffer.length > 0) {
       const message = transportBuffer.shift()!;

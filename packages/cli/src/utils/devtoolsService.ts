@@ -24,6 +24,7 @@ const DEFAULT_DEVTOOLS_PORT = 25417;
 const DEFAULT_DEVTOOLS_HOST = '127.0.0.1';
 const MAX_PROMOTION_ATTEMPTS = 3;
 let promotionAttempts = 0;
+let serverStartPromise: Promise<string> | null = null;
 
 /**
  * Probe whether a DevTools server is already listening on the given host:port.
@@ -132,8 +133,15 @@ export function setupInitialActivityLogger(config: Config) {
 /**
  * Starts the DevTools server and opens the UI in the browser.
  * Returns the URL to the DevTools UI.
+ * Deduplicates concurrent calls — returns the same promise if already in flight.
  */
-export async function startDevToolsServer(config: Config): Promise<string> {
+export function startDevToolsServer(config: Config): Promise<string> {
+  if (serverStartPromise) return serverStartPromise;
+  serverStartPromise = startDevToolsServerImpl(config);
+  return serverStartPromise;
+}
+
+async function startDevToolsServerImpl(config: Config): Promise<string> {
   const onReconnectFailed = () => handlePromotion(config);
 
   // Probe for an existing DevTools server
@@ -172,18 +180,8 @@ export async function startDevToolsServer(config: Config): Promise<string> {
   return `http://${host}:${port}`;
 }
 
-/**
- * Registers the activity logger (legacy wrapper).
- */
-export async function registerActivityLogger(config: Config) {
-  setupInitialActivityLogger(config);
-  const target = process.env['GEMINI_CLI_ACTIVITY_LOG_TARGET'];
-  if (!target) {
-    await startDevToolsServer(config);
-  }
-}
-
 /** Reset module-level state — test only. */
 export function resetForTesting() {
   promotionAttempts = 0;
+  serverStartPromise = null;
 }

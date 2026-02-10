@@ -59,8 +59,7 @@ const mockDevToolsInstance = vi.hoisted(() => ({
 const mockActivityLoggerInstance = vi.hoisted(() => ({
   disableNetworkLogging: vi.fn(),
   enableNetworkLogging: vi.fn(),
-  getBufferedLogs: vi.fn().mockReturnValue({ network: [], console: [] }),
-  clearBufferedLogs: vi.fn(),
+  drainBufferedLogs: vi.fn().mockReturnValue({ network: [], console: [] }),
 }));
 
 vi.mock('./activityLogger.js', () => ({
@@ -184,6 +183,26 @@ describe('devtoolsService', () => {
       expect(
         mockActivityLoggerInstance.enableNetworkLogging,
       ).toHaveBeenCalled();
+    });
+
+    it('deduplicates concurrent calls (returns same promise)', async () => {
+      const config = createMockConfig();
+      mockDevToolsInstance.start.mockResolvedValue('http://127.0.0.1:25417');
+      mockDevToolsInstance.getPort.mockReturnValue(25417);
+
+      const promise1 = startDevToolsServer(config);
+      const promise2 = startDevToolsServer(config);
+
+      expect(promise1).toBe(promise2);
+
+      await vi.waitFor(() => expect(MockWebSocket.instances.length).toBe(1));
+      MockWebSocket.instances[0].simulateError();
+
+      const [url1, url2] = await Promise.all([promise1, promise2]);
+      expect(url1).toBe('http://127.0.0.1:25417');
+      expect(url2).toBe('http://127.0.0.1:25417');
+      // Only one probe + one server start
+      expect(mockAddNetworkTransport).toHaveBeenCalledTimes(1);
     });
 
     it('throws when DevTools server fails to start', async () => {

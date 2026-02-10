@@ -27,10 +27,8 @@ describe('ActivityLogger', () => {
         headers: {},
         pending: true,
       };
-      // @ts-expect-error - accessing private member for test
-      logger.safeEmitNetwork(initial);
-      // @ts-expect-error - accessing private member for test
-      logger.safeEmitNetwork({
+      logger.emitNetworkEvent(initial);
+      logger.emitNetworkEvent({
         id: `req-${i}`,
         pending: false,
         response: {
@@ -53,8 +51,7 @@ describe('ActivityLogger', () => {
 
   it('keeps all chunk events for a buffered request', () => {
     // One request with many chunks
-    // @ts-expect-error - accessing private member for test
-    logger.safeEmitNetwork({
+    logger.emitNetworkEvent({
       id: 'chunked',
       timestamp: 1,
       method: 'POST',
@@ -63,15 +60,13 @@ describe('ActivityLogger', () => {
       pending: true,
     });
     for (let i = 0; i < 5; i++) {
-      // @ts-expect-error - accessing private member for test
-      logger.safeEmitNetwork({
+      logger.emitNetworkEvent({
         id: 'chunked',
         pending: true,
         chunk: { index: i, data: `chunk-${i}`, timestamp: 2 + i },
       });
     }
-    // @ts-expect-error - accessing private member for test
-    logger.safeEmitNetwork({
+    logger.emitNetworkEvent({
       id: 'chunked',
       pending: false,
       response: { status: 200, headers: {}, body: 'done', durationMs: 50 },
@@ -105,8 +100,7 @@ describe('ActivityLogger', () => {
 
   it('clearBufferedLogs empties both buffers', () => {
     logger.logConsole({ content: 'test', type: 'log' });
-    // @ts-expect-error - accessing private member for test
-    logger.safeEmitNetwork({
+    logger.emitNetworkEvent({
       id: 'r1',
       timestamp: 1,
       method: 'GET',
@@ -117,5 +111,25 @@ describe('ActivityLogger', () => {
     const logs = logger.getBufferedLogs();
     expect(logs.console.length).toBe(0);
     expect(logs.network.length).toBe(0);
+  });
+
+  it('drainBufferedLogs returns and clears atomically', () => {
+    logger.logConsole({ content: 'drain-test', type: 'log' });
+    logger.emitNetworkEvent({
+      id: 'r1',
+      timestamp: 1,
+      method: 'GET',
+      url: 'http://example.com',
+      headers: {},
+    });
+
+    const drained = logger.drainBufferedLogs();
+    expect(drained.console.length).toBe(1);
+    expect(drained.network.length).toBe(1);
+
+    // Buffer should now be empty
+    const after = logger.getBufferedLogs();
+    expect(after.console.length).toBe(0);
+    expect(after.network.length).toBe(0);
   });
 });
