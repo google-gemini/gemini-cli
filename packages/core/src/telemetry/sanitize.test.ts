@@ -26,6 +26,8 @@ function createMockConfig(logPromptsEnabled: boolean): Config {
   return {
     getTelemetryLogPromptsEnabled: () => logPromptsEnabled,
     getSessionId: () => 'test-session-id',
+    getExperiments: () => undefined,
+    getExperimentsAsync: async () => undefined,
     getModel: () => 'gemini-1.5-flash',
     isInteractive: () => true,
     getUserEmail: () => undefined,
