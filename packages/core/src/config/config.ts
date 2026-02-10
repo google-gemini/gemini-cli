@@ -101,6 +101,7 @@ import { HookSystem } from '../hooks/index.js';
 import type { UserTierId } from '../code_assist/types.js';
 import type { RetrieveUserQuotaResponse } from '../code_assist/types.js';
 import type { AdminControlsSettings } from '../code_assist/types.js';
+import type { HierarchicalMemory } from './memory.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
 import type { Experiments } from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
@@ -384,7 +385,7 @@ export interface ConfigParameters {
   mcpServerCommand?: string;
   mcpServers?: Record<string, MCPServerConfig>;
   mcpEnablementCallbacks?: McpEnablementCallbacks;
-  userMemory?: string;
+  userMemory?: string | HierarchicalMemory;
   geminiMdFileCount?: number;
   geminiMdFilePaths?: string[];
   approvalMode?: ApprovalMode;
@@ -519,7 +520,7 @@ export class Config {
   private readonly extensionsEnabled: boolean;
   private mcpServers: Record<string, MCPServerConfig> | undefined;
   private readonly mcpEnablementCallbacks?: McpEnablementCallbacks;
-  private userMemory: string;
+  private userMemory: string | HierarchicalMemory;
   private geminiMdFileCount: number;
   private geminiMdFilePaths: string[];
   private readonly showMemoryUsage: boolean;
@@ -1379,14 +1380,13 @@ export class Config {
     this.mcpServers = mcpServers;
   }
 
-  getUserMemory(): string {
+  getUserMemory(): string | HierarchicalMemory {
     if (this.experimentalJitContext && this.contextManager) {
-      return [
-        this.contextManager.getGlobalMemory(),
-        this.contextManager.getEnvironmentMemory(),
-      ]
-        .filter(Boolean)
-        .join('\n\n');
+      return {
+        global: this.contextManager.getGlobalMemory(),
+        extension: this.contextManager.getExtensionMemory(),
+        project: this.contextManager.getEnvironmentMemory(),
+      };
     }
     return this.userMemory;
   }
@@ -1409,7 +1409,7 @@ export class Config {
     }
   }
 
-  setUserMemory(newUserMemory: string): void {
+  setUserMemory(newUserMemory: string | HierarchicalMemory): void {
     this.userMemory = newUserMemory;
   }
 
