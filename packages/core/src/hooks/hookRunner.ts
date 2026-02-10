@@ -441,6 +441,9 @@ export class HookRunner {
     text: string,
     exitCode: number,
   ): HookOutput {
+    if (process.env['CI'] === 'true' || process.env['VERBOSE'] === 'true') {
+      console.log(`[HookRunner] convertPlainTextToHookOutput: exitCode=${exitCode}, text="${text}"`);
+    }
     if (exitCode === EXIT_CODE_SUCCESS) {
       // Success - treat as system message or additional context
       return {
