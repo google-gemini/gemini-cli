@@ -15,6 +15,7 @@ import {
   PREVIEW_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL,
+  PREVIEW_GEMINI_FLASH_MODEL,
 } from '../../config/models.js';
 import { promptIdContext } from '../../utils/promptIdContext.js';
 import type { Content } from '@google/genai';
@@ -118,7 +119,7 @@ describe('NumericalClassifierStrategy', () => {
       .calls[0][0];
 
     expect(generateJsonCall).toMatchObject({
-      modelConfigKey: { model: mockResolvedConfig.model },
+      modelConfigKey: { model: PREVIEW_GEMINI_FLASH_MODEL },
       promptId: 'test-prompt-id',
     });
 
