@@ -8,6 +8,7 @@ import { describe, it, expect } from 'vitest';
 import {
   resolveModel,
   resolveClassifierModel,
+  isGemini3Model,
   isGemini2Model,
   isAutoModel,
   getDisplayString,
@@ -24,6 +25,29 @@ import {
   PREVIEW_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL_AUTO,
 } from './models.js';
+
+describe('isGemini3Model', () => {
+  it('should return true for gemini-3 models', () => {
+    expect(isGemini3Model('gemini-3-pro-preview')).toBe(true);
+    expect(isGemini3Model('gemini-3-flash-preview')).toBe(true);
+  });
+
+  it('should return true for aliases that resolve to Gemini 3 when preview is enabled', () => {
+    expect(isGemini3Model(GEMINI_MODEL_ALIAS_AUTO, true)).toBe(true);
+    expect(isGemini3Model(GEMINI_MODEL_ALIAS_PRO, true)).toBe(true);
+    expect(isGemini3Model(PREVIEW_GEMINI_MODEL_AUTO)).toBe(true);
+  });
+
+  it('should return false for Gemini 2 models', () => {
+    expect(isGemini3Model('gemini-2.5-pro')).toBe(false);
+    expect(isGemini3Model('gemini-2.5-flash')).toBe(false);
+    expect(isGemini3Model(DEFAULT_GEMINI_MODEL_AUTO)).toBe(false);
+  });
+
+  it('should return false for arbitrary strings', () => {
+    expect(isGemini3Model('gpt-4')).toBe(false);
+  });
+});
 
 describe('getDisplayString', () => {
   it('should return Auto (Gemini 3) for preview auto model', () => {
