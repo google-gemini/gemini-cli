@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - 'main'
+      - 'ntm/repro-hook-flakiness'
   merge_group:
   workflow_run:
     workflows: ['Trigger E2E']
@@ -130,8 +131,7 @@ jobs:
       - 'merge_queue_skipper'
       - 'parse_run_context'
     runs-on: 'gemini-cli-ubuntu-16-core'
-    if: |
-      always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
+    if: false
     strategy:
       fail-fast: false
       matrix:
@@ -183,8 +183,7 @@ jobs:
       - 'merge_queue_skipper'
       - 'parse_run_context'
     runs-on: 'macos-latest'
-    if: |
-      always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
+    if: false
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
@@ -275,7 +274,7 @@ jobs:
           UV_THREADPOOL_SIZE: '32'
           NODE_ENV: 'test'
         shell: 'pwsh'
-        run: 'npm run test:integration:sandbox:none'
+        run: 'npx vitest run --root integration-tests hooks-system.test.ts'
 
   evals:
     name: 'Evals (ALWAYS_PASSING)'
@@ -283,8 +282,7 @@ jobs:
       - 'merge_queue_skipper'
       - 'parse_run_context'
     runs-on: 'gemini-cli-ubuntu-16-core'
-    if: |
-      always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
+    if: false
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955' # ratchet:actions/checkout@v5
@@ -313,21 +311,17 @@ jobs:
     if: |
       always() && (needs.merge_queue_skipper.result !='success' || needs.merge_queue_skipper.outputs.skip != 'true')
     needs:
-      - 'e2e_linux'
-      - 'e2e_mac'
-      - 'evals'
+      - 'e2e_windows'
       - 'merge_queue_skipper'
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Check E2E test results'
         run: |
-          if [[ ${{ needs.e2e_linux.result }} != 'success' || \
-               ${{ needs.e2e_mac.result }} != 'success' || \
-               ${{ needs.evals.result }} != 'success' ]]; then
-            echo "One or more E2E jobs failed."
+          if [[ ${{ needs.e2e_windows.result }} != 'success' ]]; then
+            echo "Windows E2E job failed."
             exit 1
           fi
-          echo "All required E2E jobs passed!"
+          echo "Windows E2E job passed!"
 
   set_workflow_status:
     runs-on: 'gemini-cli-ubuntu-16-core'
