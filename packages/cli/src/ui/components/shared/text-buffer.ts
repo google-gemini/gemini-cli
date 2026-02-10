@@ -34,8 +34,8 @@ import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
 import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../../constants.js';
 
-const LARGE_PASTE_LINE_THRESHOLD = 5;
-const LARGE_PASTE_CHAR_THRESHOLD = 500;
+export const LARGE_PASTE_LINE_THRESHOLD = 5;
+export const LARGE_PASTE_CHAR_THRESHOLD = 500;
 
 // Regex to match paste placeholders like [Pasted Text: 6 lines] or [Pasted Text: 501 chars #2]
 export const PASTED_TEXT_PLACEHOLDER_REGEX =
@@ -986,11 +986,15 @@ export function getTransformUnderCursor(
   row: number,
   col: number,
   spansByLine: Transformation[][],
+  options: { includeEdge?: boolean } = {},
 ): Transformation | null {
   const spans = spansByLine[row];
   if (!spans || spans.length === 0) return null;
   for (const span of spans) {
-    if (col >= span.logStart && col < span.logEnd) {
+    if (
+      col >= span.logStart &&
+      (options.includeEdge ? col <= span.logEnd : col < span.logEnd)
+    ) {
       return span;
     }
     if (col < span.logStart) break;

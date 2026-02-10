@@ -9,7 +9,7 @@ import { createMockSettings } from '../../test-utils/settings.js';
 import { waitFor } from '../../test-utils/async.js';
 import { act, useState } from 'react';
 import type { InputPromptProps } from './InputPrompt.js';
-import { InputPrompt } from './InputPrompt.js';
+import { InputPrompt, tryTogglePasteExpansion } from './InputPrompt.js';
 import type { TextBuffer } from './shared/text-buffer.js';
 import {
   calculateTransformationsForLine,
@@ -46,6 +46,11 @@ import { isLowColorDepth } from '../utils/terminalUtils.js';
 import { cpLen } from '../utils/textUtils.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import type { Key } from '../hooks/useKeypress.js';
+import {
+  appEvents,
+  AppEvent,
+  TransientMessageType,
+} from '../../utils/events.js';
 
 vi.mock('../hooks/useShellHistory.js');
 vi.mock('../hooks/useCommandCompletion.js');
@@ -67,6 +72,10 @@ vi.mock('ink', async (importOriginal) => {
       <actual.Text {...props}>{children}</actual.Text>
     )),
   };
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 const mockSlashCommands: SlashCommand[] = [
@@ -3826,6 +3835,260 @@ describe('InputPrompt', () => {
       unmount();
     });
   });
+
+  describe('Ctrl+O paste expansion', () => {
+    const CTRL_O = '\x0f'; // Ctrl+O key sequence
+
+    it('Ctrl+O triggers paste expansion via keybinding', async () => {
+      const id = '[Pasted Text: 10 lines]';
+      const toggleFn = vi.fn();
+      const buffer = {
+        ...props.buffer,
+        text: id,
+        cursor: [0, 0] as number[],
+        pastedContent: {
+          [id]: 'line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10',
+        },
+        transformationsByLine: [
+          [
+            {
+              logStart: 0,
+              logEnd: id.length,
+              logicalText: id,
+              collapsedText: id,
+              type: 'paste',
+              id,
+            },
+          ],
+        ],
+        expandedPaste: null,
+        getExpandedPasteAtLine: vi.fn().mockReturnValue(null),
+        togglePasteExpansion: toggleFn,
+      } as unknown as TextBuffer;
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} buffer={buffer} />,
+        { uiActions },
+      );
+
+      await act(async () => {
+        stdin.write(CTRL_O);
+      });
+
+      await waitFor(() => {
+        expect(toggleFn).toHaveBeenCalledWith(id, 0, 0);
+      });
+      unmount();
+    });
+
+    it.each([
+      {
+        name: 'hint appears on large paste via Ctrl+V',
+        text: 'line1\nline2\nline3\nline4\nline5\nline6',
+        method: 'ctrl-v',
+        expectHint: true,
+      },
+      {
+        name: 'hint does not appear for small pastes via Ctrl+V',
+        text: 'hello',
+        method: 'ctrl-v',
+        expectHint: false,
+      },
+      {
+        name: 'hint appears on large terminal paste event',
+        text: 'line1\nline2\nline3\nline4\nline5\nline6',
+        method: 'terminal-paste',
+        expectHint: true,
+      },
+    ])('$name', async ({ text, method, expectHint }) => {
+      vi.mocked(clipboardy.read).mockResolvedValue(text);
+      vi.mocked(clipboardUtils.clipboardHasImage).mockResolvedValue(false);
+
+      const emitSpy = vi.spyOn(appEvents, 'emit');
+      const buffer = {
+        ...props.buffer,
+        handleInput: vi.fn().mockReturnValue(true),
+      } as unknown as TextBuffer;
+
+      // Need kitty protocol enabled for terminal paste events
+      if (method === 'terminal-paste') {
+        mockedUseKittyKeyboardProtocol.mockReturnValue({
+          enabled: true,
+          checking: false,
+        });
+      }
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt
+          {...props}
+          buffer={method === 'terminal-paste' ? buffer : props.buffer}
+        />,
+      );
+
+      await act(async () => {
+        if (method === 'ctrl-v') {
+          stdin.write('\x16'); // Ctrl+V
+        } else {
+          stdin.write(`\x1b[200~${text}\x1b[201~`);
+        }
+      });
+
+      await waitFor(() => {
+        if (expectHint) {
+          expect(emitSpy).toHaveBeenCalledWith(AppEvent.TransientMessage, {
+            message: 'Press Ctrl+O to expand pasted text',
+            type: TransientMessageType.Hint,
+          });
+        } else {
+          // If no hint expected, verify buffer was still updated
+          if (method === 'ctrl-v') {
+            expect(mockBuffer.insert).toHaveBeenCalledWith(text, {
+              paste: true,
+            });
+          } else {
+            expect(buffer.handleInput).toHaveBeenCalled();
+          }
+        }
+      });
+
+      if (!expectHint) {
+        expect(emitSpy).not.toHaveBeenCalledWith(
+          AppEvent.TransientMessage,
+          expect.any(Object),
+        );
+      }
+
+      emitSpy.mockRestore();
+      unmount();
+    });
+  });
+
+  describe('tryTogglePasteExpansion', () => {
+    it.each([
+      {
+        name: 'returns false when no pasted content exists',
+        cursor: [0, 0],
+        pastedContent: {},
+        getExpandedPasteAtLine: null,
+        expected: false,
+      },
+      {
+        name: 'expands placeholder under cursor',
+        cursor: [0, 2],
+        pastedContent: { '[Pasted Text: 6 lines]': 'content' },
+        transformations: [
+          {
+            logStart: 0,
+            logEnd: '[Pasted Text: 6 lines]'.length,
+            id: '[Pasted Text: 6 lines]',
+          },
+        ],
+        expected: true,
+        expectedToggle: ['[Pasted Text: 6 lines]', 0, 2],
+      },
+      {
+        name: 'collapses expanded paste when cursor is inside',
+        cursor: [1, 0],
+        pastedContent: { '[Pasted Text: 6 lines]': 'a\nb\nc' },
+        getExpandedPasteAtLine: '[Pasted Text: 6 lines]',
+        expected: true,
+        expectedToggle: ['[Pasted Text: 6 lines]', 1, 0],
+      },
+      {
+        name: 'expands placeholder when cursor is immediately after it',
+        cursor: [0, '[Pasted Text: 6 lines]'.length],
+        pastedContent: { '[Pasted Text: 6 lines]': 'content' },
+        transformations: [
+          {
+            logStart: 0,
+            logEnd: '[Pasted Text: 6 lines]'.length,
+            id: '[Pasted Text: 6 lines]',
+          },
+        ],
+        expected: true,
+        expectedToggle: [
+          '[Pasted Text: 6 lines]',
+          0,
+          '[Pasted Text: 6 lines]'.length,
+        ],
+      },
+      {
+        name: 'shows hint when cursor is not on placeholder but placeholders exist',
+        cursor: [0, 0],
+        pastedContent: { '[Pasted Text: 6 lines]': 'content' },
+        transformationsByLine: [
+          [],
+          [
+            {
+              logStart: 0,
+              logEnd: '[Pasted Text: 6 lines]'.length,
+              type: 'paste',
+              id: '[Pasted Text: 6 lines]',
+            },
+          ],
+        ],
+        expected: true,
+        expectedHint: 'Move cursor within placeholder to expand',
+      },
+    ])(
+      '$name',
+      ({
+        cursor,
+        pastedContent,
+        transformations,
+        transformationsByLine,
+        getExpandedPasteAtLine,
+        expected,
+        expectedToggle,
+        expectedHint,
+      }) => {
+        const id = '[Pasted Text: 6 lines]';
+        const buffer = {
+          cursor,
+          pastedContent,
+          transformationsByLine: transformationsByLine || [
+            transformations
+              ? transformations.map((t) => ({
+                  ...t,
+                  logicalText: id,
+                  collapsedText: id,
+                  type: 'paste',
+                }))
+              : [],
+          ],
+          getExpandedPasteAtLine: vi
+            .fn()
+            .mockReturnValue(getExpandedPasteAtLine),
+          togglePasteExpansion: vi.fn(),
+        } as unknown as TextBuffer;
+
+        const emitSpy = vi.spyOn(appEvents, 'emit');
+        expect(tryTogglePasteExpansion(buffer)).toBe(expected);
+
+        if (expectedToggle) {
+          expect(buffer.togglePasteExpansion).toHaveBeenCalledWith(
+            ...expectedToggle,
+          );
+        } else {
+          expect(buffer.togglePasteExpansion).not.toHaveBeenCalled();
+        }
+
+        if (expectedHint) {
+          expect(emitSpy).toHaveBeenCalledWith(AppEvent.TransientMessage, {
+            message: expectedHint,
+            type: TransientMessageType.Hint,
+          });
+        } else {
+          expect(emitSpy).not.toHaveBeenCalledWith(
+            AppEvent.TransientMessage,
+            expect.any(Object),
+          );
+        }
+        emitSpy.mockRestore();
+      },
+    );
+  });
+
   describe('History Navigation and Completion Suppression', () => {
     beforeEach(() => {
       props.userMessages = ['first message', 'second message'];
