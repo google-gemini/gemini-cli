@@ -4,9 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
-import path from 'node:path';
-import { resolveToolDeclaration } from './resolver.js';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock node:os BEFORE importing coreTools to ensure it uses the mock
 vi.mock('node:os', async (importOriginal) => {
@@ -17,6 +15,7 @@ vi.mock('node:os', async (importOriginal) => {
   };
 });
 
+import { resolveToolDeclaration } from './resolver.js';
 import {
   READ_FILE_DEFINITION,
   WRITE_FILE_DEFINITION,
@@ -27,6 +26,27 @@ import {
 } from './coreTools.js';
 
 describe('coreTools snapshots for specific models', () => {
+  const mockPlatform = (platform: string) => {
+    vi.stubGlobal(
+      'process',
+      Object.create(process, {
+        platform: {
+          get: () => platform,
+        },
+      }),
+    );
+  };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    // Stub process.platform to 'linux' by default for deterministic snapshots across OSes
+    mockPlatform('linux');
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   const modelIds = ['gemini-2.5-pro', 'gemini-3-pro-preview'];
   const tools = [
     { name: 'read_file', definition: READ_FILE_DEFINITION },
@@ -43,17 +63,9 @@ describe('coreTools snapshots for specific models', () => {
   for (const modelId of modelIds) {
     describe(`Model: ${modelId}`, () => {
       for (const tool of tools) {
-        it(`snapshot for tool: ${tool.name}`, async () => {
+        it(`snapshot for tool: ${tool.name}`, () => {
           const resolved = resolveToolDeclaration(tool.definition, modelId);
-          // Create a directory structure: __snapshots__/<modelId>/<toolName>.json
-          const snapshotPath = path.join(
-            '__snapshots__',
-            modelId,
-            `${tool.name}.json`,
-          );
-          await expect(JSON.stringify(resolved, null, 2)).toMatchFileSnapshot(
-            snapshotPath,
-          );
+          expect(resolved).toMatchSnapshot();
         });
       }
     });
