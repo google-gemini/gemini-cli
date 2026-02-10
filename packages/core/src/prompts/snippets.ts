@@ -221,7 +221,7 @@ export function renderAgentSkills(skills?: AgentSkillOptions[]): string {
   return `
 # Available Agent Skills
 
-You have access to the following specialized skills. To activate a skill and receive its detailed instructions, you can call the ${formatToolName(ACTIVATE_SKILL_TOOL_NAME)} tool with the skill's name.
+You have access to the following specialized skills. To activate a skill and receive its detailed instructions, call the ${formatToolName(ACTIVATE_SKILL_TOOL_NAME)} tool with the skill's name.
 
 <available_skills>
 ${skillsXml}
