@@ -7,7 +7,14 @@
 import { Type } from '@google/genai';
 import type { ToolDefinition } from './types.js';
 import * as os from 'node:os';
-import { READ_FILE_TOOL_NAME, SHELL_TOOL_NAME } from '../tool-names.js';
+import {
+  GLOB_TOOL_NAME,
+  GREP_TOOL_NAME,
+  LS_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  SHELL_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+} from '../tool-names.js';
 
 // ============================================================================
 // READ_FILE TOOL
@@ -41,13 +48,160 @@ export const READ_FILE_DEFINITION: ToolDefinition = {
 };
 
 // ============================================================================
+// WRITE_FILE TOOL
+// ============================================================================
+
+export const WRITE_FILE_DEFINITION: ToolDefinition = {
+  base: {
+    name: WRITE_FILE_TOOL_NAME,
+    description: `Writes content to a specified file in the local filesystem.
+
+      The user has the ability to modify \`content\`. If modified, this will be stated in the response.`,
+    parametersJsonSchema: {
+      type: Type.OBJECT,
+      properties: {
+        file_path: {
+          description: 'The path to the file to write to.',
+          type: Type.STRING,
+        },
+        content: {
+          description: 'The content to write to the file.',
+          type: Type.STRING,
+        },
+      },
+      required: ['file_path', 'content'],
+    },
+  },
+};
+
+// ============================================================================
+// GREP TOOL
+// ============================================================================
+
+export const GREP_DEFINITION: ToolDefinition = {
+  base: {
+    name: GREP_TOOL_NAME,
+    description:
+      'Searches for a regular expression pattern within file contents. Max 100 matches.',
+    parametersJsonSchema: {
+      type: Type.OBJECT,
+      properties: {
+        pattern: {
+          description: `The regular expression (regex) pattern to search for within file contents (e.g., 'function\\s+myFunction', 'import\\s+\\{.*\\}\\s+from\\s+.*').`,
+          type: Type.STRING,
+        },
+        dir_path: {
+          description:
+            'Optional: The absolute path to the directory to search within. If omitted, searches the current working directory.',
+          type: Type.STRING,
+        },
+        include: {
+          description: `Optional: A glob pattern to filter which files are searched (e.g., '*.js', '*.{ts,tsx}', 'src/**'). If omitted, searches all files (respecting potential global ignores).`,
+          type: Type.STRING,
+        },
+      },
+      required: ['pattern'],
+    },
+  },
+};
+
+// ============================================================================
+// GLOB TOOL
+// ============================================================================
+
+export const GLOB_DEFINITION: ToolDefinition = {
+  base: {
+    name: GLOB_TOOL_NAME,
+    description:
+      'Efficiently finds files matching specific glob patterns (e.g., `src/**/*.ts`, `**/*.md`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.',
+    parametersJsonSchema: {
+      type: Type.OBJECT,
+      properties: {
+        pattern: {
+          description:
+            "The glob pattern to match against (e.g., '**/*.py', 'docs/*.md').",
+          type: Type.STRING,
+        },
+        dir_path: {
+          description:
+            'Optional: The absolute path to the directory to search within. If omitted, searches the root directory.',
+          type: Type.STRING,
+        },
+        case_sensitive: {
+          description:
+            'Optional: Whether the search should be case-sensitive. Defaults to false.',
+          type: Type.BOOLEAN,
+        },
+        respect_git_ignore: {
+          description:
+            'Optional: Whether to respect .gitignore patterns when finding files. Only available in git repositories. Defaults to true.',
+          type: Type.BOOLEAN,
+        },
+        respect_gemini_ignore: {
+          description:
+            'Optional: Whether to respect .geminiignore patterns when finding files. Defaults to true.',
+          type: Type.BOOLEAN,
+        },
+      },
+      required: ['pattern'],
+    },
+  },
+};
+
+// ============================================================================
+// LS TOOL
+// ============================================================================
+
+export const LS_DEFINITION: ToolDefinition = {
+  base: {
+    name: LS_TOOL_NAME,
+    description:
+      'Lists the names of files and subdirectories directly within a specified directory path. Can optionally ignore entries matching provided glob patterns.',
+    parametersJsonSchema: {
+      type: Type.OBJECT,
+      properties: {
+        dir_path: {
+          description: 'The path to the directory to list',
+          type: Type.STRING,
+        },
+        ignore: {
+          description: 'List of glob patterns to ignore',
+          items: {
+            type: Type.STRING,
+          },
+          type: Type.ARRAY,
+        },
+        file_filtering_options: {
+          description:
+            'Optional: Whether to respect ignore patterns from .gitignore or .geminiignore',
+          type: Type.OBJECT,
+          properties: {
+            respect_git_ignore: {
+              description:
+                'Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.',
+              type: Type.BOOLEAN,
+            },
+            respect_gemini_ignore: {
+              description:
+                'Optional: Whether to respect .geminiignore patterns when listing files. Defaults to true.',
+              type: Type.BOOLEAN,
+            },
+          },
+        },
+      },
+      required: ['dir_path'],
+    },
+  },
+};
+
+// ============================================================================
 // SHELL TOOL
 // ============================================================================
 
 /**
  * Generates the platform-specific description for the shell tool.
  */
-export function getShellToolDescription(
+function getShellToolDescription(
   enableInteractiveShell: boolean,
   enableEfficiency: boolean,
 ): string {
@@ -86,7 +240,7 @@ export function getShellToolDescription(
 /**
  * Returns the platform-specific description for the 'command' parameter.
  */
-export function getCommandDescription(): string {
+function getCommandDescription(): string {
   if (os.platform() === 'win32') {
     return 'Exact command to execute as `powershell.exe -NoProfile -Command <command>`';
   }
