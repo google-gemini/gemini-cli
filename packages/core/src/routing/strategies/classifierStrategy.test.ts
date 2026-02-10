@@ -51,12 +51,8 @@ describe('ClassifierStrategy', () => {
       modelConfigService: {
         getResolvedConfig: vi.fn().mockReturnValue(mockResolvedConfig),
       },
-<<<<<<< HEAD
       getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
       getPreviewFeatures: () => false,
-=======
-      getModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO),
->>>>>>> 37f128a10 (feat(routing): restrict numerical routing to Gemini 3 family (#18478))
       getNumericalRoutingEnabled: vi.fn().mockResolvedValue(false),
     } as unknown as Config;
     mockBaseLlmClient = {

@@ -143,8 +143,11 @@ export function isPreviewModel(model: string): boolean {
  * @param model The model name to check.
  * @returns True if the model is a Gemini 3 model.
  */
-export function isGemini3Model(model: string): boolean {
-  const resolved = resolveModel(model);
+export function isGemini3Model(
+  model: string,
+  previewFeaturesEnabled = false,
+): boolean {
+  const resolved = resolveModel(model, previewFeaturesEnabled);
   return /^gemini-3(\.|-|$)/.test(resolved);
 }
 

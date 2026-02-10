@@ -12,7 +12,6 @@ import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import {
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
-  PREVIEW_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL,
 } from '../../config/models.js';
@@ -48,12 +47,8 @@ describe('NumericalClassifierStrategy', () => {
       modelConfigService: {
         getResolvedConfig: vi.fn().mockReturnValue(mockResolvedConfig),
       },
-<<<<<<< HEAD
       getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
       getPreviewFeatures: () => false,
-=======
-      getModel: vi.fn().mockReturnValue(PREVIEW_GEMINI_MODEL_AUTO),
->>>>>>> 37f128a10 (feat(routing): restrict numerical routing to Gemini 3 family (#18478))
       getSessionId: vi.fn().mockReturnValue('control-group-id'), // Default to Control Group (Hash 71 >= 50)
       getNumericalRoutingEnabled: vi.fn().mockResolvedValue(true),
       getClassifierThreshold: vi.fn().mockResolvedValue(undefined),
