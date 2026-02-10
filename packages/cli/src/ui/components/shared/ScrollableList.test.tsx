@@ -14,6 +14,12 @@ import { MouseProvider } from '../../contexts/MouseContext.js';
 import { describe, it, expect, vi } from 'vitest';
 import { waitFor } from '../../../test-utils/async.js';
 
+vi.mock('../../contexts/UIStateContext.js', () => ({
+  useUIState: vi.fn(() => ({
+    copyModeEnabled: false,
+  })),
+}));
+
 // Mock useStdout to provide a fixed size for testing
 vi.mock('ink', async (importOriginal) => {
   const actual = await importOriginal<typeof import('ink')>();
