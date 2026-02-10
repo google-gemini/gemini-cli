@@ -30,7 +30,6 @@ import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { StreamingState, ToolCallStatus } from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
-import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 
 export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const config = useConfig();
@@ -39,7 +38,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const uiState = useUIState();
   const uiActions = useUIActions();
   const { vimEnabled, vimMode } = useVimMode();
-  const inlineThinkingMode = getInlineThinkingMode(settings);
   const terminalWidth = process.stdout.columns;
   const isNarrow = isNarrowWidth(terminalWidth);
   const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
@@ -119,9 +117,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                     ? undefined
                     : uiState.currentLoadingPhrase
                 }
-                thoughtLabel={
-                  inlineThinkingMode === 'full' ? 'Thinking ...' : undefined
-                }
+                thoughtLabel={undefined}
                 elapsedTime={uiState.elapsedTime}
               />
             )}

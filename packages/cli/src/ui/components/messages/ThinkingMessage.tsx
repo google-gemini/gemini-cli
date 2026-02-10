@@ -13,9 +13,12 @@ import { theme } from '../../semantic-colors.js';
 interface ThinkingMessageProps {
   thought: ThoughtSummary;
   terminalWidth: number;
+  isFirstThinking?: boolean;
+  isLastThinking?: boolean;
 }
 
 const THINKING_LEFT_PADDING = 1;
+const VERTICAL_LINE_WIDTH = 2;
 
 function splitGraphemes(value: string): string[] {
   if (typeof Intl !== 'undefined' && 'Segmenter' in Intl) {
@@ -117,20 +120,26 @@ function wrapLineToWidth(line: string, width: number): string[] {
 export const ThinkingMessage: React.FC<ThinkingMessageProps> = ({
   thought,
   terminalWidth,
+  isFirstThinking,
+  isLastThinking,
 }) => {
   const fullLines = useMemo(() => normalizeThoughtLines(thought), [thought]);
-  const fullSummaryDisplayLines = useMemo(() => {
-    const contentWidth = Math.max(terminalWidth - THINKING_LEFT_PADDING - 2, 1);
-    return fullLines.length > 0
-      ? wrapLineToWidth(fullLines[0], contentWidth)
-      : [];
-  }, [fullLines, terminalWidth]);
-  const fullBodyDisplayLines = useMemo(() => {
-    const contentWidth = Math.max(terminalWidth - THINKING_LEFT_PADDING - 2, 1);
-    return fullLines
-      .slice(1)
-      .flatMap((line) => wrapLineToWidth(line, contentWidth));
-  }, [fullLines, terminalWidth]);
+  const contentWidth = Math.max(
+    terminalWidth - THINKING_LEFT_PADDING - VERTICAL_LINE_WIDTH - 2,
+    1,
+  );
+
+  const fullSummaryDisplayLines = useMemo(
+    () =>
+      fullLines.length > 0 ? wrapLineToWidth(fullLines[0], contentWidth) : [],
+    [fullLines, contentWidth],
+  );
+
+  const fullBodyDisplayLines = useMemo(
+    () =>
+      fullLines.slice(1).flatMap((line) => wrapLineToWidth(line, contentWidth)),
+    [fullLines, contentWidth],
+  );
 
   if (
     fullSummaryDisplayLines.length === 0 &&
@@ -139,31 +148,60 @@ export const ThinkingMessage: React.FC<ThinkingMessageProps> = ({
     return null;
   }
 
+  const verticalLine = (
+    <Box width={VERTICAL_LINE_WIDTH}>
+      <Text color={theme.text.secondary}>│ </Text>
+    </Box>
+  );
+
   return (
     <Box
       width={terminalWidth}
-      marginBottom={1}
-      paddingLeft={THINKING_LEFT_PADDING}
       flexDirection="column"
+      marginBottom={isLastThinking ? 1 : 0}
     >
-      {fullSummaryDisplayLines.map((line, index) => (
-        <Box key={`summary-line-row-${index}`} flexDirection="row">
-          <Box width={2}>
+      {isFirstThinking && (
+        <>
+          <Text color={theme.text.primary} italic>
+            {' '}
+            Thinking...{' '}
+          </Text>
+          <Box flexDirection="row">
+            <Box width={THINKING_LEFT_PADDING} />
+            {verticalLine}
             <Text> </Text>
           </Box>
-          <Text color={theme.text.primary} bold italic wrap="truncate-end">
-            {line}
-          </Text>
+        </>
+      )}
+
+      {!isFirstThinking && (
+        <Box flexDirection="row">
+          <Box width={THINKING_LEFT_PADDING} />
+          {verticalLine}
+          <Text> </Text>
+        </Box>
+      )}
+
+      {fullSummaryDisplayLines.map((line, index) => (
+        <Box key={`summary-line-row-${index}`} flexDirection="row">
+          <Box width={THINKING_LEFT_PADDING} />
+          {verticalLine}
+          <Box marginLeft={1}>
+            <Text color={theme.text.primary} bold italic wrap="truncate-end">
+              {line}
+            </Text>
+          </Box>
         </Box>
       ))}
       {fullBodyDisplayLines.map((line, index) => (
         <Box key={`body-line-row-${index}`} flexDirection="row">
-          <Box width={2}>
-            <Text color={theme.border.default}>│ </Text>
+          <Box width={THINKING_LEFT_PADDING} />
+          {verticalLine}
+          <Box marginLeft={1}>
+            <Text color={theme.text.secondary} italic wrap="truncate-end">
+              {line}
+            </Text>
           </Box>
-          <Text color={theme.text.secondary} italic wrap="truncate-end">
-            {line}
-          </Text>
         </Box>
       ))}
     </Box>

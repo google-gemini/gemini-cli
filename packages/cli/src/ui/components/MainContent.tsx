@@ -60,18 +60,30 @@ export const MainContent = () => {
 
   const historyItems = useMemo(
     () =>
-      uiState.history.map((h) => (
-        <MemoizedHistoryItemDisplay
-          terminalWidth={mainAreaWidth}
-          availableTerminalHeight={staticAreaMaxItemHeight}
-          availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
-          key={h.id}
-          item={h}
-          isPending={false}
-          commands={uiState.slashCommands}
-          inlineThinkingMode={inlineThinkingMode}
-        />
-      )),
+      uiState.history.map((h, index) => {
+        const isFirstThinking =
+          h.type === 'thinking' &&
+          (index === 0 || uiState.history[index - 1]?.type !== 'thinking');
+        const isLastThinking =
+          h.type === 'thinking' &&
+          (index === uiState.history.length - 1 ||
+            uiState.history[index + 1]?.type !== 'thinking');
+
+        return (
+          <MemoizedHistoryItemDisplay
+            terminalWidth={mainAreaWidth}
+            availableTerminalHeight={staticAreaMaxItemHeight}
+            availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
+            key={h.id}
+            item={h}
+            isPending={false}
+            commands={uiState.slashCommands}
+            inlineThinkingMode={inlineThinkingMode}
+            isFirstThinking={isFirstThinking}
+            isLastThinking={isLastThinking}
+          />
+        );
+      }),
     [
       uiState.history,
       mainAreaWidth,
@@ -84,24 +96,38 @@ export const MainContent = () => {
   const pendingItems = useMemo(
     () => (
       <Box flexDirection="column">
-        {pendingHistoryItems.map((item, i) => (
-          <HistoryItemDisplay
-            key={i}
-            availableTerminalHeight={
-              (uiState.constrainHeight && !isAlternateBuffer) ||
-              isAlternateBuffer
-                ? availableTerminalHeight
-                : undefined
-            }
-            terminalWidth={mainAreaWidth}
-            item={{ ...item, id: 0 }}
-            isPending={true}
-            isFocused={!uiState.isEditorDialogOpen}
-            activeShellPtyId={uiState.activePtyId}
-            embeddedShellFocused={uiState.embeddedShellFocused}
-            inlineThinkingMode={inlineThinkingMode}
-          />
-        ))}
+        {pendingHistoryItems.map((item, i) => {
+          const isFirstThinking =
+            item.type === 'thinking' &&
+            (i === 0 || pendingHistoryItems[i - 1]?.type !== 'thinking') &&
+            (uiState.history.length === 0 ||
+              uiState.history.at(-1)?.type !== 'thinking');
+          const isLastThinking =
+            item.type === 'thinking' &&
+            (i === pendingHistoryItems.length - 1 ||
+              pendingHistoryItems[i + 1]?.type !== 'thinking');
+
+          return (
+            <HistoryItemDisplay
+              key={i}
+              availableTerminalHeight={
+                (uiState.constrainHeight && !isAlternateBuffer) ||
+                isAlternateBuffer
+                  ? availableTerminalHeight
+                  : undefined
+              }
+              terminalWidth={mainAreaWidth}
+              item={{ ...item, id: 0 }}
+              isPending={true}
+              isFocused={!uiState.isEditorDialogOpen}
+              activeShellPtyId={uiState.activePtyId}
+              embeddedShellFocused={uiState.embeddedShellFocused}
+              inlineThinkingMode={inlineThinkingMode}
+              isFirstThinking={isFirstThinking}
+              isLastThinking={isLastThinking}
+            />
+          );
+        })}
         {showConfirmationQueue && confirmingTool && (
           <ToolConfirmationQueue confirmingTool={confirmingTool} />
         )}
@@ -119,13 +145,28 @@ export const MainContent = () => {
       uiState.embeddedShellFocused,
       showConfirmationQueue,
       confirmingTool,
+      uiState.history,
     ],
   );
 
   const virtualizedData = useMemo(
     () => [
       { type: 'header' as const },
-      ...uiState.history.map((item) => ({ type: 'history' as const, item })),
+      ...uiState.history.map((item, index) => {
+        const isFirstThinking =
+          item.type === 'thinking' &&
+          (index === 0 || uiState.history[index - 1]?.type !== 'thinking');
+        const isLastThinking =
+          item.type === 'thinking' &&
+          (index === uiState.history.length - 1 ||
+            uiState.history[index + 1]?.type !== 'thinking');
+        return {
+          type: 'history' as const,
+          item,
+          isFirstThinking,
+          isLastThinking,
+        };
+      }),
       { type: 'pending' as const },
     ],
     [uiState.history],
@@ -146,6 +187,8 @@ export const MainContent = () => {
             isPending={false}
             commands={uiState.slashCommands}
             inlineThinkingMode={inlineThinkingMode}
+            isFirstThinking={item.isFirstThinking}
+            isLastThinking={item.isLastThinking}
           />
         );
       } else {

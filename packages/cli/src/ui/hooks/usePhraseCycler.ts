@@ -77,7 +77,10 @@ export const usePhraseCycler = (
           phraseList = showTip ? INFORMATIVE_TIPS : WITTY_LOADING_PHRASES;
         }
         const randomIndex = Math.floor(Math.random() * phraseList.length);
-        setCurrentLoadingPhrase(phraseList[randomIndex]);
+        const phrase = phraseList[randomIndex];
+        setCurrentLoadingPhrase(
+          phraseList === INFORMATIVE_TIPS ? `Tip: ${phrase}` : phrase,
+        );
       }
     };
 

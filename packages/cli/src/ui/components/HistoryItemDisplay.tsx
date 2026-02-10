@@ -48,6 +48,8 @@ interface HistoryItemDisplayProps {
   embeddedShellFocused?: boolean;
   availableTerminalHeightGemini?: number;
   inlineThinkingMode?: InlineThinkingMode;
+  isFirstThinking?: boolean;
+  isLastThinking?: boolean;
 }
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
@@ -61,6 +63,8 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   embeddedShellFocused,
   availableTerminalHeightGemini,
   inlineThinkingMode = 'off',
+  isFirstThinking = false,
+  isLastThinking = false,
 }) => {
   const itemForDisplay = useMemo(() => escapeAnsiCtrlCodes(item), [item]);
 
@@ -71,6 +75,8 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
         <ThinkingMessage
           thought={itemForDisplay.thought}
           terminalWidth={terminalWidth}
+          isFirstThinking={isFirstThinking}
+          isLastThinking={isLastThinking}
         />
       )}
       {itemForDisplay.type === 'user' && (

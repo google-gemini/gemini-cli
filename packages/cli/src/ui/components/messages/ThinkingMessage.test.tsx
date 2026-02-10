@@ -9,14 +9,17 @@ import { renderWithProviders } from '../../../test-utils/render.js';
 import { ThinkingMessage } from './ThinkingMessage.js';
 
 describe('ThinkingMessage', () => {
-  it('renders subject line', () => {
+  it('renders subject line with vertical rule and "Thinking..." header', () => {
     const { lastFrame } = renderWithProviders(
       <ThinkingMessage
         thought={{ subject: 'Planning', description: 'test' }}
         terminalWidth={80}
+        isFirstThinking={true}
       />,
     );
 
+    expect(lastFrame()).toContain(' Thinking...');
+    expect(lastFrame()).toContain('│');
     expect(lastFrame()).toContain('Planning');
   });
 
@@ -29,6 +32,7 @@ describe('ThinkingMessage', () => {
     );
 
     expect(lastFrame()).toContain('Processing details');
+    expect(lastFrame()).toContain('│');
   });
 
   it('renders full mode with left vertical rule and full text', () => {
@@ -43,15 +47,11 @@ describe('ThinkingMessage', () => {
     );
 
     expect(lastFrame()).toContain('│');
-    expect(lastFrame()).not.toContain('┌');
-    expect(lastFrame()).not.toContain('┐');
-    expect(lastFrame()).not.toContain('└');
-    expect(lastFrame()).not.toContain('┘');
     expect(lastFrame()).toContain('Planning');
     expect(lastFrame()).toContain('I am planning the solution.');
   });
 
-  it('starts left rule below the bold summary line in full mode', () => {
+  it('renders "Thinking..." header when isFirstThinking is true', () => {
     const { lastFrame } = renderWithProviders(
       <ThinkingMessage
         thought={{
@@ -59,13 +59,13 @@ describe('ThinkingMessage', () => {
           description: 'First body line',
         }}
         terminalWidth={80}
+        isFirstThinking={true}
       />,
     );
 
-    const lines = (lastFrame() ?? '').split('\n');
-    expect(lines[0] ?? '').toContain('Summary line');
-    expect(lines[0] ?? '').not.toContain('│');
-    expect(lines.slice(1).join('\n')).toContain('│');
+    expect(lastFrame()).toContain(' Thinking...');
+    expect(lastFrame()).toContain('Summary line');
+    expect(lastFrame()).toContain('│');
   });
 
   it('normalizes escaped newline tokens so literal \\n\\n is not shown', () => {

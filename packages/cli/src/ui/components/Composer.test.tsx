@@ -299,11 +299,11 @@ describe('Composer', () => {
       expect(output).toContain('LoadingIndicator: Processing');
     });
 
-    it('renders generic thinking text in loading indicator when full inline thinking is enabled', () => {
+    it('renders actual thought subject in loading indicator even when full inline thinking is enabled', () => {
       const uiState = createMockUIState({
         streamingState: StreamingState.Responding,
         thought: {
-          subject: 'Detailed in-history thought',
+          subject: 'Thinking about code',
           description: 'Full text is already in history',
         },
       });
@@ -314,7 +314,7 @@ describe('Composer', () => {
       const { lastFrame } = renderComposer(uiState, settings);
 
       const output = lastFrame();
-      expect(output).toContain('LoadingIndicator: Thinking ...');
+      expect(output).toContain('LoadingIndicator: Thinking about code');
     });
 
     it('keeps shortcuts hint visible while loading', () => {
