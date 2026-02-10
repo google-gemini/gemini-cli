@@ -46,7 +46,7 @@ describe('ToastDisplay', () => {
       ctrlCPressedOnce: true,
     });
     const { lastFrame } = renderToastDisplay(uiState);
-    expect(lastFrame()).toContain('Press Ctrl+C again to exit.');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders warning message', () => {
@@ -54,7 +54,7 @@ describe('ToastDisplay', () => {
       warningMessage: 'This is a warning',
     });
     const { lastFrame } = renderToastDisplay(uiState);
-    expect(lastFrame()).toContain('This is a warning');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders Ctrl+D prompt', () => {
@@ -62,7 +62,7 @@ describe('ToastDisplay', () => {
       ctrlDPressedOnce: true,
     });
     const { lastFrame } = renderToastDisplay(uiState);
-    expect(lastFrame()).toContain('Press Ctrl+D again to exit.');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders Escape prompt when buffer is empty', () => {
@@ -71,7 +71,7 @@ describe('ToastDisplay', () => {
       buffer: { text: '' },
     });
     const { lastFrame } = renderToastDisplay(uiState);
-    expect(lastFrame()).toContain('Press Esc again to rewind.');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders Escape prompt when buffer is NOT empty', () => {
@@ -80,7 +80,7 @@ describe('ToastDisplay', () => {
       buffer: { text: 'some text' },
     });
     const { lastFrame } = renderToastDisplay(uiState);
-    expect(lastFrame()).toContain('Press Esc again to clear prompt.');
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('renders Queue Error Message', () => {
@@ -88,6 +88,6 @@ describe('ToastDisplay', () => {
       queueErrorMessage: 'Queue Error',
     });
     const { lastFrame } = renderToastDisplay(uiState);
-    expect(lastFrame()).toContain('Queue Error');
+    expect(lastFrame()).toMatchSnapshot();
   });
 });
