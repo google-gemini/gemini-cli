@@ -201,6 +201,14 @@
           "default": false,
           "type": "boolean"
         },
+        "inlineThinkingMode": {
+          "title": "Inline Thinking",
+          "description": "Display model thinking inline: off or full.",
+          "markdownDescription": "Display model thinking inline: off or full.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `off`",
+          "default": "off",
+          "type": "string",
+          "enum": ["off", "full"]
+        },
         "showStatusInTitle": {
           "title": "Show Thoughts in Title",
           "description": "Show Gemini CLI model thoughts in the terminal window title during the working phase",

@@ -6,14 +6,18 @@
 
 import { Box } from 'ink';
 import { useUIState } from '../contexts/UIStateContext.js';
+import { useSettings } from '../contexts/SettingsContext.js';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
+import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 
 export const QuittingDisplay = () => {
   const uiState = useUIState();
+  const settings = useSettings();
   const { rows: terminalHeight, columns: terminalWidth } = useTerminalSize();
 
   const availableTerminalHeight = terminalHeight;
+  const inlineThinkingMode = getInlineThinkingMode(settings);
 
   if (!uiState.quittingMessages) {
     return null;
@@ -30,6 +34,7 @@ export const QuittingDisplay = () => {
           terminalWidth={terminalWidth}
           item={item}
           isPending={false}
+          inlineThinkingMode={inlineThinkingMode}
         />
       ))}
     </Box>
