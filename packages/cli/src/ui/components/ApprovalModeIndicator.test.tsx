@@ -15,8 +15,8 @@ describe('ApprovalModeIndicator', () => {
       <ApprovalModeIndicator approvalMode={ApprovalMode.AUTO_EDIT} />,
     );
     const output = lastFrame();
-    expect(output).toContain('auto-edit');
-    expect(output).toContain('shift + tab to enter default mode');
+    expect(output).toContain('auto-accept edits');
+    expect(output).toContain('shift+tab to manual');
   });
 
   it('renders correctly for AUTO_EDIT mode with plan enabled', () => {
@@ -27,8 +27,8 @@ describe('ApprovalModeIndicator', () => {
       />,
     );
     const output = lastFrame();
-    expect(output).toContain('auto-edit');
-    expect(output).toContain('shift + tab to enter default mode');
+    expect(output).toContain('auto-accept edits');
+    expect(output).toContain('shift+tab to manual');
   });
 
   it('renders correctly for PLAN mode', () => {
@@ -37,7 +37,7 @@ describe('ApprovalModeIndicator', () => {
     );
     const output = lastFrame();
     expect(output).toContain('plan');
-    expect(output).toContain('shift + tab to enter auto-edit mode');
+    expect(output).toContain('shift+tab to accept edits');
   });
 
   it('renders correctly for YOLO mode', () => {
@@ -46,7 +46,7 @@ describe('ApprovalModeIndicator', () => {
     );
     const output = lastFrame();
     expect(output).toContain('YOLO');
-    expect(output).toContain('shift + tab to enter auto-edit mode');
+    expect(output).toContain('ctrl+y');
   });
 
   it('renders correctly for DEFAULT mode', () => {
@@ -54,7 +54,7 @@ describe('ApprovalModeIndicator', () => {
       <ApprovalModeIndicator approvalMode={ApprovalMode.DEFAULT} />,
     );
     const output = lastFrame();
-    expect(output).toContain('shift + tab to enter auto-edit mode');
+    expect(output).toContain('shift+tab to accept edits');
   });
 
   it('renders correctly for DEFAULT mode with plan enabled', () => {
@@ -65,6 +65,6 @@ describe('ApprovalModeIndicator', () => {
       />,
     );
     const output = lastFrame();
-    expect(output).toContain('shift + tab to enter plan mode');
+    expect(output).toContain('shift+tab to plan');
   });
 });
