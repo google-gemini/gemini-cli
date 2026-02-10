@@ -9,7 +9,6 @@ import { render } from '../../test-utils/render.js';
 import { Text } from 'ink';
 import { StatusDisplay } from './StatusDisplay.js';
 import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
-import { TransientMessageType } from '../../utils/events.js';
 import { ConfigContext } from '../contexts/ConfigContext.js';
 import { SettingsContext } from '../contexts/SettingsContext.js';
 import type { Config } from '@google/gemini-cli-core';
@@ -92,6 +91,7 @@ describe('StatusDisplay', () => {
   afterEach(() => {
     process.env = { ...originalEnv };
     delete process.env['GEMINI_SYSTEM_MD'];
+    vi.restoreAllMocks();
   });
 
   it('renders nothing by default if context summary is hidden via props', () => {
@@ -107,111 +107,6 @@ describe('StatusDisplay', () => {
   it('renders system md indicator if env var is set', () => {
     process.env['GEMINI_SYSTEM_MD'] = 'true';
     const { lastFrame } = renderStatusDisplay();
-    expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('prioritizes Ctrl+C prompt over everything else (except system md)', () => {
-    const uiState = createMockUIState({
-      ctrlCPressedOnce: true,
-      transientMessage: {
-        text: 'Warning',
-        type: TransientMessageType.Warning,
-      },
-      activeHooks: [{ name: 'hook', eventName: 'event' }],
-    });
-    const { lastFrame } = renderStatusDisplay(
-      { hideContextSummary: false },
-      uiState,
-    );
-    expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('renders warning message', () => {
-    const uiState = createMockUIState({
-      transientMessage: {
-        text: 'This is a warning',
-        type: TransientMessageType.Warning,
-      },
-    });
-    const { lastFrame } = renderStatusDisplay(
-      { hideContextSummary: false },
-      uiState,
-    );
-    expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('renders hint message', () => {
-    const uiState = createMockUIState({
-      transientMessage: {
-        text: 'This is a hint',
-        type: TransientMessageType.Hint,
-      },
-    });
-    const { lastFrame } = renderStatusDisplay(
-      { hideContextSummary: false },
-      uiState,
-    );
-    expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('prioritizes warning over Ctrl+D', () => {
-    const uiState = createMockUIState({
-      transientMessage: {
-        text: 'Warning',
-        type: TransientMessageType.Warning,
-      },
-      ctrlDPressedOnce: true,
-    });
-    const { lastFrame } = renderStatusDisplay(
-      { hideContextSummary: false },
-      uiState,
-    );
-    expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('renders Ctrl+D prompt', () => {
-    const uiState = createMockUIState({
-      ctrlDPressedOnce: true,
-    });
-    const { lastFrame } = renderStatusDisplay(
-      { hideContextSummary: false },
-      uiState,
-    );
-    expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('renders Escape prompt when buffer is empty', () => {
-    const uiState = createMockUIState({
-      showEscapePrompt: true,
-      buffer: { text: '' },
-    });
-    const { lastFrame } = renderStatusDisplay(
-      { hideContextSummary: false },
-      uiState,
-    );
-    expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('renders Escape prompt when buffer is NOT empty', () => {
-    const uiState = createMockUIState({
-      showEscapePrompt: true,
-      buffer: { text: 'some text' },
-    });
-    const { lastFrame } = renderStatusDisplay(
-      { hideContextSummary: false },
-      uiState,
-    );
-    expect(lastFrame()).toMatchSnapshot();
-  });
-
-  it('renders Queue Error Message', () => {
-    const uiState = createMockUIState({
-      queueErrorMessage: 'Queue Error',
-    });
-    const { lastFrame } = renderStatusDisplay(
-      { hideContextSummary: false },
-      uiState,
-    );
     expect(lastFrame()).toMatchSnapshot();
   });
 

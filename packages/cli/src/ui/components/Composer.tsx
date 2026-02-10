@@ -9,6 +9,7 @@ import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import { ApprovalMode, tokenLimit } from '@google/gemini-cli-core';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { StatusDisplay } from './StatusDisplay.js';
+import { ToastDisplay, shouldShowToast } from './ToastDisplay.js';
 import { ApprovalModeIndicator } from './ApprovalModeIndicator.js';
 import { ShellModeIndicator } from './ShellModeIndicator.js';
 import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
@@ -34,7 +35,6 @@ import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
 import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 import { theme } from '../semantic-colors.js';
-import { TransientMessageType } from '../../utils/events.js';
 
 export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const config = useConfig();
@@ -44,7 +44,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const uiActions = useUIActions();
   const { vimEnabled, vimMode } = useVimMode();
   const inlineThinkingMode = getInlineThinkingMode(settings);
-  const terminalWidth = process.stdout.columns;
+  const terminalWidth = uiState.terminalWidth;
   const isNarrow = isNarrowWidth(terminalWidth);
   const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
   const [suggestionsVisible, setSuggestionsVisible] = useState(false);
@@ -69,6 +69,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     Boolean(uiState.quota.proQuotaRequest) ||
     Boolean(uiState.quota.validationRequest) ||
     Boolean(uiState.customDialog);
+  const hasToast = shouldShowToast(uiState);
   const showLoadingIndicator =
     (!uiState.embeddedShellFocused || uiState.isBackgroundShellVisible) &&
     uiState.streamingState === StreamingState.Responding &&
@@ -91,14 +92,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const minimalModeBleedThrough = hideMinimalModeHintWhileBusy
     ? null
     : modeBleedThrough;
-  const hasMinimalStatusBleedThrough =
-    uiState.ctrlCPressedOnce ||
-    uiState.ctrlDPressedOnce ||
-    (uiState.transientMessage?.type === TransientMessageType.Warning &&
-      Boolean(uiState.transientMessage.text)) ||
-    Boolean(uiState.queueErrorMessage) ||
-    (uiState.showEscapePrompt &&
-      (uiState.buffer.text.length > 0 || uiState.history.length > 0));
+  const hasMinimalStatusBleedThrough = shouldShowToast(uiState);
   const contextTokenLimit =
     typeof uiState.currentModel === 'string' && uiState.currentModel.length > 0
       ? tokenLimit(uiState.currentModel)
@@ -242,7 +236,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                       : 0
                   }
                 >
-                  <StatusDisplay hideContextSummary={true} />
+                  <ToastDisplay />
                 </Box>
               )}
             </Box>
@@ -295,44 +289,48 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
               alignItems="center"
               flexGrow={1}
             >
-              {!showLoadingIndicator && (
-                <Box
-                  flexDirection={isNarrow ? 'column' : 'row'}
-                  alignItems={isNarrow ? 'flex-start' : 'center'}
-                >
-                  {showApprovalIndicator && (
-                    <ApprovalModeIndicator
-                      approvalMode={showApprovalModeIndicator}
-                      isPlanEnabled={config.isPlanEnabled()}
-                    />
-                  )}
-                  {uiState.shellModeActive && (
-                    <Box
-                      marginLeft={showApprovalIndicator && !isNarrow ? 1 : 0}
-                      marginTop={showApprovalIndicator && isNarrow ? 1 : 0}
-                    >
-                      <ShellModeIndicator />
-                    </Box>
-                  )}
-                  {showRawMarkdownIndicator && (
-                    <Box
-                      marginLeft={
-                        (showApprovalIndicator || uiState.shellModeActive) &&
-                        !isNarrow
-                          ? 1
-                          : 0
-                      }
-                      marginTop={
-                        (showApprovalIndicator || uiState.shellModeActive) &&
-                        isNarrow
-                          ? 1
-                          : 0
-                      }
-                    >
-                      <RawMarkdownIndicator />
-                    </Box>
-                  )}
-                </Box>
+              {hasToast ? (
+                <ToastDisplay />
+              ) : (
+                !showLoadingIndicator && (
+                  <Box
+                    flexDirection={isNarrow ? 'column' : 'row'}
+                    alignItems={isNarrow ? 'flex-start' : 'center'}
+                  >
+                    {showApprovalIndicator && (
+                      <ApprovalModeIndicator
+                        approvalMode={showApprovalModeIndicator}
+                        isPlanEnabled={config.isPlanEnabled()}
+                      />
+                    )}
+                    {uiState.shellModeActive && (
+                      <Box
+                        marginLeft={showApprovalIndicator && !isNarrow ? 1 : 0}
+                        marginTop={showApprovalIndicator && isNarrow ? 1 : 0}
+                      >
+                        <ShellModeIndicator />
+                      </Box>
+                    )}
+                    {showRawMarkdownIndicator && (
+                      <Box
+                        marginLeft={
+                          (showApprovalIndicator || uiState.shellModeActive) &&
+                          !isNarrow
+                            ? 1
+                            : 0
+                        }
+                        marginTop={
+                          (showApprovalIndicator || uiState.shellModeActive) &&
+                          isNarrow
+                            ? 1
+                            : 0
+                        }
+                      >
+                        <RawMarkdownIndicator />
+                      </Box>
+                    )}
+                  </Box>
+                )
               )}
             </Box>
 
