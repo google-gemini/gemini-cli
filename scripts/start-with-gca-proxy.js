@@ -124,12 +124,17 @@ async function main() {
     await waitForServer(port, STARTUP_TIMEOUT_MS);
     console.log(`✅ Proxy ready at https://localhost:${port}\n`);
 
-    // Verify the proxy wrote its certificate to disk
-    if (!fs.existsSync(PROXY_CERT_PATH)) {
-      throw new Error(
-        `Proxy certificate not found at ${PROXY_CERT_PATH}. ` +
-          'The proxy server may have failed to start correctly.',
-      );
+    // Wait for the proxy to write its certificate to disk
+    const certWaitStart = Date.now();
+    const CERT_TIMEOUT_MS = 5000;
+    while (!fs.existsSync(PROXY_CERT_PATH)) {
+      if (Date.now() - certWaitStart > CERT_TIMEOUT_MS) {
+        throw new Error(
+          `Proxy certificate not found at ${PROXY_CERT_PATH} after ${CERT_TIMEOUT_MS}ms. ` +
+            'The proxy server may have failed to start correctly.',
+        );
+      }
+      await new Promise((r) => setTimeout(r, 200));
     }
     console.log(`🔒 Using proxy certificate: ${PROXY_CERT_PATH}`);
 
