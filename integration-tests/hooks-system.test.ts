@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig, poll } from './test-helper.js';
+import { TestRig, poll, normalizePath } from './test-helper.js';
 import { join } from 'node:path';
 import { writeFileSync } from 'node:fs';
 
@@ -54,7 +54,7 @@ describe('Hooks System Integration', () => {
                   hooks: [
                     {
                       type: 'command',
-                      command: `node "${scriptPath}"`,
+                      command: normalizePath(`node "${scriptPath}"`),
                       timeout: 5000,
                     },
                   ],
@@ -114,11 +114,12 @@ describe('Hooks System Integration', () => {
               BeforeTool: [
                 {
                   matcher: 'write_file',
+                  sequential: true,
                   hooks: [
                     {
                       type: 'command',
                       // Exit with code 2 and write reason to stderr
-                      command: `node "${scriptPath}"`,
+                      command: normalizePath(`node "${scriptPath}"`),
                       timeout: 5000,
                     },
                   ],
@@ -183,10 +184,11 @@ describe('Hooks System Integration', () => {
               BeforeTool: [
                 {
                   matcher: 'write_file',
+                  sequential: true,
                   hooks: [
                     {
                       type: 'command',
-                      command: `node "${scriptPath}"`,
+                      command: normalizePath(`node "${scriptPath}"`),
                       timeout: 5000,
                     },
                   ],
@@ -239,10 +241,11 @@ describe('Hooks System Integration', () => {
             AfterTool: [
               {
                 matcher: 'read_file',
+                sequential: true,
                 hooks: [
                   {
                     type: 'command',
-                    command: command,
+                    command: normalizePath(command),
                     timeout: 5000,
                   },
                 ],
@@ -267,7 +270,9 @@ describe('Hooks System Integration', () => {
       const hookTelemetryFound = rig.readHookLogs();
       expect(hookTelemetryFound.length).toBeGreaterThan(0);
       expect(hookTelemetryFound[0].hookCall.hook_event_name).toBe('AfterTool');
-      expect(hookTelemetryFound[0].hookCall.hook_name).toBe(command);
+      expect(hookTelemetryFound[0].hookCall.hook_name).toBe(
+        normalizePath(command),
+      );
       expect(hookTelemetryFound[0].hookCall.hook_input).toBeDefined();
       expect(hookTelemetryFound[0].hookCall.hook_output).toBeDefined();
       expect(hookTelemetryFound[0].hookCall.exit_code).toBe(0);
@@ -312,10 +317,11 @@ console.log(JSON.stringify({
           hooks: {
             BeforeModel: [
               {
+                sequential: true,
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
+                    command: normalizePath(`node "${scriptPath}"`),
                     timeout: 5000,
                   },
                 ],
@@ -375,10 +381,11 @@ console.log(JSON.stringify({
             hooks: {
               BeforeModel: [
                 {
+                  sequential: true,
                   hooks: [
                     {
                       type: 'command',
-                      command: `node "${scriptPath.replace(/\\/g, '/')}"`,
+                      command: normalizePath(`node "${scriptPath}"`),
                       timeout: 5000,
                     },
                   ],
@@ -422,10 +429,11 @@ console.log(JSON.stringify({
             hooks: {
               BeforeModel: [
                 {
+                  sequential: true,
                   hooks: [
                     {
                       type: 'command',
-                      command: `node "${scriptPath.replace(/\\/g, '/')}"`,
+                      command: normalizePath(`node "${scriptPath}"`),
                       timeout: 5000,
                     },
                   ],
@@ -491,7 +499,7 @@ console.log(JSON.stringify({
                   hooks: [
                     {
                       type: 'command',
-                      command: `node "${scriptPath.replace(/\\/g, '/')}"`,
+                      command: normalizePath(`node "${scriptPath}"`),
                       timeout: 5000,
                     },
                   ],
@@ -552,7 +560,7 @@ console.log(JSON.stringify({
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
+                    command: normalizePath(`node "${scriptPath}"`),
                     timeout: 5000,
                   },
                 ],
@@ -619,7 +627,7 @@ console.log(JSON.stringify({
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
+                    command: normalizePath(`node "${scriptPath}"`),
                     timeout: 5000,
                   },
                 ],
@@ -671,10 +679,11 @@ console.log(JSON.stringify({
             Notification: [
               {
                 matcher: 'ToolPermission',
+                sequential: true,
                 hooks: [
                   {
                     type: 'command',
-                    command: hookCommand,
+                    command: normalizePath(hookCommand),
                     timeout: 5000,
                   },
                 ],
@@ -709,7 +718,7 @@ console.log(JSON.stringify({
       const notificationLog = hookLogs.find(
         (log) =>
           log.hookCall.hook_event_name === 'Notification' &&
-          log.hookCall.hook_name === hookCommand,
+          log.hookCall.hook_name === normalizePath(hookCommand),
       );
 
       expect(notificationLog).toBeDefined();
@@ -777,12 +786,12 @@ console.log(JSON.stringify({
                 hooks: [
                   {
                     type: 'command',
-                    command: hook1Command,
+                    command: normalizePath(hook1Command),
                     timeout: 5000,
                   },
                   {
                     type: 'command',
-                    command: hook2Command,
+                    command: normalizePath(hook2Command),
                     timeout: 5000,
                   },
                 ],
@@ -801,10 +810,10 @@ console.log(JSON.stringify({
       // Verify both hooks executed
       const hookLogs = rig.readHookLogs();
       const hook1Log = hookLogs.find(
-        (log) => log.hookCall.hook_name === hook1Command,
+        (log) => log.hookCall.hook_name === normalizePath(hook1Command),
       );
       const hook2Log = hookLogs.find(
-        (log) => log.hookCall.hook_name === hook2Command,
+        (log) => log.hookCall.hook_name === normalizePath(hook2Command),
       );
 
       expect(hook1Log).toBeDefined();
@@ -860,7 +869,7 @@ try {
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
+                    command: normalizePath(`node "${scriptPath}"`),
                     timeout: 5000,
                   },
                 ],
@@ -915,12 +924,13 @@ try {
               BeforeTool: [
                 {
                   matcher: 'write_file',
+                  sequential: true,
                   hooks: [
                     {
                       type: 'command',
                       // Output plain text then JSON.
                       // This breaks JSON parsing, so it falls back to 'allow' with the whole stdout as systemMessage.
-                      command: `node "${scriptPath}"`,
+                      command: normalizePath(`node "${scriptPath}"`),
                       timeout: 5000,
                     },
                   ],
@@ -983,7 +993,7 @@ try {
                 hooks: [
                   {
                     type: 'command',
-                    command: beforeAgentCommand,
+                    command: normalizePath(beforeAgentCommand),
                     timeout: 5000,
                   },
                 ],
@@ -992,10 +1002,11 @@ try {
             BeforeTool: [
               {
                 matcher: 'write_file',
+                sequential: true,
                 hooks: [
                   {
                     type: 'command',
-                    command: beforeToolCommand,
+                    command: normalizePath(beforeToolCommand),
                     timeout: 5000,
                   },
                 ],
@@ -1004,10 +1015,11 @@ try {
             AfterTool: [
               {
                 matcher: 'write_file',
+                sequential: true,
                 hooks: [
                   {
                     type: 'command',
-                    command: afterToolCommand,
+                    command: normalizePath(afterToolCommand),
                     timeout: 5000,
                   },
                 ],
@@ -1042,13 +1054,13 @@ try {
       // Verify all three hooks executed
       const hookLogs = rig.readHookLogs();
       const beforeAgentLog = hookLogs.find(
-        (log) => log.hookCall.hook_name === beforeAgentCommand,
+        (log) => log.hookCall.hook_name === normalizePath(beforeAgentCommand),
       );
       const beforeToolLog = hookLogs.find(
-        (log) => log.hookCall.hook_name === beforeToolCommand,
+        (log) => log.hookCall.hook_name === normalizePath(beforeToolCommand),
       );
       const afterToolLog = hookLogs.find(
-        (log) => log.hookCall.hook_name === afterToolCommand,
+        (log) => log.hookCall.hook_name === normalizePath(afterToolCommand),
       );
 
       expect(beforeAgentLog).toBeDefined();
@@ -1104,12 +1116,12 @@ try {
                 hooks: [
                   {
                     type: 'command',
-                    command: failingCommand,
+                    command: normalizePath(failingCommand),
                     timeout: 5000,
                   },
                   {
                     type: 'command',
-                    command: workingCommand,
+                    command: normalizePath(workingCommand),
                     timeout: 5000,
                   },
                 ],
@@ -1165,7 +1177,7 @@ try {
                 hooks: [
                   {
                     type: 'command',
-                    command: hookCommand,
+                    command: normalizePath(hookCommand),
                     timeout: 5000,
                   },
                 ],
@@ -1213,10 +1225,11 @@ try {
             SessionStart: [
               {
                 matcher: 'startup',
+                sequential: true,
                 hooks: [
                   {
                     type: 'command',
-                    command: sessionStartCommand,
+                    command: normalizePath(sessionStartCommand),
                     timeout: 5000,
                   },
                 ],
@@ -1237,7 +1250,9 @@ try {
 
       expect(sessionStartLog).toBeDefined();
       if (sessionStartLog) {
-        expect(sessionStartLog.hookCall.hook_name).toBe(sessionStartCommand);
+        expect(sessionStartLog.hookCall.hook_name).toBe(
+          normalizePath(sessionStartCommand),
+        );
         expect(sessionStartLog.hookCall.exit_code).toBe(0);
         expect(sessionStartLog.hookCall.hook_input).toBeDefined();
 
@@ -1288,10 +1303,11 @@ console.log(JSON.stringify({
             SessionStart: [
               {
                 matcher: 'startup',
+                sequential: true,
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
+                    command: normalizePath(`node "${scriptPath}"`),
                     timeout: 5000,
                   },
                 ],
@@ -1372,10 +1388,11 @@ console.log(JSON.stringify({
               SessionStart: [
                 {
                   matcher: 'startup',
+                  sequential: true,
                   hooks: [
                     {
                       type: 'command',
-                      command: `node "${scriptPath.replace(/\\/g, '/')}"`,
+                      command: normalizePath(`node "${scriptPath}"`),
                       timeout: 5000,
                     },
                   ],
@@ -1455,10 +1472,11 @@ console.log(JSON.stringify({
               SessionEnd: [
                 {
                   matcher: '*',
+                  sequential: true,
                   hooks: [
                     {
                       type: 'command',
-                      command: sessionEndCommand,
+                      command: normalizePath(sessionEndCommand),
                       timeout: 5000,
                     },
                   ],
@@ -1467,10 +1485,11 @@ console.log(JSON.stringify({
               SessionStart: [
                 {
                   matcher: '*',
+                  sequential: true,
                   hooks: [
                     {
                       type: 'command',
-                      command: sessionStartCommand,
+                      command: normalizePath(sessionStartCommand),
                       timeout: 5000,
                     },
                   ],
@@ -1561,7 +1580,7 @@ console.log(JSON.stringify({
       const sessionEndLog = hookLogs.find(
         (log) =>
           log.hookCall.hook_event_name === 'SessionEnd' &&
-          log.hookCall.hook_name === sessionEndCommand,
+          log.hookCall.hook_name === normalizePath(sessionEndCommand),
       );
       // Because the flakiness of the test, we relax this check
       // expect(sessionEndLog).toBeDefined();
@@ -1584,7 +1603,7 @@ console.log(JSON.stringify({
       const sessionStartAfterClearLogs = hookLogs.filter(
         (log) =>
           log.hookCall.hook_event_name === 'SessionStart' &&
-          log.hookCall.hook_name === sessionStartCommand,
+          log.hookCall.hook_name === normalizePath(sessionStartCommand),
       );
       // Should have at least one SessionStart from after clear
       // Because the flakiness of the test, we relax this check
@@ -1636,10 +1655,11 @@ console.log(JSON.stringify({
             PreCompress: [
               {
                 matcher: 'auto',
+                sequential: true,
                 hooks: [
                   {
                     type: 'command',
-                    command: preCompressCommand,
+                    command: normalizePath(preCompressCommand),
                     timeout: 5000,
                   },
                 ],
@@ -1666,7 +1686,9 @@ console.log(JSON.stringify({
 
       expect(preCompressLog).toBeDefined();
       if (preCompressLog) {
-        expect(preCompressLog.hookCall.hook_name).toBe(preCompressCommand);
+        expect(preCompressLog.hookCall.hook_name).toBe(
+          normalizePath(preCompressCommand),
+        );
         expect(preCompressLog.hookCall.exit_code).toBe(0);
         expect(preCompressLog.hookCall.hook_input).toBeDefined();
 
@@ -1711,10 +1733,11 @@ console.log(JSON.stringify({
             SessionEnd: [
               {
                 matcher: 'exit',
+                sequential: true,
                 hooks: [
                   {
                     type: 'command',
-                    command: sessionEndCommand,
+                    command: normalizePath(sessionEndCommand),
                     timeout: 5000,
                   },
                 ],
@@ -1762,7 +1785,9 @@ console.log(JSON.stringify({
 
       expect(sessionEndLog).toBeDefined();
       if (sessionEndLog) {
-        expect(sessionEndLog.hookCall.hook_name).toBe(sessionEndCommand);
+        expect(sessionEndLog.hookCall.hook_name).toBe(
+          normalizePath(sessionEndCommand),
+        );
         expect(sessionEndLog.hookCall.exit_code).toBe(0);
         expect(sessionEndLog.hookCall.hook_input).toBeDefined();
 
@@ -1814,12 +1839,12 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${enabledPath}"`,
+                    command: normalizePath(`node "${enabledPath}"`),
                     timeout: 5000,
                   },
                   {
                     type: 'command',
-                    command: `node "${disabledPath}"`,
+                    command: normalizePath(`node "${disabledPath}"`),
                     timeout: 5000,
                   },
                 ],
@@ -1848,10 +1873,12 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
       // Check hook telemetry - only enabled hook should have executed
       const hookLogs = rig.readHookLogs();
       const enabledHookLog = hookLogs.find(
-        (log) => log.hookCall.hook_name === `node "${enabledPath}"`,
+        (log) =>
+          log.hookCall.hook_name === normalizePath(`node "${enabledPath}"`),
       );
       const disabledHookLog = hookLogs.find(
-        (log) => log.hookCall.hook_name === `node "${disabledPath}"`,
+        (log) =>
+          log.hookCall.hook_name === normalizePath(`node "${disabledPath}"`),
       );
 
       expect(enabledHookLog).toBeDefined();
@@ -1891,12 +1918,12 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${activePath}"`,
+                    command: normalizePath(`node "${activePath}"`),
                     timeout: 5000,
                   },
                   {
                     type: 'command',
-                    command: `node "${disabledPath}"`,
+                    command: normalizePath(`node "${disabledPath}"`),
                     timeout: 5000,
                   },
                 ],
@@ -1922,10 +1949,12 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
       // Check hook telemetry
       const hookLogs1 = rig.readHookLogs();
       const activeHookLog1 = hookLogs1.find(
-        (log) => log.hookCall.hook_name === `node "${activePath}"`,
+        (log) =>
+          log.hookCall.hook_name === normalizePath(`node "${activePath}"`),
       );
       const disabledHookLog1 = hookLogs1.find(
-        (log) => log.hookCall.hook_name === `node "${disabledPath}"`,
+        (log) =>
+          log.hookCall.hook_name === normalizePath(`node "${disabledPath}"`),
       );
 
       expect(activeHookLog1).toBeDefined();
@@ -1946,7 +1975,8 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
       // Verify disabled hook still hasn't executed
       const hookLogs2 = rig.readHookLogs();
       const disabledHookCalls = hookLogs2.filter(
-        (log) => log.hookCall.hook_name === `node "${disabledPath}"`,
+        (log) =>
+          log.hookCall.hook_name === normalizePath(`node "${disabledPath}"`),
       );
       expect(disabledHookCalls.length).toBe(0);
     });
@@ -1989,10 +2019,11 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
             BeforeTool: [
               {
                 matcher: 'write_file',
+                sequential: true,
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
+                    command: normalizePath(`node "${scriptPath}"`),
                     timeout: 5000,
                   },
                 ],
@@ -2076,10 +2107,11 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
             BeforeTool: [
               {
                 matcher: 'write_file',
+                sequential: true,
                 hooks: [
                   {
                     type: 'command',
-                    command: `node "${scriptPath.replace(/\\/g, '/')}"`,
+                    command: normalizePath(`node "${scriptPath}"`),
                     timeout: 5000,
                   },
                 ],
