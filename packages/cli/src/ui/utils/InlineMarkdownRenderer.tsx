@@ -17,6 +17,8 @@ const STRIKETHROUGH_MARKER_LENGTH = 2; // For "~~")
 const INLINE_CODE_MARKER_LENGTH = 1; // For "`"
 const UNDERLINE_TAG_START_LENGTH = 3; // For "<u>"
 const UNDERLINE_TAG_END_LENGTH = 4; // For "</u>"
+const SECONDARY_TAG_START_LENGTH = 11; // For "<secondary>"
+const SECONDARY_TAG_END_LENGTH = 12; // For "</secondary>"
 
 interface RenderInlineProps {
   text: string;
@@ -29,14 +31,14 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
 }) => {
   const baseColor = defaultColor ?? theme.text.primary;
   // Early return for plain text without markdown or URLs
-  if (!/[*_~`<[https?:]/.test(text)) {
+  if (!/[*_~`<[https?:]/.test(text) && !text.includes('<secondary>')) {
     return <Text color={baseColor}>{text}</Text>;
   }
 
   const nodes: React.ReactNode[] = [];
   let lastIndex = 0;
   const inlineRegex =
-    /(\*\*.*?\*\*|\*.*?\*|_.*?_|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>|https?:\/\/\S+)/g;
+    /(\*\*.*?\*\*|\*.*?\*|_.*?_|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>|<secondary>.*?<\/secondary>|https?:\/\/\S+)/g;
   let match;
 
   while ((match = inlineRegex.exec(text)) !== null) {
@@ -134,6 +136,18 @@ const RenderInlineInternal: React.FC<RenderInlineProps> = ({
             {fullMatch.slice(
               UNDERLINE_TAG_START_LENGTH,
               -UNDERLINE_TAG_END_LENGTH,
+            )}
+          </Text>
+        );
+      } else if (
+        fullMatch.startsWith('<secondary>') &&
+        fullMatch.endsWith('</secondary>')
+      ) {
+        renderedNode = (
+          <Text key={key} color={theme.text.secondary}>
+            {fullMatch.slice(
+              SECONDARY_TAG_START_LENGTH,
+              -SECONDARY_TAG_END_LENGTH,
             )}
           </Text>
         );

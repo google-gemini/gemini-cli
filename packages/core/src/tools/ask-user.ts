@@ -217,7 +217,7 @@ export class AskUserInvocation extends BaseToolInvocation<
               return (
                 prefix +
                 visibleLines.join('\n' + indent) +
-                `\n${indent}... ${hiddenCount} more lines hidden`
+                `\n${indent}<secondary>... ${hiddenCount} more lines hidden</secondary>`
               );
             }
             return prefix + lines.join('\n' + indent);
