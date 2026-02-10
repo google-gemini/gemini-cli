@@ -43,6 +43,13 @@ vi.mock('./StatusDisplay.js', () => ({
 
 vi.mock('./ToastDisplay.js', () => ({
   ToastDisplay: () => <Text>ToastDisplay</Text>,
+  shouldShowToast: (uiState: UIState) =>
+    uiState.ctrlCPressedOnce ||
+    Boolean(uiState.transientMessage) ||
+    uiState.ctrlDPressedOnce ||
+    (uiState.showEscapePrompt &&
+      (uiState.buffer.text.length > 0 || uiState.history.length > 0)) ||
+    Boolean(uiState.queueErrorMessage),
 }));
 
 vi.mock('./ContextSummaryDisplay.js', () => ({

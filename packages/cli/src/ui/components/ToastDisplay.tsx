@@ -7,8 +7,19 @@
 import type React from 'react';
 import { Text } from 'ink';
 import { theme } from '../semantic-colors.js';
-import { useUIState } from '../contexts/UIStateContext.js';
+import { useUIState, type UIState } from '../contexts/UIStateContext.js';
 import { TransientMessageType } from '../../utils/events.js';
+
+export function shouldShowToast(uiState: UIState): boolean {
+  return (
+    uiState.ctrlCPressedOnce ||
+    Boolean(uiState.transientMessage) ||
+    uiState.ctrlDPressedOnce ||
+    (uiState.showEscapePrompt &&
+      (uiState.buffer.text.length > 0 || uiState.history.length > 0)) ||
+    Boolean(uiState.queueErrorMessage)
+  );
+}
 
 export const ToastDisplay: React.FC = () => {
   const uiState = useUIState();
