@@ -4,15 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { ClassifierStrategy } from './classifierStrategy.js';
 import type { RoutingContext } from '../routingStrategy.js';
 import type { Config } from '../../config/config.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
-import {
-  isFunctionCall,
-  isFunctionResponse,
-} from '../../utils/messageInspectors.js';
 import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
@@ -32,6 +28,9 @@ describe('ClassifierStrategy', () => {
   let mockConfig: Config;
   let mockBaseLlmClient: BaseLlmClient;
   let mockResolvedConfig: ResolvedModelConfig;
+  let mockGetModel: Mock;
+  let mockGetNumericalRoutingEnabled: Mock;
+  let mockGenerateJson: Mock;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -47,28 +46,30 @@ describe('ClassifierStrategy', () => {
       model: 'classifier',
       generateContentConfig: {},
     } as unknown as ResolvedModelConfig;
+
+    mockGetModel = vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO);
+    mockGetNumericalRoutingEnabled = vi.fn().mockResolvedValue(false);
+    mockGenerateJson = vi.fn();
+
     mockConfig = {
       modelConfigService: {
         getResolvedConfig: vi.fn().mockReturnValue(mockResolvedConfig),
       },
-<<<<<<< HEAD
-      getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
+      getModel: mockGetModel,
       getPreviewFeatures: () => false,
-=======
-      getModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO),
->>>>>>> 37f128a10 (feat(routing): restrict numerical routing to Gemini 3 family (#18478))
-      getNumericalRoutingEnabled: vi.fn().mockResolvedValue(false),
+      getNumericalRoutingEnabled: mockGetNumericalRoutingEnabled,
     } as unknown as Config;
+
     mockBaseLlmClient = {
-      generateJson: vi.fn(),
+      generateJson: mockGenerateJson,
     } as unknown as BaseLlmClient;
 
     vi.spyOn(promptIdContext, 'getStore').mockReturnValue('test-prompt-id');
   });
 
   it('should return null if numerical routing is enabled and model is Gemini 3', async () => {
-    vi.mocked(mockConfig.getNumericalRoutingEnabled).mockResolvedValue(true);
-    vi.mocked(mockConfig.getModel).mockReturnValue(PREVIEW_GEMINI_MODEL_AUTO);
+    mockGetNumericalRoutingEnabled.mockResolvedValue(true);
+    mockGetModel.mockReturnValue(PREVIEW_GEMINI_MODEL_AUTO);
 
     const decision = await strategy.route(
       mockContext,
@@ -77,13 +78,13 @@ describe('ClassifierStrategy', () => {
     );
 
     expect(decision).toBeNull();
-    expect(mockBaseLlmClient.generateJson).not.toHaveBeenCalled();
+    expect(mockGenerateJson).not.toHaveBeenCalled();
   });
 
   it('should NOT return null if numerical routing is enabled but model is NOT Gemini 3', async () => {
-    vi.mocked(mockConfig.getNumericalRoutingEnabled).mockResolvedValue(true);
-    vi.mocked(mockConfig.getModel).mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO);
-    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue({
+    mockGetNumericalRoutingEnabled.mockResolvedValue(true);
+    mockGetModel.mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO);
+    mockGenerateJson.mockResolvedValue({
       reasoning: 'test',
       model_choice: 'flash',
     });
@@ -95,7 +96,7 @@ describe('ClassifierStrategy', () => {
     );
 
     expect(decision).not.toBeNull();
-    expect(mockBaseLlmClient.generateJson).toHaveBeenCalled();
+    expect(mockGenerateJson).toHaveBeenCalled();
   });
 
   it('should call generateJson with the correct parameters', async () => {
@@ -103,13 +104,11 @@ describe('ClassifierStrategy', () => {
       reasoning: 'Simple task',
       model_choice: 'flash',
     };
-    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
-      mockApiResponse,
-    );
+    mockGenerateJson.mockResolvedValue(mockApiResponse);
 
     await strategy.route(mockContext, mockConfig, mockBaseLlmClient);
 
-    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledWith(
+    expect(mockGenerateJson).toHaveBeenCalledWith(
       expect.objectContaining({
         modelConfigKey: { model: mockResolvedConfig.model },
         promptId: 'test-prompt-id',
@@ -122,9 +121,7 @@ describe('ClassifierStrategy', () => {
       reasoning: 'This is a simple task.',
       model_choice: 'flash',
     };
-    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
-      mockApiResponse,
-    );
+    mockGenerateJson.mockResolvedValue(mockApiResponse);
 
     const decision = await strategy.route(
       mockContext,
@@ -132,7 +129,7 @@ describe('ClassifierStrategy', () => {
       mockBaseLlmClient,
     );
 
-    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledOnce();
+    expect(mockGenerateJson).toHaveBeenCalledOnce();
     expect(decision).toEqual({
       model: DEFAULT_GEMINI_FLASH_MODEL,
       metadata: {
@@ -148,9 +145,7 @@ describe('ClassifierStrategy', () => {
       reasoning: 'This is a complex task.',
       model_choice: 'pro',
     };
-    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
-      mockApiResponse,
-    );
+    mockGenerateJson.mockResolvedValue(mockApiResponse);
     mockContext.request = [{ text: 'how do I build a spaceship?' }];
 
     const decision = await strategy.route(
@@ -159,7 +154,7 @@ describe('ClassifierStrategy', () => {
       mockBaseLlmClient,
     );
 
-    expect(mockBaseLlmClient.generateJson).toHaveBeenCalledOnce();
+    expect(mockGenerateJson).toHaveBeenCalledOnce();
     expect(decision).toEqual({
       model: DEFAULT_GEMINI_MODEL,
       metadata: {
@@ -175,7 +170,7 @@ describe('ClassifierStrategy', () => {
       .spyOn(debugLogger, 'warn')
       .mockImplementation(() => {});
     const testError = new Error('API Failure');
-    vi.mocked(mockBaseLlmClient.generateJson).mockRejectedValue(testError);
+    mockGenerateJson.mockRejectedValue(testError);
 
     const decision = await strategy.route(
       mockContext,
@@ -196,9 +191,7 @@ describe('ClassifierStrategy', () => {
       reasoning: 'This is a simple task.',
       // model_choice is missing, which will cause a Zod parsing error.
     };
-    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
-      malformedApiResponse,
-    );
+    mockGenerateJson.mockResolvedValue(malformedApiResponse);
 
     const decision = await strategy.route(
       mockContext,
@@ -227,14 +220,11 @@ describe('ClassifierStrategy', () => {
       reasoning: 'Simple.',
       model_choice: 'flash',
     };
-    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
-      mockApiResponse,
-    );
+    mockGenerateJson.mockResolvedValue(mockApiResponse);
 
     await strategy.route(mockContext, mockConfig, mockBaseLlmClient);
 
-    const generateJsonCall = vi.mocked(mockBaseLlmClient.generateJson).mock
-      .calls[0][0];
+    const generateJsonCall = mockGenerateJson.mock.calls[0][0];
     const contents = generateJsonCall.contents;
 
     const expectedContents = [
@@ -263,14 +253,11 @@ describe('ClassifierStrategy', () => {
       reasoning: 'Simple.',
       model_choice: 'flash',
     };
-    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
-      mockApiResponse,
-    );
+    mockGenerateJson.mockResolvedValue(mockApiResponse);
 
     await strategy.route(mockContext, mockConfig, mockBaseLlmClient);
 
-    const generateJsonCall = vi.mocked(mockBaseLlmClient.generateJson).mock
-      .calls[0][0];
+    const generateJsonCall = mockGenerateJson.mock.calls[0][0];
     const contents = generateJsonCall.contents;
 
     // Manually calculate what the history should be
@@ -278,7 +265,10 @@ describe('ClassifierStrategy', () => {
     const HISTORY_TURNS_FOR_CONTEXT = 4;
     const historySlice = longHistory.slice(-HISTORY_SEARCH_WINDOW);
     const cleanHistory = historySlice.filter(
-      (content) => !isFunctionCall(content) && !isFunctionResponse(content),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (content: any) =>
+        !content.parts?.[0]?.functionCall &&
+        !content.parts?.[0]?.functionResponse,
     );
     const finalHistory = cleanHistory.slice(-HISTORY_TURNS_FOR_CONTEXT);
 
@@ -299,14 +289,11 @@ describe('ClassifierStrategy', () => {
       reasoning: 'Simple.',
       model_choice: 'flash',
     };
-    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
-      mockApiResponse,
-    );
+    mockGenerateJson.mockResolvedValue(mockApiResponse);
 
     await strategy.route(mockContext, mockConfig, mockBaseLlmClient);
 
-    const generateJsonCall = vi.mocked(mockBaseLlmClient.generateJson).mock
-      .calls[0][0];
+    const generateJsonCall = mockGenerateJson.mock.calls[0][0];
 
     expect(generateJsonCall.promptId).toMatch(
       /^classifier-router-fallback-\d+-\w+$/,
@@ -325,9 +312,7 @@ describe('ClassifierStrategy', () => {
       reasoning: 'Choice is flash',
       model_choice: 'flash',
     };
-    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
-      mockApiResponse,
-    );
+    mockGenerateJson.mockResolvedValue(mockApiResponse);
 
     const contextWithRequestedModel = {
       ...mockContext,

@@ -135,11 +135,12 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
     const startTime = Date.now();
     try {
       const model = context.requestedModel ?? config.getModel();
+      const previewFeaturesEnabled = config.getPreviewFeatures();
       if (!(await config.getNumericalRoutingEnabled())) {
         return null;
       }
 
-      if (!isGemini3Model(model)) {
+      if (!isGemini3Model(model, previewFeaturesEnabled)) {
         return null;
       }
 
@@ -181,15 +182,11 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
           config.getSessionId() || 'unknown-session',
         );
 
-<<<<<<< HEAD
       const selectedModel = resolveClassifierModel(
-        config.getModel(),
+        model,
         modelAlias,
         config.getPreviewFeatures(),
       );
-=======
-      const selectedModel = resolveClassifierModel(model, modelAlias);
->>>>>>> 37f128a10 (feat(routing): restrict numerical routing to Gemini 3 family (#18478))
 
       const latencyMs = Date.now() - startTime;
 

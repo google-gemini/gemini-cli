@@ -12,9 +12,10 @@ import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import {
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
-  PREVIEW_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL,
+  PREVIEW_GEMINI_MODEL_AUTO,
+  GEMINI_MODEL_ALIAS_AUTO,
 } from '../../config/models.js';
 import { promptIdContext } from '../../utils/promptIdContext.js';
 import type { Content } from '@google/genai';
@@ -48,12 +49,8 @@ describe('NumericalClassifierStrategy', () => {
       modelConfigService: {
         getResolvedConfig: vi.fn().mockReturnValue(mockResolvedConfig),
       },
-<<<<<<< HEAD
-      getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
-      getPreviewFeatures: () => false,
-=======
       getModel: vi.fn().mockReturnValue(PREVIEW_GEMINI_MODEL_AUTO),
->>>>>>> 37f128a10 (feat(routing): restrict numerical routing to Gemini 3 family (#18478))
+      getPreviewFeatures: () => false,
       getSessionId: vi.fn().mockReturnValue('control-group-id'), // Default to Control Group (Hash 71 >= 50)
       getNumericalRoutingEnabled: vi.fn().mockResolvedValue(true),
       getClassifierThreshold: vi.fn().mockResolvedValue(undefined),
@@ -106,6 +103,28 @@ describe('NumericalClassifierStrategy', () => {
 
     expect(decision).toBeNull();
     expect(mockBaseLlmClient.generateJson).not.toHaveBeenCalled();
+  });
+
+  it('should return a decision if model is auto and preview features are enabled (resolves to Gemini 3)', async () => {
+    vi.mocked(mockConfig.getModel).mockReturnValue(GEMINI_MODEL_ALIAS_AUTO);
+    vi.spyOn(mockConfig, 'getPreviewFeatures').mockReturnValue(true);
+
+    const mockApiResponse = {
+      complexity_reasoning: 'Simple task',
+      complexity_score: 10,
+    };
+    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue(
+      mockApiResponse,
+    );
+
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+    );
+
+    expect(decision).not.toBeNull();
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalled();
   });
 
   it('should call generateJson with the correct parameters and wrapped user content', async () => {
