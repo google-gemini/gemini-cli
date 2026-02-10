@@ -91,6 +91,7 @@ export enum Command {
   TOGGLE_YOLO = 'app.toggleYolo',
   CYCLE_APPROVAL_MODE = 'app.cycleApprovalMode',
   SHOW_MORE_LINES = 'app.showMoreLines',
+  EXPAND_PASTE = 'app.expandPaste',
   FOCUS_SHELL_INPUT = 'app.focusShellInput',
   UNFOCUS_SHELL_INPUT = 'app.unfocusShellInput',
   CLEAR_SCREEN = 'app.clearScreen',
@@ -289,6 +290,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
     { key: 'o', ctrl: true },
     { key: 's', ctrl: true },
   ],
+  [Command.EXPAND_PASTE]: [{ key: 'o', ctrl: true }],
   [Command.FOCUS_SHELL_INPUT]: [{ key: 'tab', shift: false }],
   [Command.UNFOCUS_SHELL_INPUT]: [{ key: 'tab', shift: true }],
   [Command.CLEAR_SCREEN]: [{ key: 'l', ctrl: true }],
@@ -399,6 +401,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.TOGGLE_YOLO,
       Command.CYCLE_APPROVAL_MODE,
       Command.SHOW_MORE_LINES,
+      Command.EXPAND_PASTE,
       Command.TOGGLE_BACKGROUND_SHELL,
       Command.TOGGLE_BACKGROUND_SHELL_LIST,
       Command.KILL_BACKGROUND_SHELL,
@@ -499,6 +502,8 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
     'Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only).',
   [Command.SHOW_MORE_LINES]:
     'Expand a height-constrained response to show additional lines when not in alternate buffer mode.',
+  [Command.EXPAND_PASTE]:
+    'Expand or collapse a paste placeholder when cursor is over placeholder.',
   [Command.BACKGROUND_SHELL_SELECT]:
     'Confirm selection in background shell list.',
   [Command.BACKGROUND_SHELL_ESCAPE]: 'Dismiss background shell list.',
