@@ -9,6 +9,7 @@ import {
   getErrorMessage,
   getMCPServerPrompts,
   debugLogger,
+  sanitizeMcpContent,
 } from '@google/gemini-cli-core';
 import type {
   CommandContext,
@@ -127,39 +128,41 @@ export class McpPromptLoader implements ICommandLoader {
                 };
               }
 
-              const promptContent = result.messages?.map((msg) => {
-                const { content } = msg;
-                if (content.type === 'text') {
-                  return { text: content.text };
-                }
-                if (content.type === 'image') {
-                  return {
-                    inlineData: {
-                      mimeType: content.mimeType,
-                      data: content.data,
-                    },
-                  };
-                }
-                if (content.type === 'resource') {
-                  const { resource } = content;
-                  if ('text' in resource) {
-                    return { text: resource.text };
+              const promptContent = result.messages
+                ?.map((msg) => {
+                  const { content } = msg;
+                  if (content.type === 'text') {
+                    return { text: sanitizeMcpContent(content.text) };
                   }
-                  if ('blob' in resource) {
+                  if (content.type === 'image') {
                     return {
                       inlineData: {
-                        mimeType:
-                          resource.mimeType || 'application/octet-stream',
-                        data: resource.blob,
+                        mimeType: content.mimeType,
+                        data: content.data,
                       },
                     };
                   }
-                }
-                debugLogger.warn(
-                  `Unsupported MCP content type: ${JSON.stringify(content)}`,
-                );
-                return { text: '' };
-              });
+                  if (content.type === 'resource') {
+                    const { resource } = content;
+                    if ('text' in resource) {
+                      return { text: sanitizeMcpContent(resource.text) };
+                    }
+                    if ('blob' in resource) {
+                      return {
+                        inlineData: {
+                          mimeType:
+                            resource.mimeType || 'application/octet-stream',
+                          data: resource.blob,
+                        },
+                      };
+                    }
+                  }
+                  debugLogger.warn(
+                    `Unsupported MCP content type: ${JSON.stringify(content)}`,
+                  );
+                  return null;
+                })
+                .filter((p) => p !== null);
 
               if (!promptContent || promptContent.length === 0) {
                 return {

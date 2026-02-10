@@ -8,6 +8,7 @@ import { McpPromptLoader } from './McpPromptLoader.js';
 import type { Config } from '@google/gemini-cli-core';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as cliCore from '@google/gemini-cli-core';
+import { sanitizeMcpContent } from '@google/gemini-cli-core';
 import type { CommandContext } from '../ui/commands/types.js';
 
 const mockPrompt = {
@@ -92,7 +93,7 @@ describe('McpPromptLoader Issue 15851', () => {
 
     expect(result).toEqual({
       type: 'submit_prompt',
-      content: [{ text: 'example text' }],
+      content: [{ text: sanitizeMcpContent('example text') }],
     });
   });
 });
