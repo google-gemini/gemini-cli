@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { act } from 'react';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
@@ -21,6 +21,14 @@ const writeKey = (stdin: { write: (data: string) => void }, key: string) => {
 };
 
 describe('AskUserDialog', () => {
+  // Ensure keystrokes appear spaced in time to avoid bufferFastReturn
+  // converting Enter into Shift+Enter during synchronous test execution.
+  let mockTime: number;
+  beforeEach(() => {
+    mockTime = 0;
+    vi.spyOn(Date, 'now').mockImplementation(() => (mockTime += 50));
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -763,7 +771,7 @@ describe('AskUserDialog', () => {
       });
     });
 
-    it('does not submit empty text', () => {
+    it('submits empty text as unanswered', async () => {
       const textQuestion: Question[] = [
         {
           question: 'Enter the class name:',
@@ -785,8 +793,9 @@ describe('AskUserDialog', () => {
 
       writeKey(stdin, '\r');
 
-      // onSubmit should not be called for empty text
-      expect(onSubmit).not.toHaveBeenCalled();
+      await waitFor(() => {
+        expect(onSubmit).toHaveBeenCalledWith({});
+      });
     });
 
     it('clears text on Ctrl+C', async () => {
