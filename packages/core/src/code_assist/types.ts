@@ -63,7 +63,7 @@ export type UserTierId = (typeof UserTierId)[keyof typeof UserTierId] | string;
  * privacy notice.
  */
 export const PrivacyNoticeSchema = z.object({
-  showNotice: z.boolean(),
+  showNotice: z.boolean().optional().default(false),
   noticeText: z.string().optional(),
 });
 export type PrivacyNotice = z.infer<typeof PrivacyNoticeSchema>;
