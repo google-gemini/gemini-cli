@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - 'main'
+      - 'ntm/repro-hook-flakiness'
   merge_group:
   workflow_run:
     workflows: ['Trigger E2E']
