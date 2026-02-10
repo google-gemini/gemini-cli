@@ -827,6 +827,9 @@ export async function loadCliConfig(
       return {
         disabledSkills: refreshedSettings.merged.skills.disabled,
         agents: refreshedSettings.merged.agents,
+        notifications: {
+          enabled: refreshedSettings.merged.ui.enableNotifications ?? true,
+        },
       };
     },
   });

@@ -485,6 +485,7 @@ export interface ConfigParameters {
     disabledSkills?: string[];
     adminSkillsEnabled?: boolean;
     agents?: AgentSettings;
+    notifications?: NotificationConfig;
   }>;
 }
 
@@ -625,6 +626,7 @@ export class Config {
         disabledSkills?: string[];
         adminSkillsEnabled?: boolean;
         agents?: AgentSettings;
+        notifications?: NotificationConfig;
       }>)
     | undefined;
 
@@ -920,6 +922,7 @@ export class Config {
     await this.agentRegistry.initialize();
 
     coreEvents.on(CoreEvent.AgentsRefreshed, this.onAgentsRefreshed);
+    coreEvents.on(CoreEvent.SettingsChanged, this.onSettingsChanged);
 
     this.toolRegistry = await this.createToolRegistry();
     discoverToolsHandle?.end();
@@ -2387,12 +2390,23 @@ export class Config {
     }
   };
 
+  private onSettingsChanged = async () => {
+    if (this.onReload) {
+      const refreshed = await this.onReload();
+      if (refreshed.notifications) {
+        this.notificationService.updateConfig(refreshed.notifications);
+      }
+    }
+  };
+
   /**
    * Disposes of resources and removes event listeners.
    */
   async dispose(): Promise<void> {
     this.logCurrentModeDuration(this.getApprovalMode());
     coreEvents.off(CoreEvent.AgentsRefreshed, this.onAgentsRefreshed);
+    coreEvents.off(CoreEvent.SettingsChanged, this.onSettingsChanged);
+    this.notificationService.dispose();
     this.agentRegistry?.dispose();
     this.geminiClient?.dispose();
     if (this.mcpClientManager) {

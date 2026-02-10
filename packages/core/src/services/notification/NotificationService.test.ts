@@ -8,14 +8,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import notifier from 'node-notifier';
 import process from 'node:process';
 import { NotificationService } from './NotificationService.js';
-import type { MessageBus } from '../../confirmation-bus/message-bus.js';
-import {
-  MessageBusType,
-  type NotificationRequest,
-  type ToolConfirmationRequest,
-} from '../../confirmation-bus/types.js';
+import { MessageBusType } from '../../confirmation-bus/types.js';
 import { CoreEventEmitter } from '../../utils/events.js';
 import { isTerminalAppFocused } from './focusUtils.js';
+import { MockMessageBus } from '../../test-utils/mock-message-bus.js';
 
 vi.mock('./focusUtils.js', () => ({
   isTerminalAppFocused: vi.fn(),
@@ -47,9 +43,7 @@ describe('NotificationService', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    Object.defineProperty(process, 'platform', {
-      value: originalPlatform,
-    });
+    vi.spyOn(process, 'platform', 'get').mockReturnValue(originalPlatform);
     // Mock isTTY to true by default for tests
     Object.defineProperty(process.stdout, 'isTTY', {
       value: true,
@@ -91,9 +85,7 @@ describe('NotificationService', () => {
   });
 
   it('should include activate option on macOS if provided', async () => {
-    Object.defineProperty(process, 'platform', {
-      value: 'darwin',
-    });
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin');
     const service = new NotificationService({ enabled: true }, mockEvents);
     mockEvents.emitWindowFocusChanged(false);
     await service.notify({ message: 'Test', activate: 'com.test.app' });
@@ -107,9 +99,7 @@ describe('NotificationService', () => {
   });
 
   it('should include activate option on macOS from env if not provided', async () => {
-    Object.defineProperty(process, 'platform', {
-      value: 'darwin',
-    });
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin');
     process.env['__CFBundleIdentifier'] = 'com.env.app';
     const service = new NotificationService({ enabled: true }, mockEvents);
     mockEvents.emitWindowFocusChanged(false);
@@ -126,11 +116,9 @@ describe('NotificationService', () => {
   it('should handle MessageBus subscriptions and notify on TOOL_CONFIRMATION_REQUEST', async () => {
     const service = new NotificationService({ enabled: true }, mockEvents);
     mockEvents.emitWindowFocusChanged(false);
-    const mockBus = {
-      subscribe: vi.fn(),
-    } as unknown as MessageBus;
+    const mockBus = new MockMessageBus();
 
-    service.subscribeToBus(mockBus);
+    service.subscribeToBus(mockBus as unknown as MessageBus);
 
     expect(mockBus.subscribe).toHaveBeenCalledWith(
       MessageBusType.TOOL_CONFIRMATION_REQUEST,
@@ -138,10 +126,7 @@ describe('NotificationService', () => {
     );
 
     // Simulate event
-    const handler = vi.mocked(mockBus.subscribe).mock.calls[0][1] as (
-      msg: ToolConfirmationRequest,
-    ) => void;
-    handler({
+    mockBus.publish({
       type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
       correlationId: 'test-correlation-id',
       toolCall: { name: 'test_tool' } as never,
@@ -160,20 +145,12 @@ describe('NotificationService', () => {
 
   it('should handle NOTIFICATION_REQUEST with force flag', async () => {
     const service = new NotificationService({ enabled: false }, mockEvents);
-    const mockBus = {
-      subscribe: vi.fn(),
-    } as unknown as MessageBus;
+    const mockBus = new MockMessageBus();
 
-    service.subscribeToBus(mockBus);
+    service.subscribeToBus(mockBus as unknown as MessageBus);
 
     // Simulate event
-    const calls = vi.mocked(mockBus.subscribe).mock.calls;
-    const notificationCall = calls.find(
-      (call) => call[0] === MessageBusType.NOTIFICATION_REQUEST,
-    );
-    const handler = notificationCall![1] as (msg: NotificationRequest) => void;
-
-    handler({
+    mockBus.publish({
       type: MessageBusType.NOTIFICATION_REQUEST,
       message: 'Policy Alert',
       force: true,
@@ -221,12 +198,9 @@ describe('NotificationService', () => {
 
   it('should unsubscribe from MessageBus on dispose', () => {
     const service = new NotificationService({ enabled: true }, mockEvents);
-    const mockBus = {
-      subscribe: vi.fn(),
-      unsubscribe: vi.fn(),
-    } as unknown as MessageBus;
+    const mockBus = new MockMessageBus();
 
-    service.subscribeToBus(mockBus);
+    service.subscribeToBus(mockBus as unknown as MessageBus);
     service.dispose();
 
     expect(mockBus.unsubscribe).toHaveBeenCalledWith(

@@ -93,12 +93,15 @@ export class NotificationService {
     try {
       const notifierOptions = this.prepareNotifierOptions(options);
 
-      notifier.notify(notifierOptions, (error, response, meta) => {
-        if (error) {
-          debugLogger.warn('Failed to send system notification', error);
-        }
-        debugLogger.debug('Notification callback', { response, meta });
-      });
+      notifier.notify(
+        notifierOptions,
+        (error: Error | null, response: string, meta?: unknown) => {
+          if (error) {
+            debugLogger.warn('Failed to send system notification', error);
+          }
+          debugLogger.debug('Notification callback', { response, meta });
+        },
+      );
 
       this.sendTerminalNotification(options);
       debugLogger.debug(`Notification sent: ${options.message}`);
