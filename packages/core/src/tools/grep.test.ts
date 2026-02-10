@@ -458,6 +458,46 @@ describe('GrepTool', () => {
       // Clean up
       await fs.rm(secondDir, { recursive: true, force: true });
     });
+
+    it('should respect total_max_matches and truncate results', async () => {
+      // Use 'world' pattern which has 3 matches across fileA.txt and sub/fileC.txt
+      const params: GrepToolParams = {
+        pattern: 'world',
+        total_max_matches: 2,
+      };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain('Found 2 matches');
+      expect(result.llmContent).toContain(
+        'results limited to 2 matches for performance',
+      );
+      // It should find matches in fileA.txt first (2 matches)
+      expect(result.llmContent).toContain('File: fileA.txt');
+      expect(result.llmContent).toContain('L1: hello world');
+      expect(result.llmContent).toContain('L2: second line with world');
+      // And sub/fileC.txt should be excluded because limit reached
+      expect(result.llmContent).not.toContain('File: sub/fileC.txt');
+      expect(result.returnDisplay).toBe('Found 2 matches (limited)');
+    });
+
+    it('should respect max_matches_per_file in JS fallback', async () => {
+      const params: GrepToolParams = {
+        pattern: 'world',
+        max_matches_per_file: 1,
+      };
+      const invocation = grepTool.build(params);
+      const result = (await invocation.execute(abortSignal));
+
+      // fileA.txt has 2 worlds, but should only return 1.
+      // sub/fileC.txt has 1 world, so total matches = 2.
+      expect(result.llmContent).toContain('Found 2 matches');
+      expect(result.llmContent).toContain('File: fileA.txt');
+      expect(result.llmContent).toContain('L1: hello world');
+      expect(result.llmContent).not.toContain('L2: second line with world');
+      expect(result.llmContent).toContain('File: sub/fileC.txt');
+      expect(result.llmContent).toContain('L1: another world in sub dir');
+    });
   });
 
   describe('getDescription', () => {

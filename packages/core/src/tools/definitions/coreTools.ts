@@ -98,6 +98,18 @@ export const GREP_DEFINITION: ToolDefinition = {
           description: `Optional: A glob pattern to filter which files are searched (e.g., '*.js', '*.{ts,tsx}', 'src/**'). If omitted, searches all files (respecting potential global ignores).`,
           type: 'string',
         },
+        max_matches_per_file: {
+          description:
+            'Optional: Maximum number of matches to return per file. Use this to prevent being overwhelmed by repetitive matches in large files.',
+          type: 'integer',
+          minimum: 1,
+        },
+        total_max_matches: {
+          description:
+            'Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 2000 if omitted.',
+          type: 'integer',
+          minimum: 1,
+        },
       },
       required: ['pattern'],
     },

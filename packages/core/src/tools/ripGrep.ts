@@ -131,6 +131,16 @@ export interface RipGrepToolParams {
    * If true, does not respect .gitignore or default ignores (like build/dist).
    */
   no_ignore?: boolean;
+
+  /**
+   * Optional: Maximum number of matches to return per file. Use this to prevent being overwhelmed by repetitive matches in large files.
+   */
+  max_matches_per_file?: number;
+
+  /**
+   * Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 2000 if omitted.
+   */
+  total_max_matches?: number;
 }
 
 /**
@@ -208,7 +218,8 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       const searchDirDisplay = pathParam;
 
-      const totalMaxMatches = DEFAULT_TOTAL_MAX_MATCHES;
+      const totalMaxMatches =
+        this.params.total_max_matches ?? DEFAULT_TOTAL_MAX_MATCHES;
       if (this.config.getDebugMode()) {
         debugLogger.log(`[GrepTool] Total result limit: ${totalMaxMatches}`);
       }
@@ -240,6 +251,7 @@ class GrepToolInvocation extends BaseToolInvocation<
           before: this.params.before,
           no_ignore: this.params.no_ignore,
           maxMatches: totalMaxMatches,
+          max_matches_per_file: this.params.max_matches_per_file,
           signal: timeoutController.signal,
         });
       } finally {
@@ -325,6 +337,7 @@ class GrepToolInvocation extends BaseToolInvocation<
     before?: number;
     no_ignore?: boolean;
     maxMatches: number;
+    max_matches_per_file?: number;
     signal: AbortSignal;
   }): Promise<GrepMatch[]> {
     const {
@@ -338,6 +351,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       before,
       no_ignore,
       maxMatches,
+      max_matches_per_file,
     } = options;
 
     const rgArgs = ['--json'];
@@ -364,6 +378,10 @@ class GrepToolInvocation extends BaseToolInvocation<
     }
     if (no_ignore) {
       rgArgs.push('--no-ignore');
+    }
+
+    if (max_matches_per_file) {
+      rgArgs.push('--max-count', max_matches_per_file.toString());
     }
 
     if (include) {
@@ -558,6 +576,18 @@ export class RipGrepTool extends BaseDeclarativeTool<
               'If true, searches all files including those usually ignored (like in .gitignore, build/, dist/, etc). Defaults to false if omitted.',
             type: 'boolean',
           },
+          max_matches_per_file: {
+            description:
+              'Optional: Maximum number of matches to return per file. Use this to prevent being overwhelmed by repetitive matches in large files.',
+            type: 'integer',
+            minimum: 1,
+          },
+          total_max_matches: {
+            description:
+              'Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 2000 if omitted.',
+            type: 'integer',
+            minimum: 1,
+          },
         },
         required: ['pattern'],
         type: 'object',
@@ -586,6 +616,20 @@ export class RipGrepTool extends BaseDeclarativeTool<
       } catch (error) {
         return `Invalid regular expression pattern provided: ${params.pattern}. Error: ${getErrorMessage(error)}`;
       }
+    }
+
+    if (
+      params.max_matches_per_file !== undefined &&
+      params.max_matches_per_file < 1
+    ) {
+      return 'max_matches_per_file must be at least 1.';
+    }
+
+    if (
+      params.total_max_matches !== undefined &&
+      params.total_max_matches < 1
+    ) {
+      return 'total_max_matches must be at least 1.';
     }
 
     // Only validate path if one is provided
