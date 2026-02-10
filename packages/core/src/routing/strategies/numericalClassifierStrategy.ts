@@ -12,7 +12,7 @@ import type {
   RoutingDecision,
   RoutingStrategy,
 } from '../routingStrategy.js';
-import { resolveClassifierModel } from '../../config/models.js';
+import { resolveClassifierModel, isGemini3Model } from '../../config/models.js';
 import { createUserContent, Type } from '@google/genai';
 import type { Config } from '../../config/config.js';
 import { debugLogger } from '../../utils/debugLogger.js';
@@ -134,7 +134,12 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
   ): Promise<RoutingDecision | null> {
     const startTime = Date.now();
     try {
+      const model = context.requestedModel ?? config.getModel();
       if (!(await config.getNumericalRoutingEnabled())) {
+        return null;
+      }
+
+      if (!isGemini3Model(model)) {
         return null;
       }
 
@@ -176,11 +181,15 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
           config.getSessionId() || 'unknown-session',
         );
 
+<<<<<<< HEAD
       const selectedModel = resolveClassifierModel(
         config.getModel(),
         modelAlias,
         config.getPreviewFeatures(),
       );
+=======
+      const selectedModel = resolveClassifierModel(model, modelAlias);
+>>>>>>> 37f128a10 (feat(routing): restrict numerical routing to Gemini 3 family (#18478))
 
       const latencyMs = Date.now() - startTime;
 
