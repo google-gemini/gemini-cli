@@ -178,7 +178,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).toContain('# Available Sub-Agents');
     expect(prompt).toContain('<available_subagents>');
     expect(prompt).toContain('<subagent>');
-    expect(prompt).toContain('<name>Test Agent</name>');
+    expect(prompt).toContain('<name>test-agent</name>');
     expect(prompt).toContain(
       '<description>A test agent description</description>',
     );
