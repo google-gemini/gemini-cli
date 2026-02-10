@@ -4,11 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../../test-utils/render.js';
+import { renderWithProviders } from '../../../test-utils/render.js';
 import { Card } from './Card.js';
 import { Text } from 'ink';
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { ToolCallStatus } from '../../types.js';
+import { ToolCallStatus, StreamingState } from '../../types.js';
 
 describe('Card', () => {
   afterEach(() => {
@@ -52,6 +52,20 @@ describe('Card', () => {
       body: 'Listed 39 item(s).',
     },
     {
+      status: ToolCallStatus.Executing,
+      title: 'Searching',
+      suffix: 'ripgrep',
+      showStatusIndicator: true,
+      body: 'Searching for pattern in directory...',
+    },
+    {
+      status: ToolCallStatus.Pending,
+      title: 'No Status Indicator',
+      suffix: 'Hidden',
+      showStatusIndicator: false,
+      body: 'The status indicator should be hidden.',
+    },
+    {
       status: ToolCallStatus.Pending,
       title: 'Fixed Width Card',
       suffix: undefined,
@@ -62,7 +76,7 @@ describe('Card', () => {
   ] as const)(
     "renders '$title' card with status=$status and showStatusIndicator=$showStatusIndicator",
     ({ status, title, suffix, showStatusIndicator, body, width }) => {
-      const { lastFrame } = render(
+      const { lastFrame } = renderWithProviders(
         <Card
           status={status}
           title={title}
@@ -72,6 +86,11 @@ describe('Card', () => {
         >
           <Text>{body}</Text>
         </Card>,
+        {
+          uiState: {
+            streamingState: StreamingState.Responding,
+          },
+        },
       );
 
       const output = lastFrame();
