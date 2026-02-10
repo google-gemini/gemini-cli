@@ -27,10 +27,10 @@ const buildShortcutItems = (): ShortcutItem[] => {
     { key: '@', description: 'select file or folder' },
     { key: 'Ctrl+Y', description: 'YOLO mode' },
     { key: `${altLabel}+M`, description: 'raw markdown mode' },
-    { key: 'Esc Esc', description: 'clear prompt / rewind' },
+    { key: 'Esc Esc', description: 'clear & rewind' },
     { key: 'Ctrl+R', description: 'reverse-search history' },
     { key: 'Ctrl+X', description: 'open external editor' },
-    { key: 'Tab Tab', description: 'toggle clean UI' },
+    { key: 'Tab Tab', description: 'focus UI' },
   ];
 };
 

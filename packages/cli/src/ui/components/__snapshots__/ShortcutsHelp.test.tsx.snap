@@ -8,10 +8,10 @@ exports[`ShortcutsHelp > renders correctly in 'narrow' mode on 'linux' 1`] = `
  @ select file or folder
  Ctrl+Y YOLO mode
  Alt+M raw markdown mode
- Esc Esc clear prompt / rewind
+ Esc Esc clear & rewind
  Ctrl+R reverse-search history
  Ctrl+X open external editor
- Tab Tab toggle clean UI"
+ Tab Tab focus UI"
 `;
 
 exports[`ShortcutsHelp > renders correctly in 'narrow' mode on 'mac' 1`] = `
@@ -22,24 +22,24 @@ exports[`ShortcutsHelp > renders correctly in 'narrow' mode on 'mac' 1`] = `
  @ select file or folder
  Ctrl+Y YOLO mode
  Option+M raw markdown mode
- Esc Esc clear prompt / rewind
+ Esc Esc clear & rewind
  Ctrl+R reverse-search history
  Ctrl+X open external editor
- Tab Tab toggle clean UI"
+ Tab Tab focus UI"
 `;
 
 exports[`ShortcutsHelp > renders correctly in 'wide' mode on 'linux' 1`] = `
 "── Shortcuts (for more, see /help) ─────────────────────────────────────────────────────────────────
  ! shell mode                    Shift+Tab cycle mode            Ctrl+V paste images
  @ select file or folder         Ctrl+Y YOLO mode                Alt+M raw markdown mode
- Esc Esc clear prompt / rewind   Ctrl+R reverse-search history   Ctrl+X open external editor
- Tab Tab toggle clean UI"
+ Esc Esc clear & rewind          Ctrl+R reverse-search history   Ctrl+X open external editor
+ Tab Tab focus UI"
 `;
 
 exports[`ShortcutsHelp > renders correctly in 'wide' mode on 'mac' 1`] = `
 "── Shortcuts (for more, see /help) ─────────────────────────────────────────────────────────────────
  ! shell mode                    Shift+Tab cycle mode            Ctrl+V paste images
  @ select file or folder         Ctrl+Y YOLO mode                Option+M raw markdown mode
- Esc Esc clear prompt / rewind   Ctrl+R reverse-search history   Ctrl+X open external editor
- Tab Tab toggle clean UI"
+ Esc Esc clear & rewind          Ctrl+R reverse-search history   Ctrl+X open external editor
+ Tab Tab focus UI"
 `;
