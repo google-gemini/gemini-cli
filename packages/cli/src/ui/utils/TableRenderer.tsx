@@ -70,9 +70,9 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
   );
 
   const { wrappedHeaders, wrappedRows, adjustedWidths } = useMemo(() => {
-    const numColumns = Math.max(
+    const numColumns = styledRows.reduce(
+      (max, row) => Math.max(max, row.length),
       styledHeaders.length,
-      ...styledRows.map((r) => r.length),
     );
 
     // --- Define Constraints per Column ---
