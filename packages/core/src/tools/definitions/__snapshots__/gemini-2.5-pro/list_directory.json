@@ -30,8 +30,6 @@
         }
       }
     },
-    "required": [
-      "dir_path"
-    ]
+    "required": ["dir_path"]
   }
 }

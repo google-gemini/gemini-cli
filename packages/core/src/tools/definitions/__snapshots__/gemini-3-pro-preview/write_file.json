@@ -13,9 +13,6 @@
         "type": "string"
       }
     },
-    "required": [
-      "file_path",
-      "content"
-    ]
+    "required": ["file_path", "content"]
   }
 }
