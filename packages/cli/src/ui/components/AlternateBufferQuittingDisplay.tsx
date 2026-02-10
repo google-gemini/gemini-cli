@@ -6,7 +6,6 @@
 
 import { Box, Text } from 'ink';
 import { useUIState } from '../contexts/UIStateContext.js';
-import { useSettings } from '../contexts/SettingsContext.js';
 import { AppHeader } from './AppHeader.js';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';
 import { QuittingDisplay } from './QuittingDisplay.js';
@@ -16,18 +15,15 @@ import { useConfirmingTool } from '../hooks/useConfirmingTool.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { ToolStatusIndicator, ToolInfo } from './messages/ToolShared.js';
 import { theme } from '../semantic-colors.js';
-import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 
 export const AlternateBufferQuittingDisplay = () => {
   const { version } = useAppContext();
   const uiState = useUIState();
-  const settings = useSettings();
   const config = useConfig();
 
   const confirmingTool = useConfirmingTool();
   const showPromptedTool =
     config.isEventDrivenSchedulerEnabled() && confirmingTool !== null;
-  const inlineThinkingMode = getInlineThinkingMode(settings);
 
   // We render the entire chat history and header here to ensure that the
   // conversation history is visible to the user after the app quits and the
@@ -51,7 +47,6 @@ export const AlternateBufferQuittingDisplay = () => {
           item={h}
           isPending={false}
           commands={uiState.slashCommands}
-          inlineThinkingMode={inlineThinkingMode}
         />
       ))}
       {uiState.pendingHistoryItems.map((item, i) => (
@@ -64,7 +59,6 @@ export const AlternateBufferQuittingDisplay = () => {
           isFocused={false}
           activeShellPtyId={uiState.activePtyId}
           embeddedShellFocused={uiState.embeddedShellFocused}
-          inlineThinkingMode={inlineThinkingMode}
         />
       ))}
       {showPromptedTool && (

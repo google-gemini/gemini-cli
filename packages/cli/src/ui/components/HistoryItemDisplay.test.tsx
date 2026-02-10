@@ -15,6 +15,7 @@ import type {
 } from '@google/gemini-cli-core';
 import { ToolGroupMessage } from './messages/ToolGroupMessage.js';
 import { renderWithProviders } from '../../test-utils/render.js';
+import { createMockSettings } from '../../test-utils/settings.js';
 
 // Mock child components
 vi.mock('./messages/ToolGroupMessage.js', () => ({
@@ -240,14 +241,15 @@ describe('<HistoryItemDisplay />', () => {
         thought: { subject: 'Thinking', description: 'test' },
       };
       const { lastFrame } = renderWithProviders(
-        <HistoryItemDisplay
-          {...baseItem}
-          item={item}
-          inlineThinkingMode="full"
-        />,
+        <HistoryItemDisplay {...baseItem} item={item} />,
+        {
+          settings: createMockSettings({
+            merged: { ui: { inlineThinkingMode: 'full' } },
+          }),
+        },
       );
 
-      expect(lastFrame()).toContain('Thinking');
+      expect(lastFrame()).toMatchSnapshot();
     });
 
     it('does not render thinking item when disabled', () => {
@@ -257,11 +259,12 @@ describe('<HistoryItemDisplay />', () => {
         thought: { subject: 'Thinking', description: 'test' },
       };
       const { lastFrame } = renderWithProviders(
-        <HistoryItemDisplay
-          {...baseItem}
-          item={item}
-          inlineThinkingMode="off"
-        />,
+        <HistoryItemDisplay {...baseItem} item={item} />,
+        {
+          settings: createMockSettings({
+            merged: { ui: { inlineThinkingMode: 'off' } },
+          }),
+        },
       );
 
       expect(lastFrame()).toBe('');

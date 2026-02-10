@@ -1,0 +1,30 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ThinkingMessage > indents summary line correctly 1`] = `
+"   Summary line
+ │ First body line
+"
+`;
+
+exports[`ThinkingMessage > normalizes escaped newline tokens 1`] = `
+"   Matching the Blocks
+ │ Some more text
+"
+`;
+
+exports[`ThinkingMessage > renders full mode with left border and full text 1`] = `
+"   Planning
+ │ I am planning the solution.
+"
+`;
+
+exports[`ThinkingMessage > renders subject line 1`] = `
+"   Planning
+ │ test
+"
+`;
+
+exports[`ThinkingMessage > uses description when subject is empty 1`] = `
+"   Processing details
+"
+`;
