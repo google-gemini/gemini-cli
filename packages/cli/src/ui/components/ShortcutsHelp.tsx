@@ -22,15 +22,15 @@ const buildShortcutItems = (): ShortcutItem[] => {
 
   return [
     { key: '!', description: 'shell mode' },
-    { key: 'Tab Tab', description: 'toggle clean UI' },
     { key: 'Shift+Tab', description: 'cycle mode' },
     { key: 'Ctrl+V', description: 'paste images' },
     { key: '@', description: 'select file or folder' },
     { key: 'Ctrl+Y', description: 'YOLO mode' },
-    { key: 'Ctrl+R', description: 'reverse-search history' },
-    { key: 'Esc Esc', description: 'clear prompt / rewind' },
     { key: `${altLabel}+M`, description: 'raw markdown mode' },
+    { key: 'Esc Esc', description: 'clear prompt / rewind' },
+    { key: 'Ctrl+R', description: 'reverse-search history' },
     { key: 'Ctrl+X', description: 'open external editor' },
+    { key: 'Tab Tab', description: 'toggle clean UI' },
   ];
 };
 
