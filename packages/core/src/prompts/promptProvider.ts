@@ -26,6 +26,8 @@ import {
   WRITE_TODOS_TOOL_NAME,
   READ_FILE_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
+  GLOB_TOOL_NAME,
+  GREP_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { resolveModel, isPreviewModel } from '../config/models.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
@@ -159,6 +161,8 @@ export class PromptProvider {
             enableEnterPlanModeTool: enabledToolNames.has(
               ENTER_PLAN_MODE_TOOL_NAME,
             ),
+            enableGrep: enabledToolNames.has(GREP_TOOL_NAME),
+            enableGlob: enabledToolNames.has(GLOB_TOOL_NAME),
             approvedPlan: approvedPlanPath
               ? { path: approvedPlanPath }
               : undefined,
