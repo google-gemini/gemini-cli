@@ -6,6 +6,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, prefer-const */
 import express from 'express';
 import cors from 'cors';
+import * as fs from 'node:fs';
 import * as https from 'node:https';
 import * as path from 'node:path';
 import * as zlib from 'node:zlib';
@@ -21,7 +22,25 @@ const PORT = process.env.PORT || 3001;
 const UPSTREAM_URL =
   process.env.UPSTREAM_GCA_ENDPOINT || 'https://cloudcode-pa.googleapis.com';
 
-app.use(cors());
+// Restrict CORS to localhost origins only to prevent cross-site attacks
+const ALLOWED_ORIGIN_PATTERN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+
+function isAllowedOrigin(origin: string | undefined): boolean {
+  if (!origin) return true; // Allow same-origin requests (no Origin header)
+  return ALLOWED_ORIGIN_PATTERN.test(origin);
+}
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (isAllowedOrigin(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`Origin ${origin} not allowed by CORS`));
+      }
+    },
+  }),
+);
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static(CLIENT_DIST));
 
@@ -672,6 +691,8 @@ app.get('*', (req, res) => {
 });
 
 // --- SSL Certificate ---
+const CERT_PATH = path.resolve(__dirname, '../proxy-cert.pem');
+
 function generateCert() {
   console.log('Generating self-signed certificate...');
   const keys = forge.pki.rsa.generateKeyPair(2048);
@@ -692,9 +713,15 @@ function generateCert() {
   cert.setIssuer(attrs);
   cert.sign(keys.privateKey, forge.md.sha256.create());
 
+  const certPem = forge.pki.certificateToPem(cert);
+
+  // Save cert to disk so the CLI can trust it via NODE_EXTRA_CA_CERTS
+  fs.writeFileSync(CERT_PATH, certPem, 'utf-8');
+  console.log(`Certificate saved to ${CERT_PATH}`);
+
   return {
     key: forge.pki.privateKeyToPem(keys.privateKey),
-    cert: forge.pki.certificateToPem(cert),
+    cert: certPem,
   };
 }
 
@@ -702,7 +729,44 @@ const { key, cert } = generateCert();
 
 // --- Start Server ---
 const server = https.createServer({ key, cert }, app);
-wss = new WebSocketServer({ server });
+wss = new WebSocketServer({
+  server,
+  verifyClient: (info, callback) => {
+    const origin = info.origin || info.req.headers.origin;
+    if (isAllowedOrigin(origin)) {
+      callback(true);
+    } else {
+      console.warn(`[WS] Rejected connection from origin: ${origin}`);
+      callback(false, 403, 'Forbidden: origin not allowed');
+    }
+  },
+});
+
+/**
+ * Release all pending requests (e.g. when UI disconnects).
+ * Uses the upstream response if available, otherwise returns a 502 error.
+ */
+function releaseAllPending(reason: string) {
+  if (pendingRequests.size === 0) return;
+  console.log(
+    `[Proxy] Auto-releasing ${pendingRequests.size} pending request(s): ${reason}`,
+  );
+  for (const [id, pending] of pendingRequests) {
+    if (pending.upstreamResponse) {
+      pending.resolve({
+        statusCode: pending.upstreamResponse.statusCode,
+        body: pending.upstreamResponse.body,
+        chunks: pending.upstreamResponse.chunks,
+      });
+    } else {
+      pending.resolve({
+        statusCode: 502,
+        body: { error: 'Proxy UI disconnected' },
+      });
+    }
+  }
+  pendingRequests.clear();
+}
 
 wss.on('connection', (ws) => {
   console.log('[WS] Client connected');
@@ -733,6 +797,13 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     console.log('[WS] Client disconnected');
+    // If no UI clients remain, release all pending requests to prevent CLI hangs
+    const activeClients = [...wss.clients].filter(
+      (c) => c.readyState === WebSocket.OPEN,
+    );
+    if (activeClients.length === 0) {
+      releaseAllPending('last UI client disconnected');
+    }
   });
 });
 
@@ -741,5 +812,5 @@ server.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`📡 Upstream: ${UPSTREAM_URL}`);
   console.log(`\nTo use with Gemini CLI:`);
   console.log(`  export CODE_ASSIST_ENDPOINT=https://localhost:${PORT}`);
-  console.log(`  export NODE_TLS_REJECT_UNAUTHORIZED=0\n`);
+  console.log(`  export NODE_EXTRA_CA_CERTS=${CERT_PATH}\n`);
 });

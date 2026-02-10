@@ -61,3 +61,6 @@ gemini-debug.log
 .gemini-clipboard/
 .eslintcache
 evals/logs/
+
+# GCA Proxy generated certificate
+proxy-cert.pem

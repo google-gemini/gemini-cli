@@ -14,13 +14,16 @@
  */
 
 import { spawn } from 'node:child_process';
+import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as https from 'node:https';
+import * as path from 'node:path';
 
 const MIN_PORT = 3001;
 const MAX_PORT = 3100;
 const STARTUP_TIMEOUT_MS = 10000;
 const POLL_INTERVAL_MS = 200;
+const PROXY_CERT_PATH = path.resolve('tools/gca-proxy/proxy-cert.pem');
 
 /**
  * Find an available port in the given range
@@ -117,6 +120,15 @@ async function main() {
     await waitForServer(port, STARTUP_TIMEOUT_MS);
     console.log(`✅ Proxy ready at https://localhost:${port}\n`);
 
+    // Verify the proxy wrote its certificate to disk
+    if (!fs.existsSync(PROXY_CERT_PATH)) {
+      throw new Error(
+        `Proxy certificate not found at ${PROXY_CERT_PATH}. ` +
+          'The proxy server may have failed to start correctly.',
+      );
+    }
+    console.log(`🔒 Using proxy certificate: ${PROXY_CERT_PATH}`);
+
     // Start the CLI
     console.log('🤖 Starting Gemini CLI...\n');
     const cliProcess = spawn(
@@ -127,7 +139,7 @@ async function main() {
           ...process.env,
           NODE_ENV: 'development',
           CODE_ASSIST_ENDPOINT: `https://localhost:${port}`,
-          NODE_TLS_REJECT_UNAUTHORIZED: '0',
+          NODE_EXTRA_CA_CERTS: PROXY_CERT_PATH,
         },
         stdio: 'inherit',
       },
