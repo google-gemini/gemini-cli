@@ -275,7 +275,7 @@ jobs:
           UV_THREADPOOL_SIZE: '32'
           NODE_ENV: 'test'
         shell: 'pwsh'
-        run: 'npm run test:integration:sandbox:none'
+        run: 'npx vitest run --root integration-tests hooks-system.test.ts'
 
   evals:
     name: 'Evals (ALWAYS_PASSING)'
