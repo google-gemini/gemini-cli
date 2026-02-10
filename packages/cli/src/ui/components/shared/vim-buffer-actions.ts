@@ -910,9 +910,11 @@ export function handleVimAction(
         col++;
       }
 
+      // Clamp to valid position (last char or 0 for empty/whitespace-only lines)
+      const maxCol = lineCodePoints.length > 0 ? lineCodePoints.length - 1 : 0;
       return {
         ...state,
-        cursorCol: col,
+        cursorCol: Math.min(col, maxCol),
         preferredCol: null,
       };
     }
