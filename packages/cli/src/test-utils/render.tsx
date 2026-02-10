@@ -403,7 +403,7 @@ export function renderHook<Result, Props>(
 }
 
 export function renderHookWithProviders<Result, Props>(
-  renderCallback: (props: Props) => Result,
+  renderCallback: (props: Props & { settings: LoadedSettings }) => Result,
   options: {
     initialProps?: Props;
     wrapper?: React.ComponentType<{ children: React.ReactNode }>;
@@ -421,6 +421,7 @@ export function renderHookWithProviders<Result, Props>(
   rerender: (props?: Props) => void;
   unmount: () => void;
 } {
+  const settings = options.settings ?? mockSettings;
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const result = { current: undefined as unknown as Result };
 
@@ -432,7 +433,7 @@ export function renderHookWithProviders<Result, Props>(
     const [, forceUpdate] = useState(0);
     setPropsFn = setProps;
     forceUpdateFn = () => forceUpdate((n) => n + 1);
-    result.current = renderCallback(props);
+    result.current = renderCallback({ ...props, settings });
     return null;
   }
 
@@ -446,7 +447,7 @@ export function renderHookWithProviders<Result, Props>(
         {/* eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion */}
         <TestComponent initialProps={options.initialProps as Props} />
       </Wrapper>,
-      options,
+      { ...options, settings },
     );
   });
 

@@ -48,22 +48,13 @@ describe('<ToolGroupMessage />', () => {
     enableEventDrivenScheduler: true,
   });
 
-  const commonOptions = {
-    config: baseMockConfig,
-    settings: createMockSettings({
-      ui: {
-        enableCompactToolOutput: false,
-      },
-    }),
-  };
-
   describe('Golden Snapshots', () => {
     it('renders single successful tool call', () => {
       const toolCalls = [createToolCall()];
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
         {
-          ...commonOptions,
+          config: baseMockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
           },
@@ -103,7 +94,6 @@ describe('<ToolGroupMessage />', () => {
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
         {
-          ...commonOptions,
           config: mockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
@@ -138,7 +128,6 @@ describe('<ToolGroupMessage />', () => {
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
         {
-          ...commonOptions,
           config: mockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
@@ -161,7 +150,7 @@ describe('<ToolGroupMessage />', () => {
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
         {
-          ...commonOptions,
+          config: baseMockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
           },
@@ -201,7 +190,6 @@ describe('<ToolGroupMessage />', () => {
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
         {
-          ...commonOptions,
           config: mockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
@@ -235,7 +223,7 @@ describe('<ToolGroupMessage />', () => {
           availableTerminalHeight={10}
         />,
         {
-          ...commonOptions,
+          config: baseMockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
           },
@@ -254,7 +242,7 @@ describe('<ToolGroupMessage />', () => {
           isFocused={false}
         />,
         {
-          ...commonOptions,
+          config: baseMockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
           },
@@ -279,7 +267,7 @@ describe('<ToolGroupMessage />', () => {
           terminalWidth={40}
         />,
         {
-          ...commonOptions,
+          config: baseMockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
           },
@@ -293,7 +281,7 @@ describe('<ToolGroupMessage />', () => {
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={[]} />,
         {
-          ...commonOptions,
+          config: baseMockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: [] }],
           },
@@ -324,7 +312,7 @@ describe('<ToolGroupMessage />', () => {
           <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />
         </Scrollable>,
         {
-          ...commonOptions,
+          config: baseMockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
           },
@@ -347,7 +335,7 @@ describe('<ToolGroupMessage />', () => {
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
         {
-          ...commonOptions,
+          config: baseMockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
           },
@@ -381,7 +369,7 @@ describe('<ToolGroupMessage />', () => {
           <ToolGroupMessage {...baseProps} toolCalls={toolCalls2} />
         </Scrollable>,
         {
-          ...commonOptions,
+          config: baseMockConfig,
           uiState: {
             pendingHistoryItems: [
               { type: 'tool_group', tools: toolCalls1 },
@@ -407,7 +395,6 @@ describe('<ToolGroupMessage />', () => {
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
         {
-          ...commonOptions,
           config: mockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
@@ -429,7 +416,7 @@ describe('<ToolGroupMessage />', () => {
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
         {
-          ...commonOptions,
+          config: baseMockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
           },
@@ -451,7 +438,7 @@ describe('<ToolGroupMessage />', () => {
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
         {
-          ...commonOptions,
+          config: baseMockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
           },
@@ -485,7 +472,7 @@ describe('<ToolGroupMessage />', () => {
           availableTerminalHeight={20}
         />,
         {
-          ...commonOptions,
+          config: baseMockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
           },
@@ -531,7 +518,6 @@ describe('<ToolGroupMessage />', () => {
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
         {
-          ...commonOptions,
           config: mockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
@@ -558,7 +544,6 @@ describe('<ToolGroupMessage />', () => {
         }),
       ];
       const settings = createMockSettings({
-        ui: { enableCompactToolOutput: false },
         security: { enablePermanentToolApproval: true },
       });
       const mockConfig = makeFakeConfig({
@@ -570,7 +555,6 @@ describe('<ToolGroupMessage />', () => {
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
         {
-          ...commonOptions,
           settings,
           config: mockConfig,
           uiState: {
@@ -606,7 +590,7 @@ describe('<ToolGroupMessage />', () => {
 
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
-        { ...commonOptions, config: mockConfig },
+        { config: mockConfig },
       );
       expect(lastFrame()).not.toContain('Allow for all future sessions');
       expect(lastFrame()).toMatchSnapshot();
@@ -633,7 +617,7 @@ describe('<ToolGroupMessage />', () => {
 
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
-        { ...commonOptions, config: mockConfig },
+        { config: mockConfig },
       );
 
       // Should render nothing because all tools in the group are confirming
@@ -666,7 +650,7 @@ describe('<ToolGroupMessage />', () => {
 
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
-        { ...commonOptions, config: mockConfig },
+        { config: mockConfig },
       );
 
       const output = lastFrame();
@@ -695,7 +679,7 @@ describe('<ToolGroupMessage />', () => {
           toolCalls={toolCalls}
           borderBottom={false}
         />,
-        { ...commonOptions, config: baseMockConfig },
+        { config: baseMockConfig },
       );
       // AskUser tools in progress are rendered by AskUserDialog, so we expect nothing.
       expect(lastFrame()).toMatchSnapshot();
@@ -719,7 +703,7 @@ describe('<ToolGroupMessage />', () => {
 
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
-        { ...commonOptions, config: baseMockConfig },
+        { config: baseMockConfig },
       );
 
       expect(lastFrame()).toMatchSnapshot();
@@ -739,7 +723,7 @@ describe('<ToolGroupMessage />', () => {
 
         const { lastFrame, unmount } = renderWithProviders(
           <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
-          { ...commonOptions, config: baseMockConfig },
+          { config: baseMockConfig },
         );
 
         expect(lastFrame()).toMatchSnapshot();
@@ -763,7 +747,7 @@ describe('<ToolGroupMessage />', () => {
 
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
-        { ...commonOptions, config: baseMockConfig },
+        { config: baseMockConfig },
       );
 
       expect(lastFrame()).toMatchSnapshot();

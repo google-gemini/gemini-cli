@@ -9,7 +9,6 @@ import type { Mock, MockInstance } from 'vitest';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act } from 'react';
 import { renderHookWithProviders } from '../../test-utils/render.js';
-import { createMockSettings } from '../../test-utils/settings.js';
 import { waitFor } from '../../test-utils/async.js';
 import { useGeminiStream } from './useGeminiStream.js';
 import { useKeypress } from './useKeypress.js';
@@ -307,12 +306,6 @@ describe('useGeminiStream', () => {
     setValue: vi.fn(),
   } as unknown as LoadedSettings;
 
-  const commonSettings = createMockSettings({
-    ui: {
-      enableCompactToolOutput: true,
-    },
-  });
-
   const renderTestHook = (
     initialToolCalls: TrackedToolCall[] = [],
     geminiClient?: any,
@@ -396,7 +389,6 @@ describe('useGeminiStream', () => {
         ),
       {
         initialProps,
-        settings: commonSettings,
       },
     );
     return {
@@ -476,30 +468,26 @@ describe('useGeminiStream', () => {
       modelSwitched = false,
     } = options;
 
-    return renderHookWithProviders(
-      () =>
-        useGeminiStream(
-          new MockedGeminiClientClass(mockConfig),
-          [],
-          mockAddItem,
-          mockConfig,
-          mockLoadedSettings,
-          mockOnDebugMessage,
-          mockHandleSlashCommand,
-          shellModeActive,
-          () => 'vscode' as EditorType,
-          onAuthError,
-          performMemoryRefresh,
-          modelSwitched,
-          setModelSwitched,
-          onCancelSubmit,
-          setShellInputFocused,
-          80,
-          24,
-        ),
-      {
-        settings: commonSettings,
-      },
+    return renderHookWithProviders(() =>
+      useGeminiStream(
+        new MockedGeminiClientClass(mockConfig),
+        [],
+        mockAddItem,
+        mockConfig,
+        mockLoadedSettings,
+        mockOnDebugMessage,
+        mockHandleSlashCommand,
+        shellModeActive,
+        () => 'vscode' as EditorType,
+        onAuthError,
+        performMemoryRefresh,
+        modelSwitched,
+        setModelSwitched,
+        onCancelSubmit,
+        setShellInputFocused,
+        80,
+        24,
+      ),
     );
   };
 
@@ -2040,30 +2028,26 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderHookWithProviders(
-        () =>
-          useGeminiStream(
-            new MockedGeminiClientClass(mockConfig),
-            [],
-            mockAddItem,
-            mockConfig,
-            mockLoadedSettings,
-            mockOnDebugMessage,
-            mockHandleSlashCommand,
-            false,
-            () => 'vscode' as EditorType,
-            () => {},
-            () => Promise.resolve(),
-            false,
-            () => {},
-            () => {},
-            () => {},
-            80,
-            24,
-          ),
-        {
-          settings: commonSettings,
-        },
+      const { result } = renderHookWithProviders(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          () => {},
+          80,
+          24,
+        ),
       );
 
       // Submit a query
@@ -2548,30 +2532,26 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderHookWithProviders(
-        () =>
-          useGeminiStream(
-            new MockedGeminiClientClass(mockConfig),
-            [],
-            mockAddItem,
-            mockConfig,
-            mockLoadedSettings,
-            mockOnDebugMessage,
-            mockHandleSlashCommand,
-            false,
-            () => 'vscode' as EditorType,
-            () => {},
-            () => Promise.resolve(),
-            false,
-            () => {},
-            () => {},
-            () => {},
-            80,
-            24,
-          ),
-        {
-          settings: commonSettings,
-        },
+      const { result } = renderHookWithProviders(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          () => {},
+          80,
+          24,
+        ),
       );
 
       // Submit first query to set a thought
@@ -2634,30 +2614,26 @@ describe('useGeminiStream', () => {
         0,
       ]);
 
-      const { result, rerender } = renderHookWithProviders(
-        () =>
-          useGeminiStream(
-            mockConfig.getGeminiClient(),
-            [],
-            mockAddItem,
-            mockConfig,
-            mockLoadedSettings,
-            mockOnDebugMessage,
-            mockHandleSlashCommand,
-            false,
-            () => 'vscode' as EditorType,
-            () => {},
-            () => Promise.resolve(),
-            false,
-            () => {},
-            () => {},
-            () => {},
-            80,
-            24,
-          ),
-        {
-          settings: commonSettings,
-        },
+      const { result, rerender } = renderHookWithProviders(() =>
+        useGeminiStream(
+          mockConfig.getGeminiClient(),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          () => {},
+          80,
+          24,
+        ),
       );
 
       const firstResult = result.current.pendingHistoryItems;
@@ -2709,30 +2685,26 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderHookWithProviders(
-        () =>
-          useGeminiStream(
-            new MockedGeminiClientClass(mockConfig),
-            [],
-            mockAddItem,
-            mockConfig,
-            mockLoadedSettings,
-            mockOnDebugMessage,
-            mockHandleSlashCommand,
-            false,
-            () => 'vscode' as EditorType,
-            () => {},
-            () => Promise.resolve(),
-            false,
-            () => {},
-            () => {},
-            () => {},
-            80,
-            24,
-          ),
-        {
-          settings: commonSettings,
-        },
+      const { result } = renderHookWithProviders(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          () => {},
+          80,
+          24,
+        ),
       );
 
       // Submit query
@@ -2770,30 +2742,26 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderHookWithProviders(
-        () =>
-          useGeminiStream(
-            new MockedGeminiClientClass(mockConfig),
-            [],
-            mockAddItem,
-            mockConfig,
-            mockLoadedSettings,
-            mockOnDebugMessage,
-            mockHandleSlashCommand,
-            false,
-            () => 'vscode' as EditorType,
-            () => {},
-            () => Promise.resolve(),
-            false,
-            () => {},
-            () => {},
-            () => {},
-            80,
-            24,
-          ),
-        {
-          settings: commonSettings,
-        },
+      const { result } = renderHookWithProviders(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          () => {},
+          80,
+          24,
+        ),
       );
 
       // Submit query
@@ -2842,30 +2810,26 @@ describe('useGeminiStream', () => {
         })(),
       );
 
-      const { result } = renderHookWithProviders(
-        () =>
-          useGeminiStream(
-            new MockedGeminiClientClass(mockConfig),
-            [],
-            mockAddItem,
-            mockConfig,
-            mockLoadedSettings,
-            mockOnDebugMessage,
-            mockHandleSlashCommand,
-            false,
-            () => 'vscode' as EditorType,
-            () => {},
-            () => Promise.resolve(),
-            false,
-            () => {},
-            () => {},
-            () => {},
-            80,
-            24,
-          ),
-        {
-          settings: commonSettings,
-        },
+      const { result } = renderHookWithProviders(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockConfig,
+          mockLoadedSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          () => {},
+          80,
+          24,
+        ),
       );
 
       // Submit query
