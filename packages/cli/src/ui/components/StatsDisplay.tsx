@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -8,7 +8,7 @@ import type React from 'react';
 import { Box, Text } from 'ink';
 import { ThemedGradient } from './ThemedGradient.js';
 import { theme } from '../semantic-colors.js';
-import { formatDuration } from '../utils/formatters.js';
+import { formatDuration, formatResetTime } from '../utils/formatters.js';
 import type { ModelMetrics } from '../contexts/SessionContext.js';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import {
@@ -24,8 +24,12 @@ import { computeSessionStats } from '../utils/computeStats.js';
 import {
   type RetrieveUserQuotaResponse,
   VALID_GEMINI_MODELS,
+  getDisplayString,
+  isAutoModel,
 } from '@google/gemini-cli-core';
 import { useSettings } from '../contexts/SettingsContext.js';
+import type { QuotaStats } from '../types.js';
+import { QuotaStatsInfo } from './QuotaStatsInfo.js';
 
 // A more flexible and powerful StatRow component
 interface StatRowProps {
@@ -122,36 +126,25 @@ const buildModelRows = (
   return [...activeRows, ...quotaRows];
 };
 
-const formatResetTime = (resetTime: string): string => {
-  const diff = new Date(resetTime).getTime() - Date.now();
-  if (diff <= 0) return '';
-
-  const totalMinutes = Math.ceil(diff / (1000 * 60));
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-
-  const fmt = (val: number, unit: 'hour' | 'minute') =>
-    new Intl.NumberFormat('en', {
-      style: 'unit',
-      unit,
-      unitDisplay: 'narrow',
-    }).format(val);
-
-  if (hours > 0 && minutes > 0) {
-    return `(Resets in ${fmt(hours, 'hour')} ${fmt(minutes, 'minute')})`;
-  } else if (hours > 0) {
-    return `(Resets in ${fmt(hours, 'hour')})`;
-  }
-
-  return `(Resets in ${fmt(minutes, 'minute')})`;
-};
-
 const ModelUsageTable: React.FC<{
   models: Record<string, ModelMetrics>;
   quotas?: RetrieveUserQuotaResponse;
   cacheEfficiency: number;
   totalCachedTokens: number;
-}> = ({ models, quotas, cacheEfficiency, totalCachedTokens }) => {
+  currentModel?: string;
+  pooledRemaining?: number;
+  pooledLimit?: number;
+  pooledResetTime?: string;
+}> = ({
+  models,
+  quotas,
+  cacheEfficiency,
+  totalCachedTokens,
+  currentModel,
+  pooledRemaining,
+  pooledLimit,
+  pooledResetTime,
+}) => {
   const rows = buildModelRows(models, quotas);
 
   if (rows.length === 0) {
@@ -179,13 +172,43 @@ const ModelUsageTable: React.FC<{
       ? usageLimitWidth
       : uncachedWidth + cachedWidth + outputTokensWidth);
 
+  const isAuto = currentModel && isAutoModel(currentModel);
+  const modelUsageTitle = isAuto
+    ? `${getDisplayString(currentModel)} Usage`
+    : `Model Usage`;
+
   return (
     <Box flexDirection="column" marginTop={1}>
       {/* Header */}
       <Box alignItems="flex-end">
         <Box width={nameWidth}>
           <Text bold color={theme.text.primary} wrap="truncate-end">
-            Model Usage
+            {modelUsageTitle}
+          </Text>
+        </Box>
+      </Box>
+
+      {isAuto &&
+        showQuotaColumn &&
+        pooledRemaining !== undefined &&
+        pooledLimit !== undefined &&
+        pooledLimit > 0 && (
+          <Box flexDirection="column" marginTop={0} marginBottom={1}>
+            <QuotaStatsInfo
+              remaining={pooledRemaining}
+              limit={pooledLimit}
+              resetTime={pooledResetTime}
+            />
+            <Text color={theme.text.primary}>
+              For a full token breakdown, run `/stats model`.
+            </Text>
+          </Box>
+        )}
+
+      <Box alignItems="flex-end">
+        <Box width={nameWidth}>
+          <Text bold color={theme.text.primary}>
+            Model
           </Text>
         </Box>
         <Box
@@ -198,6 +221,7 @@ const ModelUsageTable: React.FC<{
             Reqs
           </Text>
         </Box>
+
         {!showQuotaColumn && (
           <>
             <Box
@@ -239,7 +263,7 @@ const ModelUsageTable: React.FC<{
             alignItems="flex-end"
           >
             <Text bold color={theme.text.primary}>
-              Usage left
+              Usage remaining
             </Text>
           </Box>
         )}
@@ -259,7 +283,10 @@ const ModelUsageTable: React.FC<{
       {rows.map((row) => (
         <Box key={row.key}>
           <Box width={nameWidth}>
-            <Text color={theme.text.primary} wrap="truncate-end">
+            <Text
+              color={row.isActive ? theme.text.primary : theme.text.secondary}
+              wrap="truncate-end"
+            >
               {row.modelName}
             </Text>
           </Box>
@@ -344,19 +371,6 @@ const ModelUsageTable: React.FC<{
           </Text>
         </Box>
       )}
-
-      {showQuotaColumn && (
-        <>
-          <Box marginTop={1} marginBottom={2}>
-            <Text color={theme.text.primary}>
-              {`Usage limits span all sessions and reset daily.\n/auth to upgrade or switch to API key.`}
-            </Text>
-          </Box>
-          <Text color={theme.text.secondary}>
-            » Tip: For a full token breakdown, run `/stats model`.
-          </Text>
-        </>
-      )}
     </Box>
   );
 };
@@ -368,6 +382,8 @@ interface StatsDisplayProps {
   selectedAuthType?: string;
   userEmail?: string;
   tier?: string;
+  currentModel?: string;
+  quotaStats?: QuotaStats;
 }
 
 export const StatsDisplay: React.FC<StatsDisplayProps> = ({
@@ -377,12 +393,19 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
   selectedAuthType,
   userEmail,
   tier,
+  currentModel,
+  quotaStats,
 }) => {
   const { stats } = useSessionStats();
   const { metrics } = stats;
   const { models, tools, files } = metrics;
   const computed = computeSessionStats(metrics);
   const settings = useSettings();
+
+  const pooledRemaining = quotaStats?.remaining;
+  const pooledLimit = quotaStats?.limit;
+  const pooledResetTime = quotaStats?.resetTime;
+
   const showUserIdentity = settings.merged.ui.showUserIdentity;
 
   const successThresholds = {
@@ -415,7 +438,7 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
       borderStyle="round"
       borderColor={theme.border.default}
       flexDirection="column"
-      paddingY={1}
+      paddingTop={1}
       paddingX={2}
       overflow="hidden"
     >
@@ -508,6 +531,10 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
         quotas={quotas}
         cacheEfficiency={computed.cacheEfficiency}
         totalCachedTokens={computed.totalCachedTokens}
+        currentModel={currentModel}
+        pooledRemaining={pooledRemaining}
+        pooledLimit={pooledLimit}
+        pooledResetTime={pooledResetTime}
       />
     </Box>
   );

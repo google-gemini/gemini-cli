@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -24,7 +24,10 @@ vi.mock('../contexts/VimModeContext.js', () => ({
   })),
 }));
 import { ApprovalMode } from '@google/gemini-cli-core';
+import type { Config } from '@google/gemini-cli-core';
 import { StreamingState, ToolCallStatus } from '../types.js';
+import type { LoadedSettings } from '../../config/settings.js';
+import type { SessionMetrics } from '../contexts/SessionContext.js';
 
 // Mock child components
 vi.mock('./LoadingIndicator.js', () => ({
@@ -145,6 +148,12 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     activeHooks: [],
     isBackgroundShellVisible: false,
     embeddedShellFocused: false,
+    quota: {
+      userTier: undefined,
+      stats: undefined,
+      proQuotaRequest: null,
+      validationRequest: null,
+    },
     ...overrides,
   }) as UIState;
 
@@ -155,31 +164,30 @@ const createMockUIActions = (): UIActions =>
     setShellModeActive: vi.fn(),
     onEscapePromptChange: vi.fn(),
     vimHandleInput: vi.fn(),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  }) as any;
+  }) as Partial<UIActions> as UIActions;
 
-const createMockConfig = (overrides = {}) => ({
-  getModel: vi.fn(() => 'gemini-1.5-pro'),
-  getTargetDir: vi.fn(() => '/test/dir'),
-  getDebugMode: vi.fn(() => false),
-  getAccessibility: vi.fn(() => ({})),
-  getMcpServers: vi.fn(() => ({})),
-  isPlanEnabled: vi.fn(() => false),
-  getToolRegistry: () => ({
-    getTool: vi.fn(),
-  }),
-  getSkillManager: () => ({
-    getSkills: () => [],
-    getDisplayableSkills: () => [],
-  }),
-  getMcpClientManager: () => ({
-    getMcpServers: () => ({}),
-    getBlockedMcpServers: () => [],
-  }),
-  ...overrides,
-});
+const createMockConfig = (overrides = {}): Config =>
+  ({
+    getModel: vi.fn(() => 'gemini-1.5-pro'),
+    getTargetDir: vi.fn(() => '/test/dir'),
+    getDebugMode: vi.fn(() => false),
+    getAccessibility: vi.fn(() => ({})),
+    getMcpServers: vi.fn(() => ({})),
+    isPlanEnabled: vi.fn(() => false),
+    getToolRegistry: () => ({
+      getTool: vi.fn(),
+    }),
+    getSkillManager: () => ({
+      getSkills: () => [],
+      getDisplayableSkills: () => [],
+    }),
+    getMcpClientManager: () => ({
+      getMcpServers: () => ({}),
+      getBlockedMcpServers: () => [],
+    }),
+    ...overrides,
+  }) as unknown as Config;
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const renderComposer = (
   uiState: UIState,
   settings = createMockSettings(),
@@ -187,8 +195,8 @@ const renderComposer = (
   uiActions = createMockUIActions(),
 ) =>
   render(
-    <ConfigContext.Provider value={config as any}>
-      <SettingsContext.Provider value={settings as any}>
+    <ConfigContext.Provider value={config as unknown as Config}>
+      <SettingsContext.Provider value={settings as unknown as LoadedSettings}>
         <UIStateContext.Provider value={uiState}>
           <UIActionsContext.Provider value={uiActions}>
             <Composer />
@@ -197,7 +205,6 @@ const renderComposer = (
       </SettingsContext.Provider>
     </ConfigContext.Provider>,
   );
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 describe('Composer', () => {
   describe('Footer Display Settings', () => {
@@ -229,8 +236,11 @@ describe('Composer', () => {
         sessionStats: {
           sessionId: 'test-session',
           sessionStartTime: new Date(),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          metrics: {} as any,
+          metrics: {
+            models: {},
+            tools: {},
+            files: {},
+          } as SessionMetrics,
           lastPromptTokenCount: 150,
           promptCount: 5,
         },
@@ -251,8 +261,9 @@ describe('Composer', () => {
       vi.mocked(useVimMode).mockReturnValueOnce({
         vimEnabled: true,
         vimMode: 'INSERT',
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any);
+        toggleVimEnabled: vi.fn(),
+        setVimMode: vi.fn(),
+      } as unknown as ReturnType<typeof useVimMode>);
 
       const { lastFrame } = renderComposer(uiState, settings, config);
 
@@ -541,9 +552,12 @@ describe('Composer', () => {
       const uiState = createMockUIState({
         showErrorDetails: true,
         filteredConsoleMessages: [
-          { level: 'error', message: 'Test error', timestamp: new Date() },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ] as any,
+          {
+            type: 'error',
+            content: 'Test error',
+            count: 1,
+          },
+        ],
       });
 
       const { lastFrame } = renderComposer(uiState);
