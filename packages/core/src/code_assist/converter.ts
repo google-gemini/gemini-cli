@@ -137,18 +137,14 @@ export function toGenerateContentRequest(
 export function fromGenerateContentResponse(
   res: CaGenerateContentResponse,
 ): GenerateContentResponse {
-  const out = new GenerateContentResponse();
-  out.responseId = res.traceId;
   const inres = res.response;
-  if (!inres) {
-    out.candidates = [];
-    return out;
-  }
-  out.candidates = inres.candidates ?? [];
+  const out = new GenerateContentResponse();
+  out.candidates = inres.candidates;
   out.automaticFunctionCallingHistory = inres.automaticFunctionCallingHistory;
   out.promptFeedback = inres.promptFeedback;
   out.usageMetadata = inres.usageMetadata;
   out.modelVersion = inres.modelVersion;
+  out.responseId = res.traceId;
   return out;
 }
 

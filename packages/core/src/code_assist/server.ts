@@ -65,7 +65,7 @@ import {
   recordConversationOffered,
 } from './telemetry.js';
 import { getClientMetadata } from './experiments/client_metadata.js';
-import { debugLogger } from 'src/utils/debugLogger.js';
+import { debugLogger } from '../utils/debugLogger.js';
 /** HTTP options to be used in each of the requests. */
 export interface HttpOptions {
   /** Additional HTTP headers to be sent with the request. */
