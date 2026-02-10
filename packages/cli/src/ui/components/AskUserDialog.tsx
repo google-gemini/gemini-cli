@@ -361,7 +361,7 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
       </Box>
 
       <Box flexDirection="row" marginBottom={1}>
-        <Text color={theme.text.accent}>{'> '}</Text>
+        <Text color={theme.status.success}>{'> '}</Text>
         <TextInput
           buffer={buffer}
           placeholder={placeholder}
@@ -838,7 +838,9 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
               <Box flexDirection="row">
                 {showCheck && (
                   <Text
-                    color={isChecked ? theme.text.accent : theme.text.secondary}
+                    color={
+                      isChecked ? theme.status.success : theme.text.secondary
+                    }
                   >
                     [{isChecked ? 'x' : ' '}]
                   </Text>
@@ -870,7 +872,9 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
               <Box flexDirection="row">
                 {showCheck && (
                   <Text
-                    color={isChecked ? theme.text.accent : theme.text.secondary}
+                    color={
+                      isChecked ? theme.status.success : theme.text.secondary
+                    }
                   >
                     [{isChecked ? 'x' : ' '}]
                   </Text>

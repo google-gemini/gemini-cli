@@ -23,6 +23,7 @@ const __dirname = path.dirname(__filename);
 
 // Determine the monorepo root (assuming eslint.config.js is at the root)
 const projectRoot = __dirname;
+const currentYear = new Date().getFullYear();
 
 export default tseslint.config(
   {
@@ -193,6 +194,14 @@ export default tseslint.config(
     },
   },
   {
+    // Rules that only apply to product code
+    files: ['packages/*/src/**/*.{ts,tsx}'],
+    ignores: ['**/*.test.ts', '**/*.test.tsx'],
+    rules: {
+      '@typescript-eslint/no-unsafe-type-assertion': 'error',
+    },
+  },
+  {
     // Allow os.homedir() in tests and paths.ts where it is used to implement the helper
     files: [
       '**/*.test.ts',
@@ -259,8 +268,8 @@ export default tseslint.config(
           ].join('\n'),
           patterns: {
             year: {
-              pattern: '202[5-6]',
-              defaultValue: '2026',
+              pattern: `202[5-${currentYear.toString().slice(-1)}]`,
+              defaultValue: currentYear.toString(),
             },
           },
         },

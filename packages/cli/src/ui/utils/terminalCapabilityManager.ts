@@ -64,6 +64,14 @@ export class TerminalCapabilityManager {
     this.instance = undefined;
   }
 
+  private static cleanupOnExit(): void {
+    // don't bother catching errors since if one write
+    // fails, the other probably will too
+    disableKittyKeyboardProtocol();
+    disableModifyOtherKeys();
+    disableBracketedPasteMode();
+  }
+
   /**
    * Detects terminal capabilities (Kitty protocol support, terminal name,
    * background color).
@@ -77,16 +85,12 @@ export class TerminalCapabilityManager {
       return;
     }
 
-    const cleanupOnExit = () => {
-      // don't bother catching errors since if one write
-      // fails, the other probably will too
-      disableKittyKeyboardProtocol();
-      disableModifyOtherKeys();
-      disableBracketedPasteMode();
-    };
-    process.on('exit', cleanupOnExit);
-    process.on('SIGTERM', cleanupOnExit);
-    process.on('SIGINT', cleanupOnExit);
+    process.off('exit', TerminalCapabilityManager.cleanupOnExit);
+    process.off('SIGTERM', TerminalCapabilityManager.cleanupOnExit);
+    process.off('SIGINT', TerminalCapabilityManager.cleanupOnExit);
+    process.on('exit', TerminalCapabilityManager.cleanupOnExit);
+    process.on('SIGTERM', TerminalCapabilityManager.cleanupOnExit);
+    process.on('SIGINT', TerminalCapabilityManager.cleanupOnExit);
 
     return new Promise((resolve) => {
       const originalRawMode = process.stdin.isRaw;

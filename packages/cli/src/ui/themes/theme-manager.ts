@@ -383,6 +383,7 @@ class ThemeManager {
 
       // 3. Read, parse, and validate the theme file.
       const themeContent = fs.readFileSync(canonicalPath, 'utf-8');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const customThemeConfig = JSON.parse(themeContent) as CustomTheme;
 
       const validation = validateCustomTheme(customThemeConfig);

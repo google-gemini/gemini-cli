@@ -13,6 +13,9 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │  ● Vim Mode                                                                               false  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
+│    Default Approval Mode                                                                Default  │
+│    The default approval mode for tool execution. 'default' prompts for approval, 'au…            │
+│                                                                                                  │
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
@@ -30,9 +33,6 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │                                                                                                  │
 │    Auto Theme Switching                                                                    true  │
 │    Automatically switch between default light and dark themes based on terminal backgro…         │
-│                                                                                                  │
-│    Terminal Background Polling Interval                                                      60  │
-│    Interval in seconds to poll the terminal background color.                                    │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -59,6 +59,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │  ● Vim Mode                                                                               true*  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
+│    Default Approval Mode                                                                Default  │
+│    The default approval mode for tool execution. 'default' prompts for approval, 'au…            │
+│                                                                                                  │
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
@@ -76,9 +79,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │                                                                                                  │
 │    Auto Theme Switching                                                                    true  │
 │    Automatically switch between default light and dark themes based on terminal backgro…         │
-│                                                                                                  │
-│    Terminal Background Polling Interval                                                      60  │
-│    Interval in seconds to poll the terminal background color.                                    │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -105,6 +105,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │  ● Vim Mode                                                                              false*  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
+│    Default Approval Mode                                                                Default  │
+│    The default approval mode for tool execution. 'default' prompts for approval, 'au…            │
+│                                                                                                  │
 │    Enable Auto Update                                                                     true*  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
@@ -122,9 +125,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │                                                                                                  │
 │    Auto Theme Switching                                                                    true  │
 │    Automatically switch between default light and dark themes based on terminal backgro…         │
-│                                                                                                  │
-│    Terminal Background Polling Interval                                                      60  │
-│    Interval in seconds to poll the terminal background color.                                    │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -151,6 +151,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │  ● Vim Mode                                                                               false  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
+│    Default Approval Mode                                                                Default  │
+│    The default approval mode for tool execution. 'default' prompts for approval, 'au…            │
+│                                                                                                  │
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
@@ -168,9 +171,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │                                                                                                  │
 │    Auto Theme Switching                                                                    true  │
 │    Automatically switch between default light and dark themes based on terminal backgro…         │
-│                                                                                                  │
-│    Terminal Background Polling Interval                                                      60  │
-│    Interval in seconds to poll the terminal background color.                                    │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -197,6 +197,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │  ● Vim Mode                                                                               false  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
+│    Default Approval Mode                                                                Default  │
+│    The default approval mode for tool execution. 'default' prompts for approval, 'au…            │
+│                                                                                                  │
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
@@ -214,9 +217,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │                                                                                                  │
 │    Auto Theme Switching                                                                    true  │
 │    Automatically switch between default light and dark themes based on terminal backgro…         │
-│                                                                                                  │
-│    Terminal Background Polling Interval                                                      60  │
-│    Interval in seconds to poll the terminal background color.                                    │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -243,6 +243,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │    Vim Mode                                                                               false  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
+│    Default Approval Mode                                                                Default  │
+│    The default approval mode for tool execution. 'default' prompts for approval, 'au…            │
+│                                                                                                  │
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
@@ -260,9 +263,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │                                                                                                  │
 │    Auto Theme Switching                                                                    true  │
 │    Automatically switch between default light and dark themes based on terminal backgro…         │
-│                                                                                                  │
-│    Terminal Background Polling Interval                                                      60  │
-│    Interval in seconds to poll the terminal background color.                                    │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -289,6 +289,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │  ● Vim Mode                                                                              false*  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
+│    Default Approval Mode                                                                Default  │
+│    The default approval mode for tool execution. 'default' prompts for approval, 'au…            │
+│                                                                                                  │
 │    Enable Auto Update                                                                    false*  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
@@ -306,9 +309,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │                                                                                                  │
 │    Auto Theme Switching                                                                    true  │
 │    Automatically switch between default light and dark themes based on terminal backgro…         │
-│                                                                                                  │
-│    Terminal Background Polling Interval                                                      60  │
-│    Interval in seconds to poll the terminal background color.                                    │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -335,6 +335,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │  ● Vim Mode                                                                               false  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
+│    Default Approval Mode                                                                Default  │
+│    The default approval mode for tool execution. 'default' prompts for approval, 'au…            │
+│                                                                                                  │
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
@@ -352,9 +355,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │                                                                                                  │
 │    Auto Theme Switching                                                                    true  │
 │    Automatically switch between default light and dark themes based on terminal backgro…         │
-│                                                                                                  │
-│    Terminal Background Polling Interval                                                      60  │
-│    Interval in seconds to poll the terminal background color.                                    │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -381,6 +381,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │  ● Vim Mode                                                                               true*  │
 │    Enable Vim keybindings                                                                        │
 │                                                                                                  │
+│    Default Approval Mode                                                                Default  │
+│    The default approval mode for tool execution. 'default' prompts for approval, 'au…            │
+│                                                                                                  │
 │    Enable Auto Update                                                                    false*  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
@@ -398,9 +401,6 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │                                                                                                  │
 │    Auto Theme Switching                                                                    true  │
 │    Automatically switch between default light and dark themes based on terminal backgro…         │
-│                                                                                                  │
-│    Terminal Background Polling Interval                                                      60  │
-│    Interval in seconds to poll the terminal background color.                                    │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
