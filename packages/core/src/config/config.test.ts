@@ -323,12 +323,16 @@ describe('Server Config (config.ts)', () => {
         '../tools/mcp-client-manager.js'
       );
       let mcpStarted = false;
+      let resolveMcp: (value: unknown) => void;
+      const mcpPromise = new Promise((resolve) => {
+        resolveMcp = resolve;
+      });
 
-      vi.mocked(McpClientManager).mockImplementation(
+      (McpClientManager as unknown as Mock).mockImplementation(
         () =>
           ({
             startConfiguredMcpServers: vi.fn().mockImplementation(async () => {
-              await new Promise((resolve) => setTimeout(resolve, 50));
+              await mcpPromise;
               mcpStarted = true;
             }),
             getMcpInstructions: vi.fn(),
@@ -340,8 +344,9 @@ describe('Server Config (config.ts)', () => {
       // Should return immediately, before MCP finishes
       expect(mcpStarted).toBe(false);
 
-      // Wait for it to eventually finish to avoid open handles
-      await new Promise((resolve) => setTimeout(resolve, 60));
+      // Now let it finish
+      resolveMcp!(undefined);
+      await new Promise((resolve) => setTimeout(resolve, 0));
       expect(mcpStarted).toBe(true);
     });
 

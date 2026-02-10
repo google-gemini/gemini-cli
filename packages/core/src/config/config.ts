@@ -2338,18 +2338,21 @@ export class Config {
     const registry = new ToolRegistry(this, this.messageBus);
 
     // helper to create & register core tools that are enabled
+    type CoreToolConstructor = (
+      | (new (bus: MessageBus) => AnyDeclarativeTool)
+      | (new (
+          config: Config,
+          bus: MessageBus,
+          ...args: unknown[]
+        ) => AnyDeclarativeTool)
+    ) & { Name?: string };
+
     const registerCoreTool = (
-      ToolClass:
-        | (new (
-            config: Config,
-            bus: MessageBus,
-            ...args: unknown[]
-          ) => AnyDeclarativeTool)
-        | (new (bus: MessageBus) => AnyDeclarativeTool),
+      ToolClass: CoreToolConstructor,
       ...args: unknown[]
     ) => {
       const className = ToolClass.name;
-      const toolName = (ToolClass as { Name?: string }).Name || className;
+      const toolName = ToolClass.Name || className;
       const coreTools = this.getCoreTools();
       // On some platforms, the className can be minified to _ClassName.
       const normalizedClassName = className.replace(/^_+/, '');
