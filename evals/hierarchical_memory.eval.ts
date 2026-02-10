@@ -43,10 +43,12 @@ When asked for my favorite fruit, always say "Cherry".
 
 What is my favorite fruit? Tell me just the name of the fruit.`,
     assert: async (_rig, result) => {
-      assertModelHasOutput(result);
-      expect(result).toMatch(/Cherry/i);
-      expect(result).not.toMatch(/Apple/i);
-      expect(result).not.toMatch(/Banana/i);
+      // Split result to separate stdout from stderr
+      const [stdout] = result.split('\n\nStdErr:\n');
+      assertModelHasOutput(stdout);
+      expect(stdout).toMatch(/Cherry/i);
+      expect(stdout).not.toMatch(/Apple/i);
+      expect(stdout).not.toMatch(/Banana/i);
     },
   });
 
