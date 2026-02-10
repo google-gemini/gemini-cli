@@ -21,6 +21,7 @@ import {
 } from '@google/gemini-cli-core';
 import type { SessionRetentionSettings } from './settings.js';
 import { DEFAULT_MIN_RETENTION } from '../utils/sessionCleanup.js';
+import { getLanguageOptions } from '../i18n/index.js';
 
 export type SettingsType =
   | 'boolean'
@@ -1573,6 +1574,18 @@ const SETTINGS_SCHEMA = {
         default: false,
         description: 'Enable planning features (Plan Mode and tools).',
         showInDialog: true,
+      },
+      language: {
+        type: 'string',
+        label: 'Language (Experimental)',
+
+        category: 'Experimental',
+        requiresRestart: true,
+        default: 'auto',
+        description:
+          'The language for the CLI interface. Auto-detect uses system locale.',
+        showInDialog: true,
+        options: getLanguageOptions(),
       },
     },
   },
