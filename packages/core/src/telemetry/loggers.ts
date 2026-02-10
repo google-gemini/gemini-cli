@@ -81,6 +81,7 @@ import { bufferTelemetryEvent } from './sdk.js';
 import type { UiEvent } from './uiTelemetry.js';
 import { uiTelemetryService } from './uiTelemetry.js';
 import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export function logCliConfiguration(
   config: Config,
@@ -89,15 +90,19 @@ export function logCliConfiguration(
   void ClearcutLogger.getInstance(config)?.logStartSessionEvent(event);
   bufferTelemetryEvent(() => {
     // Wait for experiments to load before emitting so we capture experimentIds
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    config.getExperimentsAsync().then(() => {
-      const logger = logs.getLogger(SERVICE_NAME);
-      const logRecord: LogRecord = {
-        body: event.toLogBody(),
-        attributes: event.toOpenTelemetryAttributes(config),
-      };
-      logger.emit(logRecord);
-    });
+    void config
+      .getExperimentsAsync()
+      .then(() => {
+        const logger = logs.getLogger(SERVICE_NAME);
+        const logRecord: LogRecord = {
+          body: event.toLogBody(),
+          attributes: event.toOpenTelemetryAttributes(config),
+        };
+        logger.emit(logRecord);
+      })
+      .catch((e: unknown) => {
+        debugLogger.error('Failed to log telemetry event', e);
+      });
   });
 }
 
@@ -785,14 +790,18 @@ export function logStartupStats(
 ): void {
   bufferTelemetryEvent(() => {
     // Wait for experiments to load before emitting so we capture experimentIds
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    config.getExperimentsAsync().then(() => {
-      const logger = logs.getLogger(SERVICE_NAME);
-      const logRecord: LogRecord = {
-        body: event.toLogBody(),
-        attributes: event.toOpenTelemetryAttributes(config),
-      };
-      logger.emit(logRecord);
-    });
+    void config
+      .getExperimentsAsync()
+      .then(() => {
+        const logger = logs.getLogger(SERVICE_NAME);
+        const logRecord: LogRecord = {
+          body: event.toLogBody(),
+          attributes: event.toOpenTelemetryAttributes(config),
+        };
+        logger.emit(logRecord);
+      })
+      .catch((e: unknown) => {
+        debugLogger.error('Failed to log telemetry event', e);
+      });
   });
 }
