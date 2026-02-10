@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import path from 'node:path';
 import { resolveToolDeclaration } from './resolver.js';
 import {
   READ_FILE_DEFINITION,
@@ -32,9 +33,17 @@ describe('coreTools snapshots for specific models', () => {
   for (const modelId of modelIds) {
     describe(`Model: ${modelId}`, () => {
       for (const tool of tools) {
-        it(`snapshot for tool: ${tool.name}`, () => {
+        it(`snapshot for tool: ${tool.name}`, async () => {
           const resolved = resolveToolDeclaration(tool.definition, modelId);
-          expect(resolved).toMatchSnapshot();
+          // Create a directory structure: __snapshots__/<modelId>/<toolName>.json
+          const snapshotPath = path.join(
+            '__snapshots__',
+            modelId,
+            `${tool.name}.json`,
+          );
+          await expect(JSON.stringify(resolved, null, 2)).toMatchFileSnapshot(
+            snapshotPath,
+          );
         });
       }
     });
