@@ -1542,11 +1542,11 @@ Logging in with Google... Restarting Gemini CLI to continue.
                 try {
                   await openBrowserSecurely(url);
                 } catch (e) {
-                  setShowErrorDetails(true);
+                  setShowErrorDetails((prev) => !prev);
                   debugLogger.warn('Failed to open browser securely:', e);
                 }
               } else {
-                setShowErrorDetails(true);
+                setShowErrorDetails((prev) => !prev);
               }
             } catch (e) {
               setShowErrorDetails(true);
