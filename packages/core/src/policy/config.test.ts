@@ -317,8 +317,8 @@ describe('createPolicyEngineConfig', () => {
       (r) => r.decision === PolicyDecision.ALLOW && !r.toolName,
     );
     expect(rule).toBeDefined();
-    // Priority 999 in default tier → 1.999
-    expect(rule?.priority).toBeCloseTo(1.999, 5);
+    // Priority 998 in default tier → 1.998 (999 reserved for ask_user exception)
+    expect(rule?.priority).toBeCloseTo(1.998, 5);
   });
 
   it('should allow edit tool in AUTO_EDIT mode', async () => {
@@ -582,8 +582,8 @@ describe('createPolicyEngineConfig', () => {
       (r) => !r.toolName && r.decision === PolicyDecision.ALLOW,
     );
     expect(wildcardRule).toBeDefined();
-    // Priority 999 in default tier → 1.999
-    expect(wildcardRule?.priority).toBeCloseTo(1.999, 5);
+    // Priority 998 in default tier → 1.998 (999 reserved for ask_user exception)
+    expect(wildcardRule?.priority).toBeCloseTo(1.998, 5);
 
     // Write tool ASK_USER rules are present (from write.toml)
     const writeToolRules = config.rules?.filter(

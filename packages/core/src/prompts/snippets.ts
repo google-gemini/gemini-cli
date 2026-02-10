@@ -33,6 +33,7 @@ export interface SystemPromptOptions {
   planningWorkflow?: PlanningWorkflowOptions;
   operationalGuidelines?: OperationalGuidelinesOptions;
   sandbox?: SandboxMode;
+  interactiveYoloMode?: boolean;
   gitRepo?: GitRepoOptions;
 }
 
@@ -110,6 +111,8 @@ ${
 }
 
 ${renderOperationalGuidelines(options.operationalGuidelines)}
+
+${renderInteractiveYoloMode(options.interactiveYoloMode)}
 
 ${renderSandbox(options.sandbox)}
 
@@ -310,6 +313,25 @@ export function renderSandbox(mode?: SandboxMode): string {
       You are running in a sandbox container with limited access to files outside the project directory or system temp directory, and with limited access to host system resources such as ports. If you encounter failures that could be due to sandboxing (e.g. if a command fails with 'Operation not permitted' or similar error), when you report the error to the user, also explain why you think it could be due to sandboxing, and how the user may need to adjust their sandbox configuration.`.trim();
   }
   return '';
+}
+
+export function renderInteractiveYoloMode(enabled?: boolean): string {
+  if (!enabled) return '';
+  return `
+# Autonomous Mode (YOLO)
+
+You are operating in **autonomous mode**. The user has requested minimal interruption.
+
+**Only use the \`${ASK_USER_TOOL_NAME}\` tool if:**
+- A wrong decision would cause significant re-work
+- The request is fundamentally ambiguous with no reasonable default
+- The user explicitly asks you to confirm or ask questions
+
+**Otherwise, work autonomously:**
+- Make reasonable decisions based on context and existing code patterns
+- Follow established project conventions
+- If multiple valid approaches exist, choose the most robust option
+`.trim();
 }
 
 export function renderGitRepo(options?: GitRepoOptions): string {

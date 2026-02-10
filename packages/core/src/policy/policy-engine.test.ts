@@ -2030,4 +2030,60 @@ describe('PolicyEngine', () => {
       expect(result.decision).toBe(PolicyDecision.DENY);
     });
   });
+
+  describe('YOLO mode with ask_user tool', () => {
+    it('should return ASK_USER for ask_user tool even in YOLO mode', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'ask_user',
+          decision: PolicyDecision.ASK_USER,
+          priority: 999,
+          modes: [ApprovalMode.YOLO],
+        },
+        {
+          decision: PolicyDecision.ALLOW,
+          priority: 998,
+          modes: [ApprovalMode.YOLO],
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+      });
+
+      const result = await engine.check(
+        { name: 'ask_user', args: {} },
+        undefined,
+      );
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should return ALLOW for other tools in YOLO mode', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'ask_user',
+          decision: PolicyDecision.ASK_USER,
+          priority: 999,
+          modes: [ApprovalMode.YOLO],
+        },
+        {
+          decision: PolicyDecision.ALLOW,
+          priority: 998,
+          modes: [ApprovalMode.YOLO],
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+      });
+
+      const result = await engine.check(
+        { name: 'run_shell_command', args: { command: 'ls' } },
+        undefined,
+      );
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+  });
 });
