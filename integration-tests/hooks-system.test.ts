@@ -1888,7 +1888,7 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
       expect(disabledHookLog).toBeUndefined();
     });
 
-    it.only('should respect disabled hooks across multiple operations', async () => {
+    it('should respect disabled hooks across multiple operations', async () => {
       rig.setup('should respect disabled hooks across multiple operations', {
         fakeResponsesPath: join(
           import.meta.dirname,
