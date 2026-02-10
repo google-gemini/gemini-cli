@@ -804,23 +804,32 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
           }
 
           case 'D': {
-            // Delete from cursor to end of line (equivalent to d$)
-            executeCommand(CMD_TYPES.DELETE_TO_EOL, 1);
+            // Delete from cursor to end of line (with count, delete to end of N lines)
+            executeCommand(CMD_TYPES.DELETE_TO_EOL, repeatCount);
             dispatch({
               type: 'SET_LAST_COMMAND',
-              command: { type: CMD_TYPES.DELETE_TO_EOL, count: 1 },
+              command: { type: CMD_TYPES.DELETE_TO_EOL, count: repeatCount },
             });
             dispatch({ type: 'CLEAR_COUNT' });
             return true;
           }
 
           case 'C': {
-            // Change from cursor to end of line (equivalent to c$)
-            executeCommand(CMD_TYPES.CHANGE_TO_EOL, 1);
+            // Change from cursor to end of line (with count, change to end of N lines)
+            executeCommand(CMD_TYPES.CHANGE_TO_EOL, repeatCount);
             dispatch({
               type: 'SET_LAST_COMMAND',
-              command: { type: CMD_TYPES.CHANGE_TO_EOL, count: 1 },
+              command: { type: CMD_TYPES.CHANGE_TO_EOL, count: repeatCount },
             });
+            dispatch({ type: 'CLEAR_COUNT' });
+            return true;
+          }
+
+          case 'u': {
+            // Undo last change
+            for (let i = 0; i < repeatCount; i++) {
+              buffer.undo();
+            }
             dispatch({ type: 'CLEAR_COUNT' });
             return true;
           }
