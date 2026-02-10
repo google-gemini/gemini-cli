@@ -922,6 +922,36 @@ export function migrateDeprecatedSettings(
       }
     }
 
+    // Migrate tools settings
+    const toolsSettings = settings.tools as Record<string, unknown> | undefined;
+    if (toolsSettings) {
+      if (toolsSettings['approvalMode'] !== undefined) {
+        foundDeprecated.push('tools.approvalMode');
+
+        const generalSettings =
+          (settings.general as Record<string, unknown> | undefined) || {};
+        const newGeneral = { ...generalSettings };
+
+        // Only set defaultApprovalMode if it's not already set
+        if (newGeneral['defaultApprovalMode'] === undefined) {
+          newGeneral['defaultApprovalMode'] = toolsSettings['approvalMode'];
+          loadedSettings.setValue(scope, 'general', newGeneral);
+          if (!settingsFile.readOnly) {
+            anyModified = true;
+          }
+        }
+
+        if (removeDeprecated) {
+          const newTools = { ...toolsSettings };
+          delete newTools['approvalMode'];
+          loadedSettings.setValue(scope, 'tools', newTools);
+          if (!settingsFile.readOnly) {
+            anyModified = true;
+          }
+        }
+      }
+    }
+
     // Migrate experimental agent settings
     const experimentalModified = migrateExperimentalSettings(
       settings,
