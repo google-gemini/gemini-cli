@@ -352,7 +352,7 @@
           "type": "boolean"
         },
         "enableCompactToolOutput": {
-          "title": "Enable Compact Tool Output",
+          "title": "Compact Tool Output",
           "description": "Render tool outputs in a compact, single-line format when possible.",
           "markdownDescription": "Render tool outputs in a compact, single-line format when possible.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,

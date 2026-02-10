@@ -593,7 +593,7 @@ const SETTINGS_SCHEMA = {
       },
       enableCompactToolOutput: {
         type: 'boolean',
-        label: 'Enable Compact Tool Output',
+        label: 'Compact Tool Output',
         category: 'UI',
         requiresRestart: false,
         default: true,
