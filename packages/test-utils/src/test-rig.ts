@@ -408,9 +408,13 @@ export class TestRig {
         ui: {
           useAlternateBuffer: true,
         },
-        model: {
-          name: DEFAULT_GEMINI_MODEL,
-        },
+        ...(env['GEMINI_TEST_TYPE'] === 'integration'
+          ? {
+              model: {
+                name: DEFAULT_GEMINI_MODEL,
+              },
+            }
+          : {}),
         sandbox:
           env['GEMINI_SANDBOX'] !== 'false' ? env['GEMINI_SANDBOX'] : false,
         // Don't show the IDE connection dialog when running from VsCode
