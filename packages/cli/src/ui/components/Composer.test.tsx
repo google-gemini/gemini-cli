@@ -839,11 +839,27 @@ describe('Composer', () => {
 
       const uiState = createMockUIState({
         cleanUiDetailsVisible: false,
+        showApprovalModeIndicator: ApprovalMode.PLAN,
       });
 
       const { lastFrame } = renderComposer(uiState);
 
       expect(lastFrame()).not.toContain('ShortcutsHint');
+      expect(lastFrame()).not.toContain('plan');
+    });
+
+    it('hides approval mode indicator when suggestions are visible above input in alternate buffer', () => {
+      composerTestControls.isAlternateBuffer = true;
+      composerTestControls.suggestionsVisible = true;
+
+      const uiState = createMockUIState({
+        cleanUiDetailsVisible: true,
+        showApprovalModeIndicator: ApprovalMode.YOLO,
+      });
+
+      const { lastFrame } = renderComposer(uiState);
+
+      expect(lastFrame()).not.toContain('ApprovalModeIndicator');
     });
 
     it('keeps shortcuts hint when suggestions are visible below input in regular buffer', () => {

@@ -73,7 +73,10 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     (!uiState.embeddedShellFocused || uiState.isBackgroundShellVisible) &&
     uiState.streamingState === StreamingState.Responding &&
     !hasPendingActionRequired;
-  const showApprovalIndicator = !uiState.shellModeActive;
+  const hideUiDetailsForSuggestions =
+    suggestionsVisible && suggestionsPosition === 'above';
+  const showApprovalIndicator =
+    !uiState.shellModeActive && !hideUiDetailsForSuggestions;
   const showRawMarkdownIndicator = !uiState.renderMarkdown;
   const modeBleedThrough =
     showApprovalModeIndicator === ApprovalMode.YOLO
@@ -106,17 +109,18 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     uiState.currentModel.length > 0 &&
     contextTokenLimit > 0 &&
     uiState.sessionStats.lastPromptTokenCount / contextTokenLimit > 0.6;
-  const hideShortcutsHintForSuggestions =
-    suggestionsVisible && suggestionsPosition === 'above';
+  const hideShortcutsHintForSuggestions = hideUiDetailsForSuggestions;
   const showShortcutsHint =
     !hideShortcutsHintForSuggestions &&
     !hideMinimalModeHintWhileBusy &&
     !hasPendingActionRequired &&
     (!showUiDetails || !showLoadingIndicator);
+  const showMinimalModeBleedThrough =
+    !hideUiDetailsForSuggestions && Boolean(minimalModeBleedThrough);
   const showMinimalInlineLoading = !showUiDetails && showLoadingIndicator;
   const showMinimalBleedThroughRow =
     !showUiDetails &&
-    (Boolean(minimalModeBleedThrough) ||
+    (showMinimalModeBleedThrough ||
       hasMinimalStatusBleedThrough ||
       showMinimalContextBleedThrough);
   const showMinimalMetaRow =
@@ -225,7 +229,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                   elapsedTime={uiState.elapsedTime}
                 />
               )}
-              {minimalModeBleedThrough && (
+              {showMinimalModeBleedThrough && minimalModeBleedThrough && (
                 <Text color={minimalModeBleedThrough.color}>
                   {minimalModeBleedThrough.text}
                 </Text>
@@ -233,7 +237,9 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
               {hasMinimalStatusBleedThrough && (
                 <Box
                   marginLeft={
-                    showMinimalInlineLoading || minimalModeBleedThrough ? 1 : 0
+                    showMinimalInlineLoading || showMinimalModeBleedThrough
+                      ? 1
+                      : 0
                   }
                 >
                   <StatusDisplay hideContextSummary={true} />
