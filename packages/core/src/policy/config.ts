@@ -194,6 +194,8 @@ export async function createPolicyEngineConfig(
   //   10: Write tools default to ASK_USER (becomes 1.010 in default tier)
   //   15: Auto-edit tool override (becomes 1.015 in default tier)
   //   50: Read-only tools (becomes 1.050 in default tier)
+  //   60: Plan mode catch-all DENY override (becomes 1.060 in default tier)
+  //   70: Plan mode explicit ALLOW override (becomes 1.070 in default tier)
   //   999: YOLO mode allow-all (becomes 1.999 in default tier)
 
   // MCP servers that are explicitly excluded in settings.mcp.excluded
@@ -380,6 +382,7 @@ export function createPolicyUpdater(
             const fileContent = await fs.readFile(policyFile, 'utf-8');
             existingData = toml.parse(fileContent) as { rule?: TomlRule[] };
           } catch (error) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
               debugLogger.warn(
                 `Failed to parse ${policyFile}, overwriting with new policy.`,
@@ -422,6 +425,7 @@ export function createPolicyUpdater(
 
           // Serialize back to TOML
           // @iarna/toml stringify might not produce beautiful output but it handles escaping correctly
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           const newContent = toml.stringify(existingData as toml.JsonMap);
 
           // Atomic write: write to tmp then rename

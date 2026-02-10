@@ -6,6 +6,7 @@
 
 // Export config
 export * from './config/config.js';
+export * from './config/memory.js';
 export * from './config/defaultModelConfigs.js';
 export * from './config/models.js';
 export * from './config/constants.js';
@@ -59,6 +60,7 @@ export * from './utils/fetch.js';
 export { homedir, tmpdir } from './utils/paths.js';
 export * from './utils/paths.js';
 export * from './utils/checks.js';
+export * from './utils/headless.js';
 export * from './utils/schemaValidator.js';
 export * from './utils/errors.js';
 export * from './utils/exitCodes.js';

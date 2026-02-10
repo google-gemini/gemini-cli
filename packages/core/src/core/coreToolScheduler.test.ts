@@ -23,7 +23,6 @@ import type {
   MessageBus,
 } from '../index.js';
 import {
-  DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -271,7 +270,6 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     },
     getTruncateToolOutputThreshold: () =>
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
-    getTruncateToolOutputLines: () => DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
     getToolRegistry: () => defaultToolRegistry,
     getActiveModel: () => DEFAULT_GEMINI_MODEL,
     getGeminiClient: () => null,

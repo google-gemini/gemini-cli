@@ -106,6 +106,17 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable Vim keybindings
   - **Default:** `false`
 
+- **`general.defaultApprovalMode`** (enum):
+  - **Description:** The default approval mode for tool execution. 'default'
+    prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is
+    read-only mode. 'yolo' is not supported yet.
+  - **Default:** `"default"`
+  - **Values:** `"default"`, `"auto_edit"`, `"plan"`
+
+- **`general.devtools`** (boolean):
+  - **Description:** Enable DevTools inspector on launch.
+  - **Default:** `false`
+
 - **`general.enableAutoUpdate`** (boolean):
   - **Description:** Enable automatic updates.
   - **Default:** `true`
@@ -183,6 +194,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Hide the window title bar
   - **Default:** `false`
   - **Requires restart:** Yes
+
+- **`ui.inlineThinkingMode`** (enum):
+  - **Description:** Display model thinking inline: off or full.
+  - **Default:** `"off"`
+  - **Values:** `"off"`, `"full"`
 
 - **`ui.showStatusInTitle`** (boolean):
   - **Description:** Show Gemini CLI model thoughts in the terminal window title
@@ -672,13 +688,6 @@ their corresponding top-level category object in your `settings.json` file.
     performance.
   - **Default:** `true`
 
-- **`tools.approvalMode`** (enum):
-  - **Description:** The default approval mode for tool execution. 'default'
-    prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is
-    read-only mode. 'yolo' is not supported yet.
-  - **Default:** `"default"`
-  - **Values:** `"default"`, `"auto_edit"`, `"plan"`
-
 - **`tools.core`** (array):
   - **Description:** Restrict the set of built-in tools with an allowlist. Match
     semantics mirror tools.allowed; see the built-in tools documentation for
@@ -716,20 +725,10 @@ their corresponding top-level category object in your `settings.json` file.
     implementation. Provides faster search performance.
   - **Default:** `true`
 
-- **`tools.enableToolOutputTruncation`** (boolean):
-  - **Description:** Enable truncation of large tool outputs.
-  - **Default:** `true`
-  - **Requires restart:** Yes
-
 - **`tools.truncateToolOutputThreshold`** (number):
-  - **Description:** Truncate tool output if it is larger than this many
-    characters. Set to -1 to disable.
-  - **Default:** `4000000`
-  - **Requires restart:** Yes
-
-- **`tools.truncateToolOutputLines`** (number):
-  - **Description:** The number of lines to keep when truncating tool output.
-  - **Default:** `1000`
+  - **Description:** Maximum characters to show when truncating large tool
+    outputs. Set to 0 or negative to disable truncation.
+  - **Default:** `40000`
   - **Requires restart:** Yes
 
 - **`tools.disableLLMCorrection`** (boolean):
@@ -865,9 +864,9 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
-- **`experimental.enableEventDrivenScheduler`** (boolean):
-  - **Description:** Enables event-driven scheduler within the CLI session.
-  - **Default:** `true`
+- **`experimental.extensionRegistry`** (boolean):
+  - **Description:** Enable extension registry explore UI.
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 - **`experimental.extensionReloading`** (boolean):

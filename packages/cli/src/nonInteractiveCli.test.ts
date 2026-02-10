@@ -38,9 +38,9 @@ import type { LoadedSettings } from './config/settings.js';
 // Mock core modules
 vi.mock('./ui/hooks/atCommandProcessor.js');
 
-const mockRegisterActivityLogger = vi.hoisted(() => vi.fn());
-vi.mock('./utils/activityLogger.js', () => ({
-  registerActivityLogger: mockRegisterActivityLogger,
+const mockSetupInitialActivityLogger = vi.hoisted(() => vi.fn());
+vi.mock('./utils/devtoolsService.js', () => ({
+  setupInitialActivityLogger: mockSetupInitialActivityLogger,
 }));
 
 const mockCoreEvents = vi.hoisted(() => ({
@@ -267,8 +267,8 @@ describe('runNonInteractive', () => {
     // so we no longer expect shutdownTelemetry to be called directly here
   });
 
-  it('should register activity logger when GEMINI_CLI_ACTIVITY_LOG_FILE is set', async () => {
-    vi.stubEnv('GEMINI_CLI_ACTIVITY_LOG_FILE', '/tmp/test.jsonl');
+  it('should register activity logger when GEMINI_CLI_ACTIVITY_LOG_TARGET is set', async () => {
+    vi.stubEnv('GEMINI_CLI_ACTIVITY_LOG_TARGET', '/tmp/test.jsonl');
     const events: ServerGeminiStreamEvent[] = [
       {
         type: GeminiEventType.Finished,
@@ -286,12 +286,12 @@ describe('runNonInteractive', () => {
       prompt_id: 'prompt-id-activity-logger',
     });
 
-    expect(mockRegisterActivityLogger).toHaveBeenCalledWith(mockConfig);
+    expect(mockSetupInitialActivityLogger).toHaveBeenCalledWith(mockConfig);
     vi.unstubAllEnvs();
   });
 
-  it('should not register activity logger when GEMINI_CLI_ACTIVITY_LOG_FILE is not set', async () => {
-    vi.stubEnv('GEMINI_CLI_ACTIVITY_LOG_FILE', '');
+  it('should not register activity logger when GEMINI_CLI_ACTIVITY_LOG_TARGET is not set', async () => {
+    vi.stubEnv('GEMINI_CLI_ACTIVITY_LOG_TARGET', '');
     const events: ServerGeminiStreamEvent[] = [
       {
         type: GeminiEventType.Finished,
@@ -309,7 +309,7 @@ describe('runNonInteractive', () => {
       prompt_id: 'prompt-id-activity-logger-off',
     });
 
-    expect(mockRegisterActivityLogger).not.toHaveBeenCalled();
+    expect(mockSetupInitialActivityLogger).not.toHaveBeenCalled();
     vi.unstubAllEnvs();
   });
 

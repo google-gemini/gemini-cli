@@ -10,7 +10,6 @@
 // --------------------------------------------------------------------------
 
 import {
-  DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   DEFAULT_MODEL_CONFIGS,
   type MCPServerConfig,
@@ -179,6 +178,33 @@ const SETTINGS_SCHEMA = {
         default: false,
         description: 'Enable Vim keybindings',
         showInDialog: true,
+      },
+      defaultApprovalMode: {
+        type: 'enum',
+        label: 'Default Approval Mode',
+        category: 'General',
+        requiresRestart: false,
+        default: 'default',
+        description: oneLine`
+          The default approval mode for tool execution.
+          'default' prompts for approval, 'auto_edit' auto-approves edit tools,
+          and 'plan' is read-only mode. 'yolo' is not supported yet.
+        `,
+        showInDialog: true,
+        options: [
+          { value: 'default', label: 'Default' },
+          { value: 'auto_edit', label: 'Auto Edit' },
+          { value: 'plan', label: 'Plan' },
+        ],
+      },
+      devtools: {
+        type: 'boolean',
+        label: 'DevTools',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        description: 'Enable DevTools inspector on launch.',
+        showInDialog: false,
       },
       enableAutoUpdate: {
         type: 'boolean',
@@ -383,6 +409,19 @@ const SETTINGS_SCHEMA = {
         default: false,
         description: 'Hide the window title bar',
         showInDialog: true,
+      },
+      inlineThinkingMode: {
+        type: 'enum',
+        label: 'Inline Thinking',
+        category: 'UI',
+        requiresRestart: false,
+        default: 'off',
+        description: 'Display model thinking inline: off or full.',
+        showInDialog: true,
+        options: [
+          { value: 'off', label: 'Off' },
+          { value: 'full', label: 'Full' },
+        ],
       },
       showStatusInTitle: {
         type: 'boolean',
@@ -1062,24 +1101,7 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
-      approvalMode: {
-        type: 'enum',
-        label: 'Approval Mode',
-        category: 'Tools',
-        requiresRestart: false,
-        default: 'default',
-        description: oneLine`
-          The default approval mode for tool execution.
-          'default' prompts for approval, 'auto_edit' auto-approves edit tools,
-          and 'plan' is read-only mode. 'yolo' is not supported yet.
-        `,
-        showInDialog: true,
-        options: [
-          { value: 'default', label: 'Default' },
-          { value: 'auto_edit', label: 'Auto Edit' },
-          { value: 'plan', label: 'Plan' },
-        ],
-      },
+
       core: {
         type: 'array',
         label: 'Core Tools',
@@ -1149,15 +1171,6 @@ const SETTINGS_SCHEMA = {
           'Use ripgrep for file content search instead of the fallback implementation. Provides faster search performance.',
         showInDialog: true,
       },
-      enableToolOutputTruncation: {
-        type: 'boolean',
-        label: 'Enable Tool Output Truncation',
-        category: 'General',
-        requiresRestart: true,
-        default: true,
-        description: 'Enable truncation of large tool outputs.',
-        showInDialog: true,
-      },
       truncateToolOutputThreshold: {
         type: 'number',
         label: 'Tool Output Truncation Threshold',
@@ -1165,16 +1178,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
         description:
-          'Truncate tool output if it is larger than this many characters. Set to -1 to disable.',
-        showInDialog: true,
-      },
-      truncateToolOutputLines: {
-        type: 'number',
-        label: 'Tool Output Truncation Lines',
-        category: 'General',
-        requiresRestart: true,
-        default: DEFAULT_TRUNCATE_TOOL_OUTPUT_LINES,
-        description: 'The number of lines to keep when truncating tool output.',
+          'Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.',
         showInDialog: true,
       },
       disableLLMCorrection: {
@@ -1533,13 +1537,13 @@ const SETTINGS_SCHEMA = {
         description: 'Enable requesting and fetching of extension settings.',
         showInDialog: false,
       },
-      enableEventDrivenScheduler: {
+      extensionRegistry: {
         type: 'boolean',
-        label: 'Event Driven Scheduler',
+        label: 'Extension Registry Explore UI',
         category: 'Experimental',
         requiresRestart: true,
-        default: true,
-        description: 'Enables event-driven scheduler within the CLI session.',
+        default: false,
+        description: 'Enable extension registry explore UI.',
         showInDialog: false,
       },
       extensionReloading: {
