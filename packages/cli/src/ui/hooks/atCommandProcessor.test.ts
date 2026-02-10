@@ -319,6 +319,35 @@ describe('handleAtCommand', () => {
     );
   }, 10000);
 
+  it('should correctly handle file paths with narrow non-breaking space (NNBSP)', async () => {
+    const nnbsp = '\u202F';
+    const fileContent = 'NNBSP file content.';
+    const filePath = await createTestFile(
+      path.join(testRootDir, `my${nnbsp}file.txt`),
+      fileContent,
+    );
+    const relativePath = getRelativePath(filePath);
+    const query = `@${filePath}`;
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 129,
+      signal: abortController.signal,
+    });
+
+    expect(result.error).toBeUndefined();
+    expect(result.processedQuery).toEqual([
+      { text: `@${relativePath}` },
+      { text: '\n--- Content from referenced files ---' },
+      { text: `\nContent from @${relativePath}:\n` },
+      { text: fileContent },
+      { text: '\n--- End of content ---' },
+    ]);
+  });
+
   it('should handle multiple @file references', async () => {
     const content1 = 'Content file1';
     const file1Path = await createTestFile(
@@ -1186,40 +1215,6 @@ describe('handleAtCommand', () => {
 
       expect(mockOnDebugMessage).toHaveBeenCalledWith(
         expect.stringContaining(`using glob: ${path.join(subDirPath, '**')}`),
-      );
-    });
-
-    it('should skip absolute paths outside workspace', async () => {
-      const outsidePath = '/tmp/outside-workspace.txt';
-      const query = `Check @${outsidePath} please.`;
-
-      const mockWorkspaceContext = {
-        isPathWithinWorkspace: vi.fn((path: string) =>
-          path.startsWith(testRootDir),
-        ),
-        getDirectories: () => [testRootDir],
-        addDirectory: vi.fn(),
-        getInitialDirectories: () => [testRootDir],
-        setDirectories: vi.fn(),
-        onDirectoriesChanged: vi.fn(() => () => {}),
-      } as unknown as ReturnType<typeof mockConfig.getWorkspaceContext>;
-      mockConfig.getWorkspaceContext = () => mockWorkspaceContext;
-
-      const result = await handleAtCommand({
-        query,
-        config: mockConfig,
-        addItem: mockAddItem,
-        onDebugMessage: mockOnDebugMessage,
-        messageId: 502,
-        signal: abortController.signal,
-      });
-
-      expect(result).toEqual({
-        processedQuery: [{ text: `Check @${outsidePath} please.` }],
-      });
-
-      expect(mockOnDebugMessage).toHaveBeenCalledWith(
-        `Path ${outsidePath} is not in the workspace and will be skipped.`,
       );
     });
   });

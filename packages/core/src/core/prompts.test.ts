@@ -178,7 +178,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).toContain('# Available Sub-Agents');
     expect(prompt).toContain('<available_subagents>');
     expect(prompt).toContain('<subagent>');
-    expect(prompt).toContain('<name>Test Agent</name>');
+    expect(prompt).toContain('<name>test-agent</name>');
     expect(prompt).toContain(
       '<description>A test agent description</description>',
     );
@@ -245,6 +245,29 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).toContain(memory);
     expect(prompt).toContain('You are Gemini CLI, an interactive CLI agent'); // Ensure base prompt follows
     expect(prompt).toMatchSnapshot(); // Snapshot the combined prompt
+  });
+
+  it('should render hierarchical memory with XML tags', () => {
+    vi.stubEnv('SANDBOX', undefined);
+    const memory = {
+      global: 'global context',
+      extension: 'extension context',
+      project: 'project context',
+    };
+    const prompt = getCoreSystemPrompt(mockConfig, memory);
+
+    expect(prompt).toContain(
+      '<global_context>\nglobal context\n</global_context>',
+    );
+    expect(prompt).toContain(
+      '<extension_context>\nextension context\n</extension_context>',
+    );
+    expect(prompt).toContain(
+      '<project_context>\nproject context\n</project_context>',
+    );
+    expect(prompt).toMatchSnapshot();
+    // Should also include conflict resolution rules when hierarchical memory is present
+    expect(prompt).toContain('Conflict Resolution:');
   });
 
   it('should match snapshot on Windows', () => {
@@ -340,14 +363,14 @@ describe('Core System Prompt (prompts.ts)', () => {
           `Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery`,
         );
         expect(prompt).not.toContain(
-          "Use 'grep_search' and 'glob' search tools extensively",
+          'Use `grep_search` and `glob` search tools extensively',
         );
       } else {
         expect(prompt).not.toContain(
           `Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery`,
         );
         expect(prompt).toContain(
-          "Use 'grep_search' and 'glob' search tools extensively",
+          'Use `grep_search` and `glob` search tools extensively',
         );
       }
       expect(prompt).toMatchSnapshot();
@@ -460,11 +483,37 @@ describe('Core System Prompt (prompts.ts)', () => {
         expect(prompt).toMatchSnapshot();
       });
     });
+
+    it('should include YOLO mode instructions in interactive mode', () => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.YOLO);
+      vi.mocked(mockConfig.isInteractive).mockReturnValue(true);
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).toContain('# Autonomous Mode (YOLO)');
+      expect(prompt).toContain('Only use the `ask_user` tool if');
+    });
+
+    it('should NOT include YOLO mode instructions in non-interactive mode', () => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.YOLO);
+      vi.mocked(mockConfig.isInteractive).mockReturnValue(false);
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).not.toContain('# Autonomous Mode (YOLO)');
+    });
+
+    it('should NOT include YOLO mode instructions for DEFAULT mode', () => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(
+        ApprovalMode.DEFAULT,
+      );
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).not.toContain('# Autonomous Mode (YOLO)');
+    });
   });
 
   describe('Platform-specific and Background Process instructions', () => {
     it('should include Windows-specific shell efficiency commands on win32', () => {
       mockPlatform('win32');
+      vi.mocked(mockConfig.getActiveModel).mockReturnValue(
+        DEFAULT_GEMINI_FLASH_LITE_MODEL,
+      );
       const prompt = getCoreSystemPrompt(mockConfig);
       expect(prompt).toContain(
         "using commands like 'type' or 'findstr' (on CMD) and 'Get-Content' or 'Select-String' (on PowerShell)",
@@ -476,6 +525,9 @@ describe('Core System Prompt (prompts.ts)', () => {
 
     it('should include generic shell efficiency commands on non-Windows', () => {
       mockPlatform('linux');
+      vi.mocked(mockConfig.getActiveModel).mockReturnValue(
+        DEFAULT_GEMINI_FLASH_LITE_MODEL,
+      );
       const prompt = getCoreSystemPrompt(mockConfig);
       expect(prompt).toContain("using commands like 'grep', 'tail', 'head'");
       expect(prompt).not.toContain(

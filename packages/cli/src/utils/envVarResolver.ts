@@ -82,6 +82,7 @@ function resolveEnvVarsInObjectInternal<T>(
   }
 
   if (typeof obj === 'string') {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return resolveEnvVarsInString(obj, customEnv) as unknown as T;
   }
 
@@ -89,10 +90,12 @@ function resolveEnvVarsInObjectInternal<T>(
     // Check for circular reference
     if (visited.has(obj)) {
       // Return a shallow copy to break the cycle
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return [...obj] as unknown as T;
     }
 
     visited.add(obj);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const result = obj.map((item) =>
       resolveEnvVarsInObjectInternal(item, visited, customEnv),
     ) as unknown as T;
