@@ -13,6 +13,7 @@ import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { theme as semanticTheme } from '../../semantic-colors.js';
 import type { Theme } from '../../themes/theme.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
+import { useUIState } from '../../contexts/UIStateContext.js';
 
 interface DiffLine {
   type: 'add' | 'del' | 'context' | 'hunk' | 'other';
@@ -101,6 +102,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
   theme,
 }) => {
   const settings = useSettings();
+  const { copyModeEnabled } = useUIState();
 
   const screenReaderEnabled = useIsScreenReaderEnabled();
 
@@ -131,9 +133,9 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
     if (parsedLines.length === 0) {
       return (
         <Box
-          borderStyle="round"
+          borderStyle={copyModeEnabled ? undefined : 'round'}
           borderColor={semanticTheme.border.default}
-          padding={1}
+          padding={copyModeEnabled ? 0 : 1}
         >
           <Text dimColor>No changes detected.</Text>
         </Box>
@@ -177,6 +179,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
         tabWidth,
         availableTerminalHeight,
         terminalWidth,
+        copyModeEnabled,
       );
     }
   }, [
@@ -190,6 +193,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
     theme,
     settings,
     tabWidth,
+    copyModeEnabled,
   ]);
 
   return renderedOutput;
@@ -201,6 +205,7 @@ const renderDiffContent = (
   tabWidth = DEFAULT_TAB_WIDTH,
   availableTerminalHeight: number | undefined,
   terminalWidth: number,
+  copyModeEnabled: boolean,
 ) => {
   // 1. Normalize whitespace (replace tabs with spaces) *before* further processing
   const normalizedLines = parsedLines.map((line) => ({
@@ -216,9 +221,9 @@ const renderDiffContent = (
   if (displayableLines.length === 0) {
     return (
       <Box
-        borderStyle="round"
+        borderStyle={copyModeEnabled ? undefined : 'round'}
         borderColor={semanticTheme.border.default}
-        padding={1}
+        padding={copyModeEnabled ? 0 : 1}
       >
         <Text dimColor>No changes detected.</Text>
       </Box>

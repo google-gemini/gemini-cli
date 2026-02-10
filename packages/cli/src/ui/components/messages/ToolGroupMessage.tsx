@@ -62,7 +62,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   );
 
   const config = useConfig();
-  const { constrainHeight } = useUIState();
+  const { constrainHeight, copyModeEnabled } = useUIState();
 
   const isEventDriven = config.isEventDrivenSchedulerEnabled();
 
@@ -145,7 +145,9 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       )
     : undefined;
 
-  const contentWidth = terminalWidth - TOOL_MESSAGE_HORIZONTAL_MARGIN;
+  const contentWidth = copyModeEnabled
+    ? terminalWidth
+    : terminalWidth - TOOL_MESSAGE_HORIZONTAL_MARGIN;
 
   return (
     // This box doesn't have a border even though it conceptually does because
@@ -160,7 +162,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         cause tearing.
       */
       width={terminalWidth}
-      paddingRight={TOOL_MESSAGE_HORIZONTAL_MARGIN}
+      paddingRight={copyModeEnabled ? 0 : TOOL_MESSAGE_HORIZONTAL_MARGIN}
     >
       {visibleToolCalls.map((tool, index) => {
         const isConfirming = toolAwaitingApproval?.callId === tool.callId;
@@ -202,16 +204,16 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
               <ToolMessage {...commonProps} />
             )}
             <Box
-              borderLeft={true}
-              borderRight={true}
+              borderLeft={!copyModeEnabled}
+              borderRight={!copyModeEnabled}
               borderTop={false}
               borderBottom={false}
               borderColor={borderColor}
               borderDimColor={borderDimColor}
               flexDirection="column"
-              borderStyle="round"
-              paddingLeft={1}
-              paddingRight={1}
+              borderStyle={copyModeEnabled ? undefined : 'round'}
+              paddingLeft={copyModeEnabled ? 0 : 1}
+              paddingRight={copyModeEnabled ? 0 : 1}
             >
               {tool.status === ToolCallStatus.Confirming &&
                 isConfirming &&
@@ -245,23 +247,28 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
               We have to keep the bottom border separate so it doesn't get
               drawn over by the sticky header directly inside it.
              */
-        (visibleToolCalls.length > 0 || borderBottomOverride !== undefined) && (
-          <Box
-            height={0}
-            width={contentWidth}
-            borderLeft={true}
-            borderRight={true}
-            borderTop={false}
-            borderBottom={borderBottomOverride ?? true}
-            borderColor={borderColor}
-            borderDimColor={borderDimColor}
-            borderStyle="round"
-          />
-        )
+        !copyModeEnabled &&
+          (visibleToolCalls.length > 0 ||
+            borderBottomOverride !== undefined) && (
+            <Box
+              height={0}
+              width={contentWidth}
+              borderLeft={true}
+              borderRight={true}
+              borderTop={false}
+              borderBottom={borderBottomOverride ?? true}
+              borderColor={borderColor}
+              borderDimColor={borderDimColor}
+              borderStyle="round"
+            />
+          )
       }
-      {(borderBottomOverride ?? true) && visibleToolCalls.length > 0 && (
-        <ShowMoreLines constrainHeight={constrainHeight} />
-      )}
+      {(!copyModeEnabled || (borderBottomOverride ?? true)) &&
+        visibleToolCalls.length > 0 && (
+          <Box paddingX={1}>
+            <ShowMoreLines constrainHeight={constrainHeight} />
+          </Box>
+        )}
     </Box>
   );
 };

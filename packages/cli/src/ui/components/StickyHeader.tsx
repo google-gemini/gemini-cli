@@ -7,6 +7,7 @@
 import type React from 'react';
 import { Box, type DOMElement } from 'ink';
 import { theme } from '../semantic-colors.js';
+import { useUIState } from '../contexts/UIStateContext.js';
 
 export interface StickyHeaderProps {
   children: React.ReactNode;
@@ -24,53 +25,61 @@ export const StickyHeader: React.FC<StickyHeaderProps> = ({
   borderColor,
   borderDimColor,
   containerRef,
-}) => (
-  <Box
-    ref={containerRef}
-    sticky
-    minHeight={1}
-    flexShrink={0}
-    width={width}
-    stickyChildren={
+}) => {
+  const { copyModeEnabled } = useUIState();
+
+  return (
+    <Box
+      ref={containerRef}
+      sticky
+      minHeight={1}
+      flexShrink={0}
+      width={width}
+      stickyChildren={
+        <Box
+          borderStyle={copyModeEnabled ? undefined : 'round'}
+          flexDirection="column"
+          width={width}
+          opaque
+          borderColor={borderColor}
+          borderDimColor={borderDimColor}
+          borderBottom={false}
+          borderTop={!copyModeEnabled && isFirst}
+          borderLeft={!copyModeEnabled}
+          borderRight={!copyModeEnabled}
+          paddingTop={isFirst || copyModeEnabled ? 0 : 1}
+        >
+          <Box paddingX={copyModeEnabled ? 0 : 1}>{children}</Box>
+          {/* Dark border to separate header from content. */}
+          {!copyModeEnabled && (
+            <Box
+              width={width - 2}
+              borderColor={theme.ui.dark}
+              borderStyle="single"
+              borderTop={false}
+              borderBottom={true}
+              borderLeft={false}
+              borderRight={false}
+            ></Box>
+          )}
+        </Box>
+      }
+    >
       <Box
-        borderStyle="round"
-        flexDirection="column"
+        borderStyle={copyModeEnabled ? undefined : 'round'}
         width={width}
-        opaque
         borderColor={borderColor}
         borderDimColor={borderDimColor}
         borderBottom={false}
-        borderTop={isFirst}
-        paddingTop={isFirst ? 0 : 1}
+        borderTop={!copyModeEnabled && isFirst}
+        borderLeft={!copyModeEnabled}
+        borderRight={!copyModeEnabled}
+        paddingX={copyModeEnabled ? 0 : 1}
+        paddingBottom={copyModeEnabled ? 0 : 1}
+        paddingTop={isFirst || copyModeEnabled ? 0 : 1}
       >
-        <Box paddingX={1}>{children}</Box>
-        {/* Dark border to separate header from content. */}
-        <Box
-          width={width - 2}
-          borderColor={theme.ui.dark}
-          borderStyle="single"
-          borderTop={false}
-          borderBottom={true}
-          borderLeft={false}
-          borderRight={false}
-        ></Box>
+        {children}
       </Box>
-    }
-  >
-    <Box
-      borderStyle="round"
-      width={width}
-      borderColor={borderColor}
-      borderDimColor={borderDimColor}
-      borderBottom={false}
-      borderTop={isFirst}
-      borderLeft={true}
-      borderRight={true}
-      paddingX={1}
-      paddingBottom={1}
-      paddingTop={isFirst ? 0 : 1}
-    >
-      {children}
     </Box>
-  </Box>
-);
+  );
+};

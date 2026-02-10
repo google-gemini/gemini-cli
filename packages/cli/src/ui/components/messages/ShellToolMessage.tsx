@@ -29,6 +29,7 @@ import {
 } from '../../constants.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 import type { Config } from '@google/gemini-cli-core';
+import { useUIState } from '../../contexts/UIStateContext.js';
 
 export interface ShellToolMessageProps extends ToolMessageProps {
   activeShellPtyId?: number | null;
@@ -114,6 +115,8 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
     resultDisplay,
   );
 
+  const { copyModeEnabled } = useUIState();
+
   return (
     <>
       <StickyHeader
@@ -143,14 +146,14 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
       <Box
         ref={contentRef}
         width={terminalWidth}
-        borderStyle="round"
+        borderStyle={copyModeEnabled ? undefined : 'round'}
         borderColor={borderColor}
         borderDimColor={borderDimColor}
         borderTop={false}
         borderBottom={false}
-        borderLeft={true}
-        borderRight={true}
-        paddingX={1}
+        borderLeft={!copyModeEnabled}
+        borderRight={!copyModeEnabled}
+        paddingX={copyModeEnabled ? 0 : 1}
         flexDirection="column"
       >
         <ToolResultDisplay
