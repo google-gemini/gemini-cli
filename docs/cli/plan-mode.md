@@ -63,7 +63,8 @@ You can enter Plan Mode in three ways:
 1.  **Keyboard Shortcut:** Press `Shift+Tab` to cycle through approval modes
     (`Default` -> `Plan` -> `Auto-Edit`).
 2.  **Command:** Type `/plan` in the input box.
-3.  **Natural Language:** Ask the agent to "start a plan for...".
+3.  **Natural Language:** Ask the agent to "start a plan for...". The agent will
+    then call the [`enter_plan_mode`] tool to switch modes.
 
 ### The Planning Workflow
 
@@ -83,8 +84,8 @@ You can enter Plan Mode in three ways:
 To exit Plan Mode:
 
 1. **Keyboard Shortcut:** Press `Shift+Tab` to cycle to the desired mode.
-1. **Tool:** The agent calls the `exit_plan_mode` tool to present the finalized
-   plan for your approval.
+2. **Tool:** The agent calls the [`exit_plan_mode`] tool to present the
+   finalized plan for your approval.
 
 ## Tool Restrictions
 
@@ -180,3 +181,5 @@ Guide].
 [`activate_skill`]: /docs/cli/skills.md
 [experimental research sub-agents]: /docs/core/subagents.md
 [Policy Engine Guide]: /docs/core/policy-engine.md
+[`enter_plan_mode`]: /docs/tools/planning.md#1-enter_plan_mode-enterplanmode
+[`exit_plan_mode`]: /docs/tools/planning.md#2-exit_plan_mode-exitplanmode
