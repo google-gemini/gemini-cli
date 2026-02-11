@@ -28,7 +28,7 @@ If enabled, users will not be able to enter yolo mode.
 **Enabled/Disabled** | Default: disabled
 
 If disabled, users will not be able to use or install extensions. See
-[Extensions](../tools/extensions.md) for more details.
+[Extensions](../extensions/index.md) for more details.
 
 ### MCP
 
