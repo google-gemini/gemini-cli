@@ -1778,14 +1778,18 @@ console.log(JSON.stringify({
       });
 
       // Create two hook scripts - one enabled, one disabled via rig to ensure they are tracked
+      // Use very specific strings to avoid model hallucinations triggering false positives
+      const enabledMsg = 'EXECUTION_ALLOWED_BY_HOOK_A';
+      const disabledMsg = 'EXECUTION_BLOCKED_BY_HOOK_B';
+
       const enabledPath = rig.createScript(
         'enabled_hook.cjs',
-        'console.log(JSON.stringify({decision: "allow", systemMessage: "Enabled hook executed"}));',
+        `console.log(JSON.stringify({decision: "allow", systemMessage: "${enabledMsg}"}));`,
       );
 
       const disabledPath = rig.createScript(
         'disabled_hook.cjs',
-        'console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook should not execute", reason: "This hook should be disabled"}));',
+        `console.log(JSON.stringify({decision: "block", systemMessage: "${disabledMsg}", reason: "${disabledMsg}"}));`,
       );
 
       const normalizedDisabledCmd = normalizePath(`node "${disabledPath}"`);
@@ -1829,8 +1833,8 @@ console.log(JSON.stringify({
       expect(fileContent).toContain('test');
 
       // Result should contain message from enabled hook but not from disabled hook
-      expect(result).toContain('Enabled hook executed');
-      expect(result).not.toContain('Disabled hook should not execute');
+      expect(result).toContain(enabledMsg);
+      expect(result).not.toContain(disabledMsg);
 
       // Check hook telemetry - only enabled hook should have executed
       const hookLogs = rig.readHookLogs();
@@ -1851,13 +1855,16 @@ console.log(JSON.stringify({
       // 1. First setup to get the test directory and prepare the hook scripts
       rig.setup('should respect disabled hooks across multiple operations');
 
+      const activeMsg = 'MULTIPLE_OPS_ENABLED_HOOK';
+      const disabledMsg = 'MULTIPLE_OPS_DISABLED_HOOK';
+
       const activePath = rig.createScript(
         'active_hook.cjs',
-        'console.log(JSON.stringify({decision: "allow", systemMessage: "Active hook executed"}));',
+        `console.log(JSON.stringify({decision: "allow", systemMessage: "${activeMsg}"}));`,
       );
       const disabledPath = rig.createScript(
         'disabled_hook.cjs',
-        'console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook should not execute", reason: "This hook is disabled"}));',
+        `console.log(JSON.stringify({decision: "block", systemMessage: "${disabledMsg}", reason: "${disabledMsg}"}));`,
       );
 
       const normalizedDisabledCmd = normalizePath(`node "${disabledPath}"`);
@@ -1898,8 +1905,8 @@ console.log(JSON.stringify({
       expect(foundWriteFile1).toBeTruthy();
 
       // Result should contain active hook message but not disabled hook message
-      expect(result1).toContain('Active hook executed');
-      expect(result1).not.toContain('Disabled hook should not execute');
+      expect(result1).toContain(activeMsg);
+      expect(result1).not.toContain(disabledMsg);
 
       // Check hook telemetry
       const hookLogs1 = rig.readHookLogs();
@@ -1924,8 +1931,8 @@ console.log(JSON.stringify({
       expect(foundWriteFile2).toBeTruthy();
 
       // Same expectations as first run
-      expect(result2).toContain('Active hook executed');
-      expect(result2).not.toContain('Disabled hook should not execute');
+      expect(result2).toContain(activeMsg);
+      expect(result2).not.toContain(disabledMsg);
 
       // Verify disabled hook still hasn't executed
       const hookLogs2 = rig.readHookLogs();
