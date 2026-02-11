@@ -14,17 +14,26 @@ import {
   Kind,
   type MessageBus,
 } from '@google/gemini-cli-core';
+import type { SessionContext } from './types.js';
 
 export { z };
+
+export class ModelVisibleError extends Error {
+  constructor(message: string | Error) {
+    super(message instanceof Error ? message.message : message);
+    this.name = 'ModelVisibleError';
+  }
+}
 
 export interface ToolDefinition<T extends z.ZodType> {
   name: string;
   description: string;
   inputSchema: T;
+  sendErrorsToModel?: boolean;
 }
 
 export interface Tool<T extends z.ZodType> extends ToolDefinition<T> {
-  action: (params: z.infer<T>) => Promise<unknown>;
+  action: (params: z.infer<T>, context?: SessionContext) => Promise<unknown>;
 }
 
 class SdkToolInvocation<T extends z.ZodType> extends BaseToolInvocation<
@@ -34,8 +43,13 @@ class SdkToolInvocation<T extends z.ZodType> extends BaseToolInvocation<
   constructor(
     params: z.infer<T>,
     messageBus: MessageBus,
-    private readonly action: (params: z.infer<T>) => Promise<unknown>,
+    private readonly action: (
+      params: z.infer<T>,
+      context?: SessionContext,
+    ) => Promise<unknown>,
+    private readonly context: SessionContext | undefined,
     toolName: string,
+    private readonly sendErrorsToModel: boolean = false,
   ) {
     super(params, messageBus, toolName);
   }
@@ -49,7 +63,7 @@ class SdkToolInvocation<T extends z.ZodType> extends BaseToolInvocation<
     _updateOutput?: (output: string) => void,
   ): Promise<ToolResult> {
     try {
-      const result = await this.action(this.params);
+      const result = await this.action(this.params, this.context);
       const output =
         typeof result === 'string' ? result : JSON.stringify(result, null, 2);
       return {
@@ -57,15 +71,18 @@ class SdkToolInvocation<T extends z.ZodType> extends BaseToolInvocation<
         returnDisplay: output,
       };
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      return {
-        llmContent: `Error: ${errorMessage}`,
-        returnDisplay: `Error: ${errorMessage}`,
-        error: {
-          message: errorMessage,
-        },
-      };
+      if (this.sendErrorsToModel || error instanceof ModelVisibleError) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        return {
+          llmContent: `Error: ${errorMessage}`,
+          returnDisplay: `Error: ${errorMessage}`,
+          error: {
+            message: errorMessage,
+          },
+        };
+      }
+      throw error;
     }
   }
 }
@@ -77,6 +94,8 @@ export class SdkTool<T extends z.ZodType> extends BaseDeclarativeTool<
   constructor(
     private readonly definition: Tool<T>,
     messageBus: MessageBus,
+
+    _agent?: unknown, // To prevent unused variable error, but ideally we'd pass agent here if needed
   ) {
     super(
       definition.name,
@@ -85,6 +104,22 @@ export class SdkTool<T extends z.ZodType> extends BaseDeclarativeTool<
       Kind.Other,
       zodToJsonSchema(definition.inputSchema),
       messageBus,
+    );
+  }
+
+  createInvocationWithContext(
+    params: z.infer<T>,
+    messageBus: MessageBus,
+    context: SessionContext | undefined,
+    toolName?: string,
+  ): ToolInvocation<z.infer<T>, ToolResult> {
+    return new SdkToolInvocation(
+      params,
+      messageBus,
+      this.definition.action,
+      context,
+      toolName || this.name,
+      this.definition.sendErrorsToModel,
     );
   }
 
@@ -97,14 +132,16 @@ export class SdkTool<T extends z.ZodType> extends BaseDeclarativeTool<
       params,
       messageBus,
       this.definition.action,
+      undefined,
       toolName || this.name,
+      this.definition.sendErrorsToModel,
     );
   }
 }
 
 export function tool<T extends z.ZodType>(
   definition: ToolDefinition<T>,
-  action: (params: z.infer<T>) => Promise<unknown>,
+  action: (params: z.infer<T>, context?: SessionContext) => Promise<unknown>,
 ): Tool<T> {
   return {
     ...definition,

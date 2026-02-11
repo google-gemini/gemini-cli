@@ -13,9 +13,13 @@ import {
   type ToolCallRequestInfo,
   type ServerGeminiStreamEvent,
   type GeminiClient,
+  type Content,
 } from '@google/gemini-cli-core';
 
 import { type Tool, SdkTool, type z } from './tool.js';
+import { SdkAgentFilesystem } from './fs.js';
+import { SdkAgentShell } from './shell.js';
+import type { SessionContext } from './types.js';
 
 export interface GeminiCliAgentOptions {
   instructions: string;
@@ -44,6 +48,8 @@ export class GeminiCliAgent {
       enableHooks: false,
       mcpEnabled: false,
       extensionsEnabled: false,
+      recordResponses: options.recordResponses,
+      fakeResponses: options.fakeResponses,
     };
 
     this.config = new Config(configParams);
@@ -68,7 +74,7 @@ export class GeminiCliAgent {
       const messageBus = this.config.getMessageBus();
 
       for (const toolDef of this.tools) {
-        const sdkTool = new SdkTool(toolDef, messageBus);
+        const sdkTool = new SdkTool(toolDef, messageBus, this);
         registry.registerTool(sdkTool);
       }
     }
@@ -81,6 +87,9 @@ export class GeminiCliAgent {
     ];
     const signal = new AbortController().signal; // TODO: support signal
     const sessionId = this.config.getSessionId();
+
+    const fs = new SdkAgentFilesystem(this.config);
+    const shell = new SdkAgentShell(this.config);
 
     while (true) {
       // sendMessageStream returns AsyncGenerator<ServerGeminiStreamEvent, Turn>
@@ -100,6 +109,17 @@ export class GeminiCliAgent {
       }
 
       const functionResponses: Array<Record<string, unknown>> = [];
+      const transcript: Content[] = client.getHistory();
+      const context: SessionContext = {
+        sessionId,
+        transcript,
+        cwd: this.config.getWorkingDir(),
+        timestamp: new Date().toISOString(),
+        fs,
+        shell,
+        agent: this,
+      };
+
       for (const toolCall of toolCalls) {
         const tool = registry.getTool(toolCall.name);
         if (!tool) {
@@ -115,7 +135,14 @@ export class GeminiCliAgent {
 
         try {
           // Cast toolCall.args to object to satisfy AnyDeclarativeTool.build
-          const invocation = tool.build(toolCall.args as object);
+          const invocation =
+            tool instanceof SdkTool
+              ? tool.createInvocationWithContext(
+                  toolCall.args as object,
+                  this.config.getMessageBus(),
+                  context,
+                )
+              : tool.build(toolCall.args as object);
           const result = await invocation.execute(signal);
 
           functionResponses.push({
@@ -126,10 +153,15 @@ export class GeminiCliAgent {
             },
           });
         } catch (e) {
+          // eslint-disable-next-line no-console
+          console.error(`Tool execution error for ${toolCall.name}:`, e);
           functionResponses.push({
             functionResponse: {
               name: toolCall.name,
-              response: { error: e instanceof Error ? e.message : String(e) },
+              response: {
+                error:
+                  'Error: Tool execution failed. Please try again or use a different approach.',
+              },
               id: toolCall.callId,
             },
           });
