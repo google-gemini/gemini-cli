@@ -10,6 +10,7 @@ import {
   GREP_TOOL_NAME,
   LS_TOOL_NAME,
   READ_FILE_TOOL_NAME,
+  WEB_FETCH_TOOL_NAME,
 } from '../tools/tool-names.js';
 import {
   DEFAULT_THINKING_MODE,
@@ -120,6 +121,7 @@ export const CodebaseInvestigatorAgent = (
         READ_FILE_TOOL_NAME,
         GLOB_TOOL_NAME,
         GREP_TOOL_NAME,
+        WEB_FETCH_TOOL_NAME,
       ],
     },
 
