@@ -35,7 +35,6 @@ import { IdeTrustChangeDialog } from './IdeTrustChangeDialog.js';
 import { NewAgentsNotification } from './NewAgentsNotification.js';
 import { AgentConfigDialog } from './AgentConfigDialog.js';
 import { SessionRetentionWarningDialog } from './SessionRetentionWarningDialog.js';
-import { useSessionRetentionCheck } from '../../hooks/useSessionRetentionCheck.js';
 import { useCallback } from 'react';
 import { SettingScope } from '../../config/settings.js';
 
@@ -59,10 +58,8 @@ export const DialogManager = ({
     terminalHeight,
     staticExtraHeight,
     terminalWidth: uiTerminalWidth,
+    shouldShowRetentionWarning,
   } = uiState;
-
-  const { shouldShowWarning, checkComplete: retentionCheckComplete } =
-    useSessionRetentionCheck(config, settings.merged);
 
   const handleCleanUpNow = useCallback(() => {
     settings.setValue(
@@ -88,7 +85,7 @@ export const DialogManager = ({
     );
   }, [settings]);
 
-  if (shouldShowWarning && retentionCheckComplete) {
+  if (shouldShowRetentionWarning) {
     return (
       <SessionRetentionWarningDialog
         onCleanUpNow={handleCleanUpNow}

@@ -6,7 +6,7 @@
 
 import { useState, useEffect } from 'react';
 import { type Config } from '@google/gemini-cli-core';
-import { type Settings } from '../config/settings.js';
+import { type Settings } from '../../config/settings.js';
 
 export function useSessionRetentionCheck(config: Config, settings: Settings) {
   const [shouldShowWarning, setShouldShowWarning] = useState(false);
@@ -23,7 +23,7 @@ export function useSessionRetentionCheck(config: Config, settings: Settings) {
     // If user has manually enabled retention, we skip the warning
     if (
       settings.general?.sessionRetention?.enabled &&
-      settings.general?.sessionRetention?.maxAge !== undefined
+      settings.general?.sessionRetention?.maxAge !== '60d'
     ) {
       setShouldShowWarning(false);
       setCheckComplete(true);
