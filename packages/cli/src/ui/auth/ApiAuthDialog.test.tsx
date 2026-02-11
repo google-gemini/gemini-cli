@@ -110,6 +110,7 @@ describe('ApiAuthDialog', () => {
       keypressHandler({
         name: keyName,
         shift: false,
+        alt: false,
         ctrl: false,
         cmd: false,
         sequence,
