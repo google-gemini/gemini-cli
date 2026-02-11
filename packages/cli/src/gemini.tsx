@@ -57,8 +57,8 @@ import {
   writeToStderr,
   disableMouseEvents,
   enableMouseEvents,
-  enterAlternateScreen,
   disableLineWrapping,
+  enableLineWrapping,
   shouldEnterAlternateScreen,
   startupProfiler,
   ExitCodes,
@@ -89,6 +89,7 @@ import { SessionStatsProvider } from './ui/contexts/SessionContext.js';
 import { VimModeProvider } from './ui/contexts/VimModeContext.js';
 import { KeypressProvider } from './ui/contexts/KeypressContext.js';
 import { useKittyKeyboardProtocol } from './ui/hooks/useKittyKeyboardProtocol.js';
+import { useTerminalSize } from './ui/hooks/useTerminalSize.js';
 import {
   relaunchAppInChildProcess,
   relaunchOnExitCode,
@@ -214,9 +215,13 @@ export async function startInteractiveUI(
 
   const { stdout: inkStdout, stderr: inkStderr } = createWorkingStdio();
 
+  const isShpool = !!process.env['SHPOOL_SESSION_NAME'];
+
   // Create wrapper component to use hooks inside render
   const AppWrapper = () => {
     useKittyKeyboardProtocol();
+    const { columns, rows } = useTerminalSize();
+
     return (
       <SettingsContext.Provider value={settings}>
         <KeypressProvider
@@ -234,6 +239,7 @@ export async function startInteractiveUI(
                 <SessionStatsProvider>
                   <VimModeProvider settings={settings}>
                     <AppContainer
+                      key={`${columns}-${rows}`}
                       config={config}
                       startupWarnings={startupWarnings}
                       version={version}
@@ -249,6 +255,17 @@ export async function startInteractiveUI(
       </SettingsContext.Provider>
     );
   };
+
+  if (isShpool) {
+    // Wait a moment for shpool to stabilize terminal size and state.
+    // shpool is a persistence tool that restores terminal state by replaying it.
+    // This delay gives shpool time to finish its restoration replay and send
+    // the actual terminal size (often via an immediate SIGWINCH) before we
+    // render the first TUI frame. Without this, the first frame may be
+    // garbled or rendered at an incorrect size, which disabling incremental
+    // rendering alone cannot fix for the initial frame.
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
 
   const instance = render(
     process.env['DEBUG'] ? (
@@ -273,9 +290,18 @@ export async function startInteractiveUI(
       patchConsole: false,
       alternateBuffer: useAlternateBuffer,
       incrementalRendering:
-        settings.merged.ui.incrementalRendering !== false && useAlternateBuffer,
+        settings.merged.ui.incrementalRendering !== false &&
+        useAlternateBuffer &&
+        !isShpool,
     },
   );
+
+  if (useAlternateBuffer) {
+    disableLineWrapping();
+    registerCleanup(() => {
+      enableLineWrapping();
+    });
+  }
 
   checkForUpdates(settings)
     .then((info) => {
@@ -590,26 +616,13 @@ export async function main() {
       // input showing up in the output.
       process.stdin.setRawMode(true);
 
-      if (
-        shouldEnterAlternateScreen(
-          isAlternateBufferEnabled(settings),
-          config.getScreenReader(),
-        )
-      ) {
-        enterAlternateScreen();
-        disableLineWrapping();
-
-        // Ink will cleanup so there is no need for us to manually cleanup.
-      }
-
       // This cleanup isn't strictly needed but may help in certain situations.
-      const restoreRawMode = () => {
+      process.on('SIGTERM', () => {
         process.stdin.setRawMode(wasRaw);
-      };
-      process.off('SIGTERM', restoreRawMode);
-      process.on('SIGTERM', restoreRawMode);
-      process.off('SIGINT', restoreRawMode);
-      process.on('SIGINT', restoreRawMode);
+      });
+      process.on('SIGINT', () => {
+        process.stdin.setRawMode(wasRaw);
+      });
     }
 
     await setupTerminalAndTheme(config, settings);

@@ -363,7 +363,9 @@ export const AppContainer = (props: AppContainerProps) => {
     (async () => {
       // Note: the program will not work if this fails so let errors be
       // handled by the global catch.
-      await config.initialize();
+      if (!config.isInitialized()) {
+        await config.initialize();
+      }
       setConfigInitialized(true);
       startupProfiler.flush(config);
 
