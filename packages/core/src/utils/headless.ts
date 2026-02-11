@@ -28,34 +28,24 @@ export interface HeadlessModeOptions {
  * @returns true if the environment is considered headless.
  */
 export function isHeadlessMode(options?: HeadlessModeOptions): boolean {
-  if (process.env['GEMINI_CLI_INTEGRATION_TEST'] === 'true') {
-    if (
-      !!options?.prompt ||
-      !!options?.query ||
-      (!!process.stdin && !process.stdin.isTTY) ||
-      (!!process.stdout && !process.stdout.isTTY)
-    ) {
+  if (process.env['GEMINI_CLI_INTEGRATION_TEST'] !== 'true') {
+    const isCI =
+      process.env['CI'] === 'true' || process.env['GITHUB_ACTIONS'] === 'true';
+    if (isCI) {
       return true;
     }
-    return process.argv.some(
-      (arg) =>
-        arg === '-p' || arg === '--prompt' || arg === '-y' || arg === '--yolo',
-    );
   }
 
-  const isCI =
-    process.env['CI'] === 'true' || process.env['GITHUB_ACTIONS'] === 'true';
   const isNotTTY =
     (!!process.stdin && !process.stdin.isTTY) ||
     (!!process.stdout && !process.stdout.isTTY);
 
-  if (isCI || isNotTTY || !!options?.prompt || !!options?.query) {
+  if (isNotTTY || !!options?.prompt || !!options?.query) {
     return true;
   }
 
   // Fallback: check process.argv for flags that imply headless or auto-approve mode.
-  const argv = process.argv;
-  return argv.some(
+  return process.argv.some(
     (arg) =>
       arg === '-p' || arg === '--prompt' || arg === '-y' || arg === '--yolo',
   );
