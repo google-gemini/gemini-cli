@@ -17,6 +17,7 @@ import {
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
+  PREVIEW_GEMINI_MODEL_AUTO,
 } from '../../config/models.js';
 import { promptIdContext } from '../../utils/promptIdContext.js';
 import type { Content } from '@google/genai';
@@ -50,8 +51,8 @@ describe('ClassifierStrategy', () => {
       modelConfigService: {
         getResolvedConfig: vi.fn().mockReturnValue(mockResolvedConfig),
       },
-      getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
-      getPreviewFeatures: () => false,
+      getModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO),
+      getPreviewFeatures: vi.fn().mockReturnValue(false),
       getNumericalRoutingEnabled: vi.fn().mockResolvedValue(false),
     } as unknown as Config;
     mockBaseLlmClient = {
@@ -61,8 +62,9 @@ describe('ClassifierStrategy', () => {
     vi.spyOn(promptIdContext, 'getStore').mockReturnValue('test-prompt-id');
   });
 
-  it('should return null if numerical routing is enabled', async () => {
+  it('should return null if numerical routing is enabled and model is Gemini 3', async () => {
     vi.mocked(mockConfig.getNumericalRoutingEnabled).mockResolvedValue(true);
+    vi.mocked(mockConfig.getModel).mockReturnValue(PREVIEW_GEMINI_MODEL_AUTO);
 
     const decision = await strategy.route(
       mockContext,
@@ -72,6 +74,24 @@ describe('ClassifierStrategy', () => {
 
     expect(decision).toBeNull();
     expect(mockBaseLlmClient.generateJson).not.toHaveBeenCalled();
+  });
+
+  it('should NOT return null if numerical routing is enabled but model is NOT Gemini 3', async () => {
+    vi.mocked(mockConfig.getNumericalRoutingEnabled).mockResolvedValue(true);
+    vi.mocked(mockConfig.getModel).mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO);
+    vi.mocked(mockBaseLlmClient.generateJson).mockResolvedValue({
+      reasoning: 'test',
+      model_choice: 'flash',
+    });
+
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+    );
+
+    expect(decision).not.toBeNull();
+    expect(mockBaseLlmClient.generateJson).toHaveBeenCalled();
   });
 
   it('should call generateJson with the correct parameters', async () => {
