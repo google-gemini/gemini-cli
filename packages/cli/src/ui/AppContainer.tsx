@@ -101,6 +101,7 @@ import { type LoadableSettingScope, SettingScope } from '../config/settings.js';
 import { type InitializationResult } from '../core/initializer.js';
 import { useFocus } from './hooks/useFocus.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
+import { KeypressPriority } from './contexts/KeypressContext.js';
 import { keyMatchers, Command } from './keyMatchers.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useShellInactivityStatus } from './hooks/useShellInactivityStatus.js';
@@ -363,7 +364,9 @@ export const AppContainer = (props: AppContainerProps) => {
     (async () => {
       // Note: the program will not work if this fails so let errors be
       // handled by the global catch.
-      await config.initialize();
+      if (!config.isInitialized()) {
+        await config.initialize();
+      }
       setConfigInitialized(true);
       startupProfiler.flush(config);
 
@@ -1464,17 +1467,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
       if (result.userSelection === 'yes') {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleSlashCommand('/ide install');
-        settings.setValue(
-          SettingScope.User,
-          'hasSeenIdeIntegrationNudge',
-          true,
-        );
+        settings.setValue(SettingScope.User, 'ide.hasSeenNudge', true);
       } else if (result.userSelection === 'dismiss') {
-        settings.setValue(
-          SettingScope.User,
-          'hasSeenIdeIntegrationNudge',
-          true,
-        );
+        settings.setValue(SettingScope.User, 'ide.hasSeenNudge', true);
       }
       setIdePromptAnswered(true);
     },
@@ -1489,13 +1484,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const handleGlobalKeypress = useCallback(
     (key: Key): boolean => {
-      if (copyModeEnabled) {
-        setCopyModeEnabled(false);
-        enableMouseEvents();
-        // We don't want to process any other keys if we're in copy mode.
-        return true;
-      }
-
       // Debug log keystrokes if enabled
       if (settings.merged.general.debugKeystrokeLogging) {
         debugLogger.log('[DEBUG] Keystroke:', JSON.stringify(key));
@@ -1526,7 +1514,21 @@ Logging in with Google... Restarting Gemini CLI to continue.
       }
 
       if (keyMatchers[Command.SHOW_ERROR_DETAILS](key)) {
-        setShowErrorDetails((prev) => !prev);
+        if (settings.merged.general.devtools) {
+          void (async () => {
+            const { toggleDevToolsPanel } = await import(
+              '../utils/devtoolsService.js'
+            );
+            await toggleDevToolsPanel(
+              config,
+              showErrorDetails,
+              () => setShowErrorDetails((prev) => !prev),
+              () => setShowErrorDetails(true),
+            );
+          })();
+        } else {
+          setShowErrorDetails((prev) => !prev);
+        }
         return true;
       } else if (keyMatchers[Command.SUSPEND_APP](key)) {
         const undoMessage = isITerm2()
@@ -1649,7 +1651,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       settings.merged.general.debugKeystrokeLogging,
       refreshStatic,
       setCopyModeEnabled,
-      copyModeEnabled,
       isAlternateBuffer,
       backgroundCurrentShell,
       toggleBackgroundShell,
@@ -1659,10 +1660,26 @@ Logging in with Google... Restarting Gemini CLI to continue.
       lastOutputTimeRef,
       tabFocusTimeoutRef,
       showTransientMessage,
+      settings.merged.general.devtools,
+      showErrorDetails,
     ],
   );
 
   useKeypress(handleGlobalKeypress, { isActive: true, priority: true });
+
+  useKeypress(
+    () => {
+      setCopyModeEnabled(false);
+      enableMouseEvents();
+      return true;
+    },
+    {
+      isActive: copyModeEnabled,
+      // We need to receive keypresses first so they do not bubble to other
+      // handlers.
+      priority: KeypressPriority.Critical,
+    },
+  );
 
   useEffect(() => {
     // Respect hideWindowTitle settings
