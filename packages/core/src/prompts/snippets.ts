@@ -527,7 +527,7 @@ function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
 
 function workflowStepStrategy(options: PrimaryWorkflowsOptions): string {
   if (options.approvedPlan) {
-    return `2. **Strategy:** An approved plan is available for this task. Treat this file as your single source of truth. You MUST read this file before proceeding. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements.`;
+    return `2. **Strategy:** An approved plan is available for this task. Treat this file as your single source of truth. You MUST read this file before proceeding. As you complete each step, you MUST use the ${formatToolName(EDIT_TOOL_NAME)} or ${formatToolName(WRITE_FILE_TOOL_NAME)} tools to update the plan file, checking off the corresponding Markdown checkboxes (e.g., change \`- [ ]\` to \`- [x]\`). If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements.`;
   }
 
   if (options.enableWriteTodosTool) {
@@ -551,8 +551,8 @@ function newApplicationSteps(options: PrimaryWorkflowsOptions): string {
 
   if (options.approvedPlan) {
     return `
-1. **Understand:** Read the approved plan. Use this file as a guide for your implementation.
-2. **Implement:** Implement the application according to the plan. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements.
+1. **Understand:** Read the approved plan. Treat this file as your single source of truth.
+2. **Implement:** Implement the application according to the plan. As you complete each step, you MUST use the ${formatToolName(EDIT_TOOL_NAME)} or ${formatToolName(WRITE_FILE_TOOL_NAME)} tools to update the plan file, checking off the corresponding Markdown checkboxes (e.g., change \`- [ ]\` to \`- [x]\`). If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements.
 3. **Verify:** Review work against the original request, the approved plan. Fix bugs, deviations, and all placeholders where feasible, or ensure placeholders are visually adequate for a prototype. Ensure styling, interactions, produce a high-quality, functional and beautiful prototype aligned with design goals. Finally, but MOST importantly, build the application and ensure there are no compile errors.
 4. **Finish:** Provide a brief summary of what was built.`.trim();
   }
