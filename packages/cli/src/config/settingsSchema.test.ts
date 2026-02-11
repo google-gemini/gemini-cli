@@ -186,6 +186,9 @@ describe('SettingsSchema', () => {
       expect(getSettingsSchema().ui.properties.hideTips.showInDialog).toBe(
         true,
       );
+      expect(
+        getSettingsSchema().ui.properties.showShortcutsHint.showInDialog,
+      ).toBe(true);
       expect(getSettingsSchema().ui.properties.hideBanner.showInDialog).toBe(
         true,
       );
@@ -326,6 +329,28 @@ describe('SettingsSchema', () => {
         getSettingsSchema().general.properties.debugKeystrokeLogging
           .description,
       ).toBe('Enable debug logging of keystrokes to the console.');
+    });
+
+    it('should have showShortcutsHint setting in schema', () => {
+      expect(getSettingsSchema().ui.properties.showShortcutsHint).toBeDefined();
+      expect(getSettingsSchema().ui.properties.showShortcutsHint.type).toBe(
+        'boolean',
+      );
+      expect(getSettingsSchema().ui.properties.showShortcutsHint.category).toBe(
+        'UI',
+      );
+      expect(getSettingsSchema().ui.properties.showShortcutsHint.default).toBe(
+        true,
+      );
+      expect(
+        getSettingsSchema().ui.properties.showShortcutsHint.requiresRestart,
+      ).toBe(false);
+      expect(
+        getSettingsSchema().ui.properties.showShortcutsHint.showInDialog,
+      ).toBe(true);
+      expect(
+        getSettingsSchema().ui.properties.showShortcutsHint.description,
+      ).toBe('Show the "? for shortcuts" hint above the input.');
     });
 
     it('should have enableAgents setting in schema', () => {

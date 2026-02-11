@@ -220,6 +220,10 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Hide helpful tips in the UI
   - **Default:** `false`
 
+- **`ui.showShortcutsHint`** (boolean):
+  - **Description:** Show the "? for shortcuts" hint above the input.
+  - **Default:** `true`
+
 - **`ui.hideBanner`** (boolean):
   - **Description:** Hide the application banner
   - **Default:** `false`
