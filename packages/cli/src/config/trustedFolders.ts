@@ -104,6 +104,28 @@ function getRealPath(location: string): string {
   return realPath;
 }
 
+function isActuallyHeadless(): boolean {
+  if (isHeadlessMode()) {
+    return true;
+  }
+
+  // Sniff for headless mode from process.argv if not already detected by core.
+  // This helps identify "headless" sessions (e.g. running a specific command or query)
+  // that don't need interactive trust prompts.
+  const args = process.argv.slice(2);
+  const doubleDashIndex = args.indexOf('--');
+  const relevantArgs =
+    doubleDashIndex === -1 ? args : args.slice(0, doubleDashIndex);
+
+  return (
+    relevantArgs.includes('-p') ||
+    relevantArgs.includes('--prompt') ||
+    relevantArgs.includes('-q') ||
+    relevantArgs.includes('--query') ||
+    (relevantArgs.length > 0 && !relevantArgs[0].startsWith('-'))
+  );
+}
+
 export class LoadedTrustedFolders {
   constructor(
     readonly user: TrustedFoldersFile,
@@ -128,7 +150,7 @@ export class LoadedTrustedFolders {
     location: string,
     config?: Record<string, TrustLevel>,
   ): boolean | undefined {
-    if (isHeadlessMode()) {
+    if (isActuallyHeadless()) {
       return true;
     }
     const configToUse = config ?? this.user.config;
@@ -358,7 +380,7 @@ export function isWorkspaceTrusted(
   workspaceDir: string = process.cwd(),
   trustConfig?: Record<string, TrustLevel>,
 ): TrustResult {
-  if (isHeadlessMode()) {
+  if (isActuallyHeadless()) {
     return { isTrusted: true, source: undefined };
   }
 

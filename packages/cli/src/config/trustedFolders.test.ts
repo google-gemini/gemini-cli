@@ -457,6 +457,54 @@ describe('Trusted Folders', () => {
       const folders = loadTrustedFolders();
       expect(folders.isPathTrusted('/any-untrusted-path')).toBe(true);
     });
+
+    it('should return true when a prompt flag is detected in process.argv', async () => {
+      const geminiCore = await import('@google/gemini-cli-core');
+      vi.spyOn(geminiCore, 'isHeadlessMode').mockReturnValue(false);
+
+      const originalArgv = process.argv;
+      process.argv = ['node', 'gemini', '--prompt', 'test'];
+
+      try {
+        expect(isWorkspaceTrusted(mockSettings).isTrusted).toBe(true);
+        const folders = loadTrustedFolders();
+        expect(folders.isPathTrusted('/any-path')).toBe(true);
+      } finally {
+        process.argv = originalArgv;
+      }
+    });
+
+    it('should return true when a positional argument (query/command) is detected', async () => {
+      const geminiCore = await import('@google/gemini-cli-core');
+      vi.spyOn(geminiCore, 'isHeadlessMode').mockReturnValue(false);
+
+      const originalArgv = process.argv;
+      process.argv = ['node', 'gemini', '/pickle'];
+
+      try {
+        expect(isWorkspaceTrusted(mockSettings).isTrusted).toBe(true);
+      } finally {
+        process.argv = originalArgv;
+      }
+    });
+
+    it('should return false (or check config) when no headless indicators are present', async () => {
+      const geminiCore = await import('@google/gemini-cli-core');
+      vi.spyOn(geminiCore, 'isHeadlessMode').mockReturnValue(false);
+
+      const originalArgv = process.argv;
+      process.argv = ['node', 'gemini'];
+
+      try {
+        const config = { '/projectA': TrustLevel.DO_NOT_TRUST };
+        fs.writeFileSync(trustedFoldersPath, JSON.stringify(config), 'utf-8');
+        expect(isWorkspaceTrusted(mockSettings, '/projectA').isTrusted).toBe(
+          false,
+        );
+      } finally {
+        process.argv = originalArgv;
+      }
+    });
   });
 
   describe('Trusted Folders Caching', () => {
