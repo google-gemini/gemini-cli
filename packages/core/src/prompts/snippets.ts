@@ -165,12 +165,12 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
 
 ## Context Efficiency:
-- Avoid wasting context window by scoping ${GREP_TOOL_NAME} searches. You can search iteratively, if needed.
+- Avoid wasting context window by using scoped ${GREP_TOOL_NAME} searches. You can search iteratively, if needed.
 - Optimize for the best answer possible with minimal context unnecessarily wasted.
 - Keep in mind:
-  - Extra turns spent doing multiple scoped searches _at the beginning_ can save us context window by eliminating reads later.
   - ${GREP_TOOL_NAME} parameters can be used to efficiently search broadly (max_matches_per_file=1), find a quick sample of occurrences (total_max_matches=5),
     or get a sample and some surrounding context, enabling skipping the read altogether (total_max_matches=1 and context=5).
+  - Try to make your search as specific as it can be and fallback to searching again or expanding the scope as needed.
   - Reading each file multiple times gets costly, it's better to read enough the first time.
 
 ## Engineering Standards
