@@ -462,6 +462,15 @@ const SETTINGS_SCHEMA = {
         description: 'Hide helpful tips in the UI',
         showInDialog: true,
       },
+      showShortcutsHint: {
+        type: 'boolean',
+        label: 'Show Shortcuts Hint',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description: 'Show the "? for shortcuts" hint above the input.',
+        showInDialog: true,
+      },
       hideBanner: {
         type: 'boolean',
         label: 'Hide Banner',
