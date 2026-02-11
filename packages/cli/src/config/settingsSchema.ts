@@ -322,6 +322,27 @@ const SETTINGS_SCHEMA = {
         },
         description: 'Settings for automatic session cleanup.',
       },
+      sessionLearnings: {
+        type: 'object',
+        label: 'Session Learnings',
+        category: 'General',
+        requiresRestart: false,
+        default: {},
+        description: 'Settings for session learning summaries.',
+        showInDialog: false,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Session Learnings',
+            category: 'General',
+            requiresRestart: false,
+            default: false,
+            description:
+              'Automatically generate a session-learnings.md file when the session ends.',
+            showInDialog: true,
+          },
+        },
+      },
     },
   },
   output: {
