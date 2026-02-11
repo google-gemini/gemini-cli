@@ -1871,30 +1871,11 @@ export async function createTransport(
     let transport: Transport = new StdioClientTransport({
       command: mcpServerConfig.command,
       args: mcpServerConfig.args || [],
-      env: sanitizeEnvironment(
-        {
-          ...process.env,
-          ...getExtensionEnvironment(mcpServerConfig.extension),
-          ...(mcpServerConfig.env || {}),
-        },
-        {
-          ...sanitizationConfig,
-          allowedEnvironmentVariables: [
-            ...(sanitizationConfig.allowedEnvironmentVariables ?? []),
-            ...(mcpServerConfig.extension?.resolvedSettings?.map(
-              (s) => s.envVar,
-            ) ?? []),
-          ],
-          enableEnvironmentVariableRedaction: true,
-        },
-      ) as Record<string, string>,
-
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       env: {
         ...sanitizeEnvironment(process.env, sanitizationConfig),
         ...(mcpServerConfig.env || {}),
       } as Record<string, string>,
-
       cwd: mcpServerConfig.cwd,
       stderr: 'pipe',
     });
