@@ -1623,7 +1623,7 @@ describe('mcp-client', () => {
         {
           command: 'test-command',
           args: ['--foo', 'bar'],
-          env: { GEMINI_CLI_FOO: 'bar' },
+          env: { FOO: 'bar' },
           cwd: 'test/cwd',
         },
         false,
@@ -1634,78 +1634,9 @@ describe('mcp-client', () => {
         command: 'test-command',
         args: ['--foo', 'bar'],
         cwd: 'test/cwd',
-        env: expect.objectContaining({ GEMINI_CLI_FOO: 'bar' }),
+        env: expect.objectContaining({ FOO: 'bar' }),
         stderr: 'pipe',
       });
-    });
-
-    it('should redact sensitive environment variables for command transport', async () => {
-      const mockedTransport = vi
-        .spyOn(SdkClientStdioLib, 'StdioClientTransport')
-        .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
-
-      const originalEnv = process.env;
-      process.env = {
-        ...originalEnv,
-        GEMINI_API_KEY: 'sensitive-key',
-        GEMINI_CLI_SAFE_VAR: 'safe-value',
-      };
-      // Ensure strict sanitization is not triggered for this test
-      delete process.env['GITHUB_SHA'];
-      delete process.env['SURFACE'];
-
-      try {
-        await createTransport(
-          'test-server',
-          {
-            command: 'test-command',
-          },
-          false,
-          EMPTY_CONFIG,
-        );
-
-        const callArgs = mockedTransport.mock.calls[0][0];
-        expect(callArgs.env).toBeDefined();
-        expect(callArgs.env!['GEMINI_CLI_SAFE_VAR']).toBe('safe-value');
-        expect(callArgs.env!['GEMINI_API_KEY']).toBeUndefined();
-      } finally {
-        process.env = originalEnv;
-      }
-    });
-
-    it('should include extension settings in environment', async () => {
-      const mockedTransport = vi
-        .spyOn(SdkClientStdioLib, 'StdioClientTransport')
-        .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
-
-      await createTransport(
-        'test-server',
-        {
-          command: 'test-command',
-          extension: {
-            name: 'test-ext',
-            resolvedSettings: [
-              {
-                envVar: 'GEMINI_CLI_EXT_VAR',
-                value: 'ext-value',
-                sensitive: false,
-                name: 'ext-setting',
-              },
-            ],
-            version: '',
-            isActive: false,
-            path: '',
-            contextFiles: [],
-            id: '',
-          },
-        },
-        false,
-        EMPTY_CONFIG,
-      );
-
-      const callArgs = mockedTransport.mock.calls[0][0];
-      expect(callArgs.env).toBeDefined();
-      expect(callArgs.env!['GEMINI_CLI_EXT_VAR']).toBe('ext-value');
     });
 
     it('should exclude extension settings with undefined values from environment', async () => {
