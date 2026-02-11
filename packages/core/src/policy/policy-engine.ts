@@ -26,6 +26,22 @@ import {
 } from '../utils/shell-utils.js';
 import { getToolAliases } from '../tools/tool-names.js';
 
+function isWildcardPattern(name: string): boolean {
+  return name.endsWith('__*');
+}
+
+function getWildcardPrefix(pattern: string): string {
+  return pattern.slice(0, -3);
+}
+
+function matchesWildcard(pattern: string, toolName: string): boolean {
+  if (!isWildcardPattern(pattern)) {
+    return false;
+  }
+  const prefix = getWildcardPrefix(pattern);
+  return toolName.startsWith(prefix + '__');
+}
+
 function ruleMatches(
   rule: PolicyRule | SafetyCheckerRule,
   toolCall: FunctionCall,
@@ -43,8 +59,8 @@ function ruleMatches(
   // Check tool name if specified
   if (rule.toolName) {
     // Support wildcard patterns: "serverName__*" matches "serverName__anyTool"
-    if (rule.toolName.endsWith('__*')) {
-      const prefix = rule.toolName.slice(0, -3); // Remove "__*"
+    if (isWildcardPattern(rule.toolName)) {
+      const prefix = getWildcardPrefix(rule.toolName);
       if (serverName !== undefined) {
         // Robust check: if serverName is provided, it MUST match the prefix exactly.
         // This prevents "malicious-server" from spoofing "trusted-server" by naming itself "trusted-server__malicious".
@@ -53,7 +69,7 @@ function ruleMatches(
         }
       }
       // Always verify the prefix, even if serverName matched
-      if (!toolCall.name || !toolCall.name.startsWith(prefix + '__')) {
+      if (!toolCall.name || !matchesWildcard(rule.toolName, toolCall.name)) {
         return false;
       }
     } else if (toolCall.name !== rule.toolName) {
@@ -560,8 +576,8 @@ export class PolicyEngine {
       let coveredByWildcard = false;
       for (const processed of processedTools) {
         if (
-          processed.endsWith('__*') &&
-          toolName.startsWith(processed.slice(0, -3))
+          isWildcardPattern(processed) &&
+          matchesWildcard(processed, toolName)
         ) {
           // It's covered by a higher-priority wildcard rule.
           // If that wildcard rule resulted in exclusion, this tool should also be excluded.
