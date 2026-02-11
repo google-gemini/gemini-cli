@@ -470,6 +470,7 @@ export interface ConfigParameters {
   disabledHooks?: string[];
   projectHooks?: { [K in HookEventName]?: HookDefinition[] };
   enableAgents?: boolean;
+  enableAgentHarness?: boolean;
   enableEventDrivenScheduler?: boolean;
   skillsSupport?: boolean;
   disabledSkills?: string[];
@@ -654,6 +655,7 @@ export class Config {
     | undefined;
 
   private readonly enableAgents: boolean;
+  private readonly enableAgentHarness: boolean;
   private agents: AgentSettings;
   private readonly enableEventDrivenScheduler: boolean;
   private readonly skillsSupport: boolean;
@@ -748,6 +750,7 @@ export class Config {
     this.disableLoopDetection = params.disableLoopDetection ?? false;
     this._activeModel = params.model;
     this.enableAgents = params.enableAgents ?? false;
+    this.enableAgentHarness = params.enableAgentHarness ?? false;
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? false;
@@ -1967,6 +1970,10 @@ export class Config {
 
   isAgentsEnabled(): boolean {
     return this.enableAgents;
+  }
+
+  isAgentHarnessEnabled(): boolean {
+    return this.enableAgentHarness;
   }
 
   isEventDrivenSchedulerEnabled(): boolean {

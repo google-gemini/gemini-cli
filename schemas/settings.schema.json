@@ -1486,6 +1486,13 @@
           "default": false,
           "type": "boolean"
         },
+        "enableAgentHarness": {
+          "title": "Enable Agent Harness",
+          "description": "Enable the new unified agent harness (experimental).",
+          "markdownDescription": "Enable the new unified agent harness (experimental).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "extensionManagement": {
           "title": "Extension Management",
           "description": "Enable extension management features.",

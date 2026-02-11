@@ -15,6 +15,8 @@ import type {
   SubagentActivityEvent,
 } from './types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { AgentFactory } from './agent-factory.js';
+import { GeminiEventType } from '../core/turn.js';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
@@ -83,6 +85,10 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
     signal: AbortSignal,
     updateOutput?: (output: string | AnsiOutput) => void,
   ): Promise<ToolResult> {
+    if (this.config.isAgentHarnessEnabled()) {
+      return this.executeWithHarness(signal, updateOutput);
+    }
+
     try {
       if (updateOutput) {
         updateOutput('Subagent starting...\n');
@@ -133,6 +139,76 @@ ${output.result}
 
       return {
         llmContent: `Subagent '${this.definition.name}' failed. Error: ${errorMessage}`,
+        returnDisplay: `Subagent Failed: ${this.definition.name}\nError: ${errorMessage}`,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.EXECUTION_FAILED,
+        },
+      };
+    }
+  }
+
+  private async executeWithHarness(
+    signal: AbortSignal,
+    updateOutput?: (output: string | AnsiOutput) => void,
+  ): Promise<ToolResult> {
+    try {
+      if (updateOutput) {
+        updateOutput('Subagent starting (Harness Mode)...\n');
+      }
+
+      const harness = AgentFactory.createHarness(this.config, this.definition, {
+        inputs: this.params,
+        parentPromptId: promptIdContext.getStore(),
+      });
+
+      const initialRequest = [{ text: 'Start' }]; // Placeholder for subagent start
+      const stream = harness.run(initialRequest, signal);
+
+      let turn: Turn | undefined;
+      while (true) {
+        const { value, done } = await stream.next();
+        if (done) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          turn = value as Turn;
+          break;
+        }
+        const event = value;
+        if (updateOutput) {
+          if (event.type === GeminiEventType.Thought) {
+            updateOutput(`🤖💭 ${event.value.subject}`);
+          } else if (event.type === GeminiEventType.SubagentActivity) {
+            if (event.value.type === 'TOOL_CALL_START') {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              const toolName = event.value.data['name'] as string;
+              updateOutput(`🛠️  Calling tool: ${toolName}...`);
+            }
+          }
+        }
+      }
+
+      if (!turn) {
+        throw new Error('Agent failed to return a valid turn.');
+      }
+      const output = turn.getResponseText();
+
+      const displayContent = `
+Subagent ${this.definition.name} Finished (Harness Mode)
+
+Result:
+${output}
+`;
+
+      return {
+        llmContent: [{ text: output }],
+        returnDisplay: displayContent,
+      };
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      return {
+        llmContent: `Subagent '${this.definition.name}' failed (Harness Mode). Error: ${errorMessage}`,
         returnDisplay: `Subagent Failed: ${this.definition.name}\nError: ${errorMessage}`,
         error: {
           message: errorMessage,
