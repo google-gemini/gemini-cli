@@ -40,7 +40,12 @@ export type VimAction = Extract<
   | { type: 'vim_change_line' }
   | { type: 'vim_delete_to_end_of_line' }
   | { type: 'vim_delete_to_start_of_line' }
+  | { type: 'vim_delete_to_first_nonwhitespace' }
   | { type: 'vim_change_to_end_of_line' }
+  | { type: 'vim_change_to_start_of_line' }
+  | { type: 'vim_change_to_first_nonwhitespace' }
+  | { type: 'vim_delete_to_first_line' }
+  | { type: 'vim_delete_to_last_line' }
   | { type: 'vim_change_movement' }
   | { type: 'vim_move_left' }
   | { type: 'vim_move_right' }
@@ -388,19 +393,58 @@ export function handleVimAction(
 
     case 'vim_delete_to_end_of_line':
     case 'vim_change_to_end_of_line': {
+      const { count } = action.payload;
       const currentLine = lines[cursorRow] || '';
-      if (cursorCol < cpLen(currentLine)) {
+      const totalLines = lines.length;
+
+      if (count === 1) {
+        // Single line: delete from cursor to end of current line
+        if (cursorCol < cpLen(currentLine)) {
+          const nextState = detachExpandedPaste(pushUndo(state));
+          return replaceRangeInternal(
+            nextState,
+            cursorRow,
+            cursorCol,
+            cursorRow,
+            cpLen(currentLine),
+            '',
+          );
+        }
+        return state;
+      } else {
+        // Multi-line: delete from cursor to end of current line, plus (count-1) entire lines below
+        // For example, 2D = delete to EOL + delete next line entirely
+        const linesToDelete = Math.min(count - 1, totalLines - cursorRow - 1);
+        const endRow = cursorRow + linesToDelete;
+
+        if (endRow === cursorRow) {
+          // No additional lines to delete, just delete to EOL
+          if (cursorCol < cpLen(currentLine)) {
+            const nextState = detachExpandedPaste(pushUndo(state));
+            return replaceRangeInternal(
+              nextState,
+              cursorRow,
+              cursorCol,
+              cursorRow,
+              cpLen(currentLine),
+              '',
+            );
+          }
+          return state;
+        }
+
+        // Delete from cursor position to end of endRow (including newlines)
         const nextState = detachExpandedPaste(pushUndo(state));
+        const endLine = lines[endRow] || '';
         return replaceRangeInternal(
           nextState,
           cursorRow,
           cursorCol,
-          cursorRow,
-          cpLen(currentLine),
+          endRow,
+          cpLen(endLine),
           '',
         );
       }
-      return state;
     }
 
     case 'vim_delete_to_start_of_line': {
@@ -416,6 +460,184 @@ export function handleVimAction(
         );
       }
       return state;
+    }
+
+    case 'vim_delete_to_first_nonwhitespace': {
+      // Delete from cursor to first non-whitespace character (vim 'd^')
+      const currentLine = lines[cursorRow] || '';
+      const lineCodePoints = toCodePoints(currentLine);
+      let firstNonWs = 0;
+      while (
+        firstNonWs < lineCodePoints.length &&
+        /\s/.test(lineCodePoints[firstNonWs])
+      ) {
+        firstNonWs++;
+      }
+      // If line is all whitespace, firstNonWs would be lineCodePoints.length
+      // In VIM, ^ on whitespace-only line goes to column 0
+      if (firstNonWs >= lineCodePoints.length) {
+        firstNonWs = 0;
+      }
+      // Delete between cursor and first non-whitespace (whichever direction)
+      if (cursorCol !== firstNonWs) {
+        const startCol = Math.min(cursorCol, firstNonWs);
+        const endCol = Math.max(cursorCol, firstNonWs);
+        const nextState = detachExpandedPaste(pushUndo(state));
+        return replaceRangeInternal(
+          nextState,
+          cursorRow,
+          startCol,
+          cursorRow,
+          endCol,
+          '',
+        );
+      }
+      return state;
+    }
+
+    case 'vim_change_to_start_of_line': {
+      // Change from cursor to start of line (vim 'c0')
+      if (cursorCol > 0) {
+        const nextState = detachExpandedPaste(pushUndo(state));
+        return replaceRangeInternal(
+          nextState,
+          cursorRow,
+          0,
+          cursorRow,
+          cursorCol,
+          '',
+        );
+      }
+      return state;
+    }
+
+    case 'vim_change_to_first_nonwhitespace': {
+      // Change from cursor to first non-whitespace character (vim 'c^')
+      const currentLine = lines[cursorRow] || '';
+      const lineCodePoints = toCodePoints(currentLine);
+      let firstNonWs = 0;
+      while (
+        firstNonWs < lineCodePoints.length &&
+        /\s/.test(lineCodePoints[firstNonWs])
+      ) {
+        firstNonWs++;
+      }
+      // If line is all whitespace, firstNonWs would be lineCodePoints.length
+      // In VIM, ^ on whitespace-only line goes to column 0
+      if (firstNonWs >= lineCodePoints.length) {
+        firstNonWs = 0;
+      }
+      // Change between cursor and first non-whitespace (whichever direction)
+      if (cursorCol !== firstNonWs) {
+        const startCol = Math.min(cursorCol, firstNonWs);
+        const endCol = Math.max(cursorCol, firstNonWs);
+        const nextState = detachExpandedPaste(pushUndo(state));
+        return replaceRangeInternal(
+          nextState,
+          cursorRow,
+          startCol,
+          cursorRow,
+          endCol,
+          '',
+        );
+      }
+      return state;
+    }
+
+    case 'vim_delete_to_first_line': {
+      // Delete from first line (or line N if count given) to current line (vim 'dgg' or 'd5gg')
+      // count is the target line number (1-based), or 0 for first line
+      const { count } = action.payload;
+      const totalLines = lines.length;
+
+      // Determine target row (0-based)
+      // count=0 means go to first line, count=N means go to line N (1-based)
+      let targetRow: number;
+      if (count > 0) {
+        targetRow = Math.min(count - 1, totalLines - 1);
+      } else {
+        targetRow = 0;
+      }
+
+      // Determine the range to delete (from min to max row, inclusive)
+      const startRow = Math.min(cursorRow, targetRow);
+      const endRow = Math.max(cursorRow, targetRow);
+      const linesToDelete = endRow - startRow + 1;
+
+      if (linesToDelete >= totalLines) {
+        // Deleting all lines - keep one empty line
+        const nextState = detachExpandedPaste(pushUndo(state));
+        return {
+          ...nextState,
+          lines: [''],
+          cursorRow: 0,
+          cursorCol: 0,
+          preferredCol: null,
+        };
+      }
+
+      const nextState = detachExpandedPaste(pushUndo(state));
+      const newLines = [...nextState.lines];
+      newLines.splice(startRow, linesToDelete);
+
+      // Cursor goes to start of the deleted range, clamped to valid bounds
+      const newCursorRow = Math.min(startRow, newLines.length - 1);
+
+      return {
+        ...nextState,
+        lines: newLines,
+        cursorRow: newCursorRow,
+        cursorCol: 0,
+        preferredCol: null,
+      };
+    }
+
+    case 'vim_delete_to_last_line': {
+      // Delete from current line to last line (vim 'dG') or to line N (vim 'd5G')
+      // count is the target line number (1-based), or 0 for last line
+      const { count } = action.payload;
+      const totalLines = lines.length;
+
+      // Determine target row (0-based)
+      // count=0 means go to last line, count=N means go to line N (1-based)
+      let targetRow: number;
+      if (count > 0) {
+        targetRow = Math.min(count - 1, totalLines - 1);
+      } else {
+        targetRow = totalLines - 1;
+      }
+
+      // Determine the range to delete (from min to max row, inclusive)
+      const startRow = Math.min(cursorRow, targetRow);
+      const endRow = Math.max(cursorRow, targetRow);
+      const linesToDelete = endRow - startRow + 1;
+
+      if (linesToDelete >= totalLines) {
+        // Deleting all lines - keep one empty line
+        const nextState = detachExpandedPaste(pushUndo(state));
+        return {
+          ...nextState,
+          lines: [''],
+          cursorRow: 0,
+          cursorCol: 0,
+          preferredCol: null,
+        };
+      }
+
+      const nextState = detachExpandedPaste(pushUndo(state));
+      const newLines = [...nextState.lines];
+      newLines.splice(startRow, linesToDelete);
+
+      // Move cursor to the start of the deleted range (or last line if needed)
+      const newCursorRow = Math.min(startRow, newLines.length - 1);
+
+      return {
+        ...nextState,
+        lines: newLines,
+        cursorRow: newCursorRow,
+        cursorCol: 0,
+        preferredCol: null,
+      };
     }
 
     case 'vim_change_movement': {

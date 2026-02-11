@@ -1657,9 +1657,9 @@ export type TextBufferAction =
   | { type: 'vim_change_big_word_end'; payload: { count: number } }
   | { type: 'vim_delete_line'; payload: { count: number } }
   | { type: 'vim_change_line'; payload: { count: number } }
-  | { type: 'vim_delete_to_end_of_line' }
+  | { type: 'vim_delete_to_end_of_line'; payload: { count: number } }
   | { type: 'vim_delete_to_start_of_line' }
-  | { type: 'vim_change_to_end_of_line' }
+  | { type: 'vim_change_to_end_of_line'; payload: { count: number } }
   | {
       type: 'vim_change_movement';
       payload: { movement: 'h' | 'j' | 'k' | 'l'; count: number };
@@ -1689,6 +1689,11 @@ export type TextBufferAction =
   | { type: 'vim_move_to_last_line' }
   | { type: 'vim_move_to_line'; payload: { lineNumber: number } }
   | { type: 'vim_escape_insert_mode' }
+  | { type: 'vim_delete_to_first_nonwhitespace' }
+  | { type: 'vim_change_to_start_of_line' }
+  | { type: 'vim_change_to_first_nonwhitespace' }
+  | { type: 'vim_delete_to_first_line'; payload: { count: number } }
+  | { type: 'vim_delete_to_last_line'; payload: { count: number } }
   | {
       type: 'toggle_paste_expansion';
       payload: { id: string; row: number; col: number };
@@ -2465,6 +2470,11 @@ function textBufferReducerLogic(
     case 'vim_move_to_last_line':
     case 'vim_move_to_line':
     case 'vim_escape_insert_mode':
+    case 'vim_delete_to_first_nonwhitespace':
+    case 'vim_change_to_start_of_line':
+    case 'vim_change_to_first_nonwhitespace':
+    case 'vim_delete_to_first_line':
+    case 'vim_delete_to_last_line':
       return handleVimAction(state, action as VimAction);
 
     case 'toggle_paste_expansion': {
@@ -2947,16 +2957,36 @@ export function useTextBuffer({
     dispatch({ type: 'vim_change_line', payload: { count } });
   }, []);
 
-  const vimDeleteToEndOfLine = useCallback((): void => {
-    dispatch({ type: 'vim_delete_to_end_of_line' });
+  const vimDeleteToEndOfLine = useCallback((count: number = 1): void => {
+    dispatch({ type: 'vim_delete_to_end_of_line', payload: { count } });
   }, []);
 
   const vimDeleteToStartOfLine = useCallback((): void => {
     dispatch({ type: 'vim_delete_to_start_of_line' });
   }, []);
 
-  const vimChangeToEndOfLine = useCallback((): void => {
-    dispatch({ type: 'vim_change_to_end_of_line' });
+  const vimChangeToEndOfLine = useCallback((count: number = 1): void => {
+    dispatch({ type: 'vim_change_to_end_of_line', payload: { count } });
+  }, []);
+
+  const vimDeleteToFirstNonWhitespace = useCallback((): void => {
+    dispatch({ type: 'vim_delete_to_first_nonwhitespace' });
+  }, []);
+
+  const vimChangeToStartOfLine = useCallback((): void => {
+    dispatch({ type: 'vim_change_to_start_of_line' });
+  }, []);
+
+  const vimChangeToFirstNonWhitespace = useCallback((): void => {
+    dispatch({ type: 'vim_change_to_first_nonwhitespace' });
+  }, []);
+
+  const vimDeleteToFirstLine = useCallback((count: number): void => {
+    dispatch({ type: 'vim_delete_to_first_line', payload: { count } });
+  }, []);
+
+  const vimDeleteToLastLine = useCallback((count: number): void => {
+    dispatch({ type: 'vim_delete_to_last_line', payload: { count } });
   }, []);
 
   const vimChangeMovement = useCallback(
@@ -3518,6 +3548,11 @@ export function useTextBuffer({
       vimDeleteToEndOfLine,
       vimDeleteToStartOfLine,
       vimChangeToEndOfLine,
+      vimDeleteToFirstNonWhitespace,
+      vimChangeToStartOfLine,
+      vimChangeToFirstNonWhitespace,
+      vimDeleteToFirstLine,
+      vimDeleteToLastLine,
       vimChangeMovement,
       vimMoveLeft,
       vimMoveRight,
@@ -3601,6 +3636,11 @@ export function useTextBuffer({
       vimDeleteToEndOfLine,
       vimDeleteToStartOfLine,
       vimChangeToEndOfLine,
+      vimDeleteToFirstNonWhitespace,
+      vimChangeToStartOfLine,
+      vimChangeToFirstNonWhitespace,
+      vimDeleteToFirstLine,
+      vimDeleteToLastLine,
       vimChangeMovement,
       vimMoveLeft,
       vimMoveRight,
@@ -3840,16 +3880,38 @@ export interface TextBuffer {
   vimChangeLine: (count: number) => void;
   /**
    * Delete from cursor to end of line (vim 'D' command)
+   * With count > 1, deletes to end of current line plus (count-1) additional lines
    */
-  vimDeleteToEndOfLine: () => void;
+  vimDeleteToEndOfLine: (count?: number) => void;
   /**
    * Delete from start of line to cursor (vim 'd0' command)
    */
   vimDeleteToStartOfLine: () => void;
   /**
    * Change from cursor to end of line (vim 'C' command)
+   * With count > 1, changes to end of current line plus (count-1) additional lines
    */
-  vimChangeToEndOfLine: () => void;
+  vimChangeToEndOfLine: (count?: number) => void;
+  /**
+   * Delete from cursor to first non-whitespace character (vim 'd^' command)
+   */
+  vimDeleteToFirstNonWhitespace: () => void;
+  /**
+   * Change from cursor to start of line (vim 'c0' command)
+   */
+  vimChangeToStartOfLine: () => void;
+  /**
+   * Change from cursor to first non-whitespace character (vim 'c^' command)
+   */
+  vimChangeToFirstNonWhitespace: () => void;
+  /**
+   * Delete from current line to first line (vim 'dgg' command)
+   */
+  vimDeleteToFirstLine: (count: number) => void;
+  /**
+   * Delete from current line to last line (vim 'dG' command)
+   */
+  vimDeleteToLastLine: (count: number) => void;
   /**
    * Change movement operations (vim 'ch', 'cj', 'ck', 'cl' commands)
    */
