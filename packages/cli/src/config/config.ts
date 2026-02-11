@@ -79,6 +79,7 @@ export interface CliArgs {
   allowedTools: string[] | undefined;
   experimentalAcp: boolean | undefined;
   experimentalAgentHarness: boolean | undefined;
+  experimentalEnableAgents: boolean | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
   resume: string | typeof RESUME_LATEST | undefined;
@@ -166,6 +167,10 @@ export async function parseArguments(
         .option('experimental-agent-harness', {
           type: 'boolean',
           description: 'Enable the new unified agent harness',
+        })
+        .option('experimental-enable-agents', {
+          type: 'boolean',
+          description: 'Enable local and remote subagents',
         })
         .option('allowed-mcp-server-names', {
           type: 'array',
@@ -792,10 +797,12 @@ export async function loadCliConfig(
     enabledExtensions: argv.extensions,
     extensionLoader: extensionManager,
     enableExtensionReloading: settings.experimental?.extensionReloading,
-    enableAgents: settings.experimental?.enableAgents,
+    enableAgents:
+      argv.experimentalEnableAgents ?? settings.experimental?.enableAgents,
     enableAgentHarness:
       argv.experimentalAgentHarness ??
       settings.experimental?.enableAgentHarness,
+
     plan: settings.experimental?.plan,
     enableEventDrivenScheduler: true,
     skillsSupport: settings.skills?.enabled ?? true,
