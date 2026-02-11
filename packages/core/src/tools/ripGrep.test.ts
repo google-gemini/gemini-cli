@@ -1930,7 +1930,6 @@ describe('RipGrepTool', () => {
       expect(result.llmContent).not.toContain('L3: match 3');
       expect(result.returnDisplay).toBe('Found 2 matches (limited)');
     });
-
     it('should return only file paths when names_only is true', async () => {
       mockSpawn.mockImplementationOnce(
         createMockSpawn({

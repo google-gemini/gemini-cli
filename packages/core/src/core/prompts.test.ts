@@ -152,6 +152,26 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).toMatchSnapshot();
   });
 
+  it('should include available_skills with updated verbiage for preview models', () => {
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
+    const skills = [
+      {
+        name: 'test-skill',
+        description: 'A test skill description',
+        location: '/path/to/test-skill/SKILL.md',
+        body: 'Skill content',
+      },
+    ];
+    vi.mocked(mockConfig.getSkillManager().getSkills).mockReturnValue(skills);
+    const prompt = getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).toContain('# Available Agent Skills');
+    expect(prompt).toContain(
+      "To activate a skill and receive its detailed instructions, call the `activate_skill` tool with the skill's name.",
+    );
+    expect(prompt).toMatchSnapshot();
+  });
+
   it('should NOT include skill guidance or available_skills when NO skills are provided', () => {
     vi.mocked(mockConfig.getSkillManager().getSkills).mockReturnValue([]);
     const prompt = getCoreSystemPrompt(mockConfig);

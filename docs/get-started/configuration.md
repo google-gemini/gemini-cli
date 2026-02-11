@@ -220,6 +220,10 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Hide helpful tips in the UI
   - **Default:** `false`
 
+- **`ui.showShortcutsHint`** (boolean):
+  - **Description:** Show the "? for shortcuts" hint above the input.
+  - **Default:** `true`
+
 - **`ui.hideBanner`** (boolean):
   - **Description:** Hide the application banner
   - **Default:** `false`
@@ -847,6 +851,28 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
 
 #### `experimental`
+
+- **`experimental.toolOutputMasking.enabled`** (boolean):
+  - **Description:** Enables tool output masking to save tokens.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`experimental.toolOutputMasking.toolProtectionThreshold`** (number):
+  - **Description:** Minimum number of tokens to protect from masking (most
+    recent tool outputs).
+  - **Default:** `50000`
+  - **Requires restart:** Yes
+
+- **`experimental.toolOutputMasking.minPrunableTokensThreshold`** (number):
+  - **Description:** Minimum prunable tokens required to trigger a masking pass.
+  - **Default:** `30000`
+  - **Requires restart:** Yes
+
+- **`experimental.toolOutputMasking.protectLatestTurn`** (boolean):
+  - **Description:** Ensures the absolute latest turn is never masked,
+    regardless of token count.
+  - **Default:** `true`
+  - **Requires restart:** Yes
 
 - **`experimental.enableAgents`** (boolean):
   - **Description:** Enable local and remote subagents. Warning: Experimental
