@@ -116,7 +116,11 @@ export function colorizeLine(
   line: string,
   language: string | null,
   theme?: Theme,
+  disableColor = false,
 ): React.ReactNode {
+  if (disableColor) {
+    return <Text>{line}</Text>;
+  }
   const activeTheme = theme || themeManager.getActiveTheme();
   return highlightAndRenderLine(line, language, activeTheme);
 }
@@ -129,6 +133,7 @@ export interface ColorizeCodeOptions {
   theme?: Theme | null;
   settings: LoadedSettings;
   hideLineNumbers?: boolean;
+  disableColor?: boolean;
 }
 
 /**
@@ -145,6 +150,7 @@ export function colorizeCode({
   theme = null,
   settings,
   hideLineNumbers = false,
+  disableColor = false,
 }: ColorizeCodeOptions): React.ReactNode {
   const codeToHighlight = code.replace(/\n$/, '');
   const activeTheme = theme || themeManager.getActiveTheme();
@@ -172,11 +178,9 @@ export function colorizeCode({
     }
 
     const renderedLines = lines.map((line, index) => {
-      const contentToRender = highlightAndRenderLine(
-        line,
-        language,
-        activeTheme,
-      );
+      const contentToRender = disableColor
+        ? line
+        : highlightAndRenderLine(line, language, activeTheme);
 
       return (
         <Box key={index} minHeight={1}>
@@ -188,12 +192,15 @@ export function colorizeCode({
               alignItems="flex-start"
               justifyContent="flex-end"
             >
-              <Text color={activeTheme.colors.Gray}>
+              <Text color={disableColor ? undefined : activeTheme.colors.Gray}>
                 {`${index + 1 + hiddenLinesCount}`}
               </Text>
             </Box>
           )}
-          <Text color={activeTheme.defaultColor} wrap="wrap">
+          <Text
+            color={disableColor ? undefined : activeTheme.defaultColor}
+            wrap="wrap"
+          >
             {contentToRender}
           </Text>
         </Box>
@@ -237,10 +244,14 @@ export function colorizeCode({
             alignItems="flex-start"
             justifyContent="flex-end"
           >
-            <Text color={activeTheme.defaultColor}>{`${index + 1}`}</Text>
+            <Text color={disableColor ? undefined : activeTheme.defaultColor}>
+              {`${index + 1}`}
+            </Text>
           </Box>
         )}
-        <Text color={activeTheme.colors.Gray}>{line}</Text>
+        <Text color={disableColor ? undefined : activeTheme.colors.Gray}>
+          {line}
+        </Text>
       </Box>
     ));
 

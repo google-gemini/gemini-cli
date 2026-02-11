@@ -88,6 +88,7 @@ interface DiffRendererProps {
   availableTerminalHeight?: number;
   terminalWidth: number;
   theme?: Theme;
+  disableColor?: boolean;
 }
 
 const DEFAULT_TAB_WIDTH = 4; // Spaces per tab for normalization
@@ -99,6 +100,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
   availableTerminalHeight,
   terminalWidth,
   theme,
+  disableColor = false,
 }) => {
   const settings = useSettings();
 
@@ -169,6 +171,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
         maxWidth: terminalWidth,
         theme,
         settings,
+        disableColor,
       });
     } else {
       return renderDiffContent(
@@ -177,6 +180,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
         tabWidth,
         availableTerminalHeight,
         terminalWidth,
+        disableColor,
       );
     }
   }, [
@@ -190,6 +194,7 @@ export const DiffRenderer: React.FC<DiffRendererProps> = ({
     theme,
     settings,
     tabWidth,
+    disableColor,
   ]);
 
   return renderedOutput;
@@ -201,6 +206,7 @@ const renderDiffContent = (
   tabWidth = DEFAULT_TAB_WIDTH,
   availableTerminalHeight: number | undefined,
   terminalWidth: number,
+  disableColor = false,
 ) => {
   // 1. Normalize whitespace (replace tabs with spaces) *before* further processing
   const normalizedLines = parsedLines.map((line) => ({
@@ -321,12 +327,26 @@ const renderDiffContent = (
 
       const displayContent = line.content.substring(baseIndentation);
 
-      const backgroundColor =
-        line.type === 'add'
+      const backgroundColor = disableColor
+        ? undefined
+        : line.type === 'add'
           ? semanticTheme.background.diff.added
           : line.type === 'del'
             ? semanticTheme.background.diff.removed
             : undefined;
+
+      const gutterColor = disableColor
+        ? undefined
+        : semanticTheme.text.secondary;
+
+      const symbolColor = disableColor
+        ? undefined
+        : line.type === 'add'
+          ? semanticTheme.status.success
+          : line.type === 'del'
+            ? semanticTheme.status.error
+            : undefined;
+
       acc.push(
         <Box key={lineKey} flexDirection="row">
           <Box
@@ -336,32 +356,24 @@ const renderDiffContent = (
             backgroundColor={backgroundColor}
             justifyContent="flex-end"
           >
-            <Text color={semanticTheme.text.secondary}>{gutterNumStr}</Text>
+            <Text color={gutterColor}>{gutterNumStr}</Text>
           </Box>
           {line.type === 'context' ? (
             <>
               <Text>{prefixSymbol} </Text>
-              <Text wrap="wrap">{colorizeLine(displayContent, language)}</Text>
+              <Text wrap="wrap">
+                {colorizeLine(
+                  displayContent,
+                  language,
+                  undefined,
+                  disableColor,
+                )}
+              </Text>
             </>
           ) : (
-            <Text
-              backgroundColor={
-                line.type === 'add'
-                  ? semanticTheme.background.diff.added
-                  : semanticTheme.background.diff.removed
-              }
-              wrap="wrap"
-            >
-              <Text
-                color={
-                  line.type === 'add'
-                    ? semanticTheme.status.success
-                    : semanticTheme.status.error
-                }
-              >
-                {prefixSymbol}
-              </Text>{' '}
-              {colorizeLine(displayContent, language)}
+            <Text backgroundColor={backgroundColor} wrap="wrap">
+              <Text color={symbolColor}>{prefixSymbol}</Text>{' '}
+              {colorizeLine(displayContent, language, undefined, disableColor)}
             </Text>
           )}
         </Box>,
