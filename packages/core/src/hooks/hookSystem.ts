@@ -21,6 +21,9 @@ import type {
   AfterModelHookOutput,
   BeforeToolSelectionHookOutput,
   McpToolContext,
+  HookConfig,
+  HookEventName,
+  ConfigSource,
 } from './types.js';
 import { NotificationType } from './types.js';
 import type { AggregatedHookResult } from './hookAggregator.js';
@@ -200,6 +203,17 @@ export class HookSystem {
    */
   getAllHooks(): HookRegistryEntry[] {
     return this.hookRegistry.getAllHooks();
+  }
+
+  /**
+   * Register a new hook programmatically
+   */
+  registerHook(
+    config: HookConfig,
+    eventName: HookEventName,
+    options?: { matcher?: string; sequential?: boolean; source?: ConfigSource },
+  ): void {
+    this.hookRegistry.registerHook(config, eventName, options);
   }
 
   /**
