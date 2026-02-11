@@ -17,7 +17,12 @@ describe('expandEnvVars', () => {
 
   it.each([
     ['$VAR (POSIX)', 'Hello $USER', defaultEnv, 'Hello morty'],
-    ['${VAR} (POSIX)', 'Welcome to ${HOME}', defaultEnv, 'Welcome to /home/morty'],
+    [
+      '${VAR} (POSIX)',
+      'Welcome to ${HOME}',
+      defaultEnv,
+      'Welcome to /home/morty',
+    ],
     ['%VAR% (Windows)', 'Data in %TEMP%', defaultEnv, 'Data in C:\\Temp'],
     [
       'mixed formats',
@@ -31,8 +36,18 @@ describe('expandEnvVars', () => {
       defaultEnv,
       'Missing  and  and ',
     ],
-    ['empty or undefined values', 'Value is "$EMPTY"', defaultEnv, 'Value is ""'],
-    ['original string if no variables', 'No vars here', defaultEnv, 'No vars here'],
+    [
+      'empty or undefined values',
+      'Value is "$EMPTY"',
+      defaultEnv,
+      'Value is ""',
+    ],
+    [
+      'original string if no variables',
+      'No vars here',
+      defaultEnv,
+      'No vars here',
+    ],
     ['literal values like "1234"', '1234', defaultEnv, '1234'],
     ['empty input string', '', defaultEnv, ''],
     [
