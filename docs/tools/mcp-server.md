@@ -205,7 +205,7 @@ string.
 ```json
 "env": {
   "API_KEY": "$MY_EXTERNAL_TOKEN",
-  "LOG_LEVEL": "${LOG_LEVEL:-info}",
+  "LOG_LEVEL": "$LOG_LEVEL",
   "TEMP_DIR": "%TEMP%"
 }
 ```
