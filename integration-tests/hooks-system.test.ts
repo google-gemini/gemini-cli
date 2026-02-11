@@ -486,7 +486,8 @@ console.log(JSON.stringify({
       });
 
       // Write hook script to file (inline node -e has quoting issues on Windows)
-      const hookScript = `console.log(JSON.stringify({
+      const hookScript = `
+console.log(JSON.stringify({
   hookSpecificOutput: {
     hookEventName: 'BeforeToolSelection',
     toolConfig: {
@@ -494,7 +495,9 @@ console.log(JSON.stringify({
       allowedFunctionNames: ['read_file', 'run_shell_command']
     }
   }
-}));`;
+}));
+process.exit(0);
+`;
       const scriptPath = join(rig.testDir!, 'before_tool_selection_hook.cjs');
       writeFileSync(scriptPath, hookScript);
 
@@ -511,7 +514,7 @@ console.log(JSON.stringify({
                   {
                     type: 'command',
                     command: `node "${scriptPath.replace(/\\/g, '/')}"`,
-                    timeout: 5000,
+                    timeout: 30000,
                   },
                 ],
               },

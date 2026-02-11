@@ -38,14 +38,26 @@ const entitlementsPath = join(root, 'scripts/entitlements.plist');
  * @param {object} options
  */
 function runCommand(command, args, options = {}) {
+  let finalCommand = command;
+  let useShell = options.shell || false;
+
+  // On Windows, npm/npx are batch files and need a shell
+  if (
+    process.platform === 'win32' &&
+    (command === 'npm' || command === 'npx')
+  ) {
+    finalCommand = `${command}.cmd`;
+    useShell = true;
+  }
+
   const finalOptions = {
     stdio: 'inherit',
     cwd: root,
-    shell: true,
+    shell: useShell,
     ...options,
   };
 
-  const result = spawnSync(command, args, finalOptions);
+  const result = spawnSync(finalCommand, args, finalOptions);
 
   if (result.status !== 0) {
     if (result.error) {
@@ -70,12 +82,10 @@ function removeSignature(filePath) {
     if (platform === 'darwin') {
       spawnSync('codesign', ['--remove-signature', filePath], {
         stdio: 'ignore',
-        shell: true,
       });
     } else if (platform === 'win32') {
       spawnSync('signtool', ['remove', '/s', filePath], {
         stdio: 'ignore',
-        shell: true,
       });
     }
   } catch {
@@ -290,7 +300,7 @@ if (includeNativeModules) {
 writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 
 const seaConfig = {
-  main: 'sea-launch.cjs',
+  main: 'sea/sea-launch.cjs',
   output: 'dist/sea-prep.blob',
   disableExperimentalSEAWarning: true,
   assets: assets,
