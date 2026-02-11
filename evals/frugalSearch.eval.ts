@@ -7,6 +7,11 @@
 import { describe, expect } from 'vitest';
 import { evalTest } from './test-helper.js';
 
+/**
+ * Evals to verify that the agent uses search tools efficiently (frugally)
+ * by utilizing limiting parameters like `total_max_matches` and `max_matches_per_file`.
+ * This ensures the agent doesn't flood the context window with unnecessary search results.
+ */
 describe('Frugal Search', () => {
   const getGrepParams = (call: any): any => {
     let args = call.toolRequest.args;
@@ -112,21 +117,26 @@ describe('Frugal Search', () => {
 
       expect(grepCalls.length).toBeGreaterThan(0);
 
-      const hasFrugalLimit = grepCalls.some((call) => {
-        const params = getGrepParams(call);
-        // Check for explicitly set small limit for "sample" or "example" requests
-        return (
-          params.total_max_matches !== undefined &&
-          params.total_max_matches <= 100
-        );
-      });
+      const grepParams = grepCalls.map(getGrepParams);
 
+      const hasTotalMaxLimit = grepParams.some(
+        (p) => p.total_max_matches !== undefined && p.total_max_matches <= 100,
+      );
       expect(
-        hasFrugalLimit,
-        `Expected agent to use a small total_max_matches for a sample usage request. Params used: ${JSON.stringify(
-          grepCalls.map(getGrepParams),
-          null,
-          2,
+        hasTotalMaxLimit,
+        `Expected agent to use a small total_max_matches (<= 100) for a sample usage request. Actual values: ${JSON.stringify(
+          grepParams.map((p) => p.total_max_matches),
+        )}`,
+      ).toBe(true);
+
+      const hasMaxMatchesPerFileLimit = grepParams.some(
+        (p) =>
+          p.max_matches_per_file !== undefined && p.max_matches_per_file <= 5,
+      );
+      expect(
+        hasMaxMatchesPerFileLimit,
+        `Expected agent to use a small max_matches_per_file (<= 5) for a sample usage request. Actual values: ${JSON.stringify(
+          grepParams.map((p) => p.max_matches_per_file),
         )}`,
       ).toBe(true);
     },
