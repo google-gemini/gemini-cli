@@ -165,7 +165,8 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
 
 ## Context Efficiency:
-- Always minimize wasted context window by scoping and limiting all of your ${GREP_TOOL_NAME} searches. e.g.: pass total_max_matches, include, and max_matches_per_file.
+- Always minimize wasted context window by aggressively scoping and limiting all of your ${GREP_TOOL_NAME} searches. e.g.: always pass total_max_matches, include, and max_matches_per_file.
+- Use names_only=true or max_matches_per_file=1 to find a list of files that contain a pattern.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in ${formattedFilenames} files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
