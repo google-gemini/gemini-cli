@@ -337,6 +337,12 @@ describe('AskUserTool', () => {
       expect(JSON.parse(result.llmContent as string)).toEqual({
         answers: { '0': 'Quick fix (Recommended)' },
       });
+      expect(result.data).toEqual({
+        ask_user_question_types: [QuestionType.CHOICE],
+        ask_user_dismissed: false,
+        ask_user_empty_submission: false,
+        ask_user_answer_count: 1,
+      });
     });
 
     it('should display message when user submits without answering', async () => {
@@ -368,6 +374,12 @@ describe('AskUserTool', () => {
         'User submitted without answering questions.',
       );
       expect(JSON.parse(result.llmContent as string)).toEqual({ answers: {} });
+      expect(result.data).toEqual({
+        ask_user_question_types: [QuestionType.CHOICE],
+        ask_user_dismissed: false,
+        ask_user_empty_submission: true,
+        ask_user_answer_count: 0,
+      });
     });
 
     it('should handle cancellation', async () => {
@@ -405,6 +417,10 @@ describe('AskUserTool', () => {
       expect(result.llmContent).toBe(
         'User dismissed ask_user dialog without answering.',
       );
+      expect(result.data).toEqual({
+        ask_user_question_types: [QuestionType.CHOICE],
+        ask_user_dismissed: true,
+      });
     });
   });
 });

@@ -315,6 +315,10 @@ export class ToolCallEvent implements BaseTelemetryEvent {
           };
         }
       }
+
+      if (call.status === 'success' && call.response.data) {
+        this.metadata = { ...this.metadata, ...call.response.data };
+      }
     } else {
       this.function_name = function_name as string;
       this.function_args = function_args!;

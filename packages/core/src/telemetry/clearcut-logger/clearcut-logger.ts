@@ -700,6 +700,13 @@ export class ClearcutLogger {
         user_removed_lines: EventMetadataKey.GEMINI_CLI_USER_REMOVED_LINES,
         user_added_chars: EventMetadataKey.GEMINI_CLI_USER_ADDED_CHARS,
         user_removed_chars: EventMetadataKey.GEMINI_CLI_USER_REMOVED_CHARS,
+        ask_user_question_types:
+          EventMetadataKey.GEMINI_CLI_ASK_USER_QUESTION_TYPES,
+        ask_user_dismissed: EventMetadataKey.GEMINI_CLI_ASK_USER_DISMISSED,
+        ask_user_empty_submission:
+          EventMetadataKey.GEMINI_CLI_ASK_USER_EMPTY_SUBMISSION,
+        ask_user_answer_count:
+          EventMetadataKey.GEMINI_CLI_ASK_USER_ANSWER_COUNT,
       };
 
       for (const [key, gemini_cli_key] of Object.entries(metadataMapping)) {
@@ -1622,6 +1629,10 @@ export class ClearcutLogger {
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_INTERACTIVE,
         value: this.config?.isInteractive().toString() ?? 'false',
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_ACTIVE_APPROVAL_MODE,
+        value: this.config?.getPolicyEngine().getApprovalMode() ?? '',
       },
     ];
     if (this.config?.getExperiments()) {
