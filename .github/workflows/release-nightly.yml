@@ -91,7 +91,7 @@ jobs:
         id: 'nightly_version'
         working-directory: './release'
         env:
-          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          GH_TOKEN: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
         run: |
           # Calculate the version using the centralized script
           VERSION_JSON=$(node scripts/get-release-version.js --type=nightly)
@@ -123,7 +123,7 @@ jobs:
           wombat-token-core: '${{ secrets.WOMBAT_TOKEN_CORE }}'
           wombat-token-cli: '${{ secrets.WOMBAT_TOKEN_CLI }}'
           wombat-token-a2a-server: '${{ secrets.WOMBAT_TOKEN_A2A_SERVER }}'
-          github-token: '${{ secrets.GITHUB_TOKEN }}'
+          github-token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
           dry-run: '${{ steps.vars.outputs.is_dry_run }}'
           previous-tag: '${{ steps.nightly_version.outputs.PREVIOUS_TAG }}'
           working-directory: './release'
@@ -151,7 +151,7 @@ jobs:
       - name: 'Create Issue on Failure'
         if: "${{ failure() && github.event.inputs.environment != 'dev' && (github.event_name == 'schedule' || github.event.inputs.dry_run != 'true') }}"
         env:
-          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          GITHUB_TOKEN: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
           RELEASE_TAG: '${{ steps.nightly_version.outputs.RELEASE_TAG }}'
           DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
         run: |
