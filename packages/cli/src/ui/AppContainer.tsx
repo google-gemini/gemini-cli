@@ -101,6 +101,7 @@ import { type LoadableSettingScope, SettingScope } from '../config/settings.js';
 import { type InitializationResult } from '../core/initializer.js';
 import { useFocus } from './hooks/useFocus.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
+import { KeypressPriority } from './contexts/KeypressContext.js';
 import { keyMatchers, Command } from './keyMatchers.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useShellInactivityStatus } from './hooks/useShellInactivityStatus.js';
@@ -363,7 +364,9 @@ export const AppContainer = (props: AppContainerProps) => {
     (async () => {
       // Note: the program will not work if this fails so let errors be
       // handled by the global catch.
-      await config.initialize();
+      if (!config.isInitialized()) {
+        await config.initialize();
+      }
       setConfigInitialized(true);
       startupProfiler.flush(config);
 
@@ -1481,13 +1484,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const handleGlobalKeypress = useCallback(
     (key: Key): boolean => {
-      if (copyModeEnabled) {
-        setCopyModeEnabled(false);
-        enableMouseEvents();
-        // We don't want to process any other keys if we're in copy mode.
-        return true;
-      }
-
       // Debug log keystrokes if enabled
       if (settings.merged.general.debugKeystrokeLogging) {
         debugLogger.log('[DEBUG] Keystroke:', JSON.stringify(key));
@@ -1525,6 +1521,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
             );
             await toggleDevToolsPanel(
               config,
+              showErrorDetails,
               () => setShowErrorDetails((prev) => !prev),
               () => setShowErrorDetails(true),
             );
@@ -1654,7 +1651,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       settings.merged.general.debugKeystrokeLogging,
       refreshStatic,
       setCopyModeEnabled,
-      copyModeEnabled,
       isAlternateBuffer,
       backgroundCurrentShell,
       toggleBackgroundShell,
@@ -1665,10 +1661,25 @@ Logging in with Google... Restarting Gemini CLI to continue.
       tabFocusTimeoutRef,
       showTransientMessage,
       settings.merged.general.devtools,
+      showErrorDetails,
     ],
   );
 
   useKeypress(handleGlobalKeypress, { isActive: true, priority: true });
+
+  useKeypress(
+    () => {
+      setCopyModeEnabled(false);
+      enableMouseEvents();
+      return true;
+    },
+    {
+      isActive: copyModeEnabled,
+      // We need to receive keypresses first so they do not bubble to other
+      // handlers.
+      priority: KeypressPriority.Critical,
+    },
+  );
 
   useEffect(() => {
     // Respect hideWindowTitle settings
