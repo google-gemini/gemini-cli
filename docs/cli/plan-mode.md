@@ -28,9 +28,9 @@ implementation strategy.
 - [How to use Plan Mode](#how-to-use-plan-mode)
   - [Entering Plan Mode](#entering-plan-mode)
   - [The Planning Workflow](#the-planning-workflow)
-  - [Customizing Planning with Skills](#customizing-planning-with-skills)
   - [Exiting Plan Mode](#exiting-plan-mode)
 - [Tool Restrictions](#tool-restrictions)
+  - [Customizing Planning with Skills](#customizing-planning-with-skills)
 
 ## Starting in Plan Mode
 
@@ -77,6 +77,30 @@ You can enter Plan Mode in three ways:
       Auto-Edit or Default approval mode).
     - **Iterate:** Provide feedback to refine the plan.
 
+### Exiting Plan Mode
+
+To exit Plan Mode:
+
+1. **Keyboard Shortcut:** Press `Shift+Tab` to cycle to the desired mode.
+1. **Tool:** The agent calls the `exit_plan_mode` tool to present the finalized
+   plan for your approval.
+
+## Tool Restrictions
+
+Plan Mode enforces strict safety policies to prevent accidental changes.
+
+These are the only allowed tools:
+
+- **FileSystem (Read):** [`read_file`], [`list_directory`], [`glob`]
+- **Search:** [`grep_search`], [`google_web_search`]
+- **Interaction:** `ask_user`
+- **MCP Tools (Read):** Read-only [MCP tools] (e.g., `github_read_issue`,
+  `postgres_read_schema`) are allowed.
+- **Planning (Write):** [`write_file`] and [`replace`] ONLY allowed for `.md`
+  files in the `~/.gemini/tmp/<project>/plans/` directory.
+- **Skills:** [`activate_skill`] (allows loading specialized instructions and
+  resources in a read-only manner)
+
 ### Customizing Planning with Skills
 
 You can leverage [Agent Skills](./skills.md) to customize how Gemini CLI
@@ -96,30 +120,6 @@ For example:
 To use a skill in Plan Mode, you can explicitly ask the agent to "use the
 [skill-name] skill to plan..." or the agent may autonomously activate it based
 on the task description.
-
-### Exiting Plan Mode
-
-To exit Plan Mode:
-
-1. **Keyboard Shortcut:** Press `Shift+Tab` to cycle to the desired mode.
-1. **Tool:** The agent calls the `exit_plan_mode` tool to present the finalized
-   plan for your approval.
-
-## Tool Restrictions
-
-Plan Mode enforces strict safety policies to prevent accidental changes.
-
-These are the only allowed tools:
-
-- **FileSystem (Read):** [`read_file`], [`list_directory`], [`glob`]
-- **Search:** [`grep_search`], [`google_web_search`]
-- **Skills:** [`activate_skill`] (allows loading specialized instructions and
-  resources in a read-only manner)
-- **Interaction:** `ask_user`
-- **MCP Tools (Read):** Read-only [MCP tools] (e.g., `github_read_issue`,
-  `postgres_read_schema`) are allowed.
-- **Planning (Write):** [`write_file`] and [`replace`] ONLY allowed for `.md`
-  files in the `~/.gemini/tmp/<project>/plans/` directory.
 
 [`list_directory`]: /docs/tools/file-system.md#1-list_directory-readfolder
 [`read_file`]: /docs/tools/file-system.md#2-read_file-readfile
