@@ -2095,7 +2095,7 @@ describe('PolicyEngine', () => {
           priority: 60,
           modes: [ApprovalMode.PLAN],
           denyMessage:
-            'You are in Plan Mode - adjust your prompt to only use read and search tools. Execution of scripts (including those from skills) is blocked.',
+            'You are in Plan Mode with access to read-only tools. Execution of scripts (including those from skills) is blocked.',
         },
         {
           toolName: 'activate_skill',
