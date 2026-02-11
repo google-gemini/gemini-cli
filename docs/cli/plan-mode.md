@@ -30,6 +30,7 @@ implementation strategy.
   - [The Planning Workflow](#the-planning-workflow)
   - [Exiting Plan Mode](#exiting-plan-mode)
 - [Tool Restrictions](#tool-restrictions)
+  - [Customizing Policies](#customizing-policies)
 
 ## Starting in Plan Mode
 
@@ -98,6 +99,53 @@ These are the only allowed tools:
 - **Planning (Write):** [`write_file`] and [`replace`] ONLY allowed for `.md`
   files in the `~/.gemini/tmp/<project>/plans/` directory.
 
+### Customizing Policies
+
+Plan Mode is designed to be read-only by default to ensure safety during the
+research phase. However, you may occasionally need to allow specific tools to
+assist in your planning.
+
+Because user policies (Tier 2) have a higher base priority than built-in
+policies (Tier 1), you can override Plan Mode's default restrictions by creating
+a rule in your `~/.gemini/policies/` directory.
+
+#### Example: Allow `git status` and `git diff` in Plan Mode
+
+This rule allows you to check the repository status and see changes while in
+Plan Mode.
+
+`~/.gemini/policies/git-research.toml`
+
+```toml
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = ["git status", "git diff"]
+decision = "allow"
+priority = 100
+modes = ["plan"]
+```
+
+#### Example: Enable research sub-agents in Plan Mode
+
+You can enable [experimental research sub-agents] like `codebase_investigator`
+to help gather architecture details during the planning phase.
+
+`~/.gemini/policies/research-subagents.toml`
+
+```toml
+[[rule]]
+toolName = "codebase_investigator"
+decision = "allow"
+priority = 100
+modes = ["plan"]
+```
+
+Tell the agent it can use these tools in your prompt, for example: _"You can
+check ongoing changes in git."_
+
+For more information on how the policy engine works, see the [Policy Engine
+Guide].
+
 [`list_directory`]: /docs/tools/file-system.md#1-list_directory-readfolder
 [`read_file`]: /docs/tools/file-system.md#2-read_file-readfile
 [`grep_search`]: /docs/tools/file-system.md#5-grep_search-searchtext
@@ -106,3 +154,5 @@ These are the only allowed tools:
 [`google_web_search`]: /docs/tools/web-search.md
 [`replace`]: /docs/tools/file-system.md#6-replace-edit
 [MCP tools]: /docs/tools/mcp-server.md
+[experimental research sub-agents]: /docs/core/subagents.md
+[Policy Engine Guide]: /docs/core/policy-engine.md
