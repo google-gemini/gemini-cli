@@ -128,6 +128,9 @@ export class LoadedTrustedFolders {
     location: string,
     config?: Record<string, TrustLevel>,
   ): boolean | undefined {
+    if (isHeadlessMode()) {
+      return true;
+    }
     const configToUse = config ?? this.user.config;
 
     // Resolve location to its realpath for canonical comparison
