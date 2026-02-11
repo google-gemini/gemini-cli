@@ -1623,7 +1623,7 @@ describe('mcp-client', () => {
         {
           command: 'test-command',
           args: ['--foo', 'bar'],
-          env: { GEMINI_CLI_FOO: 'bar' },
+          env: { FOO: 'bar' },
           cwd: 'test/cwd',
         },
         false,
@@ -1634,7 +1634,7 @@ describe('mcp-client', () => {
         command: 'test-command',
         args: ['--foo', 'bar'],
         cwd: 'test/cwd',
-        env: expect.objectContaining({ GEMINI_CLI_FOO: 'bar' }),
+        env: expect.objectContaining({ FOO: 'bar' }),
         stderr: 'pipe',
       });
     });

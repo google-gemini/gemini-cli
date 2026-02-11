@@ -63,11 +63,12 @@ You can enter Plan Mode in three ways:
 1.  **Keyboard Shortcut:** Press `Shift+Tab` to cycle through approval modes
     (`Default` -> `Plan` -> `Auto-Edit`).
 2.  **Command:** Type `/plan` in the input box.
-3.  **Natural Language:** Ask the agent to "start a plan for...".
+3.  **Natural Language:** Ask the agent to "start a plan for...". The agent will
+    then call the [`enter_plan_mode`] tool to switch modes.
 
 ### The Planning Workflow
 
-1.  **Requirements:** The agent clarifies goals using `ask_user`.
+1.  **Requirements:** The agent clarifies goals using [`ask_user`].
 2.  **Exploration:** The agent uses read-only tools (like [`read_file`]) to map
     the codebase and validate assumptions.
 3.  **Design:** The agent proposes alternative approaches with a recommended
@@ -83,8 +84,8 @@ You can enter Plan Mode in three ways:
 To exit Plan Mode:
 
 1. **Keyboard Shortcut:** Press `Shift+Tab` to cycle to the desired mode.
-1. **Tool:** The agent calls the `exit_plan_mode` tool to present the finalized
-   plan for your approval.
+2. **Tool:** The agent calls the [`exit_plan_mode`] tool to present the
+   finalized plan for your approval.
 
 ## Tool Restrictions
 
@@ -94,7 +95,7 @@ These are the only allowed tools:
 
 - **FileSystem (Read):** [`read_file`], [`list_directory`], [`glob`]
 - **Search:** [`grep_search`], [`google_web_search`]
-- **Interaction:** `ask_user`
+- **Interaction:** [`ask_user`]
 - **MCP Tools (Read):** Read-only [MCP tools] (e.g., `github_read_issue`,
   `postgres_read_schema`) are allowed.
 - **Planning (Write):** [`write_file`] and [`replace`] ONLY allowed for `.md`
@@ -180,3 +181,6 @@ Guide].
 [`activate_skill`]: /docs/cli/skills.md
 [experimental research sub-agents]: /docs/core/subagents.md
 [Policy Engine Guide]: /docs/core/policy-engine.md
+[`enter_plan_mode`]: /docs/tools/planning.md#1-enter_plan_mode-enterplanmode
+[`exit_plan_mode`]: /docs/tools/planning.md#2-exit_plan_mode-exitplanmode
+[`ask_user`]: /docs/tools/ask-user.md

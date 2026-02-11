@@ -34,11 +34,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { ApprovalMode, PolicyDecision } from '../policy/types.js';
 import { parse } from 'shell-quote';
-import type {
-  Config,
-  GeminiCLIExtension,
-  MCPServerConfig,
-} from '../config/config.js';
+import type { Config, MCPServerConfig } from '../config/config.js';
 import { AuthProviderType } from '../config/config.js';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { ServiceAccountImpersonationProvider } from '../mcp/sa-impersonation-provider.js';
@@ -1905,26 +1901,13 @@ export async function createTransport(
     let transport: Transport = new StdioClientTransport({
       command: mcpServerConfig.command,
       args: mcpServerConfig.args || [],
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      env: sanitizeEnvironment(
-        {
-          ...process.env,
-          ...getExtensionEnvironment(mcpServerConfig.extension),
-          ...(mcpServerConfig.env || {}),
-          [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
-            GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
-        },
-        {
-          ...sanitizationConfig,
-          allowedEnvironmentVariables: [
-            ...(sanitizationConfig.allowedEnvironmentVariables ?? []),
-            ...(mcpServerConfig.extension?.resolvedSettings?.map(
-              (s) => s.envVar,
-            ) ?? []),
-          ],
-          enableEnvironmentVariableRedaction: true,
-        },
-      ) as Record<string, string>,
+       
+      env: {
+        ...sanitizeEnvironment(process.env, sanitizationConfig),
+        ...(mcpServerConfig.env || {}),
+        [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
+          GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
+      } as Record<string, string>,
       cwd: mcpServerConfig.cwd,
       stderr: 'pipe',
     });
@@ -1998,18 +1981,4 @@ export function isEnabled(
       (tool) => tool === funcDecl.name || tool.startsWith(`${funcDecl.name}(`),
     )
   );
-}
-
-function getExtensionEnvironment(
-  extension?: GeminiCLIExtension,
-): Record<string, string> {
-  const env: Record<string, string> = {};
-  if (extension?.resolvedSettings) {
-    for (const setting of extension.resolvedSettings) {
-      if (setting.value) {
-        env[setting.envVar] = setting.value;
-      }
-    }
-  }
-  return env;
 }
