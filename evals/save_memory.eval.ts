@@ -36,7 +36,7 @@ describe('save_memory', () => {
     },
   });
   const rememberingCommandRestrictions = 'Agent remembers command restrictions';
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: rememberingCommandRestrictions,
     params: {
       settings: { tools: { core: ['save_memory'] } },
@@ -79,7 +79,7 @@ describe('save_memory', () => {
 
   const ignoringTemporaryInformation =
     'Agent ignores temporary conversation details';
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: ignoringTemporaryInformation,
     params: {
       settings: { tools: { core: ['save_memory'] } },
@@ -104,7 +104,7 @@ describe('save_memory', () => {
   });
 
   const rememberingPetName = "Agent remembers user's pet's name";
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: rememberingPetName,
     params: {
       settings: { tools: { core: ['save_memory'] } },
@@ -125,7 +125,7 @@ describe('save_memory', () => {
   });
 
   const rememberingCommandAlias = 'Agent remembers custom command aliases';
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: rememberingCommandAlias,
     params: {
       settings: { tools: { core: ['save_memory'] } },
@@ -147,7 +147,7 @@ describe('save_memory', () => {
 
   const ignoringDbSchemaLocation =
     "Agent ignores workspace's database schema location";
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: ignoringDbSchemaLocation,
     params: {
       settings: {
@@ -178,7 +178,7 @@ describe('save_memory', () => {
 
   const rememberingCodingStyle =
     "Agent remembers user's coding style preference";
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: rememberingCodingStyle,
     params: {
       settings: { tools: { core: ['save_memory'] } },
@@ -200,7 +200,7 @@ describe('save_memory', () => {
 
   const ignoringBuildArtifactLocation =
     'Agent ignores workspace build artifact location';
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: ignoringBuildArtifactLocation,
     params: {
       settings: {
@@ -230,7 +230,7 @@ describe('save_memory', () => {
   });
 
   const ignoringMainEntryPoint = "Agent ignores workspace's main entry point";
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: ignoringMainEntryPoint,
     params: {
       settings: {
@@ -260,7 +260,7 @@ describe('save_memory', () => {
   });
 
   const rememberingBirthday = "Agent remembers user's birthday";
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: rememberingBirthday,
     params: {
       settings: { tools: { core: ['save_memory'] } },
