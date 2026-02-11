@@ -92,6 +92,7 @@ import {
   HookCallEvent,
   EVENT_HOOK_CALL,
 } from './types.js';
+import { HookType } from '../hooks/types.js';
 import * as metrics from './metrics.js';
 import { FileOperation } from './metrics.js';
 import * as sdk from './sdk.js';
@@ -2210,7 +2211,7 @@ describe('loggers', () => {
     it('should log hook call event to Clearcut and OTEL', () => {
       const event = new HookCallEvent(
         'before-tool',
-        'command',
+        HookType.Command,
         '/path/to/script.sh',
         { arg: 'val' },
         150,

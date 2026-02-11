@@ -8,7 +8,7 @@ import type { Config } from '../config/config.js';
 import type { HookPlanner, HookEventContext } from './hookPlanner.js';
 import type { HookRunner } from './hookRunner.js';
 import type { HookAggregator, AggregatedHookResult } from './hookAggregator.js';
-import { HookEventName } from './types.js';
+import { HookEventName, HookType } from './types.js';
 import type {
   HookConfig,
   HookInput,
@@ -492,7 +492,10 @@ export class HookEventHandler {
    * Get hook name from config for display or telemetry
    */
   private getHookName(config: HookConfig): string {
-    return config.name || config.command || 'unknown-command';
+    if (config.type === HookType.Command) {
+      return config.name || config.command || 'unknown-command';
+    }
+    return config.name || 'unknown-hook';
   }
 
   /**
@@ -505,7 +508,7 @@ export class HookEventHandler {
   /**
    * Get hook type from execution result for telemetry
    */
-  private getHookTypeFromResult(result: HookExecutionResult): 'command' {
+  private getHookTypeFromResult(result: HookExecutionResult): HookType {
     return result.hookConfig.type;
   }
 }

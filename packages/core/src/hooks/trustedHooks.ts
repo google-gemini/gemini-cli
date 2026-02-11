@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import { Storage } from '../config/storage.js';
 import {
   getHookKey,
+  HookType,
   type HookDefinition,
   type HookEventName,
 } from './types.js';
@@ -78,6 +79,7 @@ export class TrustedHooksManager {
       for (const def of definitions) {
         if (!def || !Array.isArray(def.hooks)) continue;
         for (const hook of def.hooks) {
+          if (hook.type === HookType.Runtime) continue;
           const key = getHookKey(hook);
           if (!trustedKeys.has(key)) {
             // Return friendly name or command
@@ -107,6 +109,7 @@ export class TrustedHooksManager {
       for (const def of definitions) {
         if (!def || !Array.isArray(def.hooks)) continue;
         for (const hook of def.hooks) {
+          if (hook.type === HookType.Runtime) continue;
           currentTrusted.add(getHookKey(hook));
         }
       }

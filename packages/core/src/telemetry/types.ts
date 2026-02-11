@@ -40,6 +40,7 @@ import {
 } from './semantic.js';
 import { sanitizeHookName } from './sanitize.js';
 import { getFileDiffFromResultDisplay } from '../utils/fileDiffUtils.js';
+import type { HookType } from '../hooks/types.js';
 
 export interface BaseTelemetryEvent {
   'event.name': string;
@@ -2028,7 +2029,7 @@ export class HookCallEvent implements BaseTelemetryEvent {
   'event.name': string;
   'event.timestamp': string;
   hook_event_name: string;
-  hook_type: 'command';
+  hook_type: HookType;
   hook_name: string;
   hook_input: Record<string, unknown>;
   hook_output?: Record<string, unknown>;
@@ -2041,7 +2042,7 @@ export class HookCallEvent implements BaseTelemetryEvent {
 
   constructor(
     hookEventName: string,
-    hookType: 'command',
+    hookType: HookType,
     hookName: string,
     hookInput: Record<string, unknown>,
     durationMs: number,
