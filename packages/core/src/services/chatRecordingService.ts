@@ -330,7 +330,8 @@ export class ChatRecordingService {
       return {
         ...toolCall,
         displayName: toolInstance?.displayName || toolCall.name,
-        description: toolCall.description || toolInstance?.description || '',
+        description:
+          toolCall.description?.trim() || toolInstance?.description || '',
         renderOutputAsMarkdown: toolInstance?.isOutputMarkdown || false,
       };
     });

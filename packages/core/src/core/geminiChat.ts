@@ -975,9 +975,7 @@ export class GeminiChat {
         timestamp: new Date().toISOString(),
         resultDisplay,
         description:
-          'invocation' in call && call.invocation
-            ? call.invocation.getDescription()
-            : JSON.stringify(call.request.args),
+          'invocation' in call ? call.invocation?.getDescription() : undefined,
       };
     });
 
