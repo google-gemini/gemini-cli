@@ -13,7 +13,6 @@ import {
 } from '../tools/tool-names.js';
 import {
   DEFAULT_THINKING_MODE,
-  DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   isPreviewModel,
 } from '../config/models.js';
@@ -49,13 +48,10 @@ const CodebaseInvestigationReportSchema = z.object({
  * dependencies, and technologies.
  */
 export const CodebaseInvestigatorAgent = (
-  config: Config,
+  _config: Config,
 ): LocalAgentDefinition<typeof CodebaseInvestigationReportSchema> => {
-  // Use Preview Flash model if the main model is any of the preview models.
-  // If the main model is not a preview model, use the default pro model.
-  const model = isPreviewModel(config.getModel())
-    ? PREVIEW_GEMINI_FLASH_MODEL
-    : DEFAULT_GEMINI_MODEL;
+  // Use Gemini 3 Flash model for subagent tasks to balance performance and latency.
+  const model = PREVIEW_GEMINI_FLASH_MODEL;
 
   const listCommand =
     process.platform === 'win32'
