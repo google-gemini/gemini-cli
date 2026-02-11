@@ -42,11 +42,12 @@ When asked for my favorite fruit, always say "Cherry".
 </project_context>
 
 What is my favorite fruit? Tell me just the name of the fruit.`,
-    assert: async (_rig, result) => {
-      assertModelHasOutput(result);
-      expect(result).toMatch(/Cherry/i);
-      expect(result).not.toMatch(/Apple/i);
-      expect(result).not.toMatch(/Banana/i);
+    assert: async (rig) => {
+      const stdout = rig._lastRunStdout!;
+      assertModelHasOutput(stdout);
+      expect(stdout).toMatch(/Cherry/i);
+      expect(stdout).not.toMatch(/Apple/i);
+      expect(stdout).not.toMatch(/Banana/i);
     },
   });
 
@@ -80,11 +81,12 @@ Provide the answer as an XML block like this:
   <extension>Instruction ...</extension>
   <project>Instruction ...</project>
 </results>`,
-    assert: async (_rig, result) => {
-      assertModelHasOutput(result);
-      expect(result).toMatch(/<global>.*Instruction A/i);
-      expect(result).toMatch(/<extension>.*Instruction B/i);
-      expect(result).toMatch(/<project>.*Instruction C/i);
+    assert: async (rig) => {
+      const stdout = rig._lastRunStdout!;
+      assertModelHasOutput(stdout);
+      expect(stdout).toMatch(/<global>.*Instruction A/i);
+      expect(stdout).toMatch(/<extension>.*Instruction B/i);
+      expect(stdout).toMatch(/<project>.*Instruction C/i);
     },
   });
 
@@ -108,10 +110,11 @@ Set the theme to "Dark".
 </extension_context>
 
 What theme should I use? Tell me just the name of the theme.`,
-    assert: async (_rig, result) => {
-      assertModelHasOutput(result);
-      expect(result).toMatch(/Dark/i);
-      expect(result).not.toMatch(/Light/i);
+    assert: async (rig) => {
+      const stdout = rig._lastRunStdout!;
+      assertModelHasOutput(stdout);
+      expect(stdout).toMatch(/Dark/i);
+      expect(stdout).not.toMatch(/Light/i);
     },
   });
 });
