@@ -186,6 +186,9 @@ describe('SettingsSchema', () => {
       expect(getSettingsSchema().ui.properties.hideTips.showInDialog).toBe(
         true,
       );
+      expect(
+        getSettingsSchema().ui.properties.showShortcutsHint.showInDialog,
+      ).toBe(true);
       expect(getSettingsSchema().ui.properties.hideBanner.showInDialog).toBe(
         true,
       );
@@ -224,7 +227,7 @@ describe('SettingsSchema', () => {
       expect(
         getSettingsSchema().advanced.properties.autoConfigureMemory
           .showInDialog,
-      ).toBe(false);
+      ).toBe(true);
     });
 
     it('should infer Settings type correctly', () => {
@@ -328,6 +331,28 @@ describe('SettingsSchema', () => {
       ).toBe('Enable debug logging of keystrokes to the console.');
     });
 
+    it('should have showShortcutsHint setting in schema', () => {
+      expect(getSettingsSchema().ui.properties.showShortcutsHint).toBeDefined();
+      expect(getSettingsSchema().ui.properties.showShortcutsHint.type).toBe(
+        'boolean',
+      );
+      expect(getSettingsSchema().ui.properties.showShortcutsHint.category).toBe(
+        'UI',
+      );
+      expect(getSettingsSchema().ui.properties.showShortcutsHint.default).toBe(
+        true,
+      );
+      expect(
+        getSettingsSchema().ui.properties.showShortcutsHint.requiresRestart,
+      ).toBe(false);
+      expect(
+        getSettingsSchema().ui.properties.showShortcutsHint.showInDialog,
+      ).toBe(true);
+      expect(
+        getSettingsSchema().ui.properties.showShortcutsHint.description,
+      ).toBe('Show the "? for shortcuts" hint above the input.');
+    });
+
     it('should have enableAgents setting in schema', () => {
       const setting = getSettingsSchema().experimental.properties.enableAgents;
       expect(setting).toBeDefined();
@@ -362,20 +387,6 @@ describe('SettingsSchema', () => {
       expect(setting.showInDialog).toBe(true);
       expect(setting.description).toBe(
         'Enable planning features (Plan Mode and tools).',
-      );
-    });
-
-    it('should have enableEventDrivenScheduler setting in schema', () => {
-      const setting =
-        getSettingsSchema().experimental.properties.enableEventDrivenScheduler;
-      expect(setting).toBeDefined();
-      expect(setting.type).toBe('boolean');
-      expect(setting.category).toBe('Experimental');
-      expect(setting.default).toBe(true);
-      expect(setting.requiresRestart).toBe(true);
-      expect(setting.showInDialog).toBe(false);
-      expect(setting.description).toBe(
-        'Enables event-driven scheduler within the CLI session.',
       );
     });
 

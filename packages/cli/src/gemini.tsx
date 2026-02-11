@@ -518,11 +518,11 @@ export async function main() {
 
     adminControlsListner.setConfig(config);
 
-    if (config.isInteractive() && config.getDebugMode()) {
-      const { registerActivityLogger } = await import(
-        './utils/activityLogger.js'
+    if (config.isInteractive() && settings.merged.general.devtools) {
+      const { setupInitialActivityLogger } = await import(
+        './utils/devtoolsService.js'
       );
-      registerActivityLogger(config);
+      await setupInitialActivityLogger(config);
     }
 
     // Register config for telemetry shutdown
@@ -603,12 +603,13 @@ export async function main() {
       }
 
       // This cleanup isn't strictly needed but may help in certain situations.
-      process.on('SIGTERM', () => {
+      const restoreRawMode = () => {
         process.stdin.setRawMode(wasRaw);
-      });
-      process.on('SIGINT', () => {
-        process.stdin.setRawMode(wasRaw);
-      });
+      };
+      process.off('SIGTERM', restoreRawMode);
+      process.on('SIGTERM', restoreRawMode);
+      process.off('SIGINT', restoreRawMode);
+      process.on('SIGINT', restoreRawMode);
     }
 
     await setupTerminalAndTheme(config, settings);
@@ -819,6 +820,7 @@ function setupAdminControlsListener() {
   let config: Config | undefined;
 
   const messageHandler = (msg: unknown) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const message = msg as {
       type?: string;
       settings?: AdminControlsSettings;
