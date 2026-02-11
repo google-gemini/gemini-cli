@@ -346,6 +346,8 @@ export class SchedulerStateManager {
     response: ToolCallResponseInfo,
   ): ErroredToolCall {
     const startTime = 'startTime' in call ? call.startTime : undefined;
+    const confirmationDetails =
+      'confirmationDetails' in call ? call.confirmationDetails : undefined;
     return {
       request: call.request,
       status: 'error',
@@ -353,6 +355,7 @@ export class SchedulerStateManager {
       response,
       durationMs: startTime ? Date.now() - startTime : undefined,
       outcome: call.outcome,
+      confirmationDetails,
       schedulerId: call.schedulerId,
     };
   }
@@ -415,6 +418,8 @@ export class SchedulerStateManager {
   private toCancelled(call: ToolCall, reason: string): CancelledToolCall {
     this.validateHasToolAndInvocation(call, 'cancelled');
     const startTime = 'startTime' in call ? call.startTime : undefined;
+    const confirmationDetails =
+      'confirmationDetails' in call ? call.confirmationDetails : undefined;
 
     // TODO: Refactor this tool-specific logic into the confirmation details payload.
     // See: https://github.com/google-gemini/gemini-cli/issues/16716
@@ -463,6 +468,7 @@ export class SchedulerStateManager {
       },
       durationMs: startTime ? Date.now() - startTime : undefined,
       outcome: call.outcome,
+      confirmationDetails,
       schedulerId: call.schedulerId,
     };
   }

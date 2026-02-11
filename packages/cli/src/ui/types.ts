@@ -15,11 +15,23 @@ import type {
   RetrieveUserQuotaResponse,
   SkillDefinition,
   AgentDefinition,
+  GrepResult,
+  ListDirectoryResult,
+  ReadManyFilesResult,
+  FileDiff,
 } from '@google/gemini-cli-core';
 import type { PartListUnion } from '@google/genai';
 import { type ReactNode } from 'react';
 
-export type { ThoughtSummary, SkillDefinition, ToolResultDisplay };
+export type {
+  ThoughtSummary,
+  SkillDefinition,
+  ToolResultDisplay,
+  GrepResult,
+  ListDirectoryResult,
+  ReadManyFilesResult,
+  FileDiff,
+};
 
 export enum AuthState {
   // Attempting to authenticate or re-authenticate

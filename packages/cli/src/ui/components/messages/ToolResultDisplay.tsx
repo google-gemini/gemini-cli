@@ -82,10 +82,26 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   );
 
   const truncatedResultDisplay = React.useMemo(() => {
+    // Helper to handle structured objects that should be displayed as strings
+    // in the main view (grep, ls, read-many-files).
+    let displayContent: string | object | undefined = resultDisplay;
+
+    if (typeof resultDisplay === 'object' && resultDisplay !== null) {
+      // Use a type-safe check for structured results that contain a summary
+      // (e.g. GrepResult, ListDirectoryResult, ReadManyFilesResult)
+      const hasSummary = (obj: object): obj is { summary: string } =>
+        'summary' in obj &&
+        typeof (obj as { summary?: unknown }).summary === 'string';
+
+      if (hasSummary(resultDisplay)) {
+        displayContent = resultDisplay.summary;
+      }
+    }
+
     // Only truncate string output if not in alternate buffer mode to ensure
     // we can scroll through the full output.
-    if (typeof resultDisplay === 'string' && !isAlternateBuffer) {
-      let text = resultDisplay;
+    if (typeof displayContent === 'string' && !isAlternateBuffer) {
+      let text = displayContent;
       if (text.length > MAXIMUM_RESULT_DISPLAY_CHARACTERS) {
         text = '...' + text.slice(-MAXIMUM_RESULT_DISPLAY_CHARACTERS);
       }
@@ -101,7 +117,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
       }
       return text;
     }
-    return resultDisplay;
+    return displayContent;
   }, [resultDisplay, isAlternateBuffer, maxLines]);
 
   if (!truncatedResultDisplay) return null;

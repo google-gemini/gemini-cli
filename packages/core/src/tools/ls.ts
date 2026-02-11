@@ -254,7 +254,12 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
 
       return {
         llmContent: resultMessage,
-        returnDisplay: displayMessage,
+        returnDisplay: {
+          summary: displayMessage,
+          files: entries.map(
+            (entry) => `${entry.isDirectory ? '[DIR] ' : ''}${entry.name}`,
+          ),
+        },
       };
     } catch (error) {
       const errorMsg = `Error listing directory: ${error instanceof Error ? error.message : String(error)}`;

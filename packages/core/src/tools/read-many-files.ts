@@ -5,7 +5,11 @@
  */
 
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import type { ToolInvocation, ToolResult } from './tools.js';
+import type {
+  ToolInvocation,
+  ToolResult,
+  ReadManyFilesResult,
+} from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { getErrorMessage } from '../utils/errors.js';
 import * as fsPromises from 'node:fs/promises';
@@ -441,9 +445,22 @@ ${finalExclusionPatternsForDescription
         'No files matching the criteria were found or all were skipped.',
       );
     }
+
+    const returnDisplay: ReadManyFilesResult = {
+      summary:
+        processedFilesRelativePaths.length > 0
+          ? `Read ${processedFilesRelativePaths.length} file(s)`
+          : 'No files read',
+      files: processedFilesRelativePaths,
+      skipped: skippedFiles,
+      include: this.params.include,
+      excludes: effectiveExcludes,
+      targetDir: this.config.getTargetDir(),
+    };
+
     return {
       llmContent: contentParts,
-      returnDisplay: displayMessage.trim(),
+      returnDisplay,
     };
   }
 }

@@ -687,6 +687,14 @@ class EditToolInvocation
       'Proposed',
       DEFAULT_DIFF_OPTIONS,
     );
+
+    const diffStat = getDiffStat(
+      fileName,
+      editData.currentContent ?? '',
+      editData.newContent,
+      this.params.new_string,
+    );
+
     const ideClient = await IdeClient.getInstance();
     const ideConfirmation =
       this.config.getIdeMode() && ideClient.isDiffingEnabled()
@@ -701,6 +709,7 @@ class EditToolInvocation
       fileDiff,
       originalContent: editData.currentContent,
       newContent: editData.newContent,
+      diffStat,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
           // No need to publish a policy update as the default policy for

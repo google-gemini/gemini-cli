@@ -212,6 +212,15 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       DEFAULT_DIFF_OPTIONS,
     );
 
+    const originallyProposedContent =
+      this.params.ai_proposed_content || this.params.content;
+    const diffStat = getDiffStat(
+      fileName,
+      originalContent,
+      originallyProposedContent,
+      this.params.content,
+    );
+
     const ideClient = await IdeClient.getInstance();
     const ideConfirmation =
       this.config.getIdeMode() && ideClient.isDiffingEnabled()
@@ -226,6 +235,7 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       fileDiff,
       originalContent,
       newContent: correctedContent,
+      diffStat,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         if (outcome === ToolConfirmationOutcome.ProceedAlways) {
           // No need to publish a policy update as the default policy for

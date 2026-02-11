@@ -286,7 +286,14 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       return {
         llmContent: llmContent.trim(),
-        returnDisplay: `Found ${matchCount} ${matchTerm}${wasTruncated ? ' (limited)' : ''}`,
+        returnDisplay: {
+          summary: `Found ${matchCount} ${matchTerm}${wasTruncated ? ' (limited)' : ''}`,
+          matches: allMatches.map((m) => ({
+            filePath: m.filePath,
+            lineNumber: m.lineNumber,
+            line: m.line,
+          })),
+        },
       };
     } catch (error) {
       debugLogger.warn(`Error during GrepLogic execution: ${error}`);

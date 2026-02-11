@@ -6,6 +6,7 @@
 
 import { type FunctionCall } from '@google/genai';
 import type {
+  DiffStat,
   ToolConfirmationOutcome,
   ToolConfirmationPayload,
 } from '../tools/tools.js';
@@ -79,6 +80,7 @@ export type SerializableConfirmationDetails =
       fileDiff: string;
       originalContent: string | null;
       newContent: string;
+      diffStat?: DiffStat;
       isModifying?: boolean;
     }
   | {

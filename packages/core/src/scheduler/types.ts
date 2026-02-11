@@ -71,6 +71,9 @@ export type ErroredToolCall = {
   tool?: AnyDeclarativeTool;
   durationMs?: number;
   outcome?: ToolConfirmationOutcome;
+  confirmationDetails?:
+    | ToolCallConfirmationDetails
+    | SerializableConfirmationDetails;
   schedulerId?: string;
 };
 
@@ -105,6 +108,9 @@ export type CancelledToolCall = {
   invocation: AnyToolInvocation;
   durationMs?: number;
   outcome?: ToolConfirmationOutcome;
+  confirmationDetails?:
+    | ToolCallConfirmationDetails
+    | SerializableConfirmationDetails;
   schedulerId?: string;
 };
 
