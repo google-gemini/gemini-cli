@@ -33,11 +33,7 @@ import {
   type Tool as McpTool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { parse } from 'shell-quote';
-import type {
-  Config,
-  GeminiCLIExtension,
-  MCPServerConfig,
-} from '../config/config.js';
+import type { Config, MCPServerConfig } from '../config/config.js';
 import { AuthProviderType } from '../config/config.js';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { ServiceAccountImpersonationProvider } from '../mcp/sa-impersonation-provider.js';
@@ -1875,6 +1871,7 @@ export async function createTransport(
     let transport: Transport = new StdioClientTransport({
       command: mcpServerConfig.command,
       args: mcpServerConfig.args || [],
+<<<<<<< HEAD
       env: sanitizeEnvironment(
         {
           ...process.env,
@@ -1892,6 +1889,13 @@ export async function createTransport(
           enableEnvironmentVariableRedaction: true,
         },
       ) as Record<string, string>,
+=======
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      env: {
+        ...sanitizeEnvironment(process.env, sanitizationConfig),
+        ...(mcpServerConfig.env || {}),
+      } as Record<string, string>,
+>>>>>>> e9a947481 (Revert unintended credentials exposure (#18840))
       cwd: mcpServerConfig.cwd,
       stderr: 'pipe',
     });
@@ -1965,18 +1969,4 @@ export function isEnabled(
       (tool) => tool === funcDecl.name || tool.startsWith(`${funcDecl.name}(`),
     )
   );
-}
-
-function getExtensionEnvironment(
-  extension?: GeminiCLIExtension,
-): Record<string, string> {
-  const env: Record<string, string> = {};
-  if (extension?.resolvedSettings) {
-    for (const setting of extension.resolvedSettings) {
-      if (setting.value) {
-        env[setting.envVar] = setting.value;
-      }
-    }
-  }
-  return env;
 }
