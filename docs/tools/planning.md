@@ -12,7 +12,7 @@ mode, the agent is restricted to read-only tools to allow for safe exploration
 and planning.
 
 - **Tool name:** `enter_plan_mode`
-- **Display name:** EnterPlanMode
+- **Display name:** Enter Plan Mode
 - **File:** `enter-plan-mode.ts`
 - **Parameters:**
   - `reason` (string, optional): A short reason explaining why the agent is
@@ -30,11 +30,11 @@ and planning.
 finalized plan to the user and requests approval to start the implementation.
 
 - **Tool name:** `exit_plan_mode`
-- **Display name:** ExitPlanMode
+- **Display name:** Exit Plan Mode
 - **File:** `exit-plan-mode.ts`
 - **Parameters:**
-  - `plan_path` (string, required): The absolute path to the finalized Markdown
-    plan file. This file MUST be located within the project's temporary plans
+  - `plan_path` (string, required): The path to the finalized Markdown plan
+    file. This file MUST be located within the project's temporary plans
     directory (e.g., `~/.gemini/tmp/<project>/plans/`).
 - **Behavior:**
   - Validates that the `plan_path` is within the allowed directory and that the
