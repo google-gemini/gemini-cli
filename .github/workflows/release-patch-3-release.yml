@@ -72,7 +72,7 @@ jobs:
       - name: 'configure .npmrc'
         uses: './.github/actions/setup-npmrc'
         with:
-          github-token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
 
       - name: 'Install Script Dependencies'
         run: |-
@@ -92,7 +92,7 @@ jobs:
       - name: 'Get Patch Version'
         id: 'patch_version'
         env:
-          GH_TOKEN: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           PATCH_FROM: '${{ github.event.inputs.type }}'
           CLI_PACKAGE_NAME: '${{vars.CLI_PACKAGE_NAME}}'
         run: |
@@ -113,7 +113,7 @@ jobs:
 
       - name: 'Verify Version Consistency'
         env:
-          GH_TOKEN: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           CHANNEL: '${{ github.event.inputs.type }}'
           ORIGINAL_RELEASE_VERSION: '${{ steps.patch_version.outputs.RELEASE_VERSION }}'
           ORIGINAL_RELEASE_TAG: '${{ steps.patch_version.outputs.RELEASE_TAG }}'
@@ -198,7 +198,7 @@ jobs:
       - name: 'Create Issue on Failure'
         if: '${{ failure() && github.event.inputs.dry_run == false }}'
         env:
-          GITHUB_TOKEN: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           RELEASE_TAG: '${{ steps.patch_version.outputs.RELEASE_TAG }}'
           DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
         run: |
@@ -210,7 +210,7 @@ jobs:
       - name: 'Comment Success on Original PR'
         if: '${{ success() && github.event.inputs.original_pr }}'
         env:
-          GITHUB_TOKEN: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           ORIGINAL_PR: '${{ github.event.inputs.original_pr }}'
           SUCCESS: 'true'
           RELEASE_VERSION: '${{ steps.patch_version.outputs.RELEASE_VERSION }}'
@@ -227,7 +227,7 @@ jobs:
       - name: 'Comment Failure on Original PR'
         if: '${{ failure() && github.event.inputs.original_pr }}'
         env:
-          GITHUB_TOKEN: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           ORIGINAL_PR: '${{ github.event.inputs.original_pr }}'
           SUCCESS: 'false'
           RELEASE_VERSION: '${{ steps.patch_version.outputs.RELEASE_VERSION }}'

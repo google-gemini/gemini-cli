@@ -76,7 +76,7 @@ jobs:
       - name: 'Calculate Versions and SHAs'
         id: 'versions'
         env:
-          GH_TOKEN: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           STABLE_OVERRIDE: '${{ github.event.inputs.stable_version_override }}'
           PREVIEW_OVERRIDE: '${{ github.event.inputs.preview_version_override }}'
           REF_INPUT: '${{ github.event.inputs.ref }}'
@@ -254,7 +254,7 @@ jobs:
       - name: 'Create Issue on Failure'
         if: '${{ failure() && github.event.inputs.dry_run == false }}'
         env:
-          GITHUB_TOKEN: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           RELEASE_TAG: 'v${{ needs.calculate-versions.outputs.PREVIEW_VERSION }}'
           DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
         run: |
@@ -320,7 +320,7 @@ jobs:
       - name: 'Create Issue on Failure'
         if: '${{ failure() && github.event.inputs.dry_run == false }}'
         env:
-          GITHUB_TOKEN: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           RELEASE_TAG: 'v${{ needs.calculate-versions.outputs.STABLE_VERSION }}'
           DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
         run: |
@@ -390,13 +390,13 @@ jobs:
           branch-name: '${{ steps.release_branch.outputs.BRANCH_NAME }}'
           pr-title: 'chore(release): bump version to ${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}'
           pr-body: 'Automated version bump to prepare for the next nightly release.'
-          github-token: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
+          github-token: '${{ secrets.GITHUB_TOKEN }}'
           dry-run: '${{ github.event.inputs.dry_run }}'
 
       - name: 'Create Issue on Failure'
         if: '${{ failure() && github.event.inputs.dry_run == false }}'
         env:
-          GITHUB_TOKEN: '${{ secrets.GEMINI_CLI_ROBOT_GITHUB_PAT }}'
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
           RELEASE_TAG: 'v${{ needs.calculate-versions.outputs.NEXT_NIGHTLY_VERSION }}'
           DETAILS_URL: '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
         run: |
