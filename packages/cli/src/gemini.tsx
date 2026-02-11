@@ -407,7 +407,7 @@ export async function main() {
         await partialConfig.refreshAuth(
           settings.merged.security.auth.selectedType,
         );
-      } else if (!partialConfig.isInteractive()) {
+      } else if (!partialConfig.isInteractive() && !argv.isCommand) {
         const authType = await validateNonInteractiveAuth(
           settings.merged.security.auth.selectedType,
           settings.merged.security.auth.useExternal,

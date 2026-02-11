@@ -1042,6 +1042,52 @@ describe('gemini.tsx main function exit codes', () => {
 
     expect(refreshAuthSpy).toHaveBeenCalledWith(AuthType.USE_GEMINI);
   });
+
+  it('should skip auth validation for utility subcommands (isCommand=true)', async () => {
+    vi.stubEnv('SANDBOX', '');
+    vi.mocked(loadSandboxConfig).mockResolvedValue(undefined);
+
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        isInteractive: () => false,
+        getQuestion: () => '',
+        getSandbox: () => undefined,
+      }),
+    );
+
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: {
+          security: { auth: { selectedType: undefined } },
+          ui: {},
+        },
+        workspace: { settings: {} },
+        setValue: vi.fn(),
+        forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+      }),
+    );
+
+    vi.mocked(parseArguments).mockResolvedValue({
+      isCommand: true,
+    } as unknown as CliArgs);
+
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((code) => {
+        throw new MockProcessExitError(code);
+      });
+
+    // No API key set - should still succeed without auth validation
+    try {
+      await main();
+    } catch (e) {
+      if (!(e instanceof MockProcessExitError)) throw e;
+    } finally {
+      processExitSpy.mockRestore();
+    }
+
+    expect(validateNonInteractiveAuth).not.toHaveBeenCalled();
+  });
 });
 
 describe('validateDnsResolutionOrder', () => {
