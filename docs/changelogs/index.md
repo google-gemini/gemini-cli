@@ -18,6 +18,31 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.28.0 - February 10, 2026
+
+This release introduces a host of new features, bug fixes, and improvements
+across the board. Here are some of the highlights:
+
+- **Slash Command:** We've added a new `/prompt-suggest` slash command to help
+  you generate prompt suggestions
+  ([#17264](https://github.com/google-gemini/gemini-cli/pull/17264) by
+  @NTaylorMullen).
+- **IDE Support:** Gemini CLI now supports the Positron IDE
+  ([#15047](https://github.com/google-gemini/gemini-cli/pull/15047) by
+  @kapsner).
+- **Customization:** You can now use custom themes in extensions, and we've
+  implemented automatic theme switching based on your terminal's background
+  ([#17327](https://github.com/google-gemini/gemini-cli/pull/17327) by
+  @spencer426, [#17976](https://github.com/google-gemini/gemini-cli/pull/17976)
+  by @Abhijit-2592).
+- **Authentication:** We've added interactive and non-interactive consent for
+  OAuth, and you can now include your auth method in bug reports
+  ([#17699](https://github.com/google-gemini/gemini-cli/pull/17699) by
+  @ehedlund, [#17569](https://github.com/google-gemini/gemini-cli/pull/17569) by
+  @erikus).
+
+[See the full changelog for v0.28.0](./latest.md)
+
 ## Announcements: v0.27.0 - 2026-02-03
 
 - **Event-Driven Architecture:** The CLI now uses a new event-driven scheduler
