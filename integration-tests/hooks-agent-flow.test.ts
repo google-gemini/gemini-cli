@@ -7,6 +7,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TestRig, normalizePath } from './test-helper.js';
 import { join } from 'node:path';
+import { writeFileSync } from 'node:fs';
 
 describe('Hooks Agent Flow', () => {
   let rig: TestRig;
