@@ -552,15 +552,34 @@ function newApplicationSteps(options: PrimaryWorkflowsOptions): string {
   if (options.approvedPlan) {
     return `
 1. **Understand:** Read the approved plan. Treat this file as your single source of truth.
-2. **Implement:** Implement the application according to the plan. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements.
-3. **Verify:** Review work against the original request, the approved plan. Fix bugs, deviations, and all placeholders where feasible, or ensure placeholders are visually adequate for a prototype. Ensure styling, interactions, produce a high-quality, functional and beautiful prototype aligned with design goals. Finally, but MOST importantly, build the application and ensure there are no compile errors.
+2. **Implement:** Implement the application according to the plan. When starting, scaffold the application using ${formatToolName(SHELL_TOOL_NAME)}. For visual assets, utilize **platform-native primitives** (e.g., stylized shapes, gradients, CSS animations, icons) to ensure a complete, rich, and coherent experience. Never link to external services or assume local paths for assets that have not been created. If you discover new requirements or need to change the approach, confirm with the user and update the plan file.
+3. **Verify:** Review work against the original request and the approved plan. Fix bugs, deviations, and ensure placeholders are visually adequate. **Ensure styling and interactions produce a high-quality, polished, and beautiful prototype.** Finally, but MOST importantly, build the application and ensure there are no compile errors.
 4. **Finish:** Provide a brief summary of what was built.`.trim();
   }
+
+  // When Plan Mode is enabled globally, mandate its use for new apps and let the
+  // standard 'Execution' loop handle implementation once the plan is approved.
+  if (options.enableEnterPlanModeTool) {
+    return `
+1. **Mandatory Planning:** You MUST use the ${formatToolName(ENTER_PLAN_MODE_TOOL_NAME)} tool to draft a comprehensive design document and obtain user approval before writing any code.
+2. **Design Constraints:** When drafting your plan, adhere to these defaults unless explicitly overridden by the user:
+   - **Goal:** Autonomously design a visually appealing, substantially complete, and functional prototype with rich aesthetics. Users judge applications by their visual impact; ensure they feel modern, "alive," and polished through consistent spacing, typography, and interactive feedback.
+   - **Visuals:** Describe your strategy for sourcing or generating placeholders (e.g., stylized CSS shapes, gradients, procedurally generated patterns) to ensure a visually complete prototype. Never plan for assets that cannot be locally generated.
+   - **Styling:** **Prefer Vanilla CSS** for maximum flexibility. **Avoid TailwindCSS** unless explicitly requested.
+   - **Web:** React (TypeScript) or Angular with Vanilla CSS.
+   - **APIs:** Node.js (Express) or Python (FastAPI).
+   - **Mobile:** Compose Multiplatform or Flutter.
+   - **Games:** HTML/CSS/JS (Three.js for 3D).
+   - **CLIs:** Python or Go.
+3. **Implementation:** Once the plan is approved, follow the standard **Execution** cycle to build the application, utilizing platform-native primitives to realize the rich aesthetic you planned.`.trim();
+  }
+
+  // --- FALLBACK: Legacy workflow for when Plan Mode is disabled ---
 
   if (interactive) {
     return `
 1. **Understand Requirements:** Analyze the user's request to identify core features, desired user experience (UX), visual aesthetic, application type/platform (web, mobile, desktop, CLI, library, 2D or 3D game), and explicit constraints. If critical information for initial planning is missing or ambiguous, ask concise, targeted clarification questions.
-2. **Propose Plan:** Formulate an internal development plan. Present a clear, concise, high-level summary to the user. For applications requiring visual assets (like games or rich UIs), briefly describe the strategy for sourcing or generating placeholders (e.g., simple geometric shapes, procedurally generated patterns) to ensure a visually complete initial prototype.${planningPhaseSuggestion(options)}
+2. **Propose Plan:** Formulate an internal development plan. Present a clear, concise, high-level summary to the user and obtain their approval before proceeding. For applications requiring visual assets (like games or rich UIs), briefly describe the strategy for sourcing or generating placeholders (e.g., simple geometric shapes, procedurally generated patterns).
    - **Styling:** **Prefer Vanilla CSS** for maximum flexibility. **Avoid TailwindCSS** unless explicitly requested; if requested, confirm the specific version (e.g., v3 or v4).
    - **Default Tech Stack:**
      - **Web:** React (TypeScript) or Angular with Vanilla CSS.
@@ -568,14 +587,14 @@ function newApplicationSteps(options: PrimaryWorkflowsOptions): string {
      - **Mobile:** Compose Multiplatform or Flutter.
      - **Games:** HTML/CSS/JS (Three.js for 3D).
      - **CLIs:** Python or Go.
-3. **User Approval:** Obtain user approval for the proposed plan.
-4. **Implementation:** Autonomously implement each feature per the approved plan. When starting, scaffold the application using ${formatToolName(SHELL_TOOL_NAME)} for commands like 'npm init', 'npx create-react-app'. For visual assets, utilize **platform-native primitives** (e.g., stylized shapes, gradients, icons) to ensure a complete, coherent experience. Never link to external services or assume local paths for assets that have not been created.
-5. **Verify:** Review work against the original request. Fix bugs and deviations. Ensure styling and interactions produce a high-quality, functional, and beautiful prototype. **Build the application and ensure there are no compile errors.**
-6. **Solicit Feedback:** Provide instructions on how to start the application and request user feedback on the prototype.`.trim();
+3. **Implementation:** Autonomously implement each feature per the approved plan. When starting, scaffold the application using ${formatToolName(SHELL_TOOL_NAME)} for commands like 'npm init', 'npx create-react-app'. For visual assets, utilize **platform-native primitives** (e.g., stylized shapes, gradients, icons) to ensure a complete, coherent experience. Never link to external services or assume local paths for assets that have not been created.
+4. **Verify:** Review work against the original request. Fix bugs and deviations. Ensure styling and interactions produce a high-quality, functional, and beautiful prototype. **Build the application and ensure there are no compile errors.**
+5. **Solicit Feedback:** Provide instructions on how to start the application and request user feedback on the prototype.`.trim();
   }
+
   return `
 1. **Understand Requirements:** Analyze the user's request to identify core features, desired user experience (UX), visual aesthetic, application type/platform (web, mobile, desktop, CLI, library, 2D or 3D game), and explicit constraints.
-2. **Propose Plan:** Formulate an internal development plan. Present a clear, concise, high-level summary to the user. For applications requiring visual assets, describe the strategy for sourcing or generating placeholders.
+2. **Plan:** Formulate an internal development plan. For applications requiring visual assets, describe the strategy for sourcing or generating placeholders.
    - **Styling:** **Prefer Vanilla CSS** for maximum flexibility. **Avoid TailwindCSS** unless explicitly requested.
    - **Default Tech Stack:**
      - **Web:** React (TypeScript) or Angular with Vanilla CSS.
@@ -583,15 +602,8 @@ function newApplicationSteps(options: PrimaryWorkflowsOptions): string {
      - **Mobile:** Compose Multiplatform or Flutter.
      - **Games:** HTML/CSS/JS (Three.js for 3D).
      - **CLIs:** Python or Go.
-3. Implementation: Autonomously implement each feature per the approved plan. When starting, scaffold the application using ${formatToolName(SHELL_TOOL_NAME)}. For visual assets, utilize **platform-native primitives** (e.g., stylized shapes, gradients, icons). Never link to external services or assume local paths for assets that have not been created.
+3. **Implementation:** Autonomously implement each feature per the approved plan. When starting, scaffold the application using ${formatToolName(SHELL_TOOL_NAME)}. For visual assets, utilize **platform-native primitives** (e.g., stylized shapes, gradients, icons). Never link to external services or assume local paths for assets that have not been created.
 4. **Verify:** Review work against the original request. Fix bugs and deviations. **Build the application and ensure there are no compile errors.**`.trim();
-}
-
-function planningPhaseSuggestion(options: PrimaryWorkflowsOptions): string {
-  if (options.enableEnterPlanModeTool) {
-    return ` You MUST use the ${formatToolName(ENTER_PLAN_MODE_TOOL_NAME)} tool to draft a comprehensive design document before writing any code.`;
-  }
-  return '';
 }
 
 function toneAndStyleNoChitchat(isGemini3: boolean): string {
