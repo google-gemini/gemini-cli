@@ -5,8 +5,12 @@
  */
 
 import { useEffect } from 'react';
-import type { KeypressHandler, Key } from '../contexts/KeypressContext.js';
-import { useKeypressContext } from '../contexts/KeypressContext.js';
+import {
+  useKeypressContext,
+  type KeypressHandler,
+  type Key,
+  type KeypressPriority,
+} from '../contexts/KeypressContext.js';
 
 export type { Key };
 
@@ -16,11 +20,14 @@ export type { Key };
  * @param onKeypress - The callback function to execute on each keypress.
  * @param options - Options to control the hook's behavior.
  * @param options.isActive - Whether the hook should be actively listening for input.
- * @param options.priority - Whether the hook should have priority over normal subscribers.
+ * @param options.priority - Priority level (integer or KeypressPriority enum) or boolean for backward compatibility.
  */
 export function useKeypress(
   onKeypress: KeypressHandler,
-  { isActive, priority }: { isActive: boolean; priority?: boolean },
+  {
+    isActive,
+    priority,
+  }: { isActive: boolean; priority?: KeypressPriority | boolean },
 ) {
   const { subscribe, unsubscribe } = useKeypressContext();
 
