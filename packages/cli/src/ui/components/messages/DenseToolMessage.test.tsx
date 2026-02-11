@@ -222,6 +222,7 @@ describe('DenseToolMessage', () => {
     );
     const output = lastFrame();
     expect(output).toContain('→ Found 2 matches');
+    // Matches are rendered in a secondary list for high-signal summaries
     expect(output).toContain('file1.ts:10: match 1');
     expect(output).toContain('file2.ts:20: match 2');
   });

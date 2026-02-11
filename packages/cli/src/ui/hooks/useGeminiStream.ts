@@ -556,7 +556,7 @@ export const useGeminiStream = (
     if (pendingHistoryItemRef.current) {
       if (pendingHistoryItemRef.current.type === 'tool_group') {
         // Mark all in-progress tools as Canceled when the turn is cancelled.
-         
+
         const toolGroup = pendingHistoryItemRef.current;
         const updatedTools = toolGroup.tools.map((tool) => {
           if (

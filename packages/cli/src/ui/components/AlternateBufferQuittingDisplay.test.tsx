@@ -8,6 +8,7 @@ import {
   renderWithProviders,
   persistentStateMock,
 } from '../../test-utils/render.js';
+import { createMockSettings } from '../../test-utils/settings.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AlternateBufferQuittingDisplay } from './AlternateBufferQuittingDisplay.js';
 import { ToolCallStatus } from '../types.js';
@@ -90,6 +91,10 @@ const mockPendingHistoryItems: HistoryItemWithoutId[] = [
 ];
 
 describe('AlternateBufferQuittingDisplay', () => {
+  const mockSettings = createMockSettings({
+    ui: { enableCompactToolOutput: false },
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -116,6 +121,7 @@ describe('AlternateBufferQuittingDisplay', () => {
           history: mockHistory,
           pendingHistoryItems: mockPendingHistoryItems,
         },
+        settings: mockSettings,
       },
     );
     expect(lastFrame()).toMatchSnapshot('with_history_and_pending');
@@ -131,6 +137,7 @@ describe('AlternateBufferQuittingDisplay', () => {
           history: [],
           pendingHistoryItems: [],
         },
+        settings: mockSettings,
       },
     );
     expect(lastFrame()).toMatchSnapshot('empty');
@@ -146,6 +153,7 @@ describe('AlternateBufferQuittingDisplay', () => {
           history: mockHistory,
           pendingHistoryItems: [],
         },
+        settings: mockSettings,
       },
     );
     expect(lastFrame()).toMatchSnapshot('with_history_no_pending');
@@ -161,6 +169,7 @@ describe('AlternateBufferQuittingDisplay', () => {
           history: [],
           pendingHistoryItems: mockPendingHistoryItems,
         },
+        settings: mockSettings,
       },
     );
     expect(lastFrame()).toMatchSnapshot('with_pending_no_history');
@@ -196,6 +205,7 @@ describe('AlternateBufferQuittingDisplay', () => {
           history: [],
           pendingHistoryItems,
         },
+        settings: mockSettings,
       },
     );
     const output = lastFrame();
@@ -219,6 +229,7 @@ describe('AlternateBufferQuittingDisplay', () => {
           history,
           pendingHistoryItems: [],
         },
+        settings: mockSettings,
       },
     );
     expect(lastFrame()).toMatchSnapshot('with_user_gemini_messages');

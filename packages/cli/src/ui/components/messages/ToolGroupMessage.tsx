@@ -190,6 +190,13 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           !isShellToolCall &&
           tool.status !== ToolCallStatus.Confirming;
 
+        const nextTool = visibleToolCalls[index + 1];
+        const nextIsDense =
+          nextTool &&
+          compactMode &&
+          !isShellTool(nextTool.name) &&
+          nextTool.status !== ToolCallStatus.Confirming;
+
         if (useDenseView) {
           return (
             <DenseToolMessage
@@ -276,6 +283,20 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                 )}
               </Box>
             )}
+            {/* If the NEXT tool is dense, we must close THIS tool's box now */}
+            {nextIsDense && (
+              <Box
+                height={0}
+                width={contentWidth}
+                borderLeft={true}
+                borderRight={true}
+                borderTop={false}
+                borderBottom={true}
+                borderColor={borderColor}
+                borderDimColor={borderDimColor}
+                borderStyle="round"
+              />
+            )}
           </Box>
         );
       })}
@@ -336,12 +357,19 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           />
         );
       })()}
-      {compactMode
-        ? null
-        : (borderBottomOverride ?? true) &&
-          visibleToolCalls.length > 0 && (
-            <ShowMoreLines constrainHeight={constrainHeight} />
-          )}
+      {(() => {
+        const lastTool = visibleToolCalls[visibleToolCalls.length - 1];
+        const isShell = lastTool && isShellTool(lastTool.name);
+        const isConfirming =
+          lastTool && lastTool.status === ToolCallStatus.Confirming;
+        const isDense = compactMode && lastTool && !isShell && !isConfirming;
+
+        return isDense
+          ? null
+          : (borderBottomOverride ?? true) && visibleToolCalls.length > 0 && (
+              <ShowMoreLines constrainHeight={constrainHeight} />
+            );
+      })()}
     </Box>
   );
 };

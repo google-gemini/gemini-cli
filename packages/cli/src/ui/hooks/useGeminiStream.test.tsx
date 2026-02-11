@@ -9,6 +9,7 @@ import type { Mock, MockInstance } from 'vitest';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act } from 'react';
 import { renderHookWithProviders } from '../../test-utils/render.js';
+import { createMockSettings } from '../../test-utils/settings.js';
 import { waitFor } from '../../test-utils/async.js';
 import { useGeminiStream } from './useGeminiStream.js';
 import { useKeypress } from './useKeypress.js';
@@ -42,7 +43,7 @@ import type { Part, PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import type { SlashCommandProcessorResult } from '../types.js';
 import { MessageType, StreamingState, ToolCallStatus } from '../types.js';
-import type { LoadedSettings } from '../../config/settings.js';
+// import type { LoadedSettings } from '../../config/settings.js';
 
 // --- MOCKS ---
 const mockSendMessageStream = vi
@@ -292,19 +293,13 @@ describe('useGeminiStream', () => {
     vi.spyOn(coreEvents, 'emitFeedback');
   });
 
-  const mockLoadedSettings: LoadedSettings = {
-    merged: {
-      preferredEditor: 'vscode',
-      ui: {
-        enableCompactToolOutput: true,
-      },
+  const mockLoadedSettings = createMockSettings({
+    ui: {
+      enableCompactToolOutput: false,
+      showCitations: true,
+      showModelInfoInChat: true,
     },
-    user: { path: '/user/settings.json', settings: {} },
-    workspace: { path: '/workspace/.gemini/settings.json', settings: {} },
-    errors: [],
-    forScope: vi.fn(),
-    setValue: vi.fn(),
-  } as unknown as LoadedSettings;
+  });
 
   const renderTestHook = (
     initialToolCalls: TrackedToolCall[] = [],

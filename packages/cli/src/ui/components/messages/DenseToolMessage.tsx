@@ -39,13 +39,16 @@ const isFileDiff = (res: unknown): res is FileDiff =>
 const isGrepResult = (res: unknown): res is GrepResult =>
   typeof res === 'object' &&
   res !== null &&
-  'matches' in res &&
-  'summary' in res;
+  'summary' in res &&
+  ('matches' in res || 'payload' in res);
 
 const isListResult = (
   res: unknown,
 ): res is ListDirectoryResult | ReadManyFilesResult =>
-  typeof res === 'object' && res !== null && 'files' in res && 'summary' in res;
+  typeof res === 'object' &&
+  res !== null &&
+  'summary' in res &&
+  ('files' in res || 'include' in res);
 
 const hasPayload = (
   res: unknown,
@@ -63,22 +66,25 @@ const isTodoList = (res: unknown): res is { todos: unknown[] } =>
  */
 
 const RenderItemsList: React.FC<{
-  items: string[];
+  items?: string[];
   maxVisible?: number;
-}> = ({ items, maxVisible = 20 }) => (
-  <Box flexDirection="column">
-    {items.slice(0, maxVisible).map((item, i) => (
-      <Text key={i} color={theme.text.secondary}>
-        {item}
-      </Text>
-    ))}
-    {items.length > maxVisible && (
-      <Text color={theme.text.secondary}>
-        ... and {items.length - maxVisible} more
-      </Text>
-    )}
-  </Box>
-);
+}> = ({ items, maxVisible = 20 }) => {
+  if (!items || items.length === 0) return null;
+  return (
+    <Box flexDirection="column">
+      {items.slice(0, maxVisible).map((item, i) => (
+        <Text key={i} color={theme.text.secondary}>
+          {item}
+        </Text>
+      ))}
+      {items.length > maxVisible && (
+        <Text color={theme.text.secondary}>
+          ... and {items.length - maxVisible} more
+        </Text>
+      )}
+    </Box>
+  );
+};
 
 /**
  * --- SCENARIO LOGIC (Pure Functions) ---
@@ -144,14 +150,15 @@ function getListResultData(
   originalDescription?: string,
 ): ViewParts {
   let description = originalDescription;
-  const items: string[] = result.files;
-  const maxVisible = 20;
+  const items: string[] = result.files ?? [];
+  const maxVisible = 10;
 
   // Enhance with ReadManyFiles specific data if present
   const rmf = result as ReadManyFilesResult;
   if (toolName === 'ReadManyFiles' && rmf.include) {
     const includePatterns = rmf.include.join(', ');
     description = `Attempting to read files from ${includePatterns}`;
+    result.summary = `Read ${items.length} file(s)`;
   }
 
   const summary = <Text color={theme.text.accent}>→ {result.summary}</Text>;
@@ -165,21 +172,23 @@ function getListResultData(
       ? `Excluded patterns: ${rmf.excludes.slice(0, 3).join(', ')}${rmf.excludes.length > 3 ? '...' : ''}`
       : undefined;
 
-  const payload = (
-    <Box flexDirection="column" marginLeft={2}>
-      <RenderItemsList items={items} maxVisible={maxVisible} />
-      {skippedText && (
-        <Text color={theme.text.secondary} dimColor>
-          {skippedText}
-        </Text>
-      )}
-      {excludedText && (
-        <Text color={theme.text.secondary} dimColor>
-          {excludedText}
-        </Text>
-      )}
-    </Box>
-  );
+  const hasItems = items.length > 0;
+  const payload =
+    hasItems || skippedText || excludedText ? (
+      <Box flexDirection="column" marginLeft={2}>
+        {hasItems && <RenderItemsList items={items} maxVisible={maxVisible} />}
+        {skippedText && (
+          <Text color={theme.text.secondary} dimColor>
+            {skippedText}
+          </Text>
+        )}
+        {excludedText && (
+          <Text color={theme.text.secondary} dimColor>
+            {excludedText}
+          </Text>
+        )}
+      </Box>
+    ) : undefined;
 
   return { description, summary, payload };
 }
@@ -200,16 +209,19 @@ function getGenericSuccessData(
     );
   } else if (isGrepResult(resultDisplay)) {
     summary = <Text color={theme.text.accent}>→ {resultDisplay.summary}</Text>;
-    payload = (
-      <Box flexDirection="column" marginLeft={2}>
-        <RenderItemsList
-          items={resultDisplay.matches.map(
-            (m) => `${m.filePath}:${m.lineNumber}: ${m.line.trim()}`,
-          )}
-          maxVisible={10}
-        />
-      </Box>
-    );
+    const matches = resultDisplay.matches ?? [];
+    if (matches.length > 0) {
+      payload = (
+        <Box flexDirection="column" marginLeft={2}>
+          <RenderItemsList
+            items={matches.map(
+              (m) => `${m.filePath}:${m.lineNumber}: ${m.line.trim()}`,
+            )}
+            maxVisible={10}
+          />
+        </Box>
+      );
+    }
   } else if (isTodoList(resultDisplay)) {
     summary = (
       <Text color={theme.text.accent} wrap="wrap">
@@ -280,6 +292,11 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
     if (isListResult(resultDisplay)) {
       return getListResultData(resultDisplay, name, originalDescription);
     }
+
+    if (isGrepResult(resultDisplay)) {
+      return getGenericSuccessData(resultDisplay, originalDescription);
+    }
+
     if (status === ToolCallStatus.Success && resultDisplay) {
       return getGenericSuccessData(resultDisplay, originalDescription);
     }

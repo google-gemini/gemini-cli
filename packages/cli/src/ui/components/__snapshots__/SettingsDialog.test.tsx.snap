@@ -28,11 +28,11 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │    Output Format                                                                           Text  │
 │    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
-│    Verbose Output History                                                                  true  │
-│    Show verbose output history. When enabled, output history will include autonomous to…         │
-│                                                                                                  │
 │    Auto Theme Switching                                                                    true  │
 │    Automatically switch between default light and dark themes based on terminal backgro…         │
+│                                                                                                  │
+│    Terminal Background Polling Interval                                                      60  │
+│    Interval in seconds to poll the terminal background color.                                    │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -74,11 +74,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │    Output Format                                                                           Text  │
 │    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
-│    Verbose Output History                                                                  true  │
-│    Show verbose output history. When enabled, output history will include autonomous to…         │
-│                                                                                                  │
 │    Auto Theme Switching                                                                    true  │
 │    Automatically switch between default light and dark themes based on terminal backgro…         │
+│                                                                                                  │
+│    Terminal Background Polling Interval                                                      60  │
+│    Interval in seconds to poll the terminal background color.                                    │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -120,11 +120,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │    Output Format                                                                           Text  │
 │    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
-│    Verbose Output History                                                                  true  │
-│    Show verbose output history. When enabled, output history will include autonomous to…         │
-│                                                                                                  │
 │    Auto Theme Switching                                                                    true  │
 │    Automatically switch between default light and dark themes based on terminal backgro…         │
+│                                                                                                  │
+│    Terminal Background Polling Interval                                                      60  │
+│    Interval in seconds to poll the terminal background color.                                    │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -166,11 +166,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │    Output Format                                                                           Text  │
 │    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
-│    Verbose Output History                                                                  true  │
-│    Show verbose output history. When enabled, output history will include autonomous to…         │
-│                                                                                                  │
 │    Auto Theme Switching                                                                    true  │
 │    Automatically switch between default light and dark themes based on terminal backgro…         │
+│                                                                                                  │
+│    Terminal Background Polling Interval                                                      60  │
+│    Interval in seconds to poll the terminal background color.                                    │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -212,11 +212,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │    Output Format                                                                           Text  │
 │    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
-│    Verbose Output History                                                                  true  │
-│    Show verbose output history. When enabled, output history will include autonomous to…         │
-│                                                                                                  │
 │    Auto Theme Switching                                                                    true  │
 │    Automatically switch between default light and dark themes based on terminal backgro…         │
+│                                                                                                  │
+│    Terminal Background Polling Interval                                                      60  │
+│    Interval in seconds to poll the terminal background color.                                    │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -258,11 +258,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │    Output Format                                                                           Text  │
 │    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
-│    Verbose Output History                                                                  true  │
-│    Show verbose output history. When enabled, output history will include autonomous to…         │
-│                                                                                                  │
 │    Auto Theme Switching                                                                    true  │
 │    Automatically switch between default light and dark themes based on terminal backgro…         │
+│                                                                                                  │
+│    Terminal Background Polling Interval                                                      60  │
+│    Interval in seconds to poll the terminal background color.                                    │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -304,11 +304,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │    Output Format                                                                           Text  │
 │    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
-│    Verbose Output History                                                                  true  │
-│    Show verbose output history. When enabled, output history will include autonomous to…         │
-│                                                                                                  │
 │    Auto Theme Switching                                                                    true  │
 │    Automatically switch between default light and dark themes based on terminal backgro…         │
+│                                                                                                  │
+│    Terminal Background Polling Interval                                                      60  │
+│    Interval in seconds to poll the terminal background color.                                    │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -350,11 +350,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │    Output Format                                                                           Text  │
 │    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
-│    Verbose Output History                                                                  true  │
-│    Show verbose output history. When enabled, output history will include autonomous to…         │
-│                                                                                                  │
 │    Auto Theme Switching                                                                    true  │
 │    Automatically switch between default light and dark themes based on terminal backgro…         │
+│                                                                                                  │
+│    Terminal Background Polling Interval                                                      60  │
+│    Interval in seconds to poll the terminal background color.                                    │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -396,11 +396,11 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │    Output Format                                                                           Text  │
 │    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
-│    Verbose Output History                                                                  true  │
-│    Show verbose output history. When enabled, output history will include autonomous to…         │
-│                                                                                                  │
 │    Auto Theme Switching                                                                    true  │
 │    Automatically switch between default light and dark themes based on terminal backgro…         │
+│                                                                                                  │
+│    Terminal Background Polling Interval                                                      60  │
+│    Interval in seconds to poll the terminal background color.                                    │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │

@@ -754,4 +754,140 @@ describe('<ToolGroupMessage />', () => {
       unmount();
     });
   });
+
+  describe('Compact Tool Output (Dense Mode)', () => {
+    const compactSettings = createMockSettings({
+      ui: { enableCompactToolOutput: true },
+    });
+
+    it('renders single tool call compactly', () => {
+      const toolCalls = [
+        createToolCall({
+          name: 'read_file',
+          description: 'packages/cli/src/app.tsx',
+          resultDisplay: 'Read 150 lines',
+        }),
+      ];
+      const { lastFrame, unmount } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        {
+          config: baseMockConfig,
+          settings: compactSettings,
+          uiState: {
+            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+          },
+        },
+      );
+      expect(lastFrame()).toMatchSnapshot();
+      unmount();
+    });
+
+    it('renders multiple tool calls compactly without boxes', () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 't1',
+          name: 'read_file',
+          description: 'file1.ts',
+          resultDisplay: 'Success',
+        }),
+        createToolCall({
+          callId: 't2',
+          name: 'grep_search',
+          description: 'search term',
+          resultDisplay: {
+            summary: 'Found 3 matches',
+            matches: [
+              { filePath: 'f1.ts', lineNumber: 10, line: 'match 1' },
+              { filePath: 'f2.ts', lineNumber: 20, line: 'match 2' },
+              { filePath: 'f3.ts', lineNumber: 30, line: 'match 3' },
+            ],
+          },
+        }),
+      ];
+      const { lastFrame, unmount } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        {
+          config: baseMockConfig,
+          settings: compactSettings,
+          uiState: {
+            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+          },
+        },
+      );
+      expect(lastFrame()).toMatchSnapshot();
+      unmount();
+    });
+
+    it('renders mixed boxed (shell) and dense tools correctly', () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'shell-1',
+          name: 'run_shell_command',
+          description: 'npm test',
+          status: ToolCallStatus.Success,
+          resultDisplay: 'All tests passed',
+        }),
+        createToolCall({
+          callId: 'file-1',
+          name: 'write_file',
+          description: 'packages/core/index.ts',
+          status: ToolCallStatus.Success,
+          resultDisplay: 'File updated',
+        }),
+      ];
+      const { lastFrame, unmount } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        {
+          config: baseMockConfig,
+          settings: compactSettings,
+          uiState: {
+            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+          },
+        },
+      );
+      // Boxed shell tool should have its own bottom border before the dense tool
+      expect(lastFrame()).toMatchSnapshot();
+      unmount();
+    });
+
+    it('renders confirming tools as boxed even in compact mode', () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'confirm-1',
+          name: 'write_file',
+          description: 'critical_file.ts',
+          status: ToolCallStatus.Confirming,
+          confirmationDetails: {
+            type: 'edit',
+            title: 'Apply edit',
+            fileName: 'critical_file.ts',
+            filePath: '/path/to/critical_file.ts',
+            fileDiff: 'diff...',
+            originalContent: 'old',
+            newContent: 'new',
+            onConfirm: vi.fn(),
+          },
+        }),
+      ];
+      // When confirming, it should be boxed for visibility/interactivity
+      const mockConfigNoEventDriven = makeFakeConfig({
+        ...baseMockConfig,
+        enableEventDrivenScheduler: false,
+      });
+
+      const { lastFrame, unmount } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        {
+          config: mockConfigNoEventDriven,
+          settings: compactSettings,
+          uiState: {
+            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+          },
+        },
+      );
+      expect(lastFrame()).toContain('Apply this change?');
+      expect(lastFrame()).toMatchSnapshot();
+      unmount();
+    });
+  });
 });
