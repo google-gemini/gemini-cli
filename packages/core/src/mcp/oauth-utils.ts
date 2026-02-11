@@ -256,7 +256,15 @@ export class OAuthUtils {
         // it is using as the prefix for the metadata request exactly matches the value
         // of the resource metadata parameter in the protected resource metadata document.
         const expectedResource = this.buildResourceParameter(serverUrl);
-        if (resourceMetadata.resource !== expectedResource) {
+        // Normalize both resource URLs for comparison to ignore trailing slash differences for root paths
+        const normalizedServerResource =
+          OAuthUtils.normalizeResourceUrlForComparison(
+            resourceMetadata.resource,
+          );
+        const normalizedExpectedResource =
+          OAuthUtils.normalizeResourceUrlForComparison(expectedResource);
+
+        if (normalizedServerResource !== normalizedExpectedResource) {
           throw new ResourceMismatchError(
             `Protected resource ${resourceMetadata.resource} does not match expected ${expectedResource}`,
           );
@@ -347,7 +355,13 @@ export class OAuthUtils {
     if (resourceMetadata && mcpServerUrl) {
       // Validate resource parameter per RFC 9728 Section 7.3
       const expectedResource = this.buildResourceParameter(mcpServerUrl);
-      if (resourceMetadata.resource !== expectedResource) {
+      // Normalize both resource URLs for comparison to ignore trailing slash differences for root paths
+      const normalizedServerResource =
+        OAuthUtils.normalizeResourceUrlForComparison(resourceMetadata.resource);
+      const normalizedExpectedResource =
+        OAuthUtils.normalizeResourceUrlForComparison(expectedResource);
+
+      if (normalizedServerResource !== normalizedExpectedResource) {
         throw new ResourceMismatchError(
           `Protected resource ${resourceMetadata.resource} does not match expected ${expectedResource}`,
         );
@@ -399,6 +413,22 @@ export class OAuthUtils {
   static buildResourceParameter(endpointUrl: string): string {
     const url = new URL(endpointUrl);
     return `${url.protocol}//${url.host}${url.pathname}`;
+  }
+
+  /**
+   * Normalizes a URL for resource comparison by removing the trailing slash
+   * if the path is only '/'. This helps prevent mismatches due to inconsistent
+   * trailing slashes between resource metadata and expected URLs.
+   *
+   * @param url The URL string to normalize.
+   * @returns The normalized URL string.
+   */
+  static normalizeResourceUrlForComparison(url: string): string {
+    const urlObj = new URL(url);
+    if (urlObj.pathname === '/') {
+      return urlObj.origin;
+    }
+    return url;
   }
 
   /**

@@ -389,6 +389,65 @@ describe('OAuthUtils', () => {
     });
   });
 
+  describe('normalizeResourceUrlForComparison', () => {
+    it('should remove trailing slash for root paths', () => {
+      const result = OAuthUtils.normalizeResourceUrlForComparison(
+        'https://example.com/',
+      );
+      expect(result).toBe('https://example.com');
+    });
+
+    it('should not modify URLs without trailing slash at root', () => {
+      const result = OAuthUtils.normalizeResourceUrlForComparison(
+        'https://example.com',
+      );
+      expect(result).toBe('https://example.com');
+    });
+
+    it('should preserve trailing slash for non-root paths', () => {
+      const result = OAuthUtils.normalizeResourceUrlForComparison(
+        'https://example.com/api/v1/',
+      );
+      expect(result).toBe('https://example.com/api/v1/');
+    });
+
+    it('should not modify paths without trailing slash', () => {
+      const result = OAuthUtils.normalizeResourceUrlForComparison(
+        'https://example.com/api/v1',
+      );
+      expect(result).toBe('https://example.com/api/v1');
+    });
+
+    it('should handle URLs with ports', () => {
+      const result = OAuthUtils.normalizeResourceUrlForComparison(
+        'https://example.com:8080/',
+      );
+      expect(result).toBe('https://example.com:8080');
+    });
+
+    it('should normalize MCP server URLs correctly', () => {
+      // Simulate the Stripe MCP case
+      const withSlash = OAuthUtils.normalizeResourceUrlForComparison(
+        'https://mcp.stripe.com/',
+      );
+      const withoutSlash = OAuthUtils.normalizeResourceUrlForComparison(
+        'https://mcp.stripe.com',
+      );
+      expect(withSlash).toBe(withoutSlash);
+      expect(withSlash).toBe('https://mcp.stripe.com');
+    });
+
+    it('should make root URLs with and without trailing slash compare equal', () => {
+      const url1 = OAuthUtils.normalizeResourceUrlForComparison(
+        'https://example.com',
+      );
+      const url2 = OAuthUtils.normalizeResourceUrlForComparison(
+        'https://example.com/',
+      );
+      expect(url1).toBe(url2);
+    });
+  });
+
   describe('parseTokenExpiry', () => {
     it('should return the expiry time in milliseconds for a valid token', () => {
       // Corresponds to a date of 2100-01-01T00:00:00Z
