@@ -3,21 +3,17 @@
 This document provides an overview of Gemini CLI's sytem requriements,
 installation methods, and release types.
 
-## System requirements
+## Recommended system specifications
 
 - **Operating System:**
-  - macOS 16+
-  - Windows 10.0.26100+
+  - macOS 26+
+  - Windows 11 24H2+
   - Ubuntu 20.04+
 - **Runtime:** Node.js 20.0.0+
-- **Shell:** Bash or Zsh recommended
+- **Shell:** Bash or Zsh
 - **Location:**
   [Gemini Code Assist supported locations](https://developers.google.com/gemini-code-assist/resources/available-locations#americas)
 - **Internet connection required**
-
-Gemini CLI comes pre-installed on
-[**Cloud Shell**](https://docs.cloud.google.com/shell/docs) and
-[**Cloud Workstations**](https://cloud.google.com/workstations).
 
 ## How to install and/or run Gemini CLI
 
@@ -28,6 +24,10 @@ you intend to use Gemini CLI.
   Gemini CLI.
 - In a sandbox. This method offers increased security and isolation.
 - From the source. This is recommended for contributors to the project.
+
+Gemini CLI comes pre-installed on
+[**Cloud Shell**](https://docs.cloud.google.com/shell/docs) and
+[**Cloud Workstations**](https://cloud.google.com/workstations).
 
 ### 1. Standard installation (recommended for most users)
 
