@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { act } from 'react';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
@@ -21,6 +21,14 @@ const writeKey = (stdin: { write: (data: string) => void }, key: string) => {
 };
 
 describe('AskUserDialog', () => {
+  // Ensure keystrokes appear spaced in time to avoid bufferFastReturn
+  // converting Enter into Shift+Enter during synchronous test execution.
+  let mockTime: number;
+  beforeEach(() => {
+    mockTime = 0;
+    vi.spyOn(Date, 'now').mockImplementation(() => (mockTime += 50));
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -155,6 +163,57 @@ describe('AskUserDialog', () => {
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith({ '0': 'API Key' });
+    });
+  });
+
+  it('supports multi-line input for "Other" option in choice questions', async () => {
+    const authQuestionWithOther: Question[] = [
+      {
+        question: 'Which authentication method?',
+        header: 'Auth',
+        options: [{ label: 'OAuth 2.0', description: '' }],
+        multiSelect: false,
+      },
+    ];
+
+    const onSubmit = vi.fn();
+    const { stdin, lastFrame } = renderWithProviders(
+      <AskUserDialog
+        questions={authQuestionWithOther}
+        onSubmit={onSubmit}
+        onCancel={vi.fn()}
+        width={120}
+      />,
+      { width: 120 },
+    );
+
+    // Navigate to "Other" option
+    writeKey(stdin, '\x1b[B'); // Down to "Other"
+
+    // Type first line
+    for (const char of 'Line 1') {
+      writeKey(stdin, char);
+    }
+
+    // Insert newline using \ + Enter (handled by bufferBackslashEnter)
+    writeKey(stdin, '\\');
+    writeKey(stdin, '\r');
+
+    // Type second line
+    for (const char of 'Line 2') {
+      writeKey(stdin, char);
+    }
+
+    await waitFor(() => {
+      expect(lastFrame()).toContain('Line 1');
+      expect(lastFrame()).toContain('Line 2');
+    });
+
+    // Press Enter to submit
+    writeKey(stdin, '\r');
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({ '0': 'Line 1\nLine 2' });
     });
   });
 
@@ -763,7 +822,7 @@ describe('AskUserDialog', () => {
       });
     });
 
-    it('does not submit empty text', () => {
+    it('submits empty text as unanswered', async () => {
       const textQuestion: Question[] = [
         {
           question: 'Enter the class name:',
@@ -785,8 +844,9 @@ describe('AskUserDialog', () => {
 
       writeKey(stdin, '\r');
 
-      // onSubmit should not be called for empty text
-      expect(onSubmit).not.toHaveBeenCalled();
+      await waitFor(() => {
+        expect(onSubmit).toHaveBeenCalledWith({});
+      });
     });
 
     it('clears text on Ctrl+C', async () => {
