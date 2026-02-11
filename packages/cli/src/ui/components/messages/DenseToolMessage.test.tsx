@@ -229,33 +229,35 @@ describe('DenseToolMessage', () => {
 
   it('renders correctly for ls results', () => {
     const lsResult = {
-      summary: 'Listed 2 files',
+      summary: 'Listed 2 files. (1 ignored)',
       files: ['file1.ts', 'dir1'],
     };
     const { lastFrame } = renderWithProviders(
       <DenseToolMessage {...defaultProps} resultDisplay={lsResult} />,
     );
     const output = lastFrame();
-    expect(output).toContain('→ Listed 2 files');
-    expect(output).toContain('file1.ts');
-    expect(output).toContain('dir1');
+    expect(output).toContain('→ Listed 2 files. (1 ignored)');
+    // Directory listings should not have a payload in dense mode
+    expect(output).not.toContain('file1.ts');
+    expect(output).not.toContain('dir1');
   });
 
   it('renders correctly for ReadManyFiles results', () => {
     const rmfResult = {
       summary: 'Read 3 file(s)',
       files: ['file1.ts', 'file2.ts', 'file3.ts'],
+      include: ['**/*.ts'],
       skipped: [{ path: 'skipped.bin', reason: 'binary' }],
     };
     const { lastFrame } = renderWithProviders(
       <DenseToolMessage {...defaultProps} resultDisplay={rmfResult} />,
     );
     const output = lastFrame();
-    expect(output).toContain('→ Read 3 file(s)');
+    expect(output).toContain('Attempting to read files from **/*.ts');
+    expect(output).toContain('→ Read 3 file(s) (1 ignored)');
     expect(output).toContain('file1.ts');
     expect(output).toContain('file2.ts');
     expect(output).toContain('file3.ts');
-    expect(output).toContain('(1 skipped)');
   });
 
   it('renders correctly for todo updates', () => {

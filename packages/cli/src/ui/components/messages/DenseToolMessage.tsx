@@ -144,44 +144,30 @@ function getFileOpData(
   return { description, summary, payload };
 }
 
-function getListResultData(
-  result: ListDirectoryResult | ReadManyFilesResult,
-  toolName: string,
-  originalDescription?: string,
-): ViewParts {
-  let description = originalDescription;
-  const items: string[] = result.files ?? [];
+function getReadManyFilesData(result: ReadManyFilesResult): ViewParts {
+  const items = result.files ?? [];
   const maxVisible = 10;
+  const includePatterns = result.include?.join(', ') ?? '';
+  const description = `Attempting to read files from ${includePatterns}`;
 
-  // Enhance with ReadManyFiles specific data if present
-  const rmf = result as ReadManyFilesResult;
-  if (toolName === 'ReadManyFiles' && rmf.include) {
-    const includePatterns = rmf.include.join(', ');
-    description = `Attempting to read files from ${includePatterns}`;
-    result.summary = `Read ${items.length} file(s)`;
-  }
-
-  const summary = <Text color={theme.text.accent}>→ {result.summary}</Text>;
-
-  const skippedCount = rmf.skipped?.length ?? 0;
-  const skippedText =
-    skippedCount > 0 ? `(${skippedCount} skipped)` : undefined;
+  const skippedCount = result.skipped?.length ?? 0;
+  const summaryStr = `Read ${items.length} file(s)${
+    skippedCount > 0 ? ` (${skippedCount} ignored)` : ''
+  }`;
+  const summary = <Text color={theme.text.accent}>→ {summaryStr}</Text>;
 
   const excludedText =
-    rmf.excludes && rmf.excludes.length > 0
-      ? `Excluded patterns: ${rmf.excludes.slice(0, 3).join(', ')}${rmf.excludes.length > 3 ? '...' : ''}`
+    result.excludes && result.excludes.length > 0
+      ? `Excluded patterns: ${result.excludes.slice(0, 3).join(', ')}${
+          result.excludes.length > 3 ? '...' : ''
+        }`
       : undefined;
 
   const hasItems = items.length > 0;
   const payload =
-    hasItems || skippedText || excludedText ? (
+    hasItems || excludedText ? (
       <Box flexDirection="column" marginLeft={2}>
         {hasItems && <RenderItemsList items={items} maxVisible={maxVisible} />}
-        {skippedText && (
-          <Text color={theme.text.secondary} dimColor>
-            {skippedText}
-          </Text>
-        )}
         {excludedText && (
           <Text color={theme.text.secondary} dimColor>
             {excludedText}
@@ -191,6 +177,30 @@ function getListResultData(
     ) : undefined;
 
   return { description, summary, payload };
+}
+
+function getListDirectoryData(
+  result: ListDirectoryResult,
+  originalDescription?: string,
+): ViewParts {
+  const summary = <Text color={theme.text.accent}>→ {result.summary}</Text>;
+  // For directory listings, we want NO payload in dense mode as per request
+  return { description: originalDescription, summary, payload: undefined };
+}
+
+function getListResultData(
+  result: ListDirectoryResult | ReadManyFilesResult,
+  toolName: string,
+  originalDescription?: string,
+): ViewParts {
+  // Use 'include' to determine if this is a ReadManyFilesResult
+  if ('include' in result) {
+    return getReadManyFilesData(result);
+  }
+  return getListDirectoryData(
+    result as ListDirectoryResult,
+    originalDescription,
+  );
 }
 
 function getGenericSuccessData(
