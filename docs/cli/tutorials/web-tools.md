@@ -1,37 +1,79 @@
-# Use web search and fetch in prompts
+# Web search and fetch
 
-Gemini CLI can access the internet to provide you with up-to-date information,
-news, and content from specific URLs. You can trigger these capabilities by
-simply asking for them in your prompts.
+Access the live internet directly from your prompt. In this guide, you'll learn
+how to search for up-to-date documentation, fetch deep context from specific
+URLs, and apply that knowledge to your code.
 
-## Search the web
+## Prerequisites
 
-If you need information that isn't in the model's training data (for example,
-recent events or current documentation), just ask Gemini to search for it.
+- Gemini CLI installed and authenticated.
+- An internet connection.
 
-- "Search for the latest advancements in..."
-- "What is the current version of the React documentation?"
-- "Find a tutorial on how to use..."
+## 1. Research new technologies
 
-The model will use the `google_web_search` tool and provide a summary with
-citations.
+Imagine you want to use a library released yesterday. The model doesn't know
+about it yet. You need to teach it.
 
-## Fetch content from URLs
+**Prompt:**
+`Search for the 'Bun 1.0' release notes and summarize the key changes.`
 
-You can ask Gemini to summarize, compare, or extract data from specific web
-pages by including the URLs directly in your prompt.
+Gemini uses the `google_web_search` tool to find relevant pages and synthesizes
+an answer. This "grounding" process ensures the agent isn't hallucinating
+features that don't exist.
 
-- "Summarize https://example.com/article"
-- "What are the key points from this blog post: https://another.com/post"
-- "Compare the conclusions of these two papers: https://arxiv.org/abs/... and
-  https://arxiv.org/abs/..."
+**Prompt:** `Find the documentation for the 'React Router v7' loader API.`
 
-The model will use the `web_fetch` tool to retrieve the content and process it
-according to your instructions.
+## 2. Fetch deep context
+
+Search gives you a summary, but sometimes you need the raw details. The
+`web_fetch` tool lets you feed a specific URL directly into the agent's context.
+
+**Scenario:** You found a blog post with the exact solution to your bug.
+
+**Prompt:**
+`Read https://example.com/fixing-memory-leaks and explain how to apply it to my code.`
+
+Gemini will retrieve the page content (stripping away ads and navigation) and
+use it to answer your question.
+
+### Comparing sources
+
+You can even fetch multiple pages to compare approaches.
+
+**Prompt:**
+`Compare the pagination patterns in https://api.example.com/v1/docs and https://api.example.com/v2/docs.`
+
+## 3. Apply knowledge to code
+
+The real power comes when you combine web tools with file editing. You can
+bridge the gap between "reading the docs" and "writing the code."
+
+**Workflow:**
+
+1.  **Search:** "How do I implement auth with Supabase?"
+2.  **Fetch:** "Read this guide: https://supabase.com/docs/guides/auth."
+3.  **Implement:** "Great. Now use that pattern to create an `auth.ts` file in
+    my project."
+
+This loop—Search, Fetch, Implement—allows you to build features using libraries
+you've never seen before, with the agent acting as a pair programmer who reads
+the documentation alongside you.
+
+## 4. Troubleshooting errors
+
+When you hit an obscure error message, paste it into the chat.
+
+**Prompt:**
+`I'm getting 'Error: hydration mismatch' in Next.js. Search for recent solutions.`
+
+The agent will search GitHub issues, StackOverflow, and forums to find relevant
+fixes that might be too new to be in its base training set.
 
 ## Next steps
 
-- See the [Web search tool reference](../../tools/web-search.md) for technical
+- Explore [File management](file-management.md) to see how to apply the code you
+  generate.
+- See the [Web search tool reference](../../tools/web-search.md) for citation
   details.
-- See the [Web fetch tool reference](../../tools/web-fetch.md) for URL limits
-  and fallback behavior.
+- See the [Web fetch tool reference](../../tools/web-fetch.md) for technical
+  limitations.

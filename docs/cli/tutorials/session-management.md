@@ -1,48 +1,113 @@
-# Manage conversation history and sessions
+# Manage sessions and history
 
-Gemini CLI automatically saves your conversation history so you can pick up
-exactly where you left off. You can resume past sessions, browse your history,
-and even "rewind" time to a previous state.
+Resume, browse, and rewind your conversations with Gemini CLI. In this guide,
+you'll learn how to switch between tasks, manage your session history, and undo
+mistakes using the rewind feature.
 
-## Resume a session
+## Prerequisites
 
-You can continue a previous conversation by using the `--resume` (or `-r`) flag
-when starting the CLI.
+- Gemini CLI installed and authenticated.
+- At least one active or past session.
 
-- **Resume latest:** `gemini --resume`
-- **Resume by index:** `gemini --resume 1`
-- **Resume by ID:** `gemini --resume a1b2c3d4...`
+## 1. Resume where you left off
 
-Alternatively, use the `/resume` command while the CLI is running to open the
-interactive **Session Browser**.
+It's common to switch context—maybe you're waiting for a build and want to work
+on a different feature. Gemini makes it easy to jump back in.
 
-## Manage your history
+### Resume the last session
 
-You can list all available sessions or delete unwanted history to keep your
-workspace clean.
+The fastest way to pick up your most recent work is with the `--resume` flag (or
+`-r`).
 
-- **List sessions:** `gemini --list-sessions`
-- **Delete a session:** `gemini --delete-session 2`
+```bash
+gemini -r
+```
 
-In the Session Browser (`/resume`), you can also press **x** to delete the
-currently selected session.
+This restores your chat history and memory, so you can say "Continue with the
+next step" immediately.
 
-## Rewind conversation and files
+### Browse past sessions
 
-The `/rewind` command allows you to navigate backward through your current
-session history. This is useful for undoing mistakes or exploring different
-approaches.
+If you want to find a specific conversation from yesterday, use the interactive
+browser.
 
-When you rewind, you can choose to:
+**Command:** `/resume`
 
-- Revert the conversation history only.
-- Revert file changes made by the AI only.
-- Revert both history and file changes simultaneously.
+This opens a searchable list of all your past sessions. You'll see:
+
+- A timestamp (e.g., "2 hours ago").
+- The first user message (helping you identify the topic).
+- The number of turns in the conversation.
+
+Select a session and press **Enter** to load it.
+
+## 2. Manage your workspace
+
+Over time, you'll accumulate a lot of history. Keeping your session list clean
+helps you find what you need.
+
+### Deleting sessions
+
+In the `/resume` browser, navigate to a session you no longer need and press
+**x**. This permanently deletes the history for that specific conversation.
+
+You can also manage sessions from the command line:
+
+```bash
+# List all sessions with their IDs
+gemini --list-sessions
+
+# Delete a specific session by ID or index
+gemini --delete-session 1
+```
+
+## 3. Rewind time (Undo mistakes)
+
+We've all been there: you ask the agent to refactor a file, and it deletes
+something critical. Or maybe you just went down a rabbit hole and want to start
+over.
+
+Gemini CLI's **Rewind** feature is like `Ctrl+Z` for your entire workflow.
+
+### Triggering rewind
+
+At any point in a chat, type `/rewind` or press **Esc** twice.
+
+### Choosing a restore point
+
+You'll see a list of your recent interactions. Select the point _before_ the
+mistake happened.
+
+### Choosing what to revert
+
+Gemini gives you granular control over the undo process. You can choose to:
+
+1.  **Rewind conversation:** Only remove the chat history. The files stay
+    changed. (Useful if the code is good but the chat got off track).
+2.  **Revert code changes:** Keep the chat history but undo the file edits.
+    (Useful if you want to keep the context but retry the implementation).
+3.  **Rewind both:** Restore everything to exactly how it was. (The "Panic
+    Button").
+
+**Tip:** This uses a hidden Git history, so it's safe even if you haven't
+committed your changes to your actual Git repo yet.
+
+## 4. Forking conversations
+
+Sometimes you want to try two different approaches to the same problem.
+
+1.  Start a session and get to a decision point.
+2.  **Save** the current state with `/chat save decision-point`.
+3.  Try "Approach A".
+4.  Later, use `/chat resume decision-point` to fork the conversation back to
+    that moment and try "Approach B".
+
+This creates a new branch of history without losing your original work.
 
 ## Next steps
 
-- Read the full [Session management guide](../../cli/session-management.md) for
-  configuration and details.
-- See the [Rewind guide](../../cli/rewind.md) for more details on the interface.
-- Explore the [Command reference](../../cli/commands.md) for all session-related
-  commands.
+- Learn about [Checkpointing](../../cli/checkpointing.md) to understand the
+  underlying safety mechanism.
+- Explore [Task planning](task-planning.md) to keep complex sessions organized.
+- See the [Command reference](../../cli/commands.md) for all `/chat` and
+  `/resume` options.

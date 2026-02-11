@@ -1,47 +1,125 @@
-# Manage persistent context and memory
+# Manage context and memory
 
-Gemini CLI provides two ways to maintain persistent context across your
-sessions: `GEMINI.md` files for project-wide instructions and the `save_memory`
-tool for individual facts.
+Control what Gemini CLI knows about you and your projects. In this guide, you'll
+learn how to define project-wide rules with `GEMINI.md`, teach the agent
+persistent facts, and inspect the active context.
 
-## Project context with `GEMINI.md`
+## Prerequisites
 
-You can define persistent rules, personas, and coding standards for your
-projects by creating `GEMINI.md` files. The CLI automatically loads these files
-and includes them in every prompt.
+- Gemini CLI installed and authenticated.
+- A project directory where you want to enforce specific rules.
 
-- **Hierarchical loading:** Context is loaded from your global config, your
-  project root, and your current subdirectory.
-- **Example uses:** Define your preferred indentation, naming conventions, or
-  architectural patterns.
-- **Refresh context:** Use the `/memory refresh` command if you update your
-  `GEMINI.md` files while a session is active.
+## Why manage context?
 
-## Individual facts with `save_memory`
+Out of the box, Gemini CLI is smart but generic. It doesn't know your preferred
+testing framework, your indentation style, or that you hate using `any` in
+TypeScript. Context management solves this by giving the agent persistent
+memory.
 
-If you want Gemini to remember a specific detail indefinitely, you can ask it to
-"remember" or "save" information.
+You'll use these features when you want to:
 
-- "Remember that my preferred testing framework is Vitest."
-- "Save the fact that this project uses a microservices architecture."
+- **Enforce standards:** Ensure every generated file matches your team's style
+  guide.
+- **Set a persona:** Tell the agent to act as a "Senior Rust Engineer" or "QA
+  Specialist."
+- **Remember facts:** Save details like "My database port is 5432" so you don't
+  have to repeat them.
 
-This information is stored in your global `GEMINI.md` file and will be available
-in all future sessions.
+## 1. Define project-wide rules (GEMINI.md)
 
-## Inspecting your context
+The most powerful way to control the agent's behavior is through `GEMINI.md`
+files. These are Markdown files containing instructions that are automatically
+loaded into every conversation.
 
-You can view the exact instructional context being provided to the model at any
-time.
+### Create a project context file
 
-- **`/memory show`:** Displays the full, concatenated content of all loaded
-  context files.
-- **`/memory list`:** Lists the paths of the specific `GEMINI.md` files
-  currently in use.
+In the root of your project, create a file named `GEMINI.md`.
+
+```markdown
+# Project Instructions
+
+- **Framework:** We use React with Vite.
+- **Styling:** Use Tailwind CSS for all styling. Do not write custom CSS.
+- **Testing:** All new components must include a Vitest unit test.
+- **Tone:** Be concise. Don't explain basic React concepts.
+```
+
+Now, every time you start a session in this directory, Gemini will know these
+rules. You won't have to say "use Tailwind" in every prompt.
+
+### Understanding the hierarchy
+
+Context is loaded hierarchically. This allows you to have general rules for
+everything and specific rules for sub-projects.
+
+1.  **Global:** `~/.gemini/GEMINI.md` (Rules for _every_ project you work on).
+2.  **Project Root:** `./GEMINI.md` (Rules for the current repository).
+3.  **Subdirectory:** `./src/GEMINI.md` (Rules specific to the `src` folder).
+
+**Example:** You might set "Always use strict typing" in your global config, but
+"Use Python 3.11" only in your backend repository.
+
+## 2. Teach the agent facts (Memory)
+
+Sometimes you don't want to write a config file. You just want to tell the agent
+something once and have it remember forever. You can do this naturally in chat.
+
+### Saving a memory
+
+Just tell the agent to remember something.
+
+**Prompt:** `Remember that I prefer using 'const' over 'let' wherever possible.`
+
+The agent will use the `save_memory` tool to store this fact in your global
+memory file.
+
+**Prompt:** `Save the fact that the staging server IP is 10.0.0.5.`
+
+### Using memory in conversation
+
+Once a fact is saved, you don't need to invoke it explicitly. The agent "knows"
+it.
+
+**Next Prompt:** `Write a script to deploy to staging.`
+
+**Agent Response:** "I'll write a script to deploy to **10.0.0.5**..."
+
+## 3. Manage and inspect context
+
+As your project grows, you might want to see exactly what instructions the agent
+is following.
+
+### View active context
+
+To see the full, concatenated set of instructions currently loaded (from all
+`GEMINI.md` files and saved memories), use the `/memory show` command.
+
+**Command:** `/memory show`
+
+This prints the raw text the model receives at the start of the session. It's
+excellent for debugging why the agent might be ignoring a rule.
+
+### Refresh context
+
+If you edit a `GEMINI.md` file while a session is running, the agent won't know
+immediately. Force a reload with:
+
+**Command:** `/memory refresh`
+
+## Best practices
+
+- **Keep it focused:** Don't dump your entire internal wiki into `GEMINI.md`.
+  Keep instructions actionable and relevant to code generation.
+- **Use negative constraints:** Explicitly telling the agent what _not_ to do
+  (e.g., "Do not use class components") is often more effective than vague
+  positive instructions.
+- **Review often:** Periodically check your `GEMINI.md` files to remove outdated
+  rules.
 
 ## Next steps
 
-- Read the detailed guide on
-  [Providing context with GEMINI.md](../../cli/gemini-md.md).
-- See the [Memory tool reference](../../tools/memory.md) for technical details.
+- Learn about [Session management](session-management.md) to see how short-term
+  history works.
 - Explore the [Command reference](../../cli/commands.md) for more `/memory`
-  sub-commands.
+  options.
+- Read the technical spec for [Project context](../../cli/gemini-md.md).

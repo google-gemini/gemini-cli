@@ -1,30 +1,43 @@
 # Set up an MCP server
 
-This tutorial demonstrates how to set up a Model Context Protocol (MCP) server
-using the [GitHub MCP server](https://github.com/github/github-mcp-server) as an
-example.
-
-> **Warning:** Before using a third-party MCP server, ensure you trust its
-> source and understand the tools it provides. Your use of third-party servers
-> is at your own risk.
+Connect Gemini CLI to your external databases and services. In this guide,
+you'll learn how to extend the agent's capabilities by installing the GitHub MCP
+server and using it to manage your repositories.
 
 ## Prerequisites
 
-Before you begin, ensure you have the following installed and configured:
+- Gemini CLI installed.
+- **Docker:** Required for this specific example (many MCP servers run as Docker
+  containers).
+- **GitHub Token:** A Personal Access Token (PAT) with repo permissions.
 
-- **Docker:** Install and run [Docker](https://www.docker.com/).
-- **GitHub Personal Access Token (PAT):** Create a new
-  [classic](https://github.com/settings/tokens/new) or
-  [fine-grained](https://github.com/settings/personal-access-tokens/new) PAT
-  with the necessary scopes.
+## 1. Understand the goal
 
-## Configure the MCP server
+We want to give Gemini the ability to read your repositories, check pull
+requests, and create issues—without you having to copy-paste links into the
+chat. We'll do this by running a small "sidecar" server that speaks MCP.
 
-To add the server, you need to update your Gemini CLI settings.
+## 2. Prepare your credentials
 
-1.  Open your
-    [`.gemini/settings.json` file](../../get-started/configuration.md).
-2.  Add the `mcpServers` configuration block:
+Most MCP servers require authentication. For GitHub, you need a PAT.
+
+1.  Create a [fine-grained PAT](https://github.com/settings/tokens?type=beta).
+2.  Grant it **Read** access to **Metadata** and **Contents**, and
+    **Read/Write** access to **Issues** and **Pull Requests**.
+3.  Store it in your environment:
+
+```bash
+export GITHUB_PERSONAL_ACCESS_TOKEN="github_pat_..."
+```
+
+## 3. Configure Gemini CLI
+
+You tell Gemini about new servers by editing your `settings.json`.
+
+1.  Open `~/.gemini/settings.json` (or the project-specific
+    `.gemini/settings.json`).
+2.  Add the `mcpServers` block. This tells Gemini: "Run this docker container
+    and talk to it."
 
 ```json
 {
@@ -37,7 +50,7 @@ To add the server, you need to update your Gemini CLI settings.
         "--rm",
         "-e",
         "GITHUB_PERSONAL_ACCESS_TOKEN",
-        "ghcr.io/github/github-mcp-server"
+        "ghcr.io/modelcontextprotocol/servers/github:latest"
       ],
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
@@ -47,26 +60,48 @@ To add the server, you need to update your Gemini CLI settings.
 }
 ```
 
-## Set your authentication token
+> **Note:** The `command` is `docker`, and the rest are arguments passed to it.
+> We map the local environment variable into the container so your secret isn't
+> hardcoded in the config file.
 
-Store your GitHub PAT in an environment variable. We recommend using a
-fine-grained access token to limit the potential for data leakage.
+## 4. Verify the connection
 
-```bash
-GITHUB_PERSONAL_ACCESS_TOKEN="pat_YourActualGitHubTokenHere"
-```
+Restart Gemini CLI. It will automatically try to start the defined servers.
 
-## Verify the connection
+**Command:** `/mcp list`
 
-Launch Gemini CLI. It will automatically connect to the GitHub MCP server in the
-background. You can then use natural language prompts to perform GitHub actions:
+You should see: `✓ github: docker ... - Connected`
 
-- "List my open pull requests in the `foo/bar` repository."
-- "Get all open issues assigned to me and prioritize them."
+If you see `Disconnected` or an error, check that Docker is running and your API
+token is valid.
+
+## 5. Use the new tools
+
+Now that the server is running, the agent has new capabilities ("tools"). You
+don't need to learn special commands; just ask in natural language.
+
+**Prompt:** `List the open PRs in the google/gemini-cli repository.`
+
+The agent will:
+
+1.  Recognize the request matches a GitHub tool.
+2.  Call `github_list_pull_requests`.
+3.  Present the data to you.
+
+**Prompt:**
+`Create an issue in my repo titled "Bug: Login fails" with the description "See logs".`
+
+## Troubleshooting
+
+- **Server won't start?** Try running the docker command manually in your
+  terminal to see if it prints an error (e.g., "image not found").
+- **Tools not found?** Run `/mcp refresh` to force the CLI to re-query the
+  server for its capabilities.
 
 ## Next steps
 
-- Explore the [MCP servers reference](../../tools/mcp-server.md) for more
-  transports and options.
-- Learn about [Agent Skills](./agent-skills.md) for task-specific procedural
-  knowledge.
+- Explore the [MCP servers reference](../../tools/mcp-server.md) to learn about
+  SSE and HTTP transports for remote servers.
+- Browse the
+  [official MCP server list](https://github.com/modelcontextprotocol/servers) to
+  find connectors for Slack, Postgres, Google Drive, and more.
