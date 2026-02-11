@@ -1,0 +1,130 @@
+# Local Model Routing (experimental)
+
+Gemini CLI supports using a local model for [routing decisions](../cli/model-routing.md).
+When configured, Gemini CLI will use a locally-running **Gemma** model to make routing
+decisions (instead of sending routing decisions to a hosted model).
+
+This feature can help reduce costs associated with hosted model usage while offering similar routing decision
+latency and quality.
+
+> **Note: Local model routing is currently an experimental feature.**
+
+## Setup
+
+Using a Gemma model for routing decisions requires that an implementation of a Gemma model be
+running locally on your machine, served behind an HTTP endpoint and accessed via the Gemini API.
+
+To serve the Gemma model, follow these steps:
+
+### Download the LiteRT-LM runtime
+
+The [LiteRT-LM](https://github.com/google-ai-edge/LiteRT-LM) runtime offers pre-built binaries for 
+locally-serving models. Download the binary appropriate for your system.
+
+#### Windows
+
+1. Download [lit-windows-amd64.exe](), [dxil.dll](), [dxcompiler.dll]() to the same directory.
+2. (Optional) Test starting the runtime: `.\lit-windows-amd64.exe serve --verbose`
+
+#### Linux
+
+1. Download [lit-linux-amd64]().
+2. Ensure the binary is executable: `chmod a+x lit-linux-amd64`
+3. (Optional) Test starting the runtime: `./lit-linux-amd64 serve --verbose`
+
+#### MacOS
+
+1. Download [lit-macos-arm64]().
+2. Ensure the binary is executable: `chmod a+x lit-macos-arm64`
+3. (Optional) Test starting the runtime: `./lit-macos-arm64 serve --verbose`
+
+### Download the Gemma Model 
+
+Before using Gemma, you will need to download the model (and agree to the Terms of Service). This
+can be done via the LiteRT-LM runtime via:
+
+```bash
+$ ./lit-linux-arm64 pull gemma3-1b-gpu-custom
+
+[Legal] The model you are about to download is governed by 
+the Gemma Terms of Use and Prohibited Use Policy. Please review these terms and ensure you agree before continuing.
+
+Full Terms: https://ai.google.dev/gemma/terms
+Prohibited Use Policy: https://ai.google.dev/gemma/prohibited_use_policy
+
+Do you accept these terms? (Y/N): Y
+
+[Success] Terms accepted. 
+[Lorry] Downloading gemma3-1b-gpu-custom...
+[####################################] 100% (554.7 MB)
+```
+
+### Start LiteRT-LM Runtime
+
+Using the command appropriate to your system, start the LiteRT-LM runtime. Configure
+the port that you want to use for your Gemma model. For the purposes of this document,
+we will use port `8000`.
+
+Example command for MacOS: `./lit-macos-arm64 serve --port=8000 --verbose`
+
+### (Optional) Verify Model Serving
+
+Send a quick prompt to the model via HTTP to validate successful model serving.
+This will cause the runtime to download the model and run it once.
+
+You should see a short joke in the server output as an indicator of success.
+
+#### Windows
+
+```
+# Run this in PowerShell to send a request to the server
+
+$uri = "http://localhost:8000/v1beta/models/gemma3-1b-gpu-custom:generateContent"
+$body = @{contents = @( @{
+  role = "user"
+  parts = @( @{ text = "Tell me a joke." } )
+})} | ConvertTo-Json -Depth 10
+
+Invoke-RestMethod -Uri $uri -Method Post -Body $body -ContentType "application/json"
+```
+
+#### Linux/MacOS
+
+```bash
+$ curl "http://localhost:8000/v1beta/models/gemma3-1b-gpu-custom:generateContent" \
+  -H 'Content-Type: application/json' \
+  -X POST \
+  -d '{"contents":[{"role":"user","parts":[{"text":"Tell me a joke."}]}]}'
+```
+
+## Configuration
+
+To use a local Gemma model for routing, you must explicitly enable it in your
+`settings.json`:
+
+```json
+{
+  "experimental": {
+    "gemmaModelRouter": {
+      "enabled": true,
+      "classifier": {
+        "host": "http://localhost:8000",
+        "model": "gemma3-1b-gpu-custom" 
+      }
+    }
+  }
+}
+```
+
+> Use the port you started your LiteRT-LM runtime on in the setup steps.
+
+### Configuration schema
+
+| Field            | Type   | Required | Description                                                                                                    |
+| :--------------- | :----- | :------- | :------------------------------------------------------------------------------------------------------------- |
+| `enabled`           | boolean | Yes      | Must be `true` to enable the feature.                                                                                              |
+| `classifier`           | object | Yes      | The configuration for the local model endpoint. It includes the host and model specifiers. |
+| `classifier.host` | string | Yes      | The URL to the local model server. Should be `http://localhost:<port>`. |
+| `classifier.model` | string | Yes      | The model name to use for decisions. Must be one of [`"gemma3-1b-gpu-custom"`, `"gemma3-1b-int4b32-gpu-custom"`, `"gemma3-1b"`] |
+
+> **Note: You will need to restart after configuration changes for local model routing to take effect.**
