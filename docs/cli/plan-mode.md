@@ -30,6 +30,7 @@ implementation strategy.
   - [The Planning Workflow](#the-planning-workflow)
   - [Exiting Plan Mode](#exiting-plan-mode)
 - [Tool Restrictions](#tool-restrictions)
+  - [Customizing Planning with Skills](#customizing-planning-with-skills)
   - [Customizing Policies](#customizing-policies)
 
 ## Starting in Plan Mode
@@ -98,6 +99,28 @@ These are the only allowed tools:
   `postgres_read_schema`) are allowed.
 - **Planning (Write):** [`write_file`] and [`replace`] ONLY allowed for `.md`
   files in the `~/.gemini/tmp/<project>/plans/` directory.
+- **Skills:** [`activate_skill`] (allows loading specialized instructions and
+  resources in a read-only manner)
+
+### Customizing Planning with Skills
+
+You can leverage [Agent Skills](./skills.md) to customize how Gemini CLI
+approaches planning for specific types of tasks. When a skill is activated
+during Plan Mode, its specialized instructions and procedural workflows will
+guide the research and design phases.
+
+For example:
+
+- A **"Database Migration"** skill could ensure the plan includes data safety
+  checks and rollback strategies.
+- A **"Security Audit"** skill could prompt the agent to look for specific
+  vulnerabilities during codebase exploration.
+- A **"Frontend Design"** skill could guide the agent to use specific UI
+  components and accessibility standards in its proposal.
+
+To use a skill in Plan Mode, you can explicitly ask the agent to "use the
+[skill-name] skill to plan..." or the agent may autonomously activate it based
+on the task description.
 
 ### Customizing Policies
 
@@ -154,5 +177,6 @@ Guide].
 [`google_web_search`]: /docs/tools/web-search.md
 [`replace`]: /docs/tools/file-system.md#6-replace-edit
 [MCP tools]: /docs/tools/mcp-server.md
+[`activate_skill`]: /docs/cli/skills.md
 [experimental research sub-agents]: /docs/core/subagents.md
 [Policy Engine Guide]: /docs/core/policy-engine.md
