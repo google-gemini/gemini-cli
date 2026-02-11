@@ -137,6 +137,42 @@ function normalizeCell(value: unknown): PrimitiveCell {
   return JSON.stringify(value);
 }
 
+function normalizeLookupKey(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function getRecordValueByColumn(
+  record: Record<string, unknown>,
+  column: string,
+): unknown {
+  if (Object.prototype.hasOwnProperty.call(record, column)) {
+    return record[column];
+  }
+
+  const normalizedColumn = normalizeLookupKey(column);
+  if (normalizedColumn.length === 0) {
+    return undefined;
+  }
+
+  const entries = Object.entries(record).map(([key, value]) => ({
+    key,
+    value,
+    normalized: normalizeLookupKey(key),
+  }));
+
+  const exact = entries.find((entry) => entry.normalized === normalizedColumn);
+  if (exact) {
+    return exact.value;
+  }
+
+  const partial = entries.find(
+    (entry) =>
+      entry.normalized.includes(normalizedColumn) ||
+      normalizedColumn.includes(entry.normalized),
+  );
+  return partial?.value;
+}
+
 function makeBar(value: number, max: number, width: number): string {
   const safeMax = max <= 0 ? 1 : max;
   const ratio = Math.max(0, Math.min(1, value / safeMax));
@@ -234,7 +270,9 @@ function asTable(data: Record<string, unknown>): {
 
       const record = row;
       const keys = columns.length > 0 ? columns : Object.keys(record);
-      return keys.map((key) => normalizeCell(record[key]));
+      return keys.map((key) =>
+        normalizeCell(getRecordValueByColumn(record, key)),
+      );
     });
 
   const inferredColumns =

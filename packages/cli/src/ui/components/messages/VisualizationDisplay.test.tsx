@@ -128,6 +128,38 @@ describe('VisualizationResultDisplay', () => {
     expect(frame).toContain('Showing truncated data (8 original items)');
   });
 
+  it('renders table object rows with humanized columns without blank cells', () => {
+    const visualization: VisualizationDisplay = {
+      type: 'visualization',
+      kind: 'table',
+      title: 'Server Health Check',
+      data: {
+        columns: ['Server Name', 'CPU %', 'Memory GB', 'Status'],
+        rows: [
+          {
+            server_name: 'api-1',
+            cpu_percent: 62,
+            memoryGb: 8,
+            status: 'healthy',
+          },
+        ],
+      },
+      meta: {
+        truncated: false,
+        originalItemCount: 1,
+      },
+    };
+
+    const { lastFrame } = render(
+      <VisualizationResultDisplay visualization={visualization} width={100} />,
+    );
+    const frame = lastFrame();
+
+    expect(frame).toContain('Server Name');
+    expect(frame).toContain('api-1');
+    expect(frame).toContain('healthy');
+  });
+
   it('renders diagram visualization with UML-like nodes', () => {
     const visualization: VisualizationDisplay = {
       type: 'visualization',

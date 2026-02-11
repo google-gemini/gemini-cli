@@ -206,6 +206,34 @@ describe('RenderVisualizationTool', () => {
     });
   });
 
+  it('maps table object rows when column labels are humanized', async () => {
+    const result = await tool.buildAndExecute(
+      {
+        visualizationKind: 'table',
+        data: {
+          columns: ['Server Name', 'CPU %', 'Memory GB', 'Status'],
+          rows: [
+            {
+              server_name: 'api-1',
+              cpu_percent: 62,
+              memoryGb: 8,
+              status: 'healthy',
+            },
+          ],
+        },
+      },
+      signal,
+    );
+
+    expect(result.returnDisplay).toMatchObject({
+      type: 'visualization',
+      kind: 'table',
+      data: {
+        rows: [['api-1', 62, 8, 'healthy']],
+      },
+    });
+  });
+
   it('renders diagram visualization', async () => {
     const params: RenderVisualizationToolParams = {
       visualizationKind: 'diagram',
@@ -243,6 +271,31 @@ describe('RenderVisualizationTool', () => {
             { source: 'start', target: 'validate', label: 'ok' },
             { source: 'validate', target: 'done' },
           ],
+        },
+      },
+      signal,
+    );
+
+    expect(result.returnDisplay).toMatchObject({
+      type: 'visualization',
+      kind: 'diagram',
+      data: {
+        direction: 'TB',
+      },
+    });
+  });
+
+  it('accepts top-level diagram direction alias', async () => {
+    const result = await tool.buildAndExecute(
+      {
+        visualizationKind: 'diagram',
+        direction: 'TB',
+        data: {
+          nodes: [
+            { id: 'start', label: 'Start' },
+            { id: 'end', label: 'End' },
+          ],
+          edges: [{ from: 'start', to: 'end' }],
         },
       },
       signal,

@@ -38,6 +38,8 @@ export interface RenderVisualizationToolParams {
   xLabel?: string;
   yLabel?: string;
   unit?: string;
+  direction?: 'LR' | 'TB' | string;
+  diagramKind?: 'architecture' | 'flowchart' | string;
   data: unknown;
   sourceContext?: string;
   sort?: SortMode;
@@ -127,6 +129,44 @@ function normalizeCell(value: unknown): PrimitiveCell {
     return '';
   }
   return JSON.stringify(value);
+}
+
+function normalizeLookupKey(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function getRecordValueByColumn(
+  record: Record<string, unknown>,
+  column: string,
+): unknown {
+  if (Object.prototype.hasOwnProperty.call(record, column)) {
+    return record[column];
+  }
+
+  const normalizedColumn = normalizeLookupKey(column);
+  if (normalizedColumn.length === 0) {
+    return undefined;
+  }
+
+  const normalizedEntries = Object.entries(record).map(([key, value]) => ({
+    key,
+    value,
+    normalized: normalizeLookupKey(key),
+  }));
+
+  const exactNormalized = normalizedEntries.find(
+    (entry) => entry.normalized === normalizedColumn,
+  );
+  if (exactNormalized) {
+    return exactNormalized.value;
+  }
+
+  const includesNormalized = normalizedEntries.find(
+    (entry) =>
+      entry.normalized.includes(normalizedColumn) ||
+      normalizedColumn.includes(entry.normalized),
+  );
+  return includesNormalized?.value;
 }
 
 function applySort(
@@ -805,7 +845,9 @@ function normalizeTable(
       if (columns.length === 0) {
         columns = Object.keys(rawRow);
       }
-      return columns.map((column) => normalizeCell(rawRow[column]));
+      return columns.map((column) =>
+        normalizeCell(getRecordValueByColumn(rawRow, column)),
+      );
     }
 
     throw new Error(`table row ${rowIndex} must be an array or object.`);
@@ -1090,9 +1132,33 @@ class RenderVisualizationToolInvocation extends BaseToolInvocation<
       Math.min(this.params.maxItems ?? DEFAULT_MAX_ITEMS, MAX_ALLOWED_ITEMS),
     );
 
+    const toolData = (() => {
+      const data = ensureRecord(this.params.data, '`data` must be an object.');
+      if (this.params.visualizationKind !== 'diagram') {
+        return data;
+      }
+
+      const diagramData: Record<string, unknown> = { ...data };
+      if (
+        diagramData['direction'] === undefined &&
+        typeof this.params.direction === 'string' &&
+        this.params.direction.trim().length > 0
+      ) {
+        diagramData['direction'] = this.params.direction;
+      }
+      if (
+        diagramData['diagramKind'] === undefined &&
+        typeof this.params.diagramKind === 'string' &&
+        this.params.diagramKind.trim().length > 0
+      ) {
+        diagramData['diagramKind'] = this.params.diagramKind;
+      }
+      return diagramData;
+    })();
+
     const normalized = normalizeByKind(
       this.params.visualizationKind,
-      this.params.data,
+      toolData,
       sort,
       maxItems,
     );
@@ -1198,6 +1264,16 @@ export class RenderVisualizationTool extends BaseDeclarativeTool<
           unit: {
             type: 'string',
             description: 'Optional unit label for values.',
+          },
+          direction: {
+            type: 'string',
+            description:
+              'Optional top-level direction alias for diagram calls; copied into data.direction when provided.',
+          },
+          diagramKind: {
+            type: 'string',
+            description:
+              'Optional top-level diagram kind alias for diagram calls; copied into data.diagramKind when provided.',
           },
           data: {
             type: 'object',
