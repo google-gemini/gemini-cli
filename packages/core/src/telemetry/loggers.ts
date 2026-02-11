@@ -220,12 +220,7 @@ export function logApiRequest(config: Config, event: ApiRequestEvent): void {
   ClearcutLogger.getInstance(config)?.logApiRequestEvent(event);
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
-    const logRecord: LogRecord = event.toLogRecord(config);
-    if (event.role) {
-      if (!logRecord.attributes) logRecord.attributes = {};
-      logRecord.attributes['role'] = event.role;
-    }
-    logger.emit(logRecord);
+    logger.emit(event.toLogRecord(config));
     logger.emit(event.toSemanticLogRecord(config));
   });
 }
