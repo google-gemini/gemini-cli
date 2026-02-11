@@ -1255,10 +1255,12 @@ describe('ClearcutLogger', () => {
         response: {
           resultDisplay: 'User answered: ...',
           data: {
-            ask_user_question_types: ['choice', 'text'],
-            ask_user_dismissed: false,
-            ask_user_empty_submission: false,
-            ask_user_answer_count: 2,
+            ask_user: {
+              question_types: ['choice', 'text'],
+              dismissed: false,
+              empty_submission: false,
+              answer_count: 2,
+            },
           },
         },
         status: 'success',

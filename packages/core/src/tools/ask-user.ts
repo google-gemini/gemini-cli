@@ -195,25 +195,31 @@ export class AskUserInvocation extends BaseToolInvocation<
     const questionTypes = this.params.questions.map(
       (q) => q.type ?? QuestionType.CHOICE,
     );
-    const metrics: Record<string, unknown> = {
-      ask_user_question_types: questionTypes,
-    };
 
     if (this.confirmationOutcome === ToolConfirmationOutcome.Cancel) {
-      metrics['ask_user_dismissed'] = true;
       return {
         llmContent: 'User dismissed ask_user dialog without answering.',
         returnDisplay: 'User dismissed dialog',
-        data: metrics,
+        data: {
+          ask_user: {
+            question_types: questionTypes,
+            dismissed: true,
+          },
+        },
       };
     }
 
     const answerEntries = Object.entries(this.userAnswers);
     const hasAnswers = answerEntries.length > 0;
 
-    metrics['ask_user_dismissed'] = false;
-    metrics['ask_user_empty_submission'] = !hasAnswers;
-    metrics['ask_user_answer_count'] = answerEntries.length;
+    const metrics: Record<string, unknown> = {
+      ask_user: {
+        question_types: questionTypes,
+        dismissed: false,
+        empty_submission: !hasAnswers,
+        answer_count: answerEntries.length,
+      },
+    };
 
     const returnDisplay = hasAnswers
       ? `**User answered:**\n${answerEntries

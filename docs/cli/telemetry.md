@@ -361,10 +361,20 @@ Captures tool executions, output truncation, and Edit behavior.
     - `extension_id` (string, if applicable)
     - `content_length` (int, if applicable)
     - `metadata` (if applicable), which includes for the `AskUser` tool:
-      - `ask_user_question_types` (array of strings)
-      - `ask_user_dismissed` (boolean)
-      - `ask_user_empty_submission` (boolean)
-      - `ask_user_answer_count` (number)
+      - `ask_user` (object):
+        - `question_types` (array of strings)
+        - `ask_user_dismissed` (boolean)
+        - `ask_user_empty_submission` (boolean)
+        - `ask_user_answer_count` (number)
+    - `diffStat` (if applicable), which includes:
+      - `model_added_lines` (number)
+      - `model_removed_lines` (number)
+      - `model_added_chars` (number)
+      - `model_removed_chars` (number)
+      - `user_added_lines` (number)
+      - `user_removed_lines` (number)
+      - `user_added_chars` (number)
+      - `user_removed_chars` (number)
 
 - `gemini_cli.tool_output_truncated`: Output of a tool call was truncated.
   - **Attributes**:

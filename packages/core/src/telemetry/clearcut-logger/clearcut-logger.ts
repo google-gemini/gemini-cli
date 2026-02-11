@@ -703,15 +703,27 @@ export class ClearcutLogger {
         user_removed_chars: EventMetadataKey.GEMINI_CLI_USER_REMOVED_CHARS,
       };
 
-      if (event.function_name === ASK_USER_TOOL_NAME) {
-        metadataMapping['ask_user_question_types'] =
-          EventMetadataKey.GEMINI_CLI_ASK_USER_QUESTION_TYPES;
-        metadataMapping['ask_user_dismissed'] =
-          EventMetadataKey.GEMINI_CLI_ASK_USER_DISMISSED;
-        metadataMapping['ask_user_empty_submission'] =
-          EventMetadataKey.GEMINI_CLI_ASK_USER_EMPTY_SUBMISSION;
-        metadataMapping['ask_user_answer_count'] =
-          EventMetadataKey.GEMINI_CLI_ASK_USER_ANSWER_COUNT;
+      if (
+        event.function_name === ASK_USER_TOOL_NAME &&
+        event.metadata['ask_user']
+      ) {
+        const askUser = event.metadata['ask_user'];
+        const askUserMapping: { [key: string]: EventMetadataKey } = {
+          question_types: EventMetadataKey.GEMINI_CLI_ASK_USER_QUESTION_TYPES,
+          dismissed: EventMetadataKey.GEMINI_CLI_ASK_USER_DISMISSED,
+          empty_submission:
+            EventMetadataKey.GEMINI_CLI_ASK_USER_EMPTY_SUBMISSION,
+          answer_count: EventMetadataKey.GEMINI_CLI_ASK_USER_ANSWER_COUNT,
+        };
+
+        for (const [key, gemini_cli_key] of Object.entries(askUserMapping)) {
+          if (askUser[key] !== undefined) {
+            data.push({
+              gemini_cli_key,
+              value: JSON.stringify(askUser[key]),
+            });
+          }
+        }
       }
 
       for (const [key, gemini_cli_key] of Object.entries(metadataMapping)) {

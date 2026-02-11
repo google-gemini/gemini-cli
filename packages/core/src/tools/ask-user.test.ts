@@ -338,10 +338,12 @@ describe('AskUserTool', () => {
         answers: { '0': 'Quick fix (Recommended)' },
       });
       expect(result.data).toEqual({
-        ask_user_question_types: [QuestionType.CHOICE],
-        ask_user_dismissed: false,
-        ask_user_empty_submission: false,
-        ask_user_answer_count: 1,
+        ask_user: {
+          question_types: [QuestionType.CHOICE],
+          dismissed: false,
+          empty_submission: false,
+          answer_count: 1,
+        },
       });
     });
 
@@ -375,10 +377,12 @@ describe('AskUserTool', () => {
       );
       expect(JSON.parse(result.llmContent as string)).toEqual({ answers: {} });
       expect(result.data).toEqual({
-        ask_user_question_types: [QuestionType.CHOICE],
-        ask_user_dismissed: false,
-        ask_user_empty_submission: true,
-        ask_user_answer_count: 0,
+        ask_user: {
+          question_types: [QuestionType.CHOICE],
+          dismissed: false,
+          empty_submission: true,
+          answer_count: 0,
+        },
       });
     });
 
@@ -418,8 +422,10 @@ describe('AskUserTool', () => {
         'User dismissed ask_user dialog without answering.',
       );
       expect(result.data).toEqual({
-        ask_user_question_types: [QuestionType.CHOICE],
-        ask_user_dismissed: true,
+        ask_user: {
+          question_types: [QuestionType.CHOICE],
+          dismissed: true,
+        },
       });
     });
   });

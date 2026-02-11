@@ -1178,8 +1178,10 @@ describe('loggers', () => {
           error: undefined,
           errorType: undefined,
           data: {
-            ask_user_question_types: ['choice'],
-            ask_user_dismissed: false,
+            ask_user: {
+              question_types: ['choice'],
+              dismissed: false,
+            },
           },
         },
         tool: undefined as unknown as AnyDeclarativeTool,
@@ -1196,8 +1198,10 @@ describe('loggers', () => {
         attributes: expect.objectContaining({
           function_name: 'ask_user',
           metadata: expect.objectContaining({
-            ask_user_question_types: ['choice'],
-            ask_user_dismissed: false,
+            ask_user: {
+              question_types: ['choice'],
+              dismissed: false,
+            },
           }),
         }),
       });

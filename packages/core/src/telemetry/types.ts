@@ -304,6 +304,7 @@ export class ToolCallEvent implements BaseTelemetryEvent {
         const diffStat = fileDiff.diffStat;
         if (diffStat) {
           this.metadata = {
+            ...this.metadata,
             model_added_lines: diffStat.model_added_lines,
             model_removed_lines: diffStat.model_removed_lines,
             model_added_chars: diffStat.model_added_chars,
