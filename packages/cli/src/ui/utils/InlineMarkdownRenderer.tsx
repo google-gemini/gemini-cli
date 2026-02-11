@@ -177,13 +177,67 @@ export const RenderInline = React.memo(RenderInlineInternal);
  * This is useful for calculating column widths in tables
  */
 export const getPlainTextLength = (text: string): number => {
-  const cleanText = text
-    .replace(/\*\*(.*?)\*\*/g, '$1')
-    .replace(/\*(.+?)\*/g, '$1')
-    .replace(/_(.*?)_/g, '$1')
-    .replace(/~~(.*?)~~/g, '$1')
-    .replace(/`(.*?)`/g, '$1')
-    .replace(/<u>(.*?)<\/u>/g, '$1')
-    .replace(/.*\[(.*?)\]\(.*\)/g, '$1');
+  const inlineRegex =
+    /(\*\*.*?\*\*|\*.*?\*|_.*?_|~~.*?~~|\[.*?\]\(.*?\)|`+.+?`+|<u>.*?<\/u>|https?:\/\/\S+)/g;
+
+  const cleanText = text.replace(inlineRegex, (fullMatch) => {
+    if (
+      fullMatch.startsWith('**') &&
+      fullMatch.endsWith('**') &&
+      fullMatch.length > BOLD_MARKER_LENGTH * 2
+    ) {
+      return fullMatch.slice(BOLD_MARKER_LENGTH, -BOLD_MARKER_LENGTH);
+    }
+    if (
+      fullMatch.length > ITALIC_MARKER_LENGTH * 2 &&
+      ((fullMatch.startsWith('*') && fullMatch.endsWith('*')) ||
+        (fullMatch.startsWith('_') && fullMatch.endsWith('_')))
+    ) {
+      return fullMatch.slice(ITALIC_MARKER_LENGTH, -ITALIC_MARKER_LENGTH);
+    }
+    if (
+      fullMatch.startsWith('~~') &&
+      fullMatch.endsWith('~~') &&
+      fullMatch.length > STRIKETHROUGH_MARKER_LENGTH * 2
+    ) {
+      return fullMatch.slice(
+        STRIKETHROUGH_MARKER_LENGTH,
+        -STRIKETHROUGH_MARKER_LENGTH,
+      );
+    }
+    if (
+      fullMatch.startsWith('`') &&
+      fullMatch.endsWith('`') &&
+      fullMatch.length > INLINE_CODE_MARKER_LENGTH
+    ) {
+      const codeMatch = fullMatch.match(/^(`+)(.+?)\1$/s);
+      if (codeMatch && codeMatch[2]) {
+        return codeMatch[2];
+      }
+    }
+    if (
+      fullMatch.startsWith('[') &&
+      fullMatch.includes('](') &&
+      fullMatch.endsWith(')')
+    ) {
+      const linkMatch = fullMatch.match(/\[(.*?)\]\((.*?)\)/);
+      if (linkMatch) {
+        return linkMatch[1];
+      }
+    }
+    if (
+      fullMatch.startsWith('<u>') &&
+      fullMatch.endsWith('</u>') &&
+      fullMatch.length >
+        UNDERLINE_TAG_START_LENGTH + UNDERLINE_TAG_END_LENGTH - 1
+    ) {
+      return fullMatch.slice(
+        UNDERLINE_TAG_START_LENGTH,
+        -UNDERLINE_TAG_END_LENGTH,
+      );
+    }
+    return fullMatch;
+  });
+
   return stringWidth(cleanText);
 };

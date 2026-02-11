@@ -55,6 +55,7 @@ const noColorSemanticColors: SemanticColors = {
     error: '',
     success: '',
     warning: '',
+    info: '',
   },
 };
 

@@ -648,7 +648,20 @@ export interface TodoList {
   todos: Todo[];
 }
 
-export type ToolResultDisplay = string | FileDiff | AnsiOutput | TodoList;
+export interface RichVisualization {
+  type: 'table' | 'bar_chart' | 'pie_chart' | 'line_chart' | 'diff';
+  title?: string;
+  data: unknown;
+  columns?: Array<{ key: string; label: string }>;
+  savedFilePath?: string;
+}
+
+export type ToolResultDisplay =
+  | string
+  | FileDiff
+  | AnsiOutput
+  | TodoList
+  | RichVisualization;
 
 export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 

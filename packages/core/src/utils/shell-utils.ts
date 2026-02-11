@@ -139,6 +139,16 @@ export async function initializeShellParsers(): Promise<void> {
   await treeSitterInitialization;
 }
 
+/**
+ * Resets the shell parser initialization state.
+ * Only for testing purposes.
+ */
+export function resetShellParsersForTesting(): void {
+  bashLanguage = null;
+  treeSitterInitialization = null;
+  treeSitterInitializationError = null;
+}
+
 export interface ParsedCommandDetail {
   name: string;
   text: string;

@@ -112,6 +112,7 @@ describe('<Header />', () => {
         error: '',
         success: '',
         warning: '',
+        info: '',
       },
     });
     const Gradient = await import('ink-gradient');

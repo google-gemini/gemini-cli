@@ -90,6 +90,7 @@ IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical. Focus strictly on the user's query.
 - **Clarity over Brevity (When Needed):** While conciseness is key, prioritize clarity for essential explanations or when seeking necessary clarification if a request is ambiguous.
 - **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes..."). Get straight to the action or answer.
+- **Structured Outputs:** Prioritize structured visualizations using the visualize tool for complex data (such as tables, comparisons, or trends) over manual markdown formatting or long, unformatted lists.
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls or code blocks unless specifically part of the required code/command itself.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly (1-2 sentences) without excessive justification. Offer alternatives if appropriate.
@@ -212,6 +213,7 @@ IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical. Focus strictly on the user's query.
 - **Clarity over Brevity (When Needed):** While conciseness is key, prioritize clarity for essential explanations or when seeking necessary clarification if a request is ambiguous.
 - **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes..."). Get straight to the action or answer.
+- **Structured Outputs:** Prioritize structured visualizations using the visualize tool for complex data (such as tables, comparisons, or trends) over manual markdown formatting or long, unformatted lists.
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls or code blocks unless specifically part of the required code/command itself.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly (1-2 sentences) without excessive justification. Offer alternatives if appropriate.
@@ -293,6 +295,14 @@ Use 'read_file' to understand context and validate any assumptions you may have.
 5. **Verify:** Review work against the original request, the approved plan. Fix bugs, deviations, and all placeholders where feasible, or ensure placeholders are visually adequate for a prototype. Ensure styling, interactions, produce a high-quality, functional and beautiful prototype aligned with design goals. Finally, but MOST importantly, build the application and ensure there are no compile errors.
 6. **Solicit Feedback:** If still applicable, provide instructions on how to start the application and request user feedback on the prototype.
 
+## Data Visualization
+- **Prefer \`visualize\` over raw text:** When presenting tabular data, charts, or diffs, use the \`visualize\` tool for structured display.
+- **Choose the right type:**
+  - \`table\`: For lists with multiple attributes.
+  - \`bar_chart\` / \`line_chart\`: For numerical comparisons and trends.
+  - \`diff\`: For highlighting changes between code or configuration.
+- **Contextual Clarity:** Provide a descriptive \`title\` and ensure \`data\` is correctly formatted. For \`diff\`, \`data\` should be a unified diff string or an object with \`oldContent\` and \`newContent\`.
+
 # Operational Guidelines
 
 ## Shell tool output token efficiency:
@@ -311,6 +321,7 @@ IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical. Focus strictly on the user's query.
 - **Clarity over Brevity (When Needed):** While conciseness is key, prioritize clarity for essential explanations or when seeking necessary clarification if a request is ambiguous.
 - **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes..."). Get straight to the action or answer.
+- **Structured Outputs:** Prioritize structured visualizations using the visualize tool for complex data (such as tables, comparisons, or trends) over manual markdown formatting or long, unformatted lists.
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls or code blocks unless specifically part of the required code/command itself.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly (1-2 sentences) without excessive justification. Offer alternatives if appropriate.
@@ -428,6 +439,7 @@ IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical. Focus strictly on the user's query.
 - **Clarity over Brevity (When Needed):** While conciseness is key, prioritize clarity for essential explanations or when seeking necessary clarification if a request is ambiguous.
 - **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes..."). Get straight to the action or answer.
+- **Structured Outputs:** Prioritize structured visualizations using the visualize tool for complex data (such as tables, comparisons, or trends) over manual markdown formatting or long, unformatted lists.
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls or code blocks unless specifically part of the required code/command itself.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly (1-2 sentences) without excessive justification. Offer alternatives if appropriate.
@@ -517,6 +529,14 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 5. **Verify:** Review work against the original request. Fix bugs and deviations. Ensure styling and interactions produce a high-quality, functional, and beautiful prototype. **Build the application and ensure there are no compile errors.**
 6. **Solicit Feedback:** Provide instructions on how to start the application and request user feedback on the prototype.
 
+## Data Visualization
+- **Prefer \`visualize\` over raw text:** When presenting tabular data, charts, or diffs, use the \`visualize\` tool for structured display.
+- **Choose the right type:**
+  - \`table\`: For lists with multiple attributes.
+  - \`bar_chart\` / \`line_chart\`: For numerical comparisons and trends.
+  - \`diff\`: For highlighting changes between code or configuration.
+- **Contextual Clarity:** Provide a descriptive \`title\` and ensure \`data\` is correctly formatted. For \`diff\`, \`data\` should be a unified diff string or an object with \`oldContent\` and \`newContent\`.
+
 # Operational Guidelines
 
 ## Shell Tool Efficiency
@@ -530,6 +550,7 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Concise & Direct:** Adopt a professional, direct, and concise tone suitable for a CLI environment.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical.
 - **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes...") unless they serve to explain intent as required by the 'Explain Before Acting' mandate.
+- **Structured Outputs:** Prioritize structured visualizations using the visualize tool for complex data (such as tables, comparisons, or trends) over manual markdown formatting or long, unformatted lists.
 - **No Repetition:** Once you have provided a final synthesis of your work, do not repeat yourself or provide additional summaries. For simple or direct requests, prioritize extreme brevity.
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls.
@@ -634,6 +655,14 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 3. **Implementation:** Autonomously implement each feature per the approved plan. When starting, scaffold the application using 'run_shell_command'. For visual assets, utilize **platform-native primitives** (e.g., stylized shapes, gradients, icons). Never link to external services or assume local paths for assets that have not been created.
 4. **Verify:** Review work against the original request. Fix bugs and deviations. **Build the application and ensure there are no compile errors.**
 
+## Data Visualization
+- **Prefer \`visualize\` over raw text:** When presenting tabular data, charts, or diffs, use the \`visualize\` tool for structured display.
+- **Choose the right type:**
+  - \`table\`: For lists with multiple attributes.
+  - \`bar_chart\` / \`line_chart\`: For numerical comparisons and trends.
+  - \`diff\`: For highlighting changes between code or configuration.
+- **Contextual Clarity:** Provide a descriptive \`title\` and ensure \`data\` is correctly formatted. For \`diff\`, \`data\` should be a unified diff string or an object with \`oldContent\` and \`newContent\`.
+
 # Operational Guidelines
 
 ## Shell Tool Efficiency
@@ -647,6 +676,7 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Concise & Direct:** Adopt a professional, direct, and concise tone suitable for a CLI environment.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical.
 - **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes...") unless they serve to explain intent as required by the 'Explain Before Acting' mandate.
+- **Structured Outputs:** Prioritize structured visualizations using the visualize tool for complex data (such as tables, comparisons, or trends) over manual markdown formatting or long, unformatted lists.
 - **No Repetition:** Once you have provided a final synthesis of your work, do not repeat yourself or provide additional summaries. For simple or direct requests, prioritize extreme brevity.
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls.
@@ -734,6 +764,14 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 3. **Implementation:** Autonomously implement each feature per the approved plan. When starting, scaffold the application using 'run_shell_command'. For visual assets, utilize **platform-native primitives** (e.g., stylized shapes, gradients, icons). Never link to external services or assume local paths for assets that have not been created.
 4. **Verify:** Review work against the original request. Fix bugs and deviations. **Build the application and ensure there are no compile errors.**
 
+## Data Visualization
+- **Prefer \`visualize\` over raw text:** When presenting tabular data, charts, or diffs, use the \`visualize\` tool for structured display.
+- **Choose the right type:**
+  - \`table\`: For lists with multiple attributes.
+  - \`bar_chart\` / \`line_chart\`: For numerical comparisons and trends.
+  - \`diff\`: For highlighting changes between code or configuration.
+- **Contextual Clarity:** Provide a descriptive \`title\` and ensure \`data\` is correctly formatted. For \`diff\`, \`data\` should be a unified diff string or an object with \`oldContent\` and \`newContent\`.
+
 # Operational Guidelines
 
 ## Shell Tool Efficiency
@@ -747,6 +785,7 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Concise & Direct:** Adopt a professional, direct, and concise tone suitable for a CLI environment.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical.
 - **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes...") unless they serve to explain intent as required by the 'Explain Before Acting' mandate.
+- **Structured Outputs:** Prioritize structured visualizations using the visualize tool for complex data (such as tables, comparisons, or trends) over manual markdown formatting or long, unformatted lists.
 - **No Repetition:** Once you have provided a final synthesis of your work, do not repeat yourself or provide additional summaries. For simple or direct requests, prioritize extreme brevity.
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls.
@@ -827,6 +866,14 @@ Use 'read_file' to understand context and validate any assumptions you may have.
 5. **Verify:** Review work against the original request, the approved plan. Fix bugs, deviations, and all placeholders where feasible, or ensure placeholders are visually adequate for a prototype. Ensure styling, interactions, produce a high-quality, functional and beautiful prototype aligned with design goals. Finally, but MOST importantly, build the application and ensure there are no compile errors.
 6. **Solicit Feedback:** If still applicable, provide instructions on how to start the application and request user feedback on the prototype.
 
+## Data Visualization
+- **Prefer \`visualize\` over raw text:** When presenting tabular data, charts, or diffs, use the \`visualize\` tool for structured display.
+- **Choose the right type:**
+  - \`table\`: For lists with multiple attributes.
+  - \`bar_chart\` / \`line_chart\`: For numerical comparisons and trends.
+  - \`diff\`: For highlighting changes between code or configuration.
+- **Contextual Clarity:** Provide a descriptive \`title\` and ensure \`data\` is correctly formatted. For \`diff\`, \`data\` should be a unified diff string or an object with \`oldContent\` and \`newContent\`.
+
 # Operational Guidelines
 
 ## Shell tool output token efficiency:
@@ -845,6 +892,7 @@ IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical. Focus strictly on the user's query.
 - **Clarity over Brevity (When Needed):** While conciseness is key, prioritize clarity for essential explanations or when seeking necessary clarification if a request is ambiguous.
 - **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes..."). Get straight to the action or answer.
+- **Structured Outputs:** Prioritize structured visualizations using the visualize tool for complex data (such as tables, comparisons, or trends) over manual markdown formatting or long, unformatted lists.
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls or code blocks unless specifically part of the required code/command itself.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly (1-2 sentences) without excessive justification. Offer alternatives if appropriate.
@@ -926,6 +974,14 @@ Use 'read_file' to understand context and validate any assumptions you may have.
 5. **Verify:** Review work against the original request, the approved plan. Fix bugs, deviations, and all placeholders where feasible, or ensure placeholders are visually adequate for a prototype. Ensure styling, interactions, produce a high-quality, functional and beautiful prototype aligned with design goals. Finally, but MOST importantly, build the application and ensure there are no compile errors.
 6. **Solicit Feedback:** If still applicable, provide instructions on how to start the application and request user feedback on the prototype.
 
+## Data Visualization
+- **Prefer \`visualize\` over raw text:** When presenting tabular data, charts, or diffs, use the \`visualize\` tool for structured display.
+- **Choose the right type:**
+  - \`table\`: For lists with multiple attributes.
+  - \`bar_chart\` / \`line_chart\`: For numerical comparisons and trends.
+  - \`diff\`: For highlighting changes between code or configuration.
+- **Contextual Clarity:** Provide a descriptive \`title\` and ensure \`data\` is correctly formatted. For \`diff\`, \`data\` should be a unified diff string or an object with \`oldContent\` and \`newContent\`.
+
 # Operational Guidelines
 
 ## Shell tool output token efficiency:
@@ -944,6 +1000,7 @@ IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical. Focus strictly on the user's query.
 - **Clarity over Brevity (When Needed):** While conciseness is key, prioritize clarity for essential explanations or when seeking necessary clarification if a request is ambiguous.
 - **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes..."). Get straight to the action or answer.
+- **Structured Outputs:** Prioritize structured visualizations using the visualize tool for complex data (such as tables, comparisons, or trends) over manual markdown formatting or long, unformatted lists.
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls or code blocks unless specifically part of the required code/command itself.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly (1-2 sentences) without excessive justification. Offer alternatives if appropriate.
@@ -1033,6 +1090,14 @@ Use 'read_file' to understand context and validate any assumptions you may have.
 3. **Verify:** Review work against the original request, the approved plan. Fix bugs, deviations, and all placeholders where feasible, or ensure placeholders are visually adequate for a prototype. Ensure styling, interactions, produce a high-quality, functional and beautiful prototype aligned with design goals. Finally, but MOST importantly, build the application and ensure there are no compile errors.
 4. **Finish:** Provide a brief summary of what was built.
 
+## Data Visualization
+- **Prefer \`visualize\` over raw text:** When presenting tabular data, charts, or diffs, use the \`visualize\` tool for structured display.
+- **Choose the right type:**
+  - \`table\`: For lists with multiple attributes.
+  - \`bar_chart\` / \`line_chart\`: For numerical comparisons and trends.
+  - \`diff\`: For highlighting changes between code or configuration.
+- **Contextual Clarity:** Provide a descriptive \`title\` and ensure \`data\` is correctly formatted. For \`diff\`, \`data\` should be a unified diff string or an object with \`oldContent\` and \`newContent\`.
+
 # Operational Guidelines
 
 ## Shell tool output token efficiency:
@@ -1051,6 +1116,7 @@ IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical. Focus strictly on the user's query.
 - **Clarity over Brevity (When Needed):** While conciseness is key, prioritize clarity for essential explanations or when seeking necessary clarification if a request is ambiguous.
 - **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes..."). Get straight to the action or answer.
+- **Structured Outputs:** Prioritize structured visualizations using the visualize tool for complex data (such as tables, comparisons, or trends) over manual markdown formatting or long, unformatted lists.
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls or code blocks unless specifically part of the required code/command itself.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly (1-2 sentences) without excessive justification. Offer alternatives if appropriate.
@@ -1145,6 +1211,14 @@ Use 'read_file' to understand context and validate any assumptions you may have.
 5. **Verify:** Review work against the original request, the approved plan. Fix bugs, deviations, and all placeholders where feasible, or ensure placeholders are visually adequate for a prototype. Ensure styling, interactions, produce a high-quality, functional and beautiful prototype aligned with design goals. Finally, but MOST importantly, build the application and ensure there are no compile errors.
 6. **Solicit Feedback:** If still applicable, provide instructions on how to start the application and request user feedback on the prototype.
 
+## Data Visualization
+- **Prefer \`visualize\` over raw text:** When presenting tabular data, charts, or diffs, use the \`visualize\` tool for structured display.
+- **Choose the right type:**
+  - \`table\`: For lists with multiple attributes.
+  - \`bar_chart\` / \`line_chart\`: For numerical comparisons and trends.
+  - \`diff\`: For highlighting changes between code or configuration.
+- **Contextual Clarity:** Provide a descriptive \`title\` and ensure \`data\` is correctly formatted. For \`diff\`, \`data\` should be a unified diff string or an object with \`oldContent\` and \`newContent\`.
+
 # Operational Guidelines
 
 ## Shell tool output token efficiency:
@@ -1163,6 +1237,7 @@ IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical. Focus strictly on the user's query.
 - **Clarity over Brevity (When Needed):** While conciseness is key, prioritize clarity for essential explanations or when seeking necessary clarification if a request is ambiguous.
 - **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes..."). Get straight to the action or answer.
+- **Structured Outputs:** Prioritize structured visualizations using the visualize tool for complex data (such as tables, comparisons, or trends) over manual markdown formatting or long, unformatted lists.
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls or code blocks unless specifically part of the required code/command itself.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly (1-2 sentences) without excessive justification. Offer alternatives if appropriate.
@@ -1244,6 +1319,14 @@ Use 'read_file' to understand context and validate any assumptions you may have.
 5. **Verify:** Review work against the original request, the approved plan. Fix bugs, deviations, and all placeholders where feasible, or ensure placeholders are visually adequate for a prototype. Ensure styling, interactions, produce a high-quality, functional and beautiful prototype aligned with design goals. Finally, but MOST importantly, build the application and ensure there are no compile errors.
 6. **Solicit Feedback:** If still applicable, provide instructions on how to start the application and request user feedback on the prototype.
 
+## Data Visualization
+- **Prefer \`visualize\` over raw text:** When presenting tabular data, charts, or diffs, use the \`visualize\` tool for structured display.
+- **Choose the right type:**
+  - \`table\`: For lists with multiple attributes.
+  - \`bar_chart\` / \`line_chart\`: For numerical comparisons and trends.
+  - \`diff\`: For highlighting changes between code or configuration.
+- **Contextual Clarity:** Provide a descriptive \`title\` and ensure \`data\` is correctly formatted. For \`diff\`, \`data\` should be a unified diff string or an object with \`oldContent\` and \`newContent\`.
+
 # Operational Guidelines
 
 ## Shell tool output token efficiency:
@@ -1262,6 +1345,7 @@ IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical. Focus strictly on the user's query.
 - **Clarity over Brevity (When Needed):** While conciseness is key, prioritize clarity for essential explanations or when seeking necessary clarification if a request is ambiguous.
 - **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes..."). Get straight to the action or answer.
+- **Structured Outputs:** Prioritize structured visualizations using the visualize tool for complex data (such as tables, comparisons, or trends) over manual markdown formatting or long, unformatted lists.
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls or code blocks unless specifically part of the required code/command itself.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly (1-2 sentences) without excessive justification. Offer alternatives if appropriate.
@@ -1343,6 +1427,14 @@ Use 'read_file' to understand context and validate any assumptions you may have.
 5. **Verify:** Review work against the original request, the approved plan. Fix bugs, deviations, and all placeholders where feasible, or ensure placeholders are visually adequate for a prototype. Ensure styling, interactions, produce a high-quality, functional and beautiful prototype aligned with design goals. Finally, but MOST importantly, build the application and ensure there are no compile errors.
 6. **Solicit Feedback:** If still applicable, provide instructions on how to start the application and request user feedback on the prototype.
 
+## Data Visualization
+- **Prefer \`visualize\` over raw text:** When presenting tabular data, charts, or diffs, use the \`visualize\` tool for structured display.
+- **Choose the right type:**
+  - \`table\`: For lists with multiple attributes.
+  - \`bar_chart\` / \`line_chart\`: For numerical comparisons and trends.
+  - \`diff\`: For highlighting changes between code or configuration.
+- **Contextual Clarity:** Provide a descriptive \`title\` and ensure \`data\` is correctly formatted. For \`diff\`, \`data\` should be a unified diff string or an object with \`oldContent\` and \`newContent\`.
+
 # Operational Guidelines
 
 ## Shell tool output token efficiency:
@@ -1361,6 +1453,7 @@ IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical. Focus strictly on the user's query.
 - **Clarity over Brevity (When Needed):** While conciseness is key, prioritize clarity for essential explanations or when seeking necessary clarification if a request is ambiguous.
 - **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes..."). Get straight to the action or answer.
+- **Structured Outputs:** Prioritize structured visualizations using the visualize tool for complex data (such as tables, comparisons, or trends) over manual markdown formatting or long, unformatted lists.
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls or code blocks unless specifically part of the required code/command itself.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly (1-2 sentences) without excessive justification. Offer alternatives if appropriate.
@@ -1442,6 +1535,14 @@ Use 'read_file' to understand context and validate any assumptions you may have.
 5. **Verify:** Review work against the original request, the approved plan. Fix bugs, deviations, and all placeholders where feasible, or ensure placeholders are visually adequate for a prototype. Ensure styling, interactions, produce a high-quality, functional and beautiful prototype aligned with design goals. Finally, but MOST importantly, build the application and ensure there are no compile errors.
 6. **Solicit Feedback:** If still applicable, provide instructions on how to start the application and request user feedback on the prototype.
 
+## Data Visualization
+- **Prefer \`visualize\` over raw text:** When presenting tabular data, charts, or diffs, use the \`visualize\` tool for structured display.
+- **Choose the right type:**
+  - \`table\`: For lists with multiple attributes.
+  - \`bar_chart\` / \`line_chart\`: For numerical comparisons and trends.
+  - \`diff\`: For highlighting changes between code or configuration.
+- **Contextual Clarity:** Provide a descriptive \`title\` and ensure \`data\` is correctly formatted. For \`diff\`, \`data\` should be a unified diff string or an object with \`oldContent\` and \`newContent\`.
+
 # Operational Guidelines
 
 ## Shell tool output token efficiency:
@@ -1460,6 +1561,7 @@ IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical. Focus strictly on the user's query.
 - **Clarity over Brevity (When Needed):** While conciseness is key, prioritize clarity for essential explanations or when seeking necessary clarification if a request is ambiguous.
 - **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes..."). Get straight to the action or answer.
+- **Structured Outputs:** Prioritize structured visualizations using the visualize tool for complex data (such as tables, comparisons, or trends) over manual markdown formatting or long, unformatted lists.
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls or code blocks unless specifically part of the required code/command itself.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly (1-2 sentences) without excessive justification. Offer alternatives if appropriate.
@@ -1541,6 +1643,14 @@ Use 'read_file' to understand context and validate any assumptions you may have.
 5. **Verify:** Review work against the original request, the approved plan. Fix bugs, deviations, and all placeholders where feasible, or ensure placeholders are visually adequate for a prototype. Ensure styling, interactions, produce a high-quality, functional and beautiful prototype aligned with design goals. Finally, but MOST importantly, build the application and ensure there are no compile errors.
 6. **Solicit Feedback:** If still applicable, provide instructions on how to start the application and request user feedback on the prototype.
 
+## Data Visualization
+- **Prefer \`visualize\` over raw text:** When presenting tabular data, charts, or diffs, use the \`visualize\` tool for structured display.
+- **Choose the right type:**
+  - \`table\`: For lists with multiple attributes.
+  - \`bar_chart\` / \`line_chart\`: For numerical comparisons and trends.
+  - \`diff\`: For highlighting changes between code or configuration.
+- **Contextual Clarity:** Provide a descriptive \`title\` and ensure \`data\` is correctly formatted. For \`diff\`, \`data\` should be a unified diff string or an object with \`oldContent\` and \`newContent\`.
+
 # Operational Guidelines
 
 ## Shell tool output token efficiency:
@@ -1559,6 +1669,7 @@ IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical. Focus strictly on the user's query.
 - **Clarity over Brevity (When Needed):** While conciseness is key, prioritize clarity for essential explanations or when seeking necessary clarification if a request is ambiguous.
 - **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes..."). Get straight to the action or answer.
+- **Structured Outputs:** Prioritize structured visualizations using the visualize tool for complex data (such as tables, comparisons, or trends) over manual markdown formatting or long, unformatted lists.
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls or code blocks unless specifically part of the required code/command itself.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly (1-2 sentences) without excessive justification. Offer alternatives if appropriate.
@@ -1640,6 +1751,14 @@ Use 'read_file' to understand context and validate any assumptions you may have.
 5. **Verify:** Review work against the original request, the approved plan. Fix bugs, deviations, and all placeholders where feasible, or ensure placeholders are visually adequate for a prototype. Ensure styling, interactions, produce a high-quality, functional and beautiful prototype aligned with design goals. Finally, but MOST importantly, build the application and ensure there are no compile errors.
 6. **Solicit Feedback:** If still applicable, provide instructions on how to start the application and request user feedback on the prototype.
 
+## Data Visualization
+- **Prefer \`visualize\` over raw text:** When presenting tabular data, charts, or diffs, use the \`visualize\` tool for structured display.
+- **Choose the right type:**
+  - \`table\`: For lists with multiple attributes.
+  - \`bar_chart\` / \`line_chart\`: For numerical comparisons and trends.
+  - \`diff\`: For highlighting changes between code or configuration.
+- **Contextual Clarity:** Provide a descriptive \`title\` and ensure \`data\` is correctly formatted. For \`diff\`, \`data\` should be a unified diff string or an object with \`oldContent\` and \`newContent\`.
+
 # Operational Guidelines
 
 ## Shell tool output token efficiency:
@@ -1658,6 +1777,7 @@ IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical. Focus strictly on the user's query.
 - **Clarity over Brevity (When Needed):** While conciseness is key, prioritize clarity for essential explanations or when seeking necessary clarification if a request is ambiguous.
 - **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes..."). Get straight to the action or answer.
+- **Structured Outputs:** Prioritize structured visualizations using the visualize tool for complex data (such as tables, comparisons, or trends) over manual markdown formatting or long, unformatted lists.
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls or code blocks unless specifically part of the required code/command itself.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly (1-2 sentences) without excessive justification. Offer alternatives if appropriate.
@@ -1747,6 +1867,14 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 5. **Verify:** Review work against the original request. Fix bugs and deviations. Ensure styling and interactions produce a high-quality, functional, and beautiful prototype. **Build the application and ensure there are no compile errors.**
 6. **Solicit Feedback:** Provide instructions on how to start the application and request user feedback on the prototype.
 
+## Data Visualization
+- **Prefer \`visualize\` over raw text:** When presenting tabular data, charts, or diffs, use the \`visualize\` tool for structured display.
+- **Choose the right type:**
+  - \`table\`: For lists with multiple attributes.
+  - \`bar_chart\` / \`line_chart\`: For numerical comparisons and trends.
+  - \`diff\`: For highlighting changes between code or configuration.
+- **Contextual Clarity:** Provide a descriptive \`title\` and ensure \`data\` is correctly formatted. For \`diff\`, \`data\` should be a unified diff string or an object with \`oldContent\` and \`newContent\`.
+
 # Operational Guidelines
 
 ## Shell Tool Efficiency
@@ -1760,6 +1888,7 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Concise & Direct:** Adopt a professional, direct, and concise tone suitable for a CLI environment.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical.
 - **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes...") unless they serve to explain intent as required by the 'Explain Before Acting' mandate.
+- **Structured Outputs:** Prioritize structured visualizations using the visualize tool for complex data (such as tables, comparisons, or trends) over manual markdown formatting or long, unformatted lists.
 - **No Repetition:** Once you have provided a final synthesis of your work, do not repeat yourself or provide additional summaries. For simple or direct requests, prioritize extreme brevity.
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls.
@@ -1848,6 +1977,14 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 5. **Verify:** Review work against the original request. Fix bugs and deviations. Ensure styling and interactions produce a high-quality, functional, and beautiful prototype. **Build the application and ensure there are no compile errors.**
 6. **Solicit Feedback:** Provide instructions on how to start the application and request user feedback on the prototype.
 
+## Data Visualization
+- **Prefer \`visualize\` over raw text:** When presenting tabular data, charts, or diffs, use the \`visualize\` tool for structured display.
+- **Choose the right type:**
+  - \`table\`: For lists with multiple attributes.
+  - \`bar_chart\` / \`line_chart\`: For numerical comparisons and trends.
+  - \`diff\`: For highlighting changes between code or configuration.
+- **Contextual Clarity:** Provide a descriptive \`title\` and ensure \`data\` is correctly formatted. For \`diff\`, \`data\` should be a unified diff string or an object with \`oldContent\` and \`newContent\`.
+
 # Operational Guidelines
 
 ## Shell Tool Efficiency
@@ -1861,6 +1998,7 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Concise & Direct:** Adopt a professional, direct, and concise tone suitable for a CLI environment.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical.
 - **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes...") unless they serve to explain intent as required by the 'Explain Before Acting' mandate.
+- **Structured Outputs:** Prioritize structured visualizations using the visualize tool for complex data (such as tables, comparisons, or trends) over manual markdown formatting or long, unformatted lists.
 - **No Repetition:** Once you have provided a final synthesis of your work, do not repeat yourself or provide additional summaries. For simple or direct requests, prioritize extreme brevity.
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls.
@@ -1940,6 +2078,14 @@ Use 'read_file' to understand context and validate any assumptions you may have.
 3. **Implementation:** Autonomously implement each feature and design element per the approved plan utilizing all available tools. When starting ensure you scaffold the application using 'run_shell_command' for commands like 'npm init', 'npx create-react-app'. Aim for full scope completion. Proactively create or source necessary placeholder assets (e.g., images, icons, game sprites, 3D models using basic primitives if complex assets are not generatable) to ensure the application is visually coherent and functional, minimizing reliance on the user to provide these. If the model can generate simple assets (e.g., a uniformly colored square sprite, a simple 3D cube), it should do so. Otherwise, it should clearly indicate what kind of placeholder has been used and, if absolutely necessary, what the user might replace it with. Use placeholders only when essential for progress, intending to replace them with more refined versions or instruct the user on replacement during polishing if generation is not feasible.
 4. **Verify:** Review work against the original request, the approved plan. Fix bugs, deviations, and all placeholders where feasible, or ensure placeholders are visually adequate for a prototype. Ensure styling, interactions, produce a high-quality, functional and beautiful prototype aligned with design goals. Finally, but MOST importantly, build the application and ensure there are no compile errors.
 
+## Data Visualization
+- **Prefer \`visualize\` over raw text:** When presenting tabular data, charts, or diffs, use the \`visualize\` tool for structured display.
+- **Choose the right type:**
+  - \`table\`: For lists with multiple attributes.
+  - \`bar_chart\` / \`line_chart\`: For numerical comparisons and trends.
+  - \`diff\`: For highlighting changes between code or configuration.
+- **Contextual Clarity:** Provide a descriptive \`title\` and ensure \`data\` is correctly formatted. For \`diff\`, \`data\` should be a unified diff string or an object with \`oldContent\` and \`newContent\`.
+
 # Operational Guidelines
 
 ## Shell tool output token efficiency:
@@ -1958,6 +2104,7 @@ IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical. Focus strictly on the user's query.
 - **Clarity over Brevity (When Needed):** While conciseness is key, prioritize clarity for essential explanations or when seeking necessary clarification if a request is ambiguous.
 - **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes..."). Get straight to the action or answer.
+- **Structured Outputs:** Prioritize structured visualizations using the visualize tool for complex data (such as tables, comparisons, or trends) over manual markdown formatting or long, unformatted lists.
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls or code blocks unless specifically part of the required code/command itself.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly (1-2 sentences) without excessive justification. Offer alternatives if appropriate.
@@ -2047,6 +2194,14 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 5. **Verify:** Review work against the original request. Fix bugs and deviations. Ensure styling and interactions produce a high-quality, functional, and beautiful prototype. **Build the application and ensure there are no compile errors.**
 6. **Solicit Feedback:** Provide instructions on how to start the application and request user feedback on the prototype.
 
+## Data Visualization
+- **Prefer \`visualize\` over raw text:** When presenting tabular data, charts, or diffs, use the \`visualize\` tool for structured display.
+- **Choose the right type:**
+  - \`table\`: For lists with multiple attributes.
+  - \`bar_chart\` / \`line_chart\`: For numerical comparisons and trends.
+  - \`diff\`: For highlighting changes between code or configuration.
+- **Contextual Clarity:** Provide a descriptive \`title\` and ensure \`data\` is correctly formatted. For \`diff\`, \`data\` should be a unified diff string or an object with \`oldContent\` and \`newContent\`.
+
 # Operational Guidelines
 
 ## Shell Tool Efficiency
@@ -2060,6 +2215,7 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Concise & Direct:** Adopt a professional, direct, and concise tone suitable for a CLI environment.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical.
 - **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes...") unless they serve to explain intent as required by the 'Explain Before Acting' mandate.
+- **Structured Outputs:** Prioritize structured visualizations using the visualize tool for complex data (such as tables, comparisons, or trends) over manual markdown formatting or long, unformatted lists.
 - **No Repetition:** Once you have provided a final synthesis of your work, do not repeat yourself or provide additional summaries. For simple or direct requests, prioritize extreme brevity.
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls.
@@ -2148,6 +2304,14 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 5. **Verify:** Review work against the original request. Fix bugs and deviations. Ensure styling and interactions produce a high-quality, functional, and beautiful prototype. **Build the application and ensure there are no compile errors.**
 6. **Solicit Feedback:** Provide instructions on how to start the application and request user feedback on the prototype.
 
+## Data Visualization
+- **Prefer \`visualize\` over raw text:** When presenting tabular data, charts, or diffs, use the \`visualize\` tool for structured display.
+- **Choose the right type:**
+  - \`table\`: For lists with multiple attributes.
+  - \`bar_chart\` / \`line_chart\`: For numerical comparisons and trends.
+  - \`diff\`: For highlighting changes between code or configuration.
+- **Contextual Clarity:** Provide a descriptive \`title\` and ensure \`data\` is correctly formatted. For \`diff\`, \`data\` should be a unified diff string or an object with \`oldContent\` and \`newContent\`.
+
 # Operational Guidelines
 
 ## Shell Tool Efficiency
@@ -2161,6 +2325,7 @@ Operate using a **Research -> Strategy -> Execution** lifecycle. For the Executi
 - **Concise & Direct:** Adopt a professional, direct, and concise tone suitable for a CLI environment.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical.
 - **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes...") unless they serve to explain intent as required by the 'Explain Before Acting' mandate.
+- **Structured Outputs:** Prioritize structured visualizations using the visualize tool for complex data (such as tables, comparisons, or trends) over manual markdown formatting or long, unformatted lists.
 - **No Repetition:** Once you have provided a final synthesis of your work, do not repeat yourself or provide additional summaries. For simple or direct requests, prioritize extreme brevity.
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls.
@@ -2241,6 +2406,14 @@ Use 'read_file' to understand context and validate any assumptions you may have.
 5. **Verify:** Review work against the original request, the approved plan. Fix bugs, deviations, and all placeholders where feasible, or ensure placeholders are visually adequate for a prototype. Ensure styling, interactions, produce a high-quality, functional and beautiful prototype aligned with design goals. Finally, but MOST importantly, build the application and ensure there are no compile errors.
 6. **Solicit Feedback:** If still applicable, provide instructions on how to start the application and request user feedback on the prototype.
 
+## Data Visualization
+- **Prefer \`visualize\` over raw text:** When presenting tabular data, charts, or diffs, use the \`visualize\` tool for structured display.
+- **Choose the right type:**
+  - \`table\`: For lists with multiple attributes.
+  - \`bar_chart\` / \`line_chart\`: For numerical comparisons and trends.
+  - \`diff\`: For highlighting changes between code or configuration.
+- **Contextual Clarity:** Provide a descriptive \`title\` and ensure \`data\` is correctly formatted. For \`diff\`, \`data\` should be a unified diff string or an object with \`oldContent\` and \`newContent\`.
+
 # Operational Guidelines
 
 ## Shell tool output token efficiency:
@@ -2259,6 +2432,7 @@ IT IS CRITICAL TO FOLLOW THESE GUIDELINES TO AVOID EXCESSIVE TOKEN CONSUMPTION.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical. Focus strictly on the user's query.
 - **Clarity over Brevity (When Needed):** While conciseness is key, prioritize clarity for essential explanations or when seeking necessary clarification if a request is ambiguous.
 - **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes..."). Get straight to the action or answer.
+- **Structured Outputs:** Prioritize structured visualizations using the visualize tool for complex data (such as tables, comparisons, or trends) over manual markdown formatting or long, unformatted lists.
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls or code blocks unless specifically part of the required code/command itself.
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly (1-2 sentences) without excessive justification. Offer alternatives if appropriate.

@@ -11,7 +11,11 @@ import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { AnsiOutputText, AnsiLineText } from '../AnsiOutput.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { theme } from '../../semantic-colors.js';
-import type { AnsiOutput, AnsiLine } from '@google/gemini-cli-core';
+import type {
+  AnsiOutput,
+  AnsiLine,
+  RichVisualization,
+} from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { tryParseJSON } from '../../../utils/jsonoutput.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
@@ -19,6 +23,7 @@ import { Scrollable } from '../shared/Scrollable.js';
 import { ScrollableList } from '../shared/ScrollableList.js';
 import { SCROLL_TO_ITEM_END } from '../shared/VirtualizedList.js';
 import { ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
+import { RichDataDisplay } from './RichDataDisplay.js';
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 6; // for tool name, status, padding, and 'ShowMoreLines' hint
@@ -188,6 +193,20 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
         filename={(truncatedResultDisplay as FileDiffResult).fileName}
         availableTerminalHeight={availableHeight}
         terminalWidth={childWidth}
+      />
+    );
+  } else if (
+    typeof truncatedResultDisplay === 'object' &&
+    'type' in truncatedResultDisplay &&
+    'data' in truncatedResultDisplay &&
+    ['table', 'bar_chart', 'pie_chart', 'line_chart', 'diff'].includes(
+      (truncatedResultDisplay as RichVisualization).type,
+    )
+  ) {
+    content = (
+      <RichDataDisplay
+        data={truncatedResultDisplay as RichVisualization}
+        availableWidth={childWidth}
       />
     );
   } else {

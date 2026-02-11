@@ -149,6 +149,7 @@ export class Theme {
         error: this.colors.AccentRed,
         success: this.colors.AccentGreen,
         warning: this.colors.AccentYellow,
+        info: this.colors.AccentBlue,
       },
     };
     this._colorMap = Object.freeze(this._buildColorMap(rawMappings)); // Build and freeze the map
@@ -414,6 +415,7 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
       error: customTheme.status?.error ?? colors.AccentRed,
       success: customTheme.status?.success ?? colors.AccentGreen,
       warning: customTheme.status?.warning ?? colors.AccentYellow,
+      info: customTheme.status?.info ?? colors.AccentBlue,
     },
   };
 

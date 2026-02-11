@@ -301,4 +301,44 @@ describe('ToolResultDisplay', () => {
     expect(output).not.toContain('Line 1');
     expect(output).toContain('Line 50');
   });
+
+  it('renders rich visualization result (diff)', () => {
+    const richResult = {
+      type: 'diff' as const,
+      data: {
+        fileDiff:
+          'diff --git a/test.ts b/test.ts\n--- a/test.ts\n+++ b/test.ts\n@@ -1 +1 @@\n-old\n+new',
+        fileName: 'test.ts',
+      },
+    };
+    const { lastFrame } = render(
+      <ToolResultDisplay
+        resultDisplay={richResult}
+        terminalWidth={80}
+        availableTerminalHeight={20}
+      />,
+    );
+    const output = lastFrame();
+
+    expect(output).toContain('old');
+    expect(output).toContain('new');
+  });
+
+  it('renders rich visualization result (table)', () => {
+    const richResult = {
+      type: 'table' as const,
+      data: [{ name: 'Test', value: 123 }],
+    };
+    const { lastFrame } = render(
+      <ToolResultDisplay
+        resultDisplay={richResult}
+        terminalWidth={80}
+        availableTerminalHeight={20}
+      />,
+    );
+    const output = lastFrame();
+
+    expect(output).toContain('Test');
+    expect(output).toContain('123');
+  });
 });

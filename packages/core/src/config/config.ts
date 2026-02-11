@@ -34,6 +34,7 @@ import { WebFetchTool } from '../tools/web-fetch.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { AskUserTool } from '../tools/ask-user.js';
+import { VisualizeTool } from '../tools/visualize.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
 import { GeminiClient } from '../core/client.js';
@@ -217,6 +218,7 @@ export interface CustomTheme {
     error?: string;
     success?: string;
     warning?: string;
+    info?: string;
   };
 
   // Legacy properties (all optional)
@@ -2198,6 +2200,7 @@ export class Config {
     registerCoreTool(MemoryTool);
     registerCoreTool(WebSearchTool, this);
     registerCoreTool(AskUserTool);
+    registerCoreTool(VisualizeTool, this.messageBus);
     if (this.getUseWriteTodos()) {
       registerCoreTool(WriteTodosTool);
     }

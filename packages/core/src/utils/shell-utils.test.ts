@@ -18,12 +18,14 @@ import {
   getCommandRoots,
   getShellConfiguration,
   initializeShellParsers,
+  resetShellParsersForTesting,
   parseCommandDetails,
   stripShellWrapper,
   hasRedirection,
   resolveExecutable,
 } from './shell-utils.js';
 import path from 'node:path';
+import * as fileUtils from './fileUtils.js';
 
 const mockPlatform = vi.hoisted(() => vi.fn());
 const mockHomedir = vi.hoisted(() => vi.fn());
@@ -184,23 +186,24 @@ describe('getCommandRoots', () => {
   });
 
   it('should handle parser initialization failures gracefully', async () => {
-    // Reset modules to clear singleton state
-    vi.resetModules();
+    // Reset singleton state
+    resetShellParsersForTesting();
 
     // Mock fileUtils to fail Wasm loading
-    vi.doMock('./fileUtils.js', () => ({
-      loadWasmBinary: vi.fn().mockRejectedValue(new Error('Wasm load failed')),
-    }));
-
-    // Re-import shell-utils with mocked dependencies
-    const shellUtils = await import('./shell-utils.js');
+    const spy = vi
+      .spyOn(fileUtils, 'loadWasmBinary')
+      .mockRejectedValue(new Error('Wasm load failed'));
 
     // Should catch the error and not throw
-    await expect(shellUtils.initializeShellParsers()).resolves.not.toThrow();
+    await expect(initializeShellParsers()).resolves.not.toThrow();
 
     // Fallback: splitting commands depends on parser, so if parser fails, it returns empty
-    const roots = shellUtils.getCommandRoots('ls -la');
+    const roots = getCommandRoots('ls -la');
     expect(roots).toEqual([]);
+
+    spy.mockRestore();
+    resetShellParsersForTesting();
+    await initializeShellParsers();
   });
 
   it('should handle bash parser timeouts', () => {
