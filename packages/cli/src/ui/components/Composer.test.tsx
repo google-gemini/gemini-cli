@@ -145,7 +145,6 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     activeHooks: [],
     isBackgroundShellVisible: false,
     embeddedShellFocused: false,
-    hasPendingActionRequired: false,
     ...overrides,
   }) as UIState;
 
@@ -156,6 +155,7 @@ const createMockUIActions = (): UIActions =>
     setShellModeActive: vi.fn(),
     onEscapePromptChange: vi.fn(),
     vimHandleInput: vi.fn(),
+    setShortcutsHelpVisible: vi.fn(),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   }) as any;
 
@@ -326,7 +326,6 @@ describe('Composer', () => {
 
     it('does not render LoadingIndicator when a tool confirmation is pending', () => {
       const uiState = createMockUIState({
-        hasPendingActionRequired: true,
         streamingState: StreamingState.Responding,
         pendingHistoryItems: [
           {
@@ -604,7 +603,6 @@ describe('Composer', () => {
   describe('Shortcuts Hint', () => {
     it('hides shortcuts hint when a action is required (e.g. dialog is open)', () => {
       const uiState = createMockUIState({
-        hasPendingActionRequired: true,
         customDialog: (
           <Box>
             <Text>Test Dialog</Text>
@@ -652,7 +650,6 @@ describe('Composer', () => {
 
     it('hides shortcuts help when action is required', () => {
       const uiState = createMockUIState({
-        hasPendingActionRequired: true,
         shortcutsHelpVisible: true,
         customDialog: (
           <Box>
