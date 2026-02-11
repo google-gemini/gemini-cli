@@ -40,9 +40,9 @@ describe('GeminiCliAgent Skills Integration', () => {
     // 1. Ask to activate the skill
     const events = [];
     // The prompt explicitly asks to activate the skill by name
-    const stream = agent.sendStream(
-      'Activate the pirate-skill and then tell me a joke.',
-    );
+    const stream = agent
+      .session()
+      .sendStream('Activate the pirate-skill and then tell me a joke.');
 
     for await (const event of stream) {
       events.push(event);
@@ -72,9 +72,9 @@ describe('GeminiCliAgent Skills Integration', () => {
 
     // 1. Ask to activate the skill
     const events = [];
-    const stream = agent.sendStream(
-      'Activate the pirate-skill and confirm it is active.',
-    );
+    const stream = agent
+      .session()
+      .sendStream('Activate the pirate-skill and confirm it is active.');
 
     for await (const event of stream) {
       events.push(event);
