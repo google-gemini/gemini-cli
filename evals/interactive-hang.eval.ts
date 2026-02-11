@@ -67,8 +67,10 @@ describe('interactive_commands', () => {
       ).toBeDefined();
       expect(
         scaffoldCall?.toolRequest.args,
-        'Agent should have passed a non-interactive flag (-y, --yes, or a specific --template)',
-      ).toMatch(/(?:^|\s)(--yes|-y|--template\s+\S+)(?:\s|$|\\|")/);
+        'Agent should have passed a non-interactive flag (-y, --yes, --no-interactive, or a specific --template)',
+      ).toMatch(
+        /(?:^|\s)(--yes|-y|--no-interactive|--template\s+\S+)(?:\s|$|\\|")/,
+      );
     },
   });
 });
