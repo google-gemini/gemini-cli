@@ -59,6 +59,7 @@ import { getVersion } from '../utils/version.js';
 import { getToolCallContext } from '../utils/toolCallContext.js';
 import { scheduleAgentTools } from './agent-scheduler.js';
 import { DeadlineTimer } from '../utils/deadlineTimer.js';
+import { LlmRole } from '../telemetry/types.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -699,6 +700,11 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       modelToUse = requestedModel;
     }
 
+    const role =
+      this.definition.name === 'codebase_investigator'
+        ? LlmRole.SUBAGENT_CODEBASE_INVESTIGATOR
+        : LlmRole.SUBAGENT;
+
     const responseStream = await chat.sendMessageStream(
       {
         model: modelToUse,
@@ -707,6 +713,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       message.parts || [],
       promptId,
       signal,
+      role,
     );
 
     const functionCalls: FunctionCall[] = [];

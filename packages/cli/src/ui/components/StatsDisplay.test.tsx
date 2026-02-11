@@ -11,6 +11,7 @@ import * as SessionContext from '../contexts/SessionContext.js';
 import type { SessionMetrics } from '../contexts/SessionContext.js';
 import {
   ToolCallDecision,
+  LlmRole,
   type RetrieveUserQuotaResponse,
 } from '@google/gemini-cli-core';
 
@@ -93,6 +94,7 @@ describe('<StatsDisplay />', () => {
             thoughts: 100,
             tool: 50,
           },
+          roles: {},
         },
         'gemini-2.5-flash': {
           api: { totalRequests: 5, totalErrors: 1, totalLatencyMs: 4500 },
@@ -105,6 +107,7 @@ describe('<StatsDisplay />', () => {
             thoughts: 2000,
             tool: 1000,
           },
+          roles: {},
         },
       },
     });
@@ -133,6 +136,7 @@ describe('<StatsDisplay />', () => {
             thoughts: 0,
             tool: 0,
           },
+          roles: {},
         },
       },
       tools: {
@@ -227,6 +231,7 @@ describe('<StatsDisplay />', () => {
               thoughts: 0,
               tool: 0,
             },
+            roles: {},
           },
         },
       });
@@ -411,6 +416,7 @@ describe('<StatsDisplay />', () => {
               thoughts: 0,
               tool: 0,
             },
+            roles: {},
           },
         },
       });
@@ -617,5 +623,61 @@ describe('<StatsDisplay />', () => {
       expect(output).toContain('Google API Key');
       expect(output).not.toContain('Tier:');
     });
+  });
+
+  it('renders roles correctly', () => {
+    const metrics = createTestMetrics({
+      models: {
+        'gemini-2.5-pro': {
+          api: { totalRequests: 3, totalErrors: 0, totalLatencyMs: 15000 },
+          tokens: {
+            input: 500,
+            prompt: 1000,
+            candidates: 2000,
+            total: 43234,
+            cached: 500,
+            thoughts: 100,
+            tool: 50,
+          },
+          roles: {
+            [LlmRole.MAIN]: {
+              totalRequests: 1,
+              totalErrors: 0,
+              totalLatencyMs: 1000,
+              tokens: {
+                input: 100,
+                prompt: 0,
+                candidates: 0,
+                total: 100,
+                cached: 0,
+                thoughts: 0,
+                tool: 0,
+              },
+            },
+            [LlmRole.UTILITY_TOOL]: {
+              totalRequests: 2,
+              totalErrors: 0,
+              totalLatencyMs: 14000,
+              tokens: {
+                input: 400,
+                prompt: 1000,
+                candidates: 2000,
+                total: 3400,
+                cached: 500,
+                thoughts: 100,
+                tool: 50,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const { lastFrame } = renderWithMockedStats(metrics);
+    const output = lastFrame();
+
+    expect(output).toContain('↳ ' + LlmRole.MAIN);
+    expect(output).toContain('↳ ' + LlmRole.UTILITY_TOOL);
+    expect(output).toMatchSnapshot();
   });
 });
