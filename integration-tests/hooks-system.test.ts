@@ -518,7 +518,10 @@ console.log(JSON.stringify({
 
   describe('BeforeToolSelection Hooks - Tool Configuration', () => {
     it('should modify tool selection with BeforeToolSelection hooks', async () => {
-      // Create a hook script before setup
+      // 1. Initial setup to establish test directory
+      rig.setup('should modify tool selection with BeforeToolSelection hooks');
+
+      // 2. Create the script in the established directory
       const scriptPath = rig.createScript(
         'before_tool_selection_hook.cjs',
         `console.log(JSON.stringify({
@@ -532,6 +535,7 @@ console.log(JSON.stringify({
 }));`,
       );
 
+      // 3. Final setup with full settings
       rig.setup('should modify tool selection with BeforeToolSelection hooks', {
         fakeResponsesPath: join(
           import.meta.dirname,
@@ -1761,7 +1765,10 @@ console.log(JSON.stringify({
 
   describe('Hook Disabling', () => {
     it('should not execute hooks disabled in settings file', async () => {
-      // Create scripts before setup
+      // 1. Initial setup to establish test directory
+      rig.setup('should not execute hooks disabled in settings file');
+
+      // 2. Create scripts in the established directory
       const enabledPath = rig.createScript(
         'enabled_hook.cjs',
         'console.log(JSON.stringify({decision: "allow", systemMessage: "EXECUTION_ALLOWED_BY_HOOK_A"}));',
@@ -1775,6 +1782,7 @@ console.log(JSON.stringify({
       const normalizedDisabledCmd = normalizePath(`node "${disabledPath}"`);
       const normalizedEnabledCmd = normalizePath(`node "${enabledPath}"`);
 
+      // 3. Final setup with full settings
       rig.setup('should not execute hooks disabled in settings file', {
         fakeResponsesPath: join(
           import.meta.dirname,
@@ -1826,7 +1834,10 @@ console.log(JSON.stringify({
     });
 
     it('should respect disabled hooks across multiple operations', async () => {
-      // Create scripts before setup
+      // 1. Initial setup to establish test directory
+      rig.setup('should respect disabled hooks across multiple operations');
+
+      // 2. Create scripts in the established directory
       const activePath = rig.createScript(
         'active_hook.cjs',
         'console.log(JSON.stringify({decision: "allow", systemMessage: "MULTIPLE_OPS_ENABLED_HOOK"}));',
@@ -1839,6 +1850,7 @@ console.log(JSON.stringify({
       const normalizedDisabledCmd = normalizePath(`node "${disabledPath}"`);
       const normalizedActiveCmd = normalizePath(`node "${activePath}"`);
 
+      // 3. Final setup with full settings
       rig.setup('should respect disabled hooks across multiple operations', {
         settings: {
           enableHooks: true,
