@@ -5,6 +5,7 @@
  */
 
 import type { ToolDefinition } from './types.js';
+import { Type } from '@google/genai';
 import * as os from 'node:os';
 
 // Centralized tool names to avoid circular dependencies
@@ -24,21 +25,21 @@ export const READ_FILE_DEFINITION: ToolDefinition = {
     name: READ_FILE_TOOL_NAME,
     description: `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files. For text files, it can read specific line ranges.`,
     parametersJsonSchema: {
-      type: 'object',
+      type: Type.OBJECT,
       properties: {
         file_path: {
           description: 'The path to the file to read.',
-          type: 'string',
+          type: Type.STRING,
         },
         offset: {
           description:
             "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
-          type: 'number',
+          type: Type.NUMBER,
         },
         limit: {
           description:
             "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (if feasible, up to a default limit).",
-          type: 'number',
+          type: Type.NUMBER,
         },
       },
       required: ['file_path'],
@@ -57,15 +58,15 @@ export const WRITE_FILE_DEFINITION: ToolDefinition = {
 
       The user has the ability to modify \`content\`. If modified, this will be stated in the response.`,
     parametersJsonSchema: {
-      type: 'object',
+      type: Type.OBJECT,
       properties: {
         file_path: {
           description: 'The path to the file to write to.',
-          type: 'string',
+          type: Type.STRING,
         },
         content: {
           description: 'The content to write to the file.',
-          type: 'string',
+          type: Type.STRING,
         },
       },
       required: ['file_path', 'content'],
@@ -83,31 +84,31 @@ export const GREP_DEFINITION: ToolDefinition = {
     description:
       'Searches for a regular expression pattern within file contents. Max 100 matches.',
     parametersJsonSchema: {
-      type: 'object',
+      type: Type.OBJECT,
       properties: {
         pattern: {
           description: `The regular expression (regex) pattern to search for within file contents (e.g., 'function\\s+myFunction', 'import\\s+\\{.*\\}\\s+from\\s+.*').`,
-          type: 'string',
+          type: Type.STRING,
         },
         dir_path: {
           description:
             'Optional: The absolute path to the directory to search within. If omitted, searches the current working directory.',
-          type: 'string',
+          type: Type.STRING,
         },
         include: {
           description: `Optional: A glob pattern to filter which files are searched (e.g., '*.js', '*.{ts,tsx}', 'src/**'). If omitted, searches all files (respecting potential global ignores).`,
-          type: 'string',
+          type: Type.STRING,
         },
         max_matches_per_file: {
           description:
             'Optional: Maximum number of matches to return per file. Use this to prevent being overwhelmed by repetitive matches in large files.',
-          type: 'integer',
+          type: Type.INTEGER,
           minimum: 1,
         },
         total_max_matches: {
           description:
             'Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 100 if omitted.',
-          type: 'integer',
+          type: Type.INTEGER,
           minimum: 1,
         },
       },
@@ -126,32 +127,32 @@ export const GLOB_DEFINITION: ToolDefinition = {
     description:
       'Efficiently finds files matching specific glob patterns (e.g., `src/**/*.ts`, `**/*.md`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.',
     parametersJsonSchema: {
-      type: 'object',
+      type: Type.OBJECT,
       properties: {
         pattern: {
           description:
             "The glob pattern to match against (e.g., '**/*.py', 'docs/*.md').",
-          type: 'string',
+          type: Type.STRING,
         },
         dir_path: {
           description:
             'Optional: The absolute path to the directory to search within. If omitted, searches the root directory.',
-          type: 'string',
+          type: Type.STRING,
         },
         case_sensitive: {
           description:
             'Optional: Whether the search should be case-sensitive. Defaults to false.',
-          type: 'boolean',
+          type: Type.BOOLEAN,
         },
         respect_git_ignore: {
           description:
             'Optional: Whether to respect .gitignore patterns when finding files. Only available in git repositories. Defaults to true.',
-          type: 'boolean',
+          type: Type.BOOLEAN,
         },
         respect_gemini_ignore: {
           description:
             'Optional: Whether to respect .geminiignore patterns when finding files. Defaults to true.',
-          type: 'boolean',
+          type: Type.BOOLEAN,
         },
       },
       required: ['pattern'],
@@ -169,33 +170,33 @@ export const LS_DEFINITION: ToolDefinition = {
     description:
       'Lists the names of files and subdirectories directly within a specified directory path. Can optionally ignore entries matching provided glob patterns.',
     parametersJsonSchema: {
-      type: 'object',
+      type: Type.OBJECT,
       properties: {
         dir_path: {
           description: 'The path to the directory to list',
-          type: 'string',
+          type: Type.STRING,
         },
         ignore: {
           description: 'List of glob patterns to ignore',
           items: {
-            type: 'string',
+            type: Type.STRING,
           },
-          type: 'array',
+          type: Type.ARRAY,
         },
         file_filtering_options: {
           description:
             'Optional: Whether to respect ignore patterns from .gitignore or .geminiignore',
-          type: 'object',
+          type: Type.OBJECT,
           properties: {
             respect_git_ignore: {
               description:
                 'Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.',
-              type: 'boolean',
+              type: Type.BOOLEAN,
             },
             respect_gemini_ignore: {
               description:
                 'Optional: Whether to respect .geminiignore patterns when listing files. Defaults to true.',
-              type: 'boolean',
+              type: Type.BOOLEAN,
             },
           },
         },
@@ -273,24 +274,24 @@ export function getShellDefinition(
         enableEfficiency,
       ),
       parametersJsonSchema: {
-        type: 'object',
+        type: Type.OBJECT,
         properties: {
           command: {
-            type: 'string',
+            type: Type.STRING,
             description: getCommandDescription(),
           },
           description: {
-            type: 'string',
+            type: Type.STRING,
             description:
               'Brief description of the command for the user. Be specific and concise. Ideally a single sentence. Can be up to 3 sentences for clarity. No line breaks.',
           },
           dir_path: {
-            type: 'string',
+            type: Type.STRING,
             description:
               '(OPTIONAL) The path of the directory to run the command in. If not provided, the project root directory is used. Must be a directory within the workspace and must already exist.',
           },
           is_background: {
-            type: 'boolean',
+            type: Type.BOOLEAN,
             description:
               'Set to true if this command should be run in the background (e.g. for long-running servers or watchers). The command will be started, allowed to run for a brief moment to check for immediate errors, and then moved to the background.',
           },
