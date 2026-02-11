@@ -275,9 +275,9 @@ For local development and debugging, you can capture telemetry data locally:
 The following section describes the structure of logs and metrics generated for
 Gemini CLI.
 
-The `session.id`, `installation.id`, and `user.email` (available only when
-authenticated with a Google account) are included as common attributes on all
-logs and metrics.
+The `session.id`, `installation.id`, `active_approval_mode`, and `user.email`
+(available only when authenticated with a Google account) are included as common
+attributes on all logs and metrics.
 
 ### Logs
 
@@ -360,7 +360,11 @@ Captures tool executions, output truncation, and Edit behavior.
     - `extension_name` (string, if applicable)
     - `extension_id` (string, if applicable)
     - `content_length` (int, if applicable)
-    - `metadata` (if applicable)
+    - `metadata` (if applicable), which includes for the `AskUser` tool:
+      - `ask_user_question_types` (array of strings)
+      - `ask_user_dismissed` (boolean)
+      - `ask_user_empty_submission` (boolean)
+      - `ask_user_answer_count` (number)
 
 - `gemini_cli.tool_output_truncated`: Output of a tool call was truncated.
   - **Attributes**:
