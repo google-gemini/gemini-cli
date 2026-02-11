@@ -14,7 +14,7 @@
  */
 export function expandEnvVars(
   str: string,
-  env: Record<string, string>,
+  env: Record<string, string | undefined>,
 ): string {
   if (!str) return str;
   return str.replace(

@@ -1903,28 +1903,25 @@ export async function createTransport(
     const sanitizedEnv = sanitizeEnvironment(process.env, {
       ...sanitizationConfig,
       enableEnvironmentVariableRedaction: true,
-    }) as Record<string, string>;
+    });
 
-    // 2. Prepare the final environment by merging in user-provided overrides.
-    // We trust these explicitly because they are defined in the user's settings or extensions.
-    const finalEnv = { ...sanitizedEnv };
+    const finalEnv: Record<string, string> = {};
+    for (const [key, value] of Object.entries(sanitizedEnv)) {
+      if (value !== undefined) {
+        finalEnv[key] = value;
+      }
+    }
 
     // Expand and merge environment variables from the extension.
     const extensionEnv = getExtensionEnvironment(mcpServerConfig.extension);
     for (const [key, value] of Object.entries(extensionEnv)) {
-      finalEnv[key] = expandEnvVars(
-        value,
-        process.env as Record<string, string>,
-      );
+      finalEnv[key] = expandEnvVars(value, process.env);
     }
 
     // Expand and merge explicit environment variables from the MCP configuration.
     if (mcpServerConfig.env) {
       for (const [key, value] of Object.entries(mcpServerConfig.env)) {
-        finalEnv[key] = expandEnvVars(
-          value,
-          process.env as Record<string, string>,
-        );
+        finalEnv[key] = expandEnvVars(value, process.env);
       }
     }
 
