@@ -519,7 +519,7 @@ console.log(JSON.stringify({
   describe('BeforeToolSelection Hooks - Tool Configuration', () => {
     it.only('should modify tool selection with BeforeToolSelection hooks', async () => {
       // 1. Initial setup to establish test directory
-      rig.setup('should modify tool selection with BeforeToolSelection hooks');
+      rig.setup('BeforeToolSelection Hooks');
 
       const toolConfigJson = JSON.stringify({
         hookSpecificOutput: {
@@ -534,7 +534,7 @@ console.log(JSON.stringify({
       // Use node -e to avoid file system and PTY overhead
       const nodeCmd = `node -e "console.log(JSON.stringify(${toolConfigJson.replace(/"/g, '\\"')}))"`;
 
-      rig.setup('should modify tool selection with BeforeToolSelection hooks', {
+      rig.setup('BeforeToolSelection Hooks', {
         fakeResponsesPath: join(
           import.meta.dirname,
           'hooks-system.before-tool-selection.responses',
@@ -1765,7 +1765,7 @@ console.log(JSON.stringify({
   describe('Hook Disabling', () => {
     it.only('should not execute hooks disabled in settings file', async () => {
       // 1. Initial setup to establish test directory
-      rig.setup('should not execute hooks disabled in settings file');
+      rig.setup('Hook Disabling');
 
       const enabledMsg = 'EXECUTION_ALLOWED_BY_HOOK_A';
       const disabledMsg = 'EXECUTION_BLOCKED_BY_HOOK_B';
@@ -1784,7 +1784,7 @@ console.log(JSON.stringify({
       const disabledCmd = `node -e "console.log(JSON.stringify(${disabledJson.replace(/"/g, '\\"')}))"`;
 
       // 3. Final setup with full settings
-      rig.setup('should not execute hooks disabled in settings file', {
+      rig.setup('Hook Disabling', {
         fakeResponsesPath: join(
           import.meta.dirname,
           'hooks-system.disabled-via-settings.responses',
@@ -1836,7 +1836,7 @@ console.log(JSON.stringify({
 
     it.only('should respect disabled hooks across multiple operations', async () => {
       // 1. Initial setup to establish test directory
-      rig.setup('should respect disabled hooks across multiple operations');
+      rig.setup('Hook Disabling');
 
       const activeMsg = 'MULTIPLE_OPS_ENABLED_HOOK';
       const disabledMsg = 'MULTIPLE_OPS_DISABLED_HOOK';
@@ -1855,7 +1855,7 @@ console.log(JSON.stringify({
       const disabledCmd = `node -e "console.log(JSON.stringify(${disabledJson.replace(/"/g, '\\"')}))"`;
 
       // 3. Final setup with full settings
-      rig.setup('should respect disabled hooks across multiple operations', {
+      rig.setup('Hook Disabling', {
         settings: {
           enableHooks: true,
           disabledHooks: [disabledCmd],
