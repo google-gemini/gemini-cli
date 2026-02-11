@@ -52,6 +52,14 @@
           "default": false,
           "type": "boolean"
         },
+        "defaultApprovalMode": {
+          "title": "Default Approval Mode",
+          "description": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet.",
+          "markdownDescription": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `default`",
+          "default": "default",
+          "type": "string",
+          "enum": ["default", "auto_edit", "plan"]
+        },
         "devtools": {
           "title": "DevTools",
           "description": "Enable DevTools inspector on launch.",
@@ -211,6 +219,14 @@
           "default": false,
           "type": "boolean"
         },
+        "inlineThinkingMode": {
+          "title": "Inline Thinking",
+          "description": "Display model thinking inline: off or full.",
+          "markdownDescription": "Display model thinking inline: off or full.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `off`",
+          "default": "off",
+          "type": "string",
+          "enum": ["off", "full"]
+        },
         "showStatusInTitle": {
           "title": "Show Thoughts in Title",
           "description": "Show Gemini CLI model thoughts in the terminal window title during the working phase",
@@ -237,6 +253,13 @@
           "description": "Hide helpful tips in the UI",
           "markdownDescription": "Hide helpful tips in the UI\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
+          "type": "boolean"
+        },
+        "showShortcutsHint": {
+          "title": "Show Shortcuts Hint",
+          "description": "Show the \"? for shortcuts\" hint above the input.",
+          "markdownDescription": "Show the \"? for shortcuts\" hint above the input.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "hideBanner": {
@@ -1143,14 +1166,6 @@
           },
           "additionalProperties": false
         },
-        "approvalMode": {
-          "title": "Approval Mode",
-          "description": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet.",
-          "markdownDescription": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `default`",
-          "default": "default",
-          "type": "string",
-          "enum": ["default", "auto_edit", "plan"]
-        },
         "core": {
           "title": "Core Tools",
           "description": "Restrict the set of built-in tools with an allowlist. Match semantics mirror tools.allowed; see the built-in tools documentation for available names.",
@@ -1434,8 +1449,8 @@
             "enabled": {
               "title": "Enable Tool Output Masking",
               "description": "Enables tool output masking to save tokens.",
-              "markdownDescription": "Enables tool output masking to save tokens.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
-              "default": false,
+              "markdownDescription": "Enables tool output masking to save tokens.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
               "type": "boolean"
             },
             "toolProtectionThreshold": {
@@ -1481,6 +1496,13 @@
           "description": "Enable requesting and fetching of extension settings.",
           "markdownDescription": "Enable requesting and fetching of extension settings.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
           "default": true,
+          "type": "boolean"
+        },
+        "extensionRegistry": {
+          "title": "Extension Registry Explore UI",
+          "description": "Enable extension registry explore UI.",
+          "markdownDescription": "Enable extension registry explore UI.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
           "type": "boolean"
         },
         "extensionReloading": {

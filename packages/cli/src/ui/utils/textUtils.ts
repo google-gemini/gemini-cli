@@ -143,6 +143,13 @@ export function sanitizeForDisplay(str: string, maxLength?: number): string {
   return sanitized;
 }
 
+/**
+ * Normalizes escaped newline characters (e.g., "\\n") into actual newline characters.
+ */
+export function normalizeEscapedNewlines(value: string): string {
+  return value.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n');
+}
+
 const stringWidthCache = new LRUCache<string, number>(
   LRU_BUFFER_PERF_CACHE_LIMIT,
 );
@@ -203,6 +210,7 @@ export function escapeAnsiCtrlCodes<T>(obj: T): T {
     }
 
     regex.lastIndex = 0; // needed for global regex
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return obj.replace(regex, (match) =>
       JSON.stringify(match).slice(1, -1),
     ) as T;
@@ -225,6 +233,7 @@ export function escapeAnsiCtrlCodes<T>(obj: T): T {
         newArr[i] = escapedValue;
       }
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return (newArr !== null ? newArr : obj) as T;
   }
 
@@ -232,6 +241,7 @@ export function escapeAnsiCtrlCodes<T>(obj: T): T {
   const keys = Object.keys(obj);
 
   for (const key of keys) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const value = (obj as Record<string, unknown>)[key];
     const escapedValue = escapeAnsiCtrlCodes(value);
 
@@ -239,6 +249,7 @@ export function escapeAnsiCtrlCodes<T>(obj: T): T {
       if (newObj === null) {
         newObj = { ...obj };
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       (newObj as Record<string, unknown>)[key] = escapedValue;
     }
   }

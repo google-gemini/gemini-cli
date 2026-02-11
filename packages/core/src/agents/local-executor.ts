@@ -822,6 +822,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     for (const [index, functionCall] of functionCalls.entries()) {
       const callId = functionCall.id ?? `${promptId}-${index}`;
       const args = functionCall.args ?? {};
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const toolName = functionCall.name as string;
 
       this.emitActivity('TOOL_CALL_START', {
@@ -1107,6 +1108,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         ...schema
       } = jsonSchema;
       completeTool.parameters!.properties![outputConfig.outputName] =
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         schema as Schema;
       completeTool.parameters!.required!.push(outputConfig.outputName);
     } else {

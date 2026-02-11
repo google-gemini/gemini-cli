@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -33,7 +33,11 @@ vi.mock('../contexts/SettingsContext.js', async (importOriginal) => {
 const useSessionStatsMock = vi.mocked(SessionContext.useSessionStats);
 const useSettingsMock = vi.mocked(SettingsContext.useSettings);
 
-const renderWithMockedStats = (metrics: SessionMetrics, width?: number) => {
+const renderWithMockedStats = (
+  metrics: SessionMetrics,
+  width?: number,
+  currentModel: string = 'gemini-2.5-pro',
+) => {
   useSessionStatsMock.mockReturnValue({
     stats: {
       sessionId: 'test-session',
@@ -55,7 +59,7 @@ const renderWithMockedStats = (metrics: SessionMetrics, width?: number) => {
     },
   } as unknown as LoadedSettings);
 
-  return render(<ModelStatsDisplay />, width);
+  return render(<ModelStatsDisplay currentModel={currentModel} />, width);
 };
 
 describe('<ModelStatsDisplay />', () => {
@@ -380,6 +384,7 @@ describe('<ModelStatsDisplay />', () => {
         },
       },
       80,
+      'auto-gemini-3',
     );
 
     const output = lastFrame();

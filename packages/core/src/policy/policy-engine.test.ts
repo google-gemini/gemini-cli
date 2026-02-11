@@ -2030,4 +2030,100 @@ describe('PolicyEngine', () => {
       expect(result.decision).toBe(PolicyDecision.DENY);
     });
   });
+
+  describe('YOLO mode with ask_user tool', () => {
+    it('should return ASK_USER for ask_user tool even in YOLO mode', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'ask_user',
+          decision: PolicyDecision.ASK_USER,
+          priority: 999,
+          modes: [ApprovalMode.YOLO],
+        },
+        {
+          decision: PolicyDecision.ALLOW,
+          priority: 998,
+          modes: [ApprovalMode.YOLO],
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+      });
+
+      const result = await engine.check(
+        { name: 'ask_user', args: {} },
+        undefined,
+      );
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should return ALLOW for other tools in YOLO mode', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'ask_user',
+          decision: PolicyDecision.ASK_USER,
+          priority: 999,
+          modes: [ApprovalMode.YOLO],
+        },
+        {
+          decision: PolicyDecision.ALLOW,
+          priority: 998,
+          modes: [ApprovalMode.YOLO],
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.YOLO,
+      });
+
+      const result = await engine.check(
+        { name: 'run_shell_command', args: { command: 'ls' } },
+        undefined,
+      );
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+  });
+
+  describe('Plan Mode', () => {
+    it('should allow activate_skill but deny shell commands in Plan Mode', async () => {
+      const rules: PolicyRule[] = [
+        {
+          decision: PolicyDecision.DENY,
+          priority: 60,
+          modes: [ApprovalMode.PLAN],
+          denyMessage:
+            'You are in Plan Mode with access to read-only tools. Execution of scripts (including those from skills) is blocked.',
+        },
+        {
+          toolName: 'activate_skill',
+          decision: PolicyDecision.ALLOW,
+          priority: 70,
+          modes: [ApprovalMode.PLAN],
+        },
+      ];
+
+      engine = new PolicyEngine({
+        rules,
+        approvalMode: ApprovalMode.PLAN,
+      });
+
+      const skillResult = await engine.check(
+        { name: 'activate_skill', args: { name: 'test' } },
+        undefined,
+      );
+      expect(skillResult.decision).toBe(PolicyDecision.ALLOW);
+
+      const shellResult = await engine.check(
+        { name: 'run_shell_command', args: { command: 'ls' } },
+        undefined,
+      );
+      expect(shellResult.decision).toBe(PolicyDecision.DENY);
+      expect(shellResult.rule?.denyMessage).toContain(
+        'Execution of scripts (including those from skills) is blocked',
+      );
+    });
+  });
 });
