@@ -37,8 +37,11 @@ import {
 } from '../../config/settingsSchema.js';
 import { coreEvents, debugLogger } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
-import { type SettingsDialogItem } from './shared/BaseSettingsDialog.js';
-import { SearchableList } from './shared/SearchableList.js';
+import {
+  type SettingsDialogItem,
+  BaseSettingsDialog,
+} from './shared/BaseSettingsDialog.js';
+import { useFuzzyList } from '../hooks/useFuzzyList.js';
 
 interface SettingsDialogProps {
   settings: LoadedSettings;
@@ -115,7 +118,7 @@ export function SettingsDialog({
   }, [selectedScope, settings, globalPendingChanges]);
 
   // Generate items for SearchableList
-  const settingKeys = getDialogSettingKeys();
+  const settingKeys = useMemo(() => getDialogSettingKeys(), []);
   const items: SettingsDialogItem[] = useMemo(() => {
     const scopeSettings = settings.forScope(selectedScope).settings;
     const mergedSettings = settings.merged;
@@ -160,6 +163,11 @@ export function SettingsDialog({
       };
     });
   }, [settingKeys, selectedScope, settings, modifiedSettings, pendingSettings]);
+
+  // Use fuzzy search hook
+  const { filteredItems, searchBuffer, maxLabelWidth } = useFuzzyList({
+    items,
+  });
 
   // Scope selection handler
   const handleScopeChange = useCallback((scope: LoadableSettingScope) => {
@@ -582,15 +590,17 @@ export function SettingsDialog({
   ) : null;
 
   return (
-    <SearchableList
+    <BaseSettingsDialog
       title="Settings"
       borderColor={showRestartPrompt ? theme.status.warning : undefined}
       searchEnabled={showSearch}
-      items={items}
+      searchBuffer={searchBuffer}
+      items={filteredItems}
       showScopeSelector={showScopeSelection}
       selectedScope={selectedScope}
       onScopeChange={handleScopeChange}
       maxItemsToShow={effectiveMaxItemsToShow}
+      maxLabelWidth={maxLabelWidth}
       onItemToggle={handleItemToggle}
       onEditCommit={handleEditCommit}
       onItemClear={handleItemClear}

@@ -5,150 +5,185 @@
  */
 
 import type React from 'react';
-import { useState, useEffect, useMemo } from 'react';
-import { AsyncFzf } from 'fzf';
+import { useState, useEffect } from 'react';
+import { Box, Text } from 'ink';
+import { theme } from '../../semantic-colors.js';
+import { TextInput } from './TextInput.js';
+import { useKeypress, type Key } from '../../hooks/useKeypress.js';
+import { keyMatchers, Command } from '../../keyMatchers.js';
 import {
-  BaseSettingsDialog,
-  type SettingsDialogItem,
-  type BaseSettingsDialogProps,
-} from './BaseSettingsDialog.js';
-import { useTextBuffer } from './text-buffer.js';
-import { useUIState } from '../../contexts/UIStateContext.js';
+  useFuzzyList,
+  type GenericListItem,
+} from '../../hooks/useFuzzyList.js';
 
-import { getCachedStringWidth } from '../../utils/textUtils.js';
-
-interface FzfResult {
-  item: string;
-  start: number;
-  end: number;
-  score: number;
-  positions?: number[];
-}
-
-/**
- * SearchableListProps extends BaseSettingsDialogProps but removes props that are handled internally
- * or derived from the items and search state.
- */
-export interface SearchableListProps
-  extends Omit<
-    BaseSettingsDialogProps,
-    'searchBuffer' | 'items' | 'maxLabelWidth'
-  > {
-  /** All available items */
-  items: SettingsDialogItem[];
-  /** Optional custom search query handler */
-  onSearch?: (query: string) => void;
+export interface SearchableListProps<T extends GenericListItem> {
+  /** List title */
+  title?: string;
+  /** Available items */
+  items: T[];
+  /** Callback when an item is selected */
+  onSelect: (item: T) => void;
+  /** Callback when the list is closed (e.g. via Esc) */
+  onClose?: () => void;
   /** Initial search query */
   initialSearchQuery?: string;
+  /** Placeholder for search input */
+  searchPlaceholder?: string;
+  /** Max items to show at once */
+  maxItemsToShow?: number;
 }
 
 /**
- * A generic searchable list component that wraps BaseSettingsDialog.
- * It handles fuzzy searching and filtering of items.
+ * A generic searchable list component.
  */
-export function SearchableList({
+export function SearchableList<T extends GenericListItem>({
+  title,
   items,
-  onSearch,
+  onSelect,
+  onClose,
   initialSearchQuery = '',
-  ...baseProps
-}: SearchableListProps): React.JSX.Element {
-  // Search state
-  const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
-  const [filteredKeys, setFilteredKeys] = useState<string[]>(() =>
-    items.map((i) => i.key),
-  );
-
-  // FZF instance for fuzzy searching
-  const { fzfInstance, searchMap } = useMemo(() => {
-    const map = new Map<string, string>();
-    const searchItems: string[] = [];
-
-    items.forEach((item) => {
-      searchItems.push(item.label);
-      map.set(item.label.toLowerCase(), item.key);
-    });
-
-    const fzf = new AsyncFzf(searchItems, {
-      fuzzy: 'v2',
-      casing: 'case-insensitive',
-    });
-    return { fzfInstance: fzf, searchMap: map };
-  }, [items]);
-
-  // Perform search
-  useEffect(() => {
-    let active = true;
-    if (!searchQuery.trim() || !fzfInstance) {
-      setFilteredKeys(items.map((i) => i.key));
-      return;
-    }
-
-    const doSearch = async () => {
-      const results = await fzfInstance.find(searchQuery);
-
-      if (!active) return;
-
-      const matchedKeys = new Set<string>();
-      results.forEach((res: FzfResult) => {
-        const key = searchMap.get(res.item.toLowerCase());
-        if (key) matchedKeys.add(key);
-      });
-      setFilteredKeys(Array.from(matchedKeys));
-      onSearch?.(searchQuery);
-    };
-
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    doSearch();
-
-    return () => {
-      active = false;
-    };
-  }, [searchQuery, fzfInstance, searchMap, items, onSearch]);
-
-  // Get mainAreaWidth for search buffer viewport from UIState
-  const { mainAreaWidth } = useUIState();
-  const viewportWidth = Math.max(20, mainAreaWidth - 8);
-
-  // Search input buffer
-  const searchBuffer = useTextBuffer({
-    initialText: searchQuery,
-    initialCursorOffset: searchQuery.length,
-    viewport: {
-      width: viewportWidth,
-      height: 1,
-    },
-    singleLine: true,
-    onChange: (text) => setSearchQuery(text),
+  searchPlaceholder = 'Search...',
+  maxItemsToShow = 10,
+}: SearchableListProps<T>): React.JSX.Element {
+  const { filteredItems, searchBuffer, maxLabelWidth } = useFuzzyList({
+    items,
+    initialQuery: initialSearchQuery,
   });
 
-  // Filtered items to display
-  const displayItems = useMemo(() => {
-    if (!searchQuery) return items;
-    return items.filter((item) => filteredKeys.includes(item.key));
-  }, [items, filteredKeys, searchQuery]);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [scrollOffset, setScrollOffset] = useState(0);
 
-  // Calculate max label width for alignment
-  const maxLabelWidth = useMemo(() => {
-    let max = 0;
-    // We use all items for consistent alignment even when filtered
-    items.forEach((item) => {
-      const labelFull =
-        item.label + (item.scopeMessage ? ` ${item.scopeMessage}` : '');
-      const lWidth = getCachedStringWidth(labelFull);
-      const dWidth = item.description
-        ? getCachedStringWidth(item.description)
-        : 0;
-      max = Math.max(max, lWidth, dWidth);
-    });
-    return max;
-  }, [items]);
+  // Reset selection when filtered items change
+  useEffect(() => {
+    setActiveIndex(0);
+    setScrollOffset(0);
+  }, [filteredItems]);
+
+  // Calculate visible items
+  const visibleItems = filteredItems.slice(
+    scrollOffset,
+    scrollOffset + maxItemsToShow,
+  );
+  const showScrollUp = scrollOffset > 0;
+  const showScrollDown = scrollOffset + maxItemsToShow < filteredItems.length;
+
+  useKeypress(
+    (key: Key) => {
+      // Navigation
+      if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
+        const newIndex =
+          activeIndex > 0 ? activeIndex - 1 : filteredItems.length - 1;
+        setActiveIndex(newIndex);
+        if (newIndex === filteredItems.length - 1) {
+          setScrollOffset(Math.max(0, filteredItems.length - maxItemsToShow));
+        } else if (newIndex < scrollOffset) {
+          setScrollOffset(newIndex);
+        }
+        return;
+      }
+      if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
+        const newIndex =
+          activeIndex < filteredItems.length - 1 ? activeIndex + 1 : 0;
+        setActiveIndex(newIndex);
+        if (newIndex === 0) {
+          setScrollOffset(0);
+        } else if (newIndex >= scrollOffset + maxItemsToShow) {
+          setScrollOffset(newIndex - maxItemsToShow + 1);
+        }
+        return;
+      }
+
+      // Selection
+      if (keyMatchers[Command.RETURN](key)) {
+        const item = filteredItems[activeIndex];
+        if (item) {
+          onSelect(item);
+        }
+        return;
+      }
+
+      // Close
+      if (keyMatchers[Command.ESCAPE](key)) {
+        onClose?.();
+        return;
+      }
+    },
+    { isActive: true },
+  );
 
   return (
-    <BaseSettingsDialog
-      {...baseProps}
-      items={displayItems}
-      searchBuffer={searchBuffer}
-      maxLabelWidth={maxLabelWidth}
-    />
+    <Box
+      borderStyle="round"
+      borderColor={theme.border.default}
+      flexDirection="column"
+      padding={1}
+      width="100%"
+    >
+      {/* Header */}
+      {title && (
+        <Box marginBottom={1}>
+          <Text bold>{title}</Text>
+        </Box>
+      )}
+
+      {/* Search Input */}
+      {searchBuffer && (
+        <Box
+          borderStyle="round"
+          borderColor={theme.border.focused}
+          paddingX={1}
+          marginBottom={1}
+        >
+          <TextInput
+            buffer={searchBuffer}
+            placeholder={searchPlaceholder}
+            focus={true}
+          />
+        </Box>
+      )}
+
+      {/* List */}
+      <Box flexDirection="column">
+        {visibleItems.length === 0 ? (
+          <Text color={theme.text.secondary}>No items found.</Text>
+        ) : (
+          visibleItems.map((item, idx) => {
+            const index = scrollOffset + idx;
+            const isActive = index === activeIndex;
+
+            return (
+              <Box key={item.key} flexDirection="row">
+                <Text
+                  color={isActive ? theme.status.success : theme.text.secondary}
+                >
+                  {isActive ? '> ' : '  '}
+                </Text>
+                <Box width={maxLabelWidth + 2}>
+                  <Text
+                    color={isActive ? theme.status.success : theme.text.primary}
+                  >
+                    {item.label}
+                  </Text>
+                </Box>
+                {item.description && (
+                  <Text color={theme.text.secondary}>{item.description}</Text>
+                )}
+              </Box>
+            );
+          })
+        )}
+      </Box>
+
+      {/* Footer/Scroll Indicators */}
+      {(showScrollUp || showScrollDown) && (
+        <Box marginTop={1} justifyContent="center">
+          <Text color={theme.text.secondary}>
+            {showScrollUp ? '▲ ' : '  '}
+            {filteredItems.length} items
+            {showScrollDown ? ' ▼' : '  '}
+          </Text>
+        </Box>
+      )}
+    </Box>
   );
 }

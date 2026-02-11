@@ -4,71 +4,56 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import React from 'react';
 import { render } from '../../../test-utils/render.js';
 import { waitFor } from '../../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act } from 'react';
 import { SearchableList, type SearchableListProps } from './SearchableList.js';
 import { KeypressProvider } from '../../contexts/KeypressContext.js';
-import { SettingScope } from '../../../config/settings.js';
-import { type SettingsDialogItem } from './BaseSettingsDialog.js';
+import { type GenericListItem } from '../../hooks/useFuzzyList.js';
 
+// Mock UI State
 vi.mock('../../contexts/UIStateContext.js', () => ({
   useUIState: () => ({
     mainAreaWidth: 100,
   }),
 }));
 
-const createMockItems = (): SettingsDialogItem[] => [
+const mockItems: GenericListItem[] = [
   {
-    key: 'boolean-setting',
-    label: 'Boolean Setting',
-    description: 'A boolean setting for testing',
-    displayValue: 'true',
-    rawValue: true,
-    type: 'boolean',
+    key: 'item-1',
+    label: 'Item One',
+    description: 'Description for item one',
   },
   {
-    key: 'string-setting',
-    label: 'String Setting',
-    description: 'A string setting for testing',
-    displayValue: 'test-value',
-    rawValue: 'test-value',
-    type: 'string',
+    key: 'item-2',
+    label: 'Item Two',
+    description: 'Description for item two',
   },
   {
-    key: 'number-setting',
-    label: 'Number Setting',
-    description: 'A number setting for testing',
-    displayValue: '42',
-    rawValue: 42,
-    type: 'number',
+    key: 'item-3',
+    label: 'Item Three',
+    description: 'Description for item three',
   },
 ];
 
 describe('SearchableList', () => {
-  let mockOnItemToggle: ReturnType<typeof vi.fn>;
-  let mockOnEditCommit: ReturnType<typeof vi.fn>;
-  let mockOnItemClear: ReturnType<typeof vi.fn>;
+  let mockOnSelect: ReturnType<typeof vi.fn>;
   let mockOnClose: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockOnItemToggle = vi.fn();
-    mockOnEditCommit = vi.fn();
-    mockOnItemClear = vi.fn();
+    mockOnSelect = vi.fn();
     mockOnClose = vi.fn();
   });
 
-  const renderList = (props: Partial<SearchableListProps> = {}) => {
-    const defaultProps: SearchableListProps = {
+  const renderList = (
+    props: Partial<SearchableListProps<GenericListItem>> = {},
+  ) => {
+    const defaultProps: SearchableListProps<GenericListItem> = {
       title: 'Test List',
-      items: createMockItems(),
-      selectedScope: SettingScope.User,
-      maxItemsToShow: 8,
-      onItemToggle: mockOnItemToggle,
-      onEditCommit: mockOnEditCommit,
-      onItemClear: mockOnItemClear,
+      items: mockItems,
+      onSelect: mockOnSelect,
       onClose: mockOnClose,
       ...props,
     };
@@ -83,76 +68,89 @@ describe('SearchableList', () => {
   it('should render all items initially', () => {
     const { lastFrame } = renderList();
     const frame = lastFrame();
-    expect(frame).toContain('Boolean Setting');
-    expect(frame).toContain('String Setting');
-    expect(frame).toContain('Number Setting');
+
+    // Check for title
+    expect(frame).toContain('Test List');
+
+    // Check for items
+    expect(frame).toContain('Item One');
+    expect(frame).toContain('Item Two');
+    expect(frame).toContain('Item Three');
+
+    // Check for descriptions
+    expect(frame).toContain('Description for item one');
   });
 
   it('should filter items based on search query', async () => {
     const { lastFrame, stdin } = renderList();
 
-    // Type "bool" into search
-    await act(async () => {
-      stdin.write('bool');
+    // Type "Two" into search
+    await React.act(async () => {
+      stdin.write('Two');
     });
 
     await waitFor(() => {
       const frame = lastFrame();
-      expect(frame).toContain('Boolean Setting');
-      expect(frame).not.toContain('String Setting');
-      expect(frame).not.toContain('Number Setting');
+      expect(frame).toContain('Item Two');
+      expect(frame).not.toContain('Item One');
+      expect(frame).not.toContain('Item Three');
     });
   });
 
-  it('should show "No matches found." when no items match', async () => {
+  it('should show "No items found." when no items match', async () => {
     const { lastFrame, stdin } = renderList();
 
     // Type something that won't match
-    await act(async () => {
+    await React.act(async () => {
       stdin.write('xyz123');
     });
 
     await waitFor(() => {
       const frame = lastFrame();
-      expect(frame).toContain('No matches found.');
+      expect(frame).toContain('No items found.');
     });
   });
 
-  it('should call onSearch callback when query changes', async () => {
-    const mockOnSearch = vi.fn();
-    const { stdin } = renderList({ onSearch: mockOnSearch });
+  it('should handle selection with Enter', async () => {
+    const { stdin } = renderList();
 
-    await act(async () => {
-      stdin.write('a');
+    // Select first item (default active)
+    await React.act(async () => {
+      stdin.write('\r'); // Enter
     });
 
     await waitFor(() => {
-      expect(mockOnSearch).toHaveBeenCalledWith('a');
+      expect(mockOnSelect).toHaveBeenCalledWith(mockItems[0]);
     });
   });
 
-  it('should handle clearing the search query', async () => {
-    const { lastFrame, stdin } = renderList();
+  it('should handle navigation and selection', async () => {
+    const { stdin } = renderList();
 
-    // Search for something
-    await act(async () => {
-      stdin.write('bool');
+    // Navigate down to second item
+    await React.act(async () => {
+      stdin.write('\u001B[B'); // Down Arrow
+    });
+
+    // Select second item
+    await React.act(async () => {
+      stdin.write('\r'); // Enter
     });
 
     await waitFor(() => {
-      expect(lastFrame()).not.toContain('String Setting');
+      expect(mockOnSelect).toHaveBeenCalledWith(mockItems[1]);
     });
+  });
 
-    // Clear search (Backspace 4 times)
-    await act(async () => {
-      stdin.write('\u0008\u0008\u0008\u0008');
+  it('should handle close with Esc', async () => {
+    const { stdin } = renderList();
+
+    await React.act(async () => {
+      stdin.write('\u001B'); // Esc
     });
 
     await waitFor(() => {
-      const frame = lastFrame();
-      expect(frame).toContain('Boolean Setting');
-      expect(frame).toContain('String Setting');
-      expect(frame).toContain('Number Setting');
+      expect(mockOnClose).toHaveBeenCalled();
     });
   });
 });
