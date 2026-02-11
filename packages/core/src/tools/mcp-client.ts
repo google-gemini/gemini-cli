@@ -1889,13 +1889,13 @@ export async function createTransport(
           enableEnvironmentVariableRedaction: true,
         },
       ) as Record<string, string>,
-=======
+
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       env: {
         ...sanitizeEnvironment(process.env, sanitizationConfig),
         ...(mcpServerConfig.env || {}),
       } as Record<string, string>,
->>>>>>> e9a947481 (Revert unintended credentials exposure (#18840))
+
       cwd: mcpServerConfig.cwd,
       stderr: 'pipe',
     });
