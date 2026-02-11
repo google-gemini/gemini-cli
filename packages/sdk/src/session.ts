@@ -18,6 +18,10 @@ import {
   loadSkillsFromDir,
   ActivateSkillTool,
   type ResumedSessionData,
+  HookType,
+  executeToolWithHooks,
+  SessionStartSource,
+  SessionEndReason,
 } from '@google/gemini-cli-core';
 
 import { type Tool, SdkTool, type z } from './tool.js';
@@ -29,11 +33,13 @@ import type {
   SystemInstructions,
 } from './types.js';
 import type { SkillReference } from './skills.js';
+import type { Hook } from './hook.js';
 import type { GeminiCliAgent } from './agent.js';
 
 export class GeminiCliSession {
   private config: Config;
   private tools: Array<Tool<z.ZodType>>;
+  private hooks: Hook[];
   private skillRefs: SkillReference[];
   private instructions: SystemInstructions | undefined;
   private client: GeminiClient | undefined;
@@ -48,6 +54,7 @@ export class GeminiCliSession {
     this.instructions = options.instructions;
     const cwd = options.cwd || process.cwd();
     this.tools = options.tools || [];
+    this.hooks = options.hooks || [];
     this.skillRefs = options.skills || [];
 
     const initialMemory =
@@ -61,7 +68,7 @@ export class GeminiCliSession {
       model: options.model || PREVIEW_GEMINI_MODEL_AUTO,
       userMemory: initialMemory,
       // Minimal config
-      enableHooks: false,
+      enableHooks: this.hooks.length > 0,
       mcpEnabled: false,
       extensionsEnabled: false,
       recordResponses: options.recordResponses,
@@ -78,6 +85,22 @@ export class GeminiCliSession {
    */
   get id(): string {
     return this.sessionId;
+  }
+
+  /**
+   * Returns the session context.
+   */
+  getContext(): SessionContext {
+    return {
+      sessionId: this.sessionId,
+      transcript: this.client?.getHistory() || [],
+      cwd: this.config.getWorkingDir(),
+      timestamp: new Date().toISOString(),
+      fs: new SdkAgentFilesystem(this.config),
+      shell: new SdkAgentShell(this.config),
+      agent: this.agent,
+      session: this,
+    };
   }
 
   async initialize(): Promise<void> {
@@ -138,7 +161,39 @@ export class GeminiCliSession {
       registry.registerTool(sdkTool);
     }
 
+    // Register hooks
+    if (this.hooks.length > 0) {
+      const hookSystem = this.config.getHookSystem();
+      if (hookSystem) {
+        for (const sdkHook of this.hooks) {
+          hookSystem.registerHook(
+            {
+              type: HookType.Runtime,
+              name: sdkHook.name,
+              action: async (input) =>
+                // Cast the generic HookInput to the specific EventInputMap type required by this hook.
+                // This is safe because the hook system guarantees the input matches the event name.
+                // We use 'any' for the argument to satisfy the intersection requirement of the union function type.
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any
+                sdkHook.action(input as any, this.getContext()),
+            },
+            sdkHook.event,
+            {
+              matcher: sdkHook.matcher,
+              sequential: sdkHook.sequential,
+            },
+          );
+        }
+      }
+    }
+
     this.client = this.config.getGeminiClient();
+
+    // Fire SessionStart event
+    const hookSystem = this.config.getHookSystem();
+    if (hookSystem) {
+      await hookSystem.fireSessionStartEvent(SessionStartSource.Startup);
+    }
 
     if (this.resumedData) {
       const history: Content[] = this.resumedData.conversation.messages.map(
@@ -160,6 +215,17 @@ export class GeminiCliSession {
     this.initialized = true;
   }
 
+  /**
+   * Closes the session and fires the SessionEnd event.
+   */
+  async close(reason: SessionEndReason = SessionEndReason.Exit): Promise<void> {
+    const hookSystem = this.config.getHookSystem();
+    if (hookSystem) {
+      await hookSystem.fireSessionEndEvent(reason);
+    }
+    this.initialized = false;
+  }
+
   async *sendStream(prompt: string): AsyncGenerator<ServerGeminiStreamEvent> {
     if (!this.initialized || !this.client) {
       await this.initialize();
@@ -173,21 +239,9 @@ export class GeminiCliSession {
     const signal = new AbortController().signal; // TODO: support signal
     const sessionId = this.config.getSessionId();
 
-    const fs = new SdkAgentFilesystem(this.config);
-    const shell = new SdkAgentShell(this.config);
-
     while (true) {
       if (typeof this.instructions === 'function') {
-        const context: SessionContext = {
-          sessionId,
-          transcript: client.getHistory(),
-          cwd: this.config.getWorkingDir(),
-          timestamp: new Date().toISOString(),
-          fs,
-          shell,
-          agent: this.agent,
-          session: this,
-        };
+        const context = this.getContext();
         try {
           const newInstructions = this.instructions(context);
           this.config.setUserMemory(newInstructions);
@@ -214,17 +268,7 @@ export class GeminiCliSession {
       }
 
       const functionResponses: Array<Record<string, unknown>> = [];
-      const transcript: Content[] = client.getHistory();
-      const context: SessionContext = {
-        sessionId,
-        transcript,
-        cwd: this.config.getWorkingDir(),
-        timestamp: new Date().toISOString(),
-        fs,
-        shell,
-        agent: this.agent,
-        session: this,
-      };
+      const context = this.getContext();
 
       for (const toolCall of toolCalls) {
         const tool = registry.getTool(toolCall.name);
@@ -248,7 +292,18 @@ export class GeminiCliSession {
                   context,
                 )
               : tool.build(toolCall.args as object);
-          const result = await invocation.execute(signal);
+
+          const result = await executeToolWithHooks(
+            invocation,
+            toolCall.name,
+            signal,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any
+            tool as any,
+            undefined,
+            undefined,
+            undefined,
+            this.config,
+          );
 
           functionResponses.push({
             functionResponse: {

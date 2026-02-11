@@ -6,6 +6,7 @@
 
 import type { Content } from '@google/gemini-cli-core';
 import type { Tool } from './tool.js';
+import type { Hook } from './hook.js';
 import type { SkillReference } from './skills.js';
 import type { GeminiCliAgent } from './agent.js';
 import type { GeminiCliSession } from './session.js';
@@ -15,6 +16,7 @@ export type SystemInstructions = string | ((context: SessionContext) => string);
 export interface GeminiCliAgentOptions {
   instructions?: SystemInstructions;
   tools?: Tool[];
+  hooks?: Hook[];
   skills?: SkillReference[];
   model?: string;
   cwd?: string;
