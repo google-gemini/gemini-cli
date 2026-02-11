@@ -139,7 +139,7 @@ export class Theme {
       border: {
         default: interpolateColor(
           this.colors.Background,
-          this.colors.Gray,
+          this.colors.Foreground,
           DEFAULT_BORDER_OPACITY,
         ),
         focused: this.colors.AccentBlue,
@@ -410,7 +410,7 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
         customTheme.border?.default ??
         interpolateColor(
           colors.Background,
-          colors.Gray,
+          colors.Foreground,
           DEFAULT_BORDER_OPACITY,
         ),
       focused: customTheme.border?.focused ?? colors.AccentBlue,
