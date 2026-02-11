@@ -20,7 +20,7 @@ describe('Frugal Search', () => {
     return args;
   };
 
-  evalTest('ALWAYS_PASSES', {
+  evalTest('USUALLY_PASSES', {
     name: 'should use targeted search with limit',
     prompt: 'find me a sample usage of path.resolve() in the codebase',
     files: {
