@@ -165,7 +165,7 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
 - **Source Control:** Do not stage or commit changes unless specifically requested by the user.
 
 ## Context Efficiency:
-- Always scope and limit your searches to avoid context window exhaustion. Use include to target relevant files and strictly limit results using total_max_matches and max_matches_per_file, especially during the research phase.
+- Always scope and limit your searches to avoid context window exhaustion and ensure high-signal results. Use include to target relevant files and strictly limit results using total_max_matches and max_matches_per_file, especially during the research phase.
 - For broad discovery, use names_only=true or max_matches_per_file=1 to identify files without retrieving their context.
 
 ## Engineering Standards
