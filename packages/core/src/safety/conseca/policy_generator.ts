@@ -5,10 +5,12 @@
  */
 
 import type { Config } from '../../config/config.js';
-import type { SecurityPolicy, ToolPolicy } from './types.js';
+import type { SecurityPolicy } from './types.js';
 import { getResponseText } from '../../utils/partUtils.js';
+import { safeTemplateReplace } from '../../utils/textUtils.js';
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../../config/models.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { SafetyCheckDecision } from '../protocol.js';
 
 const CONSECA_POLICY_GENERATION_PROMPT = `
 You are a security expert responsible for generating fine-grained security policies for a large language model integrated into a command-line tool. Your role is to act as a "policy generator" that creates temporary, context-specific rules based on a user's prompt and the tools available to the main LLM.
@@ -69,10 +71,9 @@ Trusted Tools (Context):
 
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import type { Schema } from '@google/genai';
 
 const ToolPolicySchema = z.object({
-  permissions: z.enum(['allow', 'deny', 'ask_user']),
+  permissions: z.nativeEnum(SafetyCheckDecision),
   constraints: z.string(),
   rationale: z.string(),
 });
@@ -114,17 +115,17 @@ export async function generatePolicy(
           responseMimeType: 'application/json',
           responseSchema: zodToJsonSchema(SecurityPolicyResponseSchema, {
             target: 'openApi3',
-          }) as unknown as Schema,
+          }),
         },
         contents: [
           {
             role: 'user',
             parts: [
               {
-                text: CONSECA_POLICY_GENERATION_PROMPT.replace(
-                  '{{user_prompt}}',
-                  userPrompt,
-                ).replace('{{trusted_content}}', trustedContent),
+                text: safeTemplateReplace(CONSECA_POLICY_GENERATION_PROMPT, {
+                  user_prompt: userPrompt,
+                  trusted_content: trustedContent,
+                }),
               },
             ],
           },
@@ -143,11 +144,10 @@ export async function generatePolicy(
     }
 
     try {
-      const parsed = JSON.parse(responseText);
-      const policiesList = parsed.policies as Array<{
-        tool_name: string;
-        policy: ToolPolicy;
-      }>;
+      const parsed = SecurityPolicyResponseSchema.parse(
+        JSON.parse(responseText),
+      );
+      const policiesList = parsed.policies;
       const policy: SecurityPolicy = {};
       for (const item of policiesList) {
         policy[item.tool_name] = item.policy;

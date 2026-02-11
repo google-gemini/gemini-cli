@@ -9,6 +9,8 @@ import type { FunctionCall } from '@google/genai';
 import { SafetyCheckDecision, type SafetyCheckResult } from '../protocol.js';
 import type { SecurityPolicy } from './types.js';
 import { getResponseText } from '../../utils/partUtils.js';
+import { safeTemplateReplace } from '../../utils/textUtils.js';
+
 import { DEFAULT_GEMINI_FLASH_MODEL } from '../../config/models.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 
@@ -37,7 +39,6 @@ Output strictly JSON.
 
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import type { Schema } from '@google/genai';
 
 const EnforcementResultSchema = z.object({
   decision: z.enum(['allow', 'deny', 'ask_user']),
@@ -97,17 +98,17 @@ export async function enforcePolicy(
           responseMimeType: 'application/json',
           responseSchema: zodToJsonSchema(EnforcementResultSchema, {
             target: 'openApi3',
-          }) as unknown as Schema,
+          }),
         },
         contents: [
           {
             role: 'user',
             parts: [
               {
-                text: CONSECA_ENFORCEMENT_PROMPT.replace(
-                  '{{policy}}',
-                  policyStr,
-                ).replace('{{tool_call}}', toolCallStr),
+                text: safeTemplateReplace(CONSECA_ENFORCEMENT_PROMPT, {
+                  policy: policyStr,
+                  tool_call: toolCallStr,
+                }),
               },
             ],
           },
