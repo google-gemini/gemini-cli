@@ -106,10 +106,6 @@ export const profiler = {
     }
 
     if (idleInPastSecond >= 5) {
-      if (this.openedDebugConsole === false) {
-        this.openedDebugConsole = true;
-        appEvents.emit(AppEvent.OpenDebugConsole);
-      }
       debugLogger.error(
         `${idleInPastSecond} frames rendered while the app was ` +
           `idle in the past second. This likely indicates severe infinite loop ` +
