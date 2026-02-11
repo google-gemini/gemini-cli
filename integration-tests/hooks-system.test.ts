@@ -153,10 +153,13 @@ describe('Hooks System Integration', () => {
       const blockHook = hookLogs.find(
         (log) =>
           log.hookCall.hook_event_name === 'BeforeTool' &&
-          log.hookCall.exit_code === 2,
+          (log.hookCall.stdout.includes('"decision":"deny"') ||
+            log.hookCall.stderr.includes('"decision":"deny"')),
       );
       expect(blockHook).toBeDefined();
-      expect(blockHook?.hookCall.stderr).toContain(blockMsg);
+      expect(
+        blockHook?.hookCall.stdout + blockHook?.hookCall.stderr,
+      ).toContain(blockMsg);
     });
 
     it('should allow tool execution when hook returns allow decision', async () => {
