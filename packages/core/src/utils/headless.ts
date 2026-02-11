@@ -29,17 +29,34 @@ export interface HeadlessModeOptions {
  */
 export function isHeadlessMode(options?: HeadlessModeOptions): boolean {
   if (process.env['GEMINI_CLI_INTEGRATION_TEST'] === 'true') {
-    return (
+    if (
       !!options?.prompt ||
+      !!options?.query ||
       (!!process.stdin && !process.stdin.isTTY) ||
       (!!process.stdout && !process.stdout.isTTY)
+    ) {
+      return true;
+    }
+    return process.argv.some(
+      (arg) =>
+        arg === '-p' || arg === '--prompt' || arg === '-y' || arg === '--yolo',
     );
   }
-  return (
-    process.env['CI'] === 'true' ||
-    process.env['GITHUB_ACTIONS'] === 'true' ||
-    !!options?.prompt ||
+
+  const isCI =
+    process.env['CI'] === 'true' || process.env['GITHUB_ACTIONS'] === 'true';
+  const isNotTTY =
     (!!process.stdin && !process.stdin.isTTY) ||
-    (!!process.stdout && !process.stdout.isTTY)
+    (!!process.stdout && !process.stdout.isTTY);
+
+  if (isCI || isNotTTY || !!options?.prompt || !!options?.query) {
+    return true;
+  }
+
+  // Fallback: check process.argv for flags that imply headless or auto-approve mode.
+  const argv = process.argv;
+  return argv.some(
+    (arg) =>
+      arg === '-p' || arg === '--prompt' || arg === '-y' || arg === '--yolo',
   );
 }
