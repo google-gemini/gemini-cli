@@ -55,17 +55,25 @@ describe('AgentHarness', () => {
       name: 'test-agent',
       displayName: 'Test Agent',
       description: 'A test agent',
+      inputConfig: {
+        inputSchema: { type: 'object', properties: {}, required: [] },
+      },
+      modelConfig: {
+        model: 'gemini-test-model',
+      },
       runConfig: { maxTurns: 5, maxTimeMinutes: 5 },
       promptConfig: { systemPrompt: 'You are a test agent.' },
       outputConfig: {
         outputName: 'result',
+        description: 'The final result.',
         schema: z.string(),
       },
     };
 
     const harness = new AgentHarness({
       config: mockConfig,
-      definition,
+       
+      definition: definition as unknown as AgentDefinition,
       inputs: {},
     });
 

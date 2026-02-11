@@ -209,14 +209,13 @@ export class AgentHarness {
 
       if (def.outputConfig) {
         const schema = zodToJsonSchema(def.outputConfig.schema);
-         
+
         const {
           $schema: _,
           definitions: __,
           ...cleanSchema
         } = schema as Record<string, unknown>;
         completeTool.parameters!.properties![def.outputConfig.outputName] =
-           
           cleanSchema as Schema;
         completeTool.parameters!.required!.push(def.outputConfig.outputName);
       } else {
@@ -273,6 +272,11 @@ export class AgentHarness {
             value: compressionResult,
           };
         }
+
+        await this.toolOutputMaskingService.mask(
+          this.chat!.getHistory(),
+          this.config,
+        );
 
         // 2. Loop Detection
         if (await this.loopDetector.turnStarted(signal)) {
@@ -341,7 +345,7 @@ export class AgentHarness {
             );
             if (completeCall) {
               // Check for validation errors in complete_task
-              if (completeCall.part.functionResponse?.response?.error) {
+              if (completeCall.part.functionResponse?.response?.['error']) {
                 // The model messed up complete_task, it will receive the error as currentRequest and try again
                 currentRequest = [completeCall.part];
               } else {
@@ -446,8 +450,8 @@ export class AgentHarness {
     });
 
     return completedCalls.map((call) => ({
-        name: call.request.name,
-        part: call.response.responseParts[0],
-      }));
+      name: call.request.name,
+      part: call.response.responseParts[0],
+    }));
   }
 }

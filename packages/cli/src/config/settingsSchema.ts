@@ -1528,6 +1528,15 @@ const SETTINGS_SCHEMA = {
           'Enable local and remote subagents. Warning: Experimental feature, uses YOLO mode for subagents',
         showInDialog: false,
       },
+      enableAgentHarness: {
+        type: 'boolean',
+        label: 'Enable Agent Harness',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable the new unified agent harness (experimental).',
+        showInDialog: false,
+      },
       extensionManagement: {
         type: 'boolean',
         label: 'Extension Management',

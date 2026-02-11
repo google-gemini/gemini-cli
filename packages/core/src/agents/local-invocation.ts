@@ -16,7 +16,9 @@ import type {
 } from './types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { AgentFactory } from './agent-factory.js';
+import type { Turn } from '../core/turn.js';
 import { GeminiEventType } from '../core/turn.js';
+import { promptIdContext } from '../utils/promptIdContext.js';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
@@ -169,8 +171,8 @@ ${output.result}
       while (true) {
         const { value, done } = await stream.next();
         if (done) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          turn = value as Turn;
+           
+          turn = value;
           break;
         }
         const event = value;

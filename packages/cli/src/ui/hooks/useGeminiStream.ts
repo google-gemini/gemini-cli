@@ -1168,6 +1168,9 @@ export const useGeminiStream = (
           case ServerGeminiEventType.InvalidStream:
             // Will add the missing logic later
             break;
+          case ServerGeminiEventType.SubagentActivity:
+            // TODO: UI implementation for subagent activity
+            break;
           default: {
             // enforces exhaustive switch-case
             const unreachable: never = event;
