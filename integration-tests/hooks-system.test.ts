@@ -517,7 +517,7 @@ console.log(JSON.stringify({
   });
 
   describe('BeforeToolSelection Hooks - Tool Configuration', () => {
-    it.only('should modify tool selection with BeforeToolSelection hooks', async () => {
+    it('should modify tool selection with BeforeToolSelection hooks', async () => {
       // 1. Initial setup to establish test directory
       rig.setup('should modify tool selection with BeforeToolSelection hooks');
 
@@ -531,11 +531,8 @@ console.log(JSON.stringify({
         },
       });
 
-      // Use simple echo to avoid node-pty instability in CI
-      const echoCmd =
-        process.platform === 'win32'
-          ? `powershell -NoProfile -Command "echo '${toolConfigJson.replace(/"/g, '\"')}'"`
-          : `echo '${toolConfigJson}'`;
+      // Use node -e to avoid file system and PTY overhead
+      const nodeCmd = `node -e "console.log(JSON.stringify(${toolConfigJson.replace(/"/g, '\\"')}))"`;
 
       rig.setup('should modify tool selection with BeforeToolSelection hooks', {
         fakeResponsesPath: join(
@@ -551,8 +548,8 @@ console.log(JSON.stringify({
                 hooks: [
                   {
                     type: 'command',
-                    command: echoCmd,
-                    timeout: 5000,
+                    command: nodeCmd,
+                    timeout: 15000,
                   },
                 ],
               },
@@ -1765,7 +1762,7 @@ console.log(JSON.stringify({
   });
 
   describe('Hook Disabling', () => {
-    it.only('should not execute hooks disabled in settings file', async () => {
+    it('should not execute hooks disabled in settings file', async () => {
       // 1. Initial setup to establish test directory
       rig.setup('should not execute hooks disabled in settings file');
 
@@ -1781,15 +1778,9 @@ console.log(JSON.stringify({
         reason: disabledMsg,
       });
 
-      const enabledCmd =
-        process.platform === 'win32'
-          ? `powershell -NoProfile -Command "echo '${enabledJson.replace(/"/g, '\"')}'"`
-          : `echo '${enabledJson}'`;
-
-      const disabledCmd =
-        process.platform === 'win32'
-          ? `powershell -NoProfile -Command "echo '${disabledJson.replace(/"/g, '\"')}'"`
-          : `echo '${disabledJson}'`;
+      // Use node -e to avoid file system and PTY overhead
+      const enabledCmd = `node -e "console.log(JSON.stringify(${enabledJson.replace(/"/g, '\\"')}))"`;
+      const disabledCmd = `node -e "console.log(JSON.stringify(${disabledJson.replace(/"/g, '\\"')}))"`;
 
       // 3. Final setup with full settings
       rig.setup('should not execute hooks disabled in settings file', {
@@ -1807,12 +1798,12 @@ console.log(JSON.stringify({
                   {
                     type: 'command',
                     command: enabledCmd,
-                    timeout: 5000,
+                    timeout: 15000,
                   },
                   {
                     type: 'command',
                     command: disabledCmd,
-                    timeout: 5000,
+                    timeout: 15000,
                   },
                 ],
               },
@@ -1842,7 +1833,7 @@ console.log(JSON.stringify({
       expect(disabledHookLog).toBeUndefined();
     });
 
-    it.only('should respect disabled hooks across multiple operations', async () => {
+    it('should respect disabled hooks across multiple operations', async () => {
       // 1. Initial setup to establish test directory
       rig.setup('should respect disabled hooks across multiple operations');
 
@@ -1858,15 +1849,9 @@ console.log(JSON.stringify({
         reason: disabledMsg,
       });
 
-      const activeCmd =
-        process.platform === 'win32'
-          ? `powershell -NoProfile -Command "echo '${activeJson.replace(/"/g, '\"')}'"`
-          : `echo '${activeJson}'`;
-
-      const disabledCmd =
-        process.platform === 'win32'
-          ? `powershell -NoProfile -Command "echo '${disabledJson.replace(/"/g, '\"')}'"`
-          : `echo '${disabledJson}'`;
+      // Use node -e to avoid file system and PTY overhead
+      const activeCmd = `node -e "console.log(JSON.stringify(${activeJson.replace(/"/g, '\\"')}))"`;
+      const disabledCmd = `node -e "console.log(JSON.stringify(${disabledJson.replace(/"/g, '\\"')}))"`;
 
       // 3. Final setup with full settings
       rig.setup('should respect disabled hooks across multiple operations', {
@@ -1880,12 +1865,12 @@ console.log(JSON.stringify({
                   {
                     type: 'command',
                     command: activeCmd,
-                    timeout: 5000,
+                    timeout: 15000,
                   },
                   {
                     type: 'command',
                     command: disabledCmd,
-                    timeout: 5000,
+                    timeout: 15000,
                   },
                 ],
               },
