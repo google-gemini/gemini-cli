@@ -796,8 +796,6 @@ export async function loadCliConfig(
     toolOutputMasking: settings.experimental?.toolOutputMasking,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
-    sessionLearnings: settings.general?.sessionLearnings?.enabled,
-    sessionLearningsOutputPath: settings.general?.sessionLearnings?.outputPath,
     ideMode,
     disableLoopDetection: settings.model?.disableLoopDetection,
     compressionThreshold: settings.model?.compressionThreshold,

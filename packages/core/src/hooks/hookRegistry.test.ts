@@ -74,7 +74,6 @@ describe('HookRegistry', () => {
       getDisabledHooks: vi.fn().mockReturnValue([]),
       isTrustedFolder: vi.fn().mockReturnValue(true),
       getProjectRoot: vi.fn().mockReturnValue('/project'),
-      isSessionLearningsEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Config;
 
     hookRegistry = new HookRegistry(mockConfig);
@@ -279,21 +278,6 @@ describe('HookRegistry', () => {
       expect(
         hookRegistry.getHooksForEvent(HookEventName.BeforeTool),
       ).toHaveLength(0);
-    });
-
-    it('should register builtin session-learnings hook when enabled', async () => {
-      vi.mocked(mockConfig.isSessionLearningsEnabled).mockReturnValue(true);
-
-      await hookRegistry.initialize();
-
-      const hooks = hookRegistry.getHooksForEvent(HookEventName.SessionEnd);
-      expect(hooks).toHaveLength(1);
-      expect(hooks[0].config.type).toBe(HookType.Builtin);
-       
-      expect((hooks[0].config as BuiltinHookConfig).builtin_id).toBe(
-        'session-learnings',
-      );
-      expect(hooks[0].source).toBe(ConfigSource.System);
     });
   });
 

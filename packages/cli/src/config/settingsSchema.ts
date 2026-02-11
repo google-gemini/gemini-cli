@@ -322,37 +322,6 @@ const SETTINGS_SCHEMA = {
         },
         description: 'Settings for automatic session cleanup.',
       },
-      sessionLearnings: {
-        type: 'object',
-        label: 'Session Learnings',
-        category: 'General',
-        requiresRestart: false,
-        default: {},
-        description: 'Settings for session learning summaries.',
-        showInDialog: false,
-        properties: {
-          enabled: {
-            type: 'boolean',
-            label: 'Enable Session Learnings',
-            category: 'General',
-            requiresRestart: false,
-            default: false,
-            description:
-              'Automatically generate a session-learnings.md file when the session ends.',
-            showInDialog: true,
-          },
-          outputPath: {
-            type: 'string',
-            label: 'Output Path',
-            category: 'General',
-            requiresRestart: false,
-            default: undefined as string | undefined,
-            description:
-              'Directory where session-learnings files should be saved. Defaults to project root.',
-            showInDialog: true,
-          },
-        },
-      },
     },
   },
   output: {

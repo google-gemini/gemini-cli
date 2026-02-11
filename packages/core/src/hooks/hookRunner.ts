@@ -6,7 +6,7 @@
 
 import { spawn } from 'node:child_process';
 import type { HookConfig } from './types.js';
-import { HookEventName, ConfigSource, HookType } from './types.js';
+import { HookEventName, ConfigSource } from './types.js';
 import type { Config } from '../config/config.js';
 import type {
   HookInput,
@@ -16,9 +16,7 @@ import type {
   BeforeModelInput,
   BeforeModelOutput,
   BeforeToolInput,
-  SessionEndInput,
 } from './types.js';
-import { SessionEndReason } from './types.js';
 import type { LLMRequest } from './hookTranslator.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { sanitizeEnvironment } from '../services/environmentSanitization.js';
@@ -27,7 +25,6 @@ import {
   getShellConfiguration,
   type ShellType,
 } from '../utils/shell-utils.js';
-import { SessionLearningsService } from '../services/sessionLearningsService.js';
 
 /**
  * Default timeout for hook execution (60 seconds)
@@ -46,11 +43,9 @@ const EXIT_CODE_NON_BLOCKING_ERROR = 1;
  */
 export class HookRunner {
   private readonly config: Config;
-  private readonly sessionLearningsService: SessionLearningsService;
 
   constructor(config: Config) {
     this.config = config;
-    this.sessionLearningsService = new SessionLearningsService(config);
   }
 
   /**
@@ -81,25 +76,12 @@ export class HookRunner {
     }
 
     try {
-      if (hookConfig.type === HookType.Command) {
-        return await this.executeCommandHook(
-          hookConfig,
-          eventName,
-          input,
-          startTime,
-        );
-      } else if (hookConfig.type === HookType.Builtin) {
-        return await this.executeBuiltinHook(
-          hookConfig,
-          eventName,
-          input,
-          startTime,
-        );
-      } else {
-        throw new Error(
-          `Unsupported hook type: ${(hookConfig as HookConfig).type}`,
-        );
-      }
+      return await this.executeCommandHook(
+        hookConfig,
+        eventName,
+        input,
+        startTime,
+      );
     } catch (error) {
       const duration = Date.now() - startTime;
       const hookId = hookConfig.name || hookConfig.command || 'unknown';
@@ -247,52 +229,6 @@ export class HookRunner {
     }
 
     return modifiedInput;
-  }
-
-  /**
-   * Execute a builtin hook
-   */
-  private async executeBuiltinHook(
-    hookConfig: HookConfig,
-    eventName: HookEventName,
-    input: HookInput,
-    startTime: number,
-  ): Promise<HookExecutionResult> {
-    if (hookConfig.type !== HookType.Builtin) {
-      throw new Error('Expected builtin hook configuration');
-    }
-
-    try {
-      if (hookConfig.builtin_id === 'session-learnings') {
-        if (eventName === HookEventName.SessionEnd) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          const sessionEndInput = input as SessionEndInput;
-          if (
-            sessionEndInput.reason === SessionEndReason.Exit ||
-            sessionEndInput.reason === SessionEndReason.Logout
-          ) {
-            await this.sessionLearningsService.generateAndSaveLearnings();
-          }
-        }
-      }
-
-      return {
-        hookConfig,
-        eventName,
-        success: true,
-        duration: Date.now() - startTime,
-        exitCode: EXIT_CODE_SUCCESS,
-        output: {},
-      };
-    } catch (error) {
-      return {
-        hookConfig,
-        eventName,
-        success: false,
-        error: error instanceof Error ? error : new Error(String(error)),
-        duration: Date.now() - startTime,
-      };
-    }
   }
 
   /**

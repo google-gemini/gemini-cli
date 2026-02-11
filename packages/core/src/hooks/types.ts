@@ -62,16 +62,7 @@ export interface CommandHookConfig {
   env?: Record<string, string>;
 }
 
-export interface BuiltinHookConfig {
-  type: HookType.Builtin;
-  builtin_id: string;
-  name?: string;
-  description?: string;
-  timeout?: number;
-  source?: ConfigSource;
-}
-
-export type HookConfig = CommandHookConfig | BuiltinHookConfig;
+export type HookConfig = CommandHookConfig;
 
 /**
  * Hook definition with matcher
@@ -87,7 +78,6 @@ export interface HookDefinition {
  */
 export enum HookType {
   Command = 'command',
-  Builtin = 'builtin',
 }
 
 /**
@@ -95,9 +85,8 @@ export enum HookType {
  */
 export function getHookKey(hook: HookConfig): string {
   const name = hook.name || '';
-  const identifier =
-    hook.type === HookType.Command ? hook.command : hook.builtin_id;
-  return `${name}:${identifier}`;
+  const command = hook.command || '';
+  return `${name}:${command}`;
 }
 
 /**
