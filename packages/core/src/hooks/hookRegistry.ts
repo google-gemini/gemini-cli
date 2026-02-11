@@ -6,7 +6,12 @@
 
 import type { Config } from '../config/config.js';
 import type { HookDefinition, HookConfig } from './types.js';
-import { HookEventName, ConfigSource, HOOKS_CONFIG_FIELDS } from './types.js';
+import {
+  HookEventName,
+  ConfigSource,
+  HOOKS_CONFIG_FIELDS,
+  HookType,
+} from './types.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { TrustedHooksManager } from './trustedHooks.js';
 import { coreEvents } from '../utils/events.js';
@@ -137,6 +142,8 @@ please review the project settings (.gemini/settings.json) and remove them.`;
       this.checkProjectHooksTrust();
     }
 
+    this.registerBuiltinHooks();
+
     // Get hooks from the main config (this comes from the merged settings)
     const configHooks = this.config.getHooks();
     if (configHooks) {
@@ -158,6 +165,27 @@ please review the project settings (.gemini/settings.json) and remove them.`;
           ConfigSource.Extensions,
         );
       }
+    }
+  }
+
+  /**
+   * Register system-level builtin hooks
+   */
+  private registerBuiltinHooks(): void {
+    if (this.config.isSessionLearningsEnabled()) {
+      debugLogger.debug('Registering builtin session-learnings hook');
+      this.entries.push({
+        config: {
+          type: HookType.Builtin,
+          builtin_id: 'session-learnings',
+          name: 'session-learnings',
+          description: 'Automatically generate session learning summaries',
+          source: ConfigSource.System,
+        },
+        source: ConfigSource.System,
+        eventName: HookEventName.SessionEnd,
+        enabled: true,
+      });
     }
   }
 

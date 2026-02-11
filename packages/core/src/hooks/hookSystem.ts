@@ -33,7 +33,6 @@ import type {
   ToolListUnion,
 } from '@google/genai';
 import type { ToolCallConfirmationDetails } from '../tools/tools.js';
-import { SessionLearningsService } from '../services/sessionLearningsService.js';
 
 /**
  * Main hook system that coordinates all hook-related functionality
@@ -152,7 +151,6 @@ export class HookSystem {
   private readonly hookAggregator: HookAggregator;
   private readonly hookPlanner: HookPlanner;
   private readonly hookEventHandler: HookEventHandler;
-  private readonly sessionLearningsService: SessionLearningsService;
 
   constructor(config: Config) {
     // Initialize components
@@ -166,7 +164,6 @@ export class HookSystem {
       this.hookRunner,
       this.hookAggregator,
     );
-    this.sessionLearningsService = new SessionLearningsService(config);
   }
 
   /**
@@ -218,14 +215,7 @@ export class HookSystem {
   async fireSessionEndEvent(
     reason: SessionEndReason,
   ): Promise<AggregatedHookResult | undefined> {
-    const result = await this.hookEventHandler.fireSessionEndEvent(reason);
-
-    // Built-in system hook for session learnings
-    if (reason === 'exit' || reason === 'logout') {
-      await this.sessionLearningsService.generateAndSaveLearnings();
-    }
-
-    return result;
+    return this.hookEventHandler.fireSessionEndEvent(reason);
   }
 
   async firePreCompressEvent(
