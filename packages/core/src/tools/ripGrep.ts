@@ -103,6 +103,16 @@ export interface RipGrepToolParams {
   include?: string;
 
   /**
+   * Optional: A regular expression pattern to exclude from the search results.
+   */
+  exclude_pattern?: string;
+
+  /**
+   * Optional: If true, only the file paths of the matches will be returned.
+   */
+  names_only?: boolean;
+
+  /**
    * If true, searches case-sensitively. Defaults to false.
    */
   case_sensitive?: boolean;
@@ -244,6 +254,7 @@ class GrepToolInvocation extends BaseToolInvocation<
           pattern: this.params.pattern,
           path: searchDirAbs,
           include: this.params.include,
+          exclude_pattern: this.params.exclude_pattern,
           case_sensitive: this.params.case_sensitive,
           fixed_strings: this.params.fixed_strings,
           context: this.params.context,
@@ -299,6 +310,16 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       const wasTruncated = matchCount >= totalMaxMatches;
 
+      if (this.params.names_only) {
+        const filePaths = Object.keys(matchesByFile).sort();
+        let llmContent = `Found ${filePaths.length} files with matches for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}${wasTruncated ? ` (results limited to ${totalMaxMatches} matches for performance)` : ''}:\n`;
+        llmContent += filePaths.join('\n');
+        return {
+          llmContent: llmContent.trim(),
+          returnDisplay: `Found ${filePaths.length} files${wasTruncated ? ' (limited)' : ''}`,
+        };
+      }
+
       let llmContent = `Found ${matchCount} ${matchTerm} for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}${wasTruncated ? ` (results limited to ${totalMaxMatches} matches for performance)` : ''}:\n---\n`;
 
       for (const filePath in matchesByFile) {
@@ -330,6 +351,7 @@ class GrepToolInvocation extends BaseToolInvocation<
     pattern: string;
     path: string;
     include?: string;
+    exclude_pattern?: string;
     case_sensitive?: boolean;
     fixed_strings?: boolean;
     context?: number;
@@ -344,6 +366,7 @@ class GrepToolInvocation extends BaseToolInvocation<
       pattern,
       path: absolutePath,
       include,
+      exclude_pattern,
       case_sensitive,
       fixed_strings,
       context,
@@ -423,9 +446,18 @@ class GrepToolInvocation extends BaseToolInvocation<
       });
 
       let matchesFound = 0;
+      let excludeRegex: RegExp | null = null;
+      if (exclude_pattern) {
+        excludeRegex = new RegExp(exclude_pattern, case_sensitive ? '' : 'i');
+      }
+
       for await (const line of generator) {
         const match = this.parseRipgrepJsonLine(line, absolutePath);
         if (match) {
+          if (excludeRegex && excludeRegex.test(match.line)) {
+            continue;
+          }
+
           results.push(match);
           if (!match.isContext) {
             matchesFound++;
@@ -527,7 +559,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
     super(
       RipGrepTool.Name,
       'SearchText',
-      'Searches for a regular expression pattern within file contents. Max 100 matches.',
+      'Searches for a regular expression pattern within file contents.',
       Kind.Search,
       {
         properties: {
@@ -545,6 +577,16 @@ export class RipGrepTool extends BaseDeclarativeTool<
             description:
               "Glob pattern to filter files (e.g., '*.ts', 'src/**'). Recommended for large repositories to reduce noise. Defaults to all files if omitted.",
             type: 'string',
+          },
+          exclude_pattern: {
+            description:
+              'Optional: A regular expression pattern to exclude from the search results. If a line matches both the pattern and the exclude_pattern, it will be omitted.',
+            type: 'string',
+          },
+          names_only: {
+            description:
+              'Optional: If true, only the file paths of the matches will be returned, without the line content or line numbers. This is useful for gathering a list of files.',
+            type: 'boolean',
           },
           case_sensitive: {
             description:
@@ -565,11 +607,13 @@ export class RipGrepTool extends BaseDeclarativeTool<
             description:
               'Show this many lines after each match (equivalent to grep -A). Defaults to 0 if omitted.',
             type: 'integer',
+            minimum: 0,
           },
           before: {
             description:
               'Show this many lines before each match (equivalent to grep -B). Defaults to 0 if omitted.',
             type: 'integer',
+            minimum: 0,
           },
           no_ignore: {
             description:
@@ -615,6 +659,14 @@ export class RipGrepTool extends BaseDeclarativeTool<
         new RegExp(params.pattern);
       } catch (error) {
         return `Invalid regular expression pattern provided: ${params.pattern}. Error: ${getErrorMessage(error)}`;
+      }
+    }
+
+    if (params.exclude_pattern) {
+      try {
+        new RegExp(params.exclude_pattern);
+      } catch (error) {
+        return `Invalid exclude regular expression pattern provided: ${params.exclude_pattern}. Error: ${getErrorMessage(error)}`;
       }
     }
 
