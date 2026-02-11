@@ -97,17 +97,10 @@ describe('Hooks System Integration', () => {
       );
 
       const blockMsg = 'File writing blocked by security policy';
-      const blockJson = JSON.stringify({
-        decision: 'deny',
-        reason: blockMsg,
-      });
-
-      // Use a direct echo command to avoid Node.js startup flakiness/pathing
-      // On Windows PowerShell, we need to escape quotes carefully for echo
-      const echoCmd =
-        process.platform === 'win32'
-          ? `powershell -NoProfile -Command "echo '${blockJson.replace(/"/g, '\"')}'"`
-          : `echo '${blockJson}'`;
+      const scriptPath = rig.createScript(
+        'stderr_block_hook.cjs',
+        `process.stderr.write('${blockMsg}'); process.exit(2);`,
+      );
 
       rig.setup(
         'should block tool execution and use stderr as reason when hook exits with code 2',
@@ -122,7 +115,7 @@ describe('Hooks System Integration', () => {
                   hooks: [
                     {
                       type: 'command',
-                      command: echoCmd,
+                      command: normalizePath(`node "${scriptPath}"`)!,
                       timeout: 5000,
                     },
                   ],
@@ -155,12 +148,10 @@ describe('Hooks System Integration', () => {
       const blockHook = hookLogs.find(
         (log) =>
           log.hookCall.hook_event_name === 'BeforeTool' &&
-          JSON.stringify(log.hookCall.hook_output).includes('"decision":"deny"'),
+          log.hookCall.exit_code === 2,
       );
       expect(blockHook).toBeDefined();
-      expect(JSON.stringify(blockHook?.hookCall.hook_output)).toContain(
-        blockMsg,
-      );
+      expect(blockHook?.hookCall.stderr).toContain(blockMsg);
     });
 
     it('should allow tool execution when hook returns allow decision', async () => {
