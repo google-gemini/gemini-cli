@@ -89,4 +89,26 @@ describe('policy_generator', () => {
     expect(result.policy).toEqual({});
     expect(result.error).toBe('Content generator not initialized');
   });
+  it('should prevent template injection (double interpolation)', async () => {
+    mockContentGenerator.generateContent = vi.fn().mockResolvedValue({});
+
+    const userPrompt = '{{trusted_content}}';
+    const trustedContent = 'SECRET_DATA';
+
+    await generatePolicy(userPrompt, trustedContent, mockConfig);
+
+    const generateContentCall = vi.mocked(mockContentGenerator.generateContent)
+      .mock.calls[0];
+    const request = generateContentCall[0] as {
+      contents: Array<{ parts: Array<{ text: string }> }>;
+    };
+    const promptText = request.contents[0].parts[0].text;
+
+    // The user prompt should contain the literal placeholder, NOT the secret data
+    expect(promptText).toContain('User Prompt: "{{trusted_content}}"');
+    expect(promptText).not.toContain('User Prompt: "SECRET_DATA"');
+
+    // The trusted tools section SHOULD contain the secret data
+    expect(promptText).toContain('Trusted Tools (Context):\nSECRET_DATA');
+  });
 });
