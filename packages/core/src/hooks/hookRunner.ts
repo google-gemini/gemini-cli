@@ -295,12 +295,21 @@ export class HookRunner {
       // Set up timeout
       const timeoutHandle = setTimeout(() => {
         timedOut = true;
-        child.kill('SIGTERM');
+
+        if (process.platform === 'win32' && child.pid) {
+          spawn('taskkill', ['/pid', child.pid.toString(), '/f', '/t']);
+        } else {
+          child.kill('SIGTERM');
+        }
 
         // Force kill after 5 seconds
         setTimeout(() => {
           if (!child.killed) {
-            child.kill('SIGKILL');
+            if (process.platform === 'win32' && child.pid) {
+              spawn('taskkill', ['/pid', child.pid.toString(), '/f', '/t']);
+            } else {
+              child.kill('SIGKILL');
+            }
           }
         }, 5000);
       }, timeout);
