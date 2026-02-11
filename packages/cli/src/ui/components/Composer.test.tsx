@@ -650,6 +650,19 @@ describe('Composer', () => {
   });
 
   describe('Shortcuts Hint', () => {
+    it('hides shortcuts hint when showShortcutsHint setting is false', () => {
+      const uiState = createMockUIState();
+      const settings = createMockSettings({
+        ui: {
+          showShortcutsHint: false,
+        },
+      });
+
+      const { lastFrame } = renderComposer(uiState, settings);
+
+      expect(lastFrame()).not.toContain('ShortcutsHint');
+    });
+
     it('hides shortcuts hint when a action is required (e.g. dialog is open)', () => {
       const uiState = createMockUIState({
         customDialog: (

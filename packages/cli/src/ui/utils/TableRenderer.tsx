@@ -28,8 +28,7 @@ const MIN_COLUMN_WIDTH = 5;
 const COLUMN_PADDING = 2;
 const TABLE_MARGIN = 2;
 
-const calculateWidths = (text: string) => {
-  const styledChars = toStyledCharacters(text);
+const calculateWidths = (styledChars: StyledChar[]) => {
   const contentWidth = styledCharsWidth(styledChars);
 
   const words: StyledChar[][] = wordBreakStyledChars(styledChars);
@@ -60,31 +59,48 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     [headers],
   );
 
+  const styledHeaders = useMemo(
+    () => cleanedHeaders.map((header) => toStyledCharacters(header)),
+    [cleanedHeaders],
+  );
+
+  const styledRows = useMemo(
+    () => rows.map((row) => row.map((cell) => toStyledCharacters(cell))),
+    [rows],
+  );
+
   const { wrappedHeaders, wrappedRows, adjustedWidths } = useMemo(() => {
+    const numColumns = styledRows.reduce(
+      (max, row) => Math.max(max, row.length),
+      styledHeaders.length,
+    );
+
     // --- Define Constraints per Column ---
-    const constraints = cleanedHeaders.map((header, colIndex) => {
-      let { contentWidth: maxContentWidth, maxWordWidth } =
-        calculateWidths(header);
+    const constraints = Array.from({ length: numColumns }).map(
+      (_, colIndex) => {
+        const headerStyledChars = styledHeaders[colIndex] || [];
+        let { contentWidth: maxContentWidth, maxWordWidth } =
+          calculateWidths(headerStyledChars);
 
-      rows.forEach((row) => {
-        const cell = row[colIndex] || '';
-        const { contentWidth: cellWidth, maxWordWidth: cellWordWidth } =
-          calculateWidths(cell);
+        styledRows.forEach((row) => {
+          const cellStyledChars = row[colIndex] || [];
+          const { contentWidth: cellWidth, maxWordWidth: cellWordWidth } =
+            calculateWidths(cellStyledChars);
 
-        maxContentWidth = Math.max(maxContentWidth, cellWidth);
-        maxWordWidth = Math.max(maxWordWidth, cellWordWidth);
-      });
+          maxContentWidth = Math.max(maxContentWidth, cellWidth);
+          maxWordWidth = Math.max(maxWordWidth, cellWordWidth);
+        });
 
-      const minWidth = maxWordWidth;
-      const maxWidth = Math.max(minWidth, maxContentWidth);
+        const minWidth = maxWordWidth;
+        const maxWidth = Math.max(minWidth, maxContentWidth);
 
-      return { minWidth, maxWidth };
-    });
+        return { minWidth, maxWidth };
+      },
+    );
 
     // --- Calculate Available Space ---
     // Fixed overhead: borders (n+1) + padding (2n)
-    const fixedOverhead =
-      cleanedHeaders.length + 1 + cleanedHeaders.length * COLUMN_PADDING;
+    const fixedOverhead = numColumns + 1 + numColumns * COLUMN_PADDING;
     const availableWidth = Math.max(
       0,
       terminalWidth - fixedOverhead - TABLE_MARGIN,
@@ -136,17 +152,18 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     }
 
     // --- Pre-wrap and Optimize Widths ---
-    const actualColumnWidths = new Array(cleanedHeaders.length).fill(0);
+    const actualColumnWidths = new Array(numColumns).fill(0);
 
-    const wrapAndProcessRow = (row: string[]) => {
+    const wrapAndProcessRow = (row: StyledChar[][]) => {
       const rowResult: ProcessedLine[][] = [];
-      row.forEach((cell, colIndex) => {
+      // Ensure we iterate up to numColumns, filling with empty cells if needed
+      for (let colIndex = 0; colIndex < numColumns; colIndex++) {
+        const cellStyledChars = row[colIndex] || [];
         const allocatedWidth = finalContentWidths[colIndex];
         const contentWidth = Math.max(1, allocatedWidth);
 
-        const contentStyledChars = toStyledCharacters(cell);
         const wrappedStyledLines = wrapStyledChars(
-          contentStyledChars,
+          cellStyledChars,
           contentWidth,
         );
 
@@ -161,19 +178,18 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
           width: styledCharsWidth(line),
         }));
         rowResult.push(lines);
-      });
+      }
       return rowResult;
     };
 
-    const wrappedHeaders = wrapAndProcessRow(cleanedHeaders);
-    const wrappedRows = rows.map((row) => wrapAndProcessRow(row));
+    const wrappedHeaders = wrapAndProcessRow(styledHeaders);
+    const wrappedRows = styledRows.map((row) => wrapAndProcessRow(row));
 
     // Use the TIGHTEST widths that fit the wrapped content + padding
     const adjustedWidths = actualColumnWidths.map((w) => w + COLUMN_PADDING);
 
     return { wrappedHeaders, wrappedRows, adjustedWidths };
-  }, [cleanedHeaders, rows, terminalWidth]);
-
+  }, [styledHeaders, styledRows, terminalWidth]);
   // Helper function to render a cell with proper width
   const renderCell = (
     content: ProcessedLine,

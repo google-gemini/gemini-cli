@@ -48,6 +48,16 @@ export interface GrepToolParams {
    * File pattern to include in the search (e.g. "*.js", "*.{ts,tsx}")
    */
   include?: string;
+
+  /**
+   * Optional: Maximum number of matches to return per file. Use this to prevent being overwhelmed by repetitive matches in large files.
+   */
+  max_matches_per_file?: number;
+
+  /**
+   * Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 100 if omitted.
+   */
+  total_max_matches?: number;
 }
 
 /**
@@ -189,7 +199,8 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       // Collect matches from all search directories
       let allMatches: GrepMatch[] = [];
-      const totalMaxMatches = DEFAULT_TOTAL_MAX_MATCHES;
+      const totalMaxMatches =
+        this.params.total_max_matches ?? DEFAULT_TOTAL_MAX_MATCHES;
 
       // Create a timeout controller to prevent indefinitely hanging searches
       const timeoutController = new AbortController();
@@ -215,6 +226,7 @@ class GrepToolInvocation extends BaseToolInvocation<
             path: searchDir,
             include: this.params.include,
             maxMatches: remainingLimit,
+            max_matches_per_file: this.params.max_matches_per_file,
             signal: timeoutController.signal,
           });
 
@@ -343,9 +355,16 @@ class GrepToolInvocation extends BaseToolInvocation<
     path: string; // Expects absolute path
     include?: string;
     maxMatches: number;
+    max_matches_per_file?: number;
     signal: AbortSignal;
   }): Promise<GrepMatch[]> {
-    const { pattern, path: absolutePath, include, maxMatches } = options;
+    const {
+      pattern,
+      path: absolutePath,
+      include,
+      maxMatches,
+      max_matches_per_file,
+    } = options;
     let strategyUsed = 'none';
 
     try {
@@ -363,6 +382,9 @@ class GrepToolInvocation extends BaseToolInvocation<
           '--ignore-case',
           pattern,
         ];
+        if (max_matches_per_file) {
+          gitArgs.push('--max-count', max_matches_per_file.toString());
+        }
         if (include) {
           gitArgs.push('--', include);
         }
@@ -425,6 +447,9 @@ class GrepToolInvocation extends BaseToolInvocation<
           })
           .filter((dir): dir is string => !!dir);
         commonExcludes.forEach((dir) => grepArgs.push(`--exclude-dir=${dir}`));
+        if (max_matches_per_file) {
+          grepArgs.push('--max-count', max_matches_per_file.toString());
+        }
         if (include) {
           grepArgs.push(`--include=${include}`);
         }
@@ -499,6 +524,7 @@ class GrepToolInvocation extends BaseToolInvocation<
         try {
           const content = await fsPromises.readFile(fileAbsolutePath, 'utf8');
           const lines = content.split(/\r?\n/);
+          let matchesInFile = 0;
           for (let index = 0; index < lines.length; index++) {
             const line = lines[index];
             if (regex.test(line)) {
@@ -509,7 +535,14 @@ class GrepToolInvocation extends BaseToolInvocation<
                 lineNumber: index + 1,
                 line,
               });
+              matchesInFile++;
               if (allMatches.length >= maxMatches) break;
+              if (
+                max_matches_per_file &&
+                matchesInFile >= max_matches_per_file
+              ) {
+                break;
+              }
             }
           }
         } catch (readError: unknown) {
@@ -602,6 +635,20 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
       new RegExp(params.pattern);
     } catch (error) {
       return `Invalid regular expression pattern provided: ${params.pattern}. Error: ${getErrorMessage(error)}`;
+    }
+
+    if (
+      params.max_matches_per_file !== undefined &&
+      params.max_matches_per_file < 1
+    ) {
+      return 'max_matches_per_file must be at least 1.';
+    }
+
+    if (
+      params.total_max_matches !== undefined &&
+      params.total_max_matches < 1
+    ) {
+      return 'total_max_matches must be at least 1.';
     }
 
     // Only validate dir_path if one is provided
