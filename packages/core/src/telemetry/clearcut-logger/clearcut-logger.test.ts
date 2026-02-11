@@ -1286,6 +1286,45 @@ describe('ClearcutLogger', () => {
         '2',
       ]);
     });
+
+    it('does not log AskUser tool metadata for other tools', () => {
+      const { logger } = setup();
+      const completedToolCall = {
+        request: {
+          name: 'some_other_tool',
+          args: {},
+          prompt_id: 'prompt-123',
+        },
+        response: {
+          resultDisplay: 'Result',
+          data: {
+            ask_user_question_types: ['choice', 'text'],
+            ask_user_dismissed: false,
+            ask_user_empty_submission: false,
+            ask_user_answer_count: 2,
+          },
+        },
+        status: 'success',
+      } as unknown as SuccessfulToolCall;
+
+      logger?.logToolCallEvent(new ToolCallEvent(completedToolCall));
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.TOOL_CALL);
+      expect(events[0]).not.toHaveMetadataKey(
+        EventMetadataKey.GEMINI_CLI_ASK_USER_QUESTION_TYPES,
+      );
+      expect(events[0]).not.toHaveMetadataKey(
+        EventMetadataKey.GEMINI_CLI_ASK_USER_DISMISSED,
+      );
+      expect(events[0]).not.toHaveMetadataKey(
+        EventMetadataKey.GEMINI_CLI_ASK_USER_EMPTY_SUBMISSION,
+      );
+      expect(events[0]).not.toHaveMetadataKey(
+        EventMetadataKey.GEMINI_CLI_ASK_USER_ANSWER_COUNT,
+      );
+    });
   });
 
   describe('flushIfNeeded', () => {

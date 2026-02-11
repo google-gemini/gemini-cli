@@ -56,6 +56,7 @@ import {
   safeJsonStringify,
   safeJsonStringifyBooleanValuesOnly,
 } from '../../utils/safeJsonStringify.js';
+import { ASK_USER_TOOL_NAME } from '../../tools/tool-names.js';
 import { FixedDeque } from 'mnemonist';
 import { GIT_COMMIT_INFO, CLI_VERSION } from '../../generated/git-commit.js';
 import {
@@ -700,14 +701,18 @@ export class ClearcutLogger {
         user_removed_lines: EventMetadataKey.GEMINI_CLI_USER_REMOVED_LINES,
         user_added_chars: EventMetadataKey.GEMINI_CLI_USER_ADDED_CHARS,
         user_removed_chars: EventMetadataKey.GEMINI_CLI_USER_REMOVED_CHARS,
-        ask_user_question_types:
-          EventMetadataKey.GEMINI_CLI_ASK_USER_QUESTION_TYPES,
-        ask_user_dismissed: EventMetadataKey.GEMINI_CLI_ASK_USER_DISMISSED,
-        ask_user_empty_submission:
-          EventMetadataKey.GEMINI_CLI_ASK_USER_EMPTY_SUBMISSION,
-        ask_user_answer_count:
-          EventMetadataKey.GEMINI_CLI_ASK_USER_ANSWER_COUNT,
       };
+
+      if (event.function_name === ASK_USER_TOOL_NAME) {
+        metadataMapping['ask_user_question_types'] =
+          EventMetadataKey.GEMINI_CLI_ASK_USER_QUESTION_TYPES;
+        metadataMapping['ask_user_dismissed'] =
+          EventMetadataKey.GEMINI_CLI_ASK_USER_DISMISSED;
+        metadataMapping['ask_user_empty_submission'] =
+          EventMetadataKey.GEMINI_CLI_ASK_USER_EMPTY_SUBMISSION;
+        metadataMapping['ask_user_answer_count'] =
+          EventMetadataKey.GEMINI_CLI_ASK_USER_ANSWER_COUNT;
+      }
 
       for (const [key, gemini_cli_key] of Object.entries(metadataMapping)) {
         if (event.metadata[key] !== undefined) {
@@ -1632,7 +1637,11 @@ export class ClearcutLogger {
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_ACTIVE_APPROVAL_MODE,
-        value: this.config?.getPolicyEngine().getApprovalMode() ?? '',
+        value:
+          typeof this.config?.getPolicyEngine === 'function' &&
+          typeof this.config.getPolicyEngine()?.getApprovalMode === 'function'
+            ? this.config.getPolicyEngine().getApprovalMode()
+            : '',
       },
     ];
     if (this.config?.getExperiments()) {
