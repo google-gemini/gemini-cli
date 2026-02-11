@@ -87,6 +87,8 @@ Gemini CLI's built-in tools can be broadly categorized as follows:
 - **[Todo Tool](./todos.md) (`write_todos`):** For managing subtasks of complex
   requests.
 - **[Planning Tools](./planning.md):** For entering and exiting Plan Mode.
+- **[Ask User Tool](./ask-user.md) (`ask_user`):** For gathering user input and
+  making decisions.
 
 Additionally, these tools incorporate:
 
