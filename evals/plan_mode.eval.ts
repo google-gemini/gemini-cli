@@ -74,6 +74,30 @@ describe('plan_mode', () => {
     },
   });
 
+  evalTest('ALWAYS_PASSES', {
+    name: 'should use markdown checkboxes when creating a plan',
+    approvalMode: ApprovalMode.PLAN,
+    params: {
+      settings,
+    },
+    prompt: 'Create a plan for a new login feature.',
+    assert: async (rig, result) => {
+      await rig.waitForTelemetryReady();
+      const toolLogs = rig.readToolLogs();
+
+      const writeCall = toolLogs.find(
+        (log) => log.toolRequest.name === 'write_file',
+      );
+
+      expect(writeCall, 'Should attempt to write a plan file').toBeDefined();
+
+      if (writeCall) {
+        const args = JSON.parse(writeCall.toolRequest.args);
+        expect(args.content).toMatch(/- \[[ x~]\] /);
+      }
+    },
+  });
+
   evalTest('USUALLY_PASSES', {
     name: 'should exit plan mode when plan is complete and implementation is requested',
     approvalMode: ApprovalMode.PLAN,
