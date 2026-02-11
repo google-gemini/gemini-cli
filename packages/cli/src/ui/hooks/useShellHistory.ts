@@ -79,14 +79,26 @@ export function useShellHistory(
   const [historyFilePath, setHistoryFilePath] = useState<string | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
     async function loadHistory() {
-      const filePath = await getHistoryFilePath(projectRoot, storage);
-      setHistoryFilePath(filePath);
-      const loadedHistory = await readHistoryFile(filePath);
-      setHistory(loadedHistory.reverse()); // Newest first
+      try {
+        const filePath = await getHistoryFilePath(projectRoot, storage);
+        if (!isMounted) return;
+        setHistoryFilePath(filePath);
+        const loadedHistory = await readHistoryFile(filePath);
+        if (!isMounted) return;
+        setHistory(loadedHistory.reverse()); // Newest first
+      } catch (error) {
+        if (isMounted) {
+          debugLogger.error('Error loading shell history:', error);
+        }
+      }
     }
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     loadHistory();
+    return () => {
+      isMounted = false;
+    };
   }, [projectRoot, storage]);
 
   const addCommandToHistory = useCallback(

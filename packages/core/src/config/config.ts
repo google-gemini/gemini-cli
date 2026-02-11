@@ -615,7 +615,7 @@ export class Config {
   private readonly enablePromptCompletion: boolean = false;
   private readonly truncateToolOutputThreshold: number;
   private compressionTruncationCounter = 0;
-  private initialized: boolean = false;
+  private initPromise: Promise<void> | undefined;
   readonly storage: Storage;
   private readonly fileExclusions: FileExclusions;
   private readonly eventEmitter?: EventEmitter;
@@ -668,7 +668,7 @@ export class Config {
   private remoteAdminSettings: AdminControlsSettings | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
   private lastModeSwitchTime: number = Date.now();
-
+  private userHints: Array<{ text: string; timestamp: number }> = [];
   private approvedPlanPath: string | undefined;
 
   constructor(params: ConfigParameters) {
@@ -909,97 +909,100 @@ export class Config {
    * Must only be called once, throws if called again.
    */
   async initialize(): Promise<void> {
-    if (this.initialized) {
-      throw Error('Config was already initialized');
-    }
-    this.initialized = true;
-
-    await this.storage.initialize();
-
-    // Add pending directories to workspace context
-    for (const dir of this.pendingIncludeDirectories) {
-      this.workspaceContext.addDirectory(dir);
+    if (this.initPromise) {
+      return this.initPromise;
     }
 
-    // Add plans directory to workspace context for plan file storage
-    if (this.planEnabled) {
-      const plansDir = this.storage.getProjectTempPlansDir();
-      await fs.promises.mkdir(plansDir, { recursive: true });
-      this.workspaceContext.addDirectory(plansDir);
-    }
+    this.initPromise = (async () => {
+      await this.storage.initialize();
 
-    // Initialize centralized FileDiscoveryService
-    const discoverToolsHandle = startupProfiler.start('discover_tools');
-    this.getFileService();
-    if (this.getCheckpointingEnabled()) {
-      await this.getGitService();
-    }
-    this.promptRegistry = new PromptRegistry();
-    this.resourceRegistry = new ResourceRegistry();
-
-    this.agentRegistry = new AgentRegistry(this);
-    await this.agentRegistry.initialize();
-
-    coreEvents.on(CoreEvent.AgentsRefreshed, this.onAgentsRefreshed);
-
-    this.toolRegistry = await this.createToolRegistry();
-    discoverToolsHandle?.end();
-    this.mcpClientManager = new McpClientManager(
-      this.clientVersion,
-      this.toolRegistry,
-      this,
-      this.eventEmitter,
-    );
-    // We do not await this promise so that the CLI can start up even if
-    // MCP servers are slow to connect.
-    const mcpInitialization = Promise.allSettled([
-      this.mcpClientManager.startConfiguredMcpServers(),
-      this.getExtensionLoader().start(this),
-    ]).then((results) => {
-      for (const result of results) {
-        if (result.status === 'rejected') {
-          debugLogger.error('Error initializing MCP clients:', result.reason);
-        }
+      // Add pending directories to workspace context
+      for (const dir of this.pendingIncludeDirectories) {
+        this.workspaceContext.addDirectory(dir);
       }
-    });
 
-    if (!this.interactive) {
-      await mcpInitialization;
-    }
+      // Add plans directory to workspace context for plan file storage
+      if (this.planEnabled) {
+        const plansDir = this.storage.getProjectTempPlansDir();
+        await fs.promises.mkdir(plansDir, { recursive: true });
+        this.workspaceContext.addDirectory(plansDir);
+      }
 
-    if (this.skillsSupport) {
-      this.getSkillManager().setAdminSettings(this.adminSkillsEnabled);
-      if (this.adminSkillsEnabled) {
-        await this.getSkillManager().discoverSkills(
-          this.storage,
-          this.getExtensions(),
-          this.isTrustedFolder(),
-        );
-        this.getSkillManager().setDisabledSkills(this.disabledSkills);
+      // Initialize centralized FileDiscoveryService
+      const discoverToolsHandle = startupProfiler.start('discover_tools');
+      this.getFileService();
+      if (this.getCheckpointingEnabled()) {
+        await this.getGitService();
+      }
+      this.promptRegistry = new PromptRegistry();
+      this.resourceRegistry = new ResourceRegistry();
 
-        // Re-register ActivateSkillTool to update its schema with the discovered enabled skill enums
-        if (this.getSkillManager().getSkills().length > 0) {
-          this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
-          this.getToolRegistry().registerTool(
-            new ActivateSkillTool(this, this.messageBus),
+      this.agentRegistry = new AgentRegistry(this);
+      await this.agentRegistry.initialize();
+
+      coreEvents.on(CoreEvent.AgentsRefreshed, this.onAgentsRefreshed);
+
+      this.toolRegistry = await this.createToolRegistry();
+      discoverToolsHandle?.end();
+      this.mcpClientManager = new McpClientManager(
+        this.clientVersion,
+        this.toolRegistry,
+        this,
+        this.eventEmitter,
+      );
+      // We do not await this promise so that the CLI can start up even if
+      // MCP servers are slow to connect.
+      const mcpInitialization = Promise.allSettled([
+        this.mcpClientManager.startConfiguredMcpServers(),
+        this.getExtensionLoader().start(this),
+      ]).then((results) => {
+        for (const result of results) {
+          if (result.status === 'rejected') {
+            debugLogger.error('Error initializing MCP clients:', result.reason);
+          }
+        }
+      });
+
+      if (!this.interactive) {
+        await mcpInitialization;
+      }
+
+      if (this.skillsSupport) {
+        this.getSkillManager().setAdminSettings(this.adminSkillsEnabled);
+        if (this.adminSkillsEnabled) {
+          await this.getSkillManager().discoverSkills(
+            this.storage,
+            this.getExtensions(),
+            this.isTrustedFolder(),
           );
+          this.getSkillManager().setDisabledSkills(this.disabledSkills);
+
+          // Re-register ActivateSkillTool to update its schema with the discovered enabled skill enums
+          if (this.getSkillManager().getSkills().length > 0) {
+            this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
+            this.getToolRegistry().registerTool(
+              new ActivateSkillTool(this, this.messageBus),
+            );
+          }
         }
       }
-    }
 
-    // Initialize hook system if enabled
-    if (this.getEnableHooks()) {
-      this.hookSystem = new HookSystem(this);
-      await this.hookSystem.initialize();
-    }
+      // Initialize hook system if enabled
+      if (this.getEnableHooks()) {
+        this.hookSystem = new HookSystem(this);
+        await this.hookSystem.initialize();
+      }
 
-    if (this.experimentalJitContext) {
-      this.contextManager = new ContextManager(this);
-      await this.contextManager.refresh();
-    }
+      if (this.experimentalJitContext) {
+        this.contextManager = new ContextManager(this);
+        await this.contextManager.refresh();
+      }
 
-    await this.geminiClient.initialize();
-    this.syncPlanModeTools();
+      await this.geminiClient.initialize();
+      this.syncPlanModeTools();
+    })();
+
+    return this.initPromise;
   }
 
   getContentGenerator(): ContentGenerator {
@@ -2484,6 +2487,36 @@ export class Config {
    */
   getHookSystem(): HookSystem | undefined {
     return this.hookSystem;
+  }
+
+  addUserHint(hint: string): void {
+    const trimmed = hint.trim();
+    if (trimmed.length === 0) {
+      return;
+    }
+    this.userHints.push({ text: trimmed, timestamp: Date.now() });
+  }
+
+  getUserHints(): string[] {
+    return this.userHints.map((h) => h.text);
+  }
+
+  getUserHintsAfter(index: number): string[] {
+    if (index < 0) {
+      return this.getUserHints();
+    }
+    return this.userHints.slice(index + 1).map((h) => h.text);
+  }
+
+  getLatestHintIndex(): number {
+    return this.userHints.length - 1;
+  }
+
+  getLastUserHintAt(): number | null {
+    if (this.userHints.length === 0) {
+      return null;
+    }
+    return this.userHints[this.userHints.length - 1].timestamp;
   }
 
   /**

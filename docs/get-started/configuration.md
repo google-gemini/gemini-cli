@@ -468,6 +468,19 @@ their corresponding top-level category object in your `settings.json` file.
           }
         }
       },
+      "flash-lite-helper": {
+        "extends": "base",
+        "modelConfig": {
+          "model": "gemini-2.5-flash-lite",
+          "generateContentConfig": {
+            "temperature": 0.2,
+            "maxOutputTokens": 120,
+            "thinkingConfig": {
+              "thinkingBudget": 0
+            }
+          }
+        }
+      },
       "edit-corrector": {
         "extends": "base",
         "modelConfig": {

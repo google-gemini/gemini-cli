@@ -243,6 +243,15 @@ export class StartupProfiler {
     // Clear all phases.
     this.phases.clear();
   }
+
+  /**
+   * Resets the profiler state for tests.
+   */
+  clear(): void {
+    this.phases.clear();
+    performance.clearMarks();
+    performance.clearMeasures();
+  }
 }
 
 export const startupProfiler = StartupProfiler.getInstance();

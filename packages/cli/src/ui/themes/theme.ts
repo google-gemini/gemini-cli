@@ -131,6 +131,7 @@ export class Theme {
       },
       background: {
         primary: this.colors.Background,
+        hintMode: this.type === 'light' ? '#E8E0F0' : '#352A45',
         diff: {
           added: this.colors.DiffAdded,
           removed: this.colors.DiffRemoved,
@@ -400,6 +401,7 @@ export function createCustomTheme(customTheme: CustomTheme): Theme {
     },
     background: {
       primary: customTheme.background?.primary ?? colors.Background,
+      hintMode: 'magenta',
       diff: {
         added: customTheme.background?.diff?.added ?? colors.DiffAdded,
         removed: customTheme.background?.diff?.removed ?? colors.DiffRemoved,

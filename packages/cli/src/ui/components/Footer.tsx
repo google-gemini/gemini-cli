@@ -71,7 +71,8 @@ export const Footer: React.FC = () => {
   const justifyContent = hideCWD && hideModelInfo ? 'center' : 'space-between';
   const displayVimMode = vimEnabled ? vimMode : undefined;
 
-  const showDebugProfiler = debugMode || isDevelopment;
+  const showDebugProfiler =
+    debugMode || (isDevelopment && settings.merged.general.devtools);
 
   return (
     <Box

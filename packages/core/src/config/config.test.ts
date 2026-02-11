@@ -41,6 +41,7 @@ import type { SkillDefinition } from '../skills/skillLoader.js';
 import type { McpClientManager } from '../tools/mcp-client-manager.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 import { DEFAULT_GEMINI_MODEL } from './models.js';
+import { Storage } from './storage.js';
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -279,16 +280,21 @@ describe('Server Config (config.ts)', () => {
       await expect(config.initialize()).resolves.toBeUndefined();
     });
 
-    it('should throw an error if initialized more than once', async () => {
+    it('should deduplicate multiple calls to initialize', async () => {
       const config = new Config({
         ...baseParams,
         checkpointing: false,
       });
 
-      await expect(config.initialize()).resolves.toBeUndefined();
-      await expect(config.initialize()).rejects.toThrow(
-        'Config was already initialized',
-      );
+      const storageSpy = vi.spyOn(Storage.prototype, 'initialize');
+
+      await Promise.all([
+        config.initialize(),
+        config.initialize(),
+        config.initialize(),
+      ]);
+
+      expect(storageSpy).toHaveBeenCalledTimes(1);
     });
 
     it('should await MCP initialization in non-interactive mode', async () => {
@@ -2582,5 +2588,35 @@ describe('syncPlanModeTools', () => {
     config.syncPlanModeTools();
 
     expect(setToolsSpy).toHaveBeenCalled();
+  });
+
+  describe('user hints', () => {
+    it('stores trimmed hints and exposes them via indexing', () => {
+      const config = new Config(baseParams);
+
+      config.addUserHint('  first hint  ');
+      config.addUserHint('second hint');
+      config.addUserHint('   ');
+
+      expect(config.getUserHints()).toEqual(['first hint', 'second hint']);
+      expect(config.getLatestHintIndex()).toBe(1);
+      expect(config.getUserHintsAfter(-1)).toEqual([
+        'first hint',
+        'second hint',
+      ]);
+      expect(config.getUserHintsAfter(0)).toEqual(['second hint']);
+      expect(config.getUserHintsAfter(1)).toEqual([]);
+    });
+
+    it('tracks the last hint timestamp', () => {
+      const config = new Config(baseParams);
+
+      expect(config.getLastUserHintAt()).toBeNull();
+      config.addUserHint('hint');
+
+      const timestamp = config.getLastUserHintAt();
+      expect(timestamp).not.toBeNull();
+      expect(typeof timestamp).toBe('number');
+    });
   });
 });
