@@ -68,8 +68,10 @@ You can enter Plan Mode in three ways:
 1.  **Requirements:** The agent clarifies goals using `ask_user`.
 2.  **Exploration:** The agent uses read-only tools (like [`read_file`]) to map
     the codebase and validate assumptions.
-3.  **Planning:** A detailed plan is written to a temporary Markdown file.
-4.  **Review:** You review the plan.
+3.  **Design:** The agent proposes alternative approaches with a recommended
+    solution for you to choose from.
+4.  **Planning:** A detailed plan is written to a temporary Markdown file.
+5.  **Review:** You review the plan.
     - **Approve:** Exit Plan Mode and start implementation (switching to
       Auto-Edit or Default approval mode).
     - **Iterate:** Provide feedback to refine the plan.
