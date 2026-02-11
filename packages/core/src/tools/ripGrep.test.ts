@@ -1848,6 +1848,168 @@ describe('RipGrepTool', () => {
       expect(invocation.getDescription()).toContain(path.join('src', 'app'));
     });
   });
+
+  describe('new parameters', () => {
+    it('should pass --max-count when max_matches_per_file is provided', async () => {
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileA.txt' },
+                line_number: 1,
+                lines: { text: 'hello world\n' },
+              },
+            }) + '\n',
+          exitCode: 0,
+        }),
+      );
+
+      const params: RipGrepToolParams = {
+        pattern: 'world',
+        max_matches_per_file: 1,
+      };
+      const invocation = grepTool.build(params);
+      await invocation.execute(abortSignal);
+
+      const spawnArgs = mockSpawn.mock.calls[0][1];
+      expect(spawnArgs).toContain('--max-count');
+      expect(spawnArgs).toContain('1');
+    });
+
+    it('should respect total_max_matches and truncate results', async () => {
+      // Return 3 matches, but set total_max_matches to 2
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileA.txt' },
+                line_number: 1,
+                lines: { text: 'match 1\n' },
+              },
+            }) +
+            '\n' +
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileA.txt' },
+                line_number: 2,
+                lines: { text: 'match 2\n' },
+              },
+            }) +
+            '\n' +
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileA.txt' },
+                line_number: 3,
+                lines: { text: 'match 3\n' },
+              },
+            }) +
+            '\n',
+          exitCode: 0,
+        }),
+      );
+
+      const params: RipGrepToolParams = {
+        pattern: 'match',
+        total_max_matches: 2,
+      };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain('Found 2 matches');
+      expect(result.llmContent).toContain(
+        'results limited to 2 matches for performance',
+      );
+      expect(result.llmContent).toContain('L1: match 1');
+      expect(result.llmContent).toContain('L2: match 2');
+      expect(result.llmContent).not.toContain('L3: match 3');
+      expect(result.returnDisplay).toBe('Found 2 matches (limited)');
+    });
+
+    it('should return only file paths when names_only is true', async () => {
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileA.txt' },
+                line_number: 1,
+                lines: { text: 'hello world\n' },
+              },
+            }) +
+            '\n' +
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileB.txt' },
+                line_number: 5,
+                lines: { text: 'hello again\n' },
+              },
+            }) +
+            '\n',
+          exitCode: 0,
+        }),
+      );
+
+      const params: RipGrepToolParams = {
+        pattern: 'hello',
+        names_only: true,
+      };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain('Found 2 files with matches');
+      expect(result.llmContent).toContain('fileA.txt');
+      expect(result.llmContent).toContain('fileB.txt');
+      expect(result.llmContent).not.toContain('L1:');
+      expect(result.llmContent).not.toContain('hello world');
+    });
+
+    it('should filter out matches based on exclude_pattern', async () => {
+      mockSpawn.mockImplementationOnce(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileA.txt' },
+                line_number: 1,
+                lines: { text: 'Copyright 2025 Google LLC\n' },
+              },
+            }) +
+            '\n' +
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'fileB.txt' },
+                line_number: 1,
+                lines: { text: 'Copyright 2026 Google LLC\n' },
+              },
+            }) +
+            '\n',
+          exitCode: 0,
+        }),
+      );
+
+      const params: RipGrepToolParams = {
+        pattern: 'Copyright .* Google LLC',
+        exclude_pattern: '2026',
+      };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).toContain('Found 1 match');
+      expect(result.llmContent).toContain('fileA.txt');
+      expect(result.llmContent).not.toContain('fileB.txt');
+      expect(result.llmContent).toContain('Copyright 2025 Google LLC');
+    });
+  });
 });
 
 afterAll(() => {
