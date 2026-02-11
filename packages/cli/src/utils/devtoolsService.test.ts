@@ -437,7 +437,19 @@ describe('devtoolsService', () => {
   });
 
   describe('toggleDevToolsPanel', () => {
-    it('calls toggle when browser opens successfully', async () => {
+    it('calls toggle (to close) when already open', async () => {
+      const config = createMockConfig();
+      const toggle = vi.fn();
+      const setOpen = vi.fn();
+
+      const promise = toggleDevToolsPanel(config, true, toggle, setOpen);
+      await promise;
+
+      expect(toggle).toHaveBeenCalledTimes(1);
+      expect(setOpen).not.toHaveBeenCalled();
+    });
+
+    it('does NOT call toggle or setOpen when browser opens successfully', async () => {
       const config = createMockConfig();
       const toggle = vi.fn();
       const setOpen = vi.fn();
@@ -447,18 +459,18 @@ describe('devtoolsService', () => {
       mockDevToolsInstance.start.mockResolvedValue('http://127.0.0.1:25417');
       mockDevToolsInstance.getPort.mockReturnValue(25417);
 
-      const promise = toggleDevToolsPanel(config, toggle, setOpen);
+      const promise = toggleDevToolsPanel(config, false, toggle, setOpen);
 
       await vi.waitFor(() => expect(MockWebSocket.instances.length).toBe(1));
       MockWebSocket.instances[0].simulateError();
 
       await promise;
 
-      expect(toggle).toHaveBeenCalledTimes(1);
+      expect(toggle).not.toHaveBeenCalled();
       expect(setOpen).not.toHaveBeenCalled();
     });
 
-    it('calls toggle when browser fails to open', async () => {
+    it('calls setOpen when browser fails to open', async () => {
       const config = createMockConfig();
       const toggle = vi.fn();
       const setOpen = vi.fn();
@@ -468,18 +480,18 @@ describe('devtoolsService', () => {
       mockDevToolsInstance.start.mockResolvedValue('http://127.0.0.1:25417');
       mockDevToolsInstance.getPort.mockReturnValue(25417);
 
-      const promise = toggleDevToolsPanel(config, toggle, setOpen);
+      const promise = toggleDevToolsPanel(config, false, toggle, setOpen);
 
       await vi.waitFor(() => expect(MockWebSocket.instances.length).toBe(1));
       MockWebSocket.instances[0].simulateError();
 
       await promise;
 
-      expect(toggle).toHaveBeenCalledTimes(1);
-      expect(setOpen).not.toHaveBeenCalled();
+      expect(toggle).not.toHaveBeenCalled();
+      expect(setOpen).toHaveBeenCalledTimes(1);
     });
 
-    it('calls toggle when shouldLaunchBrowser returns false', async () => {
+    it('calls setOpen when shouldLaunchBrowser returns false', async () => {
       const config = createMockConfig();
       const toggle = vi.fn();
       const setOpen = vi.fn();
@@ -488,15 +500,15 @@ describe('devtoolsService', () => {
       mockDevToolsInstance.start.mockResolvedValue('http://127.0.0.1:25417');
       mockDevToolsInstance.getPort.mockReturnValue(25417);
 
-      const promise = toggleDevToolsPanel(config, toggle, setOpen);
+      const promise = toggleDevToolsPanel(config, false, toggle, setOpen);
 
       await vi.waitFor(() => expect(MockWebSocket.instances.length).toBe(1));
       MockWebSocket.instances[0].simulateError();
 
       await promise;
 
-      expect(toggle).toHaveBeenCalledTimes(1);
-      expect(setOpen).not.toHaveBeenCalled();
+      expect(toggle).not.toHaveBeenCalled();
+      expect(setOpen).toHaveBeenCalledTimes(1);
     });
 
     it('calls setOpen when DevTools server fails to start', async () => {
@@ -506,7 +518,7 @@ describe('devtoolsService', () => {
 
       mockDevToolsInstance.start.mockRejectedValue(new Error('fail'));
 
-      const promise = toggleDevToolsPanel(config, toggle, setOpen);
+      const promise = toggleDevToolsPanel(config, false, toggle, setOpen);
 
       await vi.waitFor(() => expect(MockWebSocket.instances.length).toBe(1));
       MockWebSocket.instances[0].simulateError();
