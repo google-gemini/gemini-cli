@@ -17,26 +17,34 @@ import {
 import { debugLogger } from '../../utils/debugLogger.js';
 import type { Config } from '../../config/config.js';
 
-import { generatePolicy } from './policy_generator.js';
-import { enforcePolicy } from './policy_enforcer.js';
+import { generatePolicy } from './policy-generator.js';
+import { enforcePolicy } from './policy-enforcer.js';
 import type { SecurityPolicy } from './types.js';
 
 export class ConsecaSafetyChecker implements InProcessChecker {
-  private static instance: ConsecaSafetyChecker;
+  private static instance: ConsecaSafetyChecker | undefined;
   private currentPolicy: SecurityPolicy | null = null;
   private activeUserPrompt: string | null = null;
   private config: Config | null = null;
 
   /**
-   * Public for testing purposes. Use `getInstance()` in production.
+   * Private constructor to enforce singleton pattern.
+   * Use `getInstance()` to access the instance.
    */
-  constructor() {}
+  private constructor() {}
 
   static getInstance(): ConsecaSafetyChecker {
     if (!ConsecaSafetyChecker.instance) {
       ConsecaSafetyChecker.instance = new ConsecaSafetyChecker();
     }
     return ConsecaSafetyChecker.instance;
+  }
+
+  /**
+   * Resets the singleton instance. Use only in tests.
+   */
+  static resetInstance(): void {
+    ConsecaSafetyChecker.instance = undefined;
   }
 
   setConfig(config: Config): void {
