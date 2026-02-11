@@ -28,6 +28,7 @@ implementation strategy.
 - [How to use Plan Mode](#how-to-use-plan-mode)
   - [Entering Plan Mode](#entering-plan-mode)
   - [The Planning Workflow](#the-planning-workflow)
+  - [Customizing Planning with Skills](#customizing-planning-with-skills)
   - [Exiting Plan Mode](#exiting-plan-mode)
 - [Tool Restrictions](#tool-restrictions)
 
@@ -76,6 +77,26 @@ You can enter Plan Mode in three ways:
       Auto-Edit or Default approval mode).
     - **Iterate:** Provide feedback to refine the plan.
 
+### Customizing Planning with Skills
+
+You can leverage [Agent Skills](./skills.md) to customize how Gemini CLI
+approaches planning for specific types of tasks. When a skill is activated
+during Plan Mode, its specialized instructions and procedural workflows will
+guide the research and design phases.
+
+For example:
+
+- A **"Database Migration"** skill could ensure the plan includes data safety
+  checks and rollback strategies.
+- A **"Security Audit"** skill could prompt the agent to look for specific
+  vulnerabilities during codebase exploration.
+- A **"Frontend Design"** skill could guide the agent to use specific UI
+  components and accessibility standards in its proposal.
+
+To use a skill in Plan Mode, you can explicitly ask the agent to "use the
+[skill-name] skill to plan..." or the agent may autonomously activate it based
+on the task description.
+
 ### Exiting Plan Mode
 
 To exit Plan Mode:
@@ -92,6 +113,8 @@ These are the only allowed tools:
 
 - **FileSystem (Read):** [`read_file`], [`list_directory`], [`glob`]
 - **Search:** [`grep_search`], [`google_web_search`]
+- **Skills:** [`activate_skill`] (allows loading specialized instructions and
+  resources in a read-only manner)
 - **Interaction:** `ask_user`
 - **MCP Tools (Read):** Read-only [MCP tools] (e.g., `github_read_issue`,
   `postgres_read_schema`) are allowed.
@@ -106,3 +129,4 @@ These are the only allowed tools:
 [`google_web_search`]: /docs/tools/web-search.md
 [`replace`]: /docs/tools/file-system.md#6-replace-edit
 [MCP tools]: /docs/tools/mcp-server.md
+[`activate_skill`]: /docs/cli/skills.md
