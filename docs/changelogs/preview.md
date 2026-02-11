@@ -120,11 +120,11 @@ npm install -g @google/gemini-cli@preview
   in [#18389](https://github.com/google-gemini/gemini-cli/pull/18389)
 - feat(core,cli): implement session-linked tool output storage and cleanup by
   abhipatel12 in
-  [#18416](https://github.google.com/google-gemini/gemini-cli/pull/18416)
+  [#18416](https://github.com/google-gemini/gemini-cli/pull/18416)
 - Shorten temp directory by joshualitt in
   [#17901](https://github.com/google-gemini/gemini-cli/pull/17901)
 - feat(plan): add behavioral evals for plan mode by jerop in
-  [#18437](https://github.com/google.gemini/gemini-cli/pull/18437)
+  [#18437](https://github.com/google-gemini/gemini-cli/pull/18437)
 - Add extension registry client by chrstnb in
   [#18396](https://github.com/google-gemini/gemini-cli/pull/18396)
 - Enable extension config by default by chrstnb in
