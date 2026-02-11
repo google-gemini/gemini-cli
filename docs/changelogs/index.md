@@ -18,10 +18,7 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
-## Announcements: v0.28.0 - February 10, 2026
-
-This release introduces a host of new features, bug fixes, and improvements
-across the board. Here are some of the highlights:
+## Announcements: v0.28.0 - 2026-02-03
 
 - **Slash Command:** We've added a new `/prompt-suggest` slash command to help
   you generate prompt suggestions
@@ -40,8 +37,6 @@ across the board. Here are some of the highlights:
   ([#17699](https://github.com/google-gemini/gemini-cli/pull/17699) by
   @ehedlund, [#17569](https://github.com/google-gemini/gemini-cli/pull/17569) by
   @erikus).
-
-[See the full changelog for v0.28.0](./latest.md)
 
 ## Announcements: v0.27.0 - 2026-02-03
 
