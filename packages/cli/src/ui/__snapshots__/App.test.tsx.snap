@@ -2,20 +2,20 @@
 
 exports[`App > Snapshots > renders default layout correctly 1`] = `
 "
- ███         █████████
-░░░███      ███░░░░░███
-  ░░░███   ███     ░░░
-    ░░░███░███
-     ███░ ░███    █████
-   ███░   ░░███  ░░███
- ███░      ░░█████████
-░░░         ░░░░░░░░░
+  ▝▜▄     Gemini CLI v1.2.3
+    ▝▜▄
+   ▗▟▀    Authenticated with undefined /auth
+  ▝▀      Gemini Code Assist for individuals /upgrade
+
 
 Tips for getting started:
-1. Ask questions, edit files, or run commands.
-2. Be specific for the best results.
-3. Create GEMINI.md files to customize your interactions with Gemini.
-4. /help for more information.
+1. /help for more information
+2. Ask coding questions, edit code or run commands
+3. Be specific for the best results
+
+
+
+
 
 
 
@@ -47,33 +47,29 @@ exports[`App > Snapshots > renders screen reader layout correctly 1`] = `
 "Notifications
 Footer
 
- ███         █████████
-░░░███      ███░░░░░███
-  ░░░███   ███     ░░░
-    ░░░███░███
-     ███░ ░███    █████
-   ███░   ░░███  ░░███
- ███░      ░░█████████
-░░░         ░░░░░░░░░
+  ▝▜▄     Gemini CLI v1.2.3
+    ▝▜▄
+   ▗▟▀    Authenticated with undefined /auth
+  ▝▀      Gemini Code Assist for individuals /upgrade
+
 
 Tips for getting started:
-1. Ask questions, edit files, or run commands.
-2. Be specific for the best results.
-3. Create GEMINI.md files to customize your interactions with Gemini.
-4. /help for more information.
+1. /help for more information
+2. Ask coding questions, edit code or run commands
+3. Be specific for the best results
 Composer"
 `;
 
 exports[`App > Snapshots > renders with dialogs visible 1`] = `
 "
- ███         █████████
-░░░███      ███░░░░░███
-  ░░░███   ███     ░░░
-    ░░░███░███
-     ███░ ░███    █████
-   ███░   ░░███  ░░███
- ███░      ░░█████████
-░░░         ░░░░░░░░░
+  ▝▜▄     Gemini CLI v1.2.3
+    ▝▜▄
+   ▗▟▀    Authenticated with undefined /auth
+  ▝▀      Gemini Code Assist for individuals /upgrade
+
+
+
+
 
 
 
@@ -109,20 +105,16 @@ DialogManager
 
 exports[`App > should render ToolConfirmationQueue along with Composer when tool is confirming and experiment is on 1`] = `
 "
- ███         █████████
-░░░███      ███░░░░░███
-  ░░░███   ███     ░░░
-    ░░░███░███
-     ███░ ░███    █████
-   ███░   ░░███  ░░███
- ███░      ░░█████████
-░░░         ░░░░░░░░░
+  ▝▜▄     Gemini CLI v1.2.3
+    ▝▜▄
+   ▗▟▀    Authenticated with undefined /auth
+  ▝▀      Gemini Code Assist for individuals /upgrade
+
 
 Tips for getting started:
-1. Ask questions, edit files, or run commands.
-2. Be specific for the best results.
-3. Create GEMINI.md files to customize your interactions with Gemini.
-4. /help for more information.
+1. /help for more information
+2. Ask coding questions, edit code or run commands
+3. Be specific for the best results
 HistoryItemDisplay
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ Action Required                                                                                                      │
@@ -137,6 +129,10 @@ HistoryItemDisplay
 │   3. No, suggest changes (esc)                                                                                       │
 │                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+
+
+
 
 
 
