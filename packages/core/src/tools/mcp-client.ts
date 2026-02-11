@@ -1871,7 +1871,6 @@ export async function createTransport(
     let transport: Transport = new StdioClientTransport({
       command: mcpServerConfig.command,
       args: mcpServerConfig.args || [],
-<<<<<<< HEAD
       env: sanitizeEnvironment(
         {
           ...process.env,
