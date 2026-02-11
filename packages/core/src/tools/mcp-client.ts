@@ -71,6 +71,10 @@ import {
   sanitizeEnvironment,
   type EnvironmentSanitizationConfig,
 } from '../services/environmentSanitization.js';
+import {
+  GEMINI_CLI_IDENTIFICATION_ENV_VAR,
+  GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
+} from 'src/services/shellExecutionService.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
@@ -1941,6 +1945,8 @@ export async function createTransport(
           ...process.env,
           ...getExtensionEnvironment(mcpServerConfig.extension),
           ...(mcpServerConfig.env || {}),
+          [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
+            GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
         },
         {
           ...sanitizationConfig,

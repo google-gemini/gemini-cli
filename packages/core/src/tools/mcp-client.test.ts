@@ -1639,6 +1639,32 @@ describe('mcp-client', () => {
       });
     });
 
+    it('sets the GEMINI_CLI env var for the execution', async () => {
+      const mockedTransport = vi
+        .spyOn(SdkClientStdioLib, 'StdioClientTransport')
+        .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
+
+      await createTransport(
+        'test-server',
+        {
+          command: 'test-command',
+          args: ['--foo', 'bar'],
+          env: {},
+          cwd: 'test/cwd',
+        },
+        false,
+        EMPTY_CONFIG,
+      );
+
+      expect(mockedTransport).toHaveBeenCalledWith({
+        command: 'test-command',
+        args: ['--foo', 'bar'],
+        cwd: 'test/cwd',
+        env: expect.objectContaining({ GEMINI_CLI: '1' }),
+        stderr: 'pipe',
+      });
+    });
+
     it('should redact sensitive environment variables for command transport', async () => {
       const mockedTransport = vi
         .spyOn(SdkClientStdioLib, 'StdioClientTransport')
