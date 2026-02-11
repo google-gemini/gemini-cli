@@ -85,7 +85,7 @@ describe('Hooks System Integration', () => {
       expect(hookTelemetryFound).toBeTruthy();
     });
 
-    it.only('should block tool execution and use stderr as reason when hook exits with code 2', async () => {
+    it('should block tool execution and use stderr as reason when hook exits with code 2', async () => {
       rig.setup(
         'should block tool execution and use stderr as reason when hook exits with code 2',
         {
