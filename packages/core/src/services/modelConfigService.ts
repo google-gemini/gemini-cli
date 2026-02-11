@@ -171,10 +171,10 @@ export class ModelConfigService {
 
       // Ensure we don't have BOTH if one was a default from an alias
       if (context.thinkingLevel) {
-        delete (thinkingConfig as Record<string, unknown>).thinkingBudget;
+        delete (thinkingConfig as Record<string, unknown>)['thinkingBudget'];
       }
       if (context.thinkingBudget) {
-        delete (thinkingConfig as Record<string, unknown>).thinkingLevel;
+        delete (thinkingConfig as Record<string, unknown>)['thinkingLevel'];
       }
 
       currentConfig.generateContentConfig = {
