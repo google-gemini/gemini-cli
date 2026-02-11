@@ -301,4 +301,56 @@ describe('ToolResultDisplay', () => {
     expect(output).not.toContain('Line 1');
     expect(output).toContain('Line 50');
   });
+
+  it('renders GrepResult as summary string', () => {
+    const grepResult = {
+      summary: 'Found 5 matches',
+      matches: [{ filePath: 'test.ts', lineNumber: 1, line: 'code' }],
+    };
+    const { lastFrame } = render(
+      <ToolResultDisplay
+        resultDisplay={grepResult}
+        terminalWidth={80}
+        availableTerminalHeight={20}
+      />,
+    );
+    const output = lastFrame();
+    expect(output).toContain('Found 5 matches');
+    expect(output).not.toContain('filePath'); // Should not render the array content
+    expect(output).not.toContain('code');
+  });
+
+  it('renders ListDirectoryResult as summary string', () => {
+    const lsResult = {
+      summary: 'Listed 10 files',
+      files: ['some-file.txt'],
+    };
+    const { lastFrame } = render(
+      <ToolResultDisplay
+        resultDisplay={lsResult}
+        terminalWidth={80}
+        availableTerminalHeight={20}
+      />,
+    );
+    const output = lastFrame();
+    expect(output).toContain('Listed 10 files');
+    expect(output).not.toContain('some-file.txt'); // Should not render the array content
+  });
+
+  it('renders ReadManyFilesResult as summary string', () => {
+    const rmfResult = {
+      summary: 'Read 20 files',
+      files: ['f1.txt', 'f2.txt'],
+    };
+    const { lastFrame } = render(
+      <ToolResultDisplay
+        resultDisplay={rmfResult}
+        terminalWidth={80}
+        availableTerminalHeight={20}
+      />,
+    );
+    const output = lastFrame();
+    expect(output).toContain('Read 20 files');
+    expect(output).not.toContain('f1.txt');
+  });
 });

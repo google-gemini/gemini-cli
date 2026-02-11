@@ -64,7 +64,6 @@ import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
 import { useStateAndRef } from './useStateAndRef.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useLogger } from './useLogger.js';
-import { SHELL_COMMAND_NAME } from '../constants.js';
 import { mapToDisplay as mapTrackedToolCallsToDisplay } from './toolMapping.js';
 import {
   useToolScheduler,
@@ -555,23 +554,19 @@ export const useGeminiStream = (
     cancelAllToolCalls(abortControllerRef.current.signal);
 
     if (pendingHistoryItemRef.current) {
-      const isShellCommand =
-        pendingHistoryItemRef.current.type === 'tool_group' &&
-        pendingHistoryItemRef.current.tools.some(
-          (t) => t.name === SHELL_COMMAND_NAME,
-        );
-
-      // If it is a shell command, we update the status to Canceled and clear the output
-      // to avoid artifacts, then add it to history immediately.
-      if (isShellCommand) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        const toolGroup = pendingHistoryItemRef.current as HistoryItemToolGroup;
+      if (pendingHistoryItemRef.current.type === 'tool_group') {
+        // Mark all in-progress tools as Canceled when the turn is cancelled.
+         
+        const toolGroup = pendingHistoryItemRef.current;
         const updatedTools = toolGroup.tools.map((tool) => {
-          if (tool.name === SHELL_COMMAND_NAME) {
+          if (
+            tool.status === ToolCallStatus.Pending ||
+            tool.status === ToolCallStatus.Confirming ||
+            tool.status === ToolCallStatus.Executing
+          ) {
             return {
               ...tool,
               status: ToolCallStatus.Canceled,
-              resultDisplay: tool.resultDisplay,
             };
           }
           return tool;

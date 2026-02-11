@@ -31,6 +31,7 @@ export type {
   ListDirectoryResult,
   ReadManyFilesResult,
   FileDiff,
+  SerializableConfirmationDetails,
 };
 
 export enum AuthState {

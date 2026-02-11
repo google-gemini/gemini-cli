@@ -92,6 +92,9 @@ export function mapToDisplay(
       case 'error':
       case 'cancelled':
         resultDisplay = call.response.resultDisplay;
+        // Preserve confirmation details so we can still show what was being proposed
+        // if it was an edit/write-file that was rejected.
+        confirmationDetails = call.confirmationDetails;
         break;
       case 'awaiting_approval':
         correlationId = call.correlationId;
