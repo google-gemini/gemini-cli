@@ -166,8 +166,8 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
 
 ## Context Efficiency:
 - Minimize context waste with a tiered ${GREP_TOOL_NAME} strategy:
-  - First, perform broad, shallow searches (using \`max_matches_per_file: 1\` or \`names_only\`) to map the codebase.
-  - Minimize wasted context window by scoping and limiting all of your ${GREP_TOOL_NAME} searches. e.g.: pass max_total_matches, include, and max_matches_per_file.
+  - Minimize wasted context window by scoping and limiting the size of all of your ${GREP_TOOL_NAME} searches. e.g.: pass max_total_matches, include, and max_matches_per_file.
+  - Identify files of interest and recover from failed targeted searches using \`names_only\`.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in ${formattedFilenames} files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
