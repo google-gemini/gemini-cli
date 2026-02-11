@@ -497,7 +497,7 @@ function mandateContinueWork(interactive: boolean): string {
 function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
   let suggestion = '';
   if (options.enableEnterPlanModeTool) {
-    suggestion = ` For complex implementation tasks, consider using the ${formatToolName(ENTER_PLAN_MODE_TOOL_NAME)} tool to design your approach before making changes. Do not use this for answering questions or simple inquiries.`;
+    suggestion = ` If the request is ambiguous, broad in scope, or involves creating a new feature/application, you MUST use the ${formatToolName(ENTER_PLAN_MODE_TOOL_NAME)} tool to design your approach before making changes. Do NOT use Plan Mode for straightforward bug fixes, answering questions, or simple inquiries.`;
   }
 
   const searchTools: string[] = [];
@@ -589,7 +589,7 @@ function newApplicationSteps(options: PrimaryWorkflowsOptions): string {
 
 function planningPhaseSuggestion(options: PrimaryWorkflowsOptions): string {
   if (options.enableEnterPlanModeTool) {
-    return ` For complex implementation tasks, consider using the ${formatToolName(ENTER_PLAN_MODE_TOOL_NAME)} tool to enter a dedicated planning phase before starting implementation.`;
+    return ` You MUST use the ${formatToolName(ENTER_PLAN_MODE_TOOL_NAME)} tool to draft a comprehensive design document before writing any code.`;
   }
   return '';
 }
