@@ -901,9 +901,9 @@ describe('mcp-client', () => {
       vi.mocked(ClientLib.Client).mockReturnValue(
         mockedClient as unknown as ClientLib.Client,
       );
-      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue({
-        close: vi.fn(),
-      } as unknown as SdkClientStdioLib.StdioClientTransport);
+      vi.spyOn(SdkClientStdioLib, 'StdioClientTransport').mockReturnValue(
+        {} as SdkClientStdioLib.StdioClientTransport,
+      );
       const mockedToolRegistry = {
         registerTool: vi.fn(),
         unregisterTool: vi.fn(),
@@ -2066,7 +2066,7 @@ describe('connectToMcpServer with OAuth', () => {
       EMPTY_CONFIG,
     );
 
-    expect(client.client).toBe(mockedClient);
+    expect(client).toBe(mockedClient);
     expect(mockedClient.connect).toHaveBeenCalledTimes(2);
     expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
 
@@ -2112,7 +2112,7 @@ describe('connectToMcpServer with OAuth', () => {
       EMPTY_CONFIG,
     );
 
-    expect(client.client).toBe(mockedClient);
+    expect(client).toBe(mockedClient);
     expect(mockedClient.connect).toHaveBeenCalledTimes(2);
     expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
     expect(OAuthUtils.discoverOAuthConfig).toHaveBeenCalledWith(serverUrl);
@@ -2207,7 +2207,7 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
       EMPTY_CONFIG,
     );
 
-    expect(client.client).toBe(mockedClient);
+    expect(client).toBe(mockedClient);
     // First HTTP attempt fails, second SSE attempt succeeds
     expect(mockedClient.connect).toHaveBeenCalledTimes(2);
   });
@@ -2248,7 +2248,7 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
       EMPTY_CONFIG,
     );
 
-    expect(client.client).toBe(mockedClient);
+    expect(client).toBe(mockedClient);
     expect(mockedClient.connect).toHaveBeenCalledTimes(2);
   });
 });
@@ -2333,7 +2333,7 @@ describe('connectToMcpServer - OAuth with transport fallback', () => {
       EMPTY_CONFIG,
     );
 
-    expect(client.client).toBe(mockedClient);
+    expect(client).toBe(mockedClient);
     expect(mockedClient.connect).toHaveBeenCalledTimes(3);
     expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
   });

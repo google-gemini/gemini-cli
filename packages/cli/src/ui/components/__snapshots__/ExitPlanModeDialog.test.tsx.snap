@@ -21,7 +21,7 @@ Files to Modify
       Approves plan and allows tools to run automatically
   2.  Yes, manually accept edits
       Approves plan but requires confirmation for each tool
-● 3.  Type your feedback... ✓
+● 3.  Type your feedback...
 
 Enter to submit · Esc to cancel"
 `;
@@ -47,7 +47,7 @@ Files to Modify
       Approves plan and allows tools to run automatically
   2.  Yes, manually accept edits
       Approves plan but requires confirmation for each tool
-● 3.  Add tests  ✓
+● 3.  Add tests
 
 Enter to submit · Esc to cancel"
 `;
@@ -127,7 +127,7 @@ Files to Modify
       Approves plan and allows tools to run automatically
   2.  Yes, manually accept edits
       Approves plan but requires confirmation for each tool
-● 3.  Type your feedback... ✓
+● 3.  Type your feedback...
 
 Enter to submit · Esc to cancel"
 `;
@@ -153,7 +153,7 @@ Files to Modify
       Approves plan and allows tools to run automatically
   2.  Yes, manually accept edits
       Approves plan but requires confirmation for each tool
-● 3.  Add tests  ✓
+● 3.  Add tests
 
 Enter to submit · Esc to cancel"
 `;

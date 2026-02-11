@@ -281,7 +281,10 @@ describe('InputPrompt', () => {
       navigateDown: vi.fn(),
       handleSubmit: vi.fn(),
     };
-    mockedUseInputHistory.mockReturnValue(mockInputHistory);
+    mockedUseInputHistory.mockImplementation(({ onSubmit }) => {
+      mockInputHistory.handleSubmit = vi.fn((val) => onSubmit(val));
+      return mockInputHistory;
+    });
 
     mockReverseSearchCompletion = {
       suggestions: [],
@@ -4093,7 +4096,7 @@ describe('InputPrompt', () => {
     beforeEach(() => {
       props.userMessages = ['first message', 'second message'];
       // Mock useInputHistory to actually call onChange
-      mockedUseInputHistory.mockImplementation(({ onChange }) => ({
+      mockedUseInputHistory.mockImplementation(({ onChange, onSubmit }) => ({
         navigateUp: () => {
           onChange('second message', 'start');
           return true;
@@ -4102,7 +4105,7 @@ describe('InputPrompt', () => {
           onChange('first message', 'end');
           return true;
         },
-        handleSubmit: vi.fn(),
+        handleSubmit: vi.fn((val) => onSubmit(val)),
       }));
     });
 
@@ -4293,6 +4296,30 @@ describe('InputPrompt', () => {
   });
 
   describe('shortcuts help visibility', () => {
+    it('opens shortcuts help with ? on empty prompt even when showShortcutsHint is false', async () => {
+      const setShortcutsHelpVisible = vi.fn();
+      const settings = createMockSettings({
+        ui: { showShortcutsHint: false },
+      });
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          settings,
+          uiActions: { setShortcutsHelpVisible },
+        },
+      );
+
+      await act(async () => {
+        stdin.write('?');
+      });
+
+      await waitFor(() => {
+        expect(setShortcutsHelpVisible).toHaveBeenCalledWith(true);
+      });
+      unmount();
+    });
+
     it.each([
       {
         name: 'terminal paste event occurs',
