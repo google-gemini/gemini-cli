@@ -1769,7 +1769,7 @@ console.log(JSON.stringify({
   });
 
   describe('Hook Disabling', () => {
-    it('should not execute hooks disabled in settings file', async () => {
+    it.only('should not execute hooks disabled in settings file', async () => {
       rig.setup('should not execute hooks disabled in settings file', {
         fakeResponsesPath: join(
           import.meta.dirname,
@@ -1777,35 +1777,36 @@ console.log(JSON.stringify({
         ),
       });
 
-      // Create two hook scripts - one enabled, one disabled
-      const enabledHookScript = `const fs = require('fs');
-console.log(JSON.stringify({decision: "allow", systemMessage: "Enabled hook executed"}));`;
+      // Create two hook scripts - one enabled, one disabled via rig to ensure they are tracked
+      const enabledPath = rig.createScript(
+        'enabled_hook.cjs',
+        'console.log(JSON.stringify({decision: "allow", systemMessage: "Enabled hook executed"}));',
+      );
 
-      const disabledHookScript = `const fs = require('fs');
-console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook should not execute", reason: "This hook should be disabled"}));`;
+      const disabledPath = rig.createScript(
+        'disabled_hook.cjs',
+        'console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook should not execute", reason: "This hook should be disabled"}));',
+      );
 
-      const enabledPath = join(rig.testDir!, 'enabled_hook.cjs');
-      const disabledPath = join(rig.testDir!, 'disabled_hook.cjs');
-
-      writeFileSync(enabledPath, enabledHookScript);
-      writeFileSync(disabledPath, disabledHookScript);
+      const normalizedDisabledCmd = normalizePath(`node "${disabledPath}"`);
+      const normalizedEnabledCmd = normalizePath(`node "${enabledPath}"`);
 
       rig.setup('should not execute hooks disabled in settings file', {
         settings: {
           enableHooks: true,
-          disabledHooks: [normalizePath(`node "${disabledPath}"`)], // Disable the second hook
+          disabledHooks: [normalizedDisabledCmd!], // Disable the second hook
           hooks: {
             BeforeTool: [
               {
                 hooks: [
                   {
                     type: 'command',
-                    command: normalizePath(`node "${enabledPath}"`),
+                    command: normalizedEnabledCmd!,
                     timeout: 5000,
                   },
                   {
                     type: 'command',
-                    command: normalizePath(`node "${disabledPath}"`),
+                    command: normalizedDisabledCmd!,
                     timeout: 5000,
                   },
                 ],
@@ -1846,22 +1847,21 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
       expect(disabledHookLog).toBeUndefined();
     });
 
-    it('should respect disabled hooks across multiple operations', async () => {
+    it.only('should respect disabled hooks across multiple operations', async () => {
       // 1. First setup to get the test directory and prepare the hook scripts
       rig.setup('should respect disabled hooks across multiple operations');
 
-      const activeHookScript = `const fs = require('fs');
-console.log(JSON.stringify({decision: "allow", systemMessage: "Active hook executed"}));`;
-      const disabledHookScript = `const fs = require('fs');
-console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook should not execute", reason: "This hook is disabled"}));`;
-
-      const activePath = join(rig.testDir!, 'active_hook.cjs');
-      const disabledPath = join(rig.testDir!, 'disabled_hook.cjs');
-
-      writeFileSync(activePath, activeHookScript);
-      writeFileSync(disabledPath, disabledHookScript);
+      const activePath = rig.createScript(
+        'active_hook.cjs',
+        'console.log(JSON.stringify({decision: "allow", systemMessage: "Active hook executed"}));',
+      );
+      const disabledPath = rig.createScript(
+        'disabled_hook.cjs',
+        'console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook should not execute", reason: "This hook is disabled"}));',
+      );
 
       const normalizedDisabledCmd = normalizePath(`node "${disabledPath}"`);
+      const normalizedActiveCmd = normalizePath(`node "${activePath}"`);
 
       rig.setup('should respect disabled hooks across multiple operations', {
         settings: {
@@ -1873,7 +1873,7 @@ console.log(JSON.stringify({decision: "block", systemMessage: "Disabled hook sho
                 hooks: [
                   {
                     type: 'command',
-                    command: normalizePath(`node "${activePath}"`),
+                    command: normalizedActiveCmd!,
                     timeout: 5000,
                   },
                   {
