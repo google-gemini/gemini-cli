@@ -211,15 +211,6 @@ export class AskUserInvocation extends BaseToolInvocation<
             const indent = ' '.repeat(prefix.length);
 
             const lines = answer.split('\n');
-            if (lines.length > 5) {
-              const visibleLines = lines.slice(0, 5);
-              const hiddenCount = lines.length - 5;
-              return (
-                prefix +
-                visibleLines.join('\n' + indent) +
-                `\n${indent}<secondary>... ${hiddenCount} more lines hidden</secondary>`
-              );
-            }
             return prefix + lines.join('\n' + indent);
           })
           .join('\n')}`

@@ -406,37 +406,5 @@ describe('AskUserTool', () => {
         'User dismissed ask_user dialog without answering.',
       );
     });
-
-    it('should truncate multi-line answers in returnDisplay but keep full text in llmContent', async () => {
-      const questions = [
-        {
-          question: 'Enter many lines:',
-          header: 'Lines',
-          type: QuestionType.TEXT,
-        },
-      ];
-
-      const invocation = tool.build({ questions });
-      const details = await invocation.shouldConfirmExecute(
-        new AbortController().signal,
-      );
-
-      const manyLines =
-        'line 1\nline 2\nline 3\nline 4\nline 5\nline 6\nline 7';
-      if (details && 'onConfirm' in details) {
-        await details.onConfirm(ToolConfirmationOutcome.ProceedOnce, {
-          answers: { '0': manyLines },
-        });
-      }
-
-      const result = await invocation.execute(new AbortController().signal);
-      expect(result.returnDisplay).toContain('  Lines → line 1');
-      expect(result.returnDisplay).toContain('line 5');
-      expect(result.returnDisplay).not.toContain('line 6');
-      expect(result.returnDisplay).toContain('... 2 more lines hidden');
-      expect(JSON.parse(result.llmContent as string)).toEqual({
-        answers: { '0': manyLines },
-      });
-    });
   });
 });

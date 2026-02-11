@@ -16,7 +16,6 @@ describe('getPlainTextLength', () => {
     ['**', 2],
     ['*', 1],
     ['compile-time**', 14],
-    ['<secondary>dimmed</secondary>', 6],
   ])(
     'should measure markdown text length correctly for "%s"',
     (input, expected) => {

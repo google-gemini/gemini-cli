@@ -232,22 +232,17 @@ const ReviewView: React.FC<ReviewViewProps> = ({
       )}
 
       <Box flexDirection="column">
-        {questions.map((q, i) => {
-          const header = q.header;
-          const answer = answers[i] || '(not answered)';
-
-          return (
-            <Box key={i} marginBottom={0}>
-              <Text color={theme.text.secondary}>{header}</Text>
-              <Text color={theme.text.secondary}> → </Text>
-              <Text
-                color={answers[i] ? theme.text.primary : theme.status.warning}
-              >
-                {answer}
-              </Text>
-            </Box>
-          );
-        })}
+        {questions.map((q, i) => (
+          <Box key={i} marginBottom={0}>
+            <Text color={theme.text.secondary}>{q.header}</Text>
+            <Text color={theme.text.secondary}> → </Text>
+            <Text
+              color={answers[i] ? theme.text.primary : theme.status.warning}
+            >
+              {answers[i] || '(not answered)'}
+            </Text>
+          </Box>
+        ))}
       </Box>
       <DialogFooter
         primaryAction="Enter to submit"
