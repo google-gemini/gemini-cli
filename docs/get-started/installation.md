@@ -9,6 +9,9 @@ installation methods, and release types.
   - macOS 26+
   - Windows 11 24H2+
   - Ubuntu 20.04+
+- **Hardware:**
+  - "Casual" use (short sessions, asking questions, small edits): 4GB+ RAM
+  - "Power" use (long sessions, large codebases, deep context): 16GB+ RAM
 - **Runtime:** Node.js 20.0.0+
 - **Shell:** Bash or Zsh
 - **Location:**
