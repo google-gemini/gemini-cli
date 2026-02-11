@@ -314,4 +314,35 @@ describe('TableRenderer', () => {
     });
     expect(output).toMatchSnapshot();
   });
+
+  it.each([
+    {
+      name: 'renders correctly when headers are empty but rows have data',
+      headers: [] as string[],
+      rows: [['Data 1', 'Data 2']],
+      expected: ['Data 1', 'Data 2'],
+    },
+    {
+      name: 'renders correctly when there are more headers than columns in rows',
+      headers: ['Header 1', 'Header 2', 'Header 3'],
+      rows: [['Data 1', 'Data 2']],
+      expected: ['Header 1', 'Header 2', 'Header 3', 'Data 1', 'Data 2'],
+    },
+  ])('$name', ({ headers, rows, expected }) => {
+    const terminalWidth = 50;
+
+    const { lastFrame } = renderWithProviders(
+      <TableRenderer
+        headers={headers}
+        rows={rows}
+        terminalWidth={terminalWidth}
+      />,
+    );
+
+    const output = lastFrame();
+    expected.forEach((text) => {
+      expect(output).toContain(text);
+    });
+    expect(output).toMatchSnapshot();
+  });
 });
