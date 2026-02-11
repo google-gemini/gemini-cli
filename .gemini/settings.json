@@ -1,8 +1,5 @@
 {
   "experimental": {
-    "toolOutputMasking": {
-      "enabled": true
-    },
     "plan": true
   },
   "general": {
