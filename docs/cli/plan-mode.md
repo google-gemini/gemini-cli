@@ -31,6 +31,7 @@ implementation strategy.
   - [Exiting Plan Mode](#exiting-plan-mode)
 - [Tool Restrictions](#tool-restrictions)
   - [Customizing Planning with Skills](#customizing-planning-with-skills)
+  - [Customizing Policies](#customizing-policies)
 
 ## Starting in Plan Mode
 
@@ -121,6 +122,53 @@ To use a skill in Plan Mode, you can explicitly ask the agent to "use the
 [skill-name] skill to plan..." or the agent may autonomously activate it based
 on the task description.
 
+### Customizing Policies
+
+Plan Mode is designed to be read-only by default to ensure safety during the
+research phase. However, you may occasionally need to allow specific tools to
+assist in your planning.
+
+Because user policies (Tier 2) have a higher base priority than built-in
+policies (Tier 1), you can override Plan Mode's default restrictions by creating
+a rule in your `~/.gemini/policies/` directory.
+
+#### Example: Allow `git status` and `git diff` in Plan Mode
+
+This rule allows you to check the repository status and see changes while in
+Plan Mode.
+
+`~/.gemini/policies/git-research.toml`
+
+```toml
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = ["git status", "git diff"]
+decision = "allow"
+priority = 100
+modes = ["plan"]
+```
+
+#### Example: Enable research sub-agents in Plan Mode
+
+You can enable [experimental research sub-agents] like `codebase_investigator`
+to help gather architecture details during the planning phase.
+
+`~/.gemini/policies/research-subagents.toml`
+
+```toml
+[[rule]]
+toolName = "codebase_investigator"
+decision = "allow"
+priority = 100
+modes = ["plan"]
+```
+
+Tell the agent it can use these tools in your prompt, for example: _"You can
+check ongoing changes in git."_
+
+For more information on how the policy engine works, see the [Policy Engine
+Guide].
+
 [`list_directory`]: /docs/tools/file-system.md#1-list_directory-readfolder
 [`read_file`]: /docs/tools/file-system.md#2-read_file-readfile
 [`grep_search`]: /docs/tools/file-system.md#5-grep_search-searchtext
@@ -130,3 +178,5 @@ on the task description.
 [`replace`]: /docs/tools/file-system.md#6-replace-edit
 [MCP tools]: /docs/tools/mcp-server.md
 [`activate_skill`]: /docs/cli/skills.md
+[experimental research sub-agents]: /docs/core/subagents.md
+[Policy Engine Guide]: /docs/core/policy-engine.md
