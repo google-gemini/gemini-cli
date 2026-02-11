@@ -258,7 +258,7 @@ ${workflowStepStrategy(options)}
 3. **Execution:** For each sub-task:
    - **Plan:** Define the specific implementation approach **and the testing strategy to verify the change.**
    - **Act:** Apply targeted, surgical changes strictly related to the sub-task. Use the available tools (e.g., ${formatToolName(EDIT_TOOL_NAME)}, ${formatToolName(WRITE_FILE_TOOL_NAME)}, ${formatToolName(SHELL_TOOL_NAME)}). Ensure changes are idiomatically complete and follow all workspace standards, even if it requires multiple tool calls. **Include necessary automated tests; a change is incomplete without verification logic.** Avoid unrelated refactoring or "cleanup" of outside code. Before making manual code changes, check if an ecosystem tool (like 'eslint --fix', 'prettier --write', 'go fmt', 'cargo fmt') is available in the project to perform the task automatically.
-   - **Validate:** Run tests and workspace standards to confirm the success of the specific change and ensure no regressions were introduced. After making code changes, execute the project-specific build, linting and type-checking commands (e.g., 'tsc', 'npm run lint', 'ruff check .') that you have identified for this project.${workflowVerifyStandardsSuffix(options.interactive)}${options.approvedPlan ? ` Once validated, you MUST use ${formatToolName(EDIT_TOOL_NAME)} or ${formatToolName(WRITE_FILE_TOOL_NAME)} to update the approved plan file, checking off the completed Markdown checkbox (e.g., changing \`- [ ]\` to \`- [x]\`). This is NOT considered "tool call overhead"—it is a mandatory step to maintain the single source of truth.` : ''}
+   - **Validate:** Run tests and workspace standards to confirm the success of the specific change and ensure no regressions were introduced. After making code changes, execute the project-specific build, linting and type-checking commands (e.g., 'tsc', 'npm run lint', 'ruff check .') that you have identified for this project.${workflowVerifyStandardsSuffix(options.interactive)}
 
 **Validation is the only path to finality.** Never assume success or settle for unverified changes. Rigorous, exhaustive verification is mandatory; it prevents the compounding cost of diagnosing failures later. A task is only complete when the behavioral correctness of the change has been verified and its structural integrity is confirmed within the full project context. Prioritize comprehensive validation above all else, utilizing redirection and focused analysis to manage high-output tasks without sacrificing depth. Never sacrifice validation rigor for the sake of brevity or to minimize tool-call overhead; partial or isolated checks are insufficient when more comprehensive validation is possible.
 
@@ -437,13 +437,13 @@ ${options.planModeToolsList}
 ## Required Plan Structure
 When writing the plan file, you MUST include the following structure:
   # Objective
-    (A concise summary of what needs to be built or fixed)
+  (A concise summary of what needs to be built or fixed)
   # Key Files & Context
-    (List the specific files that will be modified, including helpful context like function signatures or code snippets)
+  (List the specific files that will be modified, including helpful context like function signatures or code snippets)
   # Implementation Steps
-    (Use actionable checkboxes, e.g., "- [ ] Step 1: Implement X in [File]")
+  (Iterative development steps, e.g., "1. Implement X in [File]", "2. Verify with test Y")
   # Verification & Testing
-    (Specific unit tests, manual checks, or build commands to verify success)
+  (Specific unit tests, manual checks, or build commands to verify success)
 
 ## Workflow
 1. **Explore & Draft:** Analyze requirements, use search/read tools to explore the codebase, and write the drafted plan to the plans directory using ${formatToolName(WRITE_FILE_TOOL_NAME)}.
@@ -527,7 +527,7 @@ function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
 
 function workflowStepStrategy(options: PrimaryWorkflowsOptions): string {
   if (options.approvedPlan) {
-    return `2. **Strategy:** An approved plan is available for this task. Treat this file as your single source of truth. You MUST read this file before proceeding. As you complete each step, you MUST use the ${formatToolName(EDIT_TOOL_NAME)} or ${formatToolName(WRITE_FILE_TOOL_NAME)} tools to update the plan file, checking off the corresponding Markdown checkboxes (e.g., change \`- [ ]\` to \`- [x]\`). If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements.`;
+    return `2. **Strategy:** An approved plan is available for this task. Treat this file as your single source of truth. You MUST read this file before proceeding. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements.`;
   }
 
   if (options.enableWriteTodosTool) {
@@ -552,7 +552,7 @@ function newApplicationSteps(options: PrimaryWorkflowsOptions): string {
   if (options.approvedPlan) {
     return `
 1. **Understand:** Read the approved plan. Treat this file as your single source of truth.
-2. **Implement:** Implement the application according to the plan. As you complete each step, you MUST use the ${formatToolName(EDIT_TOOL_NAME)} or ${formatToolName(WRITE_FILE_TOOL_NAME)} tools to update the plan file, checking off the corresponding Markdown checkboxes (e.g., change \`- [ ]\` to \`- [x]\`). If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements.
+2. **Implement:** Implement the application according to the plan. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements.
 3. **Verify:** Review work against the original request, the approved plan. Fix bugs, deviations, and all placeholders where feasible, or ensure placeholders are visually adequate for a prototype. Ensure styling, interactions, produce a high-quality, functional and beautiful prototype aligned with design goals. Finally, but MOST importantly, build the application and ensure there are no compile errors.
 4. **Finish:** Provide a brief summary of what was built.`.trim();
   }
