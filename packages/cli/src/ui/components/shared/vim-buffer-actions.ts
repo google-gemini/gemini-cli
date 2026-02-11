@@ -1148,11 +1148,14 @@ export function handleVimAction(
         col++;
       }
 
-      // Clamp to valid position (last char or 0 for empty/whitespace-only lines)
-      const maxCol = lineCodePoints.length > 0 ? lineCodePoints.length - 1 : 0;
+      // If line is all whitespace or empty, ^ goes to column 0 (standard Vim behavior)
+      if (col >= lineCodePoints.length) {
+        col = 0;
+      }
+
       return {
         ...state,
-        cursorCol: Math.min(col, maxCol),
+        cursorCol: col,
         preferredCol: null,
       };
     }

@@ -469,6 +469,24 @@ describe('vim-buffer-actions', () => {
         expect(result.cursorCol).toBe(3); // Position of 'h'
       });
 
+      it('vim_move_to_first_nonwhitespace should go to column 0 on whitespace-only line', () => {
+        const state = createTestState(['     '], 0, 3);
+        const action = { type: 'vim_move_to_first_nonwhitespace' as const };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.cursorCol).toBe(0);
+      });
+
+      it('vim_move_to_first_nonwhitespace should go to column 0 on empty line', () => {
+        const state = createTestState([''], 0, 0);
+        const action = { type: 'vim_move_to_first_nonwhitespace' as const };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.cursorCol).toBe(0);
+      });
+
       it('vim_move_to_first_line should move to row 0', () => {
         const state = createTestState(['line1', 'line2', 'line3'], 2, 5);
         const action = { type: 'vim_move_to_first_line' as const };
