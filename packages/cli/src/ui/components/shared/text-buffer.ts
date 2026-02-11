@@ -1658,6 +1658,7 @@ export type TextBufferAction =
   | { type: 'vim_delete_line'; payload: { count: number } }
   | { type: 'vim_change_line'; payload: { count: number } }
   | { type: 'vim_delete_to_end_of_line' }
+  | { type: 'vim_delete_to_start_of_line' }
   | { type: 'vim_change_to_end_of_line' }
   | {
       type: 'vim_change_movement';
@@ -2437,6 +2438,7 @@ function textBufferReducerLogic(
     case 'vim_delete_line':
     case 'vim_change_line':
     case 'vim_delete_to_end_of_line':
+    case 'vim_delete_to_start_of_line':
     case 'vim_change_to_end_of_line':
     case 'vim_change_movement':
     case 'vim_move_left':
@@ -2947,6 +2949,10 @@ export function useTextBuffer({
 
   const vimDeleteToEndOfLine = useCallback((): void => {
     dispatch({ type: 'vim_delete_to_end_of_line' });
+  }, []);
+
+  const vimDeleteToStartOfLine = useCallback((): void => {
+    dispatch({ type: 'vim_delete_to_start_of_line' });
   }, []);
 
   const vimChangeToEndOfLine = useCallback((): void => {
@@ -3510,6 +3516,7 @@ export function useTextBuffer({
       vimDeleteLine,
       vimChangeLine,
       vimDeleteToEndOfLine,
+      vimDeleteToStartOfLine,
       vimChangeToEndOfLine,
       vimChangeMovement,
       vimMoveLeft,
@@ -3592,6 +3599,7 @@ export function useTextBuffer({
       vimDeleteLine,
       vimChangeLine,
       vimDeleteToEndOfLine,
+      vimDeleteToStartOfLine,
       vimChangeToEndOfLine,
       vimChangeMovement,
       vimMoveLeft,
@@ -3834,6 +3842,10 @@ export interface TextBuffer {
    * Delete from cursor to end of line (vim 'D' command)
    */
   vimDeleteToEndOfLine: () => void;
+  /**
+   * Delete from start of line to cursor (vim 'd0' command)
+   */
+  vimDeleteToStartOfLine: () => void;
   /**
    * Change from cursor to end of line (vim 'C' command)
    */

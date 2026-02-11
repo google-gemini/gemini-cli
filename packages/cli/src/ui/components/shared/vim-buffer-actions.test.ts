@@ -922,11 +922,11 @@ describe('vim-buffer-actions', () => {
 
         const result = handleVimAction(state, action);
         expect(result).toHaveOnlyValidCharacters();
-        // The movement 'j' with count 2 changes 2 lines starting from cursor row
-        // Since we're at cursor position 2, it changes lines starting from current row
-        expect(result.lines).toEqual(['line1', 'line2', 'line3']); // No change because count > available lines
+        // In VIM, 2cj deletes current line + 2 lines below = 3 lines total
+        // Since there are exactly 3 lines, all are deleted
+        expect(result.lines).toEqual(['']);
         expect(result.cursorRow).toBe(0);
-        expect(result.cursorCol).toBe(2);
+        expect(result.cursorCol).toBe(0);
       });
     });
   });

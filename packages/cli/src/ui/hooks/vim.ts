@@ -44,6 +44,13 @@ const CMD_TYPES = {
     UP: 'ck',
     RIGHT: 'cl',
   },
+  DELETE_MOVEMENT: {
+    LEFT: 'dh',
+    DOWN: 'dj',
+    UP: 'dk',
+    RIGHT: 'dl',
+  },
+  DELETE_TO_SOL: 'd0',
 } as const;
 
 // Helper function to clear pending state
@@ -283,6 +290,28 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
           break;
         }
 
+        case CMD_TYPES.DELETE_TO_SOL: {
+          buffer.vimDeleteToStartOfLine();
+          break;
+        }
+
+        case CMD_TYPES.DELETE_MOVEMENT.LEFT:
+        case CMD_TYPES.DELETE_MOVEMENT.DOWN:
+        case CMD_TYPES.DELETE_MOVEMENT.UP:
+        case CMD_TYPES.DELETE_MOVEMENT.RIGHT: {
+          const movementMap: Record<string, 'h' | 'j' | 'k' | 'l'> = {
+            [CMD_TYPES.DELETE_MOVEMENT.LEFT]: 'h',
+            [CMD_TYPES.DELETE_MOVEMENT.DOWN]: 'j',
+            [CMD_TYPES.DELETE_MOVEMENT.UP]: 'k',
+            [CMD_TYPES.DELETE_MOVEMENT.RIGHT]: 'l',
+          };
+          const movementType = movementMap[cmdType];
+          if (movementType) {
+            buffer.vimChangeMovement(movementType, count);
+          }
+          break;
+        }
+
         case CMD_TYPES.CHANGE_TO_EOL: {
           buffer.vimChangeToEndOfLine();
           updateMode('INSERT');
@@ -412,6 +441,37 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
   );
 
   /**
+   * Handles delete movement commands (dh, dj, dk, dl)
+   * @param movement - The movement direction
+   * @returns boolean indicating if command was handled
+   */
+  const handleDeleteMovement = useCallback(
+    (movement: 'h' | 'j' | 'k' | 'l'): boolean => {
+      const count = getCurrentCount();
+      dispatch({ type: 'CLEAR_COUNT' });
+      // Note: vimChangeMovement performs the same deletion operation as what we need.
+      // The only difference between 'change' and 'delete' is that 'change' enters
+      // INSERT mode after deletion, which is handled here (we simply don't call updateMode).
+      buffer.vimChangeMovement(movement, count);
+
+      const cmdTypeMap = {
+        h: CMD_TYPES.DELETE_MOVEMENT.LEFT,
+        j: CMD_TYPES.DELETE_MOVEMENT.DOWN,
+        k: CMD_TYPES.DELETE_MOVEMENT.UP,
+        l: CMD_TYPES.DELETE_MOVEMENT.RIGHT,
+      };
+
+      dispatch({
+        type: 'SET_LAST_COMMAND',
+        command: { type: cmdTypeMap[movement], count },
+      });
+      dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
+      return true;
+    },
+    [getCurrentCount, dispatch, buffer],
+  );
+
+  /**
    * Handles operator-motion commands (dw/cw, db/cb, de/ce)
    * @param operator - The operator type ('d' for delete, 'c' for change)
    * @param motion - The motion type ('w', 'b', 'e')
@@ -518,7 +578,10 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
         switch (normalizedKey.sequence) {
           case 'h': {
-            // Check if this is part of a change command (ch)
+            // Check if this is part of a delete or change command (dh/ch)
+            if (state.pendingOperator === 'd') {
+              return handleDeleteMovement('h');
+            }
             if (state.pendingOperator === 'c') {
               return handleChangeMovement('h');
             }
@@ -530,7 +593,10 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
           }
 
           case 'j': {
-            // Check if this is part of a change command (cj)
+            // Check if this is part of a delete or change command (dj/cj)
+            if (state.pendingOperator === 'd') {
+              return handleDeleteMovement('j');
+            }
             if (state.pendingOperator === 'c') {
               return handleChangeMovement('j');
             }
@@ -542,7 +608,10 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
           }
 
           case 'k': {
-            // Check if this is part of a change command (ck)
+            // Check if this is part of a delete or change command (dk/ck)
+            if (state.pendingOperator === 'd') {
+              return handleDeleteMovement('k');
+            }
             if (state.pendingOperator === 'c') {
               return handleChangeMovement('k');
             }
@@ -554,7 +623,10 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
           }
 
           case 'l': {
-            // Check if this is part of a change command (cl)
+            // Check if this is part of a delete or change command (dl/cl)
+            if (state.pendingOperator === 'd') {
+              return handleDeleteMovement('l');
+            }
             if (state.pendingOperator === 'c') {
               return handleChangeMovement('l');
             }
@@ -699,6 +771,18 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
           }
 
           case '0': {
+            // Check if this is part of a delete command (d0)
+            if (state.pendingOperator === 'd') {
+              buffer.vimDeleteToStartOfLine();
+              dispatch({
+                type: 'SET_LAST_COMMAND',
+                command: { type: CMD_TYPES.DELETE_TO_SOL, count: 1 },
+              });
+              dispatch({ type: 'CLEAR_COUNT' });
+              dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
+              return true;
+            }
+
             // Move to start of line
             buffer.vimMoveToLineStart();
             dispatch({ type: 'CLEAR_COUNT' });
@@ -706,6 +790,18 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
           }
 
           case '$': {
+            // Check if this is part of a delete command (d$)
+            if (state.pendingOperator === 'd') {
+              buffer.vimDeleteToEndOfLine();
+              dispatch({
+                type: 'SET_LAST_COMMAND',
+                command: { type: CMD_TYPES.DELETE_TO_EOL, count: 1 },
+              });
+              dispatch({ type: 'CLEAR_COUNT' });
+              dispatch({ type: 'SET_PENDING_OPERATOR', operator: null });
+              return true;
+            }
+
             // Move to end of line (with count, move down count-1 lines first)
             if (repeatCount > 1) {
               buffer.vimMoveDown(repeatCount - 1);
@@ -852,6 +948,9 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
             // Check for arrow keys (they have different sequences but known names)
             if (normalizedKey.name === 'left') {
               // Left arrow - same as 'h'
+              if (state.pendingOperator === 'd') {
+                return handleDeleteMovement('h');
+              }
               if (state.pendingOperator === 'c') {
                 return handleChangeMovement('h');
               }
@@ -864,6 +963,9 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
             if (normalizedKey.name === 'down') {
               // Down arrow - same as 'j'
+              if (state.pendingOperator === 'd') {
+                return handleDeleteMovement('j');
+              }
               if (state.pendingOperator === 'c') {
                 return handleChangeMovement('j');
               }
@@ -876,6 +978,9 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
             if (normalizedKey.name === 'up') {
               // Up arrow - same as 'k'
+              if (state.pendingOperator === 'd') {
+                return handleDeleteMovement('k');
+              }
               if (state.pendingOperator === 'c') {
                 return handleChangeMovement('k');
               }
@@ -888,6 +993,9 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
             if (normalizedKey.name === 'right') {
               // Right arrow - same as 'l'
+              if (state.pendingOperator === 'd') {
+                return handleDeleteMovement('l');
+              }
               if (state.pendingOperator === 'c') {
                 return handleChangeMovement('l');
               }
@@ -920,6 +1028,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
       dispatch,
       getCurrentCount,
       handleChangeMovement,
+      handleDeleteMovement,
       handleOperatorMotion,
       buffer,
       executeCommand,

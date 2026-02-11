@@ -39,6 +39,7 @@ export type VimAction = Extract<
   | { type: 'vim_delete_line' }
   | { type: 'vim_change_line' }
   | { type: 'vim_delete_to_end_of_line' }
+  | { type: 'vim_delete_to_start_of_line' }
   | { type: 'vim_change_to_end_of_line' }
   | { type: 'vim_change_movement' }
   | { type: 'vim_move_left' }
@@ -402,6 +403,21 @@ export function handleVimAction(
       return state;
     }
 
+    case 'vim_delete_to_start_of_line': {
+      if (cursorCol > 0) {
+        const nextState = detachExpandedPaste(pushUndo(state));
+        return replaceRangeInternal(
+          nextState,
+          cursorRow,
+          0,
+          cursorRow,
+          cursorCol,
+          '',
+        );
+      }
+      return state;
+    }
+
     case 'vim_change_movement': {
       const { movement, count } = action.payload;
       const totalLines = lines.length;
@@ -422,8 +438,8 @@ export function handleVimAction(
         }
 
         case 'j': {
-          // Down
-          const linesToChange = Math.min(count, totalLines - cursorRow);
+          // Down - delete/change current line + count lines below
+          const linesToChange = Math.min(count + 1, totalLines - cursorRow);
           if (linesToChange > 0) {
             if (totalLines === 1) {
               const currentLine = state.lines[0] || '';
@@ -458,8 +474,8 @@ export function handleVimAction(
         }
 
         case 'k': {
-          // Up
-          const upLines = Math.min(count, cursorRow + 1);
+          // Up - delete/change current line + count lines above
+          const upLines = Math.min(count + 1, cursorRow + 1);
           if (upLines > 0) {
             if (state.lines.length === 1) {
               const currentLine = state.lines[0] || '';
@@ -472,7 +488,7 @@ export function handleVimAction(
                 '',
               );
             } else {
-              const startRow = Math.max(0, cursorRow - count + 1);
+              const startRow = Math.max(0, cursorRow - count);
               const linesToChange = cursorRow - startRow + 1;
               const nextState = detachExpandedPaste(pushUndo(state));
               const { startOffset, endOffset } = getLineRangeOffsets(
