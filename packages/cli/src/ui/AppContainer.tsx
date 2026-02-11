@@ -483,7 +483,7 @@ export const AppContainer = (props: AppContainerProps) => {
       );
       coreEvents.off(CoreEvent.AgentsDiscovered, handleAgentsDiscovered);
     };
-  }, []);
+  }, [settings]);
 
   const { consoleMessages, clearConsoleMessages: clearConsoleMessagesState } =
     useConsoleMessages();
@@ -596,7 +596,7 @@ export const AppContainer = (props: AppContainerProps) => {
   );
 
   // Poll for terminal background color changes to auto-switch theme
-  useTerminalTheme(handleThemeSelect, config);
+  useTerminalTheme(handleThemeSelect, config, refreshStatic);
 
   const {
     authState,

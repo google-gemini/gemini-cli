@@ -27,6 +27,16 @@ export class TerminalCapabilityManager {
   private static readonly DEVICE_ATTRIBUTES_QUERY = '\x1b[c';
   private static readonly MODIFY_OTHER_KEYS_QUERY = '\x1b[>4;?m';
 
+  /**
+   * Triggers a terminal background color query.
+   * @param stdout The stdout stream to write to.
+   */
+  static queryBackgroundColor(stdout: {
+    write: (data: string) => void | boolean;
+  }): void {
+    stdout.write(TerminalCapabilityManager.OSC_11_QUERY);
+  }
+
   // Kitty keyboard flags: CSI ? flags u
   // eslint-disable-next-line no-control-regex
   private static readonly KITTY_REGEX = /\x1b\[\?(\d+)u/;
@@ -39,7 +49,7 @@ export class TerminalCapabilityManager {
   // OSC 11 response: OSC 11 ; rgb:rrrr/gggg/bbbb ST (or BEL)
   static readonly OSC_11_REGEX =
     // eslint-disable-next-line no-control-regex
-    /\x1b\]11;rgb:([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})(\x1b\\|\x07)?/;
+    /\x1b\]11;rgb:([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})\/([0-9a-fA-F]{1,4})(\x1b\\|\x07)/;
   // modifyOtherKeys response: CSI > 4 ; level m
   // eslint-disable-next-line no-control-regex
   private static readonly MODIFY_OTHER_KEYS_REGEX = /\x1b\[>4;(\d+)m/;
