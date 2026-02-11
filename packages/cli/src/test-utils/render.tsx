@@ -10,7 +10,7 @@ import type React from 'react';
 import { vi } from 'vitest';
 import { act, useState } from 'react';
 import os from 'node:os';
-import { LoadedSettings } from '../config/settings.js';
+import type { LoadedSettings } from '../config/settings.js';
 import { KeypressProvider } from '../ui/contexts/KeypressContext.js';
 import { SettingsContext } from '../ui/contexts/SettingsContext.js';
 import { ShellFocusContext } from '../ui/contexts/ShellFocusContext.js';
@@ -130,14 +130,11 @@ const configProxy = new Proxy({} as Config, {
   },
 });
 
-export const mockSettings = new LoadedSettings(
-  { path: '', settings: {}, originalSettings: {} },
-  { path: '', settings: {}, originalSettings: {} },
-  { path: '', settings: {}, originalSettings: {} },
-  { path: '', settings: {}, originalSettings: {} },
-  true,
-  [],
-);
+export const mockSettings = createMockSettings({
+  ui: {
+    enableCompactToolOutput: false,
+  },
+});
 
 // A minimal mock UIState to satisfy the context provider.
 // Tests that need specific UIState values should provide their own.
