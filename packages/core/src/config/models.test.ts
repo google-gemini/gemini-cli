@@ -32,9 +32,9 @@ describe('isGemini3Model', () => {
     expect(isGemini3Model('gemini-3-flash-preview')).toBe(true);
   });
 
-  it('should return true for aliases that resolve to Gemini 3', () => {
-    expect(isGemini3Model(GEMINI_MODEL_ALIAS_AUTO)).toBe(true);
-    expect(isGemini3Model(GEMINI_MODEL_ALIAS_PRO)).toBe(true);
+  it('should return true for aliases that resolve to Gemini 3 when preview is enabled', () => {
+    expect(isGemini3Model(GEMINI_MODEL_ALIAS_AUTO, true)).toBe(true);
+    expect(isGemini3Model(GEMINI_MODEL_ALIAS_PRO, true)).toBe(true);
     expect(isGemini3Model(PREVIEW_GEMINI_MODEL_AUTO)).toBe(true);
   });
 
