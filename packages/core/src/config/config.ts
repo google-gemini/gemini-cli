@@ -478,6 +478,7 @@ export interface ConfigParameters {
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
   sessionLearnings?: boolean;
+  sessionLearningsOutputPath?: string;
   plan?: boolean;
   onModelChange?: (model: string) => void;
   mcpEnabled?: boolean;
@@ -664,6 +665,7 @@ export class Config {
   private readonly experimentalJitContext: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly sessionLearnings: boolean;
+  private readonly sessionLearningsOutputPath: string | undefined;
   private readonly planEnabled: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
@@ -753,6 +755,7 @@ export class Config {
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.sessionLearnings = params.sessionLearnings ?? false;
+    this.sessionLearningsOutputPath = params.sessionLearningsOutputPath;
     this.planEnabled = params.plan ?? false;
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
     this.skillsSupport = params.skillsSupport ?? true;
@@ -1958,6 +1961,10 @@ export class Config {
 
   isSessionLearningsEnabled(): boolean {
     return this.sessionLearnings;
+  }
+
+  getSessionLearningsOutputPath(): string | undefined {
+    return this.sessionLearningsOutputPath;
   }
 
   isPlanEnabled(): boolean {

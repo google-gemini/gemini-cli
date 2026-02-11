@@ -23,15 +23,30 @@ describe('SessionLearningsService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    mockGenerateContent = vi.fn().mockResolvedValue({
-      candidates: [
-        {
-          content: {
-            parts: [{ text: '# Session Learnings\nSummary text here.' }],
-          },
-        },
-      ],
-    } as unknown as GenerateContentResponse);
+    mockGenerateContent = vi.fn().mockImplementation((_params, promptId) => {
+      if (promptId === 'session-learnings-generation') {
+        return Promise.resolve({
+          candidates: [
+            {
+              content: {
+                parts: [{ text: '# Session Learnings\nSummary text here.' }],
+              },
+            },
+          ],
+        } as unknown as GenerateContentResponse);
+      } else if (promptId === 'session-summary-generation') {
+        return Promise.resolve({
+          candidates: [
+            {
+              content: {
+                parts: [{ text: 'Mock Session Title' }],
+              },
+            },
+          ],
+        } as unknown as GenerateContentResponse);
+      }
+      return Promise.reject(new Error(`Unexpected promptId: ${promptId}`));
+    });
 
     mockContentGenerator = {
       generateContent: mockGenerateContent,
@@ -52,6 +67,7 @@ describe('SessionLearningsService', () => {
 
     mockConfig = {
       isSessionLearningsEnabled: vi.fn().mockReturnValue(true),
+      getSessionLearningsOutputPath: vi.fn().mockReturnValue(undefined),
       getGeminiClient: () => mockGeminiClient,
       getContentGenerator: () => mockContentGenerator,
       getWorkingDir: () => '/mock/cwd',
@@ -78,25 +94,67 @@ describe('SessionLearningsService', () => {
     service = new SessionLearningsService(mockConfig as Config);
 
     vi.spyOn(fs, 'writeFile').mockResolvedValue(undefined);
+    vi.spyOn(fs, 'mkdir').mockResolvedValue(undefined as any);
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('should generate and save learnings when enabled and enough messages exist', async () => {
+  it('should generate and save learnings with descriptive filename', async () => {
+    const dateStr = new Date().toISOString().split('T')[0];
     await service.generateAndSaveLearnings();
 
-    expect(mockGenerateContent).toHaveBeenCalled();
+    expect(mockGenerateContent).toHaveBeenCalledTimes(2);
     expect(fs.writeFile).toHaveBeenCalledWith(
-      path.join('/mock/cwd', 'session-learnings.md'),
+      path.join('/mock/cwd', `learnings-Mock-Session-Title-${dateStr}.md`),
+      '# Session Learnings\nSummary text here.',
+      'utf-8',
+    );
+  });
+
+  it('should use custom output path if configured', async () => {
+    const dateStr = new Date().toISOString().split('T')[0];
+    (mockConfig as any).getSessionLearningsOutputPath.mockReturnValue(
+      'custom/path',
+    );
+
+    await service.generateAndSaveLearnings();
+
+    expect(fs.mkdir).toHaveBeenCalledWith(
+      path.join('/mock/cwd', 'custom/path'),
+      { recursive: true },
+    );
+    expect(fs.writeFile).toHaveBeenCalledWith(
+      path.join(
+        '/mock/cwd',
+        'custom/path',
+        `learnings-Mock-Session-Title-${dateStr}.md`,
+      ),
+      '# Session Learnings\nSummary text here.',
+      'utf-8',
+    );
+  });
+
+  it('should use absolute output path if configured', async () => {
+    const dateStr = new Date().toISOString().split('T')[0];
+    (mockConfig as any).getSessionLearningsOutputPath.mockReturnValue(
+      '/absolute/path',
+    );
+
+    await service.generateAndSaveLearnings();
+
+    expect(fs.mkdir).toHaveBeenCalledWith('/absolute/path', {
+      recursive: true,
+    });
+    expect(fs.writeFile).toHaveBeenCalledWith(
+      path.join('/absolute/path', `learnings-Mock-Session-Title-${dateStr}.md`),
       '# Session Learnings\nSummary text here.',
       'utf-8',
     );
   });
 
   it('should not generate learnings if disabled', async () => {
-     
     (mockConfig as any).isSessionLearningsEnabled.mockReturnValue(false);
 
     await service.generateAndSaveLearnings();
@@ -106,7 +164,6 @@ describe('SessionLearningsService', () => {
   });
 
   it('should not generate learnings if not enough messages', async () => {
-     
     mockRecordingService.getConversation.mockReturnValue({
       messages: [{ type: 'user', content: [{ text: 'Single message' }] }],
     });
