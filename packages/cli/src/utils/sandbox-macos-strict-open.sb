@@ -3,8 +3,43 @@
 ;; deny everything by default
 (deny default)
 
-;; allow reading files from anywhere on host
-(allow file-read*)
+;; allow reading ONLY from working directory, system paths, and essential user paths
+(allow file-read*
+    (literal "/")
+    (subpath (param "TARGET_DIR"))
+    (subpath (param "TMP_DIR"))
+    (subpath (param "CACHE_DIR"))
+    ;; Only allow reading essential dotfiles/directories under HOME, not the entire HOME
+    (subpath (string-append (param "HOME_DIR") "/.gemini"))
+    (subpath (string-append (param "HOME_DIR") "/.npm"))
+    (subpath (string-append (param "HOME_DIR") "/.cache"))
+    (literal (string-append (param "HOME_DIR") "/.gitconfig"))
+    (subpath (string-append (param "HOME_DIR") "/.nvm"))
+    (subpath (string-append (param "HOME_DIR") "/.fnm"))
+    (subpath (string-append (param "HOME_DIR") "/.node"))
+    (subpath (string-append (param "HOME_DIR") "/.config"))
+    ;; Allow reads from included directories
+    (subpath (param "INCLUDE_DIR_0"))
+    (subpath (param "INCLUDE_DIR_1"))
+    (subpath (param "INCLUDE_DIR_2"))
+    (subpath (param "INCLUDE_DIR_3"))
+    (subpath (param "INCLUDE_DIR_4"))
+    ;; System paths required for Node.js, shell, and common tools
+    (subpath "/usr")
+    (subpath "/bin")
+    (subpath "/sbin")
+    (subpath "/Library")
+    (subpath "/System")
+    (subpath "/private")
+    (subpath "/dev")
+    (subpath "/etc")
+    (subpath "/opt")
+    (subpath "/Applications")
+)
+
+;; allow path traversal everywhere (metadata only: stat/lstat, NOT readdir or file content)
+;; this is needed for Node.js module resolution to traverse intermediate directories
+(allow file-read-metadata)
 
 ;; allow exec/fork (children inherit policy)
 (allow process-exec)
@@ -91,3 +126,6 @@
 
 ;; allow inbound network traffic on debugger port
 (allow network-inbound (local ip "localhost:9229"))
+
+;; allow all outbound network traffic
+(allow network-outbound)
