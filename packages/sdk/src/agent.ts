@@ -14,18 +14,23 @@ import {
   type ServerGeminiStreamEvent,
   type GeminiClient,
   type Content,
+  type SkillDefinition,
+  loadSkillsFromDir,
+  ActivateSkillTool,
 } from '@google/gemini-cli-core';
 
 import { type Tool, SdkTool, type z } from './tool.js';
 import { SdkAgentFilesystem } from './fs.js';
 import { SdkAgentShell } from './shell.js';
 import type { SessionContext } from './types.js';
+import type { SkillReference } from './skills.js';
 
 export type SystemInstructions = string | ((context: SessionContext) => string);
 
 export interface GeminiCliAgentOptions {
   instructions: SystemInstructions;
   tools?: Array<Tool<z.ZodType>>;
+  skills?: SkillReference[];
   model?: string;
   cwd?: string;
   debug?: boolean;
@@ -36,12 +41,14 @@ export interface GeminiCliAgentOptions {
 export class GeminiCliAgent {
   private config: Config;
   private tools: Array<Tool<z.ZodType>>;
+  private skillRefs: SkillReference[];
   private instructions: SystemInstructions;
 
   constructor(options: GeminiCliAgentOptions) {
     this.instructions = options.instructions;
     const cwd = options.cwd || process.cwd();
     this.tools = options.tools || [];
+    this.skillRefs = options.skills || [];
 
     const initialMemory =
       typeof this.instructions === 'string' ? this.instructions : '';
@@ -59,6 +66,8 @@ export class GeminiCliAgent {
       extensionsEnabled: false,
       recordResponses: options.recordResponses,
       fakeResponses: options.fakeResponses,
+      skillsSupport: true,
+      adminSkillsEnabled: true,
     };
 
     this.config = new Config(configParams);
@@ -77,6 +86,45 @@ export class GeminiCliAgent {
 
       await this.config.refreshAuth(authType);
       await this.config.initialize();
+
+      // Load additional skills from options
+      if (this.skillRefs.length > 0) {
+        const skillManager = this.config.getSkillManager();
+        const loadedSkills: SkillDefinition[] = [];
+
+        for (const ref of this.skillRefs) {
+          try {
+            if (ref.type === 'dir' || ref.type === 'root') {
+              // loadSkillsFromDir handles both checking for SKILL.md in dir and */SKILL.md
+              const skills = await loadSkillsFromDir(ref.path);
+              loadedSkills.push(...skills);
+            }
+          } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error(`Failed to load skills from ${ref.path}:`, e);
+          }
+        }
+
+        if (loadedSkills.length > 0) {
+          skillManager.addSkills(loadedSkills);
+        }
+      }
+
+      // Re-register ActivateSkillTool if we have skills (either built-in/workspace or manually loaded)
+      // This is required because ActivateSkillTool captures the set of available skills at construction time.
+      const skillManager = this.config.getSkillManager();
+      if (skillManager.getSkills().length > 0) {
+        const registry = this.config.getToolRegistry();
+        const toolName = ActivateSkillTool.Name;
+        // Config.initialize already registers it, but we might have added more skills.
+        // Re-registering updates the schema with new skills.
+        if (registry.getTool(toolName)) {
+          registry.unregisterTool(toolName);
+        }
+        registry.registerTool(
+          new ActivateSkillTool(this.config, this.config.getMessageBus()),
+        );
+      }
 
       // Register tools now that registry exists
       const registry = this.config.getToolRegistry();
