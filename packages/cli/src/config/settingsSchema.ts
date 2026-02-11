@@ -341,6 +341,16 @@ const SETTINGS_SCHEMA = {
               'Automatically generate a session-learnings.md file when the session ends.',
             showInDialog: true,
           },
+          outputPath: {
+            type: 'string',
+            label: 'Output Path',
+            category: 'General',
+            requiresRestart: false,
+            default: undefined as string | undefined,
+            description:
+              'Directory where session-learnings files should be saved. Defaults to project root.',
+            showInDialog: true,
+          },
         },
       },
     },

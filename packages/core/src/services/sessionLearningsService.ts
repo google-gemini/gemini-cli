@@ -9,16 +9,14 @@ import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { partListUnionToString } from '../core/geminiRequest.js';
 import { getResponseText } from '../utils/partUtils.js';
+import { SessionSummaryService } from './sessionSummaryService.js';
+import { sanitizeFilenamePart } from '../utils/fileUtils.js';
 import type { Content } from '@google/genai';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
 const MIN_MESSAGES = 2;
-const MAX_MESSAGES_FOR_CONTEXT = 30;
-const MAX_MESSAGE_LENGTH = 1000;
-const TIMEOUT_MS = 30000;
-
-const LEARNINGS_FILENAME = 'session-learnings.md';
+const TIMEOUT_MS = 60000; // Increased timeout for potentially larger context
 
 const LEARNINGS_PROMPT = `It's time to pause on this development. Looking back at what you have done so far:
 Prepare a summary of the problem you were trying to solve, the analysis synthesized, and information you would need to implement this request if you were to start again
@@ -60,19 +58,12 @@ export class SessionLearningsService {
         return;
       }
 
-      // Prepare transcript
-      const relevantMessages = conversation.messages.slice(
-        -MAX_MESSAGES_FOR_CONTEXT,
-      );
-      const transcript = relevantMessages
+      // Prepare transcript (no max messages, no max length)
+      const transcript = conversation.messages
         .map((msg) => {
           const role = msg.type === 'user' ? 'User' : 'Assistant';
           const content = partListUnionToString(msg.content);
-          const truncated =
-            content.length > MAX_MESSAGE_LENGTH
-              ? content.slice(0, MAX_MESSAGE_LENGTH) + '...'
-              : content;
-          return `[${role}]: ${truncated}`;
+          return `[${role}]: ${content}`;
         })
         .join('\n\n');
 
@@ -105,19 +96,47 @@ export class SessionLearningsService {
           promptId: 'session-learnings-generation',
         });
 
-        const summary = getResponseText(response);
-        if (!summary) {
+        const summaryText = getResponseText(response);
+        if (!summaryText) {
           debugLogger.warn(
             '[SessionLearnings] Failed to generate summary (empty response)',
           );
           return;
         }
 
-        const filePath = path.join(
-          this.config.getWorkingDir(),
-          LEARNINGS_FILENAME,
-        );
-        await fs.writeFile(filePath, summary, 'utf-8');
+        // Generate descriptive filename
+        const summaryService = new SessionSummaryService(baseLlmClient);
+        const sessionTitle = await summaryService.generateSummary({
+          messages: conversation.messages,
+        });
+
+        const dateStr = new Date().toISOString().split('T')[0];
+        const sanitizedTitle = sessionTitle
+          ? sanitizeFilenamePart(sessionTitle.trim().replace(/\s+/g, '-'))
+          : 'untitled';
+
+        const fileName = `learnings-${sanitizedTitle}-${dateStr}.md`;
+
+        // Determine output directory
+        const configOutputPath = this.config.getSessionLearningsOutputPath();
+        let outputDir = this.config.getWorkingDir();
+
+        if (configOutputPath) {
+          if (path.isAbsolute(configOutputPath)) {
+            outputDir = configOutputPath;
+          } else {
+            outputDir = path.join(
+              this.config.getWorkingDir(),
+              configOutputPath,
+            );
+          }
+        }
+
+        // Ensure directory exists
+        await fs.mkdir(outputDir, { recursive: true });
+
+        const filePath = path.join(outputDir, fileName);
+        await fs.writeFile(filePath, summaryText, 'utf-8');
         debugLogger.log(
           `[SessionLearnings] Saved session learnings to ${filePath}`,
         );
