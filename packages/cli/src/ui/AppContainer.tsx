@@ -1525,6 +1525,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
             );
             await toggleDevToolsPanel(
               config,
+              showErrorDetails,
               () => setShowErrorDetails((prev) => !prev),
               () => setShowErrorDetails(true),
             );
@@ -1665,6 +1666,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       tabFocusTimeoutRef,
       showTransientMessage,
       settings.merged.general.devtools,
+      showErrorDetails,
     ],
   );
 
