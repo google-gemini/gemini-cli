@@ -44,6 +44,26 @@ exports[`TableRenderer > 'renders a table with only emojis and …' 1`] = `
 "
 `;
 
+exports[`TableRenderer > 'renders correctly when headers are em…' 1`] = `
+"
+┌────────┬────────┐
+│        │        │
+├────────┼────────┤
+│ Data 1 │ Data 2 │
+└────────┴────────┘
+"
+`;
+
+exports[`TableRenderer > 'renders correctly when there are more…' 1`] = `
+"
+┌──────────┬──────────┬──────────┐
+│ Header 1 │ Header 2 │ Header 3 │
+├──────────┼──────────┼──────────┤
+│ Data 1   │ Data 2   │          │
+└──────────┴──────────┴──────────┘
+"
+`;
+
 exports[`TableRenderer > handles wrapped bold headers without showing markers 1`] = `
 "
 ┌─────────────┬───────┬─────────┐
