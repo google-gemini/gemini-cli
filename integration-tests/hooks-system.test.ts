@@ -521,7 +521,7 @@ console.log(JSON.stringify({
       // 1. Initial setup to establish test directory
       rig.setup('BeforeToolSelection Hooks');
 
-      const toolConfigJson = JSON.stringify({
+      const toolConfigJson = {
         hookSpecificOutput: {
           hookEventName: 'BeforeToolSelection',
           toolConfig: {
@@ -529,10 +529,12 @@ console.log(JSON.stringify({
             allowedFunctionNames: ['read_file'],
           },
         },
-      });
+      };
 
-      // Use node -e to avoid file system and PTY overhead
-      const nodeCmd = `node -e "console.log(JSON.stringify(${toolConfigJson.replace(/"/g, '\\"')}))"`;
+      const scriptPath = rig.createScript(
+        'before_tool_selection_hook.cjs',
+        `console.log(JSON.stringify(${JSON.stringify(toolConfigJson)}));`,
+      );
 
       rig.setup('BeforeToolSelection Hooks', {
         fakeResponsesPath: join(
@@ -548,8 +550,8 @@ console.log(JSON.stringify({
                 hooks: [
                   {
                     type: 'command',
-                    command: nodeCmd,
-                    timeout: 15000,
+                    command: normalizePath(`node "${scriptPath}"`)!,
+                    timeout: 30000,
                   },
                 ],
               },
@@ -1770,18 +1772,18 @@ console.log(JSON.stringify({
       const enabledMsg = 'EXECUTION_ALLOWED_BY_HOOK_A';
       const disabledMsg = 'EXECUTION_BLOCKED_BY_HOOK_B';
 
-      const enabledJson = JSON.stringify({
-        decision: 'allow',
-        systemMessage: enabledMsg,
-      });
-      const disabledJson = JSON.stringify({
-        decision: 'block',
-        reason: disabledMsg,
-      });
+      const enabledPath = rig.createScript(
+        'enabled_hook.cjs',
+        `console.log(JSON.stringify({decision: "allow", systemMessage: "${enabledMsg}"}));`,
+      );
 
-      // Use node -e to avoid file system and PTY overhead
-      const enabledCmd = `node -e "console.log(JSON.stringify(${enabledJson.replace(/"/g, '\\"')}))"`;
-      const disabledCmd = `node -e "console.log(JSON.stringify(${disabledJson.replace(/"/g, '\\"')}))"`;
+      const disabledPath = rig.createScript(
+        'disabled_hook.cjs',
+        `console.log(JSON.stringify({decision: "block", reason: "${disabledMsg}"}));`,
+      );
+
+      const normalizedDisabledCmd = normalizePath(`node "${disabledPath}"`);
+      const normalizedEnabledCmd = normalizePath(`node "${enabledPath}"`);
 
       // 3. Final setup with full settings
       rig.setup('Hook Disabling', {
@@ -1791,20 +1793,20 @@ console.log(JSON.stringify({
         ),
         settings: {
           enableHooks: true,
-          disabledHooks: [disabledCmd],
+          disabledHooks: [normalizedDisabledCmd!],
           hooks: {
             BeforeTool: [
               {
                 hooks: [
                   {
                     type: 'command',
-                    command: enabledCmd,
-                    timeout: 15000,
+                    command: normalizedEnabledCmd!,
+                    timeout: 30000,
                   },
                   {
                     type: 'command',
-                    command: disabledCmd,
-                    timeout: 15000,
+                    command: normalizedDisabledCmd!,
+                    timeout: 30000,
                   },
                 ],
               },
@@ -1835,43 +1837,41 @@ console.log(JSON.stringify({
     });
 
     it.only('should respect disabled hooks across multiple operations', async () => {
-      // 1. Initial setup to establish test directory
       rig.setup('Hook Disabling');
 
       const activeMsg = 'MULTIPLE_OPS_ENABLED_HOOK';
       const disabledMsg = 'MULTIPLE_OPS_DISABLED_HOOK';
 
-      const activeJson = JSON.stringify({
-        decision: 'allow',
-        systemMessage: activeMsg,
-      });
-      const disabledJson = JSON.stringify({
-        decision: 'block',
-        reason: disabledMsg,
-      });
+      const activePath = rig.createScript(
+        'active_hook.cjs',
+        `console.log(JSON.stringify({decision: "allow", systemMessage: "${activeMsg}"}));`,
+      );
+      const disabledPath = rig.createScript(
+        'disabled_hook.cjs',
+        `console.log(JSON.stringify({decision: "block", reason: "${disabledMsg}"}));`,
+      );
 
-      // Use node -e to avoid file system and PTY overhead
-      const activeCmd = `node -e "console.log(JSON.stringify(${activeJson.replace(/"/g, '\\"')}))"`;
-      const disabledCmd = `node -e "console.log(JSON.stringify(${disabledJson.replace(/"/g, '\\"')}))"`;
+      const normalizedDisabledCmd = normalizePath(`node "${disabledPath}"`);
+      const normalizedActiveCmd = normalizePath(`node "${activePath}"`);
 
       // 3. Final setup with full settings
       rig.setup('Hook Disabling', {
         settings: {
           enableHooks: true,
-          disabledHooks: [disabledCmd],
+          disabledHooks: [normalizedDisabledCmd!],
           hooks: {
             BeforeTool: [
               {
                 hooks: [
                   {
                     type: 'command',
-                    command: activeCmd,
-                    timeout: 15000,
+                    command: normalizedActiveCmd!,
+                    timeout: 30000,
                   },
                   {
                     type: 'command',
-                    command: disabledCmd,
-                    timeout: 15000,
+                    command: normalizedDisabledCmd!,
+                    timeout: 30000,
                   },
                 ],
               },
