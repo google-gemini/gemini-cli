@@ -462,6 +462,15 @@ const SETTINGS_SCHEMA = {
         description: 'Hide helpful tips in the UI',
         showInDialog: true,
       },
+      showShortcutsHint: {
+        type: 'boolean',
+        label: 'Show Shortcuts Hint',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description: 'Show the "? for shortcuts" hint above the input.',
+        showInDialog: true,
+      },
       hideBanner: {
         type: 'boolean',
         label: 'Hide Banner',
@@ -1413,7 +1422,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description: 'Automatically configure Node.js memory limits',
-        showInDialog: false,
+        showInDialog: true,
       },
       dnsResolutionOrder: {
         type: 'string',
