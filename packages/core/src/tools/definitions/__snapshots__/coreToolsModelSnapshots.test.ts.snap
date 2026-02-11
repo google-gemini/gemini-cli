@@ -67,7 +67,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
         "type": "string",
       },
       "total_max_matches": {
-        "description": "Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 2000 if omitted.",
+        "description": "Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 100 if omitted.",
         "minimum": 1,
         "type": "integer",
       },
@@ -284,7 +284,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
         "type": "string",
       },
       "total_max_matches": {
-        "description": "Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 2000 if omitted.",
+        "description": "Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 100 if omitted.",
         "minimum": 1,
         "type": "integer",
       },

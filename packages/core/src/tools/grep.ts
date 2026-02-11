@@ -65,7 +65,7 @@ export interface GrepToolParams {
   max_matches_per_file?: number;
 
   /**
-   * Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 2000 if omitted.
+   * Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 100 if omitted.
    */
   total_max_matches?: number;
 }

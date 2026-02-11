@@ -148,7 +148,7 @@ export interface RipGrepToolParams {
   max_matches_per_file?: number;
 
   /**
-   * Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 2000 if omitted.
+   * Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 100 if omitted.
    */
   total_max_matches?: number;
 }
@@ -628,7 +628,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
           },
           total_max_matches: {
             description:
-              'Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 2000 if omitted.',
+              'Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 100 if omitted.',
             type: 'integer',
             minimum: 1,
           },

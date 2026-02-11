@@ -498,6 +498,7 @@ describe('GrepTool', () => {
       expect(result.llmContent).toContain('File: sub/fileC.txt');
       expect(result.llmContent).toContain('L1: another world in sub dir');
     });
+
     it('should return only file paths when names_only is true', async () => {
       const params: GrepToolParams = {
         pattern: 'world',
