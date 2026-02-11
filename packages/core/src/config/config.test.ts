@@ -2583,4 +2583,29 @@ describe('syncPlanModeTools', () => {
 
     expect(setToolsSpy).toHaveBeenCalled();
   });
+
+  describe('user hints', () => {
+    it('stores trimmed hints and exposes them via peek/consume', () => {
+      const config = new Config(baseParams);
+
+      config.addUserHint('  first hint  ');
+      config.addUserHint('second hint');
+      config.addUserHint('   ');
+
+      expect(config.peekUserHints()).toEqual(['first hint', 'second hint']);
+      expect(config.consumeUserHints()).toEqual(['first hint', 'second hint']);
+      expect(config.peekUserHints()).toEqual([]);
+    });
+
+    it('tracks the last hint timestamp', () => {
+      const config = new Config(baseParams);
+
+      expect(config.getLastUserHintAt()).toBeNull();
+      config.addUserHint('hint');
+
+      const timestamp = config.getLastUserHintAt();
+      expect(timestamp).not.toBeNull();
+      expect(typeof timestamp).toBe('number');
+    });
+  });
 });

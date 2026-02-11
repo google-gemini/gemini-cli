@@ -462,7 +462,14 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       const query = this.definition.promptConfig.query
         ? templateString(this.definition.promptConfig.query, augmentedInputs)
         : DEFAULT_QUERY_STRING;
-      let currentMessage: Content = { role: 'user', parts: [{ text: query }] };
+      const userHints = this.runtimeContext.peekUserHints();
+      const hintText = userHints.map((hint) => `- ${hint}`).join('\n');
+      let currentMessage: Content = hintText
+        ? {
+            role: 'user',
+            parts: [{ text: `User hints:\n${hintText}` }, { text: query }],
+          }
+        : { role: 'user', parts: [{ text: query }] };
 
       while (true) {
         // Check for termination conditions like max turns.

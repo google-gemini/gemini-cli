@@ -668,6 +668,8 @@ export class Config {
   private remoteAdminSettings: AdminControlsSettings | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
   private lastModeSwitchTime: number = Date.now();
+  private pendingUserHints: string[] = [];
+  private lastUserHintAt: number | null = null;
 
   private approvedPlanPath: string | undefined;
 
@@ -2484,6 +2486,29 @@ export class Config {
    */
   getHookSystem(): HookSystem | undefined {
     return this.hookSystem;
+  }
+
+  addUserHint(hint: string): void {
+    const trimmed = hint.trim();
+    if (trimmed.length === 0) {
+      return;
+    }
+    this.pendingUserHints.push(trimmed);
+    this.lastUserHintAt = Date.now();
+  }
+
+  peekUserHints(): string[] {
+    return [...this.pendingUserHints];
+  }
+
+  consumeUserHints(): string[] {
+    const hints = this.pendingUserHints;
+    this.pendingUserHints = [];
+    return hints;
+  }
+
+  getLastUserHintAt(): number | null {
+    return this.lastUserHintAt;
   }
 
   /**

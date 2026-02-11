@@ -8,6 +8,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   GeminiEventType as ServerGeminiEventType,
   getErrorMessage,
+  getResponseText,
   isNodeError,
   MessageSenderType,
   logUserPrompt,
@@ -47,7 +48,12 @@ import type {
   GeminiErrorEventValue,
   RetryAttemptPayload,
 } from '@google/gemini-cli-core';
-import { type Part, type PartListUnion, FinishReason } from '@google/genai';
+import {
+  type Content,
+  type Part,
+  type PartListUnion,
+  FinishReason,
+} from '@google/genai';
 import type {
   HistoryItem,
   HistoryItemThinking,
@@ -81,6 +87,7 @@ import path from 'node:path';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
 import type { LoadedSettings } from '../../config/settings.js';
+import { theme } from '../semantic-colors.js';
 
 type ToolResponseWithParts = ToolCallResponseInfo & {
   llmContent?: PartListUnion;
@@ -96,6 +103,102 @@ enum StreamProcessingStatus {
   Completed,
   UserCancelled,
   Error,
+}
+
+const USER_STEERING_INSTRUCTION =
+  'Internal instruction: Re-evaluate the active plan using this user steering update. ' +
+  'Classify it as ADD_TASK, MODIFY_TASK, CANCEL_TASK, or EXTRA_CONTEXT. ' +
+  'Apply minimal-diff changes only to affected tasks and keep unaffected tasks active. ' +
+  'Do not cancel/skip tasks unless the user explicitly cancels them. ' +
+  'Acknowledge the steering briefly and state the course correction.';
+
+export function buildUserSteeringHintPrompt(hintText: string): string {
+  const trimmedText = hintText.trim();
+  return `User steering update: "${trimmedText}"\n${USER_STEERING_INSTRUCTION}`;
+}
+
+const STEERING_ACK_INSTRUCTION =
+  'Write one short, friendly sentence acknowledging a user steering update for an in-progress task. ' +
+  'Be concrete when possible (e.g., mention skipped/cancelled item numbers). ' +
+  'Do not apologize, do not mention internal policy, and do not add extra steps.';
+const STEERING_ACK_TIMEOUT_MS = 1200;
+const STEERING_ACK_MAX_INPUT_CHARS = 320;
+const STEERING_ACK_MAX_OUTPUT_CHARS = 90;
+const STEERING_ACK_INPUT_TRUNCATION_SUFFIX = '\n...[truncated]';
+
+function buildSteeringFallbackMessage(hintText: string): string {
+  const normalized = hintText.replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return 'Understood. Adjusting the plan.';
+  }
+  if (normalized.length <= 64) {
+    return `Understood. ${normalized}`;
+  }
+  return `Understood. ${normalized.slice(0, 61)}...`;
+}
+
+export async function generateSteeringAckMessage(
+  geminiClient: GeminiClient,
+  hintText: string,
+): Promise<string> {
+  const truncateSteeringAckInput = (input: string): string => {
+    if (input.length <= STEERING_ACK_MAX_INPUT_CHARS) {
+      return input;
+    }
+    if (
+      STEERING_ACK_MAX_INPUT_CHARS <=
+      STEERING_ACK_INPUT_TRUNCATION_SUFFIX.length
+    ) {
+      return input.slice(0, STEERING_ACK_MAX_INPUT_CHARS);
+    }
+    return (
+      input.slice(
+        0,
+        STEERING_ACK_MAX_INPUT_CHARS -
+          STEERING_ACK_INPUT_TRUNCATION_SUFFIX.length,
+      ) + STEERING_ACK_INPUT_TRUNCATION_SUFFIX
+    );
+  };
+
+  const fallbackText = buildSteeringFallbackMessage(hintText);
+  const safeHint = truncateSteeringAckInput(
+    hintText.replace(/\s+/g, ' ').trim(),
+  );
+  const contents: Content[] = [
+    {
+      role: 'user',
+      parts: [
+        {
+          text: `${STEERING_ACK_INSTRUCTION}\n\nUser input:\n"""${safeHint}"""`,
+        },
+      ],
+    },
+  ];
+
+  const abortController = new AbortController();
+  const timeout = setTimeout(
+    () => abortController.abort(),
+    STEERING_ACK_TIMEOUT_MS,
+  );
+  try {
+    const response = await geminiClient.generateContent(
+      { model: 'flash-lite-helper' },
+      contents,
+      abortController.signal,
+    );
+    const responseText = getResponseText(response)?.replace(/\s+/g, ' ').trim();
+    if (!responseText) {
+      return fallbackText;
+    }
+    if (responseText.length > STEERING_ACK_MAX_OUTPUT_CHARS) {
+      return responseText.slice(0, STEERING_ACK_MAX_OUTPUT_CHARS).trimEnd();
+    }
+    return responseText;
+  } catch {
+    return fallbackText;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function isShellToolData(data: unknown): data is ShellToolData {
@@ -185,6 +288,7 @@ export const useGeminiStream = (
   terminalWidth: number,
   terminalHeight: number,
   isShellFocused?: boolean,
+  getUserHint?: () => string | null,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const [retryStatus, setRetryStatus] = useState<RetryAttemptPayload | null>(
@@ -1561,6 +1665,28 @@ export const useGeminiStream = (
       const responsesToSend: Part[] = geminiTools.flatMap(
         (toolCall) => toolCall.response.responseParts,
       );
+
+      if (getUserHint) {
+        const userHint = getUserHint();
+        if (userHint && userHint.trim().length > 0) {
+          const hintText = userHint.trim();
+          responsesToSend.unshift({
+            text: buildUserSteeringHintPrompt(hintText),
+          });
+          void generateSteeringAckMessage(geminiClient, hintText).then(
+            (ackText) => {
+              addItem({
+                type: 'info',
+                icon: '· ',
+                color: theme.text.secondary,
+                marginBottom: 1,
+                text: ackText,
+              } as Omit<HistoryItem, 'id'>);
+            },
+          );
+        }
+      }
+
       const callIdsToMarkAsSubmitted = geminiTools.map(
         (toolCall) => toolCall.request.callId,
       );
@@ -1593,6 +1719,7 @@ export const useGeminiStream = (
       modelSwitchedFromQuotaError,
       addItem,
       registerBackgroundShell,
+      getUserHint,
     ],
   );
 

@@ -88,7 +88,10 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
   override async shouldConfirmExecute(
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    const invocation = this.buildSubInvocation(this.definition, this.params);
+    const invocation = this.buildSubInvocation(
+      this.definition,
+      this.withUserHints(this.params),
+    );
     return invocation.shouldConfirmExecute(abortSignal);
   }
 
@@ -107,9 +110,34 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
       );
     }
 
-    const invocation = this.buildSubInvocation(this.definition, this.params);
+    const invocation = this.buildSubInvocation(
+      this.definition,
+      this.withUserHints(this.params),
+    );
 
     return invocation.execute(signal, updateOutput);
+  }
+
+  private withUserHints(agentArgs: AgentInputs): AgentInputs {
+    if (this.definition.kind !== 'remote') {
+      return agentArgs;
+    }
+
+    const userHints = this.config.peekUserHints();
+    if (userHints.length === 0) {
+      return agentArgs;
+    }
+
+    const hintText = userHints.map((hint) => `- ${hint}`).join('\n');
+    const query = agentArgs['query'];
+    if (typeof query !== 'string' || query.trim().length === 0) {
+      return agentArgs;
+    }
+
+    return {
+      ...agentArgs,
+      query: `User hints:\n${hintText}\n\n${query}`,
+    };
   }
 
   private buildSubInvocation(
