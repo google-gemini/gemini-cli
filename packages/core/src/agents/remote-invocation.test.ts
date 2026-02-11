@@ -321,6 +321,39 @@ describe('RemoteAgentInvocation', () => {
       expect(updateOutput).toHaveBeenCalledWith(' World');
     });
 
+    it('should abort when signal is aborted during streaming', async () => {
+      mockClientManager.getClient.mockReturnValue({});
+      const controller = new AbortController();
+      mockClientManager.sendMessageStream.mockImplementation(
+        async function* () {
+          yield {
+            kind: 'message',
+            messageId: 'msg-1',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Partial' }],
+          };
+          // Simulate abort between chunks
+          controller.abort();
+          yield {
+            kind: 'message',
+            messageId: 'msg-2',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Partial response continued' }],
+          };
+        },
+      );
+
+      const invocation = new RemoteAgentInvocation(
+        mockDefinition,
+        { query: 'hi' },
+        mockMessageBus,
+      );
+      const result = await invocation.execute(controller.signal);
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.message).toContain('Operation aborted');
+    });
+
     it('should handle errors gracefully', async () => {
       mockClientManager.getClient.mockReturnValue({});
       mockClientManager.sendMessageStream.mockImplementation(
@@ -379,6 +412,10 @@ describe('RemoteAgentInvocation', () => {
       mockClientManager.sendMessageStream.mockImplementation(
         async function* () {
           yield {
+            kind: 'status-update',
+            taskId: 'task-1',
+            contextId: 'ctx-1',
+            final: false,
             status: {
               state: 'working',
               message: {
@@ -410,6 +447,7 @@ describe('RemoteAgentInvocation', () => {
       );
 
       expect(updateOutput).toHaveBeenCalledWith('Thinking...');
+      expect(updateOutput).toHaveBeenCalledWith('\n');
       expect(updateOutput).toHaveBeenCalledWith('Final Answer');
       expect(result.returnDisplay).toBe('Final Answer');
     });

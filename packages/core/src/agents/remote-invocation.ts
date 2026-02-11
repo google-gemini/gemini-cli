@@ -164,6 +164,9 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
       let finalResponse: SendMessageResult | undefined;
 
       for await (const chunk of stream) {
+        if (_signal.aborted) {
+          throw new Error('Operation aborted');
+        }
         finalResponse = chunk;
         const currentText = extractAnyText(chunk);
 
@@ -171,6 +174,9 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
           if (updateOutput) {
             const delta = getDelta(currentText, lastText);
             if (delta) {
+              if (delta === currentText && lastText !== '') {
+                updateOutput('\n');
+              }
               updateOutput(delta);
             }
           }

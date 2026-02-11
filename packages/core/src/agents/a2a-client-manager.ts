@@ -155,7 +155,7 @@ export class A2AClientManager {
     try {
       yield* client.sendMessageStream(messageParams);
     } catch (error: unknown) {
-      const prefix = `A2AClient SendMessageStream Error [${agentName}]`;
+      const prefix = `[A2AClientManager] sendMessageStream Error [${agentName}]`;
       if (error instanceof Error) {
         throw new Error(`${prefix}: ${error.message}`, { cause: error });
       }

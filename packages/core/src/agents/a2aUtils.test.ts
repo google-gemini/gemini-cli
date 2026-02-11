@@ -20,6 +20,7 @@ import type {
   DataPart,
   FilePart,
   TaskStatusUpdateEvent,
+  TaskArtifactUpdateEvent,
 } from '@a2a-js/sdk';
 
 describe('a2aUtils', () => {
@@ -108,7 +109,10 @@ describe('a2aUtils', () => {
 
     it('should set clearTaskId true for terminal status update', () => {
       const update = {
+        kind: 'status-update',
         contextId: 'ctx-4',
+        taskId: 'task-4',
+        final: true,
         status: { state: 'failed' },
       };
 
@@ -116,7 +120,44 @@ describe('a2aUtils', () => {
         update as unknown as TaskStatusUpdateEvent,
       );
       expect(result.contextId).toBe('ctx-4');
+      expect(result.taskId).toBe('task-4');
       expect(result.clearTaskId).toBe(true);
+    });
+
+    it('should extract IDs from an artifact-update event', () => {
+      const update = {
+        kind: 'artifact-update',
+        taskId: 'task-5',
+        contextId: 'ctx-5',
+        artifact: {
+          artifactId: 'art-1',
+          parts: [{ kind: 'text', text: 'artifact content' }],
+        },
+      } as unknown as TaskArtifactUpdateEvent;
+
+      const result = extractIdsFromResponse(update);
+      expect(result).toEqual({
+        contextId: 'ctx-5',
+        taskId: 'task-5',
+        clearTaskId: false,
+      });
+    });
+
+    it('should extract taskId from status update event', () => {
+      const update = {
+        kind: 'status-update',
+        taskId: 'task-6',
+        contextId: 'ctx-6',
+        final: false,
+        status: { state: 'working' },
+      };
+
+      const result = extractIdsFromResponse(
+        update as unknown as TaskStatusUpdateEvent,
+      );
+      expect(result.taskId).toBe('task-6');
+      expect(result.contextId).toBe('ctx-6');
+      expect(result.clearTaskId).toBe(false);
     });
   });
 
@@ -150,7 +191,12 @@ describe('a2aUtils', () => {
 
     it('should extract text from status update event', () => {
       const update = {
+        kind: 'status-update',
+        taskId: 'task-1',
+        contextId: 'ctx-1',
+        final: false,
         status: {
+          state: 'working',
           message: {
             kind: 'message',
             role: 'agent',
@@ -162,6 +208,19 @@ describe('a2aUtils', () => {
       expect(extractAnyText(update as unknown as TaskStatusUpdateEvent)).toBe(
         'update',
       );
+    });
+
+    it('should extract text from artifact-update event', () => {
+      const update = {
+        kind: 'artifact-update',
+        taskId: 'task-1',
+        contextId: 'ctx-1',
+        artifact: {
+          artifactId: 'art-1',
+          parts: [{ kind: 'text', text: 'artifact content' } as TextPart],
+        },
+      } as unknown as TaskArtifactUpdateEvent;
+      expect(extractAnyText(update)).toBe('artifact content');
     });
   });
 

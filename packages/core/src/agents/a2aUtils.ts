@@ -11,7 +11,6 @@ import type {
   TextPart,
   DataPart,
   FilePart,
-  TaskStatusUpdateEvent,
 } from '@a2a-js/sdk';
 import type { SendMessageResult } from './a2a-client-manager.js';
 
@@ -150,24 +149,22 @@ export function extractIdsFromResponse(result: SendMessageResult): {
   let clearTaskId = false;
 
   if ('kind' in result) {
-    if (result.kind === 'message') {
+    const kind = result.kind;
+    if (kind === 'message' || kind === 'artifact-update') {
       taskId = result.taskId;
       contextId = result.contextId;
-    } else if (result.kind === 'task') {
+    } else if (kind === 'task') {
       taskId = result.id;
       contextId = result.contextId;
-
       if (isTerminalState(result.status?.state)) {
         clearTaskId = true;
       }
-    }
-  } else if ('status' in result) {
-    // TaskStatusUpdateEvent
-    const update = result as TaskStatusUpdateEvent;
-    contextId = update.contextId;
-
-    if (isTerminalState(update.status?.state)) {
-      clearTaskId = true;
+    } else if (kind === 'status-update') {
+      taskId = result.taskId;
+      contextId = result.contextId;
+      if (isTerminalState(result.status?.state)) {
+        clearTaskId = true;
+      }
     }
   }
 
@@ -179,20 +176,21 @@ export function extractIdsFromResponse(result: SendMessageResult): {
  */
 export function extractAnyText(result: SendMessageResult): string {
   if ('kind' in result) {
-    if (result.kind === 'message') {
+    const kind = result.kind;
+    if (kind === 'message') {
       return extractMessageText(result);
     }
-    if (result.kind === 'task') {
+    if (kind === 'task') {
       return extractTaskText(result);
+    }
+    if (kind === 'artifact-update' && 'artifact' in result) {
+      return extractPartsText(result.artifact.parts);
+    }
+    if (kind === 'status-update' && result.status?.message) {
+      return extractMessageText(result.status.message);
     }
   }
 
-  if ('status' in result && result.status?.message) {
-    // TaskStatusUpdateEvent
-    return extractMessageText(result.status.message);
-  }
-
-  // Fallback for Artifact updates or unknown types
   return '';
 }
 
