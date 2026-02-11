@@ -446,6 +446,143 @@ describe('OAuthUtils', () => {
       );
       expect(url1).toBe(url2);
     });
+
+    it('should strip query parameters for consistent comparison', () => {
+      const result = OAuthUtils.normalizeResourceUrlForComparison(
+        'https://example.com/api?foo=bar&baz=qux',
+      );
+      expect(result).toBe('https://example.com/api');
+    });
+
+    it('should strip fragments for consistent comparison', () => {
+      const result = OAuthUtils.normalizeResourceUrlForComparison(
+        'https://example.com/api#section',
+      );
+      expect(result).toBe('https://example.com/api');
+    });
+
+    it('should strip both query parameters and fragments', () => {
+      const result = OAuthUtils.normalizeResourceUrlForComparison(
+        'https://example.com/api?foo=bar#section',
+      );
+      expect(result).toBe('https://example.com/api');
+    });
+
+    it('should make URLs with and without query params compare equal', () => {
+      const withQuery = OAuthUtils.normalizeResourceUrlForComparison(
+        'https://example.com/api?foo=bar',
+      );
+      const withoutQuery = OAuthUtils.normalizeResourceUrlForComparison(
+        'https://example.com/api',
+      );
+      expect(withQuery).toBe(withoutQuery);
+      expect(withQuery).toBe('https://example.com/api');
+    });
+
+    it('should strip query parameters from root URLs', () => {
+      const result = OAuthUtils.normalizeResourceUrlForComparison(
+        'https://example.com/?foo=bar',
+      );
+      expect(result).toBe('https://example.com');
+    });
+  });
+
+  describe('discoverOAuthFromWWWAuthenticate - SSRF Protection', () => {
+    beforeEach(() => {
+      mockFetch.mockClear();
+    });
+
+    it('should reject metadata URLs with different origin (SSRF protection)', async () => {
+      const wwwAuthenticate =
+        'Bearer realm="example", resource_metadata="https://attacker.com/.well-known/oauth-protected-resource"';
+      const mcpServerUrl = 'https://legitimate-server.com';
+
+      await expect(
+        OAuthUtils.discoverOAuthFromWWWAuthenticate(
+          wwwAuthenticate,
+          mcpServerUrl,
+        ),
+      ).rejects.toThrow(
+        'Resource metadata origin https://attacker.com does not match expected origin https://legitimate-server.com',
+      );
+
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('should reject metadata URLs pointing to internal networks (SSRF protection)', async () => {
+      const wwwAuthenticate =
+        'Bearer realm="example", resource_metadata="http://localhost:8080/.well-known/oauth-protected-resource"';
+      const mcpServerUrl = 'https://legitimate-server.com';
+
+      await expect(
+        OAuthUtils.discoverOAuthFromWWWAuthenticate(
+          wwwAuthenticate,
+          mcpServerUrl,
+        ),
+      ).rejects.toThrow('Resource metadata origin');
+
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('should reject resource URLs with different origin in metadata (info disclosure protection)', async () => {
+      const wwwAuthenticate =
+        'Bearer realm="example", resource_metadata="https://legitimate-server.com/.well-known/oauth-protected-resource"';
+      const mcpServerUrl = 'https://legitimate-server.com';
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          resource: 'https://attacker.com',
+          authorization_servers: ['https://auth.example.com'],
+        }),
+      });
+
+      await expect(
+        OAuthUtils.discoverOAuthFromWWWAuthenticate(
+          wwwAuthenticate,
+          mcpServerUrl,
+        ),
+      ).rejects.toThrow('Protected resource origin');
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should allow same-origin metadata URLs', async () => {
+      const wwwAuthenticate =
+        'Bearer realm="example", resource_metadata="https://legitimate-server.com/.well-known/oauth-protected-resource"';
+      const mcpServerUrl = 'https://legitimate-server.com';
+
+      // Mock fetch for resource metadata
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          resource: 'https://legitimate-server.com',
+          authorization_servers: ['https://legitimate-server.com/auth'],
+        }),
+      });
+
+      // Mock fetch for authorization server metadata
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          issuer: 'https://legitimate-server.com/auth',
+          authorization_endpoint:
+            'https://legitimate-server.com/auth/authorize',
+          token_endpoint: 'https://legitimate-server.com/auth/token',
+        }),
+      });
+
+      const result = await OAuthUtils.discoverOAuthFromWWWAuthenticate(
+        wwwAuthenticate,
+        mcpServerUrl,
+      );
+
+      expect(result).toBeDefined();
+      expect(result?.authorizationUrl).toBe(
+        'https://legitimate-server.com/auth/authorize',
+      );
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('parseTokenExpiry', () => {
