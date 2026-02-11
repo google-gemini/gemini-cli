@@ -880,9 +880,11 @@ export class Config {
 
     // Initialize Safety Infrastructure
     const contextBuilder = new ContextBuilder(this);
-    const checkerRegistry = new CheckerRegistry(this.targetDir); // Using targetDir as dummy path for now
+    const checkersPath = this.targetDir;
+    // The checkersPath  is used to resolve external checkers. Since we do not have any external checkers currently, it is set to the targetDir.
+    const checkerRegistry = new CheckerRegistry(checkersPath);
     const checkerRunner = new CheckerRunner(contextBuilder, checkerRegistry, {
-      checkersPath: this.targetDir,
+      checkersPath,
       timeout: 30000, // 30 seconds to allow for LLM-based checkers
     });
     this.policyUpdateConfirmationRequest =

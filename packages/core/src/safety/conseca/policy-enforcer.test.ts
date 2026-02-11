@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { enforcePolicy } from './policy_enforcer.js';
+import { enforcePolicy } from './policy-enforcer.js';
 import type { Config } from '../../config/config.js';
 import type { ContentGenerator } from '../../core/contentGenerator.js';
 import { SafetyCheckDecision } from '../protocol.js';
@@ -91,12 +91,11 @@ describe('policy_enforcer', () => {
     expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
   });
 
-  it('should DENY if tool name is missing', async () => {
+  it('should ALLOW if tool name is missing with the reason and error as tool name is missing', async () => {
     const toolCall = { args: {} } as FunctionCall;
     const policy = {};
     const result = await enforcePolicy(policy, toolCall, mockConfig);
 
-    expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
     expect(result.decision).toBe(SafetyCheckDecision.ALLOW);
     expect(result.reason).toBe('Tool name is missing');
     if (result.decision === SafetyCheckDecision.ALLOW) {

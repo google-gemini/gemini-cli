@@ -13,8 +13,8 @@ import {
   logConsecaVerdict,
 } from '../../telemetry/index.js';
 import type { Config } from '../../config/config.js';
-import * as policyGenerator from './policy_generator.js';
-import * as policyEnforcer from './policy_enforcer.js';
+import * as policyGenerator from './policy-generator.js';
+import * as policyEnforcer from './policy-enforcer.js';
 
 vi.mock('../../telemetry/index.js', () => ({
   logConsecaPolicyGeneration: vi.fn(),
@@ -23,19 +23,19 @@ vi.mock('../../telemetry/index.js', () => ({
   ConsecaVerdictEvent: vi.fn(),
 }));
 
-vi.mock('./policy_generator.js');
-vi.mock('./policy_enforcer.js');
+vi.mock('./policy-generator.js');
+vi.mock('./policy-enforcer.js');
 
 describe('ConsecaSafetyChecker', () => {
   let checker: ConsecaSafetyChecker;
   let mockConfig: Config;
 
   beforeEach(() => {
-    // Reset instance for testing using direct instantiation
-    checker = new ConsecaSafetyChecker();
-    // Reset state (since it's a singleton, we need to be careful)
-    // We can't easily reset private state without a helper or recreating.
-    // For now, we rely on the fact that we can set a new prompt.
+    // Reset singleton instance to ensure clean state
+    ConsecaSafetyChecker.resetInstance();
+    // Get the fresh singleton instance
+    checker = ConsecaSafetyChecker.getInstance();
+
     mockConfig = {
       enableConseca: true,
       getToolRegistry: vi.fn().mockReturnValue({

@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { generatePolicy } from './policy_generator.js';
+import { generatePolicy } from './policy-generator.js';
 import { SafetyCheckDecision } from '../protocol.js';
 import type { Config } from '../../config/config.js';
 import type { ContentGenerator } from '../../core/contentGenerator.js';
