@@ -479,6 +479,8 @@ function isValidThemeName(name: string): boolean {
  * @param availableThemes A list of available themes to search through.
  * @param defaultDarkThemeName The name of the fallback dark theme.
  * @param defaultLightThemeName The name of the fallback light theme.
+ * @param preferredDarkThemeName The name of the user's preferred dark theme.
+ * @param preferredLightThemeName The name of the user's preferred light theme.
  * @returns The name of the chosen theme.
  */
 export function pickDefaultThemeName(
@@ -486,6 +488,8 @@ export function pickDefaultThemeName(
   availableThemes: readonly Theme[],
   defaultDarkThemeName: string,
   defaultLightThemeName: string,
+  preferredDarkThemeName?: string,
+  preferredLightThemeName?: string,
 ): string {
   if (terminalBackground) {
     const lowerTerminalBackground = terminalBackground.toLowerCase();
@@ -501,8 +505,20 @@ export function pickDefaultThemeName(
 
   const themeType = getThemeTypeFromBackgroundColor(terminalBackground);
   if (themeType === 'light') {
+    if (
+      preferredLightThemeName &&
+      availableThemes.some((t) => t.name === preferredLightThemeName)
+    ) {
+      return preferredLightThemeName;
+    }
     return defaultLightThemeName;
   }
 
+  if (
+    preferredDarkThemeName &&
+    availableThemes.some((t) => t.name === preferredDarkThemeName)
+  ) {
+    return preferredDarkThemeName;
+  }
   return defaultDarkThemeName;
 }

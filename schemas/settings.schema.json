@@ -192,6 +192,18 @@
           "default": 60,
           "type": "number"
         },
+        "preferredLightTheme": {
+          "title": "Preferred Light Theme",
+          "description": "The theme to use when the terminal background is light (auto-switching must be enabled).",
+          "markdownDescription": "The theme to use when the terminal background is light (auto-switching must be enabled).\n\n- Category: `UI`\n- Requires restart: `no`",
+          "type": "string"
+        },
+        "preferredDarkTheme": {
+          "title": "Preferred Dark Theme",
+          "description": "The theme to use when the terminal background is dark (auto-switching must be enabled).",
+          "markdownDescription": "The theme to use when the terminal background is dark (auto-switching must be enabled).\n\n- Category: `UI`\n- Requires restart: `no`",
+          "type": "string"
+        },
         "customThemes": {
           "title": "Custom Themes",
           "description": "Custom theme definitions.",

@@ -38,9 +38,13 @@ export function useTerminalTheme(
     }
 
     const pollIntervalId = setInterval(() => {
-      // Only poll if we are using one of the default themes
+      // Only poll if we are using one of the default themes OR one of the preferred themes
       const currentThemeName = settings.merged.ui.theme;
-      if (!themeManager.isDefaultTheme(currentThemeName)) {
+      const isPreferred =
+        currentThemeName === settings.merged.ui.preferredLightTheme ||
+        currentThemeName === settings.merged.ui.preferredDarkTheme;
+
+      if (!themeManager.isDefaultTheme(currentThemeName) && !isPreferred) {
         return;
       }
 
@@ -66,6 +70,9 @@ export function useTerminalTheme(
         luminance,
         DEFAULT_THEME.name,
         DefaultLight.name,
+        settings.merged.ui.preferredDarkTheme,
+        settings.merged.ui.preferredLightTheme,
+        themeManager.getAvailableThemes().map((t) => t.name),
       );
 
       if (newTheme) {
@@ -83,6 +90,8 @@ export function useTerminalTheme(
     settings.merged.ui.theme,
     settings.merged.ui.autoThemeSwitching,
     settings.merged.ui.terminalBackgroundPollingInterval,
+    settings.merged.ui.preferredLightTheme,
+    settings.merged.ui.preferredDarkTheme,
     stdout,
     config,
     handleThemeSelect,

@@ -186,6 +186,16 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Interval in seconds to poll the terminal background color.
   - **Default:** `60`
 
+- **`ui.preferredLightTheme`** (string):
+  - **Description:** The theme to use when the terminal background is light
+    (auto-switching must be enabled).
+  - **Default:** `undefined`
+
+- **`ui.preferredDarkTheme`** (string):
+  - **Description:** The theme to use when the terminal background is dark
+    (auto-switching must be enabled).
+  - **Default:** `undefined`
+
 - **`ui.customThemes`** (object):
   - **Description:** Custom theme definitions.
   - **Default:** `{}`

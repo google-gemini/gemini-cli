@@ -37,6 +37,8 @@ const mockSettings = {
       theme: 'default', // DEFAULT_THEME.name
       autoThemeSwitching: true,
       terminalBackgroundPollingInterval: 60,
+      preferredLightTheme: undefined as string | undefined,
+      preferredDarkTheme: undefined as string | undefined,
     },
   },
 };
@@ -52,6 +54,11 @@ vi.mock('../themes/theme-manager.js', async () => {
     themeManager: {
       isDefaultTheme: (name: string) =>
         name === 'default' || name === 'default-light',
+      getAvailableThemes: () => [
+        { name: 'default' },
+        { name: 'default-light' },
+        { name: 'my-light-theme' },
+      ],
     },
     DEFAULT_THEME: { name: 'default' },
   };
@@ -81,6 +88,8 @@ describe('useTerminalTheme', () => {
     // Reset any settings modifications
     mockSettings.merged.ui.autoThemeSwitching = true;
     mockSettings.merged.ui.theme = 'default';
+    mockSettings.merged.ui.preferredLightTheme = undefined;
+    mockSettings.merged.ui.preferredDarkTheme = undefined;
   });
 
   afterEach(() => {
@@ -131,6 +140,32 @@ describe('useTerminalTheme', () => {
       'default-light',
       expect.anything(),
     );
+  });
+
+  it('should switch to preferred light theme if set', () => {
+    mockSettings.merged.ui.preferredLightTheme = 'my-light-theme';
+
+    renderHook(() => useTerminalTheme(mockHandleThemeSelect, config));
+
+    const handler = mockSubscribe.mock.calls[0][0];
+
+    // Simulate light background response (white)
+    handler('rgb:ffff/ffff/ffff');
+
+    expect(mockHandleThemeSelect).toHaveBeenCalledWith(
+      'my-light-theme',
+      expect.anything(),
+    );
+  });
+
+  it('should poll if current theme is a preferred theme', () => {
+    mockSettings.merged.ui.preferredLightTheme = 'my-light-theme';
+    mockSettings.merged.ui.theme = 'my-light-theme'; // Current theme is preferred light
+
+    renderHook(() => useTerminalTheme(mockHandleThemeSelect, config));
+
+    vi.advanceTimersByTime(60000);
+    expect(mockWrite).toHaveBeenCalled(); // Should poll
   });
 
   it('should switch to dark theme when background is dark', () => {

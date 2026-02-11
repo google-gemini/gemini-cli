@@ -322,6 +322,9 @@ export const DARK_THEME_LUMINANCE_THRESHOLD = 110;
  * @param luminance The calculated relative luminance of the background (0-255)
  * @param defaultThemeName The name of the default (dark) theme
  * @param defaultLightThemeName The name of the default light theme
+ * @param preferredDarkThemeName The name of the user's preferred dark theme
+ * @param preferredLightThemeName The name of the user's preferred light theme
+ * @param availableThemeNames An optional list of valid theme names for validation
  * @returns The name of the theme to switch to, or undefined if no switch is needed.
  */
 export function shouldSwitchTheme(
@@ -329,18 +332,35 @@ export function shouldSwitchTheme(
   luminance: number,
   defaultThemeName: string,
   defaultLightThemeName: string,
+  preferredDarkThemeName?: string,
+  preferredLightThemeName?: string,
+  availableThemeNames?: readonly string[],
 ): string | undefined {
-  const isDefaultTheme =
-    currentThemeName === defaultThemeName || currentThemeName === undefined;
-  const isDefaultLightTheme = currentThemeName === defaultLightThemeName;
+  const targetLightTheme =
+    preferredLightThemeName &&
+    availableThemeNames?.includes(preferredLightThemeName)
+      ? preferredLightThemeName
+      : defaultLightThemeName;
 
-  if (luminance > LIGHT_THEME_LUMINANCE_THRESHOLD && isDefaultTheme) {
-    return defaultLightThemeName;
-  } else if (
-    luminance < DARK_THEME_LUMINANCE_THRESHOLD &&
-    isDefaultLightTheme
-  ) {
-    return defaultThemeName;
+  const targetDarkTheme =
+    preferredDarkThemeName &&
+    availableThemeNames?.includes(preferredDarkThemeName)
+      ? preferredDarkThemeName
+      : defaultThemeName;
+
+  const isDarkActive =
+    currentThemeName === defaultThemeName ||
+    currentThemeName === preferredDarkThemeName ||
+    currentThemeName === undefined;
+
+  const isLightActive =
+    currentThemeName === defaultLightThemeName ||
+    (preferredLightThemeName && currentThemeName === preferredLightThemeName);
+
+  if (luminance > LIGHT_THEME_LUMINANCE_THRESHOLD && isDarkActive) {
+    return targetLightTheme;
+  } else if (luminance < DARK_THEME_LUMINANCE_THRESHOLD && isLightActive) {
+    return targetDarkTheme;
   }
 
   return undefined;

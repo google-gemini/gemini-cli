@@ -388,6 +388,26 @@ const SETTINGS_SCHEMA = {
           'Interval in seconds to poll the terminal background color.',
         showInDialog: true,
       },
+      preferredLightTheme: {
+        type: 'string',
+        label: 'Preferred Light Theme',
+        category: 'UI',
+        requiresRestart: false,
+        default: undefined as string | undefined,
+        description:
+          'The theme to use when the terminal background is light (auto-switching must be enabled).',
+        showInDialog: true,
+      },
+      preferredDarkTheme: {
+        type: 'string',
+        label: 'Preferred Dark Theme',
+        category: 'UI',
+        requiresRestart: false,
+        default: undefined as string | undefined,
+        description:
+          'The theme to use when the terminal background is dark (auto-switching must be enabled).',
+        showInDialog: true,
+      },
       customThemes: {
         type: 'object',
         label: 'Custom Themes',
