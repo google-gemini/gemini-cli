@@ -18,6 +18,7 @@ import {
   findPrevBigWordAcrossLines,
   findWordEndInLine,
   findBigWordEndInLine,
+  findFirstNonWhitespace,
 } from './text-buffer.js';
 import { cpLen, toCodePoints } from '../../utils/textUtils.js';
 import { assumeExhaustive } from '@google/gemini-cli-core';
@@ -40,6 +41,10 @@ export type VimAction = Extract<
   | { type: 'vim_change_line' }
   | { type: 'vim_delete_to_end_of_line' }
   | { type: 'vim_change_to_end_of_line' }
+  | { type: 'vim_delete_to_line_start' }
+  | { type: 'vim_change_to_line_start' }
+  | { type: 'vim_delete_to_first_non_whitespace' }
+  | { type: 'vim_change_to_first_non_whitespace' }
   | { type: 'vim_change_movement' }
   | { type: 'vim_move_left' }
   | { type: 'vim_move_right' }
@@ -383,6 +388,51 @@ export function handleVimAction(
         endCol,
         '',
       );
+    }
+
+    case 'vim_delete_to_line_start':
+    case 'vim_change_to_line_start': {
+      if (cursorCol > 0) {
+        const nextState = detachExpandedPaste(pushUndo(state));
+        return replaceRangeInternal(
+          nextState,
+          cursorRow,
+          0,
+          cursorRow,
+          cursorCol,
+          '',
+        );
+      }
+      return state;
+    }
+
+    case 'vim_delete_to_first_non_whitespace':
+    case 'vim_change_to_first_non_whitespace': {
+      const currentLine = lines[cursorRow] || '';
+      let firstNonWhitespaceCol = findFirstNonWhitespace(currentLine);
+
+      // If line is all whitespace, firstNonWhitespaceCol equals line length.
+      // In this case, vim's d^ deletes up to the last character (exclusive of end of line, inclusive of start if forward).
+      // Effectively it targets the last character position.
+      if (firstNonWhitespaceCol === cpLen(currentLine)) {
+        firstNonWhitespaceCol = Math.max(0, cpLen(currentLine) - 1);
+      }
+
+      const startCol = Math.min(cursorCol, firstNonWhitespaceCol);
+      const endCol = Math.max(cursorCol, firstNonWhitespaceCol);
+
+      if (startCol !== endCol) {
+        const nextState = detachExpandedPaste(pushUndo(state));
+        return replaceRangeInternal(
+          nextState,
+          cursorRow,
+          startCol,
+          cursorRow,
+          endCol,
+          '',
+        );
+      }
+      return state;
     }
 
     case 'vim_delete_to_end_of_line':
@@ -865,13 +915,7 @@ export function handleVimAction(
     case 'vim_insert_at_line_start': {
       const { cursorRow, lines } = state;
       const currentLine = lines[cursorRow] || '';
-      let col = 0;
-
-      // Find first non-whitespace character using proper Unicode handling
-      const lineCodePoints = toCodePoints(currentLine);
-      while (col < lineCodePoints.length && /\s/.test(lineCodePoints[col])) {
-        col++;
-      }
+      const col = findFirstNonWhitespace(currentLine);
 
       return {
         ...state,
@@ -902,13 +946,7 @@ export function handleVimAction(
     case 'vim_move_to_first_nonwhitespace': {
       const { cursorRow, lines } = state;
       const currentLine = lines[cursorRow] || '';
-      let col = 0;
-
-      // Find first non-whitespace character using proper Unicode handling
-      const lineCodePoints = toCodePoints(currentLine);
-      while (col < lineCodePoints.length && /\s/.test(lineCodePoints[col])) {
-        col++;
-      }
+      const col = findFirstNonWhitespace(currentLine);
 
       return {
         ...state,

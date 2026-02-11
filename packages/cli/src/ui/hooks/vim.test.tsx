@@ -191,6 +191,10 @@ describe('useVim hook', () => {
           cursorState.pos = [row, col - 1];
         }
       }),
+      vimDeleteToLineStart: vi.fn(),
+      vimChangeToLineStart: vi.fn(),
+      vimDeleteToFirstNonWhitespace: vi.fn(),
+      vimChangeToFirstNonWhitespace: vi.fn(),
       // Additional properties for transformations
       transformedToLogicalMaps: lines.map(() => []),
       visualToTransformedMap: [],
@@ -944,6 +948,106 @@ describe('useVim hook', () => {
       });
 
       expect(testBuffer.vimMoveWordForward).toHaveBeenCalledWith(3);
+    });
+  });
+
+  describe('Line Boundary Operations', () => {
+    it('should handle d0 (delete to line start)', () => {
+      const testBuffer = createMockBuffer('hello world', [0, 5]);
+      const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
+
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'd' }));
+      });
+      act(() => {
+        result.current.handleInput(createKey({ sequence: '0' }));
+      });
+
+      // We expect vimDeleteToLineStart to be called.
+      // Since it's a mock, it won't actually modify the buffer unless we implement logic.
+      // But we just want to verify the hook dispatches to it.
+      expect(testBuffer.vimDeleteToLineStart).toHaveBeenCalled();
+    });
+
+    it('should handle c0 (change to line start)', () => {
+      const testBuffer = createMockBuffer('hello world', [0, 5]);
+      const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
+
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'c' }));
+      });
+      act(() => {
+        result.current.handleInput(createKey({ sequence: '0' }));
+      });
+
+      expect(testBuffer.vimChangeToLineStart).toHaveBeenCalled();
+      expect(result.current.mode).toBe('INSERT');
+    });
+
+    it('should handle d^ (delete to first non-whitespace)', () => {
+      const testBuffer = createMockBuffer('   hello world', [0, 5]);
+      const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
+
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'd' }));
+      });
+      act(() => {
+        result.current.handleInput(createKey({ sequence: '^' }));
+      });
+
+      expect(testBuffer.vimDeleteToFirstNonWhitespace).toHaveBeenCalled();
+    });
+
+    it('should handle c^ (change to first non-whitespace)', () => {
+      const testBuffer = createMockBuffer('   hello world', [0, 5]);
+      const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
+
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'c' }));
+      });
+      act(() => {
+        result.current.handleInput(createKey({ sequence: '^' }));
+      });
+
+      expect(testBuffer.vimChangeToFirstNonWhitespace).toHaveBeenCalled();
+      expect(result.current.mode).toBe('INSERT');
+    });
+
+    it('should handle d$ (delete to line end)', () => {
+      const testBuffer = createMockBuffer('hello world', [0, 0]);
+      const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
+
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'd' }));
+      });
+      act(() => {
+        result.current.handleInput(createKey({ sequence: '$' }));
+      });
+
+      // Should call vimDeleteToEndOfLine (same as D)
+      expect(testBuffer.vimDeleteToEndOfLine).toHaveBeenCalled();
+    });
+
+    it('should handle c$ (change to line end)', () => {
+      const testBuffer = createMockBuffer('hello world', [0, 0]);
+      const { result } = renderVimHook(testBuffer);
+      exitInsertMode(result);
+
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'c' }));
+      });
+      act(() => {
+        result.current.handleInput(createKey({ sequence: '$' }));
+      });
+
+      // Should call vimChangeToEndOfLine (same as C)
+      expect(testBuffer.vimChangeToEndOfLine).toHaveBeenCalled();
+      expect(result.current.mode).toBe('INSERT');
     });
   });
 
