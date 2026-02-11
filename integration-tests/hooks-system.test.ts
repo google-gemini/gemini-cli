@@ -517,7 +517,7 @@ console.log(JSON.stringify({
   });
 
   describe('BeforeToolSelection Hooks - Tool Configuration', () => {
-    it.only('should modify tool selection with BeforeToolSelection hooks', async () => {
+    it('should modify tool selection with BeforeToolSelection hooks', async () => {
       // Create a hook script before setup
       const scriptPath = rig.createScript(
         'before_tool_selection_hook.cjs',
@@ -1760,7 +1760,7 @@ console.log(JSON.stringify({
   });
 
   describe('Hook Disabling', () => {
-    it.only('should not execute hooks disabled in settings file', async () => {
+    it('should not execute hooks disabled in settings file', async () => {
       // Create scripts before setup
       const enabledPath = rig.createScript(
         'enabled_hook.cjs',
@@ -1825,7 +1825,7 @@ console.log(JSON.stringify({
       expect(disabledHookLog).toBeUndefined();
     });
 
-    it.only('should respect disabled hooks across multiple operations', async () => {
+    it('should respect disabled hooks across multiple operations', async () => {
       // Create scripts before setup
       const activePath = rig.createScript(
         'active_hook.cjs',
@@ -1899,12 +1899,6 @@ console.log(JSON.stringify({
         (log) => log.hookCall.hook_name === normalizedDisabledCmd,
       );
       expect(disabledHookLog2).toBeUndefined();
-    });
-      const disabledHookCalls = hookLogs2.filter(
-        (log) =>
-          log.hookCall.hook_name === normalizePath(`node "${disabledPath}"`),
-      );
-      expect(disabledHookCalls.length).toBe(0);
     });
   });
 
@@ -2062,4 +2056,3 @@ console.log(JSON.stringify({
     });
   });
 });
-// trigger
