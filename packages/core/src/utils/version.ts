@@ -11,7 +11,20 @@ import path from 'node:path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export async function getVersion(): Promise<string> {
-  const pkgJson = await getPackageJson(__dirname);
-  return process.env['CLI_VERSION'] || pkgJson?.version || 'unknown';
+let versionPromise: Promise<string> | undefined;
+
+export function getVersion(): Promise<string> {
+  if (versionPromise) {
+    return versionPromise;
+  }
+  versionPromise = (async () => {
+    const pkgJson = await getPackageJson(__dirname);
+    return process.env['CLI_VERSION'] || pkgJson?.version || 'unknown';
+  })();
+  return versionPromise;
+}
+
+/** For testing purposes only */
+export function resetVersionCache(): void {
+  versionPromise = undefined;
 }
