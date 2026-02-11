@@ -1743,6 +1743,40 @@ describe('mcp-client', () => {
       expect(callArgs.env!['GEMINI_CLI_EXT_VAR']).toBeUndefined();
     });
 
+    it('should expand environment variables in mcpServerConfig.env and not redact them', async () => {
+      const mockedTransport = vi
+        .spyOn(SdkClientStdioLib, 'StdioClientTransport')
+        .mockReturnValue({} as SdkClientStdioLib.StdioClientTransport);
+
+      const originalEnv = process.env;
+      process.env = {
+        ...originalEnv,
+        GEMINI_TEST_VAR: 'expanded-value',
+      };
+
+      try {
+        await createTransport(
+          'test-server',
+          {
+            command: 'test-command',
+            env: {
+              TEST_EXPANDED: 'Value is $GEMINI_TEST_VAR',
+              SECRET_KEY: 'intentional-secret-123',
+            },
+          },
+          false,
+          EMPTY_CONFIG,
+        );
+
+        const callArgs = mockedTransport.mock.calls[0][0];
+        expect(callArgs.env).toBeDefined();
+        expect(callArgs.env!['TEST_EXPANDED']).toBe('Value is expanded-value');
+        expect(callArgs.env!['SECRET_KEY']).toBe('intentional-secret-123');
+      } finally {
+        process.env = originalEnv;
+      }
+    });
+
     describe('useGoogleCredentialProvider', () => {
       beforeEach(() => {
         // Mock GoogleAuth client
