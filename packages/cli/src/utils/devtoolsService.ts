@@ -210,6 +210,35 @@ async function startDevToolsServerImpl(config: Config): Promise<string> {
   return url;
 }
 
+/**
+ * Handles the F12 key toggle for the DevTools panel.
+ * Starts the DevTools server, attempts to open the browser,
+ * and always calls the toggle callback regardless of the outcome.
+ */
+export async function toggleDevToolsPanel(
+  config: Config,
+  toggle: () => void,
+  setOpen: () => void,
+): Promise<void> {
+  try {
+    const { openBrowserSecurely, shouldLaunchBrowser } = await import(
+      '@google/gemini-cli-core'
+    );
+    const url = await startDevToolsServer(config);
+    if (shouldLaunchBrowser()) {
+      try {
+        await openBrowserSecurely(url);
+      } catch (e) {
+        debugLogger.warn('Failed to open browser securely:', e);
+      }
+    }
+    toggle();
+  } catch (e) {
+    setOpen();
+    debugLogger.error('Failed to start DevTools server:', e);
+  }
+}
+
 /** Reset module-level state — test only. */
 export function resetForTesting() {
   promotionAttempts = 0;

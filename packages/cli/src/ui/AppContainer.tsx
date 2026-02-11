@@ -1520,28 +1520,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
       if (keyMatchers[Command.SHOW_ERROR_DETAILS](key)) {
         if (settings.merged.general.devtools) {
           void (async () => {
-            try {
-              const { startDevToolsServer } = await import(
-                '../utils/devtoolsService.js'
-              );
-              const { openBrowserSecurely, shouldLaunchBrowser } = await import(
-                '@google/gemini-cli-core'
-              );
-              const url = await startDevToolsServer(config);
-              if (shouldLaunchBrowser()) {
-                try {
-                  await openBrowserSecurely(url);
-                } catch (e) {
-                  setShowErrorDetails((prev) => !prev);
-                  debugLogger.warn('Failed to open browser securely:', e);
-                }
-              } else {
-                setShowErrorDetails((prev) => !prev);
-              }
-            } catch (e) {
-              setShowErrorDetails(true);
-              debugLogger.error('Failed to start DevTools server:', e);
-            }
+            const { toggleDevToolsPanel } = await import(
+              '../utils/devtoolsService.js'
+            );
+            await toggleDevToolsPanel(
+              config,
+              () => setShowErrorDetails((prev) => !prev),
+              () => setShowErrorDetails(true),
+            );
           })();
         } else {
           setShowErrorDetails((prev) => !prev);
