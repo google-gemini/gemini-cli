@@ -536,10 +536,8 @@ their corresponding top-level category object in your `settings.json` file.
         "modelConfig": {}
       },
       "loop-detection": {
-        "extends": "base",
-        "modelConfig": {
-          "model": "gemini-3-flash-preview"
-        }
+        "extends": "gemini-3-flash-base",
+        "modelConfig": {}
       },
       "loop-detection-double-check": {
         "extends": "base",

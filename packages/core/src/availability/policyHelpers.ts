@@ -24,6 +24,7 @@ import {
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
   isAutoModel,
+  isGemini3Model,
   resolveModel,
 } from '../config/models.js';
 import type { ModelSelectionResult } from './modelAvailabilityService.js';
@@ -51,13 +52,13 @@ export function resolvePolicyChain(
   if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
     chain = getFlashLitePolicyChain();
   } else if (
-    resolvedModel.startsWith('gemini-3-') ||
+    isGemini3Model(resolvedModel) ||
     isAutoPreferred ||
     isAutoConfigured
   ) {
     if (hasAccessToPreview) {
       const previewEnabled =
-        resolvedModel.startsWith('gemini-3-') ||
+        isGemini3Model(resolvedModel) ||
         preferredModel === PREVIEW_GEMINI_MODEL_AUTO ||
         configuredModel === PREVIEW_GEMINI_MODEL_AUTO;
       chain = getModelPolicyChain({
