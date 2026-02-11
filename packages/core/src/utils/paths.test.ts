@@ -7,6 +7,9 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import * as fs from 'node:fs';
 import path from 'node:path';
+import * as os from 'node:os';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 import { pathToFileURL } from 'node:url';
 import {
   escapePath,
@@ -536,5 +539,72 @@ describe('resolveToRealPath', () => {
     const expected = p;
 
     expect(resolveToRealPath(input)).toBe(expected);
+  });
+});
+
+const execAsync = promisify(exec);
+
+describe('Path escaping ground truth', () => {
+  let tempDir: string;
+
+  beforeAll(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-path-test-'));
+  });
+
+  afterAll(() => {
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch (_) {
+      // Ignore cleanup errors
+    }
+  });
+
+  it.each([
+    'simple.txt',
+    'space name.txt',
+    'with-dash.txt',
+    'with_underscore.txt',
+    'with.dot.txt',
+    'with(parens).txt',
+    'with[brackets].txt',
+    'with{braces}.txt',
+    'with~tilde.txt',
+    'with+plus.txt',
+    'with@at.txt',
+    'semi;colon.txt',
+    'dollar$sign.txt',
+    "single'quote.txt",
+    'double"quote.txt',
+    'ampersand&sign.txt',
+    'hash#tag.txt',
+    'percent%sign.txt',
+    'pipe|char.txt',
+    'star*.txt',
+    'question?.txt',
+    'exclamation!.txt',
+    'backtick`name.txt',
+    'greater>than.txt',
+    'less<than.txt',
+    'carriage\rreturn.txt',
+  ])('should escape %j correctly if the OS supports it', async (filename) => {
+    const filePath = path.join(tempDir, filename);
+    const content = `Content of ${JSON.stringify(filename)}`;
+
+    try {
+      fs.writeFileSync(filePath, content);
+    } catch (_) {
+      // Skip this test case if the filename is not supported by the OS
+      return;
+    }
+
+    const escapedPath = escapePath(filePath);
+
+    const cmd =
+      process.platform === 'win32'
+        ? `type ${escapedPath}`
+        : `cat ${escapedPath}`;
+
+    const { stdout } = await execAsync(cmd);
+    expect(stdout.trim()).toBe(content);
   });
 });
