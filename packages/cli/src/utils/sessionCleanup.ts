@@ -59,6 +59,22 @@ export async function cleanupExpiredSessions(
     }
 
     const retentionConfig = settings.general.sessionRetention;
+
+    // Honor retention enforcement date
+    if (retentionConfig.retentionEnforcementDate) {
+      const enforcementDate = new Date(
+        retentionConfig.retentionEnforcementDate,
+      );
+      if (new Date() < enforcementDate) {
+        if (config.getDebugMode()) {
+          debugLogger.debug(
+            `Session cleanup deferred until ${enforcementDate.toISOString()}`,
+          );
+        }
+        return { ...result, disabled: true };
+      }
+    }
+
     const chatsDir = path.join(config.storage.getProjectTempDir(), 'chats');
 
     // Validate retention configuration
@@ -364,6 +380,22 @@ export async function cleanupToolOutputFiles(
     }
 
     const retentionConfig = settings.general.sessionRetention;
+
+    // Honor retention enforcement date
+    if (retentionConfig.retentionEnforcementDate) {
+      const enforcementDate = new Date(
+        retentionConfig.retentionEnforcementDate,
+      );
+      if (new Date() < enforcementDate) {
+        if (debugMode) {
+          debugLogger.debug(
+            `Tool output cleanup deferred until ${enforcementDate.toISOString()}`,
+          );
+        }
+        return { ...result, disabled: true };
+      }
+    }
+
     let tempDir = projectTempDir;
     if (!tempDir) {
       const storage = new Storage(process.cwd());

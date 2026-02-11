@@ -34,6 +34,10 @@ import { AdminSettingsChangedDialog } from './AdminSettingsChangedDialog.js';
 import { IdeTrustChangeDialog } from './IdeTrustChangeDialog.js';
 import { NewAgentsNotification } from './NewAgentsNotification.js';
 import { AgentConfigDialog } from './AgentConfigDialog.js';
+import { SessionRetentionWarningDialog } from './SessionRetentionWarningDialog.js';
+import { useSessionRetentionCheck } from '../../hooks/useSessionRetentionCheck.js';
+import { useCallback } from 'react';
+import { SettingScope } from '../../config/settings.js';
 
 interface DialogManagerProps {
   addItem: UseHistoryManagerReturn['addItem'];
@@ -56,6 +60,42 @@ export const DialogManager = ({
     staticExtraHeight,
     terminalWidth: uiTerminalWidth,
   } = uiState;
+
+  const { shouldShowWarning, checkComplete: retentionCheckComplete } =
+    useSessionRetentionCheck(config, settings.merged);
+
+  const handleCleanUpNow = useCallback(() => {
+    settings.setValue(
+      SettingScope.User,
+      'general.sessionRetention.warningAcknowledged',
+      true,
+    );
+  }, [settings]);
+
+  const handleCleanUpIn30Days = useCallback(() => {
+    const in30Days = new Date();
+    in30Days.setDate(in30Days.getDate() + 30);
+
+    settings.setValue(
+      SettingScope.User,
+      'general.sessionRetention.warningAcknowledged',
+      true,
+    );
+    settings.setValue(
+      SettingScope.User,
+      'general.sessionRetention.retentionEnforcementDate',
+      in30Days.toISOString(),
+    );
+  }, [settings]);
+
+  if (shouldShowWarning && retentionCheckComplete) {
+    return (
+      <SessionRetentionWarningDialog
+        onCleanUpNow={handleCleanUpNow}
+        onCleanUpIn30Days={handleCleanUpIn30Days}
+      />
+    );
+  }
 
   if (uiState.adminSettingsChanged) {
     return <AdminSettingsChangedDialog />;

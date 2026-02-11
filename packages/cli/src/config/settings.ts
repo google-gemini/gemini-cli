@@ -181,6 +181,12 @@ export interface SessionRetentionSettings {
 
   /** Minimum retention period (safety limit, defaults to "1d") */
   minRetention?: string;
+
+  /** INTERNAL: Whether the user has acknowledged the session retention warning */
+  warningAcknowledged?: boolean;
+
+  /** INTERNAL: Date when session retention enforcement begins (ISO string) */
+  retentionEnforcementDate?: string;
 }
 
 export interface SettingsError {
