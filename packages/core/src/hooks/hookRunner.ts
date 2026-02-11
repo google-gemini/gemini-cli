@@ -370,28 +370,25 @@ export class HookRunner {
 
         // Parse output
         let output: HookOutput | undefined;
-        if (exitCode === EXIT_CODE_SUCCESS && stdout.trim()) {
+
+        const textToParse = stdout.trim() || stderr.trim();
+        if (textToParse) {
           try {
-            let parsed = JSON.parse(stdout.trim());
+            let parsed = JSON.parse(textToParse);
             if (typeof parsed === 'string') {
-              // If the output is a string, parse it in case
-              // it's double-encoded JSON string.
               parsed = JSON.parse(parsed);
             }
-            if (parsed) {
+            if (parsed && typeof parsed === 'object') {
               // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               output = parsed as HookOutput;
             }
           } catch {
             // Not JSON, convert plain text to structured output
-            output = this.convertPlainTextToHookOutput(stdout.trim(), exitCode);
+            output = this.convertPlainTextToHookOutput(
+              textToParse,
+              exitCode || EXIT_CODE_SUCCESS,
+            );
           }
-        } else if (exitCode !== EXIT_CODE_SUCCESS && stderr.trim()) {
-          // Convert error output to structured format
-          output = this.convertPlainTextToHookOutput(
-            stderr.trim(),
-            exitCode || EXIT_CODE_NON_BLOCKING_ERROR,
-          );
         }
 
         resolve({
