@@ -177,6 +177,7 @@ describe('Scheduler (Orchestrator)', () => {
       setOutcome: vi.fn(),
       cancelAllQueued: vi.fn(),
       clearBatch: vi.fn(),
+      replaceActiveCallWithTailCall: vi.fn(),
     } as unknown as Mocked<SchedulerStateManager>;
 
     // Define getters for accessors idiomatically
@@ -1156,6 +1157,99 @@ describe('Scheduler (Orchestrator)', () => {
       // finalizeCall should be called exactly once for this ID
       expect(mockStateManager.finalizeCall).toHaveBeenCalledTimes(1);
       expect(mockStateManager.finalizeCall).toHaveBeenCalledWith('call-1');
+    });
+
+    describe('Tail Calls', () => {
+      it('should replace the active call with a new tool call and re-run the loop when tail call is requested', async () => {
+        // Setup: Tool A will return a success with a tail call request to Tool B
+        const mockResponse = {
+          callId: 'call-1',
+          responseParts: [],
+        } as unknown as ToolCallResponseInfo;
+
+        mockExecutor.execute.mockResolvedValue({
+          status: 'success',
+          response: mockResponse,
+          tailToolCallRequest: {
+            name: 'tool-b',
+            args: { key: 'value' },
+          },
+          request: req1,
+        } as unknown as SuccessfulToolCall);
+
+        const mockToolB = {
+          name: 'tool-b',
+          build: vi.fn().mockReturnValue({}),
+        } as unknown as AnyDeclarativeTool;
+
+        vi.mocked(mockToolRegistry.getTool).mockReturnValue(mockToolB);
+
+        await scheduler.schedule(req1, signal);
+
+        // Assert: `updateStatus` is not called with success because it was intercepted
+        expect(mockStateManager.updateStatus).not.toHaveBeenCalledWith(
+          'call-1',
+          'success',
+          expect.anything(),
+        );
+
+        // Assert: The state manager is instructed to replace the call
+        expect(
+          mockStateManager.replaceActiveCallWithTailCall,
+        ).toHaveBeenCalledWith(
+          'call-1',
+          expect.objectContaining({
+            status: 'validating',
+            request: expect.objectContaining({
+              callId: 'call-1',
+              name: 'tool-b',
+              args: { key: 'value' },
+              originalRequestName: 'test-tool', // Preserves original name
+            }),
+            tool: mockToolB,
+          }),
+        );
+      });
+
+      it('should inject an errored tool call if the tail tool is not found', async () => {
+        const mockResponse = {
+          callId: 'call-1',
+          responseParts: [],
+        } as unknown as ToolCallResponseInfo;
+
+        mockExecutor.execute.mockResolvedValue({
+          status: 'success',
+          response: mockResponse,
+          tailToolCallRequest: {
+            name: 'missing-tool',
+            args: {},
+          },
+          request: req1,
+        } as unknown as SuccessfulToolCall);
+
+        // Tool registry returns undefined for missing-tool
+        vi.mocked(mockToolRegistry.getTool).mockReturnValue(undefined);
+
+        await scheduler.schedule(req1, signal);
+
+        // Assert: Replaces active call with an errored call
+        expect(
+          mockStateManager.replaceActiveCallWithTailCall,
+        ).toHaveBeenCalledWith(
+          'call-1',
+          expect.objectContaining({
+            status: 'error',
+            request: expect.objectContaining({
+              callId: 'call-1',
+              name: 'missing-tool', // Name of the failed tail call
+              originalRequestName: 'test-tool',
+            }),
+            response: expect.objectContaining({
+              errorType: ToolErrorType.TOOL_NOT_REGISTERED,
+            }),
+          }),
+        );
+      });
     });
   });
 

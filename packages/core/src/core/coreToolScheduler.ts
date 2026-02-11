@@ -76,7 +76,7 @@ const createErrorResponse = (
     {
       functionResponse: {
         id: request.callId,
-        name: request.name,
+        name: request.originalRequestName || request.name,
         response: { error: error.message },
       },
     },
@@ -834,6 +834,11 @@ export class CoreToolScheduler {
         (call) => call.status === 'scheduled',
       );
 
+      if (callsToExecute.length === 0) {
+        await this.checkAndNotifyCompletion(signal);
+        return;
+      }
+
       for (const toolCall of callsToExecute) {
         if (toolCall.status !== 'scheduled') continue;
 
@@ -878,19 +883,98 @@ export class CoreToolScheduler {
         );
         this.notifyToolCallsUpdate();
 
-        await this.checkAndNotifyCompletion(signal);
+        // Handle tail tool call requests
+        if (
+          (completedCall.status === 'success' ||
+            completedCall.status === 'error') &&
+          completedCall.tailToolCallRequest
+        ) {
+          // Log the intermediate tool call before it gets replaced.
+          logToolCall(this.config, new ToolCallEvent(completedCall));
+
+          const tailRequest = completedCall.tailToolCallRequest;
+          const originalCallId = completedCall.request.callId;
+          const originalRequestName =
+            completedCall.request.originalRequestName ||
+            completedCall.request.name;
+
+          // Resolve the new tool
+          const newToolInstance = this.config
+            .getToolRegistry()
+            .getTool(tailRequest.name);
+
+          // Clear the current active tool so the queue can process
+          this.toolCalls.shift();
+
+          const newRequest: ToolCallRequestInfo = {
+            callId: originalCallId,
+            name: tailRequest.name,
+            args: tailRequest.args,
+            originalRequestName,
+            isClientInitiated: completedCall.request.isClientInitiated,
+            prompt_id: completedCall.request.prompt_id,
+          };
+
+          if (!newToolInstance) {
+            // If the tail tool doesn't exist, we need to fail the original call
+            const errorResponse = createErrorResponse(
+              newRequest,
+              new Error(`Tool "${tailRequest.name}" not found in registry`),
+              ToolErrorType.TOOL_NOT_REGISTERED,
+            );
+            this.toolCallQueue.unshift({
+              status: 'error',
+              request: newRequest,
+              response: errorResponse,
+              durationMs: 0,
+            });
+          } else {
+            // Queue up the new tool call at the front of the queue
+            const invocationOrError = this.buildInvocation(
+              newToolInstance,
+              tailRequest.args,
+            );
+
+            if (invocationOrError instanceof Error) {
+              const errorResponse = createErrorResponse(
+                newRequest,
+                invocationOrError,
+                ToolErrorType.INVALID_TOOL_PARAMS,
+              );
+              this.toolCallQueue.unshift({
+                status: 'error',
+                request: newRequest,
+                tool: newToolInstance,
+                response: errorResponse,
+                durationMs: 0,
+              });
+            } else {
+              this.toolCallQueue.unshift({
+                status: 'validating',
+                request: newRequest,
+                tool: newToolInstance,
+                invocation: invocationOrError,
+                startTime: Date.now(),
+              });
+            }
+          }
+
+          return this._processNextInQueue(signal);
+        } else {
+          await this.checkAndNotifyCompletion(signal);
+        }
       }
     }
   }
 
   private async checkAndNotifyCompletion(signal: AbortSignal): Promise<void> {
     // This method is now only concerned with the single active tool call.
-    if (this.toolCalls.length === 0) {
+    if (this.toolCalls.length === 0 && this.toolCallQueue.length === 0) {
       // It's possible to be called when a batch is cancelled before any tool has started.
       if (signal.aborted && this.toolCallQueue.length > 0) {
         this._cancelAllQueuedCalls();
       }
-    } else {
+    } else if (this.toolCalls.length > 0) {
       const activeCall = this.toolCalls[0];
       const isTerminal =
         activeCall.status === 'success' ||

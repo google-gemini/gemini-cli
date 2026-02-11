@@ -19,6 +19,7 @@ import {
   type ExecutingToolCall,
   type ValidatingToolCall,
   type ErroredToolCall,
+  type SuccessfulToolCall,
 } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { PolicyDecision } from '../policy/types.js';
@@ -500,6 +501,62 @@ export class Scheduler {
           },
         }),
     );
+
+    if (
+      (result.status === 'success' || result.status === 'error') &&
+      result.tailToolCallRequest
+    ) {
+      // Log the intermediate tool call before it gets replaced.
+      const intermediateCall: SuccessfulToolCall | ErroredToolCall = {
+        request: activeCall.request,
+        tool: activeCall.tool,
+        invocation: activeCall.invocation,
+        status: result.status,
+        response: result.response,
+        durationMs: activeCall.startTime
+          ? Date.now() - activeCall.startTime
+          : undefined,
+        outcome: activeCall.outcome,
+        schedulerId: this.schedulerId,
+      };
+      logToolCall(this.config, new ToolCallEvent(intermediateCall));
+
+      const tailRequest = result.tailToolCallRequest;
+      const originalCallId = result.request.callId;
+      const originalRequestName =
+        result.request.originalRequestName || result.request.name;
+
+      const newTool = this.config.getToolRegistry().getTool(tailRequest.name);
+
+      const newRequest: ToolCallRequestInfo = {
+        callId: originalCallId,
+        name: tailRequest.name,
+        args: tailRequest.args,
+        originalRequestName,
+        isClientInitiated: result.request.isClientInitiated,
+        prompt_id: result.request.prompt_id,
+        schedulerId: this.schedulerId,
+      };
+
+      if (!newTool) {
+        // Enqueue an errored tool call
+        const errorCall = this._createToolNotFoundErroredToolCall(
+          newRequest,
+          this.config.getToolRegistry().getAllToolNames(),
+        );
+        this.state.replaceActiveCallWithTailCall(callId, errorCall);
+      } else {
+        // Enqueue a validating tool call for the new tail tool
+        const validatingCall = this._validateAndCreateToolCall(
+          newRequest,
+          newTool,
+        );
+        this.state.replaceActiveCallWithTailCall(callId, validatingCall);
+      }
+
+      // Loop continues, picking up the new tail call at the front of the queue.
+      return;
+    }
 
     if (result.status === 'success') {
       this.state.updateStatus(callId, 'success', result.response);
