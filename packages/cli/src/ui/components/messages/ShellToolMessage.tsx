@@ -29,6 +29,7 @@ import {
 } from '../../constants.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 import type { Config } from '@google/gemini-cli-core';
+import { CopySafeBox } from '../shared/CopySafeBox.js';
 
 export interface ShellToolMessageProps extends ToolMessageProps {
   activeShellPtyId?: number | null;
@@ -140,7 +141,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
         {emphasis === 'high' && <TrailingIndicator />}
       </StickyHeader>
 
-      <Box
+      <CopySafeBox
         ref={contentRef}
         width={terminalWidth}
         borderStyle="round"
@@ -175,7 +176,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
             />
           </Box>
         )}
-      </Box>
+      </CopySafeBox>
     </>
   );
 };
