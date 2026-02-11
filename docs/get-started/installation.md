@@ -1,7 +1,23 @@
 # Gemini CLI installation, execution, and deployment
 
-Install and run Gemini CLI. This document provides an overview of Gemini CLI's
-installation methods and deployment architecture.
+This document provides an overview of Gemini CLI's sytem requriements,
+installation methods, and release types.
+
+## System requirements
+
+- **Operating System:**
+  - macOS 16+
+  - Windows 10.0.26100+
+  - Ubuntu 20.04+
+- **Runtime:** Node.js 20.0.0+
+- **Shell:** Bash or Zsh recommended
+- **Location:**
+  [Gemini Code Assist supported locations](https://developers.google.com/gemini-code-assist/resources/available-locations#americas)
+- **Internet connection required**
+
+Gemini CLI comes pre-installed on
+[**Cloud Shell**](https://docs.cloud.google.com/shell/docs) and
+[**Cloud Workstations**](https://cloud.google.com/workstations).
 
 ## How to install and/or run Gemini CLI
 
@@ -13,7 +29,7 @@ you intend to use Gemini CLI.
 - In a sandbox. This method offers increased security and isolation.
 - From the source. This is recommended for contributors to the project.
 
-### 1. Standard installation (recommended for standard users)
+### 1. Standard installation (recommended for most users)
 
 This is the recommended way for end-users to install Gemini CLI. It involves
 downloading the Gemini CLI package from the NPM registry.
@@ -79,8 +95,6 @@ code.
   gemini
   ```
 
----
-
 ### 4. Running the latest Gemini CLI commit from GitHub
 
 You can run the most recently committed version of Gemini CLI directly from the
@@ -90,52 +104,3 @@ GitHub repository. This is useful for testing features still in development.
 # Execute the CLI directly from the main branch on GitHub
 npx https://github.com/google-gemini/gemini-cli
 ```
-
-## Deployment architecture
-
-The execution methods described above are made possible by the following
-architectural components and processes:
-
-**NPM packages**
-
-Gemini CLI project is a monorepo that publishes two core packages to the NPM
-registry:
-
-- `@google/gemini-cli-core`: The backend, handling logic and tool execution.
-- `@google/gemini-cli`: The user-facing frontend.
-
-These packages are used when performing the standard installation and when
-running Gemini CLI from the source.
-
-**Build and packaging processes**
-
-There are two distinct build processes used, depending on the distribution
-channel:
-
-- **NPM publication:** For publishing to the NPM registry, the TypeScript source
-  code in `@google/gemini-cli-core` and `@google/gemini-cli` is transpiled into
-  standard JavaScript using the TypeScript Compiler (`tsc`). The resulting
-  `dist/` directory is what gets published in the NPM package. This is a
-  standard approach for TypeScript libraries.
-
-- **GitHub `npx` execution:** When running the latest version of Gemini CLI
-  directly from GitHub, a different process is triggered by the `prepare` script
-  in `package.json`. This script uses `esbuild` to bundle the entire application
-  and its dependencies into a single, self-contained JavaScript file. This
-  bundle is created on-the-fly on the user's machine and is not checked into the
-  repository.
-
-**Docker sandbox image**
-
-The Docker-based execution method is supported by the `gemini-cli-sandbox`
-container image. This image is published to a container registry and contains a
-pre-installed, global version of Gemini CLI.
-
-## Release process
-
-The release process is automated through GitHub Actions. The release workflow
-performs the following actions:
-
-1.  Build the NPM packages using `tsc`.
-2.  Publish the NPM packages to the artifact registry.
-3.  Create GitHub releases with bundled assets.
