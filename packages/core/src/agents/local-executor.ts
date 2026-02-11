@@ -59,6 +59,7 @@ import { getVersion } from '../utils/version.js';
 import { getToolCallContext } from '../utils/toolCallContext.js';
 import { scheduleAgentTools } from './agent-scheduler.js';
 import { DeadlineTimer } from '../utils/deadlineTimer.js';
+import { formatUserHintsForModel } from '../utils/flashLiteHelper.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -462,7 +463,17 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       const query = this.definition.promptConfig.query
         ? templateString(this.definition.promptConfig.query, augmentedInputs)
         : DEFAULT_QUERY_STRING;
-      let currentMessage: Content = { role: 'user', parts: [{ text: query }] };
+
+      let lastProcessedHintIndex = this.runtimeContext.getLatestHintIndex();
+      const initialHints = this.runtimeContext.getUserHints();
+      const formattedInitialHints = formatUserHintsForModel(initialHints);
+
+      let currentMessage: Content = formattedInitialHints
+        ? {
+            role: 'user',
+            parts: [{ text: formattedInitialHints }, { text: query }],
+          }
+        : { role: 'user', parts: [{ text: query }] };
 
       while (true) {
         // Check for termination conditions like max turns.
@@ -501,6 +512,20 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
         // If status is 'continue', update message for the next loop
         currentMessage = turnResult.nextMessage;
+
+        // Check for new user steering hints
+        const newHints = this.runtimeContext.getUserHintsAfter(
+          lastProcessedHintIndex,
+        );
+        if (newHints.length > 0) {
+          const formattedHints = formatUserHintsForModel(newHints);
+          if (formattedHints) {
+            // Append hints to the current message (next turn)
+            currentMessage.parts ??= [];
+            currentMessage.parts.unshift({ text: formattedHints });
+          }
+          lastProcessedHintIndex = this.runtimeContext.getLatestHintIndex();
+        }
       }
 
       // === UNIFIED RECOVERY BLOCK ===

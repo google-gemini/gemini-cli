@@ -33,6 +33,7 @@ import { makeFakeConfig, type Config } from '@google/gemini-cli-core';
 import { FakePersistentState } from './persistentStateFake.js';
 import { AppContext, type AppState } from '../ui/contexts/AppContext.js';
 import { createMockSettings } from './settings.js';
+import { SessionStatsProvider } from '../ui/contexts/SessionContext.js';
 
 export const persistentStateMock = new FakePersistentState();
 
@@ -160,6 +161,8 @@ const baseMockUiState = {
     proQuotaRequest: null,
     validationRequest: null,
   },
+  hintMode: false,
+  hintBuffer: '',
 };
 
 export const mockAppState: AppState = {
@@ -209,6 +212,10 @@ const mockUIActions: UIActions = {
   setActiveBackgroundShellPid: vi.fn(),
   setIsBackgroundShellListOpen: vi.fn(),
   setAuthContext: vi.fn(),
+  onHintInput: vi.fn(),
+  onHintBackspace: vi.fn(),
+  onHintClear: vi.fn(),
+  onHintSubmit: vi.fn(),
   handleRestart: vi.fn(),
   handleNewAgentsSelect: vi.fn(),
 };
@@ -306,39 +313,43 @@ export const renderWithProviders = (
           <UIStateContext.Provider value={finalUiState}>
             <VimModeProvider settings={finalSettings}>
               <ShellFocusContext.Provider value={shellFocus}>
-                <StreamingContext.Provider value={finalUiState.streamingState}>
-                  <UIActionsContext.Provider value={finalUIActions}>
-                    <ToolActionsProvider
-                      config={config}
-                      toolCalls={allToolCalls}
-                    >
-                      <AskUserActionsProvider
-                        request={null}
-                        onSubmit={vi.fn()}
-                        onCancel={vi.fn()}
+                <SessionStatsProvider>
+                  <StreamingContext.Provider
+                    value={finalUiState.streamingState}
+                  >
+                    <UIActionsContext.Provider value={finalUIActions}>
+                      <ToolActionsProvider
+                        config={config}
+                        toolCalls={allToolCalls}
                       >
-                        <KeypressProvider>
-                          <MouseProvider
-                            mouseEventsEnabled={mouseEventsEnabled}
-                          >
-                            <TerminalProvider>
-                              <ScrollProvider>
-                                <Box
-                                  width={terminalWidth}
-                                  flexShrink={0}
-                                  flexGrow={0}
-                                  flexDirection="column"
-                                >
-                                  {component}
-                                </Box>
-                              </ScrollProvider>
-                            </TerminalProvider>
-                          </MouseProvider>
-                        </KeypressProvider>
-                      </AskUserActionsProvider>
-                    </ToolActionsProvider>
-                  </UIActionsContext.Provider>
-                </StreamingContext.Provider>
+                        <AskUserActionsProvider
+                          request={null}
+                          onSubmit={vi.fn()}
+                          onCancel={vi.fn()}
+                        >
+                          <KeypressProvider>
+                            <MouseProvider
+                              mouseEventsEnabled={mouseEventsEnabled}
+                            >
+                              <TerminalProvider>
+                                <ScrollProvider>
+                                  <Box
+                                    width={terminalWidth}
+                                    flexShrink={0}
+                                    flexGrow={0}
+                                    flexDirection="column"
+                                  >
+                                    {component}
+                                  </Box>
+                                </ScrollProvider>
+                              </TerminalProvider>
+                            </MouseProvider>
+                          </KeypressProvider>
+                        </AskUserActionsProvider>
+                      </ToolActionsProvider>
+                    </UIActionsContext.Provider>
+                  </StreamingContext.Provider>
+                </SessionStatsProvider>
               </ShellFocusContext.Provider>
             </VimModeProvider>
           </UIStateContext.Provider>

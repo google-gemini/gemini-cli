@@ -16,6 +16,7 @@ export interface SemanticColors {
   };
   background: {
     primary: string;
+    hintMode: string;
     diff: {
       added: string;
       removed: string;
@@ -48,6 +49,7 @@ export const lightSemanticColors: SemanticColors = {
   },
   background: {
     primary: lightTheme.Background,
+    hintMode: '#E8E0F0',
     diff: {
       added: lightTheme.DiffAdded,
       removed: lightTheme.DiffRemoved,
@@ -80,6 +82,7 @@ export const darkSemanticColors: SemanticColors = {
   },
   background: {
     primary: darkTheme.Background,
+    hintMode: '#352A45',
     diff: {
       added: darkTheme.DiffAdded,
       removed: darkTheme.DiffRemoved,

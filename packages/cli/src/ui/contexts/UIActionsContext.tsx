@@ -73,6 +73,10 @@ export interface UIActions {
   setActiveBackgroundShellPid: (pid: number) => void;
   setIsBackgroundShellListOpen: (isOpen: boolean) => void;
   setAuthContext: (context: { requiresRestart?: boolean }) => void;
+  onHintInput: (char: string) => void;
+  onHintBackspace: () => void;
+  onHintClear: () => void;
+  onHintSubmit: (hint: string) => void;
   handleRestart: () => void;
   handleNewAgentsSelect: (choice: NewAgentsChoice) => Promise<void>;
 }

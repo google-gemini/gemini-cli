@@ -121,6 +121,19 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
         },
       },
     },
+    'flash-lite-helper': {
+      extends: 'base',
+      modelConfig: {
+        model: 'gemini-2.5-flash-lite',
+        generateContentConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 120,
+          thinkingConfig: {
+            thinkingBudget: 0,
+          },
+        },
+      },
+    },
     'edit-corrector': {
       extends: 'base',
       modelConfig: {

@@ -50,6 +50,7 @@ export const DialogManager = ({
 
   const uiState = useUIState();
   const uiActions = useUIActions();
+
   const {
     constrainHeight,
     terminalHeight,
