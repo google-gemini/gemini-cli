@@ -16,7 +16,7 @@ import {
   type Content,
 } from '@google/gemini-cli-core';
 
-import { type Tool, SdkTool } from './tool.js';
+import { type Tool, SdkTool, type z } from './tool.js';
 import { SdkAgentFilesystem } from './fs.js';
 import { SdkAgentShell } from './shell.js';
 import type { SessionContext } from './types.js';
