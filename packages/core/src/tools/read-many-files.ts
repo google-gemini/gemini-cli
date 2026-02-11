@@ -250,7 +250,9 @@ ${finalExclusionPatternsForDescription
       const errorMessage = `Error during file search: ${getErrorMessage(error)}`;
       return {
         llmContent: errorMessage,
-        returnDisplay: `## File Search Error\n\nAn error occurred while searching for files:\n\`\`\`\n${getErrorMessage(error)}\n\`\`\``,
+        returnDisplay: {
+          summary: `Error: ${getErrorMessage(error)}`,
+        },
         error: {
           message: errorMessage,
           type: ToolErrorType.READ_MANY_FILES_SEARCH_ERROR,
@@ -447,10 +449,7 @@ ${finalExclusionPatternsForDescription
     }
 
     const returnDisplay: ReadManyFilesResult = {
-      summary:
-        processedFilesRelativePaths.length > 0
-          ? `Read ${processedFilesRelativePaths.length} file(s)`
-          : 'No files read',
+      summary: displayMessage.trim(),
       files: processedFilesRelativePaths,
       skipped: skippedFiles,
       include: this.params.include,

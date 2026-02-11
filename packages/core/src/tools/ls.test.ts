@@ -16,6 +16,7 @@ import { ToolErrorType } from './tool-error.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
+import type { StructuredToolResult } from './tools.js';
 
 describe('LSTool', () => {
   let lsTool: LSTool;
@@ -123,7 +124,9 @@ describe('LSTool', () => {
 
       expect(result.llmContent).toContain('[DIR] subdir');
       expect(result.llmContent).toContain('file1.txt');
-      expect(result.returnDisplay).toBe('Listed 2 item(s).');
+      expect((result.returnDisplay as StructuredToolResult).summary).toBe(
+        'Listed 2 item(s).',
+      );
     });
 
     it('should list files from secondary workspace directory', async () => {
@@ -138,7 +141,9 @@ describe('LSTool', () => {
       const result = await invocation.execute(abortSignal);
 
       expect(result.llmContent).toContain('secondary-file.txt');
-      expect(result.returnDisplay).toBe('Listed 1 item(s).');
+      expect((result.returnDisplay as StructuredToolResult).summary).toBe(
+        'Listed 1 item(s).',
+      );
     });
 
     it('should handle empty directories', async () => {
@@ -148,7 +153,9 @@ describe('LSTool', () => {
       const result = await invocation.execute(abortSignal);
 
       expect(result.llmContent).toBe(`Directory ${emptyDir} is empty.`);
-      expect(result.returnDisplay).toBe('Directory is empty.');
+      expect((result.returnDisplay as StructuredToolResult).summary).toBe(
+        'Directory is empty.',
+      );
     });
 
     it('should respect ignore patterns', async () => {
@@ -163,7 +170,9 @@ describe('LSTool', () => {
 
       expect(result.llmContent).toContain('file1.txt');
       expect(result.llmContent).not.toContain('file2.log');
-      expect(result.returnDisplay).toBe('Listed 1 item(s).');
+      expect((result.returnDisplay as StructuredToolResult).summary).toBe(
+        'Listed 1 item(s).',
+      );
     });
 
     it('should respect gitignore patterns', async () => {
@@ -177,7 +186,9 @@ describe('LSTool', () => {
       expect(result.llmContent).toContain('file1.txt');
       expect(result.llmContent).not.toContain('file2.log');
       // .git is always ignored by default.
-      expect(result.returnDisplay).toBe('Listed 2 item(s). (2 ignored)');
+      expect((result.returnDisplay as StructuredToolResult).summary).toBe(
+        'Listed 2 item(s). (2 ignored)',
+      );
     });
 
     it('should respect geminiignore patterns', async () => {
@@ -192,7 +203,9 @@ describe('LSTool', () => {
 
       expect(result.llmContent).toContain('file1.txt');
       expect(result.llmContent).not.toContain('file2.log');
-      expect(result.returnDisplay).toBe('Listed 2 item(s). (1 ignored)');
+      expect((result.returnDisplay as StructuredToolResult).summary).toBe(
+        'Listed 2 item(s). (1 ignored)',
+      );
     });
 
     it('should handle non-directory paths', async () => {
@@ -203,7 +216,9 @@ describe('LSTool', () => {
       const result = await invocation.execute(abortSignal);
 
       expect(result.llmContent).toContain('Path is not a directory');
-      expect(result.returnDisplay).toBe('Error: Path is not a directory.');
+      expect((result.returnDisplay as StructuredToolResult).summary).toBe(
+        'Error: Path is not a directory.',
+      );
       expect(result.error?.type).toBe(ToolErrorType.PATH_IS_NOT_A_DIRECTORY);
     });
 
@@ -213,7 +228,9 @@ describe('LSTool', () => {
       const result = await invocation.execute(abortSignal);
 
       expect(result.llmContent).toContain('Error listing directory');
-      expect(result.returnDisplay).toBe('Error: Failed to list directory.');
+      expect((result.returnDisplay as StructuredToolResult).summary).toBe(
+        'Error: Failed to list directory.',
+      );
       expect(result.error?.type).toBe(ToolErrorType.LS_EXECUTION_ERROR);
     });
 
@@ -253,7 +270,9 @@ describe('LSTool', () => {
 
       expect(result.llmContent).toContain('Error listing directory');
       expect(result.llmContent).toContain('permission denied');
-      expect(result.returnDisplay).toBe('Error: Failed to list directory.');
+      expect((result.returnDisplay as StructuredToolResult).summary).toBe(
+        'Error: Failed to list directory.',
+      );
       expect(result.error?.type).toBe(ToolErrorType.LS_EXECUTION_ERROR);
     });
 
@@ -279,7 +298,9 @@ describe('LSTool', () => {
       // Should still list the other files
       expect(result.llmContent).toContain('file1.txt');
       expect(result.llmContent).not.toContain('problematic.txt');
-      expect(result.returnDisplay).toBe('Listed 1 item(s).');
+      expect((result.returnDisplay as StructuredToolResult).summary).toBe(
+        'Listed 1 item(s).',
+      );
 
       statSpy.mockRestore();
     });
@@ -339,7 +360,9 @@ describe('LSTool', () => {
       const result = await invocation.execute(abortSignal);
 
       expect(result.llmContent).toContain('secondary-file.txt');
-      expect(result.returnDisplay).toBe('Listed 1 item(s).');
+      expect((result.returnDisplay as StructuredToolResult).summary).toBe(
+        'Listed 1 item(s).',
+      );
     });
   });
 });

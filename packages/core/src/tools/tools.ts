@@ -664,9 +664,12 @@ export interface TodoList {
   todos: Todo[];
 }
 
-export interface GrepResult {
+export interface StructuredToolResult {
   summary: string;
-  matches: Array<{
+}
+
+export interface GrepResult extends StructuredToolResult {
+  matches?: Array<{
     filePath: string;
     lineNumber: number;
     line: string;
@@ -674,15 +677,13 @@ export interface GrepResult {
   payload?: string;
 }
 
-export interface ListDirectoryResult {
-  summary: string;
-  files: string[];
+export interface ListDirectoryResult extends StructuredToolResult {
+  files?: string[];
   payload?: string;
 }
 
-export interface ReadManyFilesResult {
-  summary: string;
-  files: string[];
+export interface ReadManyFilesResult extends StructuredToolResult {
+  files?: string[];
   skipped?: Array<{ path: string; reason: string }>;
   include?: string[];
   excludes?: string[];

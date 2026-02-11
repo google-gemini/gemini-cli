@@ -23,6 +23,7 @@ import {
 } from '../utils/ignorePatterns.js';
 import * as glob from 'glob';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import type { StructuredToolResult } from './tools.js';
 import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 
 vi.mock('glob', { spy: true });
@@ -260,7 +261,7 @@ describe('ReadManyFilesTool', () => {
         `--- ${expectedPath} ---\n\nContent of file1\n\n`,
         `\n--- End of content ---`,
       ]);
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as StructuredToolResult).summary).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
       );
     });
@@ -284,7 +285,7 @@ describe('ReadManyFilesTool', () => {
           c.includes(`--- ${expectedPath2} ---\n\nContent2\n\n`),
         ),
       ).toBe(true);
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as StructuredToolResult).summary).toContain(
         'Successfully read and concatenated content from **2 file(s)**',
       );
     });
@@ -310,7 +311,7 @@ describe('ReadManyFilesTool', () => {
         ),
       ).toBe(true);
       expect(content.find((c) => c.includes('sub/data.json'))).toBeUndefined();
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as StructuredToolResult).summary).toContain(
         'Successfully read and concatenated content from **2 file(s)**',
       );
     });
@@ -330,7 +331,7 @@ describe('ReadManyFilesTool', () => {
       expect(
         content.find((c) => c.includes('src/main.test.ts')),
       ).toBeUndefined();
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as StructuredToolResult).summary).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
       );
     });
@@ -342,7 +343,7 @@ describe('ReadManyFilesTool', () => {
       expect(result.llmContent).toEqual([
         'No files matching the criteria were found or all were skipped.',
       ]);
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as StructuredToolResult).summary).toContain(
         'No files were read and concatenated based on the criteria.',
       );
     });
@@ -362,7 +363,7 @@ describe('ReadManyFilesTool', () => {
       expect(
         content.find((c) => c.includes('node_modules/some-lib/index.js')),
       ).toBeUndefined();
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as StructuredToolResult).summary).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
       );
     });
@@ -389,7 +390,7 @@ describe('ReadManyFilesTool', () => {
           c.includes(`--- ${expectedPath2} ---\n\napp code\n\n`),
         ),
       ).toBe(true);
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as StructuredToolResult).summary).toContain(
         'Successfully read and concatenated content from **2 file(s)**',
       );
     });
@@ -413,7 +414,7 @@ describe('ReadManyFilesTool', () => {
         },
         '\n--- End of content ---',
       ]);
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as StructuredToolResult).summary).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
       );
     });
@@ -454,8 +455,10 @@ describe('ReadManyFilesTool', () => {
             c.includes(`--- ${expectedPath} ---\n\ntext notes\n\n`),
         ),
       ).toBe(true);
-      expect(result.returnDisplay).toContain('**Skipped 1 item(s):**');
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as StructuredToolResult).summary).toContain(
+        '**Skipped 1 item(s):**',
+      );
+      expect((result.returnDisplay as StructuredToolResult).summary).toContain(
         '- `document.pdf` (Reason: asset file (image/pdf/audio) was not explicitly requested by name or extension)',
       );
     });
@@ -501,7 +504,9 @@ describe('ReadManyFilesTool', () => {
       const result = await invocation.execute(new AbortController().signal);
       expect(result.returnDisplay).not.toContain('foo.bar');
       expect(result.returnDisplay).not.toContain('foo.quux');
-      expect(result.returnDisplay).toContain('bar.ts');
+      expect((result.returnDisplay as StructuredToolResult).summary).toContain(
+        'bar.ts',
+      );
     });
 
     it('should read files from multiple workspace directories', async () => {
@@ -577,7 +582,7 @@ describe('ReadManyFilesTool', () => {
           c.includes(`--- ${expectedPath2} ---\n\nContent2\n\n`),
         ),
       ).toBe(true);
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as StructuredToolResult).summary).toContain(
         'Successfully read and concatenated content from **2 file(s)**',
       );
 
@@ -629,7 +634,7 @@ Content of receive-detail
 `,
         `\n--- End of content ---`,
       ]);
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as StructuredToolResult).summary).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
       );
     });
@@ -648,7 +653,7 @@ Content of file[1]
 `,
         `\n--- End of content ---`,
       ]);
-      expect(result.returnDisplay).toContain(
+      expect((result.returnDisplay as StructuredToolResult).summary).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
       );
     });
@@ -747,7 +752,9 @@ Content of file[1]
 
       // Should successfully process valid files despite one failure
       expect(content.length).toBeGreaterThanOrEqual(3);
-      expect(result.returnDisplay).toContain('Successfully read');
+      expect((result.returnDisplay as StructuredToolResult).summary).toContain(
+        'Successfully read',
+      );
 
       // Verify valid files were processed
       const expectedPath1 = path.join(tempRootDir, 'valid1.txt');

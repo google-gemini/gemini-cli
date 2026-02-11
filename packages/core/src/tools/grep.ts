@@ -244,7 +244,12 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       if (allMatches.length === 0) {
         const noMatchMsg = `No matches found for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}.`;
-        return { llmContent: noMatchMsg, returnDisplay: `No matches found` };
+        return {
+          llmContent: noMatchMsg,
+          returnDisplay: {
+            summary: `No matches found`,
+          },
+        };
       }
 
       const wasTruncated = allMatches.length >= totalMaxMatches;
@@ -300,7 +305,9 @@ class GrepToolInvocation extends BaseToolInvocation<
       const errorMessage = getErrorMessage(error);
       return {
         llmContent: `Error during grep search operation: ${errorMessage}`,
-        returnDisplay: `Error: ${errorMessage}`,
+        returnDisplay: {
+          summary: `Error: ${errorMessage}`,
+        },
         error: {
           message: errorMessage,
           type: ToolErrorType.GREP_EXECUTION_ERROR,
