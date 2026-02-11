@@ -1439,8 +1439,8 @@
             "enabled": {
               "title": "Enable Tool Output Masking",
               "description": "Enables tool output masking to save tokens.",
-              "markdownDescription": "Enables tool output masking to save tokens.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
-              "default": false,
+              "markdownDescription": "Enables tool output masking to save tokens.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
               "type": "boolean"
             },
             "toolProtectionThreshold": {
