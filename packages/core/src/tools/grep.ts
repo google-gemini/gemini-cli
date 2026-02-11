@@ -50,6 +50,16 @@ export interface GrepToolParams {
   include?: string;
 
   /**
+   * Optional: A regular expression pattern to exclude from the search results.
+   */
+  exclude_pattern?: string;
+
+  /**
+   * Optional: If true, only the file paths of the matches will be returned.
+   */
+  names_only?: boolean;
+
+  /**
    * Optional: Maximum number of matches to return per file. Use this to prevent being overwhelmed by repetitive matches in large files.
    */
   max_matches_per_file?: number;
@@ -225,6 +235,7 @@ class GrepToolInvocation extends BaseToolInvocation<
             pattern: this.params.pattern,
             path: searchDir,
             include: this.params.include,
+            exclude_pattern: this.params.exclude_pattern,
             maxMatches: remainingLimit,
             max_matches_per_file: this.params.max_matches_per_file,
             signal: timeoutController.signal,
@@ -279,6 +290,16 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       const matchCount = allMatches.length;
       const matchTerm = matchCount === 1 ? 'match' : 'matches';
+
+      if (this.params.names_only) {
+        const filePaths = Object.keys(matchesByFile).sort();
+        let llmContent = `Found ${filePaths.length} files with matches for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}${wasTruncated ? ` (results limited to ${totalMaxMatches} matches for performance)` : ''}:\n`;
+        llmContent += filePaths.join('\n');
+        return {
+          llmContent: llmContent.trim(),
+          returnDisplay: `Found ${filePaths.length} files${wasTruncated ? ' (limited)' : ''}`,
+        };
+      }
 
       let llmContent = `Found ${matchCount} ${matchTerm} for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}`;
 
@@ -354,6 +375,7 @@ class GrepToolInvocation extends BaseToolInvocation<
     pattern: string;
     path: string; // Expects absolute path
     include?: string;
+    exclude_pattern?: string;
     maxMatches: number;
     max_matches_per_file?: number;
     signal: AbortSignal;
@@ -362,12 +384,18 @@ class GrepToolInvocation extends BaseToolInvocation<
       pattern,
       path: absolutePath,
       include,
+      exclude_pattern,
       maxMatches,
       max_matches_per_file,
     } = options;
     let strategyUsed = 'none';
 
     try {
+      let excludeRegex: RegExp | null = null;
+      if (exclude_pattern) {
+        excludeRegex = new RegExp(exclude_pattern, 'i');
+      }
+
       // --- Strategy 1: git grep ---
       const isGit = isGitRepository(absolutePath);
       const gitAvailable = isGit && (await this.isCommandAvailable('git'));
@@ -400,6 +428,9 @@ class GrepToolInvocation extends BaseToolInvocation<
           for await (const line of generator) {
             const match = this.parseGrepLine(line, absolutePath);
             if (match) {
+              if (excludeRegex && excludeRegex.test(match.line)) {
+                continue;
+              }
               results.push(match);
               if (results.length >= maxMatches) {
                 break;
@@ -467,6 +498,9 @@ class GrepToolInvocation extends BaseToolInvocation<
           for await (const line of generator) {
             const match = this.parseGrepLine(line, absolutePath);
             if (match) {
+              if (excludeRegex && excludeRegex.test(match.line)) {
+                continue;
+              }
               results.push(match);
               if (results.length >= maxMatches) {
                 break;
@@ -528,6 +562,9 @@ class GrepToolInvocation extends BaseToolInvocation<
           for (let index = 0; index < lines.length; index++) {
             const line = lines[index];
             if (regex.test(line)) {
+              if (excludeRegex && excludeRegex.test(line)) {
+                continue;
+              }
               allMatches.push({
                 filePath:
                   path.relative(absolutePath, fileAbsolutePath) ||
@@ -635,6 +672,14 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
       new RegExp(params.pattern);
     } catch (error) {
       return `Invalid regular expression pattern provided: ${params.pattern}. Error: ${getErrorMessage(error)}`;
+    }
+
+    if (params.exclude_pattern) {
+      try {
+        new RegExp(params.exclude_pattern);
+      } catch (error) {
+        return `Invalid exclude regular expression pattern provided: ${params.exclude_pattern}. Error: ${getErrorMessage(error)}`;
+      }
     }
 
     if (
