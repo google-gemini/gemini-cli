@@ -49,6 +49,12 @@ export class SessionLearningsService {
 
       const geminiClient = this.config.getGeminiClient();
       const recordingService = geminiClient.getChatRecordingService();
+
+      if (!recordingService) {
+        debugLogger.debug('[SessionLearnings] Recording service not available');
+        return;
+      }
+
       const conversation = recordingService.getConversation();
 
       if (!conversation || conversation.messages.length < MIN_MESSAGES) {
