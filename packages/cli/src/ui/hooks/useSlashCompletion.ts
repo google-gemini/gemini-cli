@@ -316,6 +316,7 @@ function useCommandSuggestions(
             value: cmd.name,
             description: cmd.description,
             commandKind: cmd.kind,
+            source: cmd.source,
           }));
 
           setSuggestions(finalSuggestions);

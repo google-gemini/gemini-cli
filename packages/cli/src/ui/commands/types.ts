@@ -182,6 +182,12 @@ export enum CommandKind {
   AGENT = 'agent',
 }
 
+export enum CommandSource {
+  USER = 'user',
+  PROJECT = 'project',
+  EXTENSION = 'extension',
+}
+
 // The standardized contract for any command in the system.
 export interface SlashCommand {
   name: string;
@@ -190,6 +196,7 @@ export interface SlashCommand {
   hidden?: boolean;
 
   kind: CommandKind;
+  source?: CommandSource;
 
   /**
    * Controls whether the command auto-executes when selected with Enter.

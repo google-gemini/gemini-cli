@@ -1402,4 +1402,87 @@ describe('FileCommandLoader', () => {
       expect(commands[0].description).toBe('d'.repeat(97) + '...');
     });
   });
+
+  describe('CommandSource Assignment', () => {
+    it('assigns CommandSource.USER to user commands', async () => {
+      const userCommandsDir = Storage.getUserCommandsDir();
+      mock({
+        [userCommandsDir]: {
+          'user-cmd.toml': 'prompt = "User prompt"',
+        },
+      });
+
+      const loader = new FileCommandLoader(null);
+      const commands = await loader.loadCommands(signal);
+
+      expect(commands).toHaveLength(1);
+      expect(commands[0].source).toBe('user');
+    });
+
+    it('assigns CommandSource.PROJECT to project commands', async () => {
+      const projectCommandsDir = new Storage(
+        process.cwd(),
+      ).getProjectCommandsDir();
+      mock({
+        [projectCommandsDir]: {
+          'project-cmd.toml': 'prompt = "Project prompt"',
+        },
+      });
+
+      const mockConfig = {
+        getProjectRoot: vi.fn(() => process.cwd()),
+        getExtensions: vi.fn(() => []),
+        getFolderTrust: vi.fn(() => false),
+        isTrustedFolder: vi.fn(() => false),
+      } as unknown as Config;
+      const loader = new FileCommandLoader(mockConfig);
+      const commands = await loader.loadCommands(signal);
+
+      // 0 is user (empty), 1 is project
+      const projectCmd = commands.find((c) => c.name === 'project-cmd');
+      expect(projectCmd).toBeDefined();
+      expect(projectCmd?.source).toBe('project');
+    });
+
+    it('assigns CommandSource.EXTENSION to extension commands', async () => {
+      const extensionDir = path.join(
+        process.cwd(),
+        GEMINI_DIR,
+        'extensions',
+        'test-ext',
+      );
+
+      mock({
+        [extensionDir]: {
+          'gemini-extension.json': JSON.stringify({
+            name: 'test-ext',
+            version: '1.0.0',
+          }),
+          commands: {
+            'ext-cmd.toml': 'prompt = "Extension prompt"',
+          },
+        },
+      });
+
+      const mockConfig = {
+        getProjectRoot: vi.fn(() => process.cwd()),
+        getExtensions: vi.fn(() => [
+          {
+            name: 'test-ext',
+            version: '1.0.0',
+            isActive: true,
+            path: extensionDir,
+          },
+        ]),
+        getFolderTrust: vi.fn(() => false),
+        isTrustedFolder: vi.fn(() => false),
+      } as unknown as Config;
+      const loader = new FileCommandLoader(mockConfig);
+      const commands = await loader.loadCommands(signal);
+
+      const extCmd = commands.find((c) => c.name === 'ext-cmd');
+      expect(extCmd).toBeDefined();
+      expect(extCmd?.source).toBe('extension');
+    });
+  });
 });

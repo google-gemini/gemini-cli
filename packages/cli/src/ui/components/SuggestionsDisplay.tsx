@@ -7,7 +7,7 @@
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { ExpandableText, MAX_WIDTH } from './shared/ExpandableText.js';
-import { CommandKind } from '../commands/types.js';
+import { CommandKind, CommandSource } from '../commands/types.js';
 import { Colors } from '../colors.js';
 import { sanitizeForDisplay } from '../utils/textUtils.js';
 
@@ -17,6 +17,7 @@ export interface Suggestion {
   description?: string;
   matchedIndex?: number;
   commandKind?: CommandKind;
+  source?: CommandSource;
 }
 interface SuggestionsDisplayProps {
   suggestions: Suggestion[];
@@ -67,8 +68,16 @@ export function SuggestionsDisplay({
     [CommandKind.AGENT]: ' [Agent]',
   };
 
+  const COMMAND_SOURCE_SUFFIX: Partial<Record<CommandSource, string>> = {
+    [CommandSource.USER]: ' [USER]',
+    [CommandSource.PROJECT]: ' [PROJECT]',
+    [CommandSource.EXTENSION]: ' [EXT]',
+  };
+
   const getFullLabel = (s: Suggestion) =>
-    s.label + (s.commandKind ? (COMMAND_KIND_SUFFIX[s.commandKind] ?? '') : '');
+    s.label +
+    (s.commandKind ? (COMMAND_KIND_SUFFIX[s.commandKind] ?? '') : '') +
+    (s.source ? (COMMAND_SOURCE_SUFFIX[s.source] ?? '') : '');
 
   const maxLabelLength = Math.max(
     ...suggestions.map((s) => getFullLabel(s).length),
@@ -109,6 +118,12 @@ export function SuggestionsDisplay({
                   COMMAND_KIND_SUFFIX[suggestion.commandKind] && (
                     <Text color={textColor}>
                       {COMMAND_KIND_SUFFIX[suggestion.commandKind]}
+                    </Text>
+                  )}
+                {suggestion.source &&
+                  COMMAND_SOURCE_SUFFIX[suggestion.source] && (
+                    <Text color={textColor}>
+                      {COMMAND_SOURCE_SUFFIX[suggestion.source]}
                     </Text>
                   )}
               </Box>

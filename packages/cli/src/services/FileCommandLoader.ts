@@ -17,7 +17,7 @@ import type {
   SlashCommand,
   SlashCommandActionReturn,
 } from '../ui/commands/types.js';
-import { CommandKind } from '../ui/commands/types.js';
+import { CommandKind, CommandSource } from '../ui/commands/types.js';
 import { DefaultArgumentProcessor } from './prompt-processors/argumentProcessor.js';
 import type {
   IPromptProcessor,
@@ -39,6 +39,7 @@ interface CommandDirectory {
   path: string;
   extensionName?: string;
   extensionId?: string;
+  source: CommandSource;
 }
 
 /**
@@ -113,6 +114,7 @@ export class FileCommandLoader implements ICommandLoader {
             dirInfo.path,
             dirInfo.extensionName,
             dirInfo.extensionId,
+            dirInfo.source,
           ),
         );
 
@@ -151,10 +153,16 @@ export class FileCommandLoader implements ICommandLoader {
     const storage = this.config?.storage ?? new Storage(this.projectRoot);
 
     // 1. User commands
-    dirs.push({ path: Storage.getUserCommandsDir() });
+    dirs.push({
+      path: Storage.getUserCommandsDir(),
+      source: CommandSource.USER,
+    });
 
     // 2. Project commands (override user commands)
-    dirs.push({ path: storage.getProjectCommandsDir() });
+    dirs.push({
+      path: storage.getProjectCommandsDir(),
+      source: CommandSource.PROJECT,
+    });
 
     // 3. Extension commands (processed last to detect all conflicts)
     if (this.config) {
@@ -167,6 +175,7 @@ export class FileCommandLoader implements ICommandLoader {
         path: path.join(ext.path, 'commands'),
         extensionName: ext.name,
         extensionId: ext.id,
+        source: CommandSource.EXTENSION,
       }));
 
       dirs.push(...extensionCommandDirs);
@@ -185,8 +194,9 @@ export class FileCommandLoader implements ICommandLoader {
   private async parseAndAdaptFile(
     filePath: string,
     baseDir: string,
-    extensionName?: string,
-    extensionId?: string,
+    extensionName: string | undefined,
+    extensionId: string | undefined,
+    source: CommandSource,
   ): Promise<SlashCommand | null> {
     let fileContent: string;
     try {
@@ -289,6 +299,7 @@ export class FileCommandLoader implements ICommandLoader {
       kind: CommandKind.FILE,
       extensionName,
       extensionId,
+      source,
       action: async (
         context: CommandContext,
         _args: string,

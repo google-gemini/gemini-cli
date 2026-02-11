@@ -24,6 +24,12 @@ exports[`SuggestionsDisplay > renders MCP tag for MCP prompts 1`] = `" mcp-tool 
 
 exports[`SuggestionsDisplay > renders loading state 1`] = `" Loading suggestions..."`;
 
+exports[`SuggestionsDisplay > renders source tags for file commands 1`] = `
+" user-cmd [USER]
+ project-cmd [PROJECT]
+ ext-cmd [EXT]"
+`;
+
 exports[`SuggestionsDisplay > renders suggestions list 1`] = `
 " command1   Description 1
  command2   Description 2
