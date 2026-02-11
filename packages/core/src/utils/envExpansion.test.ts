@@ -11,7 +11,7 @@ describe('expandEnvVars', () => {
   const env = {
     USER: 'morty',
     HOME: '/home/morty',
-    TEMP: 'C:\Temp',
+    TEMP: 'C:\\Temp',
     EMPTY: '',
   };
 
@@ -26,12 +26,12 @@ describe('expandEnvVars', () => {
   });
 
   it('should expand %VAR% (Windows)', () => {
-    expect(expandEnvVars('Data in %TEMP%', env)).toBe('Data in C:\Temp');
+    expect(expandEnvVars('Data in %TEMP%', env)).toBe('Data in C:\\Temp');
   });
 
   it('should handle mixed formats', () => {
     expect(expandEnvVars('$USER lives in ${HOME} on %TEMP%', env)).toBe(
-      'morty lives in /home/morty on C:\Temp',
+      'morty lives in /home/morty on C:\\Temp',
     );
   });
 
