@@ -361,10 +361,19 @@ export class TestRig {
     this.testDir = join(testFileDir, sanitizedName);
     this.homeDir = join(testFileDir, sanitizedName + '-home');
 
+    if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+      console.log(`[TestRig] Setting up test: ${this.testName}`);
+      console.log(`[TestRig] testDir: ${this.testDir}`);
+      console.log(`[TestRig] homeDir: ${this.homeDir}`);
+    }
+
     if (!this._initialized) {
       // Clean up existing directories from previous runs (e.g. retries)
       const cleanDir = (dir: string) => {
         if (fs.existsSync(dir)) {
+          if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+            console.log(`[TestRig] Cleaning up existing directory: ${dir}`);
+          }
           for (let i = 0; i < 5; i++) {
             try {
               fs.rmSync(dir, { recursive: true, force: true });
@@ -761,6 +770,11 @@ export class TestRig {
       env: this._getCleanEnv(options.env),
     });
     this._spawnedProcesses.push(child);
+
+    if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+      console.log(`[TestRig] Running: ${command} ${commandArgs.join(' ')}`);
+      console.log(`[TestRig] CWD: ${this.testDir}`);
+    }
 
     let stdout = '';
     let stderr = '';
@@ -1245,6 +1259,11 @@ export class TestRig {
     }[] = [];
 
     for (const logData of parsedLogs) {
+      if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+        if (logData.attributes?.['event.name']?.includes('tool')) {
+          console.log(`[TestRig] Found tool-related log: ${JSON.stringify(logData.attributes)}`);
+        }
+      }
       // Look for tool call logs
       if (
         logData.attributes &&
@@ -1397,6 +1416,11 @@ export class TestRig {
     }[] = [];
 
     for (const logData of parsedLogs) {
+      if (env['VERBOSE'] === 'true' || env['CI'] === 'true') {
+        if (logData.attributes?.['event.name']?.includes('hook')) {
+          console.log(`[TestRig] Found hook-related log: ${JSON.stringify(logData.attributes)}`);
+        }
+      }
       // Look for tool call logs
       if (
         logData.attributes &&
