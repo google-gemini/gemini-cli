@@ -517,10 +517,7 @@ console.log(JSON.stringify({
   });
 
   describe('BeforeToolSelection Hooks - Tool Configuration', () => {
-    it.only('should modify tool selection with BeforeToolSelection hooks', async () => {
-      // 1. Initial setup to establish test directory
-      rig.setup('BeforeToolSelection Hooks');
-
+    it('should modify tool selection with BeforeToolSelection hooks', async () => {
       const toolConfigJson = JSON.stringify({
         hookSpecificOutput: {
           hookEventName: 'BeforeToolSelection',
@@ -1763,10 +1760,7 @@ console.log(JSON.stringify({
   });
 
   describe('Hook Disabling', () => {
-    it.only('should not execute hooks disabled in settings file', async () => {
-      // 1. Initial setup to establish test directory
-      rig.setup('Hook Disabling');
-
+    it('should not execute hooks disabled in settings file', async () => {
       const enabledMsg = 'EXECUTION_ALLOWED_BY_HOOK_A';
       const disabledMsg = 'EXECUTION_BLOCKED_BY_HOOK_B';
 
@@ -1834,10 +1828,7 @@ console.log(JSON.stringify({
       expect(disabledHookLog).toBeUndefined();
     });
 
-    it.only('should respect disabled hooks across multiple operations', async () => {
-      // 1. Initial setup to establish test directory
-      rig.setup('Hook Disabling');
-
+    it('should respect disabled hooks across multiple operations', async () => {
       const activeMsg = 'MULTIPLE_OPS_ENABLED_HOOK';
       const disabledMsg = 'MULTIPLE_OPS_DISABLED_HOOK';
 

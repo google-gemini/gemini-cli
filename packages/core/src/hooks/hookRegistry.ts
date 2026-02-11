@@ -233,16 +233,6 @@ please review the project settings (.gemini/settings.json) and remove them.`;
         } as HookRegistryEntry);
         const isDisabled = disabledHooks.includes(hookName);
 
-        if (process.env['CI'] === 'true' || process.env['VERBOSE'] === 'true') {
-          console.log(`[HookRegistry] Processing hook: "${hookName}"`);
-          if (isDisabled) {
-            console.log(`[HookRegistry] Hook is DISABLED (found in disabledHooks list)`);
-          }
-          if (disabledHooks.length > 0) {
-            console.log(`[HookRegistry] Current disabledHooks: ${JSON.stringify(disabledHooks)}`);
-          }
-        }
-
         // Add source to hook config
         hookConfig.source = source;
 
