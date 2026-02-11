@@ -65,6 +65,7 @@ export async function enforcePolicy(
   }
 
   const toolName = toolCall.name;
+  // If tool name is missing, we cannot enforce the policy. Allow by default.
   if (!toolName) {
     return {
       decision: SafetyCheckDecision.ALLOW,
@@ -73,22 +74,14 @@ export async function enforcePolicy(
     };
   }
 
-  const policyStr = JSON.stringify(policy[toolName] || {}, null, 2);
+  const toolPolicyStr = JSON.stringify(policy[toolName] || {}, null, 2);
   const toolCallStr = JSON.stringify(toolCall, null, 2);
   debugLogger.debug(
     `[Conseca] Enforcing policy for tool: ${toolName}`,
     toolCall,
-    policyStr,
+    toolPolicyStr,
     toolCallStr,
   );
-
-  if (!policyStr) {
-    return {
-      decision: SafetyCheckDecision.ALLOW,
-      reason: 'Policy for tool ' + toolName + ' is missing',
-      error: 'Policy for tool ' + toolName + ' is missing',
-    };
-  }
 
   try {
     const result = await contentGenerator.generateContent(
@@ -106,7 +99,7 @@ export async function enforcePolicy(
             parts: [
               {
                 text: safeTemplateReplace(CONSECA_ENFORCEMENT_PROMPT, {
-                  policy: policyStr,
+                  policy: toolPolicyStr,
                   tool_call: toolCallStr,
                 }),
               },
