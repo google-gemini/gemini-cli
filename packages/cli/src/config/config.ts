@@ -78,6 +78,7 @@ export interface CliArgs {
   allowedMcpServerNames: string[] | undefined;
   allowedTools: string[] | undefined;
   experimentalAcp: boolean | undefined;
+  experimentalAgentHarness: boolean | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
   resume: string | typeof RESUME_LATEST | undefined;
@@ -161,6 +162,10 @@ export async function parseArguments(
         .option('experimental-acp', {
           type: 'boolean',
           description: 'Starts the agent in ACP mode',
+        })
+        .option('experimental-agent-harness', {
+          type: 'boolean',
+          description: 'Enable the new unified agent harness',
         })
         .option('allowed-mcp-server-names', {
           type: 'array',
@@ -788,7 +793,9 @@ export async function loadCliConfig(
     extensionLoader: extensionManager,
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
-    enableAgentHarness: settings.experimental?.enableAgentHarness,
+    enableAgentHarness:
+      argv.experimentalAgentHarness ??
+      settings.experimental?.enableAgentHarness,
     plan: settings.experimental?.plan,
     enableEventDrivenScheduler: true,
     skillsSupport: settings.skills?.enabled ?? true,

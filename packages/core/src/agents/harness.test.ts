@@ -10,7 +10,11 @@ import { makeFakeConfig } from '../test-utils/config.js';
 import { GeminiChat, StreamEventType } from '../core/geminiChat.js';
 import { GeminiEventType, type ServerGeminiStreamEvent } from '../core/turn.js';
 import { z } from 'zod';
-import { type LocalAgentDefinition, AgentTerminateMode } from './types.js';
+import {
+  type LocalAgentDefinition,
+  AgentTerminateMode,
+  type AgentDefinition,
+} from './types.js';
 import { scheduleAgentTools } from './agent-scheduler.js';
 import { logAgentFinish } from '../telemetry/loggers.js';
 import { type Config } from '../config/config.js';
@@ -72,7 +76,7 @@ describe('AgentHarness', () => {
 
     const harness = new AgentHarness({
       config: mockConfig,
-       
+
       definition: definition as unknown as AgentDefinition,
       inputs: {},
     });
