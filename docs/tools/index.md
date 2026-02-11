@@ -86,6 +86,7 @@ Gemini CLI's built-in tools can be broadly categorized as follows:
   information across sessions.
 - **[Todo Tool](./todos.md) (`write_todos`):** For managing subtasks of complex
   requests.
+- **[Planning Tools](./planning.md):** For entering and exiting Plan Mode.
 
 Additionally, these tools incorporate:
 
