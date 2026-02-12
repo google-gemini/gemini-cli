@@ -252,7 +252,7 @@ export class Turn {
   finishReason: FinishReason | undefined = undefined;
 
   constructor(
-    private readonly chat: GeminiChat,
+    readonly chat: GeminiChat,
     private readonly prompt_id: string,
   ) {}
 

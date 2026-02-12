@@ -6,7 +6,7 @@
 
 import { type Config } from '../config/config.js';
 import { AgentHarness, type AgentHarnessOptions } from './harness.js';
-import { type AgentDefinition } from './types.js';
+import { type AgentDefinition, type LocalAgentDefinition } from './types.js';
 import { MainAgentBehavior, SubagentBehavior } from './behavior.js';
 
 /**
@@ -19,15 +19,18 @@ export class AgentFactory {
     definition?: AgentDefinition,
     options: Partial<AgentHarnessOptions> = {},
   ): AgentHarness {
-    const behavior = definition
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any
-      ? new SubagentBehavior(
-          config, 
-          definition as any, 
-          options.inputs, 
-          options.parentPromptId
-        )
-      : new MainAgentBehavior(config, options.parentPromptId);
+    let behavior;
+    if (definition && definition.kind === 'local') {
+      const localDef: LocalAgentDefinition = definition;
+      behavior = new SubagentBehavior(
+        config,
+        localDef,
+        options.inputs,
+        options.parentPromptId,
+      );
+    } else {
+      behavior = new MainAgentBehavior(config, options.parentPromptId);
+    }
 
     return new AgentHarness({
       config,

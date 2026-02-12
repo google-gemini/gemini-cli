@@ -168,3 +168,17 @@ export function appendToLastTextPart(
 
   return newPrompt;
 }
+
+/**
+ * Normalizes a PartListUnion into an array of Parts.
+ */
+export function toPartArray(value: PartListUnion): Part[] {
+  if (!value) return [];
+  const items = Array.isArray(value) ? value : [value];
+  return items.map((item) => {
+    if (typeof item === 'string') {
+      return { text: item };
+    }
+    return item;
+  });
+}

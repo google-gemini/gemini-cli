@@ -11,14 +11,21 @@ import {
   Type,
 } from '@google/genai';
 import { type Config } from '../config/config.js';
-import { type Turn, type ServerGeminiStreamEvent } from '../core/turn.js';
-import { 
+import {
+  type Turn,
+  type ServerGeminiStreamEvent,
+  GeminiEventType,
+} from '../core/turn.js';
+import {
   AgentTerminateMode,
-  type LocalAgentDefinition, 
-  type AgentInputs 
+  type LocalAgentDefinition,
+  type AgentInputs,
 } from './types.js';
 import { getCoreSystemPrompt } from '../core/prompts.js';
-import { getInitialChatHistory, getDirectoryContextString } from '../utils/environmentContext.js';
+import {
+  getInitialChatHistory,
+  getDirectoryContextString,
+} from '../utils/environmentContext.js';
 import { templateString } from './utils.js';
 import { getVersion } from '../utils/version.js';
 import { zodToJsonSchema } from 'zod-to-json-schema';
@@ -41,7 +48,7 @@ const GRACE_PERIOD_MS = 60 * 1000;
 export interface AgentBehavior {
   /** The unique ID for this agent instance. */
   readonly agentId: string;
-  
+
   /** The human-readable name of the agent. */
   readonly name: string;
 
@@ -54,7 +61,7 @@ export interface AgentBehavior {
   /** Returns the initial chat history. */
   getInitialHistory(): Promise<Content[]>;
 
-  /** 
+  /**
    * Prepares the tools list for the current turn.
    * @param baseTools The tools from the tool registry.
    */
@@ -68,12 +75,29 @@ export interface AgentBehavior {
   /**
    * Fires the "Before Agent" hooks if applicable.
    */
-  fireBeforeAgent(request: Part[]): Promise<{ stop?: boolean; reason?: string; systemMessage?: string; additionalContext?: string }>;
+  fireBeforeAgent(
+    request: Part[],
+  ): Promise<{
+    stop?: boolean;
+    reason?: string;
+    systemMessage?: string;
+    additionalContext?: string;
+  }>;
 
   /**
    * Fires the "After Agent" hooks if applicable.
    */
-  fireAfterAgent(request: Part[], response: string, turn: Turn): Promise<{ stop?: boolean; reason?: string; systemMessage?: string; contextCleared?: boolean; shouldContinue?: boolean }>;
+  fireAfterAgent(
+    request: Part[],
+    response: string,
+    turn: Turn,
+  ): Promise<{
+    stop?: boolean;
+    reason?: string;
+    systemMessage?: string;
+    contextCleared?: boolean;
+    shouldContinue?: boolean;
+  }>;
 
   /**
    * Transforms the initial request if needed (e.g. subagent 'Start' templating).
@@ -90,18 +114,29 @@ export interface AgentBehavior {
    * Checks if the agent should continue executing after a model turn with no tool calls.
    * (e.g., Main agent running next_speaker check)
    */
-  getContinuationRequest(turn: Turn, signal: AbortSignal): Promise<Part[] | null>;
+  getContinuationRequest(
+    turn: Turn,
+    signal: AbortSignal,
+  ): Promise<Part[] | null>;
 
   /**
    * Attempts to recover from a termination state (e.g., Subagent "Final Warning").
    * Returns a stream of events if recovery is attempted.
    */
-  executeRecovery(turn: Turn, reason: AgentTerminateMode, signal: AbortSignal): AsyncGenerator<ServerGeminiStreamEvent, boolean>;
+  executeRecovery(
+    turn: Turn,
+    reason: AgentTerminateMode,
+    signal: AbortSignal,
+  ): AsyncGenerator<ServerGeminiStreamEvent, boolean>;
 
   /**
    * Returns a final failure message for a given termination reason.
    */
-  getFinalFailureMessage(reason: AgentTerminateMode, maxTurns: number, maxTime: number): string;
+  getFinalFailureMessage(
+    reason: AgentTerminateMode,
+    maxTurns: number,
+    maxTime: number,
+  ): string;
 }
 
 /**
@@ -113,7 +148,10 @@ export class MainAgentBehavior implements AgentBehavior {
   private lastSentIdeContext: IdeContext | undefined;
   private forceFullIdeContext = true;
 
-  constructor(private readonly config: Config, parentPromptId?: string) {
+  constructor(
+    private readonly config: Config,
+    parentPromptId?: string,
+  ) {
     const randomIdPart = Math.random().toString(36).slice(2, 8);
     const parentPrefix = parentPromptId ? `${parentPromptId}-` : '';
     this.agentId = `${parentPrefix}main-${randomIdPart}`;
@@ -137,9 +175,12 @@ export class MainAgentBehavior implements AgentBehavior {
   async syncEnvironment(history: Content[]) {
     if (!this.config.getIdeMode()) return {};
 
-    const lastMessage = history.length > 0 ? history[history.length - 1] : undefined;
-    const hasPendingToolCall = !!lastMessage && lastMessage.role === 'model' && 
-      (lastMessage.parts?.some(p => 'functionCall' in p) || false);
+    const lastMessage =
+      history.length > 0 ? history[history.length - 1] : undefined;
+    const hasPendingToolCall =
+      !!lastMessage &&
+      lastMessage.role === 'model' &&
+      (lastMessage.parts?.some((p) => 'functionCall' in p) || false);
 
     if (hasPendingToolCall) return {};
 
@@ -147,10 +188,17 @@ export class MainAgentBehavior implements AgentBehavior {
     if (!currentIdeContext) return {};
 
     let contextParts: string[] = [];
-    if (this.forceFullIdeContext || this.lastSentIdeContext === undefined || history.length === 0) {
+    if (
+      this.forceFullIdeContext ||
+      this.lastSentIdeContext === undefined ||
+      history.length === 0
+    ) {
       contextParts = this.getFullIdeContextParts(currentIdeContext);
     } else {
-      contextParts = this.getDeltaIdeContextParts(currentIdeContext, this.lastSentIdeContext);
+      contextParts = this.getDeltaIdeContextParts(
+        currentIdeContext,
+        this.lastSentIdeContext,
+      );
     }
 
     if (contextParts.length > 0) {
@@ -164,11 +212,12 @@ export class MainAgentBehavior implements AgentBehavior {
 
   private getFullIdeContextParts(context: IdeContext): string[] {
     const openFiles = context.workspaceState?.openFiles || [];
-    const activeFile = openFiles.find(f => f.isActive);
-    const otherOpenFiles = openFiles.filter(f => !f.isActive).map(f => f.path);
+    const activeFile = openFiles.find((f) => f.isActive);
+    const otherOpenFiles = openFiles
+      .filter((f) => !f.isActive)
+      .map((f) => f.path);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const contextData: Record<string, any> = {};
+    const contextData: Record<string, unknown> = {};
     if (activeFile) {
       contextData['activeFile'] = {
         path: activeFile.path,
@@ -176,7 +225,8 @@ export class MainAgentBehavior implements AgentBehavior {
         selectedText: activeFile.selectedText || undefined,
       };
     }
-    if (otherOpenFiles.length > 0) contextData['otherOpenFiles'] = otherOpenFiles;
+    if (otherOpenFiles.length > 0)
+      contextData['otherOpenFiles'] = otherOpenFiles;
 
     if (Object.keys(contextData).length === 0) return [];
 
@@ -188,10 +238,12 @@ export class MainAgentBehavior implements AgentBehavior {
     ];
   }
 
-  private getDeltaIdeContextParts(_current: IdeContext, _last: IdeContext): string[] {
+  private getDeltaIdeContextParts(
+    _current: IdeContext,
+    _last: IdeContext,
+  ): string[] {
     // Simplified delta logic for now, similar to GeminiClient
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const changes: Record<string, any> = {};
+    const changes: Record<string, unknown> = {};
     // ... delta logic ...
     if (Object.keys(changes).length === 0) return [];
 
@@ -205,7 +257,9 @@ export class MainAgentBehavior implements AgentBehavior {
 
   async fireBeforeAgent(request: Part[]) {
     if (!this.config.getEnableHooks()) return {};
-    const hookOutput = await this.config.getHookSystem()?.fireBeforeAgentEvent(partToString(request));
+    const hookOutput = await this.config
+      .getHookSystem()
+      ?.fireBeforeAgentEvent(partToString(request));
     if (!hookOutput) return {};
 
     return {
@@ -220,7 +274,9 @@ export class MainAgentBehavior implements AgentBehavior {
     if (!this.config.getEnableHooks()) return {};
     if (turn.pendingToolCalls.length > 0) return {};
 
-    const hookOutput = await this.config.getHookSystem()?.fireAfterAgentEvent(partToString(request), response);
+    const hookOutput = await this.config
+      .getHookSystem()
+      ?.fireAfterAgentEvent(partToString(request), response);
     if (!hookOutput) return {};
 
     return {
@@ -242,8 +298,7 @@ export class MainAgentBehavior implements AgentBehavior {
 
   async getContinuationRequest(turn: Turn, signal: AbortSignal) {
     const nextSpeaker = await checkNextSpeaker(
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any
-      (turn as any).chat,
+      turn.chat,
       this.config.getBaseLlmClient(),
       signal,
       this.agentId,
@@ -254,9 +309,8 @@ export class MainAgentBehavior implements AgentBehavior {
     return null;
   }
 
-  async *executeRecovery() {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any
-    if (this.agentId === 'never') yield {} as any;
+  async *executeRecovery(): AsyncGenerator<ServerGeminiStreamEvent, boolean> {
+    if (this.agentId === 'never') yield { type: GeminiEventType.Retry };
     return false;
   }
 
@@ -276,7 +330,7 @@ export class SubagentBehavior implements AgentBehavior {
     private readonly config: Config,
     private readonly definition: LocalAgentDefinition,
     private readonly inputs?: AgentInputs,
-    parentPromptId?: string
+    parentPromptId?: string,
   ) {
     this.name = definition.name;
     const randomIdPart = Math.random().toString(36).slice(2, 8);
@@ -293,7 +347,10 @@ export class SubagentBehavior implements AgentBehavior {
       activeModel: this.config.getActiveModel(),
       today: new Date().toLocaleDateString(),
     };
-    let prompt = templateString(this.definition.promptConfig.systemPrompt || '', augmentedInputs);
+    let prompt = templateString(
+      this.definition.promptConfig.systemPrompt || '',
+      augmentedInputs,
+    );
     const dirContext = await getDirectoryContextString(this.config);
     prompt += `\n\n# Environment Context\n${dirContext}`;
     prompt += `\n\nImportant Rules:\n* You are running in a non-interactive mode. You CANNOT ask the user for input or clarification.\n* Work systematically using available tools to complete your task.\n* Always use absolute paths for file operations.`;
@@ -322,15 +379,24 @@ export class SubagentBehavior implements AgentBehavior {
   prepareTools(baseTools: FunctionDeclaration[]) {
     const completeTool: FunctionDeclaration = {
       name: TASK_COMPLETE_TOOL_NAME,
-      description: 'Call this tool to submit your final answer and complete the task.',
+      description:
+        'Call this tool to submit your final answer and complete the task.',
       parameters: { type: Type.OBJECT, properties: {}, required: [] },
     };
 
     if (this.definition.outputConfig) {
       const schema = zodToJsonSchema(this.definition.outputConfig.schema);
-      const { $schema: _, definitions: __, ...cleanSchema } = schema as Record<string, unknown>;
-      completeTool.parameters!.properties![this.definition.outputConfig.outputName] = cleanSchema as Schema;
-      completeTool.parameters!.required!.push(this.definition.outputConfig.outputName);
+      const {
+        $schema: _,
+        definitions: __,
+        ...cleanSchema
+      } = schema as Record<string, unknown>;
+      completeTool.parameters!.properties![
+        this.definition.outputConfig.outputName
+      ] = cleanSchema as Schema;
+      completeTool.parameters!.required!.push(
+        this.definition.outputConfig.outputName,
+      );
     } else {
       completeTool.parameters!.properties!['result'] = {
         type: Type.STRING,
@@ -355,11 +421,18 @@ export class SubagentBehavior implements AgentBehavior {
   }
 
   async transformRequest(request: Part[]): Promise<Part[]> {
-    if (request.length === 1 && 'text' in request[0] && request[0].text === 'Start') {
+    if (
+      request.length === 1 &&
+      'text' in request[0] &&
+      request[0].text === 'Start'
+    ) {
       return [
         {
           text: this.definition.promptConfig.query
-            ? templateString(this.definition.promptConfig.query, this.inputs || {})
+            ? templateString(
+                this.definition.promptConfig.query,
+                this.inputs || {},
+              )
             : 'Get Started!',
         },
       ];
@@ -368,7 +441,9 @@ export class SubagentBehavior implements AgentBehavior {
   }
 
   isGoalReached(toolResults: Array<{ name: string; part: Part }>) {
-    const completeCall = toolResults.find((r) => r.name === TASK_COMPLETE_TOOL_NAME);
+    const completeCall = toolResults.find(
+      (r) => r.name === TASK_COMPLETE_TOOL_NAME,
+    );
     if (completeCall) {
       // If there's an error in the call, we don't treat it as reached (model should retry)
       return !completeCall.part.functionResponse?.response?.['error'];
@@ -380,17 +455,33 @@ export class SubagentBehavior implements AgentBehavior {
     return null;
   }
 
-  async *executeRecovery(turn: Turn, reason: AgentTerminateMode, signal: AbortSignal): AsyncGenerator<ServerGeminiStreamEvent, boolean> {
+  async *executeRecovery(
+    turn: Turn,
+    reason: AgentTerminateMode,
+    signal: AbortSignal,
+  ): AsyncGenerator<ServerGeminiStreamEvent, boolean> {
     const recoveryStartTime = Date.now();
     let success = false;
-    const graceTimeoutController = new DeadlineTimer(GRACE_PERIOD_MS, 'Grace period timed out.');
-    const combinedSignal = AbortSignal.any([signal, graceTimeoutController.signal]);
+    const graceTimeoutController = new DeadlineTimer(
+      GRACE_PERIOD_MS,
+      'Grace period timed out.',
+    );
+    const combinedSignal = AbortSignal.any([
+      signal,
+      graceTimeoutController.signal,
+    ]);
 
     try {
-      const recoveryMessage: Part[] = [{ text: this.getFinalWarningMessage(reason) }];
+      const recoveryMessage: Part[] = [
+        { text: this.getFinalWarningMessage(reason) },
+      ];
       const promptId = `${this.agentId}#recovery`;
       const recoveryStream = promptIdContext.run(promptId, () =>
-        turn.run({ model: this.config.getActiveModel() }, recoveryMessage, combinedSignal),
+        turn.run(
+          { model: this.config.getActiveModel() },
+          recoveryMessage,
+          combinedSignal,
+        ),
       );
 
       for await (const event of recoveryStream) {
@@ -399,13 +490,25 @@ export class SubagentBehavior implements AgentBehavior {
 
       // Check if they called complete_task in the recovery turn
       if (turn.pendingToolCalls.length > 0) {
-        if (turn.pendingToolCalls.some(c => c.name === TASK_COMPLETE_TOOL_NAME)) {
+        if (
+          turn.pendingToolCalls.some((c) => c.name === TASK_COMPLETE_TOOL_NAME)
+        ) {
           success = true;
         }
       }
     } finally {
       graceTimeoutController.abort();
-      logRecoveryAttempt(this.config, new RecoveryAttemptEvent(this.agentId, this.name, reason, Date.now() - recoveryStartTime, success, 0));
+      logRecoveryAttempt(
+        this.config,
+        new RecoveryAttemptEvent(
+          this.agentId,
+          this.name,
+          reason,
+          Date.now() - recoveryStartTime,
+          success,
+          0,
+        ),
+      );
     }
     return success;
   }
@@ -413,20 +516,35 @@ export class SubagentBehavior implements AgentBehavior {
   private getFinalWarningMessage(reason: AgentTerminateMode): string {
     let explanation = '';
     switch (reason) {
-      case AgentTerminateMode.TIMEOUT: explanation = 'You have exceeded the time limit.'; break;
-      case AgentTerminateMode.MAX_TURNS: explanation = 'You have exceeded the maximum number of turns.'; break;
-      case AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL: explanation = 'You have stopped calling tools without finishing.'; break;
-      default: explanation = 'Execution was interrupted.';
+      case AgentTerminateMode.TIMEOUT:
+        explanation = 'You have exceeded the time limit.';
+        break;
+      case AgentTerminateMode.MAX_TURNS:
+        explanation = 'You have exceeded the maximum number of turns.';
+        break;
+      case AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL:
+        explanation = 'You have stopped calling tools without finishing.';
+        break;
+      default:
+        explanation = 'Execution was interrupted.';
     }
     return `${explanation} You have one final chance to complete the task with a short grace period. You MUST call \`${TASK_COMPLETE_TOOL_NAME}\` immediately with your best answer and explain that your investigation was interrupted. Do not call any other tools.`;
   }
 
-  getFinalFailureMessage(reason: AgentTerminateMode, maxTurns: number, maxTime: number) {
+  getFinalFailureMessage(
+    reason: AgentTerminateMode,
+    maxTurns: number,
+    maxTime: number,
+  ) {
     switch (reason) {
-      case AgentTerminateMode.TIMEOUT: return `Agent timed out after ${maxTime} minutes.`;
-      case AgentTerminateMode.MAX_TURNS: return `Agent reached max turns limit (${maxTurns}).`;
-      case AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL: return `Agent stopped calling tools but did not call '${TASK_COMPLETE_TOOL_NAME}'.`;
-      default: return 'Agent execution was terminated before completion.';
+      case AgentTerminateMode.TIMEOUT:
+        return `Agent timed out after ${maxTime} minutes.`;
+      case AgentTerminateMode.MAX_TURNS:
+        return `Agent reached max turns limit (${maxTurns}).`;
+      case AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL:
+        return `Agent stopped calling tools but did not call '${TASK_COMPLETE_TOOL_NAME}'.`;
+      default:
+        return 'Agent execution was terminated before completion.';
     }
   }
 }
