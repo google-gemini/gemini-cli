@@ -29,7 +29,8 @@ Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
 
 ## 📦 Installation
 
-See [Gemini CLI installation, execution, and releases](./docs/get-started/installation.md)
+See
+[Gemini CLI installation, execution, and releases](./docs/get-started/installation.md)
 for recommended system specifications and a detailed installation guide.
 
 ### Quick Install
