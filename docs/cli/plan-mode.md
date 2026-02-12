@@ -99,7 +99,7 @@ These are the only allowed tools:
 - **MCP Tools (Read):** Read-only [MCP tools] (e.g., `github_read_issue`,
   `postgres_read_schema`) are allowed.
 - **Planning (Write):** [`write_file`] and [`replace`] ONLY allowed for `.md`
-  files in the `~/.gemini/tmp/<project>/plans/` directory.
+  files in the `~/.gemini/tmp/<project>/<session-id>/plans/` directory.
 - **Skills:** [`activate_skill`] (allows loading specialized instructions and
   resources in a read-only manner)
 
