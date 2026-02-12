@@ -21,13 +21,31 @@ const CHAT_ISSUER = 'chat@system.gserviceaccount.com';
 
 /**
  * Creates middleware that verifies Google Chat JWT tokens.
- * When projectNumber is set, requests must include a valid Bearer token
- * signed by Google Chat with the correct audience.
- * When not set, verification is skipped (for local testing).
+ *
+ * On Cloud Run (detected via K_SERVICE env var), authentication is handled by
+ * Cloud Run's IAM layer — only principals with roles/run.invoker can reach the
+ * container. Cloud Run strips the Authorization header after validation, so our
+ * middleware cannot re-verify the token. We trust Cloud Run's IAM instead.
+ *
+ * When NOT on Cloud Run and projectNumber is set, requests must include a valid
+ * Bearer token signed by Google Chat with the correct audience.
+ *
+ * When neither condition applies, verification is skipped (local testing).
  */
 function createAuthMiddleware(
   projectNumber: string | undefined,
 ): (req: Request, res: Response, next: NextFunction) => void {
+  // On Cloud Run, IAM handles auth — the Authorization header is stripped
+  // before reaching the container, so we cannot verify it ourselves.
+  if (process.env['K_SERVICE']) {
+    logger.info(
+      '[ChatBridge] Running on Cloud Run — auth delegated to Cloud Run IAM.',
+    );
+    return (_req: Request, _res: Response, next: NextFunction) => {
+      next();
+    };
+  }
+
   if (!projectNumber) {
     logger.warn(
       '[ChatBridge] CHAT_PROJECT_NUMBER not set — JWT verification disabled. ' +
