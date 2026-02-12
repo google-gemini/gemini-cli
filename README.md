@@ -32,7 +32,7 @@ Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
 ### Recommended System Specifications
 
 - **Operating System:**
-  - macOS 26+
+  - macOS 15+
   - Windows 11 24H2+
   - Ubuntu 20.04+
 - **Hardware:**

@@ -6,7 +6,7 @@ installation methods, and release types.
 ## Recommended system specifications
 
 - **Operating System:**
-  - macOS 26+
+  - macOS 15+
   - Windows 11 24H2+
   - Ubuntu 20.04+
 - **Hardware:**
