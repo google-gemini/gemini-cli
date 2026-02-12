@@ -35,9 +35,31 @@ jobs:
             const pr_number = context.payload.pull_request.number;
 
             // 1. Check if the PR author is a maintainer
+            const isGoogler = async (login) => {
+              try {
+                const orgs = ['googlers', 'google'];
+                for (const org of orgs) {
+                  try {
+                    await github.rest.orgs.checkMembershipForUser({
+                      org: org,
+                      username: login
+                    });
+                    return true;
+                  } catch (e) {
+                    if (e.status !== 404) throw e;
+                  }
+                }
+              } catch (e) {
+                core.warning(`Failed to check org membership for ${login}: ${e.message}`);
+              }
+              return false;
+            };
+
             const authorAssociation = context.payload.pull_request.author_association;
-            if (['OWNER', 'MEMBER', 'COLLABORATOR'].includes(authorAssociation)) {
-              core.info(`${username} is a maintainer (Association: ${authorAssociation}). No notification needed.`);
+            const isRepoMaintainer = ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(authorAssociation);
+
+            if (isRepoMaintainer || await isGoogler(username)) {
+              core.info(`${username} is a maintainer or Googler. No notification needed.`);
               return;
             }
 
