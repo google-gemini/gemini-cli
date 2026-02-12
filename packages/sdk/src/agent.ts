@@ -79,7 +79,8 @@ export class GeminiCliAgent {
     let request: Parameters<GeminiClient['sendMessageStream']>[0] = [
       { text: prompt },
     ];
-    const signal = new AbortController().signal; // TODO: support signal
+    // TODO: support AbortSignal cancellation properly
+    const signal = new AbortController().signal;
     const sessionId = this.config.getSessionId();
 
     while (true) {
@@ -114,8 +115,13 @@ export class GeminiCliAgent {
         }
 
         try {
+          let args = toolCall.args;
+          if (typeof args === 'string') {
+            args = JSON.parse(args);
+          }
+
           // Cast toolCall.args to object to satisfy AnyDeclarativeTool.build
-          const invocation = tool.build(toolCall.args as object);
+          const invocation = tool.build(args as object);
           const result = await invocation.execute(signal);
 
           functionResponses.push({
