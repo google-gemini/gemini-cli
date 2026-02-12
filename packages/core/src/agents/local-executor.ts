@@ -296,7 +296,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     reason:
       | AgentTerminateMode.TIMEOUT
       | AgentTerminateMode.MAX_TURNS
-      | AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
+      | AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL
+      | AgentTerminateMode.LOOP_DETECTED,
   ): string {
     let explanation = '';
     switch (reason) {
@@ -327,7 +328,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     reason:
       | AgentTerminateMode.TIMEOUT
       | AgentTerminateMode.MAX_TURNS
-      | AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
+      | AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL
+      | AgentTerminateMode.LOOP_DETECTED,
     externalSignal: AbortSignal, // The original signal passed to run()
     onWaitingForConfirmation?: (waiting: boolean) => void,
   ): Promise<string | null> {
