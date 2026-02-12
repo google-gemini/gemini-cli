@@ -46,7 +46,7 @@ export class SchedulerStateManager {
   private _completedBatch: CompletedToolCall[] = [];
 
   constructor(
-    private readonly messageBus: MessageBus,
+    private readonly messageBus: MessageBus | undefined,
     private readonly schedulerId: string = ROOT_SCHEDULER_ID,
     private readonly onTerminalCall?: TerminalCallHandler,
   ) {}
@@ -210,6 +210,10 @@ export class SchedulerStateManager {
   }
 
   private emitUpdate() {
+    if (!this.messageBus) {
+      return;
+    }
+
     const snapshot = this.getSnapshot();
 
     // Fire and forget - The message bus handles the publish and error handling.

@@ -95,6 +95,7 @@ import { computeTerminalTitle } from '../utils/windowTitle.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
 import { useLogger } from './hooks/useLogger.js';
 import { useGeminiStream } from './hooks/useGeminiStream.js';
+import { useAgentHarness } from './hooks/useAgentHarness.js';
 import { type BackgroundShell } from './hooks/shellCommandProcessor.js';
 import { useVim } from './hooks/vim.js';
 import { type LoadableSettingScope, SettingScope } from '../config/settings.js';
@@ -966,26 +967,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
     }
   }, [pendingRestorePrompt, inputHistory, historyManager.history]);
 
-  const {
-    streamingState,
-    submitQuery,
-    initError,
-    pendingHistoryItems: pendingGeminiHistoryItems,
-    thought,
-    cancelOngoingRequest,
-    pendingToolCalls,
-    handleApprovalModeChange,
-    activePtyId,
-    loopDetectionConfirmationRequest,
-    lastOutputTime,
-    backgroundShellCount,
-    isBackgroundShellVisible,
-    toggleBackgroundShell,
-    backgroundCurrentShell,
-    backgroundShells,
-    dismissBackgroundShell,
-    retryStatus,
-  } = useGeminiStream(
+  const isAgentHarnessEnabled = config.isAgentHarnessEnabled();
+
+  const legacyStream = useGeminiStream(
     config.getGeminiClient(),
     historyManager.history,
     historyManager.addItem,
@@ -1005,6 +989,37 @@ Logging in with Google... Restarting Gemini CLI to continue.
     terminalHeight,
     embeddedShellFocused,
   );
+
+  const harnessStream = useAgentHarness(
+    historyManager.addItem,
+    config,
+    onCancelSubmit,
+  );
+
+  const activeStream = isAgentHarnessEnabled ? harnessStream : legacyStream;
+
+  const {
+    streamingState,
+    submitQuery,
+    initError,
+    pendingHistoryItems: pendingGeminiHistoryItems,
+    thought,
+    cancelOngoingRequest,
+    toolCalls: pendingToolCalls,
+    handleApprovalModeChange,
+    activePtyId: rawActivePtyId,
+    loopDetectionConfirmationRequest,
+    lastOutputTime,
+    backgroundShellCount,
+    isBackgroundShellVisible,
+    toggleBackgroundShell,
+    backgroundCurrentShell,
+    backgroundShells,
+    dismissBackgroundShell,
+    retryStatus,
+  } = activeStream;
+
+  const activePtyId = rawActivePtyId ?? undefined;
 
   toggleBackgroundShellRef.current = toggleBackgroundShell;
   isBackgroundShellVisibleRef.current = isBackgroundShellVisible;

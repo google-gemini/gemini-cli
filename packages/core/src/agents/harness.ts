@@ -29,8 +29,12 @@ import { ToolOutputMaskingService } from '../services/toolOutputMaskingService.j
 import { resolveModel } from '../config/models.js';
 import { type RoutingContext } from '../routing/routingStrategy.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
+import { SubagentTool } from './subagent-tool.js';
 import { scheduleAgentTools } from './agent-scheduler.js';
-import { type ToolCallRequestInfo } from '../scheduler/types.js';
+import {
+  type ToolCallRequestInfo,
+  type ToolCallResponseInfo,
+} from '../scheduler/types.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
 import { logAgentStart, logAgentFinish } from '../telemetry/loggers.js';
 import { AgentStartEvent, AgentFinishEvent } from '../telemetry/types.js';
@@ -258,14 +262,17 @@ export class AgentHarness {
           }
 
           if (event.type === GeminiEventType.ToolCallRequest) {
-            yield {
-              type: GeminiEventType.SubagentActivity,
-              value: {
-                agentName: this.behavior.name,
-                type: 'TOOL_CALL_START',
-                data: { name: event.value.name, args: event.value.args },
-              },
-            };
+            const tool = this.toolRegistry.getTool(event.value.name);
+            if (tool instanceof SubagentTool) {
+              yield {
+                type: GeminiEventType.SubagentActivity,
+                value: {
+                  agentName: this.behavior.name,
+                  type: 'TOOL_CALL_START',
+                  data: { name: event.value.name, args: event.value.args },
+                },
+              };
+            }
           }
         }
 
@@ -290,7 +297,9 @@ export class AgentHarness {
         if (afterResult.shouldContinue) {
           currentRequest = [{ text: afterResult.reason || 'Continue' }];
           this.turnCounter++;
-          turn = new Turn(this.chat!, this.behavior.agentId);
+          if (this.behavior.name === 'main') {
+            yield { type: GeminiEventType.TurnFinished };
+          }
           continue;
         }
 
@@ -309,14 +318,71 @@ export class AgentHarness {
             onWaitingForConfirmation,
           );
 
+          // Yield responses so UI knows they are done
+          for (const result of toolResults) {
+            if (result.result) {
+              yield {
+                type: GeminiEventType.ToolCallResponse,
+                value: result.result,
+              };
+
+              const tool = this.toolRegistry.getTool(result.name);
+              if (tool instanceof SubagentTool) {
+                yield {
+                  type: GeminiEventType.SubagentActivity,
+                  value: {
+                    agentName: this.behavior.name,
+                    type: 'TOOL_CALL_END',
+                    data: {
+                      name: result.name,
+                      output: result.result.resultDisplay,
+                    },
+                  },
+                };
+              }
+            }
+          }
+
           if (this.behavior.isGoalReached(toolResults)) {
             terminateReason = AgentTerminateMode.GOAL;
+
+            // If it's a subagent, find the complete_task call and extract the result string
+            const goalCall = toolResults.find((r) => r.name === 'complete_task');
+            if (goalCall?.result?.resultDisplay && this.chat) {
+              // Ensure the chat session records the final text result so future turns or getResponseText() can see it
+              this.chat.addHistory({
+                role: 'model',
+                parts: [{ text: String(goalCall.result.resultDisplay) }],
+              });
+            }
+
             return turn;
           }
 
-          currentRequest = toolResults.map((r) => r.part);
+          currentRequest = toolResults.map((r) => {
+            // Ensure the LLM "sees" the rich result display if it's available.
+            // We use the resultDisplay text as the definitive function response.
+            if (
+              r.result?.resultDisplay &&
+              'functionResponse' in r.part &&
+              r.part.functionResponse
+            ) {
+              return {
+                functionResponse: {
+                  ...r.part.functionResponse,
+                  response: { result: String(r.result.resultDisplay) },
+                },
+              };
+            }
+            return r.part;
+          });
           this.turnCounter++;
-          turn = new Turn(this.chat!, this.behavior.agentId);
+
+          // Only yield TurnFinished if we are the main agent.
+          // Nested subagent turns should be internal and not trigger UI flushes in the parent.
+          if (this.behavior.name === 'main') {
+            yield { type: GeminiEventType.TurnFinished };
+          }
         } else {
           // No tool calls. Check for continuation.
           const nextParts = await this.behavior.getContinuationRequest(
@@ -326,7 +392,9 @@ export class AgentHarness {
           if (nextParts) {
             currentRequest = nextParts;
             this.turnCounter++;
-            turn = new Turn(this.chat!, this.behavior.agentId);
+            if (this.behavior.name === 'main') {
+              yield { type: GeminiEventType.TurnFinished };
+            }
             continue;
           }
 
@@ -428,7 +496,7 @@ export class AgentHarness {
     calls: ToolCallRequestInfo[],
     signal: AbortSignal,
     onWaitingForConfirmation?: (waiting: boolean) => void,
-  ): Promise<Array<{ name: string; part: Part }>> {
+  ): Promise<Array<{ name: string; part: Part; result: ToolCallResponseInfo }>> {
     const taskCompleteCalls = calls.filter(
       (c) => c.name === TASK_COMPLETE_TOOL_NAME,
     );
@@ -440,7 +508,7 @@ export class AgentHarness {
 
     let completedCalls: Array<{
       request: ToolCallRequestInfo;
-      response: { responseParts: Part[] };
+      response: ToolCallResponseInfo;
     }> = [];
 
     if (otherCalls.length > 0) {
@@ -449,24 +517,38 @@ export class AgentHarness {
         toolRegistry: this.toolRegistry,
         signal,
         onWaitingForConfirmation,
+        // Only broadcast to global UI if we are the main top-level agent
+        messageBus: this.behavior.name === 'main' ? undefined : null,
       });
     }
 
     const results = completedCalls.map((call) => ({
       name: call.request.name,
       part: call.response.responseParts[0],
+      result: call.response,
     }));
 
     for (const call of taskCompleteCalls) {
+      const response: ToolCallResponseInfo = {
+        callId: call.callId,
+        responseParts: [
+          {
+            functionResponse: {
+              name: TASK_COMPLETE_TOOL_NAME,
+              response: { result: 'Task completed locally' },
+              id: call.callId,
+            },
+          },
+        ],
+        resultDisplay: 'Task completed locally',
+        error: undefined,
+        errorType: undefined,
+        contentLength: 'Task completed locally'.length,
+      };
       results.push({
         name: TASK_COMPLETE_TOOL_NAME,
-        part: {
-          functionResponse: {
-            name: TASK_COMPLETE_TOOL_NAME,
-            response: { result: 'Task completed locally' },
-            id: call.callId,
-          },
-        },
+        part: response.responseParts[0],
+        result: response,
       });
     }
 

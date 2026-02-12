@@ -7,7 +7,10 @@
 import type { Config } from '../config/config.js';
 import { LocalAgentExecutor } from './local-executor.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
-import { BaseToolInvocation, type ToolResult } from '../tools/tools.js';
+import {
+  BaseToolInvocation,
+  type ToolResult,
+} from '../tools/tools.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import type {
   LocalAgentDefinition,
@@ -17,7 +20,6 @@ import type {
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { AgentFactory } from './agent-factory.js';
 import type { Turn } from '../core/turn.js';
-import { GeminiEventType } from '../core/turn.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
@@ -168,24 +170,15 @@ ${output.result}
       const stream = harness.run(initialRequest, signal);
 
       let turn: Turn | undefined;
+
       while (true) {
         const { value, done } = await stream.next();
         if (done) {
           turn = value;
           break;
         }
-        const event = value;
-        if (updateOutput) {
-          if (event.type === GeminiEventType.Thought) {
-            updateOutput(`🤖💭 ${event.value.subject}`);
-          } else if (event.type === GeminiEventType.SubagentActivity) {
-            if (event.value.type === 'TOOL_CALL_START') {
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-              const toolName = event.value.data['name'] as string;
-              updateOutput(`🛠️  Calling tool: ${toolName}...`);
-            }
-          }
-        }
+        // For the subagent box, we don't want to stream internal thoughts or tool calls
+        // to the persistent history. We just wait for the final result.
       }
 
       if (!turn) {

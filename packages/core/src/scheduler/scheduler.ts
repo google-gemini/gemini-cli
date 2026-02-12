@@ -47,7 +47,7 @@ interface SchedulerQueueItem {
 
 export interface SchedulerOptions {
   config: Config;
-  messageBus: MessageBus;
+  messageBus?: MessageBus;
   getPreferredEditor: () => EditorType | undefined;
   schedulerId: string;
   parentCallId?: string;
@@ -87,7 +87,7 @@ export class Scheduler {
   private readonly executor: ToolExecutor;
   private readonly modifier: ToolModificationHandler;
   private readonly config: Config;
-  private readonly messageBus: MessageBus;
+  private readonly messageBus?: MessageBus;
   private readonly getPreferredEditor: () => EditorType | undefined;
   private readonly schedulerId: string;
   private readonly parentCallId?: string;
@@ -112,11 +112,13 @@ export class Scheduler {
     this.executor = new ToolExecutor(this.config);
     this.modifier = new ToolModificationHandler();
 
-    this.setupMessageBusListener(this.messageBus);
+    if (this.messageBus) {
+      this.setupMessageBusListener(this.messageBus);
+    }
   }
 
   private setupMessageBusListener(messageBus: MessageBus): void {
-    if (Scheduler.subscribedMessageBuses.has(messageBus)) {
+    if (!messageBus || Scheduler.subscribedMessageBuses.has(messageBus)) {
       return;
     }
 
@@ -432,7 +434,7 @@ export class Scheduler {
     let outcome = ToolConfirmationOutcome.ProceedOnce;
     let lastDetails: SerializableConfirmationDetails | undefined;
 
-    if (decision === PolicyDecision.ASK_USER) {
+    if (decision === PolicyDecision.ASK_USER && this.messageBus) {
       const result = await resolveConfirmation(toolCall, signal, {
         config: this.config,
         messageBus: this.messageBus,
@@ -449,10 +451,12 @@ export class Scheduler {
     }
 
     // Handle Policy Updates
-    await updatePolicy(toolCall.tool, outcome, lastDetails, {
-      config: this.config,
-      messageBus: this.messageBus,
-    });
+    if (this.messageBus) {
+      await updatePolicy(toolCall.tool, outcome, lastDetails, {
+        config: this.config,
+        messageBus: this.messageBus,
+      });
+    }
 
     // Handle cancellation (cascades to entire batch)
     if (outcome === ToolConfirmationOutcome.Cancel) {

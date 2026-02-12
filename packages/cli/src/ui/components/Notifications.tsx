@@ -110,7 +110,8 @@ export const Notifications = () => {
           marginBottom={1}
         >
           <Text color={theme.status.error}>
-            Initialization Error: {initError}
+            Initialization Error:{' '}
+            {initError instanceof Error ? initError.message : initError}
           </Text>
           <Text color={theme.status.error}>
             {' '}

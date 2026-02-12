@@ -1171,6 +1171,9 @@ export const useGeminiStream = (
           case ServerGeminiEventType.SubagentActivity:
             // TODO: UI implementation for subagent activity
             break;
+          case ServerGeminiEventType.TurnFinished:
+            // No-op for now to satisfy exhaustive switch
+            break;
           default: {
             // enforces exhaustive switch-case
             const unreachable: never = event;
@@ -1680,7 +1683,7 @@ export const useGeminiStream = (
     pendingHistoryItems,
     thought,
     cancelOngoingRequest,
-    pendingToolCalls: toolCalls,
+    toolCalls,
     handleApprovalModeChange,
     activePtyId,
     loopDetectionConfirmationRequest,

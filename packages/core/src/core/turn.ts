@@ -69,6 +69,7 @@ export enum GeminiEventType {
   AgentExecutionStopped = 'agent_execution_stopped',
   AgentExecutionBlocked = 'agent_execution_blocked',
   SubagentActivity = 'subagent_activity',
+  TurnFinished = 'turn_finished',
 }
 
 export type ServerGeminiSubagentActivityEvent = {
@@ -78,6 +79,10 @@ export type ServerGeminiSubagentActivityEvent = {
     type: string;
     data: Record<string, unknown>;
   };
+};
+
+export type ServerGeminiTurnFinishedEvent = {
+  type: GeminiEventType.TurnFinished;
 };
 
 export type ServerGeminiRetryEvent = {
@@ -240,7 +245,8 @@ export type ServerGeminiStreamEvent =
   | ServerGeminiModelInfoEvent
   | ServerGeminiAgentExecutionStoppedEvent
   | ServerGeminiAgentExecutionBlockedEvent
-  | ServerGeminiSubagentActivityEvent;
+  | ServerGeminiSubagentActivityEvent
+  | ServerGeminiTurnFinishedEvent;
 
 // A turn manages the agentic loop turn within the server context.
 export class Turn {

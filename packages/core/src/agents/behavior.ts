@@ -41,6 +41,7 @@ import { DeadlineTimer } from '../utils/deadlineTimer.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
 import type { ToolRegistry } from '../tools/tool-registry.js';
+import type { ToolCallResponseInfo } from '../scheduler/types.js';
 
 const TASK_COMPLETE_TOOL_NAME = 'complete_task';
 const GRACE_PERIOD_MS = 60 * 1000;
@@ -110,7 +111,13 @@ export interface AgentBehavior {
    * Determines if the current tool results signify that the agent's goal is met.
    * (e.g., Subagents checking for 'complete_task')
    */
-  isGoalReached(toolResults: Array<{ name: string; part: Part }>): boolean;
+  isGoalReached(
+    toolResults: Array<{
+      name: string;
+      part: Part;
+      result: ToolCallResponseInfo;
+    }>,
+  ): boolean;
 
   /**
    * Checks if the agent should continue executing after a model turn with no tool calls.
@@ -467,7 +474,13 @@ export class SubagentBehavior implements AgentBehavior {
     return request;
   }
 
-  isGoalReached(toolResults: Array<{ name: string; part: Part }>) {
+  isGoalReached(
+    toolResults: Array<{
+      name: string;
+      part: Part;
+      result: ToolCallResponseInfo;
+    }>,
+  ) {
     const completeCall = toolResults.find(
       (r) => r.name === TASK_COMPLETE_TOOL_NAME,
     );

@@ -219,7 +219,11 @@ describe('Scheduler (Orchestrator)', () => {
 
     let capturedTerminalHandler: TerminalCallHandler | undefined;
     vi.mocked(SchedulerStateManager).mockImplementation(
-      (_messageBus, _schedulerId, onTerminalCall) => {
+      (
+        _messageBus: MessageBus | undefined,
+        _schedulerId: string | undefined,
+        onTerminalCall: TerminalCallHandler | undefined,
+      ) => {
         capturedTerminalHandler = onTerminalCall;
         return mockStateManager as unknown as SchedulerStateManager;
       },

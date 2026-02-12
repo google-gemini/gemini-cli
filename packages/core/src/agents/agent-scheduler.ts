@@ -12,6 +12,7 @@ import type {
 } from '../scheduler/types.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
 import type { EditorType } from '../utils/editor.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 /**
  * Options for scheduling agent tools.
@@ -29,6 +30,13 @@ export interface AgentSchedulingOptions {
   getPreferredEditor?: () => EditorType | undefined;
   /** Optional function to be notified when the scheduler is waiting for user confirmation. */
   onWaitingForConfirmation?: (waiting: boolean) => void;
+  /**
+   * Optional message bus override.
+   * If provided, the scheduler will broadcast to this bus.
+   * If explicitly null, broadcasting is disabled.
+   * If omitted, the global config message bus is used.
+   */
+  messageBus?: MessageBus | null;
 }
 
 /**
@@ -51,6 +59,7 @@ export async function scheduleAgentTools(
     signal,
     getPreferredEditor,
     onWaitingForConfirmation,
+    messageBus,
   } = options;
 
   // Create a proxy/override of the config to provide the agent-specific tool registry.
@@ -59,7 +68,10 @@ export async function scheduleAgentTools(
 
   const scheduler = new Scheduler({
     config: agentConfig,
-    messageBus: config.getMessageBus(),
+    messageBus:
+      messageBus === undefined
+        ? config.getMessageBus()
+        : (messageBus ?? undefined),
     getPreferredEditor: getPreferredEditor ?? (() => undefined),
     schedulerId,
     parentCallId,

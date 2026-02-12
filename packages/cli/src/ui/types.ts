@@ -373,6 +373,7 @@ export enum MessageType {
   AGENTS_LIST = 'agents_list',
   MCP_STATUS = 'mcp_status',
   CHAT_LIST = 'chat_list',
+  THINKING = 'thinking',
   HOOKS_LIST = 'hooks_list',
 }
 
