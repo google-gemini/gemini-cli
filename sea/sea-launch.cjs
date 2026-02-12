@@ -84,8 +84,6 @@ function prepareRuntime(manifest, getAssetFn, deps = {}) {
   const processUid =
     deps.processUid || (process.getuid ? process.getuid() : 'unknown');
 
-  let runtimeDir = processEnv.GEMINI_SEA_RUNTIME_DIR;
-
   const version = manifest.version || '0.0.0';
   const safeVersion = getSafeName(version);
   const userInfo = osMod.userInfo();
@@ -99,10 +97,24 @@ function prepareRuntime(manifest, getAssetFn, deps = {}) {
     `gemini-runtime-${safeVersion}-${safeUsername}`,
   );
 
-  // If runtimeDir is not provided, check if we can reuse the existing one
-  if (!runtimeDir) {
-    let useExisting = false;
-    if (fsMod.existsSync(finalRuntimeDir)) {
+  let runtimeDir;
+  let useExisting = false;
+
+  const isSecure = (dir) => {
+    try {
+      const stat = fsMod.lstatSync(dir);
+      if (!stat.isDirectory()) return false;
+      if (processUid !== 'unknown' && stat.uid !== processUid) return false;
+      // Skip strict permission check on Windows as it's unreliable with standard fs.stat
+      if (process.platform !== 'win32' && (stat.mode & 0o777) !== 0o700)
+        return false;
+      return true;
+    } catch (_) {
+      return false;
+    }
+  };
+  if (fsMod.existsSync(finalRuntimeDir)) {
+    if (isSecure(finalRuntimeDir)) {
       if (
         verifyIntegrity(finalRuntimeDir, manifest, fsMod, deps.crypto || crypto)
       ) {
@@ -113,64 +125,69 @@ function prepareRuntime(manifest, getAssetFn, deps = {}) {
           fsMod.rmSync(finalRuntimeDir, { recursive: true, force: true });
         } catch (_) {}
       }
-    }
-
-    if (!useExisting) {
-      const setupDir = pathMod.join(
-        tempBase,
-        `gemini-setup-${processPid}-${Date.now()}`,
-      );
-
+    } else {
       try {
-        fsMod.mkdirSync(setupDir, { recursive: true, mode: 0o700 });
-        const writeToSetup = (assetKey, relPath) => {
-          const content = getAssetFn(assetKey);
-          if (!content) return;
-          const destPath = pathMod.join(setupDir, relPath);
-          const destDir = pathMod.dirname(destPath);
-          if (!fsMod.existsSync(destDir))
-            fsMod.mkdirSync(destDir, { recursive: true, mode: 0o700 });
-          fsMod.writeFileSync(destPath, new Uint8Array(content), {
-            mode: 0o755,
-          });
-        };
-        writeToSetup('gemini.mjs', 'gemini.mjs');
-        if (manifest.files) {
-          for (const file of manifest.files) {
-            writeToSetup(file.key, file.path);
-          }
+        fsMod.rmSync(finalRuntimeDir, { recursive: true, force: true });
+      } catch (_) {}
+    }
+  }
+
+  if (!useExisting) {
+    const setupDir = pathMod.join(
+      tempBase,
+      `gemini-setup-${processPid}-${Date.now()}`,
+    );
+
+    try {
+      fsMod.mkdirSync(setupDir, { recursive: true, mode: 0o700 });
+      const writeToSetup = (assetKey, relPath) => {
+        const content = getAssetFn(assetKey);
+        if (!content) return;
+        const destPath = pathMod.join(setupDir, relPath);
+        const destDir = pathMod.dirname(destPath);
+        if (!fsMod.existsSync(destDir))
+          fsMod.mkdirSync(destDir, { recursive: true, mode: 0o700 });
+        fsMod.writeFileSync(destPath, new Uint8Array(content), {
+          mode: 0o755,
+        });
+      };
+      writeToSetup('gemini.mjs', 'gemini.mjs');
+      if (manifest.files) {
+        for (const file of manifest.files) {
+          writeToSetup(file.key, file.path);
         }
-        try {
-          fsMod.renameSync(setupDir, finalRuntimeDir);
-          runtimeDir = finalRuntimeDir;
-        } catch (renameErr) {
-          if (
-            fsMod.existsSync(finalRuntimeDir) &&
-            verifyIntegrity(
-              finalRuntimeDir,
-              manifest,
-              fsMod,
-              deps.crypto || crypto,
-            )
-          ) {
-            runtimeDir = finalRuntimeDir;
-            try {
-              fsMod.rmSync(setupDir, { recursive: true, force: true });
-            } catch (_) {}
-          } else {
-            throw renameErr;
-          }
-        }
-      } catch (e) {
-        console.error(
-          'Fatal Error: Failed to setup secure runtime. Please try running again and if error persists please reinstall.',
-          e,
-        );
-        try {
-          fsMod.rmSync(setupDir, { recursive: true, force: true });
-        } catch (_) {}
-        process.exit(1);
       }
+      try {
+        fsMod.renameSync(setupDir, finalRuntimeDir);
+        runtimeDir = finalRuntimeDir;
+      } catch (renameErr) {
+        if (
+          fsMod.existsSync(finalRuntimeDir) &&
+          isSecure(finalRuntimeDir) &&
+          verifyIntegrity(
+            finalRuntimeDir,
+            manifest,
+            fsMod,
+            deps.crypto || crypto,
+          )
+        ) {
+          runtimeDir = finalRuntimeDir;
+          try {
+            fsMod.rmSync(setupDir, { recursive: true, force: true });
+          } catch (_) {}
+        } else {
+          throw renameErr;
+        }
+      }
+    } catch (e) {
+      console.error(
+        'Fatal Error: Failed to setup secure runtime. Please try running again and if error persists please reinstall.',
+        e,
+      );
+      try {
+        fsMod.rmSync(setupDir, { recursive: true, force: true });
+      } catch (_) {}
+      process.exit(1);
     }
   }
 
@@ -205,9 +222,6 @@ async function main(getAssetFn = getAsset) {
     processEnv: process.env,
     crypto,
   });
-
-  // Set env var for child processes
-  process.env.GEMINI_SEA_RUNTIME_DIR = runtimeDir;
 
   const mainPath = path.join(runtimeDir, 'gemini.mjs');
 

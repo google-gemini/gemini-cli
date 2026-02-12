@@ -79,12 +79,14 @@ async function main() {
         // Note: Compress-Archive only supports .zip extension, so we zip to .zip and rename
         console.log('zip command not found, falling back to PowerShell...');
         const tempZip = outputFilename + '.zip';
+        // Escape single quotes for PowerShell (replace ' with '') and use single quotes for the path
+        const safeTempZip = tempZip.replace(/'/g, "''");
         zipProcess = spawnSync(
           'powershell.exe',
           [
             '-NoProfile',
             '-Command',
-            `Compress-Archive -Path .\\* -DestinationPath "${tempZip}" -Force`,
+            `Compress-Archive -Path .\\* -DestinationPath '${safeTempZip}' -Force`,
           ],
           {
             cwd: skillPath,
