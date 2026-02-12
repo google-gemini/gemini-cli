@@ -12,6 +12,7 @@ output for other applications.
 ## Why headless mode?
 
 Headless mode runs Gemini CLI once and exits. It's perfect for:
+
 - **CI/CD:** Analyzing pull requests automatically.
 - **Batch processing:** Summarizing a large number of log files.
 - **Tool building:** Creating your own "AI wrapper" scripts.
@@ -53,8 +54,8 @@ results to a file.
 
 ### Scenario: Bulk documentation generator
 
-You have a folder of Python scripts and want to generate a `README.md`
-for each one.
+You have a folder of Python scripts and want to generate a `README.md` for each
+one.
 
 1.  Save the following code as `generate_docs.sh`:
 
@@ -84,8 +85,8 @@ for each one.
 ## Extract structured JSON data
 
 When writing a script, you often need structured data (JSON) to pass to tools
-like `jq`. To get pure JSON data from the model, combine the `--output-format
-json` flag with `jq` to parse the response field.
+like `jq`. To get pure JSON data from the model, combine the
+`--output-format json` flag with `jq` to parse the response field.
 
 ### Scenario: Extract and return structured data
 
@@ -111,7 +112,7 @@ json` flag with `jq` to parse the response field.
     ./generate_json.sh
     ```
 
-3. Check `data.json`. The file should look like this:
+3.  Check `data.json`. The file should look like this:
 
     ```json
     {
@@ -131,8 +132,8 @@ Use headless mode to perform custom, automated AI tasks.
 You can add a function to your shell configuration (like `.zshrc` or `.bashrc`)
 to create a `git commit` wrapper that writes the message for you.
 
-1.  Open your `.zshrc` file (or `.bashrc` if you use Bash) in your preferred text
-    editor.
+1.  Open your `.zshrc` file (or `.bashrc` if you use Bash) in your preferred
+    text editor.
 
     ```bash
     nano ~/.zshrc
@@ -180,7 +181,7 @@ to create a `git commit` wrapper that writes the message for you.
 
 ## Next steps
 
-- Explore the [Headless mode reference](../../cli/headless.md) for full JSON schema
-  details.
+- Explore the [Headless mode reference](../../cli/headless.md) for full JSON
+  schema details.
 - Learn about [Shell commands](shell-commands.md) to let the agent run scripts
   instead of just writing them.

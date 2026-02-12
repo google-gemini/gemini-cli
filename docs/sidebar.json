@@ -53,25 +53,103 @@
     "label": "Features",
     "items": [
       {
+        "label": "/about - About Gemini CLI",
+        "slug": "docs/cli/commands#about"
+      },
+      {
+        "label": "/auth - Authentication",
+        "slug": "docs/get-started/authentication"
+      },
+      { "label": "/bug - Report a bug", "slug": "docs/cli/commands#bug" },
+      { "label": "/chat - Chat history", "slug": "docs/cli/commands#chat" },
+      { "label": "/clear - Clear screen", "slug": "docs/cli/commands#clear" },
+      {
+        "label": "/compress - Compress context",
+        "slug": "docs/cli/commands#compress"
+      },
+      { "label": "/copy - Copy output", "slug": "docs/cli/commands#copy" },
+      {
+        "label": "/directory - Manage workspace",
+        "slug": "docs/cli/commands#directory-or-dir"
+      },
+      {
+        "label": "/docs - Open documentation",
+        "slug": "docs/cli/commands#docs"
+      },
+      {
+        "label": "/editor - Select editor",
+        "slug": "docs/cli/commands#editor"
+      },
+      {
+        "label": "/extensions - Manage extensions",
+        "slug": "docs/extensions/index"
+      },
+      { "label": "/help - Show help", "slug": "docs/cli/commands#help-or" },
+      { "label": "/hooks - Hooks", "slug": "docs/hooks" },
+      { "label": "/ide - IDE integration", "slug": "docs/ide-integration" },
+      {
+        "label": "/init - Initialize context",
+        "slug": "docs/cli/commands#init"
+      },
+      { "label": "/mcp - MCP servers", "slug": "docs/tools/mcp-server" },
+
+      {
+        "label": "/memory - Manage memory",
+        "slug": "docs/cli/commands#memory"
+      },
+      { "label": "/model - Model selection", "slug": "docs/cli/model" },
+      {
+        "label": "/policies - Manage policies",
+        "slug": "docs/cli/commands#policies"
+      },
+      {
+        "label": "/privacy - Privacy notice",
+        "slug": "docs/cli/commands#privacy"
+      },
+      { "label": "/quit - Exit CLI", "slug": "docs/cli/commands#quit-or-exit" },
+      { "label": "/restore - Restore files", "slug": "docs/cli/checkpointing" },
+      {
+        "label": "/resume - Resume session",
+
+        "slug": "docs/cli/commands#resume"
+      },
+      { "label": "/rewind - Rewind", "slug": "docs/cli/rewind" },
+      { "label": "/settings - Settings", "slug": "docs/cli/settings" },
+      {
+        "label": "/setup-github - GitHub setup",
+        "slug": "docs/cli/commands#setup-github"
+      },
+      {
+        "label": "/shells - Manage processes",
+        "slug": "docs/cli/commands#shells-or-bashes"
+      },
+      { "label": "/skills - Agent skills", "slug": "docs/cli/skills" },
+      {
+        "label": "/stats - Session statistics",
+        "slug": "docs/cli/commands#stats"
+      },
+      {
+        "label": "/terminal-setup - Terminal keybindings",
+        "slug": "docs/cli/commands#terminal-setup"
+      },
+      { "label": "/theme - Themes", "slug": "docs/cli/themes" },
+      { "label": "/tools - List tools", "slug": "docs/cli/commands#tools" },
+      { "label": "/vim - Vim mode", "slug": "docs/cli/commands#vim" },
+
+      {
         "label": "Activate skill (tool)",
         "slug": "docs/tools/activate-skill"
       },
-      { "label": "Agent skills", "slug": "docs/cli/skills" },
       { "label": "Ask user (tool)", "slug": "docs/tools/ask-user" },
       { "label": "Checkpointing", "slug": "docs/cli/checkpointing" },
       { "label": "File system (tool)", "slug": "docs/tools/file-system" },
       { "label": "Headless mode", "slug": "docs/cli/headless" },
-      { "label": "Hooks", "slug": "docs/hooks" },
-      { "label": "IDE integration", "slug": "docs/ide-integration" },
       {
         "label": "Internal documentation (tool)",
         "slug": "docs/tools/internal-docs"
       },
-      { "label": "MCP servers", "slug": "docs/tools/mcp-server" },
       { "label": "Memory (tool)", "slug": "docs/tools/memory" },
       { "label": "Model routing", "slug": "docs/cli/model-routing" },
-      { "label": "Model selection", "slug": "docs/cli/model" },
-      { "label": "Rewind", "slug": "docs/cli/rewind" },
       { "label": "Sandboxing", "slug": "docs/cli/sandbox" },
       { "label": "Shell (tool)", "slug": "docs/tools/shell" },
       { "label": "Telemetry", "slug": "docs/cli/telemetry" },

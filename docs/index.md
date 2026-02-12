@@ -47,29 +47,52 @@ User-focused guides and tutorials for daily development workflows.
 
 Technical reference documentation for each capability of Gemini CLI.
 
+- **[/about](./cli/commands.md#about):** About Gemini CLI.
+- **[/auth](./get-started/authentication.md):** Authentication.
+- **[/bug](./cli/commands.md#bug):** Report a bug.
+- **[/chat](./cli/commands.md#chat):** Chat history.
+- **[/clear](./cli/commands.md#clear):** Clear screen.
+- **[/compress](./cli/commands.md#compress):** Compress context.
+- **[/copy](./cli/commands.md#copy):** Copy output.
+- **[/directory](./cli/commands.md#directory-or-dir):** Manage workspace.
+- **[/docs](./cli/commands.md#docs):** Open documentation.
+- **[/editor](./cli/commands.md#editor):** Select editor.
+- **[/extensions](../extensions/index.md):** Manage extensions.
+- **[/help](./cli/commands.md#help-or):** Show help.
+- **[/hooks](../hooks/index.md):** Hooks.
+- **[/ide](../ide-integration/index.md):** IDE integration.
+- **[/init](./cli/commands.md#init):** Initialize context.
+- **[/mcp](../tools/mcp-server.md):** MCP servers.
+- **[/memory](./cli/commands.md#memory):** Manage memory.
+- **[/model](./cli/model.md):** Model selection.
+- **[/policies](./cli/commands.md#policies):** Manage policies.
+- **[/privacy](./cli/commands.md#privacy):** Privacy notice.
+- **[/quit](./cli/commands.md#quit-or-exit):** Exit CLI.
+- **[/restore](./cli/checkpointing.md):** Restore files.
+- **[/resume](./cli/commands.md#resume):** Resume session.
+- **[/rewind](./cli/rewind.md):** Rewind.
+- **[/settings](./cli/settings.md):** Settings.
+- **[/setup-github](./cli/commands.md#setup-github):** GitHub setup.
+- **[/shells](./cli/commands.md#shells-or-bashes):** Manage processes.
+- **[/skills](./cli/skills.md):** Agent skills.
+- **[/stats](./cli/commands.md#stats):** Session statistics.
+- **[/terminal-setup](./cli/commands.md#terminal-setup):** Terminal keybindings.
+- **[/theme](./cli/themes.md):** Themes.
+- **[/tools](./cli/commands.md#tools):** List tools.
+- **[/vim](./cli/commands.md#vim):** Vim mode.
 - **[Activate skill (tool)](./tools/activate-skill.md):** Internal mechanism for
   loading expert procedures.
-- **[Agent Skills](./cli/skills.md):** On-demand expertise and workflows.
 - **[Ask user (tool)](./tools/ask-user.md):** Internal dialog system for
   clarification.
 - **[Checkpointing](./cli/checkpointing.md):** Automatic session snapshots.
-- **[Extensions](./extensions/index.md):** Core extensibility framework.
 - **[File system (tool)](./tools/file-system.md):** Technical details for local
   file operations.
-- **[Headless mode](./cli/headless.md):** Programmatic and scripting usage.
-- **[Hooks](./hooks/index.md):** Technical specification for interception
-  points.
-- **[IDE integration](./ide-integration/index.md):** Architecture for editor
-  companions.
+- **[Headless mode](./cli/headless.md):** Programmatic and scripting interface.
 - **[Internal documentation (tool)](./tools/internal-docs.md):** Technical
   lookup for CLI features.
-- **[MCP servers](./tools/mcp-server.md):** Transport and protocol
-  specification.
 - **[Memory (tool)](./tools/memory.md):** Storage details for persistent facts.
 - **[Model routing](./cli/model-routing.md):** Automatic fallback resilience.
-- **[Model selection](./cli/model.md):** Manual and automatic model selection.
-- **[Rewind](./cli/rewind.md):** State restoration reference.
-- **[Sandboxing](./cli/sandbox.md):** Secure, isolated tool execution.
+- **[Sandboxing](./cli/sandbox.md):** Isolate tool execution.
 - **[Shell (tool)](./tools/shell.md):** Detailed system execution parameters.
 - **[Telemetry](./cli/telemetry.md):** Usage and performance metric details.
 - **[Todo (tool)](./tools/todos.md):** Progress tracking specification.
