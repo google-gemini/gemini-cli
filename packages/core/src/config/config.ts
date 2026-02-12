@@ -383,7 +383,9 @@ export interface ConfigParameters {
   question?: string;
 
   coreTools?: string[];
+  /** @deprecated Use Policy Engine instead */
   allowedTools?: string[];
+  /** @deprecated Use Policy Engine instead */
   excludeTools?: string[];
   toolDiscoveryCommand?: string;
   toolCallCommand?: string;
@@ -516,7 +518,9 @@ export class Config {
   private readonly question: string | undefined;
 
   private readonly coreTools: string[] | undefined;
+  /** @deprecated Use Policy Engine instead */
   private readonly allowedTools: string[] | undefined;
+  /** @deprecated Use Policy Engine instead */
   private readonly excludeTools: string[] | undefined;
   private readonly toolDiscoveryCommand: string | undefined;
   private readonly toolCallCommand: string | undefined;
@@ -1487,11 +1491,12 @@ export class Config {
 
   /**
    * All the excluded tools from static configuration, loaded extensions, or
-   * other sources.
+   * other sources (like the Policy Engine).
    *
    * May change over time.
    */
   getExcludeTools(): Set<string> | undefined {
+    // Right now this is present for backward compatibility with settings.json exclude
     const excludeToolsSet = new Set([...(this.excludeTools ?? [])]);
     for (const extension of this.getExtensionLoader().getExtensions()) {
       if (!extension.isActive) {
@@ -1501,6 +1506,12 @@ export class Config {
         excludeToolsSet.add(tool);
       }
     }
+
+    const policyExclusions = this.policyEngine.getExcludedTools();
+    for (const tool of policyExclusions) {
+      excludeToolsSet.add(tool);
+    }
+
     return excludeToolsSet;
   }
 
@@ -2458,26 +2469,16 @@ export class Config {
       agentsOverrides['codebase_investigator']?.enabled !== false ||
       agentsOverrides['cli_help']?.enabled !== false
     ) {
-      const allowedTools = this.getAllowedTools();
       const definitions = this.agentRegistry.getAllDefinitions();
 
       for (const definition of definitions) {
-        const isAllowed =
-          !allowedTools || allowedTools.includes(definition.name);
-
-        if (isAllowed) {
-          try {
-            const tool = new SubagentTool(
-              definition,
-              this,
-              this.getMessageBus(),
-            );
-            registry.registerTool(tool);
-          } catch (e: unknown) {
-            debugLogger.warn(
-              `Failed to register tool for agent ${definition.name}: ${getErrorMessage(e)}`,
-            );
-          }
+        try {
+          const tool = new SubagentTool(definition, this, this.getMessageBus());
+          registry.registerTool(tool);
+        } catch (e: unknown) {
+          debugLogger.warn(
+            `Failed to register tool for agent ${definition.name}: ${getErrorMessage(e)}`,
+          );
         }
       }
     }
