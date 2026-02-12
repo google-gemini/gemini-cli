@@ -26,6 +26,8 @@ vi.mock('node:fs', async () => {
     renameSync: vi.fn(),
     rmSync: vi.fn(),
     readFileSync: vi.fn().mockReturnValue('content'),
+    lstatSync: vi.fn(),
+    statSync: vi.fn(),
   };
   return {
     default: fsMock,
@@ -40,6 +42,8 @@ vi.mock('fs', async () => {
     renameSync: vi.fn(),
     rmSync: vi.fn(),
     readFileSync: vi.fn().mockReturnValue('content'),
+    lstatSync: vi.fn(),
+    statSync: vi.fn(),
   };
   return {
     default: fsMock,
@@ -199,13 +203,20 @@ describe('sea-launch', () => {
       files: [{ key: 'f1', path: 'p1', hash: 'h1' }],
     };
     const mockGetAsset = vi.fn();
+    const S_IFDIR = 0o40000;
+    const MODE_700 = 0o700;
 
-    it('reuses existing runtime if valid', () => {
+    it('reuses existing runtime if secure and valid', () => {
       const deps = {
         fs: {
           existsSync: vi.fn(() => true),
           rmSync: vi.fn(),
           readFileSync: vi.fn(),
+          lstatSync: vi.fn(() => ({
+            isDirectory: () => true,
+            uid: 1000,
+            mode: S_IFDIR | MODE_700,
+          })),
         },
         os: {
           userInfo: () => ({ username: 'user' }),
@@ -218,6 +229,7 @@ describe('sea-launch', () => {
             update: vi.fn(() => ({ digest: vi.fn(() => 'h1') })),
           })),
         },
+        processUid: 1000,
       };
 
       deps.fs.readFileSync.mockReturnValue('content');
@@ -227,7 +239,7 @@ describe('sea-launch', () => {
       expect(deps.fs.rmSync).not.toHaveBeenCalled();
     });
 
-    it('creates new runtime if existing is invalid', () => {
+    it('recreates runtime if existing has wrong owner', () => {
       const deps = {
         fs: {
           existsSync: vi.fn().mockReturnValueOnce(true).mockReturnValue(false),
@@ -235,7 +247,12 @@ describe('sea-launch', () => {
           mkdirSync: vi.fn(),
           writeFileSync: vi.fn(),
           renameSync: vi.fn(),
-          readFileSync: vi.fn().mockReturnValue('wrong_content'),
+          readFileSync: vi.fn().mockReturnValue('content'),
+          lstatSync: vi.fn(() => ({
+            isDirectory: () => true,
+            uid: 999, // Wrong UID
+            mode: S_IFDIR | MODE_700,
+          })),
         },
         os: {
           userInfo: () => ({ username: 'user' }),
@@ -245,9 +262,10 @@ describe('sea-launch', () => {
         processEnv: {},
         crypto: {
           createHash: vi.fn(() => ({
-            update: vi.fn(() => ({ digest: vi.fn(() => 'hash_calculated') })),
+            update: vi.fn(() => ({ digest: vi.fn(() => 'h1') })),
           })),
         },
+        processUid: 1000,
         processPid: 123,
       };
 
@@ -263,21 +281,22 @@ describe('sea-launch', () => {
         expect.stringContaining('gemini-setup'),
         expect.anything(),
       );
-      expect(deps.fs.writeFileSync).toHaveBeenCalled();
-      expect(deps.fs.renameSync).toHaveBeenCalled();
     });
 
-    it('handles rename failure and falls back to existing if valid', () => {
+    it('recreates runtime if existing has wrong permissions', () => {
       const deps = {
         fs: {
-          existsSync: vi.fn(),
+          existsSync: vi.fn().mockReturnValueOnce(true).mockReturnValue(false),
           rmSync: vi.fn(),
           mkdirSync: vi.fn(),
           writeFileSync: vi.fn(),
-          renameSync: vi.fn(() => {
-            throw new Error('Rename failed');
-          }),
+          renameSync: vi.fn(),
           readFileSync: vi.fn().mockReturnValue('content'),
+          lstatSync: vi.fn(() => ({
+            isDirectory: () => true,
+            uid: 1000,
+            mode: S_IFDIR | 0o777, // Too open
+          })),
         },
         os: {
           userInfo: () => ({ username: 'user' }),
@@ -290,6 +309,146 @@ describe('sea-launch', () => {
             update: vi.fn(() => ({ digest: vi.fn(() => 'h1') })),
           })),
         },
+        processUid: 1000,
+        processPid: 123,
+      };
+
+      mockGetAsset.mockReturnValue(Buffer.from('asset_content'));
+
+      prepareRuntime(mockManifest, mockGetAsset, deps);
+
+      expect(deps.fs.rmSync).toHaveBeenCalledWith(
+        expect.stringContaining('gemini-runtime'),
+        expect.anything(),
+      );
+    });
+
+    it('creates new runtime if existing is invalid (integrity check)', () => {
+      const deps = {
+        fs: {
+          existsSync: vi.fn().mockReturnValueOnce(true).mockReturnValue(false),
+          rmSync: vi.fn(),
+          mkdirSync: vi.fn(),
+          writeFileSync: vi.fn(),
+          renameSync: vi.fn(),
+          readFileSync: vi.fn().mockReturnValue('wrong_content'),
+          lstatSync: vi.fn(() => ({
+            isDirectory: () => true,
+            uid: 1000,
+            mode: S_IFDIR | MODE_700,
+          })),
+        },
+        os: {
+          userInfo: () => ({ username: 'user' }),
+          tmpdir: () => '/tmp',
+        },
+        path: path,
+        processEnv: {},
+        crypto: {
+          createHash: vi.fn(() => ({
+            update: vi.fn(() => ({ digest: vi.fn(() => 'hash_calculated') })),
+          })),
+        },
+        processUid: 1000,
+        processPid: 123,
+      };
+
+      mockGetAsset.mockReturnValue(Buffer.from('asset_content'));
+
+      prepareRuntime(mockManifest, mockGetAsset, deps);
+
+      expect(deps.fs.rmSync).toHaveBeenCalledWith(
+        expect.stringContaining('gemini-runtime'),
+        expect.anything(),
+      );
+      expect(deps.fs.mkdirSync).toHaveBeenCalledWith(
+        expect.stringContaining('gemini-setup'),
+        expect.anything(),
+      );
+    });
+
+    it('handles rename race condition: uses target if secure and valid', () => {
+      const deps = {
+        fs: {
+          existsSync: vi.fn(),
+          rmSync: vi.fn(),
+          mkdirSync: vi.fn(),
+          writeFileSync: vi.fn(),
+          renameSync: vi.fn(() => {
+            throw new Error('Rename failed');
+          }),
+          readFileSync: vi.fn().mockReturnValue('content'),
+          lstatSync: vi.fn(() => ({
+            isDirectory: () => true,
+            uid: 1000,
+            mode: S_IFDIR | MODE_700,
+          })),
+        },
+        os: {
+          userInfo: () => ({ username: 'user' }),
+          tmpdir: () => '/tmp',
+        },
+        path: path,
+        processEnv: {},
+        crypto: {
+          createHash: vi.fn(() => ({
+            update: vi.fn(() => ({ digest: vi.fn(() => 'h1') })),
+          })),
+        },
+        processUid: 1000,
+        processPid: 123,
+      };
+
+      // 1. Initial exists check -> false
+      // 2. mkdir checks (destDir) -> false
+      // 3. renameSync -> throws
+      // 4. existsSync (race check) -> true
+      deps.fs.existsSync
+        .mockReturnValueOnce(false)
+        .mockReturnValueOnce(false)
+        .mockReturnValue(true);
+
+      mockGetAsset.mockReturnValue(Buffer.from('asset_content'));
+
+      const runtime = prepareRuntime(mockManifest, mockGetAsset, deps);
+
+      expect(deps.fs.renameSync).toHaveBeenCalled();
+      expect(runtime).toContain('gemini-runtime');
+      expect(deps.fs.rmSync).toHaveBeenCalledWith(
+        expect.stringContaining('gemini-setup'),
+        expect.anything(),
+      );
+    });
+
+    it('handles rename race condition: fails if target is insecure', () => {
+      const deps = {
+        fs: {
+          existsSync: vi.fn(),
+          rmSync: vi.fn(),
+          mkdirSync: vi.fn(),
+          writeFileSync: vi.fn(),
+          renameSync: vi.fn(() => {
+            throw new Error('Rename failed');
+          }),
+          readFileSync: vi.fn().mockReturnValue('content'),
+          lstatSync: vi.fn(() => ({
+            isDirectory: () => true,
+            uid: 999, // Wrong UID
+            mode: S_IFDIR | MODE_700,
+          })),
+        },
+        os: {
+          userInfo: () => ({ username: 'user' }),
+          tmpdir: () => '/tmp',
+        },
+        path: path,
+        processEnv: {},
+        crypto: {
+          createHash: vi.fn(() => ({
+            update: vi.fn(() => ({ digest: vi.fn(() => 'h1') })),
+          })),
+        },
+        processUid: 1000,
         processPid: 123,
       };
 
@@ -300,16 +459,18 @@ describe('sea-launch', () => {
 
       mockGetAsset.mockReturnValue(Buffer.from('asset_content'));
 
-      const simpleManifest = { version: '1.0.0', mainHash: 'h1' };
+      // Mock process.exit and console.error
+      const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(globalThis.console, 'error')
+        .mockImplementation(() => {});
 
-      const runtime = prepareRuntime(simpleManifest, mockGetAsset, deps);
+      prepareRuntime(mockManifest, mockGetAsset, deps);
 
-      expect(deps.fs.renameSync).toHaveBeenCalled();
-      expect(runtime).toContain('gemini-runtime');
-      expect(deps.fs.rmSync).toHaveBeenCalledWith(
-        expect.stringContaining('gemini-setup'),
-        expect.anything(),
-      );
+      expect(exitSpy).toHaveBeenCalledWith(1);
+
+      exitSpy.mockRestore();
+      consoleSpy.mockRestore();
     });
   });
 });

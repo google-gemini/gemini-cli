@@ -301,7 +301,7 @@ export class HookRunner {
 
         if (process.platform === 'win32' && child.pid) {
           try {
-            execSync(`taskkill /pid ${child.pid} /f /t`);
+            execSync(`taskkill /pid ${child.pid} /f /t`, { timeout: 2000 });
           } catch (_e) {
             // Ignore errors if process is already dead or access denied
             debugLogger.debug(`Taskkill failed: ${_e}`);
@@ -315,7 +315,7 @@ export class HookRunner {
           if (!child.killed) {
             if (process.platform === 'win32' && child.pid) {
               try {
-                execSync(`taskkill /pid ${child.pid} /f /t`);
+                execSync(`taskkill /pid ${child.pid} /f /t`, { timeout: 2000 });
               } catch (_e) {
                 // Ignore
                 debugLogger.debug(`Taskkill failed: ${_e}`);

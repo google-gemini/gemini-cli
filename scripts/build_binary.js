@@ -146,7 +146,7 @@ function signFile(filePath) {
 
     console.log(`Signing ${filePath}...`);
     try {
-      runCommand('signtool', args);
+      runCommand('signtool', args, { stdio: 'pipe' });
     } catch (e) {
       let msg = e.message;
       if (process.env.WINDOWS_PFX_PASSWORD) {
