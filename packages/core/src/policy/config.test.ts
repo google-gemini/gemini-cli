@@ -1063,7 +1063,7 @@ name = "invalid-name"
         options?: Parameters<typeof actualFs.readdir>[1],
       ) => {
         const normalizedPath = nodePath.normalize(path.toString());
-        if (normalizedPath.includes(nodePath.normalize('.gemini/policies'))) {
+        if (normalizedPath.includes('gemini-cli-test/user/policies')) {
           return [
             {
               name: 'user-plan.toml',
@@ -1076,6 +1076,22 @@ name = "invalid-name"
           path,
           options as Parameters<typeof actualFs.readdir>[1],
         );
+      },
+    );
+
+    const mockStat = vi.fn(
+      async (
+        path: Parameters<typeof actualFs.stat>[0],
+        options?: Parameters<typeof actualFs.stat>[1],
+      ) => {
+        const normalizedPath = nodePath.normalize(path.toString());
+        if (normalizedPath.includes('gemini-cli-test/user/policies')) {
+          return {
+            isDirectory: () => true,
+            isFile: () => false,
+          } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
+        }
+        return actualFs.stat(path, options);
       },
     );
 
@@ -1107,12 +1123,35 @@ modes = ["plan"]
 
     vi.doMock('node:fs/promises', () => ({
       ...actualFs,
-      default: { ...actualFs, readFile: mockReadFile, readdir: mockReaddir },
+      default: {
+        ...actualFs,
+        readFile: mockReadFile,
+        readdir: mockReaddir,
+        stat: mockStat,
+      },
       readFile: mockReadFile,
       readdir: mockReaddir,
+      stat: mockStat,
     }));
 
     vi.resetModules();
+
+    // Robustly mock Storage using doMock to ensure it persists through imports in config.js
+    vi.doMock('../config/storage.js', async () => {
+      const actual = await vi.importActual<
+        typeof import('../config/storage.js')
+      >('../config/storage.js');
+      class MockStorage extends actual.Storage {
+        static getUserPoliciesDir() {
+          return '/tmp/gemini-cli-test/user/policies';
+        }
+        static getSystemPoliciesDir() {
+          return '/tmp/gemini-cli-test/system/policies';
+        }
+      }
+      return { ...actual, Storage: MockStorage };
+    });
+
     const { createPolicyEngineConfig } = await import('./config.js');
 
     const settings: PolicySettings = {};
