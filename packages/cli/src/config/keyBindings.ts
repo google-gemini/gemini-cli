@@ -516,12 +516,12 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.UNFOCUS_BACKGROUND_SHELL_LIST]:
     'Move focus from background shell list to Gemini.',
   [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING]:
-    'Show warning when trying to unfocus background shell via Tab.',
+    'Show warning when trying to move focus away from background shell.',
   [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING]:
-    'Show warning when trying to unfocus shell input via Tab.',
+    'Show warning when trying to move focus away from shell input.',
   [Command.FOCUS_SHELL_INPUT]: 'Move focus from Gemini to the active shell.',
   [Command.UNFOCUS_SHELL_INPUT]: 'Move focus from the shell back to Gemini.',
   [Command.CLEAR_SCREEN]: 'Clear the terminal screen and redraw the UI.',
   [Command.RESTART_APP]: 'Restart the application.',
-  [Command.SUSPEND_APP]: 'Suspend the application (not yet implemented).',
+  [Command.SUSPEND_APP]: 'Suspend the CLI and move it to the background.',
 };
