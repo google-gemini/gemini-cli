@@ -47,7 +47,7 @@ export const GeminiMessage: React.FC<GeminiMessageProps> = ({
               ? undefined
               : Math.max(availableTerminalHeight - 1, 1)
           }
-          terminalWidth={terminalWidth - prefixWidth}
+          terminalWidth={Math.max(terminalWidth - prefixWidth, 0)}
           renderMarkdown={renderMarkdown}
         />
         <Box
