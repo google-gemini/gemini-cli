@@ -86,4 +86,22 @@ describe('GeminiCliAgent Integration', () => {
 
     expect(responseText2).toContain('2');
   }, 30000);
+
+  it('throws when dynamic instructions fail', async () => {
+    const agent = new GeminiCliAgent({
+      instructions: () => {
+        throw new Error('Dynamic instruction failure');
+      },
+      model: 'gemini-2.0-flash',
+    });
+
+    const stream = agent.sendStream('Say hello.');
+
+    await expect(async () => {
+       
+      for await (const _event of stream) {
+        // Just consume the stream
+      }
+    }).rejects.toThrow('Dynamic instruction failure');
+  });
 });
