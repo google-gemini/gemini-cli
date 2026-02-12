@@ -16,6 +16,20 @@ import { SHELL_COMMAND_NAME } from '../constants.js';
 import type { UIState } from '../contexts/UIStateContext.js';
 
 // Mock dependencies
+vi.mock('../contexts/SettingsContext.js', async () => {
+  const actual = await vi.importActual('../contexts/SettingsContext.js');
+  return {
+    ...actual,
+    useSettings: () => ({
+      merged: {
+        ui: {
+          inlineThinkingMode: 'off',
+        },
+      },
+    }),
+  };
+});
+
 vi.mock('../contexts/AppContext.js', async () => {
   const actual = await vi.importActual('../contexts/AppContext.js');
   return {
@@ -68,12 +82,15 @@ describe('MainContent', () => {
     availableTerminalHeight: 24,
     slashCommands: [],
     constrainHeight: false,
+    thought: null,
     isEditorDialogOpen: false,
     activePtyId: undefined,
     embeddedShellFocused: false,
     historyRemountKey: 0,
     bannerData: { defaultText: '', warningText: '' },
     bannerVisible: false,
+    copyModeEnabled: false,
+    terminalWidth: 100,
   };
 
   beforeEach(() => {
@@ -158,6 +175,7 @@ describe('MainContent', () => {
         vi.mocked(useAlternateBuffer).mockReturnValue(isAlternateBuffer);
         const ptyId = 123;
         const uiState = {
+          ...defaultMockUiState,
           history: [],
           pendingHistoryItems: [
             {
@@ -185,6 +203,7 @@ describe('MainContent', () => {
           terminalHeight: 50,
           terminalWidth: 100,
           mainAreaWidth: 100,
+          thought: null,
           embeddedShellFocused,
           activePtyId: embeddedShellFocused ? ptyId : undefined,
           constrainHeight,

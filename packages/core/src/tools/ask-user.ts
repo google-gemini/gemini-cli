@@ -52,7 +52,7 @@ export class AskUserTool extends BaseDeclarativeTool<
                   type: 'string',
                   maxLength: 16,
                   description:
-                    'Very short label displayed as a chip/tag (max 16 chars). Examples: "Auth method", "Library", "Approach".',
+                    'MUST be 16 characters or fewer or the call will fail. Very short label displayed as a chip/tag. Use abbreviations: "Auth" not "Authentication", "Config" not "Configuration". Examples: "Auth method", "Library", "Approach", "Database".',
                 },
                 type: {
                   type: 'string',
@@ -207,7 +207,11 @@ export class AskUserInvocation extends BaseToolInvocation<
           .map(([index, answer]) => {
             const question = this.params.questions[parseInt(index, 10)];
             const category = question?.header ?? `Q${index}`;
-            return `  ${category} → ${answer}`;
+            const prefix = `  ${category} → `;
+            const indent = ' '.repeat(prefix.length);
+
+            const lines = answer.split('\n');
+            return prefix + lines.join('\n' + indent);
           })
           .join('\n')}`
       : 'User submitted without answering questions.';

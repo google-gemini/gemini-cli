@@ -31,9 +31,9 @@ export const usePhraseCycler = (
       ? customPhrases
       : WITTY_LOADING_PHRASES;
 
-  const [currentLoadingPhrase, setCurrentLoadingPhrase] = useState(
-    loadingPhrases[0],
-  );
+  const [currentLoadingPhrase, setCurrentLoadingPhrase] = useState<
+    string | undefined
+  >(isActive ? loadingPhrases[0] : undefined);
 
   const phraseIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const hasShownFirstRequestTipRef = useRef(false);
@@ -56,7 +56,7 @@ export const usePhraseCycler = (
     }
 
     if (!isActive) {
-      setCurrentLoadingPhrase(loadingPhrases[0]);
+      setCurrentLoadingPhrase(undefined);
       return;
     }
 

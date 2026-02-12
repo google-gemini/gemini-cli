@@ -1,13 +1,14 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
 import { useState } from 'react';
-import { Box, Text, useIsScreenReaderEnabled } from 'ink';
+import { Box, useIsScreenReaderEnabled } from 'ink';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { StatusDisplay } from './StatusDisplay.js';
+import { ToastDisplay, shouldShowToast } from './ToastDisplay.js';
 import { ApprovalModeIndicator } from './ApprovalModeIndicator.js';
 import { ShellModeIndicator } from './ShellModeIndicator.js';
 import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
@@ -30,7 +31,7 @@ import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { StreamingState, ToolCallStatus } from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
-import { theme } from '../semantic-colors.js';
+import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 
 export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const config = useConfig();
@@ -39,7 +40,8 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const uiState = useUIState();
   const uiActions = useUIActions();
   const { vimEnabled, vimMode } = useVimMode();
-  const terminalWidth = process.stdout.columns;
+  const inlineThinkingMode = getInlineThinkingMode(settings);
+  const terminalWidth = uiState.terminalWidth;
   const isNarrow = isNarrowWidth(terminalWidth);
   const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
   const [suggestionsVisible, setSuggestionsVisible] = useState(false);
@@ -60,18 +62,16 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     Boolean(uiState.authConsentRequest) ||
     (uiState.confirmUpdateExtensionRequests?.length ?? 0) > 0 ||
     Boolean(uiState.loopDetectionConfirmationRequest) ||
-    Boolean(uiState.proQuotaRequest) ||
-    Boolean(uiState.validationRequest) ||
+    Boolean(uiState.quota.proQuotaRequest) ||
+    Boolean(uiState.quota.validationRequest) ||
     Boolean(uiState.customDialog);
+  const hasToast = shouldShowToast(uiState);
   const showLoadingIndicator =
     (!uiState.embeddedShellFocused || uiState.isBackgroundShellVisible) &&
     uiState.streamingState === StreamingState.Responding &&
     !hasPendingActionRequired;
   const showApprovalIndicator = !uiState.shellModeActive;
   const showRawMarkdownIndicator = !uiState.renderMarkdown;
-  const showEscToCancelHint =
-    showLoadingIndicator &&
-    uiState.streamingState !== StreamingState.WaitingForConfirmation;
 
   return (
     <Box
@@ -93,11 +93,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
       <TodoTray />
 
       <Box marginTop={1} width="100%" flexDirection="column">
-        {showEscToCancelHint && (
-          <Box marginLeft={3}>
-            <Text color={theme.text.secondary}>esc to cancel</Text>
-          </Box>
-        )}
         <Box
           width="100%"
           flexDirection={isNarrow ? 'column' : 'row'}
@@ -126,8 +121,10 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                     ? undefined
                     : uiState.currentLoadingPhrase
                 }
+                thoughtLabel={
+                  inlineThinkingMode === 'full' ? 'Thinking ...' : undefined
+                }
                 elapsedTime={uiState.elapsedTime}
-                showCancelAndTimer={false}
               />
             )}
           </Box>
@@ -136,7 +133,8 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             flexDirection="column"
             alignItems={isNarrow ? 'flex-start' : 'flex-end'}
           >
-            {!hasPendingActionRequired && <ShortcutsHint />}
+            {settings.merged.ui.showShortcutsHint &&
+              !hasPendingActionRequired && <ShortcutsHint />}
           </Box>
         </Box>
         {uiState.shortcutsHelpVisible && <ShortcutsHelp />}
@@ -158,44 +156,48 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             alignItems="center"
             flexGrow={1}
           >
-            {!showLoadingIndicator && (
-              <Box
-                flexDirection={isNarrow ? 'column' : 'row'}
-                alignItems={isNarrow ? 'flex-start' : 'center'}
-              >
-                {showApprovalIndicator && (
-                  <ApprovalModeIndicator
-                    approvalMode={showApprovalModeIndicator}
-                    isPlanEnabled={config.isPlanEnabled()}
-                  />
-                )}
-                {uiState.shellModeActive && (
-                  <Box
-                    marginLeft={showApprovalIndicator && !isNarrow ? 1 : 0}
-                    marginTop={showApprovalIndicator && isNarrow ? 1 : 0}
-                  >
-                    <ShellModeIndicator />
-                  </Box>
-                )}
-                {showRawMarkdownIndicator && (
-                  <Box
-                    marginLeft={
-                      (showApprovalIndicator || uiState.shellModeActive) &&
-                      !isNarrow
-                        ? 1
-                        : 0
-                    }
-                    marginTop={
-                      (showApprovalIndicator || uiState.shellModeActive) &&
-                      isNarrow
-                        ? 1
-                        : 0
-                    }
-                  >
-                    <RawMarkdownIndicator />
-                  </Box>
-                )}
-              </Box>
+            {hasToast ? (
+              <ToastDisplay />
+            ) : (
+              !showLoadingIndicator && (
+                <Box
+                  flexDirection={isNarrow ? 'column' : 'row'}
+                  alignItems={isNarrow ? 'flex-start' : 'center'}
+                >
+                  {showApprovalIndicator && (
+                    <ApprovalModeIndicator
+                      approvalMode={showApprovalModeIndicator}
+                      isPlanEnabled={config.isPlanEnabled()}
+                    />
+                  )}
+                  {uiState.shellModeActive && (
+                    <Box
+                      marginLeft={showApprovalIndicator && !isNarrow ? 1 : 0}
+                      marginTop={showApprovalIndicator && isNarrow ? 1 : 0}
+                    >
+                      <ShellModeIndicator />
+                    </Box>
+                  )}
+                  {showRawMarkdownIndicator && (
+                    <Box
+                      marginLeft={
+                        (showApprovalIndicator || uiState.shellModeActive) &&
+                        !isNarrow
+                          ? 1
+                          : 0
+                      }
+                      marginTop={
+                        (showApprovalIndicator || uiState.shellModeActive) &&
+                        isNarrow
+                          ? 1
+                          : 0
+                      }
+                    >
+                      <RawMarkdownIndicator />
+                    </Box>
+                  )}
+                </Box>
+              )
             )}
           </Box>
 

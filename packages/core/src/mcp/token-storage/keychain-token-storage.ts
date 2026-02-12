@@ -70,6 +70,7 @@ export class KeychainTokenStorage
         return null;
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const credentials = JSON.parse(data) as OAuthCredentials;
 
       if (this.isTokenExpired(credentials)) {
@@ -179,6 +180,7 @@ export class KeychainTokenStorage
 
       for (const cred of credentials) {
         try {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           const data = JSON.parse(cred.password) as OAuthCredentials;
           if (!this.isTokenExpired(data)) {
             result.set(cred.account, data);
@@ -223,6 +225,7 @@ export class KeychainTokenStorage
       try {
         await this.deleteCredentials(server);
       } catch (error) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         errors.push(error as Error);
       }
     }

@@ -32,17 +32,17 @@ import {
   ASK_USER_TOOL_NAME,
   getVersion,
   PREVIEW_GEMINI_MODEL_AUTO,
+  type HierarchicalMemory,
   coreEvents,
   GEMINI_MODEL_ALIAS_AUTO,
   getAdminErrorMessage,
+  isHeadlessMode,
   Config,
   applyAdminAllowlist,
   getAdminBlockedMcpServersMessage,
-} from '@google/gemini-cli-core';
-import type {
-  HookDefinition,
-  HookEventName,
-  OutputFormat,
+  type HookDefinition,
+  type HookEventName,
+  type OutputFormat,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -177,7 +177,8 @@ export async function parseArguments(
           type: 'array',
           string: true,
           nargs: 1,
-          description: 'Tools that are allowed to run without confirmation',
+          description:
+            '[DEPRECATED: Use Policy Engine instead See https://geminicli.com/docs/core/policy-engine] Tools that are allowed to run without confirmation',
           coerce: (tools: string[]) =>
             // Handle comma-separated values
             tools.flatMap((tool) => tool.split(',').map((t) => t.trim())),
@@ -280,6 +281,7 @@ export async function parseArguments(
     .check((argv) => {
       // The 'query' positional can be a string (for one arg) or string[] (for multiple).
       // This guard safely checks if any positional argument was provided.
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const query = argv['query'] as string | string[] | undefined;
       const hasPositionalQuery = Array.isArray(query)
         ? query.length > 0
@@ -297,6 +299,7 @@ export async function parseArguments(
       if (
         argv['outputFormat'] &&
         !['text', 'json', 'stream-json'].includes(
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           argv['outputFormat'] as string,
         )
       ) {
@@ -345,6 +348,7 @@ export async function parseArguments(
   }
 
   // Normalize query args: handle both quoted "@path file" and unquoted @path file
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const queryArg = (result as { query?: string | string[] | undefined }).query;
   const q: string | undefined = Array.isArray(queryArg)
     ? queryArg.join(' ')
@@ -352,7 +356,7 @@ export async function parseArguments(
 
   // -p/--prompt forces non-interactive mode; positional args default to interactive in TTY
   if (q && !result['prompt']) {
-    if (process.stdin.isTTY) {
+    if (!isHeadlessMode()) {
       startupMessages.push(
         'Positional arguments now default to interactive mode. To run in non-interactive mode, use the --prompt (-p) flag.',
       );
@@ -368,6 +372,7 @@ export async function parseArguments(
 
   // The import format is now only controlled by settings.memoryImportFormat
   // We no longer accept it as a CLI argument
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return result as unknown as CliArgs;
 }
 
@@ -436,8 +441,16 @@ export async function loadCliConfig(
 
   const ideMode = settings.ide?.enabled ?? false;
 
-  const folderTrust = settings.security?.folderTrust?.enabled ?? false;
-  const trustedFolder = isWorkspaceTrusted(settings, cwd)?.isTrusted ?? false;
+  const folderTrust =
+    process.env['GEMINI_CLI_INTEGRATION_TEST'] === 'true' ||
+    process.env['VITEST'] === 'true'
+      ? false
+      : (settings.security?.folderTrust?.enabled ?? false);
+  const trustedFolder =
+    isWorkspaceTrusted(settings, cwd, undefined, {
+      prompt: argv.prompt,
+      query: argv.query,
+    })?.isTrusted ?? false;
 
   // Set the context filename in the server's memoryTool module BEFORE loading memory
   // TODO(b/343434939): This is a bit of a hack. The contextFileName should ideally be passed
@@ -472,6 +485,7 @@ export async function loadCliConfig(
     requestSetting: promptForSetting,
     workspaceDir: cwd,
     enabledExtensionOverrides: argv.extensions,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     eventEmitter: coreEvents as EventEmitter<ExtensionEvents>,
     clientVersion: await getVersion(),
   });
@@ -479,7 +493,7 @@ export async function loadCliConfig(
 
   const experimentalJitContext = settings.experimental?.jitContext ?? false;
 
-  let memoryContent = '';
+  let memoryContent: string | HierarchicalMemory = '';
   let fileCount = 0;
   let filePaths: string[] = [];
 
@@ -510,8 +524,8 @@ export async function loadCliConfig(
   const rawApprovalMode =
     argv.approvalMode ||
     (argv.yolo ? 'yolo' : undefined) ||
-    ((settings.tools?.approvalMode as string) !== 'yolo'
-      ? settings.tools.approvalMode
+    ((settings.general?.defaultApprovalMode as string) !== 'yolo'
+      ? settings.general?.defaultApprovalMode
       : undefined);
 
   if (rawApprovalMode) {
@@ -575,6 +589,7 @@ export async function loadCliConfig(
   let telemetrySettings;
   try {
     telemetrySettings = await resolveTelemetrySettings({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       env: process.env as unknown as Record<string, string | undefined>,
       settings: settings.telemetry,
     });
@@ -592,7 +607,8 @@ export async function loadCliConfig(
   const interactive =
     !!argv.promptInteractive ||
     !!argv.experimentalAcp ||
-    (process.stdin.isTTY && !argv.query && !argv.prompt && !argv.isCommand);
+    (!isHeadlessMode({ prompt: argv.prompt, query: argv.query }) &&
+      !argv.isCommand);
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
   const allowedToolsSet = new Set(allowedTools);
@@ -802,6 +818,7 @@ export async function loadCliConfig(
     eventEmitter: coreEvents,
     useWriteTodos: argv.useWriteTodos ?? settings.useWriteTodos,
     output: {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,
     },
     fakeResponses: argv.fakeResponses,
