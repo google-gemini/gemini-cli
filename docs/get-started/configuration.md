@@ -1295,7 +1295,10 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
     few other folders, see
     `packages/cli/src/utils/sandbox-macos-permissive-open.sb`) but allows other
     operations.
-  - `strict`: Uses a strict profile that declines operations by default.
+  - `restrictive-open`: Declines operations by default, allows network.
+  - `strict-open`: Restricts both reads and writes to the working directory,
+    allows network.
+  - `strict-proxied`: Same as `strict-open` but routes network through proxy.
   - `<profile_name>`: Uses a custom profile. To define a custom profile, create
     a file named `sandbox-macos-<profile_name>.sb` in your project's `.gemini/`
     directory (e.g., `my-project/.gemini/sandbox-macos-custom.sb`).

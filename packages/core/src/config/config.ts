@@ -831,7 +831,7 @@ export class Config {
       (params.shellToolInactivityTimeout ?? 300) * 1000; // 5 minutes
     this.extensionManagement = params.extensionManagement ?? true;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
-    this.storage = new Storage(this.targetDir);
+    this.storage = new Storage(this.targetDir, this.sessionId);
 
     this.fakeResponses = params.fakeResponses;
     this.recordResponses = params.recordResponses;
@@ -1356,7 +1356,8 @@ export class Config {
       !!sandboxConfig &&
       sandboxConfig.command === 'sandbox-exec' &&
       !!seatbeltProfile &&
-      seatbeltProfile.startsWith('restrictive-')
+      (seatbeltProfile.startsWith('restrictive-') ||
+        seatbeltProfile.startsWith('strict-'))
     );
   }
 
