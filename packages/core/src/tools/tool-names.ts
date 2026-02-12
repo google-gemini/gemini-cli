@@ -5,6 +5,7 @@
  */
 
 import {
+  ENTER_PLAN_MODE_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
   LS_TOOL_NAME,
@@ -18,6 +19,7 @@ import {
 // need to reference a tool's name without importing the tool's implementation.
 
 export {
+  ENTER_PLAN_MODE_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
   LS_TOOL_NAME,
@@ -40,7 +42,6 @@ export const EDIT_TOOL_NAMES = new Set([EDIT_TOOL_NAME, WRITE_FILE_TOOL_NAME]);
 export const ASK_USER_TOOL_NAME = 'ask_user';
 export const ASK_USER_DISPLAY_NAME = 'Ask User';
 export const EXIT_PLAN_MODE_TOOL_NAME = 'exit_plan_mode';
-export const ENTER_PLAN_MODE_TOOL_NAME = 'enter_plan_mode';
 
 /**
  * Mapping of legacy tool names to their current names.

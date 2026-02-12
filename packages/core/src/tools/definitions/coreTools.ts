@@ -14,6 +14,7 @@ export const LS_TOOL_NAME = 'list_directory';
 export const READ_FILE_TOOL_NAME = 'read_file';
 export const SHELL_TOOL_NAME = 'run_shell_command';
 export const WRITE_FILE_TOOL_NAME = 'write_file';
+export const ENTER_PLAN_MODE_TOOL_NAME = 'enter_plan_mode';
 
 // ============================================================================
 // READ_FILE TOOL
@@ -122,6 +123,28 @@ export const GREP_DEFINITION: ToolDefinition = {
         },
       },
       required: ['pattern'],
+    },
+  },
+};
+
+// ============================================================================
+// PLAN_MODE TOOLS
+// ============================================================================
+
+export const ENTER_PLAN_MODE_DEFINITION: ToolDefinition = {
+  base: {
+    name: ENTER_PLAN_MODE_TOOL_NAME,
+    description:
+      'Switch to Plan Mode to safely research, design, and plan complex changes using read-only tools.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        reason: {
+          type: 'string',
+          description:
+            'Short reason explaining why you are entering plan mode.',
+        },
+      },
     },
   },
 };

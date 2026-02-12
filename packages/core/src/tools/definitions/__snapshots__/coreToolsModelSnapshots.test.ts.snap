@@ -1,5 +1,21 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: enter_plan_mode 1`] = `
+{
+  "description": "Switch to Plan Mode to safely research, design, and plan complex changes using read-only tools.",
+  "name": "enter_plan_mode",
+  "parametersJsonSchema": {
+    "properties": {
+      "reason": {
+        "description": "Short reason explaining why you are entering plan mode.",
+        "type": "string",
+      },
+    },
+    "type": "object",
+  },
+}
+`;
+
 exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: glob 1`] = `
 {
   "description": "Efficiently finds files matching specific glob patterns (e.g., \`src/**/*.ts\`, \`**/*.md\`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.",
@@ -212,6 +228,22 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
       "file_path",
       "content",
     ],
+    "type": "object",
+  },
+}
+`;
+
+exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: enter_plan_mode 1`] = `
+{
+  "description": "Switch to Plan Mode to safely research, design, and plan complex changes using read-only tools.",
+  "name": "enter_plan_mode",
+  "parametersJsonSchema": {
+    "properties": {
+      "reason": {
+        "description": "Short reason explaining why you are entering plan mode.",
+        "type": "string",
+      },
+    },
     "type": "object",
   },
 }
