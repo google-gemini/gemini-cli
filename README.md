@@ -29,20 +29,8 @@ Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
 
 ## 📦 Installation
 
-### Recommended System Specifications
-
-- **Operating System:**
-  - macOS 15+
-  - Windows 11 24H2+
-  - Ubuntu 20.04+
-- **Hardware:**
-  - "Casual" usage: 4GB+ RAM (short sessions, common tasks and edits)
-  - "Power" usage: 16GB+ RAM (long sessions, large codebases, deep context)
-- **Runtime:** Node.js 20.0.0+
-- **Shell:** Bash or Zsh
-- **Location:**
-  [Gemini Code Assist supported locations](https://developers.google.com/gemini-code-assist/resources/available-locations#americas)
-- **Internet connection required**
+See [Gemini CLI installation, execution, and releases](./docs/get-started/installation.md)
+for recommended system specifications and a detailed installation guide.
 
 ### Quick Install
 
