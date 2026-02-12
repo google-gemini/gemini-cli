@@ -167,14 +167,13 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
 ## Context Efficiency:
 - Always minimize wasted context window by aggressively scoping and limiting all of your ${GREP_TOOL_NAME} searches. e.g.: always pass total_max_matches, include, and max_matches_per_file.
 - Use names_only=true or max_matches_per_file=1 to find a list of files that contain a pattern.
-- Limit unnecessary context consumption from file reads by always using ${GREP_TOOL_NAME} (configured with \`max_matches_per_file\`) to search large files (> 1kb).
+- Limit unnecessary context consumption from file reads by always using ${GREP_TOOL_NAME} (configured with \`max_matches_per_file\`) to search large files (> 5kb).
 - Conserve context when reading files by reading just enough context to definitively answer the question by passing offset and limit to ${READ_FILE_TOOL_NAME} or by searching with ${GREP_TOOL_NAME} and before=50 and after=50 and total_max_matches
   - Always request a large enough range (e.g., 100-500 lines) to ensure you see sufficient details of the code.
   - If you have multiple ranges that you want to read, always combine them into a single range to avoid wasting tokens on another tool call.
   - Avoid "paging" by requesting a generous buffer around your target; it is more token-efficient to
   read 500 lines in one turn than 100 lines across two turns.
-   - If you identify multiple relevant sections in a file, combine them into a single wide range
-  covering all of them.
+   - If you identify multiple relevant sections in a file, combine them into a single wide range covering all of them.
 
 ## Engineering Standards
 - **Contextual Precedence:** Instructions found in ${formattedFilenames} files are foundational mandates. They take absolute precedence over the general workflows and tool defaults described in this system prompt.
