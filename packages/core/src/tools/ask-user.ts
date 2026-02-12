@@ -41,7 +41,7 @@ export class AskUserTool extends BaseDeclarativeTool<
             maxItems: 4,
             items: {
               type: 'object',
-              required: ['question', 'header'],
+              required: ['question', 'header', 'type'],
               properties: {
                 question: {
                   type: 'string',
@@ -110,7 +110,7 @@ export class AskUserTool extends BaseDeclarativeTool<
 
     for (let i = 0; i < params.questions.length; i++) {
       const q = params.questions[i];
-      const questionType = q.type ?? QuestionType.CHOICE;
+      const questionType = q.type;
 
       // Validate that 'choice' type has options
       if (questionType === QuestionType.CHOICE) {
@@ -168,7 +168,7 @@ export class AskUserInvocation extends BaseToolInvocation<
   ): Promise<ToolAskUserConfirmationDetails | false> {
     const normalizedQuestions = this.params.questions.map((q) => ({
       ...q,
-      type: q.type ?? QuestionType.CHOICE,
+      type: q.type,
     }));
 
     return {
@@ -192,9 +192,7 @@ export class AskUserInvocation extends BaseToolInvocation<
   }
 
   async execute(_signal: AbortSignal): Promise<ToolResult> {
-    const questionTypes = this.params.questions.map(
-      (q) => q.type ?? QuestionType.CHOICE,
-    );
+    const questionTypes = this.params.questions.map((q) => q.type);
 
     if (this.confirmationOutcome === ToolConfirmationOutcome.Cancel) {
       return {
