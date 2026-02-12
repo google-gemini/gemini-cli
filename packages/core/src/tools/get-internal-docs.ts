@@ -172,6 +172,9 @@ export class GetInternalDocsTool extends BaseDeclarativeTool<
       messageBus,
       /* isOutputMarkdown */ true,
       /* canUpdateOutput */ false,
+      undefined,
+      undefined,
+      true,
     );
   }
 

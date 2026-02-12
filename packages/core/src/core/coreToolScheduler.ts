@@ -547,6 +547,167 @@ export class CoreToolScheduler {
     }
   }
 
+  private async validateAndSchedule(
+    toolCall: ToolCall,
+    signal: AbortSignal,
+  ): Promise<void> {
+    if (toolCall.status !== 'validating' && toolCall.status !== 'error') {
+      return;
+    }
+
+    if (toolCall.status === 'error') {
+      return;
+    }
+
+    const { request: reqInfo, invocation } = toolCall;
+
+    try {
+      if (signal.aborted) {
+        this.setStatusInternal(
+          reqInfo.callId,
+          'cancelled',
+          signal,
+          'Tool call cancelled by user.',
+        );
+        return;
+      }
+
+      // Policy Check using PolicyEngine
+      // We must reconstruct the FunctionCall format expected by PolicyEngine
+      const toolCallForPolicy = {
+        name: toolCall.request.name,
+        args: toolCall.request.args,
+      };
+      const serverName =
+        toolCall.tool instanceof DiscoveredMCPTool
+          ? toolCall.tool.serverName
+          : undefined;
+
+      const { decision, rule } = await this.config
+        .getPolicyEngine()
+        .check(toolCallForPolicy, serverName);
+
+      if (decision === PolicyDecision.DENY) {
+        const { errorMessage, errorType } = getPolicyDenialError(
+          this.config,
+          rule,
+        );
+        this.setStatusInternal(
+          reqInfo.callId,
+          'error',
+          signal,
+          createErrorResponse(reqInfo, new Error(errorMessage), errorType),
+        );
+        return;
+      }
+
+      if (decision === PolicyDecision.ALLOW) {
+        this.setToolCallOutcome(
+          reqInfo.callId,
+          ToolConfirmationOutcome.ProceedAlways,
+        );
+        this.setStatusInternal(reqInfo.callId, 'scheduled', signal);
+      } else {
+        // PolicyDecision.ASK_USER
+
+        // We need confirmation details to show to the user
+        const confirmationDetails =
+          await invocation.shouldConfirmExecute(signal);
+
+        if (!confirmationDetails) {
+          this.setToolCallOutcome(
+            reqInfo.callId,
+            ToolConfirmationOutcome.ProceedAlways,
+          );
+          this.setStatusInternal(reqInfo.callId, 'scheduled', signal);
+        } else {
+          if (!this.config.isInteractive()) {
+            throw new Error(
+              `Tool execution for "${
+                toolCall.tool.displayName || toolCall.tool.name
+              }" requires user confirmation, which is not supported in non-interactive mode.`,
+            );
+          }
+
+          // Fire Notification hook before showing confirmation to user
+          const hookSystem = this.config.getHookSystem();
+          if (hookSystem) {
+            await hookSystem.fireToolNotificationEvent(confirmationDetails);
+          }
+
+          // Allow IDE to resolve confirmation
+          if (
+            confirmationDetails.type === 'edit' &&
+            confirmationDetails.ideConfirmation
+          ) {
+            // eslint-disable-next-line @typescript-eslint/no-floating-promises
+            confirmationDetails.ideConfirmation.then((resolution) => {
+              if (resolution.status === 'accepted') {
+                // eslint-disable-next-line @typescript-eslint/no-floating-promises
+                this.handleConfirmationResponse(
+                  reqInfo.callId,
+                  confirmationDetails.onConfirm,
+                  ToolConfirmationOutcome.ProceedOnce,
+                  signal,
+                );
+              } else {
+                // eslint-disable-next-line @typescript-eslint/no-floating-promises
+                this.handleConfirmationResponse(
+                  reqInfo.callId,
+                  confirmationDetails.onConfirm,
+                  ToolConfirmationOutcome.Cancel,
+                  signal,
+                );
+              }
+            });
+          }
+
+          const originalOnConfirm = confirmationDetails.onConfirm;
+          const wrappedConfirmationDetails: ToolCallConfirmationDetails = {
+            ...confirmationDetails,
+            onConfirm: (
+              outcome: ToolConfirmationOutcome,
+              payload?: ToolConfirmationPayload,
+            ) =>
+              this.handleConfirmationResponse(
+                reqInfo.callId,
+                originalOnConfirm,
+                outcome,
+                signal,
+                payload,
+              ),
+          };
+          this.setStatusInternal(
+            reqInfo.callId,
+            'awaiting_approval',
+            signal,
+            wrappedConfirmationDetails,
+          );
+        }
+      }
+    } catch (error) {
+      if (signal.aborted) {
+        this.setStatusInternal(
+          reqInfo.callId,
+          'cancelled',
+          signal,
+          'Tool call cancelled by user.',
+        );
+      } else {
+        this.setStatusInternal(
+          reqInfo.callId,
+          'error',
+          signal,
+          createErrorResponse(
+            reqInfo,
+            error instanceof Error ? error : new Error(String(error)),
+            ToolErrorType.UNHANDLED_EXCEPTION,
+          ),
+        );
+      }
+    }
+  }
+
   private async _processNextInQueue(signal: AbortSignal): Promise<void> {
     // If there's already a tool being processed, or the queue is empty, stop.
     if (this.toolCalls.length > 0 || this.toolCallQueue.length === 0) {
@@ -561,175 +722,51 @@ export class CoreToolScheduler {
       return;
     }
 
+    // Pull the first tool.
     const toolCall = this.toolCallQueue.shift()!;
-
-    // This is now the single active tool call.
     this.toolCalls = [toolCall];
     this.notifyToolCallsUpdate();
 
     // Handle tools that were already errored during creation.
     if (toolCall.status === 'error') {
-      // An error during validation means this "active" tool is already complete.
-      // We need to check for batch completion to either finish or process the next in queue.
       await this.checkAndNotifyCompletion(signal);
       return;
     }
 
-    // This logic is moved from the old `for` loop in `_schedule`.
-    if (toolCall.status === 'validating') {
-      const { request: reqInfo, invocation } = toolCall;
+    // Process the first tool.
+    await this.validateAndSchedule(toolCall, signal);
 
-      try {
-        if (signal.aborted) {
-          this.setStatusInternal(
-            reqInfo.callId,
-            'cancelled',
-            signal,
-            'Tool call cancelled by user.',
-          );
-          // The completion check will handle the cascade.
-          await this.checkAndNotifyCompletion(signal);
-          return;
+    const isTerminal = (status: string) =>
+      status === 'success' || status === 'error' || status === 'cancelled';
+
+    // Get the updated tool call state
+    const updatedToolCall = this.toolCalls.find(
+      (c) => c.request.callId === toolCall.request.callId,
+    );
+
+    if (updatedToolCall && isTerminal(updatedToolCall.status)) {
+      await this.checkAndNotifyCompletion(signal);
+      return;
+    }
+
+    // If the first tool is read-only, batch all contiguous read-only tools.
+    if (toolCall.tool?.isReadOnly) {
+      while (this.toolCallQueue.length > 0) {
+        const nextTool = this.toolCallQueue[0];
+
+        // Stop if the next tool is a mutator.
+        if (!nextTool.tool?.isReadOnly) {
+          break;
         }
 
-        // Policy Check using PolicyEngine
-        // We must reconstruct the FunctionCall format expected by PolicyEngine
-        const toolCallForPolicy = {
-          name: toolCall.request.name,
-          args: toolCall.request.args,
-        };
-        const serverName =
-          toolCall.tool instanceof DiscoveredMCPTool
-            ? toolCall.tool.serverName
-            : undefined;
-
-        const { decision, rule } = await this.config
-          .getPolicyEngine()
-          .check(toolCallForPolicy, serverName);
-
-        if (decision === PolicyDecision.DENY) {
-          const { errorMessage, errorType } = getPolicyDenialError(
-            this.config,
-            rule,
-          );
-          this.setStatusInternal(
-            reqInfo.callId,
-            'error',
-            signal,
-            createErrorResponse(reqInfo, new Error(errorMessage), errorType),
-          );
-          await this.checkAndNotifyCompletion(signal);
-          return;
-        }
-
-        if (decision === PolicyDecision.ALLOW) {
-          this.setToolCallOutcome(
-            reqInfo.callId,
-            ToolConfirmationOutcome.ProceedAlways,
-          );
-          this.setStatusInternal(reqInfo.callId, 'scheduled', signal);
-        } else {
-          // PolicyDecision.ASK_USER
-
-          // We need confirmation details to show to the user
-          const confirmationDetails =
-            await invocation.shouldConfirmExecute(signal);
-
-          if (!confirmationDetails) {
-            this.setToolCallOutcome(
-              reqInfo.callId,
-              ToolConfirmationOutcome.ProceedAlways,
-            );
-            this.setStatusInternal(reqInfo.callId, 'scheduled', signal);
-          } else {
-            if (!this.config.isInteractive()) {
-              throw new Error(
-                `Tool execution for "${
-                  toolCall.tool.displayName || toolCall.tool.name
-                }" requires user confirmation, which is not supported in non-interactive mode.`,
-              );
-            }
-
-            // Fire Notification hook before showing confirmation to user
-            const hookSystem = this.config.getHookSystem();
-            if (hookSystem) {
-              await hookSystem.fireToolNotificationEvent(confirmationDetails);
-            }
-
-            // Allow IDE to resolve confirmation
-            if (
-              confirmationDetails.type === 'edit' &&
-              confirmationDetails.ideConfirmation
-            ) {
-              // eslint-disable-next-line @typescript-eslint/no-floating-promises
-              confirmationDetails.ideConfirmation.then((resolution) => {
-                if (resolution.status === 'accepted') {
-                  // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                  this.handleConfirmationResponse(
-                    reqInfo.callId,
-                    confirmationDetails.onConfirm,
-                    ToolConfirmationOutcome.ProceedOnce,
-                    signal,
-                  );
-                } else {
-                  // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                  this.handleConfirmationResponse(
-                    reqInfo.callId,
-                    confirmationDetails.onConfirm,
-                    ToolConfirmationOutcome.Cancel,
-                    signal,
-                  );
-                }
-              });
-            }
-
-            const originalOnConfirm = confirmationDetails.onConfirm;
-            const wrappedConfirmationDetails: ToolCallConfirmationDetails = {
-              ...confirmationDetails,
-              onConfirm: (
-                outcome: ToolConfirmationOutcome,
-                payload?: ToolConfirmationPayload,
-              ) =>
-                this.handleConfirmationResponse(
-                  reqInfo.callId,
-                  originalOnConfirm,
-                  outcome,
-                  signal,
-                  payload,
-                ),
-            };
-            this.setStatusInternal(
-              reqInfo.callId,
-              'awaiting_approval',
-              signal,
-              wrappedConfirmationDetails,
-            );
-          }
-        }
-      } catch (error) {
-        if (signal.aborted) {
-          this.setStatusInternal(
-            reqInfo.callId,
-            'cancelled',
-            signal,
-            'Tool call cancelled by user.',
-          );
-          await this.checkAndNotifyCompletion(signal);
-        } else {
-          this.setStatusInternal(
-            reqInfo.callId,
-            'error',
-            signal,
-            createErrorResponse(
-              reqInfo,
-              error instanceof Error ? error : new Error(String(error)),
-              ToolErrorType.UNHANDLED_EXCEPTION,
-            ),
-          );
-          await this.checkAndNotifyCompletion(signal);
-        }
+        // It's read-only, so it can join the turn.
+        this.toolCallQueue.shift();
+        this.toolCalls.push(nextTool);
+        this.notifyToolCallsUpdate();
+        await this.validateAndSchedule(nextTool, signal);
       }
     }
+
     await this.attemptExecutionOfScheduledCalls(signal);
   }
 
@@ -834,87 +871,124 @@ export class CoreToolScheduler {
         (call) => call.status === 'scheduled',
       );
 
+      if (callsToExecute.length === 0) {
+        return;
+      }
+
+      // Mark all as executing first to prevent duplicate triggering
       for (const toolCall of callsToExecute) {
-        if (toolCall.status !== 'scheduled') continue;
-
         this.setStatusInternal(toolCall.request.callId, 'executing', signal);
-        const executingCall = this.toolCalls.find(
-          (c) => c.request.callId === toolCall.request.callId,
-        );
+      }
 
-        if (!executingCall) {
-          // Should not happen, but safe guard
-          continue;
-        }
+      const results = await Promise.all(
+        callsToExecute.map(async (toolCall) => {
+          const executingCall = this.toolCalls.find(
+            (c) => c.request.callId === toolCall.request.callId,
+          );
 
-        const completedCall = await this.toolExecutor.execute({
-          call: executingCall,
-          signal,
-          outputUpdateHandler: (callId, output) => {
-            if (this.outputUpdateHandler) {
-              this.outputUpdateHandler(callId, output);
-            }
-            this.toolCalls = this.toolCalls.map((tc) =>
-              tc.request.callId === callId && tc.status === 'executing'
-                ? { ...tc, liveOutput: output }
-                : tc,
-            );
-            this.notifyToolCallsUpdate();
-          },
-          onUpdateToolCall: (updatedCall) => {
-            this.toolCalls = this.toolCalls.map((tc) =>
-              tc.request.callId === updatedCall.request.callId
-                ? updatedCall
-                : tc,
-            );
-            this.notifyToolCallsUpdate();
-          },
-        });
+          if (
+            !executingCall ||
+            (executingCall.status !== 'executing' &&
+              executingCall.status !== 'success' &&
+              executingCall.status !== 'error')
+          ) {
+            return undefined;
+          }
 
+          // If it already finished (e.g. via immediate error), just return it
+          if (
+            executingCall.status === 'success' ||
+            executingCall.status === 'error'
+          ) {
+            return executingCall;
+          }
+
+          return this.toolExecutor.execute({
+            call: executingCall,
+            signal,
+            outputUpdateHandler: (callId, output) => {
+              if (this.outputUpdateHandler) {
+                this.outputUpdateHandler(callId, output);
+              }
+              this.toolCalls = this.toolCalls.map((tc) =>
+                tc.request.callId === callId && tc.status === 'executing'
+                  ? { ...tc, liveOutput: output }
+                  : tc,
+              );
+              this.notifyToolCallsUpdate();
+            },
+            onUpdateToolCall: (updatedCall) => {
+              this.toolCalls = this.toolCalls.map((tc) =>
+                tc.request.callId === updatedCall.request.callId
+                  ? updatedCall
+                  : tc,
+              );
+              this.notifyToolCallsUpdate();
+            },
+          });
+        }),
+      );
+
+      // Apply all results atomically
+      for (const completedCall of results) {
+        if (!completedCall) continue;
         this.toolCalls = this.toolCalls.map((tc) =>
           tc.request.callId === completedCall.request.callId
             ? completedCall
             : tc,
         );
-        this.notifyToolCallsUpdate();
-
-        await this.checkAndNotifyCompletion(signal);
       }
+      this.notifyToolCallsUpdate();
+
+      await this.checkAndNotifyCompletion(signal);
     }
   }
 
   private async checkAndNotifyCompletion(signal: AbortSignal): Promise<void> {
-    // This method is now only concerned with the single active tool call.
     if (this.toolCalls.length === 0) {
       // It's possible to be called when a batch is cancelled before any tool has started.
       if (signal.aborted && this.toolCallQueue.length > 0) {
         this._cancelAllQueuedCalls();
       }
     } else {
-      const activeCall = this.toolCalls[0];
-      const isTerminal =
-        activeCall.status === 'success' ||
-        activeCall.status === 'error' ||
-        activeCall.status === 'cancelled';
+      const terminalCalls = this.toolCalls.filter(
+        (call) =>
+          call.status === 'success' ||
+          call.status === 'error' ||
+          call.status === 'cancelled',
+      );
 
-      // If the active tool is not in a terminal state (e.g., it's 'executing' or 'awaiting_approval'),
-      // then the scheduler is still busy or paused. We should not proceed.
-      if (!isTerminal) {
-        return;
+      if (terminalCalls.length > 0) {
+        for (const completedCall of terminalCalls as CompletedToolCall[]) {
+          this.completedToolCallsForBatch.push(completedCall);
+          logToolCall(this.config, new ToolCallEvent(completedCall));
+        }
+
+        // Remove terminal calls from active toolCalls
+        this.toolCalls = this.toolCalls.filter(
+          (call) =>
+            call.status !== 'success' &&
+            call.status !== 'error' &&
+            call.status !== 'cancelled',
+        );
       }
-
-      // The active tool is finished. Move it to the completed batch.
-      const completedCall = activeCall as CompletedToolCall;
-      this.completedToolCallsForBatch.push(completedCall);
-      logToolCall(this.config, new ToolCallEvent(completedCall));
-
-      // Clear the active tool slot. This is crucial for the sequential processing.
-      this.toolCalls = [];
     }
 
+    // A batch is complete when NO tools are in non-terminal active states.
+    const hasActiveTools = this.toolCalls.some(
+      (call) =>
+        call.status === 'executing' ||
+        call.status === 'awaiting_approval' ||
+        call.status === 'scheduled' ||
+        call.status === 'validating',
+    );
+
     // Now, check if the entire batch is complete.
-    // The batch is complete if the queue is empty or the operation was cancelled.
-    if (this.toolCallQueue.length === 0 || signal.aborted) {
+    // The batch is complete if the queue is empty AND there are no active tools.
+    if (
+      !hasActiveTools &&
+      (this.toolCallQueue.length === 0 || signal.aborted)
+    ) {
       if (signal.aborted) {
         this._cancelAllQueuedCalls();
       }

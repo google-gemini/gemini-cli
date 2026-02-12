@@ -639,6 +639,9 @@ export class RipGrepTool extends BaseDeclarativeTool<
       messageBus,
       true, // isOutputMarkdown
       false, // canUpdateOutput
+      undefined,
+      undefined,
+      true,
     );
     this.fileDiscoveryService = new FileDiscoveryService(
       config.getTargetDir(),

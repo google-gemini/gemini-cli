@@ -657,6 +657,9 @@ export class GrepTool extends BaseDeclarativeTool<GrepToolParams, ToolResult> {
       messageBus,
       true,
       false,
+      undefined,
+      undefined,
+      true,
     );
   }
 

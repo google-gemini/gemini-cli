@@ -334,6 +334,11 @@ export interface ToolBuilder<
   canUpdateOutput: boolean;
 
   /**
+   * Whether the tool is read-only (has no side effects).
+   */
+  isReadOnly: boolean;
+
+  /**
    * Validates raw parameters and builds a ready-to-execute invocation.
    * @param params The raw, untrusted parameters from the model.
    * @returns A valid `ToolInvocation` if successful. Throws an error if validation fails.
@@ -361,7 +366,16 @@ export abstract class DeclarativeTool<
     readonly canUpdateOutput: boolean = false,
     readonly extensionName?: string,
     readonly extensionId?: string,
-  ) {}
+    isReadOnly: boolean = false,
+  ) {
+    this._isReadOnly = isReadOnly;
+  }
+
+  private _isReadOnly: boolean;
+
+  get isReadOnly(): boolean {
+    return this._isReadOnly;
+  }
 
   getSchema(_modelId?: string): FunctionDeclaration {
     return {
@@ -537,6 +551,7 @@ export function isTool(obj: unknown): obj is AnyDeclarativeTool {
     obj !== null &&
     'name' in obj &&
     'build' in obj &&
+    'isReadOnly' in obj &&
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     typeof (obj as AnyDeclarativeTool).build === 'function'
   );

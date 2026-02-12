@@ -45,6 +45,11 @@ export class EnterPlanModeTool extends BaseDeclarativeTool<
         },
       },
       messageBus,
+      true,
+      false,
+      undefined,
+      undefined,
+      true,
     );
   }
 

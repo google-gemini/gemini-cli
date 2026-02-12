@@ -72,6 +72,11 @@ export class ExitPlanModeTool extends BaseDeclarativeTool<
         },
       },
       messageBus,
+      true,
+      false,
+      undefined,
+      undefined,
+      true,
     );
   }
 
