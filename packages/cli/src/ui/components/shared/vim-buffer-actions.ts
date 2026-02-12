@@ -663,85 +663,62 @@ export function handleVimAction(
           // Down - delete/change current line + count lines below
           const linesToChange = Math.min(count + 1, totalLines - cursorRow);
           if (linesToChange > 0) {
-            if (totalLines === 1) {
-              const currentLine = state.lines[0] || '';
-              return replaceRangeInternal(
-                detachExpandedPaste(pushUndo(state)),
-                0,
-                0,
-                0,
-                cpLen(currentLine),
-                '',
-              );
-            } else {
+            if (linesToChange >= totalLines) {
+              // Deleting all lines - keep one empty line
               const nextState = detachExpandedPaste(pushUndo(state));
-              const { startOffset, endOffset } = getLineRangeOffsets(
-                cursorRow,
-                linesToChange,
-                nextState.lines,
-              );
-              const { startRow, startCol, endRow, endCol } =
-                getPositionFromOffsets(startOffset, endOffset, nextState.lines);
-              return replaceRangeInternal(
-                nextState,
-                startRow,
-                startCol,
-                endRow,
-                endCol,
-                '',
-              );
+              return {
+                ...nextState,
+                lines: [''],
+                cursorRow: 0,
+                cursorCol: 0,
+                preferredCol: null,
+              };
             }
+
+            const nextState = detachExpandedPaste(pushUndo(state));
+            const newLines = [...nextState.lines];
+            newLines.splice(cursorRow, linesToChange);
+
+            return {
+              ...nextState,
+              lines: newLines,
+              cursorRow: Math.min(cursorRow, newLines.length - 1),
+              cursorCol: 0,
+              preferredCol: null,
+            };
           }
           return state;
         }
 
         case 'k': {
           // Up - delete/change current line + count lines above
-          const upLines = Math.min(count + 1, cursorRow + 1);
-          if (upLines > 0) {
-            if (state.lines.length === 1) {
-              const currentLine = state.lines[0] || '';
-              return replaceRangeInternal(
-                detachExpandedPaste(pushUndo(state)),
-                0,
-                0,
-                0,
-                cpLen(currentLine),
-                '',
-              );
-            } else {
-              const startRow = Math.max(0, cursorRow - count);
-              const linesToChange = cursorRow - startRow + 1;
+          const startRow = Math.max(0, cursorRow - count);
+          const linesToChange = cursorRow - startRow + 1;
+
+          if (linesToChange > 0) {
+            if (linesToChange >= totalLines) {
+              // Deleting all lines - keep one empty line
               const nextState = detachExpandedPaste(pushUndo(state));
-              const { startOffset, endOffset } = getLineRangeOffsets(
-                startRow,
-                linesToChange,
-                nextState.lines,
-              );
-              const {
-                startRow: newStartRow,
-                startCol,
-                endRow,
-                endCol,
-              } = getPositionFromOffsets(
-                startOffset,
-                endOffset,
-                nextState.lines,
-              );
-              const resultState = replaceRangeInternal(
-                nextState,
-                newStartRow,
-                startCol,
-                endRow,
-                endCol,
-                '',
-              );
               return {
-                ...resultState,
-                cursorRow: startRow,
+                ...nextState,
+                lines: [''],
+                cursorRow: 0,
                 cursorCol: 0,
+                preferredCol: null,
               };
             }
+
+            const nextState = detachExpandedPaste(pushUndo(state));
+            const newLines = [...nextState.lines];
+            newLines.splice(startRow, linesToChange);
+
+            return {
+              ...nextState,
+              lines: newLines,
+              cursorRow: Math.min(startRow, newLines.length - 1),
+              cursorCol: 0,
+              preferredCol: null,
+            };
           }
           return state;
         }

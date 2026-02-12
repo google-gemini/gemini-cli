@@ -1338,6 +1338,122 @@ describe('vim-buffer-actions', () => {
         expect(result.cursorRow).toBe(0);
         expect(result.cursorCol).toBe(0);
       });
+
+      it('should handle Unicode characters in cj (down)', () => {
+        const state = createTestState(
+          ['hello 🎉 world', 'line2 émoji', 'line3'],
+          0,
+          0,
+        );
+        const action = {
+          type: 'vim_change_movement' as const,
+          payload: { movement: 'j' as const, count: 1 },
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines).toEqual(['line3']);
+        expect(result.cursorRow).toBe(0);
+        expect(result.cursorCol).toBe(0);
+      });
+
+      it('should handle Unicode characters in ck (up)', () => {
+        const state = createTestState(
+          ['line1', 'hello 🎉 world', 'line3 émoji'],
+          2,
+          0,
+        );
+        const action = {
+          type: 'vim_change_movement' as const,
+          payload: { movement: 'k' as const, count: 1 },
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines).toEqual(['line1']);
+        expect(result.cursorRow).toBe(0);
+        expect(result.cursorCol).toBe(0);
+      });
+
+      it('should handle cj on first line of 2 lines (delete all)', () => {
+        const state = createTestState(['line1', 'line2'], 0, 0);
+        const action = {
+          type: 'vim_change_movement' as const,
+          payload: { movement: 'j' as const, count: 1 },
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines).toEqual(['']);
+        expect(result.cursorRow).toBe(0);
+        expect(result.cursorCol).toBe(0);
+      });
+
+      it('should handle cj on last line (delete only current line)', () => {
+        const state = createTestState(['line1', 'line2', 'line3'], 2, 0);
+        const action = {
+          type: 'vim_change_movement' as const,
+          payload: { movement: 'j' as const, count: 1 },
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines).toEqual(['line1', 'line2']);
+        expect(result.cursorRow).toBe(1);
+        expect(result.cursorCol).toBe(0);
+      });
+
+      it('should handle ck on first line (delete only current line)', () => {
+        const state = createTestState(['line1', 'line2', 'line3'], 0, 0);
+        const action = {
+          type: 'vim_change_movement' as const,
+          payload: { movement: 'k' as const, count: 1 },
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines).toEqual(['line2', 'line3']);
+        expect(result.cursorRow).toBe(0);
+        expect(result.cursorCol).toBe(0);
+      });
+
+      it('should handle 2cj from middle line', () => {
+        const state = createTestState(
+          ['line1', 'line2', 'line3', 'line4', 'line5'],
+          1,
+          0,
+        );
+        const action = {
+          type: 'vim_change_movement' as const,
+          payload: { movement: 'j' as const, count: 2 },
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        // 2cj from line 1: delete lines 1, 2, 3 (current + 2 below)
+        expect(result.lines).toEqual(['line1', 'line5']);
+        expect(result.cursorRow).toBe(1);
+        expect(result.cursorCol).toBe(0);
+      });
+
+      it('should handle 2ck from middle line', () => {
+        const state = createTestState(
+          ['line1', 'line2', 'line3', 'line4', 'line5'],
+          3,
+          0,
+        );
+        const action = {
+          type: 'vim_change_movement' as const,
+          payload: { movement: 'k' as const, count: 2 },
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        // 2ck from line 3: delete lines 1, 2, 3 (current + 2 above)
+        expect(result.lines).toEqual(['line1', 'line5']);
+        expect(result.cursorRow).toBe(1);
+        expect(result.cursorCol).toBe(0);
+      });
     });
   });
 
