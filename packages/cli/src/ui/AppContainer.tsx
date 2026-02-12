@@ -1857,7 +1857,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const isPassiveShortcutsHelpState =
     isInputActive &&
-    streamingState === StreamingState.Idle &&
+    (streamingState === StreamingState.Idle ||
+      streamingState === StreamingState.Responding) &&
     !hasPendingActionRequired;
 
   useEffect(() => {

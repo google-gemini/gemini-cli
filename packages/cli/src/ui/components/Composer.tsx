@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Box, useIsScreenReaderEnabled } from 'ink';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { StatusDisplay } from './StatusDisplay.js';
@@ -77,30 +77,16 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     Boolean(uiState.quota.proQuotaRequest) ||
     Boolean(uiState.quota.validationRequest) ||
     Boolean(uiState.customDialog);
-  const isPassiveShortcutsHelpState =
-    uiState.isInputActive &&
-    uiState.streamingState === StreamingState.Idle &&
-    !hasPendingActionRequired;
-
-  const { setShortcutsHelpVisible } = uiActions;
-
-  useEffect(() => {
-    if (uiState.shortcutsHelpVisible && !isPassiveShortcutsHelpState) {
-      setShortcutsHelpVisible(false);
-    }
-  }, [
-    uiState.shortcutsHelpVisible,
-    isPassiveShortcutsHelpState,
-    setShortcutsHelpVisible,
-  ]);
 
   const showShortcutsHelp =
     uiState.shortcutsHelpVisible &&
-    uiState.streamingState === StreamingState.Idle &&
+    (uiState.streamingState === StreamingState.Idle ||
+      uiState.streamingState === StreamingState.Responding) &&
     !hasPendingActionRequired;
   const showShortcutsHint =
     settings.merged.ui.showShortcutsHint &&
-    uiState.streamingState === StreamingState.Idle &&
+    (uiState.streamingState === StreamingState.Idle ||
+      uiState.streamingState === StreamingState.Responding) &&
     !hasPendingActionRequired;
   const hasToast = shouldShowToast(uiState);
   const showLoadingIndicator =
@@ -195,45 +181,43 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             {hasToast ? (
               <ToastDisplay />
             ) : (
-              !showLoadingIndicator && (
-                <Box
-                  flexDirection={isNarrow ? 'column' : 'row'}
-                  alignItems={isNarrow ? 'flex-start' : 'center'}
-                >
-                  {showApprovalIndicator && (
-                    <ApprovalModeIndicator
-                      approvalMode={showApprovalModeIndicator}
-                      isPlanEnabled={config.isPlanEnabled()}
-                    />
-                  )}
-                  {uiState.shellModeActive && (
-                    <Box
-                      marginLeft={showApprovalIndicator && !isNarrow ? 1 : 0}
-                      marginTop={showApprovalIndicator && isNarrow ? 1 : 0}
-                    >
-                      <ShellModeIndicator />
-                    </Box>
-                  )}
-                  {showRawMarkdownIndicator && (
-                    <Box
-                      marginLeft={
-                        (showApprovalIndicator || uiState.shellModeActive) &&
-                        !isNarrow
-                          ? 1
-                          : 0
-                      }
-                      marginTop={
-                        (showApprovalIndicator || uiState.shellModeActive) &&
-                        isNarrow
-                          ? 1
-                          : 0
-                      }
-                    >
-                      <RawMarkdownIndicator />
-                    </Box>
-                  )}
-                </Box>
-              )
+              <Box
+                flexDirection={isNarrow ? 'column' : 'row'}
+                alignItems={isNarrow ? 'flex-start' : 'center'}
+              >
+                {showApprovalIndicator && (
+                  <ApprovalModeIndicator
+                    approvalMode={showApprovalModeIndicator}
+                    isPlanEnabled={config.isPlanEnabled()}
+                  />
+                )}
+                {uiState.shellModeActive && (
+                  <Box
+                    marginLeft={showApprovalIndicator && !isNarrow ? 1 : 0}
+                    marginTop={showApprovalIndicator && isNarrow ? 1 : 0}
+                  >
+                    <ShellModeIndicator />
+                  </Box>
+                )}
+                {showRawMarkdownIndicator && (
+                  <Box
+                    marginLeft={
+                      (showApprovalIndicator || uiState.shellModeActive) &&
+                      !isNarrow
+                        ? 1
+                        : 0
+                    }
+                    marginTop={
+                      (showApprovalIndicator || uiState.shellModeActive) &&
+                      isNarrow
+                        ? 1
+                        : 0
+                    }
+                  >
+                    <RawMarkdownIndicator />
+                  </Box>
+                )}
+              </Box>
             )}
           </Box>
 
@@ -242,9 +226,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             flexDirection="column"
             alignItems={isNarrow ? 'flex-start' : 'flex-end'}
           >
-            {!showLoadingIndicator && (
-              <StatusDisplay hideContextSummary={hideContextSummary} />
-            )}
+            <StatusDisplay hideContextSummary={hideContextSummary} />
           </Box>
         </Box>
       </Box>

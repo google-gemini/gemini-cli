@@ -303,7 +303,7 @@ describe('Composer', () => {
   });
 
   describe('Loading Indicator', () => {
-    it('renders LoadingIndicator with thought when streaming', () => {
+    it('renders LoadingIndicator and keeps indicators visible when streaming', () => {
       const uiState = createMockUIState({
         streamingState: StreamingState.Responding,
         thought: {
@@ -318,6 +318,8 @@ describe('Composer', () => {
 
       const output = lastFrame();
       expect(output).toContain('LoadingIndicator: Processing');
+      expect(output).toContain('ApprovalModeIndicator');
+      expect(output).toContain('StatusDisplay');
     });
 
     it('renders generic thinking text in loading indicator when full inline thinking is enabled', () => {
@@ -338,7 +340,7 @@ describe('Composer', () => {
       expect(output).toContain('LoadingIndicator: Thinking ...');
     });
 
-    it('hides shortcuts hint while loading', () => {
+    it('shows shortcuts hint while loading', () => {
       const uiState = createMockUIState({
         streamingState: StreamingState.Responding,
         elapsedTime: 1,
@@ -348,7 +350,7 @@ describe('Composer', () => {
 
       const output = lastFrame();
       expect(output).toContain('LoadingIndicator');
-      expect(output).not.toContain('ShortcutsHint');
+      expect(output).toContain('ShortcutsHint');
     });
 
     it('renders LoadingIndicator without thought when accessibility disables loading phrases', () => {
@@ -700,7 +702,7 @@ describe('Composer', () => {
       expect(lastFrame()).toContain('ShortcutsHelp');
     });
 
-    it('hides shortcuts help while streaming', () => {
+    it('shows shortcuts help while streaming', () => {
       const uiState = createMockUIState({
         shortcutsHelpVisible: true,
         streamingState: StreamingState.Responding,
@@ -708,7 +710,7 @@ describe('Composer', () => {
 
       const { lastFrame } = renderComposer(uiState);
 
-      expect(lastFrame()).not.toContain('ShortcutsHelp');
+      expect(lastFrame()).toContain('ShortcutsHelp');
     });
 
     it('hides shortcuts help when action is required', () => {

@@ -2179,7 +2179,7 @@ describe('AppContainer State Management', () => {
       unmount();
     });
 
-    it('dismisses shortcuts help when streaming starts', async () => {
+    it('keeps shortcuts help visible when streaming starts', async () => {
       await setupShortcutsVisibilityTest();
 
       act(() => {
@@ -2197,7 +2197,7 @@ describe('AppContainer State Management', () => {
         rerender();
       });
       await waitFor(() => {
-        expect(capturedUIState.shortcutsHelpVisible).toBe(false);
+        expect(capturedUIState.shortcutsHelpVisible).toBe(true);
       });
 
       unmount();
