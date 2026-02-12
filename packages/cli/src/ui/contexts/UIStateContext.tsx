@@ -120,6 +120,7 @@ export interface UIState {
   ctrlDPressedOnce: boolean;
   showEscapePrompt: boolean;
   shortcutsHelpVisible: boolean;
+  hasPendingActionRequired: boolean;
   elapsedTime: number;
   currentLoadingPhrase: string | undefined;
   historyRemountKey: number;
