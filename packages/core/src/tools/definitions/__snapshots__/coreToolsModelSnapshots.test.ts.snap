@@ -659,8 +659,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
 exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: write_file 1`] = `
 {
   "description": "Writes content to a specified file in the local filesystem.
-
-      The user has the ability to modify \`content\`. If modified, this will be stated in the response.",
+The user has the ability to modify \`content\`. If modified, this will be stated in the response.",
   "name": "write_file",
   "parametersJsonSchema": {
     "properties": {
@@ -1448,8 +1447,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: write_file 1`] = `
 {
   "description": "Writes content to a specified file in the local filesystem.
-
-      The user has the ability to modify \`content\`. If modified, this will be stated in the response.",
+The user has the ability to modify \`content\`. If modified, this will be stated in the response.",
   "name": "write_file",
   "parametersJsonSchema": {
     "properties": {
