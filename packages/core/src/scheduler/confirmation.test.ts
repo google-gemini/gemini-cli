@@ -31,13 +31,21 @@ import type { ToolModificationHandler } from './tool-modifier.js';
 import type { ValidatingToolCall, WaitingToolCall } from './types.js';
 import { ROOT_SCHEDULER_ID } from './types.js';
 import type { Config } from '../config/config.js';
-import type { EditorType } from '../utils/editor.js';
+import { type EditorType, resolveEditorAsync } from '../utils/editor.js';
 import { randomUUID } from 'node:crypto';
 
 // Mock Dependencies
 vi.mock('node:crypto', () => ({
   randomUUID: vi.fn(),
 }));
+
+vi.mock('../utils/editor.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../utils/editor.js')>();
+  return {
+    ...actual,
+    resolveEditorAsync: vi.fn().mockResolvedValue('vim'),
+  };
+});
 
 describe('confirmation.ts', () => {
   let mockMessageBus: MessageBus;
@@ -124,6 +132,7 @@ describe('confirmation.ts', () => {
 
     beforeEach(() => {
       signal = new AbortController().signal;
+      vi.mocked(resolveEditorAsync).mockResolvedValue('vim');
 
       mockState = {
         getToolCall: vi.fn(),
@@ -286,8 +295,13 @@ describe('confirmation.ts', () => {
       };
       invocationMock.shouldConfirmExecute.mockResolvedValue(details);
 
-      // 1. User says Modify
-      // 2. User says Proceed
+      // Set up modifier mock before starting the flow
+      mockModifier.handleModifyWithEditor.mockResolvedValue({
+        updatedParams: { foo: 'bar' },
+      });
+      toolMock.build.mockReturnValue({} as unknown as AnyToolInvocation);
+
+      // Start the confirmation flow
       const listenerPromise1 = waitForListener(
         MessageBusType.TOOL_CONFIRMATION_RESPONSE,
       );
@@ -302,7 +316,12 @@ describe('confirmation.ts', () => {
 
       await listenerPromise1;
 
-      // First response: Modify
+      // Prepare to detect when the loop re-subscribes after modification
+      const listenerPromise2 = waitForListener(
+        MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+      );
+
+      // First response: User chooses to modify with editor
       emitResponse({
         type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
         correlationId: '123e4567-e89b-12d3-a456-426614174000',
@@ -310,22 +329,10 @@ describe('confirmation.ts', () => {
         outcome: ToolConfirmationOutcome.ModifyWithEditor,
       });
 
-      // Mock the modifier action
-      mockModifier.handleModifyWithEditor.mockResolvedValue({
-        updatedParams: { foo: 'bar' },
-      });
-      toolMock.build.mockReturnValue({} as unknown as AnyToolInvocation);
-
-      // Wait for loop to cycle and re-subscribe
-      const listenerPromise2 = waitForListener(
-        MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-      );
+      // Wait for the loop to process the modification and re-subscribe
       await listenerPromise2;
 
-      // Expect state update
-      expect(mockState.updateArgs).toHaveBeenCalled();
-
-      // Second response: Proceed
+      // Second response: User approves the modified params
       emitResponse({
         type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
         correlationId: '123e4567-e89b-12d3-a456-426614174000',
@@ -336,6 +343,7 @@ describe('confirmation.ts', () => {
       const result = await promise;
       expect(result.outcome).toBe(ToolConfirmationOutcome.ProceedOnce);
       expect(mockModifier.handleModifyWithEditor).toHaveBeenCalled();
+      expect(mockState.updateArgs).toHaveBeenCalled();
     });
 
     it('should handle inline modification (payload)', async () => {
