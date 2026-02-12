@@ -25,16 +25,20 @@ const mockStdin = new EventEmitter() as unknown as NodeJS.ReadStream &
   },
 );
 
-vi.mock('ink', () => ({
-  useStdin: () => ({
-    stdin: mockStdin,
-  }),
-  useStdout: () => ({
-    stdout: {
-      write: vi.fn(),
-    },
-  }),
-}));
+vi.mock('ink', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('ink')>();
+  return {
+    ...actual,
+    useStdin: () => ({
+      stdin: mockStdin,
+    }),
+    useStdout: () => ({
+      stdout: {
+        write: vi.fn(),
+      },
+    }),
+  };
+});
 
 const TestComponent = ({ onColor }: { onColor: (c: string) => void }) => {
   const { subscribe } = useTerminalContext();
@@ -47,40 +51,47 @@ const TestComponent = ({ onColor }: { onColor: (c: string) => void }) => {
 describe('TerminalContext', () => {
   it('should parse OSC 11 response', async () => {
     const handleColor = vi.fn();
-    render(
+    const { waitUntilReady, unmount } = render(
       <TerminalProvider>
         <TestComponent onColor={handleColor} />
       </TerminalProvider>,
     );
+    await waitUntilReady();
 
-    act(() => {
+    await act(async () => {
       mockStdin.emit('data', '\x1b]11;rgb:ffff/ffff/ffff\x1b\\');
     });
+    await waitUntilReady();
 
     await waitFor(() => {
       expect(handleColor).toHaveBeenCalledWith('rgb:ffff/ffff/ffff');
     });
+    unmount();
   });
 
   it('should handle partial chunks', async () => {
     const handleColor = vi.fn();
-    render(
+    const { waitUntilReady, unmount } = render(
       <TerminalProvider>
         <TestComponent onColor={handleColor} />
       </TerminalProvider>,
     );
+    await waitUntilReady();
 
-    act(() => {
+    await act(async () => {
       mockStdin.emit('data', '\x1b]11;rgb:0000/');
     });
+    await waitUntilReady();
     expect(handleColor).not.toHaveBeenCalled();
 
-    act(() => {
+    await act(async () => {
       mockStdin.emit('data', '0000/0000\x1b\\');
     });
+    await waitUntilReady();
 
     await waitFor(() => {
       expect(handleColor).toHaveBeenCalledWith('rgb:0000/0000/0000');
     });
+    unmount();
   });
 });
