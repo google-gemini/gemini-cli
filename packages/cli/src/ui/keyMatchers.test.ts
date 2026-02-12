@@ -331,6 +331,18 @@ describe('keyMatchers', () => {
       negative: [createKey('d'), createKey('c', { ctrl: true })],
     },
     {
+      command: Command.SUSPEND_APP,
+      positive: [
+        createKey('z', { ctrl: true }),
+        createKey('z', { ctrl: true, shift: true }),
+      ],
+      negative: [
+        createKey('z'),
+        createKey('y', { ctrl: true }),
+        createKey('z', { alt: true }),
+      ],
+    },
+    {
       command: Command.SHOW_MORE_LINES,
       positive: [
         createKey('s', { ctrl: true }),
@@ -358,7 +370,7 @@ describe('keyMatchers', () => {
     {
       command: Command.FOCUS_SHELL_INPUT,
       positive: [createKey('tab')],
-      negative: [createKey('f', { ctrl: true }), createKey('f')],
+      negative: [createKey('f6'), createKey('f', { ctrl: true })],
     },
     {
       command: Command.TOGGLE_YOLO,

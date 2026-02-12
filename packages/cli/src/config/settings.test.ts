@@ -2546,6 +2546,50 @@ describe('Settings Loading and Merging', () => {
     });
   });
 
+  describe('Reactivity & Snapshots', () => {
+    let loadedSettings: LoadedSettings;
+
+    beforeEach(() => {
+      const emptySettingsFile: SettingsFile = {
+        path: '/mock/path',
+        settings: {},
+        originalSettings: {},
+      };
+
+      loadedSettings = new LoadedSettings(
+        { ...emptySettingsFile, path: getSystemSettingsPath() },
+        { ...emptySettingsFile, path: getSystemDefaultsPath() },
+        { ...emptySettingsFile, path: USER_SETTINGS_PATH },
+        { ...emptySettingsFile, path: MOCK_WORKSPACE_SETTINGS_PATH },
+        true, // isTrusted
+        [],
+      );
+    });
+
+    it('getSnapshot() should return stable reference if no changes occur', () => {
+      const snap1 = loadedSettings.getSnapshot();
+      const snap2 = loadedSettings.getSnapshot();
+      expect(snap1).toBe(snap2);
+    });
+
+    it('setValue() should create a new snapshot reference and emit event', () => {
+      const oldSnapshot = loadedSettings.getSnapshot();
+      const oldUserRef = oldSnapshot.user.settings;
+
+      loadedSettings.setValue(SettingScope.User, 'ui.theme', 'high-contrast');
+
+      const newSnapshot = loadedSettings.getSnapshot();
+
+      expect(newSnapshot).not.toBe(oldSnapshot);
+      expect(newSnapshot.user.settings).not.toBe(oldUserRef);
+      expect(newSnapshot.user.settings.ui?.theme).toBe('high-contrast');
+
+      expect(newSnapshot.system.settings).not.toBe(oldSnapshot.system.settings);
+
+      expect(mockCoreEvents.emitSettingsChanged).toHaveBeenCalled();
+    });
+  });
+
   describe('Security and Sandbox', () => {
     let originalArgv: string[];
     let originalEnv: NodeJS.ProcessEnv;

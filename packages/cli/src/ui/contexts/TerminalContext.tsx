@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useStdin } from 'ink';
+import { useStdin, useStdout } from 'ink';
 import type React from 'react';
 import {
   createContext,
@@ -20,6 +20,7 @@ export type TerminalEventHandler = (event: string) => void;
 interface TerminalContextValue {
   subscribe: (handler: TerminalEventHandler) => void;
   unsubscribe: (handler: TerminalEventHandler) => void;
+  queryTerminalBackground: () => Promise<void>;
 }
 
 const TerminalContext = createContext<TerminalContextValue | undefined>(
@@ -38,6 +39,7 @@ export function useTerminalContext() {
 
 export function TerminalProvider({ children }: { children: React.ReactNode }) {
   const { stdin } = useStdin();
+  const { stdout } = useStdout();
   const subscribers = useRef<Set<TerminalEventHandler>>(new Set()).current;
   const bufferRef = useRef('');
 
@@ -53,6 +55,23 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
       subscribers.delete(handler);
     },
     [subscribers],
+  );
+
+  const queryTerminalBackground = useCallback(
+    async () =>
+      new Promise<void>((resolve) => {
+        const handler = () => {
+          unsubscribe(handler);
+          resolve();
+        };
+        subscribe(handler);
+        TerminalCapabilityManager.queryBackgroundColor(stdout);
+        setTimeout(() => {
+          unsubscribe(handler);
+          resolve();
+        }, 100);
+      }),
+    [stdout, subscribe, unsubscribe],
   );
 
   useEffect(() => {
@@ -89,7 +108,9 @@ export function TerminalProvider({ children }: { children: React.ReactNode }) {
   }, [stdin, subscribers]);
 
   return (
-    <TerminalContext.Provider value={{ subscribe, unsubscribe }}>
+    <TerminalContext.Provider
+      value={{ subscribe, unsubscribe, queryTerminalBackground }}
+    >
       {children}
     </TerminalContext.Provider>
   );

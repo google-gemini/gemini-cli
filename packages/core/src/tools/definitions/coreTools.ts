@@ -98,6 +98,16 @@ export const GREP_DEFINITION: ToolDefinition = {
           description: `Optional: A glob pattern to filter which files are searched (e.g., '*.js', '*.{ts,tsx}', 'src/**'). If omitted, searches all files (respecting potential global ignores).`,
           type: 'string',
         },
+        exclude_pattern: {
+          description:
+            'Optional: A regular expression pattern to exclude from the search results. If a line matches both the pattern and the exclude_pattern, it will be omitted.',
+          type: 'string',
+        },
+        names_only: {
+          description:
+            'Optional: If true, only the file paths of the matches will be returned, without the line content or line numbers. This is useful for gathering a list of files.',
+          type: 'boolean',
+        },
         max_matches_per_file: {
           description:
             'Optional: Maximum number of matches to return per file. Use this to prevent being overwhelmed by repetitive matches in large files.',
