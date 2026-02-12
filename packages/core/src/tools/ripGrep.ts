@@ -17,7 +17,7 @@ import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
 import { fileExists } from '../utils/fileUtils.js';
 import { Storage } from '../config/storage.js';
-import { RIP_GREP_TOOL_NAME } from './tool-names.js';
+import { GREP_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
   FileExclusions,
@@ -551,7 +551,7 @@ export class RipGrepTool extends BaseDeclarativeTool<
   RipGrepToolParams,
   ToolResult
 > {
-  static readonly Name = RIP_GREP_TOOL_NAME;
+  static readonly Name = GREP_TOOL_NAME;
   private readonly fileDiscoveryService: FileDiscoveryService;
 
   constructor(

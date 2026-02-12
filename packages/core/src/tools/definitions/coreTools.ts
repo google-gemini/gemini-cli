@@ -10,7 +10,6 @@ import * as os from 'node:os';
 // Centralized tool names to avoid circular dependencies
 export const GLOB_TOOL_NAME = 'glob';
 export const GREP_TOOL_NAME = 'grep_search';
-export const RIP_GREP_TOOL_NAME = 'ripgrep_search';
 export const LS_TOOL_NAME = 'list_directory';
 export const READ_FILE_TOOL_NAME = 'read_file';
 export const SHELL_TOOL_NAME = 'run_shell_command';
@@ -135,7 +134,7 @@ export const GREP_DEFINITION: ToolDefinition = {
 
 export const RIP_GREP_DEFINITION: ToolDefinition = {
   base: {
-    name: RIP_GREP_TOOL_NAME,
+    name: GREP_TOOL_NAME,
     description:
       'Searches for a regular expression pattern within file contents. Max 100 matches.',
     parametersJsonSchema: {
