@@ -23,6 +23,7 @@ import {
   GLOB_DEFINITION,
   LS_DEFINITION,
   getShellDefinition,
+  WEB_SEARCH_DEFINITION,
 } from './coreTools.js';
 
 describe('coreTools snapshots for specific models', () => {
@@ -58,6 +59,7 @@ describe('coreTools snapshots for specific models', () => {
       name: 'run_shell_command',
       definition: getShellDefinition(true, true),
     },
+    { name: 'google_web_search', definition: WEB_SEARCH_DEFINITION },
   ];
 
   for (const modelId of modelIds) {

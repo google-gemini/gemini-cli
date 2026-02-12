@@ -14,6 +14,7 @@ export const LS_TOOL_NAME = 'list_directory';
 export const READ_FILE_TOOL_NAME = 'read_file';
 export const SHELL_TOOL_NAME = 'run_shell_command';
 export const WRITE_FILE_TOOL_NAME = 'write_file';
+export const WEB_SEARCH_TOOL_NAME = 'google_web_search';
 
 // ============================================================================
 // READ_FILE TOOL
@@ -122,6 +123,28 @@ export const GREP_DEFINITION: ToolDefinition = {
         },
       },
       required: ['pattern'],
+    },
+  },
+};
+
+// ============================================================================
+// WEB_SEARCH TOOL
+// ============================================================================
+
+export const WEB_SEARCH_DEFINITION: ToolDefinition = {
+  base: {
+    name: WEB_SEARCH_TOOL_NAME,
+    description:
+      'Performs a web search using Google Search (via the Gemini API) and returns the results. This tool is useful for finding information on the internet based a query.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'The search query to find information on the web.',
+        },
+      },
+      required: ['query'],
     },
   },
 };

@@ -35,6 +35,25 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
 }
 `;
 
+exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: google_web_search 1`] = `
+{
+  "description": "Performs a web search using Google Search (via the Gemini API) and returns the results. This tool is useful for finding information on the internet based a query.",
+  "name": "google_web_search",
+  "parametersJsonSchema": {
+    "properties": {
+      "query": {
+        "description": "The search query to find information on the web.",
+        "type": "string",
+      },
+    },
+    "required": [
+      "query",
+    ],
+    "type": "object",
+  },
+}
+`;
+
 exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: grep_search 1`] = `
 {
   "description": "Searches for a regular expression pattern within file contents. Max 100 matches.",
@@ -246,6 +265,25 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
     },
     "required": [
       "pattern",
+    ],
+    "type": "object",
+  },
+}
+`;
+
+exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: google_web_search 1`] = `
+{
+  "description": "Performs a web search using Google Search (via the Gemini API) and returns the results. This tool is useful for finding information on the internet based a query.",
+  "name": "google_web_search",
+  "parametersJsonSchema": {
+    "properties": {
+      "query": {
+        "description": "The search query to find information on the web.",
+        "type": "string",
+      },
+    },
+    "required": [
+      "query",
     ],
     "type": "object",
   },
