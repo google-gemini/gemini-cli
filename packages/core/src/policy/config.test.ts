@@ -1142,10 +1142,10 @@ modes = ["plan"]
         typeof import('../config/storage.js')
       >('../config/storage.js');
       class MockStorage extends actual.Storage {
-        static getUserPoliciesDir() {
+        static override getUserPoliciesDir() {
           return '/tmp/gemini-cli-test/user/policies';
         }
-        static getSystemPoliciesDir() {
+        static override getSystemPoliciesDir() {
           return '/tmp/gemini-cli-test/system/policies';
         }
       }
