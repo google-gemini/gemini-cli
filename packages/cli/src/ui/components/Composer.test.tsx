@@ -1,10 +1,10 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render } from '../../test-utils/render.js';
 import { Box, Text } from 'ink';
 import { Composer } from './Composer.js';
@@ -24,13 +24,41 @@ vi.mock('../contexts/VimModeContext.js', () => ({
   })),
 }));
 import { ApprovalMode } from '@google/gemini-cli-core';
+import type { Config } from '@google/gemini-cli-core';
 import { StreamingState, ToolCallStatus } from '../types.js';
+import { TransientMessageType } from '../../utils/events.js';
+import type { LoadedSettings } from '../../config/settings.js';
+import type { SessionMetrics } from '../contexts/SessionContext.js';
 
 // Mock child components
 vi.mock('./LoadingIndicator.js', () => ({
-  LoadingIndicator: ({ thought }: { thought?: string }) => (
-    <Text>LoadingIndicator{thought ? `: ${thought}` : ''}</Text>
-  ),
+  LoadingIndicator: ({
+    thought,
+    thoughtLabel,
+  }: {
+    thought?: { subject?: string } | string;
+    thoughtLabel?: string;
+  }) => {
+    const fallbackText =
+      typeof thought === 'string' ? thought : thought?.subject;
+    const text = thoughtLabel ?? fallbackText;
+    return <Text>LoadingIndicator{text ? `: ${text}` : ''}</Text>;
+  },
+}));
+
+vi.mock('./StatusDisplay.js', () => ({
+  StatusDisplay: () => <Text>StatusDisplay</Text>,
+}));
+
+vi.mock('./ToastDisplay.js', () => ({
+  ToastDisplay: () => <Text>ToastDisplay</Text>,
+  shouldShowToast: (uiState: UIState) =>
+    uiState.ctrlCPressedOnce ||
+    Boolean(uiState.transientMessage) ||
+    uiState.ctrlDPressedOnce ||
+    (uiState.showEscapePrompt &&
+      (uiState.buffer.text.length > 0 || uiState.history.length > 0)) ||
+    Boolean(uiState.queueErrorMessage),
 }));
 
 vi.mock('./ContextSummaryDisplay.js', () => ({
@@ -145,6 +173,12 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     activeHooks: [],
     isBackgroundShellVisible: false,
     embeddedShellFocused: false,
+    quota: {
+      userTier: undefined,
+      stats: undefined,
+      proQuotaRequest: null,
+      validationRequest: null,
+    },
     ...overrides,
   }) as UIState;
 
@@ -156,31 +190,30 @@ const createMockUIActions = (): UIActions =>
     onEscapePromptChange: vi.fn(),
     vimHandleInput: vi.fn(),
     setShortcutsHelpVisible: vi.fn(),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  }) as any;
+  }) as Partial<UIActions> as UIActions;
 
-const createMockConfig = (overrides = {}) => ({
-  getModel: vi.fn(() => 'gemini-1.5-pro'),
-  getTargetDir: vi.fn(() => '/test/dir'),
-  getDebugMode: vi.fn(() => false),
-  getAccessibility: vi.fn(() => ({})),
-  getMcpServers: vi.fn(() => ({})),
-  isPlanEnabled: vi.fn(() => false),
-  getToolRegistry: () => ({
-    getTool: vi.fn(),
-  }),
-  getSkillManager: () => ({
-    getSkills: () => [],
-    getDisplayableSkills: () => [],
-  }),
-  getMcpClientManager: () => ({
-    getMcpServers: () => ({}),
-    getBlockedMcpServers: () => [],
-  }),
-  ...overrides,
-});
+const createMockConfig = (overrides = {}): Config =>
+  ({
+    getModel: vi.fn(() => 'gemini-1.5-pro'),
+    getTargetDir: vi.fn(() => '/test/dir'),
+    getDebugMode: vi.fn(() => false),
+    getAccessibility: vi.fn(() => ({})),
+    getMcpServers: vi.fn(() => ({})),
+    isPlanEnabled: vi.fn(() => false),
+    getToolRegistry: () => ({
+      getTool: vi.fn(),
+    }),
+    getSkillManager: () => ({
+      getSkills: () => [],
+      getDisplayableSkills: () => [],
+    }),
+    getMcpClientManager: () => ({
+      getMcpServers: () => ({}),
+      getBlockedMcpServers: () => [],
+    }),
+    ...overrides,
+  }) as unknown as Config;
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 const renderComposer = (
   uiState: UIState,
   settings = createMockSettings(),
@@ -188,8 +221,8 @@ const renderComposer = (
   uiActions = createMockUIActions(),
 ) =>
   render(
-    <ConfigContext.Provider value={config as any}>
-      <SettingsContext.Provider value={settings as any}>
+    <ConfigContext.Provider value={config as unknown as Config}>
+      <SettingsContext.Provider value={settings as unknown as LoadedSettings}>
         <UIStateContext.Provider value={uiState}>
           <UIActionsContext.Provider value={uiActions}>
             <Composer />
@@ -198,9 +231,12 @@ const renderComposer = (
       </SettingsContext.Provider>
     </ConfigContext.Provider>,
   );
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 describe('Composer', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   describe('Footer Display Settings', () => {
     it('renders Footer by default when hideFooter is false', () => {
       const uiState = createMockUIState();
@@ -230,8 +266,11 @@ describe('Composer', () => {
         sessionStats: {
           sessionId: 'test-session',
           sessionStartTime: new Date(),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          metrics: {} as any,
+          metrics: {
+            models: {},
+            tools: {},
+            files: {},
+          } as SessionMetrics,
           lastPromptTokenCount: 150,
           promptCount: 5,
         },
@@ -252,8 +291,9 @@ describe('Composer', () => {
       vi.mocked(useVimMode).mockReturnValueOnce({
         vimEnabled: true,
         vimMode: 'INSERT',
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any);
+        toggleVimEnabled: vi.fn(),
+        setVimMode: vi.fn(),
+      } as unknown as ReturnType<typeof useVimMode>);
 
       const { lastFrame } = renderComposer(uiState, settings, config);
 
@@ -277,7 +317,25 @@ describe('Composer', () => {
       const { lastFrame } = renderComposer(uiState);
 
       const output = lastFrame();
-      expect(output).toContain('LoadingIndicator');
+      expect(output).toContain('LoadingIndicator: Processing');
+    });
+
+    it('renders generic thinking text in loading indicator when full inline thinking is enabled', () => {
+      const uiState = createMockUIState({
+        streamingState: StreamingState.Responding,
+        thought: {
+          subject: 'Detailed in-history thought',
+          description: 'Full text is already in history',
+        },
+      });
+      const settings = createMockSettings({
+        ui: { inlineThinkingMode: 'full' },
+      });
+
+      const { lastFrame } = renderComposer(uiState, settings);
+
+      const output = lastFrame();
+      expect(output).toContain('LoadingIndicator: Thinking ...');
     });
 
     it('hides shortcuts hint while loading', () => {
@@ -411,7 +469,7 @@ describe('Composer', () => {
   });
 
   describe('Context and Status Display', () => {
-    it('shows ContextSummaryDisplay in normal state', () => {
+    it('shows StatusDisplay and ApprovalModeIndicator in normal state', () => {
       const uiState = createMockUIState({
         ctrlCPressedOnce: false,
         ctrlDPressedOnce: false,
@@ -420,49 +478,38 @@ describe('Composer', () => {
 
       const { lastFrame } = renderComposer(uiState);
 
-      expect(lastFrame()).toContain('ContextSummaryDisplay');
+      const output = lastFrame();
+      expect(output).toContain('StatusDisplay');
+      expect(output).toContain('ApprovalModeIndicator');
+      expect(output).not.toContain('ToastDisplay');
     });
 
-    it('renders HookStatusDisplay instead of ContextSummaryDisplay with active hooks', () => {
-      const uiState = createMockUIState({
-        activeHooks: [{ name: 'test-hook', eventName: 'before-agent' }],
-      });
-
-      const { lastFrame } = renderComposer(uiState);
-
-      expect(lastFrame()).toContain('HookStatusDisplay');
-      expect(lastFrame()).not.toContain('ContextSummaryDisplay');
-    });
-
-    it('shows Ctrl+C exit prompt when ctrlCPressedOnce is true', () => {
+    it('shows ToastDisplay and hides ApprovalModeIndicator when a toast is present', () => {
       const uiState = createMockUIState({
         ctrlCPressedOnce: true,
       });
 
       const { lastFrame } = renderComposer(uiState);
 
-      expect(lastFrame()).toContain('Press Ctrl+C again to exit');
+      const output = lastFrame();
+      expect(output).toContain('ToastDisplay');
+      expect(output).not.toContain('ApprovalModeIndicator');
+      expect(output).toContain('StatusDisplay');
     });
 
-    it('shows Ctrl+D exit prompt when ctrlDPressedOnce is true', () => {
+    it('shows ToastDisplay for other toast types', () => {
       const uiState = createMockUIState({
-        ctrlDPressedOnce: true,
+        transientMessage: {
+          text: 'Warning',
+          type: TransientMessageType.Warning,
+        },
       });
 
       const { lastFrame } = renderComposer(uiState);
 
-      expect(lastFrame()).toContain('Press Ctrl+D again to exit');
-    });
-
-    it('shows escape prompt when showEscapePrompt is true', () => {
-      const uiState = createMockUIState({
-        showEscapePrompt: true,
-        history: [{ id: 1, type: 'user', text: 'test' }],
-      });
-
-      const { lastFrame } = renderComposer(uiState);
-
-      expect(lastFrame()).toContain('Press Esc again to rewind');
+      const output = lastFrame();
+      expect(output).toContain('ToastDisplay');
+      expect(output).not.toContain('ApprovalModeIndicator');
     });
   });
 
@@ -542,9 +589,12 @@ describe('Composer', () => {
       const uiState = createMockUIState({
         showErrorDetails: true,
         filteredConsoleMessages: [
-          { level: 'error', message: 'Test error', timestamp: new Date() },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ] as any,
+          {
+            type: 'error',
+            content: 'Test error',
+            count: 1,
+          },
+        ],
       });
 
       const { lastFrame } = renderComposer(uiState);
@@ -601,6 +651,19 @@ describe('Composer', () => {
   });
 
   describe('Shortcuts Hint', () => {
+    it('hides shortcuts hint when showShortcutsHint setting is false', () => {
+      const uiState = createMockUIState();
+      const settings = createMockSettings({
+        ui: {
+          showShortcutsHint: false,
+        },
+      });
+
+      const { lastFrame } = renderComposer(uiState, settings);
+
+      expect(lastFrame()).not.toContain('ShortcutsHint');
+    });
+
     it('hides shortcuts hint when a action is required (e.g. dialog is open)', () => {
       const uiState = createMockUIState({
         customDialog: (

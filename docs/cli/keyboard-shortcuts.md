@@ -106,6 +106,7 @@ available combinations.
 | Toggle YOLO (auto-approval) mode for tool calls.                                                      | `Ctrl + Y`                 |
 | Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only). | `Shift + Tab`              |
 | Expand a height-constrained response to show additional lines when not in alternate buffer mode.      | `Ctrl + O`<br />`Ctrl + S` |
+| Expand or collapse a paste placeholder when cursor is over placeholder.                               | `Ctrl + O`                 |
 | Toggle current background shell visibility.                                                           | `Ctrl + B`                 |
 | Toggle background shell list.                                                                         | `Ctrl + L`                 |
 | Kill the active background shell.                                                                     | `Ctrl + K`                 |

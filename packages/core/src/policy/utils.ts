@@ -12,6 +12,37 @@ export function escapeRegex(text: string): string {
 }
 
 /**
+ * Basic validation for regular expressions to prevent common ReDoS patterns.
+ * This is a heuristic check and not a substitute for a full ReDoS scanner.
+ */
+export function isSafeRegExp(pattern: string): boolean {
+  try {
+    // 1. Ensure it's a valid regex
+    new RegExp(pattern);
+  } catch {
+    return false;
+  }
+
+  // 2. Limit length to prevent extremely long regexes
+  if (pattern.length > 2048) {
+    return false;
+  }
+
+  // 3. Heuristic: Check for nested quantifiers which are a primary source of ReDoS.
+  // Examples: (a+)+, (a|b)*, (.*)*, ([a-z]+)+
+  // We look for a group (...) followed by a quantifier (+, *, or {n,m})
+  // where the group itself contains a quantifier.
+  // This matches a '(' followed by some content including a quantifier, then ')',
+  // followed by another quantifier.
+  const nestedQuantifierPattern = /\([^)]*[*+?{].*\)[*+?{]/;
+  if (nestedQuantifierPattern.test(pattern)) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
  * Builds a list of args patterns for policy matching.
  *
  * This function handles the transformation of command prefixes and regexes into

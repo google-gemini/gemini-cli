@@ -32,6 +32,18 @@ const { Terminal } = pkg;
 
 const MAX_CHILD_PROCESS_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
 
+/**
+ * An environment variable that is set for shell executions. This can be used
+ * by downstream executables and scripts to identify that they were executed
+ * from within Gemini CLI.
+ */
+export const GEMINI_CLI_IDENTIFICATION_ENV_VAR = 'GEMINI_CLI';
+
+/**
+ * The value of {@link GEMINI_CLI_IDENTIFICATION_ENV_VAR}
+ */
+export const GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE = '1';
+
 // We want to allow shell outputs that are close to the context window in size.
 // 300,000 lines is roughly equivalent to a large context window, ensuring
 // we capture significant output from long-running commands.
@@ -302,7 +314,8 @@ export class ShellExecutionService {
         detached: !isWindows,
         env: {
           ...sanitizeEnvironment(process.env, sanitizationConfig),
-          GEMINI_CLI: '1',
+          [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
+            GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
           TERM: 'xterm-256color',
           PAGER: 'cat',
           GIT_PAGER: 'cat',
@@ -510,6 +523,7 @@ export class ShellExecutionService {
 
       return { pid: child.pid, result };
     } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const error = e as Error;
       return {
         pid: undefined,
@@ -778,6 +792,7 @@ export class ShellExecutionService {
             this.activePtys.delete(ptyProcess.pid);
             // Attempt to destroy the PTY to ensure FD is closed
             try {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
               (ptyProcess as IPty & { destroy?: () => void }).destroy?.();
             } catch {
               // Ignore errors during cleanup
@@ -860,6 +875,7 @@ export class ShellExecutionService {
 
       return { pid: ptyProcess.pid, result };
     } catch (e) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const error = e as Error;
       if (error.message.includes('posix_spawnp failed')) {
         onOutputEvent({
@@ -1105,6 +1121,7 @@ export class ShellExecutionService {
       } catch (e) {
         // Ignore errors if the pty has already exited, which can happen
         // due to a race condition between the exit event and this call.
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const err = e as { code?: string; message?: string };
         const isEsrch = err.code === 'ESRCH';
         const isWindowsPtyError = err.message?.includes(

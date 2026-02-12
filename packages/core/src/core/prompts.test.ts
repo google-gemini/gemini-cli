@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Config } from '../config/config.js';
+import type { AgentDefinition } from '../agents/types.js';
 import { CodebaseInvestigatorAgent } from '../agents/codebase-investigator.js';
 import { GEMINI_DIR } from '../utils/paths.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -82,7 +83,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', undefined);
     mockConfig = {
       getToolRegistry: vi.fn().mockReturnValue({
-        getAllToolNames: vi.fn().mockReturnValue([]),
+        getAllToolNames: vi.fn().mockReturnValue(['grep_search', 'glob']),
         getAllTools: vi.fn().mockReturnValue([]),
       }),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
@@ -101,6 +102,12 @@ describe('Core System Prompt (prompts.ts)', () => {
       getMessageBus: vi.fn(),
       getAgentRegistry: vi.fn().mockReturnValue({
         getDirectoryContext: vi.fn().mockReturnValue('Mock Agent Directory'),
+        getAllDefinitions: vi.fn().mockReturnValue([
+          {
+            name: 'mock-agent',
+            description: 'Mock Agent Description',
+          },
+        ]),
       }),
       getSkillManager: vi.fn().mockReturnValue({
         getSkills: vi.fn().mockReturnValue([]),
@@ -145,6 +152,26 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).toMatchSnapshot();
   });
 
+  it('should include available_skills with updated verbiage for preview models', () => {
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
+    const skills = [
+      {
+        name: 'test-skill',
+        description: 'A test skill description',
+        location: '/path/to/test-skill/SKILL.md',
+        body: 'Skill content',
+      },
+    ];
+    vi.mocked(mockConfig.getSkillManager().getSkills).mockReturnValue(skills);
+    const prompt = getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).toContain('# Available Agent Skills');
+    expect(prompt).toContain(
+      "To activate a skill and receive its detailed instructions, call the `activate_skill` tool with the skill's name.",
+    );
+    expect(prompt).toMatchSnapshot();
+  });
+
   it('should NOT include skill guidance or available_skills when NO skills are provided', () => {
     vi.mocked(mockConfig.getSkillManager().getSkills).mockReturnValue([]);
     const prompt = getCoreSystemPrompt(mockConfig);
@@ -152,6 +179,32 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).not.toContain('# Available Agent Skills');
     expect(prompt).not.toContain('Skill Guidance');
     expect(prompt).not.toContain('activate_skill');
+  });
+
+  it('should include sub-agents in XML for preview models', () => {
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
+    const agents = [
+      {
+        name: 'test-agent',
+        displayName: 'Test Agent',
+        description: 'A test agent description',
+      },
+    ];
+    vi.mocked(mockConfig.getAgentRegistry().getAllDefinitions).mockReturnValue(
+      agents as unknown as AgentDefinition[],
+    );
+    const prompt = getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).toContain('# Available Sub-Agents');
+    expect(prompt).toContain('<available_subagents>');
+    expect(prompt).toContain('<subagent>');
+    expect(prompt).toContain('<name>test-agent</name>');
+    expect(prompt).toContain(
+      '<description>A test agent description</description>',
+    );
+    expect(prompt).toContain('</subagent>');
+    expect(prompt).toContain('</available_subagents>');
+    expect(prompt).toMatchSnapshot();
   });
 
   it('should use legacy system prompt for non-preview model', () => {
@@ -162,8 +215,11 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).toContain(
       'You are an interactive CLI agent specializing in software engineering tasks.',
     );
+    expect(prompt).not.toContain('No sub-agents are currently available.');
     expect(prompt).toContain('# Core Mandates');
     expect(prompt).toContain('- **Conventions:**');
+    expect(prompt).toContain('# Outside of Sandbox');
+    expect(prompt).toContain('# Final Reminder');
     expect(prompt).toMatchSnapshot();
   });
 
@@ -211,6 +267,29 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).toMatchSnapshot(); // Snapshot the combined prompt
   });
 
+  it('should render hierarchical memory with XML tags', () => {
+    vi.stubEnv('SANDBOX', undefined);
+    const memory = {
+      global: 'global context',
+      extension: 'extension context',
+      project: 'project context',
+    };
+    const prompt = getCoreSystemPrompt(mockConfig, memory);
+
+    expect(prompt).toContain(
+      '<global_context>\nglobal context\n</global_context>',
+    );
+    expect(prompt).toContain(
+      '<extension_context>\nextension context\n</extension_context>',
+    );
+    expect(prompt).toContain(
+      '<project_context>\nproject context\n</project_context>',
+    );
+    expect(prompt).toMatchSnapshot();
+    // Should also include conflict resolution rules when hierarchical memory is present
+    expect(prompt).toContain('Conflict Resolution:');
+  });
+
   it('should match snapshot on Windows', () => {
     mockPlatform('win32');
     vi.stubEnv('SANDBOX', undefined);
@@ -221,13 +300,24 @@ describe('Core System Prompt (prompts.ts)', () => {
   it.each([
     ['true', '# Sandbox', ['# macOS Seatbelt', '# Outside of Sandbox']],
     ['sandbox-exec', '# macOS Seatbelt', ['# Sandbox', '# Outside of Sandbox']],
-    [undefined, '# Outside of Sandbox', ['# Sandbox', '# macOS Seatbelt']],
+    [
+      undefined,
+      'You are Gemini CLI, an interactive CLI agent',
+      ['# Sandbox', '# macOS Seatbelt'],
+    ],
   ])(
     'should include correct sandbox instructions for SANDBOX=%s',
     (sandboxValue, expectedContains, expectedNotContains) => {
       vi.stubEnv('SANDBOX', sandboxValue);
+      vi.mocked(mockConfig.getActiveModel).mockReturnValue(
+        PREVIEW_GEMINI_MODEL,
+      );
       const prompt = getCoreSystemPrompt(mockConfig);
       expect(prompt).toContain(expectedContains);
+
+      // modern snippets should NOT contain outside
+      expect(prompt).not.toContain('# Outside of Sandbox');
+
       expectedNotContains.forEach((text) => expect(prompt).not.toContain(text));
       expect(prompt).toMatchSnapshot();
     },
@@ -257,9 +347,21 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).toMatchSnapshot(); // Use snapshot for base prompt structure
   });
 
+  it('should redact grep and glob from the system prompt when they are disabled', () => {
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
+    vi.mocked(mockConfig.getToolRegistry().getAllToolNames).mockReturnValue([]);
+    const prompt = getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).not.toContain('`grep_search`');
+    expect(prompt).not.toContain('`glob`');
+    expect(prompt).toContain(
+      'Use search tools extensively to understand file structures, existing code patterns, and conventions.',
+    );
+  });
+
   it.each([
-    [[CodebaseInvestigatorAgent.name], true],
-    [[], false],
+    [[CodebaseInvestigatorAgent.name, 'grep_search', 'glob'], true],
+    [['grep_search', 'glob'], false],
   ])(
     'should handle CodebaseInvestigator with tools=%s',
     (toolNames, expectCodebaseInvestigator) => {
@@ -279,6 +381,7 @@ describe('Core System Prompt (prompts.ts)', () => {
         getPreviewFeatures: vi.fn().mockReturnValue(true),
         getAgentRegistry: vi.fn().mockReturnValue({
           getDirectoryContext: vi.fn().mockReturnValue('Mock Agent Directory'),
+          getAllDefinitions: vi.fn().mockReturnValue([]),
         }),
         getSkillManager: vi.fn().mockReturnValue({
           getSkills: vi.fn().mockReturnValue([]),
@@ -292,14 +395,14 @@ describe('Core System Prompt (prompts.ts)', () => {
           `Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery`,
         );
         expect(prompt).not.toContain(
-          "Use 'grep_search' and 'glob' search tools extensively",
+          'Use `grep_search` and `glob` search tools extensively',
         );
       } else {
         expect(prompt).not.toContain(
           `Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery`,
         );
         expect(prompt).toContain(
-          "Use 'grep_search' and 'glob' search tools extensively",
+          'Use `grep_search` and `glob` search tools extensively',
         );
       }
       expect(prompt).toMatchSnapshot();
@@ -412,11 +515,37 @@ describe('Core System Prompt (prompts.ts)', () => {
         expect(prompt).toMatchSnapshot();
       });
     });
+
+    it('should include YOLO mode instructions in interactive mode', () => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.YOLO);
+      vi.mocked(mockConfig.isInteractive).mockReturnValue(true);
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).toContain('# Autonomous Mode (YOLO)');
+      expect(prompt).toContain('Only use the `ask_user` tool if');
+    });
+
+    it('should NOT include YOLO mode instructions in non-interactive mode', () => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.YOLO);
+      vi.mocked(mockConfig.isInteractive).mockReturnValue(false);
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).not.toContain('# Autonomous Mode (YOLO)');
+    });
+
+    it('should NOT include YOLO mode instructions for DEFAULT mode', () => {
+      vi.mocked(mockConfig.getApprovalMode).mockReturnValue(
+        ApprovalMode.DEFAULT,
+      );
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).not.toContain('# Autonomous Mode (YOLO)');
+    });
   });
 
   describe('Platform-specific and Background Process instructions', () => {
     it('should include Windows-specific shell efficiency commands on win32', () => {
       mockPlatform('win32');
+      vi.mocked(mockConfig.getActiveModel).mockReturnValue(
+        DEFAULT_GEMINI_FLASH_LITE_MODEL,
+      );
       const prompt = getCoreSystemPrompt(mockConfig);
       expect(prompt).toContain(
         "using commands like 'type' or 'findstr' (on CMD) and 'Get-Content' or 'Select-String' (on PowerShell)",
@@ -428,6 +557,9 @@ describe('Core System Prompt (prompts.ts)', () => {
 
     it('should include generic shell efficiency commands on non-Windows', () => {
       mockPlatform('linux');
+      vi.mocked(mockConfig.getActiveModel).mockReturnValue(
+        DEFAULT_GEMINI_FLASH_LITE_MODEL,
+      );
       const prompt = getCoreSystemPrompt(mockConfig);
       expect(prompt).toContain("using commands like 'grep', 'tail', 'head'");
       expect(prompt).not.toContain(
@@ -442,6 +574,26 @@ describe('Core System Prompt (prompts.ts)', () => {
       );
       expect(prompt).not.toContain('via `&`');
     });
+
+    it("should include 'ctrl + f' instructions when interactive shell is enabled", () => {
+      vi.mocked(mockConfig.getActiveModel).mockReturnValue(
+        PREVIEW_GEMINI_MODEL,
+      );
+      vi.mocked(mockConfig.isInteractive).mockReturnValue(true);
+      vi.mocked(mockConfig.isInteractiveShellEnabled).mockReturnValue(true);
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).toContain('ctrl + f');
+    });
+
+    it("should NOT include 'ctrl + f' instructions when interactive shell is disabled", () => {
+      vi.mocked(mockConfig.getActiveModel).mockReturnValue(
+        PREVIEW_GEMINI_MODEL,
+      );
+      vi.mocked(mockConfig.isInteractive).mockReturnValue(true);
+      vi.mocked(mockConfig.isInteractiveShellEnabled).mockReturnValue(false);
+      const prompt = getCoreSystemPrompt(mockConfig);
+      expect(prompt).not.toContain('ctrl + f');
+    });
   });
 
   it('should include approved plan instructions when approvedPlanPath is set', () => {
@@ -453,13 +605,14 @@ describe('Core System Prompt (prompts.ts)', () => {
   });
 
   it('should include planning phase suggestion when enter_plan_mode tool is enabled', () => {
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
     vi.mocked(mockConfig.getToolRegistry().getAllToolNames).mockReturnValue([
       'enter_plan_mode',
     ]);
     const prompt = getCoreSystemPrompt(mockConfig);
 
     expect(prompt).toContain(
-      "For complex tasks, consider using the 'enter_plan_mode' tool to enter a dedicated planning phase before starting implementation.",
+      'For complex tasks, consider using the `enter_plan_mode` tool to enter a dedicated planning phase before starting implementation.',
     );
     expect(prompt).toMatchSnapshot();
   });
