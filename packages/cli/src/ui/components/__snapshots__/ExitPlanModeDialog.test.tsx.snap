@@ -13,9 +13,7 @@ Implementation Steps
  4. Add tests in src/auth/__tests__/
 
 Files to Modify
-
- - src/index.ts - Add auth middleware
- - src/config.ts - Add auth configuration options
+... last 3 lines hidden ...
 
   1.  Yes, automatically accept edits
       Approves plan and allows tools to run automatically
@@ -39,9 +37,7 @@ Implementation Steps
  4. Add tests in src/auth/__tests__/
 
 Files to Modify
-
- - src/index.ts - Add auth middleware
- - src/config.ts - Add auth configuration options
+... last 3 lines hidden ...
 
   1.  Yes, automatically accept edits
       Approves plan and allows tools to run automatically
@@ -67,9 +63,7 @@ Implementation Steps
  4. Add OAuth2 provider support in src/auth/providers/OAuth2Provider.ts
  5. Add SAML provider support in src/auth/providers/SAMLProvider.ts
  6. Add LDAP provider support in src/auth/providers/LDAPProvider.ts
- 7. Create token refresh mechanism in src/auth/TokenManager.ts
- 8. Add multi-factor authentication in src/auth/MFAService.ts
-... last 22 lines hidden ...
+... last 24 lines hidden ...
 
 ● 1.  Yes, automatically accept edits
       Approves plan and allows tools to run automatically
@@ -93,9 +87,7 @@ Implementation Steps
  4. Add tests in src/auth/__tests__/
 
 Files to Modify
-
- - src/index.ts - Add auth middleware
- - src/config.ts - Add auth configuration options
+... last 3 lines hidden ...
 
 ● 1.  Yes, automatically accept edits
       Approves plan and allows tools to run automatically

@@ -786,9 +786,13 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     ? Math.max(1, availableHeight - overhead)
     : undefined;
 
+  // We want to ensure that at least 3 options (6 lines) are visible if space allows.
+  // We reserve space for these options + 2 lines for the internal vertical spacing.
+  const listReserve = Math.max(1, Math.min(selectionItems.length, 3) * 2 + 2);
+
   const questionHeight =
     listHeight && !isAlternateBuffer
-      ? Math.max(1, listHeight - DIALOG_PADDING)
+      ? Math.max(1, listHeight - listReserve)
       : undefined;
 
   const measuredHeight = Math.min(
