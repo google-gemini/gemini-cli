@@ -2,7 +2,7 @@
 
 exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: glob 1`] = `
 {
-  "description": "Efficiently finds files matching specific glob patterns (e.g., \`src/**/*.ts\`, \`**/*.md\`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.",
+  "description": "Finds files matching glob patterns (e.g., \`src/**/*.ts\`). Results are sorted by modification time (newest first). Ideal for structural discovery and identifying recent changes. **Avoid using this tool just to list files before reading them;** if you know the symbols you need, use \`grep_search\` directly.",
   "name": "glob",
   "parametersJsonSchema": {
     "properties": {
@@ -37,7 +37,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
 
 exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: grep_search 1`] = `
 {
-  "description": "Searches for a regular expression pattern within file contents. Max 100 matches.",
+  "description": "FAST regular expression search. This is the **primary discovery tool** for locating code. Use context parameters (\`context\`, \`after\`, \`before\`) to read code surrounding matches in a single turn, often eliminating the need for a separate \`read_file\` call. (max 100 matches).",
   "name": "grep_search",
   "parametersJsonSchema": {
     "properties": {
@@ -122,10 +122,14 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
 
 exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: read_file 1`] = `
 {
-  "description": "Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files. For text files, it can read specific line ranges.",
+  "description": "Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. For Gemini 3 models, use 'start_line' and 'end_line' for precise extraction. **Important:** For high token efficiency, avoid reading large files in their entirety. Use 'grep_search' to find symbols or 'run_shell_command' with 'sed' for surgical block extraction instead of broad file reads. Handles text, images, audio, and PDF files.",
   "name": "read_file",
   "parametersJsonSchema": {
     "properties": {
+      "end_line": {
+        "description": "Optional: The 1-based line number to end reading at (inclusive). (Gemini 3+)",
+        "type": "number",
+      },
       "file_path": {
         "description": "The path to the file to read.",
         "type": "string",
@@ -136,6 +140,10 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
       },
       "offset": {
         "description": "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
+        "type": "number",
+      },
+      "start_line": {
+        "description": "Optional: The 1-based line number to start reading from. (Gemini 3+)",
         "type": "number",
       },
     },
@@ -151,10 +159,6 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
 {
   "description": "This tool executes a given shell command as \`bash -c <command>\`. To run a command in the background, set the \`is_background\` parameter to true. Do NOT use \`&\` to background commands. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.
 
-      Efficiency Guidelines:
-      - Quiet Flags: Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
-      - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).
-
       The following information is returned:
 
       Output: Combined stdout/stderr. Can be \`(empty)\` or partial on error and for any unwaited background processes.
@@ -162,7 +166,12 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
       Error: Only included if a process-level error occurred (e.g., spawn failure).
       Signal: Only included if process was terminated by a signal.
       Background PIDs: Only included if background processes were started.
-      Process Group PGID: Only included if available.",
+      Process Group PGID: Only included if available.
+      **This is the preferred tool for surgical extraction of code blocks.** Use \`sed -n '50,100p' file\` for ranges, or \`sed -n '/class X/,/^}/p' file\` for semantic blocks. Avoid 'cat' on large files to prevent context bloat. Output is limited to the last 2,000 lines.
+
+      Efficiency Guidelines:
+      - Quiet Flags: Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
+      - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).",
   "name": "run_shell_command",
   "parametersJsonSchema": {
     "properties": {
@@ -219,7 +228,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
 
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: glob 1`] = `
 {
-  "description": "Efficiently finds files matching specific glob patterns (e.g., \`src/**/*.ts\`, \`**/*.md\`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.",
+  "description": "Finds files matching glob patterns (e.g., \`src/**/*.ts\`). Results are sorted by modification time (newest first). Ideal for structural discovery and identifying recent changes. **Avoid using this tool just to list files before reading them;** if you know the symbols you need, use \`grep_search\` directly.",
   "name": "glob",
   "parametersJsonSchema": {
     "properties": {
@@ -254,7 +263,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
 
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: grep_search 1`] = `
 {
-  "description": "Searches for a regular expression pattern within file contents. Max 100 matches.",
+  "description": "FAST regular expression search. This is the **primary discovery tool** for locating code. Use context parameters (\`context\`, \`after\`, \`before\`) to read code surrounding matches in a single turn, often eliminating the need for a separate \`read_file\` call. (max 100 matches).",
   "name": "grep_search",
   "parametersJsonSchema": {
     "properties": {
@@ -339,10 +348,14 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
 
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: read_file 1`] = `
 {
-  "description": "Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files. For text files, it can read specific line ranges.",
+  "description": "Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. For Gemini 3 models, use 'start_line' and 'end_line' for precise extraction. **Important:** For high token efficiency, avoid reading large files in their entirety. Use 'grep_search' to find symbols or 'run_shell_command' with 'sed' for surgical block extraction instead of broad file reads. Handles text, images, audio, and PDF files.",
   "name": "read_file",
   "parametersJsonSchema": {
     "properties": {
+      "end_line": {
+        "description": "Optional: The 1-based line number to end reading at (inclusive). (Gemini 3+)",
+        "type": "number",
+      },
       "file_path": {
         "description": "The path to the file to read.",
         "type": "string",
@@ -353,6 +366,10 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
       },
       "offset": {
         "description": "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
+        "type": "number",
+      },
+      "start_line": {
+        "description": "Optional: The 1-based line number to start reading from. (Gemini 3+)",
         "type": "number",
       },
     },
@@ -368,10 +385,6 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
 {
   "description": "This tool executes a given shell command as \`bash -c <command>\`. To run a command in the background, set the \`is_background\` parameter to true. Do NOT use \`&\` to background commands. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.
 
-      Efficiency Guidelines:
-      - Quiet Flags: Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
-      - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).
-
       The following information is returned:
 
       Output: Combined stdout/stderr. Can be \`(empty)\` or partial on error and for any unwaited background processes.
@@ -379,7 +392,12 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
       Error: Only included if a process-level error occurred (e.g., spawn failure).
       Signal: Only included if process was terminated by a signal.
       Background PIDs: Only included if background processes were started.
-      Process Group PGID: Only included if available.",
+      Process Group PGID: Only included if available.
+      **This is the preferred tool for surgical extraction of code blocks.** Use \`sed -n '50,100p' file\` for ranges, or \`sed -n '/class X/,/^}/p' file\` for semantic blocks. Avoid 'cat' on large files to prevent context bloat. Output is limited to the last 2,000 lines.
+
+      Efficiency Guidelines:
+      - Quiet Flags: Always prefer silent or quiet flags (e.g., \`npm install --silent\`, \`git --no-pager\`) to reduce output volume while still capturing necessary information.
+      - Pagination: Always disable terminal pagination to ensure commands terminate (e.g., use \`git --no-pager\`, \`systemctl --no-pager\`, or set \`PAGER=cat\`).",
   "name": "run_shell_command",
   "parametersJsonSchema": {
     "properties": {

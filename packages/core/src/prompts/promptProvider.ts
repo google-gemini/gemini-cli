@@ -205,7 +205,6 @@ export class PromptProvider {
             })),
       } as snippets.SystemPromptOptions;
 
-       
       const getCoreSystemPrompt = activeSnippets.getCoreSystemPrompt as (
         options: snippets.SystemPromptOptions,
       ) => string;
