@@ -45,6 +45,7 @@ import {
   exitAlternateScreen,
 } from '../utils/terminal.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
+import { getConsentForOauth } from '../utils/authConsent.js';
 
 export const authEvents = new EventEmitter();
 
@@ -114,6 +115,7 @@ async function initOauthClient(
 
   if (
     credentials &&
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     (credentials as { type?: string }).type ===
       'external_account_authorized_user'
   ) {
@@ -269,6 +271,11 @@ async function initOauthClient(
 
     await triggerPostAuthCallbacks(client.credentials);
   } else {
+    const userConsent = await getConsentForOauth('Code Assist login required.');
+    if (!userConsent) {
+      throw new FatalCancellationError('Authentication cancelled by user.');
+    }
+
     const webLogin = await authWithWeb(client);
 
     coreEvents.emit(CoreEvent.UserFeedback, {
@@ -596,6 +603,7 @@ export function getAvailablePort(): Promise<number> {
       }
       const server = net.createServer();
       server.listen(0, () => {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const address = server.address()! as net.AddressInfo;
         port = address.port;
       });

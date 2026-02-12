@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -32,8 +32,6 @@ import process from 'node:process';
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
 import { AdminSettingsChangedDialog } from './AdminSettingsChangedDialog.js';
 import { IdeTrustChangeDialog } from './IdeTrustChangeDialog.js';
-import { AskUserDialog } from './AskUserDialog.js';
-import { useAskUserActions } from '../contexts/AskUserActionsContext.js';
 import { NewAgentsNotification } from './NewAgentsNotification.js';
 import { AgentConfigDialog } from './AgentConfigDialog.js';
 
@@ -59,22 +57,6 @@ export const DialogManager = ({
     terminalWidth: uiTerminalWidth,
   } = uiState;
 
-  const {
-    request: askUserRequest,
-    submit: askUserSubmit,
-    cancel: askUserCancel,
-  } = useAskUserActions();
-
-  if (askUserRequest) {
-    return (
-      <AskUserDialog
-        questions={askUserRequest.questions}
-        onSubmit={askUserSubmit}
-        onCancel={askUserCancel}
-      />
-    );
-  }
-
   if (uiState.adminSettingsChanged) {
     return <AdminSettingsChangedDialog />;
   }
@@ -89,24 +71,30 @@ export const DialogManager = ({
       />
     );
   }
-  if (uiState.proQuotaRequest) {
+  if (uiState.quota.proQuotaRequest) {
     return (
       <ProQuotaDialog
-        failedModel={uiState.proQuotaRequest.failedModel}
-        fallbackModel={uiState.proQuotaRequest.fallbackModel}
-        message={uiState.proQuotaRequest.message}
-        isTerminalQuotaError={uiState.proQuotaRequest.isTerminalQuotaError}
-        isModelNotFoundError={!!uiState.proQuotaRequest.isModelNotFoundError}
+        failedModel={uiState.quota.proQuotaRequest.failedModel}
+        fallbackModel={uiState.quota.proQuotaRequest.fallbackModel}
+        message={uiState.quota.proQuotaRequest.message}
+        isTerminalQuotaError={
+          uiState.quota.proQuotaRequest.isTerminalQuotaError
+        }
+        isModelNotFoundError={
+          !!uiState.quota.proQuotaRequest.isModelNotFoundError
+        }
         onChoice={uiActions.handleProQuotaChoice}
       />
     );
   }
-  if (uiState.validationRequest) {
+  if (uiState.quota.validationRequest) {
     return (
       <ValidationDialog
-        validationLink={uiState.validationRequest.validationLink}
-        validationDescription={uiState.validationRequest.validationDescription}
-        learnMoreUrl={uiState.validationRequest.learnMoreUrl}
+        validationLink={uiState.quota.validationRequest.validationLink}
+        validationDescription={
+          uiState.quota.validationRequest.validationDescription
+        }
+        learnMoreUrl={uiState.quota.validationRequest.learnMoreUrl}
         onChoice={uiActions.handleValidationChoice}
       />
     );
@@ -134,11 +122,38 @@ export const DialogManager = ({
       />
     );
   }
-  if (uiState.confirmationRequest) {
+
+  if (uiState.permissionConfirmationRequest) {
+    const files = uiState.permissionConfirmationRequest.files;
+    const filesList = files.map((f) => `- ${f}`).join('\n');
     return (
       <ConsentPrompt
-        prompt={uiState.confirmationRequest.prompt}
-        onConfirm={uiState.confirmationRequest.onConfirm}
+        prompt={`The following files are outside your workspace:\n\n${filesList}\n\nDo you want to allow this read?`}
+        onConfirm={(allowed) => {
+          uiState.permissionConfirmationRequest?.onComplete({ allowed });
+        }}
+        terminalWidth={terminalWidth}
+      />
+    );
+  }
+
+  // commandConfirmationRequest and authConsentRequest are kept separate
+  // to avoid focus deadlocks and state race conditions between the
+  // synchronous command loop and the asynchronous auth flow.
+  if (uiState.commandConfirmationRequest) {
+    return (
+      <ConsentPrompt
+        prompt={uiState.commandConfirmationRequest.prompt}
+        onConfirm={uiState.commandConfirmationRequest.onConfirm}
+        terminalWidth={terminalWidth}
+      />
+    );
+  }
+  if (uiState.authConsentRequest) {
+    return (
+      <ConsentPrompt
+        prompt={uiState.authConsentRequest.prompt}
+        onConfirm={uiState.authConsentRequest.onConfirm}
         terminalWidth={terminalWidth}
       />
     );

@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.27.0-nightly.20260121.97aac696f",
+  "version": "0.30.0-nightly.20260210.a2174751d",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -14,7 +14,7 @@
     "url": "git+https://github.com/google-gemini/gemini-cli.git"
   },
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.27.0-nightly.20260121.97aac696f"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.30.0-nightly.20260210.a2174751d"
   },
   "scripts": {
     "start": "cross-env NODE_ENV=development node scripts/start.js",
@@ -32,7 +32,7 @@
     "docs:settings": "tsx ./scripts/generate-settings-doc.ts",
     "docs:keybindings": "tsx ./scripts/generate-keybindings-doc.ts",
     "build": "node scripts/build.js",
-    "build-and-start": "npm run build && npm run start",
+    "build-and-start": "npm run build && npm run start --",
     "build:vscode": "node scripts/build_vscode_companion.js",
     "build:all": "npm run build && npm run build:sandbox && npm run build:vscode",
     "build:packages": "npm run build --workspaces",
@@ -64,7 +64,7 @@
     "pre-commit": "node scripts/pre-commit.js"
   },
   "overrides": {
-    "ink": "npm:@jrichman/ink@6.4.8",
+    "ink": "npm:@jrichman/ink@6.4.10",
     "wrap-ansi": "9.0.2",
     "cliui": {
       "wrap-ansi": "7.0.0"
@@ -86,9 +86,11 @@
     "@types/minimatch": "^5.1.2",
     "@types/mock-fs": "^4.13.4",
     "@types/prompts": "^2.4.9",
+    "@types/proper-lockfile": "^4.1.4",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@types/shell-quote": "^1.7.5",
+    "@types/ws": "^8.18.1",
     "@vitest/coverage-v8": "^3.1.1",
     "@vitest/eslint-plugin": "^1.3.4",
     "cross-env": "^7.0.3",
@@ -124,8 +126,9 @@
     "yargs": "^17.7.2"
   },
   "dependencies": {
-    "ink": "npm:@jrichman/ink@6.4.8",
+    "ink": "npm:@jrichman/ink@6.4.10",
     "latest-version": "^9.0.0",
+    "proper-lockfile": "^4.1.2",
     "simple-git": "^3.28.0"
   },
   "optionalDependencies": {
@@ -135,6 +138,7 @@
     "@lydell/node-pty-linux-x64": "1.1.0",
     "@lydell/node-pty-win32-arm64": "1.1.0",
     "@lydell/node-pty-win32-x64": "1.1.0",
+    "gemini-cli-devtools": "^0.2.1",
     "keytar": "^7.9.0",
     "node-pty": "^1.0.0"
   },

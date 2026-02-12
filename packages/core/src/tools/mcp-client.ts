@@ -32,12 +32,14 @@ import {
   PromptListChangedNotificationSchema,
   type Tool as McpTool,
 } from '@modelcontextprotocol/sdk/types.js';
+import { ApprovalMode, PolicyDecision } from '../policy/types.js';
 import { parse } from 'shell-quote';
 import type { Config, MCPServerConfig } from '../config/config.js';
 import { AuthProviderType } from '../config/config.js';
 import { GoogleCredentialProvider } from '../mcp/google-auth-provider.js';
 import { ServiceAccountImpersonationProvider } from '../mcp/sa-impersonation-provider.js';
 import { DiscoveredMCPTool } from './mcp-tool.js';
+import { XcodeMcpBridgeFixTransport } from './xcode-mcp-fix-transport.js';
 
 import type { CallableTool, FunctionCall, Part, Tool } from '@google/genai';
 import { basename } from 'node:path';
@@ -65,6 +67,10 @@ import {
   sanitizeEnvironment,
   type EnvironmentSanitizationConfig,
 } from '../services/environmentSanitization.js';
+import {
+  GEMINI_CLI_IDENTIFICATION_ENV_VAR,
+  GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
+} from '../services/shellExecutionService.js';
 
 export const MCP_DEFAULT_TIMEOUT_MSEC = 10 * 60 * 1000; // default to 10 minutes
 
@@ -270,7 +276,10 @@ export class McpClient {
     this.resourceRegistry.setResourcesForServer(this.serverName, resources);
   }
 
-  async readResource(uri: string): Promise<ReadResourceResult> {
+  async readResource(
+    uri: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<ReadResourceResult> {
     this.assertConnected();
     return this.client!.request(
       {
@@ -278,6 +287,7 @@ export class McpClient {
         params: { uri },
       },
       ReadResourceResultSchema,
+      options,
     );
   }
 
@@ -855,6 +865,7 @@ class LenientJsonSchemaValidator implements jsonSchemaValidator {
       );
       return (input: unknown) => ({
         valid: true as const,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         data: input as T,
         errorMessage: undefined,
       });
@@ -869,6 +880,7 @@ export function populateMcpServerCommand(
 ): Record<string, MCPServerConfig> {
   if (mcpServerCommand) {
     const cmd = mcpServerCommand;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const args = parse(cmd, process.env) as string[];
     if (args.some((arg) => typeof arg !== 'string')) {
       throw new Error('failed to parse mcpServerCommand: ' + cmd);
@@ -1002,6 +1014,9 @@ export async function discoverTools(
           mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
         );
 
+        // Extract readOnlyHint from annotations
+        const isReadOnly = toolDef.annotations?.readOnlyHint === true;
+
         const tool = new DiscoveredMCPTool(
           mcpCallableTool,
           mcpServerName,
@@ -1010,11 +1025,23 @@ export async function discoverTools(
           toolDef.inputSchema ?? { type: 'object', properties: {} },
           messageBus,
           mcpServerConfig.trust,
+          isReadOnly,
           undefined,
           cliConfig,
           mcpServerConfig.extension?.name,
           mcpServerConfig.extension?.id,
         );
+
+        // If the tool is read-only, allow it in Plan mode
+        if (isReadOnly) {
+          cliConfig.getPolicyEngine().addRule({
+            toolName: tool.getFullyQualifiedName(),
+            decision: PolicyDecision.ASK_USER,
+            priority: 50, // Match priority of built-in plan tools
+            modes: [ApprovalMode.PLAN],
+            source: `MCP Annotation (readOnlyHint) - ${mcpServerName}`,
+          });
+        }
 
         discoveredTools.push(tool);
       } catch (error) {
@@ -1022,6 +1049,7 @@ export async function discoverTools(
           'error',
           `Error discovering tool: '${
             toolDef.name
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           }' from MCP server '${mcpServerName}': ${(error as Error).message}`,
           error,
         );
@@ -1075,6 +1103,7 @@ class McpCallableTool implements CallableTool {
       const result = await this.client.callTool(
         {
           name: call.name!,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           arguments: call.args as Record<string, unknown>,
         },
         undefined,
@@ -1491,6 +1520,7 @@ export async function connectToMcpServer(
       return mcpClient;
     } catch (error) {
       await transport.close();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       firstAttemptError = error as Error;
       throw error;
     }
@@ -1530,6 +1560,7 @@ export async function connectToMcpServer(
         );
         return mcpClient;
       } catch (sseFallbackError) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         sseError = sseFallbackError as Error;
 
         // If SSE also returned 401, handle OAuth below
@@ -1867,24 +1898,50 @@ export async function createTransport(
   }
 
   if (mcpServerConfig.command) {
-    const transport = new StdioClientTransport({
+    let transport: Transport = new StdioClientTransport({
       command: mcpServerConfig.command,
       args: mcpServerConfig.args || [],
       env: {
         ...sanitizeEnvironment(process.env, sanitizationConfig),
         ...(mcpServerConfig.env || {}),
+        [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
+          GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
       } as Record<string, string>,
       cwd: mcpServerConfig.cwd,
       stderr: 'pipe',
     });
+
+    // Fix for Xcode 26.3 mcpbridge non-compliant responses
+    // It returns JSON in `content` instead of `structuredContent`
+    if (
+      mcpServerConfig.command === 'xcrun' &&
+      mcpServerConfig.args?.includes('mcpbridge')
+    ) {
+      transport = new XcodeMcpBridgeFixTransport(transport);
+    }
+
     if (debugMode) {
-      transport.stderr!.on('data', (data) => {
-        const stderrStr = data.toString().trim();
-        debugLogger.debug(
-          `[DEBUG] [MCP STDERR (${mcpServerName})]: `,
-          stderrStr,
-        );
-      });
+      // The `XcodeMcpBridgeFixTransport` wrapper hides the underlying `StdioClientTransport`,
+      // which exposes `stderr` for debug logging. We need to unwrap it to attach the listener.
+
+      const underlyingTransport =
+        transport instanceof XcodeMcpBridgeFixTransport
+          ? // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
+            (transport as any).transport
+          : transport;
+
+      if (
+        underlyingTransport instanceof StdioClientTransport &&
+        underlyingTransport.stderr
+      ) {
+        underlyingTransport.stderr.on('data', (data) => {
+          const stderrStr = data.toString().trim();
+          debugLogger.debug(
+            `[DEBUG] [MCP STDERR (${mcpServerName})]: `,
+            stderrStr,
+          );
+        });
+      }
     }
     return transport;
   }

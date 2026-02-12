@@ -17,31 +17,26 @@ import yargs from 'yargs';
 import { debugLogger } from '@google/gemini-cli-core';
 import {
   updateSetting,
-  promptForSetting,
   getScopedEnvContents,
   type ExtensionSetting,
 } from '../../config/extensions/extensionSettings.js';
 import prompts from 'prompts';
+import * as fs from 'node:fs';
 
-const {
-  mockExtensionManager,
-  mockGetExtensionAndManager,
-  mockGetExtensionManager,
-  mockLoadSettings,
-} = vi.hoisted(() => {
-  const extensionManager = {
-    loadExtensionConfig: vi.fn(),
-    getExtensions: vi.fn(),
-    loadExtensions: vi.fn(),
-    getSettings: vi.fn(),
-  };
-  return {
-    mockExtensionManager: extensionManager,
-    mockGetExtensionAndManager: vi.fn(),
-    mockGetExtensionManager: vi.fn(),
-    mockLoadSettings: vi.fn().mockReturnValue({ merged: {} }),
-  };
-});
+const { mockExtensionManager, mockGetExtensionManager, mockLoadSettings } =
+  vi.hoisted(() => {
+    const extensionManager = {
+      loadExtensionConfig: vi.fn(),
+      getExtensions: vi.fn(),
+      loadExtensions: vi.fn(),
+      getSettings: vi.fn(),
+    };
+    return {
+      mockExtensionManager: extensionManager,
+      mockGetExtensionManager: vi.fn(),
+      mockLoadSettings: vi.fn().mockReturnValue({ merged: {} }),
+    };
+  });
 
 vi.mock('../../config/extension-manager.js', () => ({
   ExtensionManager: vi.fn().mockImplementation(() => mockExtensionManager),
@@ -61,10 +56,13 @@ vi.mock('../utils.js', () => ({
   exitCli: vi.fn(),
 }));
 
-vi.mock('./utils.js', () => ({
-  getExtensionAndManager: mockGetExtensionAndManager,
-  getExtensionManager: mockGetExtensionManager,
-}));
+vi.mock('./utils.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./utils.js')>();
+  return {
+    ...actual,
+    getExtensionManager: mockGetExtensionManager,
+  };
+});
 
 vi.mock('prompts');
 
@@ -79,17 +77,17 @@ vi.mock('../../config/settings.js', () => ({
 }));
 
 describe('extensions configure command', () => {
+  let tempWorkspaceDir: string;
+
   beforeEach(() => {
     vi.spyOn(debugLogger, 'log');
     vi.spyOn(debugLogger, 'error');
     vi.clearAllMocks();
 
+    tempWorkspaceDir = fs.mkdtempSync('gemini-cli-test-workspace');
+    vi.spyOn(process, 'cwd').mockReturnValue(tempWorkspaceDir);
     // Default behaviors
     mockLoadSettings.mockReturnValue({ merged: {} });
-    mockGetExtensionAndManager.mockResolvedValue({
-      extension: null,
-      extensionManager: null,
-    });
     mockGetExtensionManager.mockResolvedValue(mockExtensionManager);
     (ExtensionManager as unknown as Mock).mockImplementation(
       () => mockExtensionManager,
@@ -112,11 +110,6 @@ describe('extensions configure command', () => {
     path = '/test/path',
   ) => {
     const extension = { name, path, id };
-    mockGetExtensionAndManager.mockImplementation(async (n) => {
-      if (n === name)
-        return { extension, extensionManager: mockExtensionManager };
-      return { extension: null, extensionManager: null };
-    });
 
     mockExtensionManager.getExtensions.mockReturnValue([extension]);
     mockExtensionManager.loadExtensionConfig.mockResolvedValue({
@@ -139,16 +132,14 @@ describe('extensions configure command', () => {
         expect.objectContaining({ name: 'test-ext' }),
         'test-id',
         'TEST_VAR',
-        promptForSetting,
+        expect.any(Function),
         'user',
+        tempWorkspaceDir,
       );
     });
 
     it('should handle missing extension', async () => {
-      mockGetExtensionAndManager.mockResolvedValue({
-        extension: null,
-        extensionManager: null,
-      });
+      mockExtensionManager.getExtensions.mockReturnValue([]);
 
       await runCommand('config missing-ext TEST_VAR');
 
@@ -184,8 +175,9 @@ describe('extensions configure command', () => {
         expect.objectContaining({ name: 'test-ext' }),
         'test-id',
         'VAR_1',
-        promptForSetting,
+        expect.any(Function),
         'user',
+        tempWorkspaceDir,
       );
     });
 
@@ -198,7 +190,7 @@ describe('extensions configure command', () => {
           return {};
         },
       );
-      (prompts as unknown as Mock).mockResolvedValue({ overwrite: true });
+      (prompts as unknown as Mock).mockResolvedValue({ confirm: true });
       (updateSetting as Mock).mockResolvedValue(undefined);
 
       await runCommand('config test-ext');
@@ -234,7 +226,7 @@ describe('extensions configure command', () => {
       const settings = [{ name: 'Setting 1', envVar: 'VAR_1' }];
       setupExtension('test-ext', settings);
       (getScopedEnvContents as Mock).mockResolvedValue({ VAR_1: 'existing' });
-      (prompts as unknown as Mock).mockResolvedValue({ overwrite: false });
+      (prompts as unknown as Mock).mockResolvedValue({ confirm: false });
 
       await runCommand('config test-ext');
 

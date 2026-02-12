@@ -742,7 +742,7 @@ The MCP integration tracks several states:
 - **Sandbox compatibility:** When using sandboxing, ensure MCP servers are
   available within the sandbox environment
 - **Private data:** Using broadly scoped personal access tokens can lead to
-  information leakage between repositories
+  information leakage between repositories.
 
 ### Performance and resource management
 

@@ -70,6 +70,14 @@ export async function runNonInteractive({
         coreEvents.emitConsoleLog(msg.type, msg.content);
       },
     });
+
+    if (process.env['GEMINI_CLI_ACTIVITY_LOG_TARGET']) {
+      const { setupInitialActivityLogger } = await import(
+        './utils/devtoolsService.js'
+      );
+      await setupInitialActivityLogger(config);
+    }
+
     const { stdout: workingStdout } = createWorkingStdio();
     const textOutput = new TextOutput(workingStdout);
 
@@ -242,6 +250,7 @@ export async function runNonInteractive({
         // Otherwise, slashCommandResult falls through to the default prompt
         // handling.
         if (slashCommandResult) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           query = slashCommandResult as Part[];
         }
       }
@@ -263,6 +272,7 @@ export async function runNonInteractive({
             error || 'Exiting due to an error processing the @ command.',
           );
         }
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         query = processedQuery as Part[];
       }
 
@@ -293,6 +303,9 @@ export async function runNonInteractive({
           currentMessages[0]?.parts || [],
           abortController.signal,
           prompt_id,
+          undefined,
+          false,
+          turnCount === 1 ? input : undefined,
         );
 
         let responseText = '';

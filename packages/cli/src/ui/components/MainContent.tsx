@@ -19,7 +19,6 @@ import { useMemo, memo, useCallback, useEffect, useRef } from 'react';
 import { MAX_GEMINI_MESSAGE_LINES } from '../constants.js';
 import { useConfirmingTool } from '../hooks/useConfirmingTool.js';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
-import { useConfig } from '../contexts/ConfigContext.js';
 
 const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
 const MemoizedAppHeader = memo(AppHeader);
@@ -31,12 +30,10 @@ const MemoizedAppHeader = memo(AppHeader);
 export const MainContent = () => {
   const { version } = useAppContext();
   const uiState = useUIState();
-  const config = useConfig();
   const isAlternateBuffer = useAlternateBuffer();
 
   const confirmingTool = useConfirmingTool();
-  const showConfirmationQueue =
-    config.isEventDrivenSchedulerEnabled() && confirmingTool !== null;
+  const showConfirmationQueue = confirmingTool !== null;
 
   const scrollableListRef = useRef<VirtualizedListRef<unknown>>(null);
 
@@ -81,14 +78,14 @@ export const MainContent = () => {
           <HistoryItemDisplay
             key={i}
             availableTerminalHeight={
-              uiState.constrainHeight && !isAlternateBuffer
+              (uiState.constrainHeight && !isAlternateBuffer) ||
+              isAlternateBuffer
                 ? availableTerminalHeight
                 : undefined
             }
             terminalWidth={mainAreaWidth}
             item={{ ...item, id: 0 }}
             isPending={true}
-            isFocused={!uiState.isEditorDialogOpen}
             activeShellPtyId={uiState.activePtyId}
             embeddedShellFocused={uiState.embeddedShellFocused}
           />
@@ -104,7 +101,6 @@ export const MainContent = () => {
       isAlternateBuffer,
       availableTerminalHeight,
       mainAreaWidth,
-      uiState.isEditorDialogOpen,
       uiState.activePtyId,
       uiState.embeddedShellFocused,
       showConfirmationQueue,
@@ -148,7 +144,7 @@ export const MainContent = () => {
     return (
       <ScrollableList
         ref={scrollableListRef}
-        hasFocus={!uiState.isEditorDialogOpen}
+        hasFocus={!uiState.isEditorDialogOpen && !uiState.embeddedShellFocused}
         width={uiState.terminalWidth}
         data={virtualizedData}
         renderItem={renderItem}

@@ -35,8 +35,10 @@ export function getHookSource(input: Record<string, unknown>): HookSource {
   const source = input['hook_source'];
   if (
     typeof source === 'string' &&
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     VALID_HOOK_SOURCES.includes(source as HookSource)
   ) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return source as HookSource;
   }
   return 'project';
@@ -142,6 +144,12 @@ export interface PolicyRule {
    * e.g. "my-policies.toml", "Settings (MCP Trusted)", etc.
    */
   source?: string;
+
+  /**
+   * Optional message to display when this rule results in a DENY decision.
+   * This message will be returned to the model/user.
+   */
+  denyMessage?: string;
 }
 
 export interface SafetyCheckerRule {
@@ -270,3 +278,9 @@ export interface CheckResult {
   decision: PolicyDecision;
   rule?: PolicyRule;
 }
+
+/**
+ * Priority for subagent tools (registered dynamically).
+ * Effective priority matching Tier 1 (Default) read-only tools.
+ */
+export const PRIORITY_SUBAGENT_TOOL = 1.05;

@@ -68,6 +68,9 @@ const MockedGeminiClientClass = vi.hoisted(() =>
       recordToolCalls: vi.fn(),
       getConversationFile: vi.fn(),
     });
+    this.getCurrentSequenceModel = vi
+      .fn()
+      .mockReturnValue('gemini-2.0-flash-exp');
   }),
 );
 
@@ -243,7 +246,6 @@ describe('useGeminiStream', () => {
     getContentGenerator: vi.fn(),
     isInteractive: () => false,
     getExperiments: () => {},
-    isEventDrivenSchedulerEnabled: vi.fn(() => false),
     getMaxSessionTurns: vi.fn(() => 100),
     isJitContextEnabled: vi.fn(() => false),
     getGlobalMemory: vi.fn(() => ''),
@@ -652,6 +654,9 @@ describe('useGeminiStream', () => {
       expectedMergedResponse,
       expect.any(AbortSignal),
       'prompt-id-2',
+      undefined,
+      false,
+      expectedMergedResponse,
     );
   });
 
@@ -1054,6 +1059,9 @@ describe('useGeminiStream', () => {
         toolCallResponseParts,
         expect.any(AbortSignal),
         'prompt-id-4',
+        undefined,
+        false,
+        toolCallResponseParts,
       );
     });
 
@@ -1495,6 +1503,9 @@ describe('useGeminiStream', () => {
           'This is the actual prompt from the command file.',
           expect.any(AbortSignal),
           expect.any(String),
+          undefined,
+          false,
+          '/my-custom-command',
         );
 
         expect(mockScheduleToolCalls).not.toHaveBeenCalled();
@@ -1521,6 +1532,9 @@ describe('useGeminiStream', () => {
           '',
           expect.any(AbortSignal),
           expect.any(String),
+          undefined,
+          false,
+          '/emptycmd',
         );
       });
     });
@@ -1539,6 +1553,9 @@ describe('useGeminiStream', () => {
           '// This is a line comment',
           expect.any(AbortSignal),
           expect.any(String),
+          undefined,
+          false,
+          '// This is a line comment',
         );
       });
     });
@@ -1557,6 +1574,9 @@ describe('useGeminiStream', () => {
           '/* This is a block comment */',
           expect.any(AbortSignal),
           expect.any(String),
+          undefined,
+          false,
+          '/* This is a block comment */',
         );
       });
     });
@@ -2389,6 +2409,9 @@ describe('useGeminiStream', () => {
       processedQueryParts, // Argument 1: The parts array directly
       expect.any(AbortSignal), // Argument 2: An AbortSignal
       expect.any(String), // Argument 3: The prompt_id string
+      undefined,
+      false,
+      rawQuery,
     );
   });
 
@@ -2481,6 +2504,110 @@ describe('useGeminiStream', () => {
     });
   });
   describe('Thought Reset', () => {
+    it('should keep full thinking entries in history when mode is full', async () => {
+      const fullThinkingSettings: LoadedSettings = {
+        ...mockLoadedSettings,
+        merged: {
+          ...mockLoadedSettings.merged,
+          ui: { inlineThinkingMode: 'full' },
+        },
+      } as unknown as LoadedSettings;
+
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.Thought,
+            value: {
+              subject: 'Full thought',
+              description: 'Detailed thinking',
+            },
+          };
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'Response',
+          };
+        })(),
+      );
+
+      const { result } = renderHookWithProviders(() =>
+        useGeminiStream(
+          new MockedGeminiClientClass(mockConfig),
+          [],
+          mockAddItem,
+          mockConfig,
+          fullThinkingSettings,
+          mockOnDebugMessage,
+          mockHandleSlashCommand,
+          false,
+          () => 'vscode' as EditorType,
+          () => {},
+          () => Promise.resolve(),
+          false,
+          () => {},
+          () => {},
+          () => {},
+          80,
+          24,
+        ),
+      );
+
+      await act(async () => {
+        await result.current.submitQuery('Test query');
+      });
+
+      expect(mockAddItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'thinking',
+          thought: expect.objectContaining({ subject: 'Full thought' }),
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('keeps thought transient and clears it on first non-thought event', async () => {
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.Thought,
+            value: {
+              subject: 'Assessing intent',
+              description: 'Inspecting context',
+            },
+          };
+          yield {
+            type: ServerGeminiEventType.Content,
+            value: 'Model response content',
+          };
+          yield {
+            type: ServerGeminiEventType.Finished,
+            value: { reason: 'STOP', usageMetadata: undefined },
+          };
+        })(),
+      );
+
+      const { result } = renderTestHook();
+
+      await act(async () => {
+        await result.current.submitQuery('Test query');
+      });
+
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'gemini',
+            text: 'Model response content',
+          }),
+          expect.any(Number),
+        );
+      });
+
+      expect(result.current.thought).toBeNull();
+      expect(mockAddItem).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'thinking' }),
+        expect.any(Number),
+      );
+    });
+
     it('should reset thought to null when starting a new prompt', async () => {
       // First, simulate a response with a thought
       mockSendMessageStream.mockReturnValue(
@@ -2928,6 +3055,9 @@ describe('useGeminiStream', () => {
           'test query',
           expect.any(AbortSignal),
           expect.any(String),
+          undefined,
+          false,
+          'test query',
         );
       });
     });
@@ -3075,6 +3205,9 @@ describe('useGeminiStream', () => {
           'second query',
           expect.any(AbortSignal),
           expect.any(String),
+          undefined,
+          false,
+          'second query',
         );
       });
     });

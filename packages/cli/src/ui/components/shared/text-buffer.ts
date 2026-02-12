@@ -34,8 +34,8 @@ import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
 import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../../constants.js';
 
-const LARGE_PASTE_LINE_THRESHOLD = 5;
-const LARGE_PASTE_CHAR_THRESHOLD = 500;
+export const LARGE_PASTE_LINE_THRESHOLD = 5;
+export const LARGE_PASTE_CHAR_THRESHOLD = 500;
 
 // Regex to match paste placeholders like [Pasted Text: 6 lines] or [Pasted Text: 501 chars #2]
 export const PASTED_TEXT_PLACEHOLDER_REGEX =
@@ -174,15 +174,21 @@ export const findWordEndInLine = (line: string, col: number): number | null => {
 
   // If we're already at the end of a word (including punctuation sequences), advance to next word
   // This includes both regular word endings and script boundaries
+  let nextBaseCharIdx = i + 1;
+  while (
+    nextBaseCharIdx < chars.length &&
+    isCombiningMark(chars[nextBaseCharIdx])
+  ) {
+    nextBaseCharIdx++;
+  }
+
   const atEndOfWordChar =
     i < chars.length &&
     isWordCharWithCombining(chars[i]) &&
-    (i + 1 >= chars.length ||
-      !isWordCharWithCombining(chars[i + 1]) ||
+    (nextBaseCharIdx >= chars.length ||
+      !isWordCharStrict(chars[nextBaseCharIdx]) ||
       (isWordCharStrict(chars[i]) &&
-        i + 1 < chars.length &&
-        isWordCharStrict(chars[i + 1]) &&
-        isDifferentScript(chars[i], chars[i + 1])));
+        isDifferentScript(chars[i], chars[nextBaseCharIdx])));
 
   const atEndOfPunctuation =
     i < chars.length &&
@@ -195,6 +201,10 @@ export const findWordEndInLine = (line: string, col: number): number | null => {
   if (atEndOfWordChar || atEndOfPunctuation) {
     // We're at the end of a word or punctuation sequence, move forward to find next word
     i++;
+    // Skip any combining marks that belong to the word we just finished
+    while (i < chars.length && isCombiningMark(chars[i])) {
+      i++;
+    }
     // Skip whitespace to find next word or punctuation
     while (i < chars.length && isWhitespace(chars[i])) {
       i++;
@@ -255,6 +265,91 @@ export const findWordEndInLine = (line: string, col: number): number | null => {
   // Return the position of the last base character, not combining marks
   if (foundWord && lastBaseCharPos >= col) {
     return lastBaseCharPos;
+  }
+
+  return null;
+};
+
+// Find next big word start within a line (W)
+export const findNextBigWordStartInLine = (
+  line: string,
+  col: number,
+): number | null => {
+  const chars = toCodePoints(line);
+  let i = col;
+
+  if (i >= chars.length) return null;
+
+  // If currently on non-whitespace, skip it
+  if (!isWhitespace(chars[i])) {
+    while (i < chars.length && !isWhitespace(chars[i])) {
+      i++;
+    }
+  }
+
+  // Skip whitespace
+  while (i < chars.length && isWhitespace(chars[i])) {
+    i++;
+  }
+
+  return i < chars.length ? i : null;
+};
+
+// Find previous big word start within a line (B)
+export const findPrevBigWordStartInLine = (
+  line: string,
+  col: number,
+): number | null => {
+  const chars = toCodePoints(line);
+  let i = col;
+
+  if (i <= 0) return null;
+
+  i--;
+
+  // Skip whitespace moving backwards
+  while (i >= 0 && isWhitespace(chars[i])) {
+    i--;
+  }
+
+  if (i < 0) return null;
+
+  // We're in a big word, move to its beginning
+  while (i >= 0 && !isWhitespace(chars[i])) {
+    i--;
+  }
+  return i + 1;
+};
+
+// Find big word end within a line (E)
+export const findBigWordEndInLine = (
+  line: string,
+  col: number,
+): number | null => {
+  const chars = toCodePoints(line);
+  let i = col;
+
+  // If we're already at the end of a big word, advance to next
+  const atEndOfBigWord =
+    i < chars.length &&
+    !isWhitespace(chars[i]) &&
+    (i + 1 >= chars.length || isWhitespace(chars[i + 1]));
+
+  if (atEndOfBigWord) {
+    i++;
+  }
+
+  // Skip whitespace
+  while (i < chars.length && isWhitespace(chars[i])) {
+    i++;
+  }
+
+  // Move to end of current big word
+  if (i < chars.length && !isWhitespace(chars[i])) {
+    while (i < chars.length && !isWhitespace(chars[i])) {
+      i++;
+    }
+    return i - 1;
   }
 
   return null;
@@ -322,34 +417,17 @@ export const findNextWordAcrossLines = (
     return { row: cursorRow, col: colInCurrentLine };
   }
 
+  let firstEmptyRow: number | null = null;
+
   // Search subsequent lines
   for (let row = cursorRow + 1; row < lines.length; row++) {
     const line = lines[row] || '';
     const chars = toCodePoints(line);
 
-    // For empty lines, if we haven't found any words yet, return the empty line
+    // For empty lines, if we haven't found any words yet, remember the first empty line
     if (chars.length === 0) {
-      // Check if there are any words in remaining lines
-      let hasWordsInLaterLines = false;
-      for (let laterRow = row + 1; laterRow < lines.length; laterRow++) {
-        const laterLine = lines[laterRow] || '';
-        const laterChars = toCodePoints(laterLine);
-        let firstNonWhitespace = 0;
-        while (
-          firstNonWhitespace < laterChars.length &&
-          isWhitespace(laterChars[firstNonWhitespace])
-        ) {
-          firstNonWhitespace++;
-        }
-        if (firstNonWhitespace < laterChars.length) {
-          hasWordsInLaterLines = true;
-          break;
-        }
-      }
-
-      // If no words in later lines, return the empty line
-      if (!hasWordsInLaterLines) {
-        return { row, col: 0 };
+      if (firstEmptyRow === null) {
+        firstEmptyRow = row;
       }
       continue;
     }
@@ -374,6 +452,11 @@ export const findNextWordAcrossLines = (
         }
       }
     }
+  }
+
+  // If no words in later lines, return the first empty line we found
+  if (firstEmptyRow !== null) {
+    return { row: firstEmptyRow, col: 0 };
   }
 
   return null;
@@ -409,6 +492,106 @@ export const findPrevWordAcrossLines = (
     if (lastWordStart > 0) {
       // Find start of this word
       const wordStart = findPrevWordStartInLine(line, lastWordStart);
+      if (wordStart !== null) {
+        return { row, col: wordStart };
+      }
+    }
+  }
+
+  return null;
+};
+
+// Find next big word across lines
+export const findNextBigWordAcrossLines = (
+  lines: string[],
+  cursorRow: number,
+  cursorCol: number,
+  searchForWordStart: boolean,
+): { row: number; col: number } | null => {
+  // First try current line
+  const currentLine = lines[cursorRow] || '';
+  const colInCurrentLine = searchForWordStart
+    ? findNextBigWordStartInLine(currentLine, cursorCol)
+    : findBigWordEndInLine(currentLine, cursorCol);
+
+  if (colInCurrentLine !== null) {
+    return { row: cursorRow, col: colInCurrentLine };
+  }
+
+  let firstEmptyRow: number | null = null;
+
+  // Search subsequent lines
+  for (let row = cursorRow + 1; row < lines.length; row++) {
+    const line = lines[row] || '';
+    const chars = toCodePoints(line);
+
+    // For empty lines, if we haven't found any words yet, remember the first empty line
+    if (chars.length === 0) {
+      if (firstEmptyRow === null) {
+        firstEmptyRow = row;
+      }
+      continue;
+    }
+
+    // Find first non-whitespace
+    let firstNonWhitespace = 0;
+    while (
+      firstNonWhitespace < chars.length &&
+      isWhitespace(chars[firstNonWhitespace])
+    ) {
+      firstNonWhitespace++;
+    }
+
+    if (firstNonWhitespace < chars.length) {
+      // Found a non-whitespace character (start of a big word)
+      if (searchForWordStart) {
+        return { row, col: firstNonWhitespace };
+      } else {
+        const endCol = findBigWordEndInLine(line, firstNonWhitespace);
+        if (endCol !== null) {
+          return { row, col: endCol };
+        }
+      }
+    }
+  }
+
+  // If no words in later lines, return the first empty line we found
+  if (firstEmptyRow !== null) {
+    return { row: firstEmptyRow, col: 0 };
+  }
+
+  return null;
+};
+
+// Find previous big word across lines
+export const findPrevBigWordAcrossLines = (
+  lines: string[],
+  cursorRow: number,
+  cursorCol: number,
+): { row: number; col: number } | null => {
+  // First try current line
+  const currentLine = lines[cursorRow] || '';
+  const colInCurrentLine = findPrevBigWordStartInLine(currentLine, cursorCol);
+
+  if (colInCurrentLine !== null) {
+    return { row: cursorRow, col: colInCurrentLine };
+  }
+
+  // Search previous lines
+  for (let row = cursorRow - 1; row >= 0; row--) {
+    const line = lines[row] || '';
+    const chars = toCodePoints(line);
+
+    if (chars.length === 0) continue;
+
+    // Find last big word start
+    let lastWordStart = chars.length;
+    while (lastWordStart > 0 && isWhitespace(chars[lastWordStart - 1])) {
+      lastWordStart--;
+    }
+
+    if (lastWordStart > 0) {
+      const wordStart = findPrevBigWordStartInLine(line, lastWordStart);
       if (wordStart !== null) {
         return { row, col: wordStart };
       }
@@ -574,7 +757,7 @@ interface UseTextBufferProps {
   stdin?: NodeJS.ReadStream | null; // For external editor
   setRawMode?: (mode: boolean) => void; // For external editor
   onChange?: (text: string) => void; // Callback for when text changes
-  isValidPath: (path: string) => boolean;
+  escapePastedPaths?: boolean;
   shellModeActive?: boolean; // Whether the text buffer is in shell mode
   inputFilter?: (text: string) => string; // Optional filter for input text
   singleLine?: boolean;
@@ -803,11 +986,15 @@ export function getTransformUnderCursor(
   row: number,
   col: number,
   spansByLine: Transformation[][],
+  options: { includeEdge?: boolean } = {},
 ): Transformation | null {
   const spans = spansByLine[row];
   if (!spans || spans.length === 0) return null;
   for (const span of spans) {
-    if (col >= span.logStart && col < span.logEnd) {
+    if (
+      col >= span.logStart &&
+      (options.includeEdge ? col <= span.logEnd : col < span.logEnd)
+    ) {
       return span;
     }
     if (col < span.logStart) break;
@@ -1413,8 +1600,13 @@ function generatePastedTextId(
 }
 
 export type TextBufferAction =
-  | { type: 'set_text'; payload: string; pushToUndo?: boolean }
   | { type: 'insert'; payload: string; isPaste?: boolean }
+  | {
+      type: 'set_text';
+      payload: string;
+      pushToUndo?: boolean;
+      cursorPosition?: 'start' | 'end' | number;
+    }
   | { type: 'add_pasted_content'; payload: { id: string; text: string } }
   | { type: 'backspace' }
   | {
@@ -1454,9 +1646,15 @@ export type TextBufferAction =
   | { type: 'vim_delete_word_forward'; payload: { count: number } }
   | { type: 'vim_delete_word_backward'; payload: { count: number } }
   | { type: 'vim_delete_word_end'; payload: { count: number } }
+  | { type: 'vim_delete_big_word_forward'; payload: { count: number } }
+  | { type: 'vim_delete_big_word_backward'; payload: { count: number } }
+  | { type: 'vim_delete_big_word_end'; payload: { count: number } }
   | { type: 'vim_change_word_forward'; payload: { count: number } }
   | { type: 'vim_change_word_backward'; payload: { count: number } }
   | { type: 'vim_change_word_end'; payload: { count: number } }
+  | { type: 'vim_change_big_word_forward'; payload: { count: number } }
+  | { type: 'vim_change_big_word_backward'; payload: { count: number } }
+  | { type: 'vim_change_big_word_end'; payload: { count: number } }
   | { type: 'vim_delete_line'; payload: { count: number } }
   | { type: 'vim_change_line'; payload: { count: number } }
   | { type: 'vim_delete_to_end_of_line' }
@@ -1473,6 +1671,9 @@ export type TextBufferAction =
   | { type: 'vim_move_word_forward'; payload: { count: number } }
   | { type: 'vim_move_word_backward'; payload: { count: number } }
   | { type: 'vim_move_word_end'; payload: { count: number } }
+  | { type: 'vim_move_big_word_forward'; payload: { count: number } }
+  | { type: 'vim_move_big_word_backward'; payload: { count: number } }
+  | { type: 'vim_move_big_word_end'; payload: { count: number } }
   | { type: 'vim_delete_char'; payload: { count: number } }
   | { type: 'vim_insert_at_cursor' }
   | { type: 'vim_append_at_cursor' }
@@ -1517,12 +1718,29 @@ function textBufferReducerLogic(
         .replace(/\r\n?/g, '\n')
         .split('\n');
       const lines = newContentLines.length === 0 ? [''] : newContentLines;
-      const lastNewLineIndex = lines.length - 1;
+
+      let newCursorRow: number;
+      let newCursorCol: number;
+
+      if (typeof action.cursorPosition === 'number') {
+        [newCursorRow, newCursorCol] = offsetToLogicalPos(
+          action.payload,
+          action.cursorPosition,
+        );
+      } else if (action.cursorPosition === 'start') {
+        newCursorRow = 0;
+        newCursorCol = 0;
+      } else {
+        // Default to 'end'
+        newCursorRow = lines.length - 1;
+        newCursorCol = cpLen(lines[newCursorRow] ?? '');
+      }
+
       return {
         ...nextState,
         lines,
-        cursorRow: lastNewLineIndex,
-        cursorCol: cpLen(lines[lastNewLineIndex] ?? ''),
+        cursorRow: newCursorRow,
+        cursorCol: newCursorCol,
         preferredCol: null,
         pastedContent: action.payload === '' ? {} : nextState.pastedContent,
       };
@@ -2207,9 +2425,15 @@ function textBufferReducerLogic(
     case 'vim_delete_word_forward':
     case 'vim_delete_word_backward':
     case 'vim_delete_word_end':
+    case 'vim_delete_big_word_forward':
+    case 'vim_delete_big_word_backward':
+    case 'vim_delete_big_word_end':
     case 'vim_change_word_forward':
     case 'vim_change_word_backward':
     case 'vim_change_word_end':
+    case 'vim_change_big_word_forward':
+    case 'vim_change_big_word_backward':
+    case 'vim_change_big_word_end':
     case 'vim_delete_line':
     case 'vim_change_line':
     case 'vim_delete_to_end_of_line':
@@ -2222,6 +2446,9 @@ function textBufferReducerLogic(
     case 'vim_move_word_forward':
     case 'vim_move_word_backward':
     case 'vim_move_word_end':
+    case 'vim_move_big_word_forward':
+    case 'vim_move_big_word_backward':
+    case 'vim_move_big_word_end':
     case 'vim_delete_char':
     case 'vim_insert_at_cursor':
     case 'vim_append_at_cursor':
@@ -2455,7 +2682,7 @@ export function useTextBuffer({
   stdin,
   setRawMode,
   onChange,
-  isValidPath,
+  escapePastedPaths = false,
   shellModeActive = false,
   inputFilter,
   singleLine = false,
@@ -2572,7 +2799,8 @@ export function useTextBuffer({
       if (
         ch.length >= minLengthToInferAsDragDrop &&
         !shellModeActive &&
-        paste
+        paste &&
+        escapePastedPaths
       ) {
         let potentialPath = ch.trim();
         const quoteMatch = potentialPath.match(/^'(.*)'$/);
@@ -2582,7 +2810,7 @@ export function useTextBuffer({
 
         potentialPath = potentialPath.trim();
 
-        const processed = parsePastedPaths(potentialPath, isValidPath);
+        const processed = parsePastedPaths(potentialPath);
         if (processed) {
           textToInsert = processed;
         }
@@ -2604,7 +2832,7 @@ export function useTextBuffer({
         dispatch({ type: 'insert', payload: currentText, isPaste: paste });
       }
     },
-    [isValidPath, shellModeActive],
+    [shellModeActive, escapePastedPaths],
   );
 
   const newline = useCallback((): void => {
@@ -2637,9 +2865,12 @@ export function useTextBuffer({
     dispatch({ type: 'redo' });
   }, []);
 
-  const setText = useCallback((newText: string): void => {
-    dispatch({ type: 'set_text', payload: newText });
-  }, []);
+  const setText = useCallback(
+    (newText: string, cursorPosition?: 'start' | 'end' | number): void => {
+      dispatch({ type: 'set_text', payload: newText, cursorPosition });
+    },
+    [],
+  );
 
   const deleteWordLeft = useCallback((): void => {
     dispatch({ type: 'delete_word_left' });
@@ -2670,6 +2901,18 @@ export function useTextBuffer({
     dispatch({ type: 'vim_delete_word_end', payload: { count } });
   }, []);
 
+  const vimDeleteBigWordForward = useCallback((count: number): void => {
+    dispatch({ type: 'vim_delete_big_word_forward', payload: { count } });
+  }, []);
+
+  const vimDeleteBigWordBackward = useCallback((count: number): void => {
+    dispatch({ type: 'vim_delete_big_word_backward', payload: { count } });
+  }, []);
+
+  const vimDeleteBigWordEnd = useCallback((count: number): void => {
+    dispatch({ type: 'vim_delete_big_word_end', payload: { count } });
+  }, []);
+
   const vimChangeWordForward = useCallback((count: number): void => {
     dispatch({ type: 'vim_change_word_forward', payload: { count } });
   }, []);
@@ -2680,6 +2923,18 @@ export function useTextBuffer({
 
   const vimChangeWordEnd = useCallback((count: number): void => {
     dispatch({ type: 'vim_change_word_end', payload: { count } });
+  }, []);
+
+  const vimChangeBigWordForward = useCallback((count: number): void => {
+    dispatch({ type: 'vim_change_big_word_forward', payload: { count } });
+  }, []);
+
+  const vimChangeBigWordBackward = useCallback((count: number): void => {
+    dispatch({ type: 'vim_change_big_word_backward', payload: { count } });
+  }, []);
+
+  const vimChangeBigWordEnd = useCallback((count: number): void => {
+    dispatch({ type: 'vim_change_big_word_end', payload: { count } });
   }, []);
 
   const vimDeleteLine = useCallback((count: number): void => {
@@ -2732,6 +2987,18 @@ export function useTextBuffer({
 
   const vimMoveWordEnd = useCallback((count: number): void => {
     dispatch({ type: 'vim_move_word_end', payload: { count } });
+  }, []);
+
+  const vimMoveBigWordForward = useCallback((count: number): void => {
+    dispatch({ type: 'vim_move_big_word_forward', payload: { count } });
+  }, []);
+
+  const vimMoveBigWordBackward = useCallback((count: number): void => {
+    dispatch({ type: 'vim_move_big_word_backward', payload: { count } });
+  }, []);
+
+  const vimMoveBigWordEnd = useCallback((count: number): void => {
+    dispatch({ type: 'vim_move_big_word_end', payload: { count } });
   }, []);
 
   const vimDeleteChar = useCallback((count: number): void => {
@@ -2825,6 +3092,7 @@ export function useTextBuffer({
       setRawMode?.(false);
       const { status, error } = spawnSync(command, args, {
         stdio: 'inherit',
+        shell: process.platform === 'win32',
       });
       if (error) throw error;
       if (typeof status === 'number' && status !== 0)
@@ -2905,12 +3173,12 @@ export function useTextBuffer({
         return true;
       }
       if (keyMatchers[Command.MOVE_UP](key)) {
-        if (cursorRow === 0) return false;
+        if (visualCursor[0] === 0) return false;
         move('up');
         return true;
       }
       if (keyMatchers[Command.MOVE_DOWN](key)) {
-        if (cursorRow === lines.length - 1) return false;
+        if (visualCursor[0] === visualLines.length - 1) return false;
         move('down');
         return true;
       }
@@ -2930,6 +3198,13 @@ export function useTextBuffer({
         move('end');
         return true;
       }
+      if (keyMatchers[Command.CLEAR_INPUT](key)) {
+        if (text.length > 0) {
+          setText('');
+          return true;
+        }
+        return false;
+      }
       if (keyMatchers[Command.DELETE_WORD_BACKWARD](key)) {
         deleteWordLeft();
         return true;
@@ -2943,6 +3218,13 @@ export function useTextBuffer({
         return true;
       }
       if (keyMatchers[Command.DELETE_CHAR_RIGHT](key)) {
+        const lastLineIdx = lines.length - 1;
+        if (
+          cursorRow === lastLineIdx &&
+          cursorCol === cpLen(lines[lastLineIdx] ?? '')
+        ) {
+          return false;
+        }
         del();
         return true;
       }
@@ -2974,6 +3256,10 @@ export function useTextBuffer({
       cursorCol,
       lines,
       singleLine,
+      setText,
+      text,
+      visualCursor,
+      visualLines,
     ],
   );
 
@@ -3212,9 +3498,15 @@ export function useTextBuffer({
       vimDeleteWordForward,
       vimDeleteWordBackward,
       vimDeleteWordEnd,
+      vimDeleteBigWordForward,
+      vimDeleteBigWordBackward,
+      vimDeleteBigWordEnd,
       vimChangeWordForward,
       vimChangeWordBackward,
       vimChangeWordEnd,
+      vimChangeBigWordForward,
+      vimChangeBigWordBackward,
+      vimChangeBigWordEnd,
       vimDeleteLine,
       vimChangeLine,
       vimDeleteToEndOfLine,
@@ -3227,6 +3519,9 @@ export function useTextBuffer({
       vimMoveWordForward,
       vimMoveWordBackward,
       vimMoveWordEnd,
+      vimMoveBigWordForward,
+      vimMoveBigWordBackward,
+      vimMoveBigWordEnd,
       vimDeleteChar,
       vimInsertAtCursor,
       vimAppendAtCursor,
@@ -3285,9 +3580,15 @@ export function useTextBuffer({
       vimDeleteWordForward,
       vimDeleteWordBackward,
       vimDeleteWordEnd,
+      vimDeleteBigWordForward,
+      vimDeleteBigWordBackward,
+      vimDeleteBigWordEnd,
       vimChangeWordForward,
       vimChangeWordBackward,
       vimChangeWordEnd,
+      vimChangeBigWordForward,
+      vimChangeBigWordBackward,
+      vimChangeBigWordEnd,
       vimDeleteLine,
       vimChangeLine,
       vimDeleteToEndOfLine,
@@ -3300,6 +3601,9 @@ export function useTextBuffer({
       vimMoveWordForward,
       vimMoveWordBackward,
       vimMoveWordEnd,
+      vimMoveBigWordForward,
+      vimMoveBigWordBackward,
+      vimMoveBigWordEnd,
       vimDeleteChar,
       vimInsertAtCursor,
       vimAppendAtCursor,
@@ -3365,7 +3669,7 @@ export interface TextBuffer {
    * Replaces the entire buffer content with the provided text.
    * The operation is undoable.
    */
-  setText: (text: string) => void;
+  setText: (text: string, cursorPosition?: 'start' | 'end' | number) => void;
   /**
    * Insert a single character or string without newlines.
    */
@@ -3419,7 +3723,7 @@ export interface TextBuffer {
   /**
    * High level "handleInput" – receives what Ink gives us.
    */
-  handleInput: (key: Key) => void;
+  handleInput: (key: Key) => boolean;
   /**
    * Opens the current buffer contents in the user's preferred terminal text
    * editor ($VISUAL or $EDITOR, falling back to "vi").  The method blocks
@@ -3483,6 +3787,18 @@ export interface TextBuffer {
    */
   vimDeleteWordEnd: (count: number) => void;
   /**
+   * Delete N big words forward from cursor position (vim 'dW' command)
+   */
+  vimDeleteBigWordForward: (count: number) => void;
+  /**
+   * Delete N big words backward from cursor position (vim 'dB' command)
+   */
+  vimDeleteBigWordBackward: (count: number) => void;
+  /**
+   * Delete to end of N big words from cursor position (vim 'dE' command)
+   */
+  vimDeleteBigWordEnd: (count: number) => void;
+  /**
    * Change N words forward from cursor position (vim 'cw' command)
    */
   vimChangeWordForward: (count: number) => void;
@@ -3494,6 +3810,18 @@ export interface TextBuffer {
    * Change to end of N words from cursor position (vim 'ce' command)
    */
   vimChangeWordEnd: (count: number) => void;
+  /**
+   * Change N big words forward from cursor position (vim 'cW' command)
+   */
+  vimChangeBigWordForward: (count: number) => void;
+  /**
+   * Change N big words backward from cursor position (vim 'cB' command)
+   */
+  vimChangeBigWordBackward: (count: number) => void;
+  /**
+   * Change to end of N big words from cursor position (vim 'cE' command)
+   */
+  vimChangeBigWordEnd: (count: number) => void;
   /**
    * Delete N lines from cursor position (vim 'dd' command)
    */
@@ -3542,6 +3870,18 @@ export interface TextBuffer {
    * Move cursor to end of Nth word (vim 'e' command)
    */
   vimMoveWordEnd: (count: number) => void;
+  /**
+   * Move cursor forward N big words (vim 'W' command)
+   */
+  vimMoveBigWordForward: (count: number) => void;
+  /**
+   * Move cursor backward N big words (vim 'B' command)
+   */
+  vimMoveBigWordBackward: (count: number) => void;
+  /**
+   * Move cursor to end of Nth big word (vim 'E' command)
+   */
+  vimMoveBigWordEnd: (count: number) => void;
   /**
    * Delete N characters at cursor (vim 'x' command)
    */

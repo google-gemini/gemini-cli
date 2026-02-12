@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -88,6 +88,7 @@ describe('App', () => {
       defaultText: 'Mock Banner Text',
       warningText: '',
     },
+    backgroundShells: new Map(),
   };
 
   it('should render main content and composer when not quitting', () => {
@@ -219,10 +220,6 @@ describe('App', () => {
     } as UIState;
 
     const configWithExperiment = makeFakeConfig();
-    vi.spyOn(
-      configWithExperiment,
-      'isEventDrivenSchedulerEnabled',
-    ).mockReturnValue(true);
     vi.spyOn(configWithExperiment, 'isTrustedFolder').mockReturnValue(true);
     vi.spyOn(configWithExperiment, 'getIdeMode').mockReturnValue(false);
 
@@ -234,7 +231,6 @@ describe('App', () => {
     expect(lastFrame()).toContain('Tips for getting started');
     expect(lastFrame()).toContain('Notifications');
     expect(lastFrame()).toContain('Action Required'); // From ToolConfirmationQueue
-    expect(lastFrame()).toContain('1 of 1');
     expect(lastFrame()).toContain('Composer');
     expect(lastFrame()).toMatchSnapshot();
   });

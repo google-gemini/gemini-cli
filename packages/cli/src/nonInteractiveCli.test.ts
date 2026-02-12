@@ -38,6 +38,11 @@ import type { LoadedSettings } from './config/settings.js';
 // Mock core modules
 vi.mock('./ui/hooks/atCommandProcessor.js');
 
+const mockSetupInitialActivityLogger = vi.hoisted(() => vi.fn());
+vi.mock('./utils/devtoolsService.js', () => ({
+  setupInitialActivityLogger: mockSetupInitialActivityLogger,
+}));
+
 const mockCoreEvents = vi.hoisted(() => ({
   on: vi.fn(),
   off: vi.fn(),
@@ -253,10 +258,59 @@ describe('runNonInteractive', () => {
       [{ text: 'Test input' }],
       expect.any(AbortSignal),
       'prompt-id-1',
+      undefined,
+      false,
+      'Test input',
     );
     expect(getWrittenOutput()).toBe('Hello World\n');
     // Note: Telemetry shutdown is now handled in runExitCleanup() in cleanup.ts
     // so we no longer expect shutdownTelemetry to be called directly here
+  });
+
+  it('should register activity logger when GEMINI_CLI_ACTIVITY_LOG_TARGET is set', async () => {
+    vi.stubEnv('GEMINI_CLI_ACTIVITY_LOG_TARGET', '/tmp/test.jsonl');
+    const events: ServerGeminiStreamEvent[] = [
+      {
+        type: GeminiEventType.Finished,
+        value: { reason: undefined, usageMetadata: { totalTokenCount: 0 } },
+      },
+    ];
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents(events),
+    );
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: 'test',
+      prompt_id: 'prompt-id-activity-logger',
+    });
+
+    expect(mockSetupInitialActivityLogger).toHaveBeenCalledWith(mockConfig);
+    vi.unstubAllEnvs();
+  });
+
+  it('should not register activity logger when GEMINI_CLI_ACTIVITY_LOG_TARGET is not set', async () => {
+    vi.stubEnv('GEMINI_CLI_ACTIVITY_LOG_TARGET', '');
+    const events: ServerGeminiStreamEvent[] = [
+      {
+        type: GeminiEventType.Finished,
+        value: { reason: undefined, usageMetadata: { totalTokenCount: 0 } },
+      },
+    ];
+    mockGeminiClient.sendMessageStream.mockReturnValue(
+      createStreamFromEvents(events),
+    );
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: 'test',
+      prompt_id: 'prompt-id-activity-logger-off',
+    });
+
+    expect(mockSetupInitialActivityLogger).not.toHaveBeenCalled();
+    vi.unstubAllEnvs();
   });
 
   it('should handle a single tool call and respond', async () => {
@@ -323,6 +377,9 @@ describe('runNonInteractive', () => {
       [{ text: 'Tool response' }],
       expect.any(AbortSignal),
       'prompt-id-2',
+      undefined,
+      false,
+      undefined,
     );
     expect(getWrittenOutput()).toBe('Final answer\n');
   });
@@ -480,6 +537,9 @@ describe('runNonInteractive', () => {
       ],
       expect.any(AbortSignal),
       'prompt-id-3',
+      undefined,
+      false,
+      undefined,
     );
     expect(getWrittenOutput()).toBe('Sorry, let me try again.\n');
   });
@@ -619,6 +679,9 @@ describe('runNonInteractive', () => {
       processedParts,
       expect.any(AbortSignal),
       'prompt-id-7',
+      undefined,
+      false,
+      rawInput,
     );
 
     // 6. Assert the final output is correct
@@ -652,6 +715,9 @@ describe('runNonInteractive', () => {
       [{ text: 'Test input' }],
       expect.any(AbortSignal),
       'prompt-id-1',
+      undefined,
+      false,
+      'Test input',
     );
     expect(processStdoutSpy).toHaveBeenCalledWith(
       JSON.stringify(
@@ -782,6 +848,9 @@ describe('runNonInteractive', () => {
       [{ text: 'Empty response test' }],
       expect.any(AbortSignal),
       'prompt-id-empty',
+      undefined,
+      false,
+      'Empty response test',
     );
 
     // This should output JSON with empty response but include stats
@@ -916,6 +985,9 @@ describe('runNonInteractive', () => {
       [{ text: 'Prompt from command' }],
       expect.any(AbortSignal),
       'prompt-id-slash',
+      undefined,
+      false,
+      '/testcommand',
     );
 
     expect(getWrittenOutput()).toBe('Response from command\n');
@@ -959,6 +1031,9 @@ describe('runNonInteractive', () => {
       [{ text: 'Slash command output' }],
       expect.any(AbortSignal),
       'prompt-id-slash',
+      undefined,
+      false,
+      '/help',
     );
     expect(getWrittenOutput()).toBe('Response to slash command\n');
     handleSlashCommandSpy.mockRestore();
@@ -1133,6 +1208,9 @@ describe('runNonInteractive', () => {
       [{ text: '/unknowncommand' }],
       expect.any(AbortSignal),
       'prompt-id-unknown',
+      undefined,
+      false,
+      '/unknowncommand',
     );
 
     expect(getWrittenOutput()).toBe('Response to unknown\n');

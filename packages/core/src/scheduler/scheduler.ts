@@ -8,7 +8,7 @@ import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { SchedulerStateManager } from './state-manager.js';
 import { resolveConfirmation } from './confirmation.js';
-import { checkPolicy, updatePolicy } from './policy.js';
+import { checkPolicy, updatePolicy, getPolicyDenialError } from './policy.js';
 import { ToolExecutor } from './tool-executor.js';
 import { ToolModificationHandler } from './tool-modifier.js';
 import {
@@ -51,6 +51,7 @@ export interface SchedulerOptions {
   getPreferredEditor: () => EditorType | undefined;
   schedulerId: string;
   parentCallId?: string;
+  onWaitingForConfirmation?: (waiting: boolean) => void;
 }
 
 const createErrorResponse = (
@@ -90,6 +91,7 @@ export class Scheduler {
   private readonly getPreferredEditor: () => EditorType | undefined;
   private readonly schedulerId: string;
   private readonly parentCallId?: string;
+  private readonly onWaitingForConfirmation?: (waiting: boolean) => void;
 
   private isProcessing = false;
   private isCancelling = false;
@@ -101,6 +103,7 @@ export class Scheduler {
     this.getPreferredEditor = options.getPreferredEditor;
     this.schedulerId = options.schedulerId;
     this.parentCallId = options.parentCallId;
+    this.onWaitingForConfirmation = options.onWaitingForConfirmation;
     this.state = new SchedulerStateManager(
       this.messageBus,
       this.schedulerId,
@@ -404,16 +407,21 @@ export class Scheduler {
     const callId = toolCall.request.callId;
 
     // Policy & Security
-    const decision = await checkPolicy(toolCall, this.config);
+    const { decision, rule } = await checkPolicy(toolCall, this.config);
 
     if (decision === PolicyDecision.DENY) {
+      const { errorMessage, errorType } = getPolicyDenialError(
+        this.config,
+        rule,
+      );
+
       this.state.updateStatus(
         callId,
         'error',
         createErrorResponse(
           toolCall.request,
-          new Error('Tool execution denied by policy.'),
-          ToolErrorType.POLICY_VIOLATION,
+          new Error(errorMessage),
+          errorType,
         ),
       );
       this.state.finalizeCall(callId);
@@ -432,6 +440,7 @@ export class Scheduler {
         modifier: this.modifier,
         getPreferredEditor: this.getPreferredEditor,
         schedulerId: this.schedulerId,
+        onWaitingForConfirmation: this.onWaitingForConfirmation,
       });
       outcome = result.outcome;
       lastDetails = result.lastDetails;
@@ -467,6 +476,7 @@ export class Scheduler {
     if (signal.aborted) throw new Error('Operation cancelled');
     this.state.updateStatus(callId, 'executing');
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const activeCall = this.state.firstActiveCall as ExecutingToolCall;
 
     const result = await runWithToolCallContext(

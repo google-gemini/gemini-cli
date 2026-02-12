@@ -109,15 +109,6 @@ export function ThemeDialog({
     },
   );
 
-  // Generate theme items filtered by selected scope
-  const customThemes =
-    selectedScope === SettingScope.User
-      ? settings.user.settings.ui?.customThemes || {}
-      : settings.merged.ui.customThemes;
-  const builtInThemes = themeManager
-    .getAvailableThemes()
-    .filter((theme) => theme.type !== 'custom');
-  const customThemeNames = Object.keys(customThemes);
   const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
   const terminalThemeType = getThemeTypeFromBackgroundColor(
@@ -125,8 +116,9 @@ export function ThemeDialog({
   );
 
   // Generate theme items
-  const themeItems = [
-    ...builtInThemes.map((theme) => {
+  const themeItems = themeManager
+    .getAvailableThemes()
+    .map((theme) => {
       const fullTheme = themeManager.getTheme(theme.name);
       const themeBackground = fullTheme
         ? resolveColor(fullTheme.colors.Background)
@@ -140,28 +132,14 @@ export function ThemeDialog({
         terminalBackgroundColor,
         terminalThemeType,
       );
-    }),
-    ...customThemeNames.map((name) => {
-      const themeConfig = customThemes[name];
-      const bg = themeConfig.background?.primary ?? themeConfig.Background;
-      const themeBackground = bg ? resolveColor(bg) : undefined;
-
-      return generateThemeItem(
-        name,
-        'Custom',
-        'custom',
-        themeBackground,
-        terminalBackgroundColor,
-        terminalThemeType,
-      );
-    }),
-  ].sort((a, b) => {
-    // Show compatible themes first
-    if (a.isCompatible && !b.isCompatible) return -1;
-    if (!a.isCompatible && b.isCompatible) return 1;
-    // Then sort by name
-    return a.label.localeCompare(b.label);
-  });
+    })
+    .sort((a, b) => {
+      // Show compatible themes first
+      if (a.isCompatible && !b.isCompatible) return -1;
+      if (!a.isCompatible && b.isCompatible) return 1;
+      // Then sort by name
+      return a.label.localeCompare(b.label);
+    });
 
   // Find the index of the selected theme, but only if it exists in the list
   const initialThemeIndex = themeItems.findIndex(
@@ -314,9 +292,20 @@ export function ThemeDialog({
                 };
 
                 if (item.themeNameDisplay && item.themeTypeDisplay) {
+                  const match = item.themeNameDisplay.match(/^(.*) \((.*)\)$/);
+                  let themeNamePart: React.ReactNode = item.themeNameDisplay;
+                  if (match) {
+                    themeNamePart = (
+                      <>
+                        {match[1]}{' '}
+                        <Text color={theme.text.secondary}>({match[2]})</Text>
+                      </>
+                    );
+                  }
+
                   return (
                     <Text color={titleColor} wrap="truncate" key={item.key}>
-                      {item.themeNameDisplay}{' '}
+                      {themeNamePart}{' '}
                       <Text color={theme.text.secondary}>
                         {item.themeTypeDisplay}
                       </Text>

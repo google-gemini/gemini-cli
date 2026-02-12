@@ -1,21 +1,25 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Box, useIsScreenReaderEnabled } from 'ink';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { StatusDisplay } from './StatusDisplay.js';
+import { ToastDisplay, shouldShowToast } from './ToastDisplay.js';
 import { ApprovalModeIndicator } from './ApprovalModeIndicator.js';
 import { ShellModeIndicator } from './ShellModeIndicator.js';
 import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
 import { RawMarkdownIndicator } from './RawMarkdownIndicator.js';
+import { ShortcutsHint } from './ShortcutsHint.js';
+import { ShortcutsHelp } from './ShortcutsHelp.js';
 import { InputPrompt } from './InputPrompt.js';
 import { Footer } from './Footer.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
 import { QueuedMessageDisplay } from './QueuedMessageDisplay.js';
+import { HorizontalLine } from './shared/HorizontalLine.js';
 import { OverflowProvider } from '../contexts/OverflowContext.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 import { useUIState } from '../contexts/UIStateContext.js';
@@ -24,10 +28,14 @@ import { useVimMode } from '../contexts/VimModeContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
-import { ApprovalMode } from '@google/gemini-cli-core';
-import { StreamingState } from '../types.js';
+import {
+  StreamingState,
+  type HistoryItemToolGroup,
+  ToolCallStatus,
+} from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
+import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 
 export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const config = useConfig();
@@ -35,8 +43,9 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
   const uiState = useUIState();
   const uiActions = useUIActions();
-  const { vimEnabled } = useVimMode();
-  const terminalWidth = process.stdout.columns;
+  const { vimEnabled, vimMode } = useVimMode();
+  const inlineThinkingMode = getInlineThinkingMode(settings);
+  const terminalWidth = uiState.terminalWidth;
   const isNarrow = isNarrowWidth(terminalWidth);
   const debugConsoleMaxHeight = Math.floor(Math.max(terminalWidth * 0.2, 5));
   const [suggestionsVisible, setSuggestionsVisible] = useState(false);
@@ -47,6 +56,60 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const hideContextSummary =
     suggestionsVisible && suggestionsPosition === 'above';
 
+  const hasPendingToolConfirmation = useMemo(
+    () =>
+      (uiState.pendingHistoryItems ?? [])
+        .filter(
+          (item): item is HistoryItemToolGroup => item.type === 'tool_group',
+        )
+        .some((item) =>
+          item.tools.some((tool) => tool.status === ToolCallStatus.Confirming),
+        ),
+    [uiState.pendingHistoryItems],
+  );
+
+  const hasPendingActionRequired =
+    hasPendingToolConfirmation ||
+    Boolean(uiState.commandConfirmationRequest) ||
+    Boolean(uiState.authConsentRequest) ||
+    (uiState.confirmUpdateExtensionRequests?.length ?? 0) > 0 ||
+    Boolean(uiState.loopDetectionConfirmationRequest) ||
+    Boolean(uiState.quota.proQuotaRequest) ||
+    Boolean(uiState.quota.validationRequest) ||
+    Boolean(uiState.customDialog);
+  const isPassiveShortcutsHelpState =
+    uiState.isInputActive &&
+    uiState.streamingState === StreamingState.Idle &&
+    !hasPendingActionRequired;
+
+  const { setShortcutsHelpVisible } = uiActions;
+
+  useEffect(() => {
+    if (uiState.shortcutsHelpVisible && !isPassiveShortcutsHelpState) {
+      setShortcutsHelpVisible(false);
+    }
+  }, [
+    uiState.shortcutsHelpVisible,
+    isPassiveShortcutsHelpState,
+    setShortcutsHelpVisible,
+  ]);
+
+  const showShortcutsHelp =
+    uiState.shortcutsHelpVisible &&
+    uiState.streamingState === StreamingState.Idle &&
+    !hasPendingActionRequired;
+  const showShortcutsHint =
+    settings.merged.ui.showShortcutsHint &&
+    uiState.streamingState === StreamingState.Idle &&
+    !hasPendingActionRequired;
+  const hasToast = shouldShowToast(uiState);
+  const showLoadingIndicator =
+    (!uiState.embeddedShellFocused || uiState.isBackgroundShellVisible) &&
+    uiState.streamingState === StreamingState.Responding &&
+    !hasPendingActionRequired;
+  const showApprovalIndicator = !uiState.shellModeActive;
+  const showRawMarkdownIndicator = !uiState.renderMarkdown;
+
   return (
     <Box
       flexDirection="column"
@@ -54,23 +117,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
       flexGrow={0}
       flexShrink={0}
     >
-      {!uiState.embeddedShellFocused && (
-        <LoadingIndicator
-          thought={
-            uiState.streamingState === StreamingState.WaitingForConfirmation ||
-            config.getAccessibility()?.enableLoadingPhrases === false
-              ? undefined
-              : uiState.thought
-          }
-          currentLoadingPhrase={
-            config.getAccessibility()?.enableLoadingPhrases === false
-              ? undefined
-              : uiState.currentLoadingPhrase
-          }
-          elapsedTime={uiState.elapsedTime}
-        />
-      )}
-
       {(!uiState.slashCommands ||
         !uiState.isConfigInitialized ||
         uiState.isResuming) && (
@@ -83,25 +129,123 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
 
       <TodoTray />
 
-      <Box
-        marginTop={1}
-        justifyContent={
-          settings.merged.ui.hideContextSummary ? 'flex-start' : 'space-between'
-        }
-        width="100%"
-        flexDirection={isNarrow ? 'column' : 'row'}
-        alignItems={isNarrow ? 'flex-start' : 'center'}
-      >
-        <Box marginRight={1}>
-          <StatusDisplay hideContextSummary={hideContextSummary} />
-        </Box>
-        <Box paddingTop={isNarrow ? 1 : 0}>
-          {showApprovalModeIndicator !== ApprovalMode.DEFAULT &&
-            !uiState.shellModeActive && (
-              <ApprovalModeIndicator approvalMode={showApprovalModeIndicator} />
+      <Box marginTop={1} width="100%" flexDirection="column">
+        <Box
+          width="100%"
+          flexDirection={isNarrow ? 'column' : 'row'}
+          alignItems={isNarrow ? 'flex-start' : 'center'}
+          justifyContent={isNarrow ? 'flex-start' : 'space-between'}
+        >
+          <Box
+            marginLeft={1}
+            marginRight={isNarrow ? 0 : 1}
+            flexDirection="row"
+            alignItems="center"
+            flexGrow={1}
+          >
+            {showLoadingIndicator && (
+              <LoadingIndicator
+                inline
+                thought={
+                  uiState.streamingState ===
+                    StreamingState.WaitingForConfirmation ||
+                  config.getAccessibility()?.enableLoadingPhrases === false
+                    ? undefined
+                    : uiState.thought
+                }
+                currentLoadingPhrase={
+                  config.getAccessibility()?.enableLoadingPhrases === false
+                    ? undefined
+                    : uiState.currentLoadingPhrase
+                }
+                thoughtLabel={
+                  inlineThinkingMode === 'full' ? 'Thinking ...' : undefined
+                }
+                elapsedTime={uiState.elapsedTime}
+              />
             )}
-          {uiState.shellModeActive && <ShellModeIndicator />}
-          {!uiState.renderMarkdown && <RawMarkdownIndicator />}
+          </Box>
+          <Box
+            marginTop={isNarrow ? 1 : 0}
+            flexDirection="column"
+            alignItems={isNarrow ? 'flex-start' : 'flex-end'}
+          >
+            {showShortcutsHint && <ShortcutsHint />}
+          </Box>
+        </Box>
+        {showShortcutsHelp && <ShortcutsHelp />}
+        <HorizontalLine />
+        <Box
+          justifyContent={
+            settings.merged.ui.hideContextSummary
+              ? 'flex-start'
+              : 'space-between'
+          }
+          width="100%"
+          flexDirection={isNarrow ? 'column' : 'row'}
+          alignItems={isNarrow ? 'flex-start' : 'center'}
+        >
+          <Box
+            marginLeft={1}
+            marginRight={isNarrow ? 0 : 1}
+            flexDirection="row"
+            alignItems="center"
+            flexGrow={1}
+          >
+            {hasToast ? (
+              <ToastDisplay />
+            ) : (
+              !showLoadingIndicator && (
+                <Box
+                  flexDirection={isNarrow ? 'column' : 'row'}
+                  alignItems={isNarrow ? 'flex-start' : 'center'}
+                >
+                  {showApprovalIndicator && (
+                    <ApprovalModeIndicator
+                      approvalMode={showApprovalModeIndicator}
+                      isPlanEnabled={config.isPlanEnabled()}
+                    />
+                  )}
+                  {uiState.shellModeActive && (
+                    <Box
+                      marginLeft={showApprovalIndicator && !isNarrow ? 1 : 0}
+                      marginTop={showApprovalIndicator && isNarrow ? 1 : 0}
+                    >
+                      <ShellModeIndicator />
+                    </Box>
+                  )}
+                  {showRawMarkdownIndicator && (
+                    <Box
+                      marginLeft={
+                        (showApprovalIndicator || uiState.shellModeActive) &&
+                        !isNarrow
+                          ? 1
+                          : 0
+                      }
+                      marginTop={
+                        (showApprovalIndicator || uiState.shellModeActive) &&
+                        isNarrow
+                          ? 1
+                          : 0
+                      }
+                    >
+                      <RawMarkdownIndicator />
+                    </Box>
+                  )}
+                </Box>
+              )
+            )}
+          </Box>
+
+          <Box
+            marginTop={isNarrow ? 1 : 0}
+            flexDirection="column"
+            alignItems={isNarrow ? 'flex-start' : 'flex-end'}
+          >
+            {!showLoadingIndicator && (
+              <StatusDisplay hideContextSummary={hideContextSummary} />
+            )}
+          </Box>
         </Box>
       </Box>
 
@@ -143,7 +287,9 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           popAllMessages={uiActions.popAllMessages}
           placeholder={
             vimEnabled
-              ? "  Press 'i' for INSERT mode and 'Esc' for NORMAL mode."
+              ? vimMode === 'INSERT'
+                ? "  Press 'Esc' for NORMAL mode."
+                : "  Press 'i' for INSERT mode."
               : uiState.shellModeActive
                 ? '  Type your shell command'
                 : '  Type your message or @path/to/file'

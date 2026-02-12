@@ -52,7 +52,7 @@ export interface UIActions {
   setConstrainHeight: (value: boolean) => void;
   onEscapePromptChange: (show: boolean) => void;
   refreshStatic: () => void;
-  handleFinalSubmit: (value: string) => void;
+  handleFinalSubmit: (value: string) => Promise<void>;
   handleClearScreen: () => void;
   handleProQuotaChoice: (
     choice: 'retry_later' | 'retry_once' | 'retry_always' | 'upgrade',
@@ -67,7 +67,11 @@ export interface UIActions {
   handleApiKeySubmit: (apiKey: string) => Promise<void>;
   handleApiKeyCancel: () => void;
   setBannerVisible: (visible: boolean) => void;
+  setShortcutsHelpVisible: (visible: boolean) => void;
   setEmbeddedShellFocused: (value: boolean) => void;
+  dismissBackgroundShell: (pid: number) => void;
+  setActiveBackgroundShellPid: (pid: number) => void;
+  setIsBackgroundShellListOpen: (isOpen: boolean) => void;
   setAuthContext: (context: { requiresRestart?: boolean }) => void;
   handleRestart: () => void;
   handleNewAgentsSelect: (choice: NewAgentsChoice) => Promise<void>;

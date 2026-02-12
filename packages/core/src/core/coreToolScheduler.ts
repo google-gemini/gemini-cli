@@ -14,7 +14,7 @@ import {
 } from '../tools/tools.js';
 import type { EditorType } from '../utils/editor.js';
 import type { Config } from '../config/config.js';
-import { PolicyDecision, ApprovalMode } from '../policy/types.js';
+import { PolicyDecision } from '../policy/types.js';
 import { logToolCall } from '../telemetry/loggers.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { ToolCallEvent } from '../telemetry/types.js';
@@ -44,6 +44,7 @@ import {
 } from '../scheduler/types.js';
 import { ToolExecutor } from '../scheduler/tool-executor.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
+import { getPolicyDenialError } from '../scheduler/policy.js';
 
 export type {
   ToolCall,
@@ -63,9 +64,6 @@ export type {
   ToolCallRequestInfo,
   ToolCallResponseInfo,
 };
-
-export const PLAN_MODE_DENIAL_MESSAGE =
-  'You are in Plan Mode - adjust your prompt to only use read and search tools.';
 
 const createErrorResponse = (
   request: ToolCallRequestInfo,
@@ -226,6 +224,7 @@ export class CoreToolScheduler {
             tool: toolInstance,
             invocation,
             status: 'success',
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             response: auxiliaryData as ToolCallResponseInfo,
             durationMs,
             outcome,
@@ -239,6 +238,7 @@ export class CoreToolScheduler {
             request: currentCall.request,
             status: 'error',
             tool: toolInstance,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             response: auxiliaryData as ToolCallResponseInfo,
             durationMs,
             outcome,
@@ -249,6 +249,7 @@ export class CoreToolScheduler {
             request: currentCall.request,
             tool: toolInstance,
             status: 'awaiting_approval',
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             confirmationDetails: auxiliaryData as ToolCallConfirmationDetails,
             startTime: existingStartTime,
             outcome,
@@ -349,6 +350,7 @@ export class CoreToolScheduler {
 
       const invocationOrError = this.buildInvocation(
         call.tool,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         args as Record<string, unknown>,
       );
       if (invocationOrError instanceof Error) {
@@ -358,6 +360,7 @@ export class CoreToolScheduler {
           ToolErrorType.INVALID_TOOL_PARAMS,
         );
         return {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           request: { ...call.request, args: args as Record<string, unknown> },
           status: 'error',
           tool: call.tool,
@@ -367,6 +370,7 @@ export class CoreToolScheduler {
 
       return {
         ...call,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         request: { ...call.request, args: args as Record<string, unknown> },
         invocation: invocationOrError,
       };
@@ -599,18 +603,15 @@ export class CoreToolScheduler {
             ? toolCall.tool.serverName
             : undefined;
 
-        const { decision } = await this.config
+        const { decision, rule } = await this.config
           .getPolicyEngine()
           .check(toolCallForPolicy, serverName);
 
         if (decision === PolicyDecision.DENY) {
-          let errorMessage = `Tool execution denied by policy.`;
-          let errorType = ToolErrorType.POLICY_VIOLATION;
-
-          if (this.config.getApprovalMode() === ApprovalMode.PLAN) {
-            errorMessage = PLAN_MODE_DENIAL_MESSAGE;
-            errorType = ToolErrorType.STOP_EXECUTION;
-          }
+          const { errorMessage, errorType } = getPolicyDenialError(
+            this.config,
+            rule,
+          );
           this.setStatusInternal(
             reqInfo.callId,
             'error',
@@ -754,6 +755,7 @@ export class CoreToolScheduler {
       this.cancelAll(signal);
       return; // `cancelAll` calls `checkAndNotifyCompletion`, so we can exit here.
     } else if (outcome === ToolConfirmationOutcome.ModifyWithEditor) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const waitingToolCall = toolCall as WaitingToolCall;
 
       const editorType = this.getPreferredEditor();
@@ -761,6 +763,7 @@ export class CoreToolScheduler {
         return;
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       this.setStatusInternal(callId, 'awaiting_approval', signal, {
         ...waitingToolCall.confirmationDetails,
         isModifying: true,
@@ -775,12 +778,14 @@ export class CoreToolScheduler {
       // Restore status (isModifying: false) and update diff if result exists
       if (result) {
         this.setArgsInternal(callId, result.updatedParams);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         this.setStatusInternal(callId, 'awaiting_approval', signal, {
           ...waitingToolCall.confirmationDetails,
           fileDiff: result.updatedDiff,
           isModifying: false,
         } as ToolCallConfirmationDetails);
       } else {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         this.setStatusInternal(callId, 'awaiting_approval', signal, {
           ...waitingToolCall.confirmationDetails,
           isModifying: false,
@@ -789,15 +794,18 @@ export class CoreToolScheduler {
     } else {
       // If the client provided new content, apply it and wait for
       // re-confirmation.
-      if (payload?.newContent && toolCall) {
+      if (payload && 'newContent' in payload && toolCall) {
         const result = await this.toolModifier.applyInlineModify(
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           toolCall as WaitingToolCall,
           payload,
           signal,
         );
         if (result) {
           this.setArgsInternal(callId, result.updatedParams);
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           this.setStatusInternal(callId, 'awaiting_approval', signal, {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             ...(toolCall as WaitingToolCall).confirmationDetails,
             fileDiff: result.updatedDiff,
           } as ToolCallConfirmationDetails);

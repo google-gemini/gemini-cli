@@ -20,6 +20,7 @@
       { "label": "Project context (GEMINI.md)", "slug": "docs/cli/gemini-md" },
       { "label": "Shell commands", "slug": "docs/tools/shell" },
       { "label": "Session management", "slug": "docs/cli/session-management" },
+      { "label": "Plan mode (experimental)", "slug": "docs/cli/plan-mode" },
       { "label": "Todos", "slug": "docs/tools/todos" },
       { "label": "Web search and fetch", "slug": "docs/tools/web-search" }
     ]
@@ -80,6 +81,10 @@
     "items": [
       { "label": "Agent skills", "slug": "docs/cli/skills" },
       {
+        "label": "Creating Agent skills",
+        "slug": "docs/cli/creating-skills"
+      },
+      {
         "label": "Sub-agents (experimental)",
         "slug": "docs/core/subagents"
       },
@@ -119,7 +124,6 @@
     "items": [
       { "label": "FAQ", "slug": "docs/faq" },
       { "label": "Quota and pricing", "slug": "docs/quota-and-pricing" },
-      { "label": "Release notes", "slug": "docs/changelogs/" },
       { "label": "Terms and privacy", "slug": "docs/tos-privacy" },
       { "label": "Troubleshooting", "slug": "docs/troubleshooting" },
       { "label": "Uninstall", "slug": "docs/cli/uninstall" }
@@ -136,6 +140,14 @@
       },
       { "label": "Local development", "slug": "docs/local-development" },
       { "label": "NPM package structure", "slug": "docs/npm" }
+    ]
+  },
+  {
+    "label": "Releases",
+    "items": [
+      { "label": "Release notes", "slug": "docs/changelogs/" },
+      { "label": "Stable release", "slug": "docs/changelogs/latest" },
+      { "label": "Preview release", "slug": "docs/changelogs/preview" }
     ]
   }
 ]

@@ -16,6 +16,22 @@ import { OverflowProvider } from '../contexts/OverflowContext.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
 import { StickyHeader } from './StickyHeader.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+import type { SerializableConfirmationDetails } from '@google/gemini-cli-core';
+
+function getConfirmationHeader(
+  details: SerializableConfirmationDetails | undefined,
+): string {
+  const headers: Partial<
+    Record<SerializableConfirmationDetails['type'], string>
+  > = {
+    ask_user: 'Answer Questions',
+    exit_plan_mode: 'Ready to start implementation?',
+  };
+  if (!details?.type) {
+    return 'Action Required';
+  }
+  return headers[details.type] ?? 'Action Required';
+}
 
 interface ToolConfirmationQueueProps {
   confirmingTool: ConfirmingToolState;
@@ -26,17 +42,23 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
 }) => {
   const config = useConfig();
   const isAlternateBuffer = useAlternateBuffer();
-  const { mainAreaWidth, terminalHeight, constrainHeight } = useUIState();
+  const {
+    mainAreaWidth,
+    terminalHeight,
+    constrainHeight,
+    availableTerminalHeight: uiAvailableHeight,
+  } = useUIState();
   const { tool, index, total } = confirmingTool;
 
   // Safety check: ToolConfirmationMessage requires confirmationDetails
   if (!tool.confirmationDetails) return null;
 
-  // V1: Constrain the queue to at most 50% of the terminal height to ensure
-  // some history is always visible and to prevent flickering.
-  // We pass this to ToolConfirmationMessage so it can calculate internal
-  // truncation while keeping buttons visible.
-  const maxHeight = Math.floor(terminalHeight * 0.5);
+  // Render up to 100% of the available terminal height (minus 1 line for safety)
+  // to maximize space for diffs and other content.
+  const maxHeight =
+    uiAvailableHeight !== undefined
+      ? Math.max(uiAvailableHeight - 1, 4)
+      : Math.floor(terminalHeight * 0.5);
 
   // ToolConfirmationMessage needs to know the height available for its OWN content.
   // We subtract the lines used by the Queue wrapper:
@@ -49,6 +71,9 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
       : undefined;
 
   const borderColor = theme.status.warning;
+  const hideToolIdentity =
+    tool.confirmationDetails?.type === 'ask_user' ||
+    tool.confirmationDetails?.type === 'exit_plan_mode';
 
   return (
     <OverflowProvider>
@@ -61,25 +86,31 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
         >
           <Box flexDirection="column" width={mainAreaWidth - 4}>
             {/* Header */}
-            <Box marginBottom={1} justifyContent="space-between">
+            <Box
+              marginBottom={hideToolIdentity ? 0 : 1}
+              justifyContent="space-between"
+            >
               <Text color={theme.status.warning} bold>
-                Action Required
+                {getConfirmationHeader(tool.confirmationDetails)}
               </Text>
-              <Text color={theme.text.secondary}>
-                {index} of {total}
-              </Text>
+              {total > 1 && (
+                <Text color={theme.text.secondary}>
+                  {index} of {total}
+                </Text>
+              )}
             </Box>
 
-            {/* Tool Identity (Context) */}
-            <Box>
-              <ToolStatusIndicator status={tool.status} name={tool.name} />
-              <ToolInfo
-                name={tool.name}
-                status={tool.status}
-                description={tool.description}
-                emphasis="high"
-              />
-            </Box>
+            {!hideToolIdentity && (
+              <Box>
+                <ToolStatusIndicator status={tool.status} name={tool.name} />
+                <ToolInfo
+                  name={tool.name}
+                  status={tool.status}
+                  description={tool.description}
+                  emphasis="high"
+                />
+              </Box>
+            )}
           </Box>
         </StickyHeader>
 
@@ -109,7 +140,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
           />
         </Box>
         <Box
-          height={0}
+          height={1}
           width={mainAreaWidth}
           borderLeft={true}
           borderRight={true}
@@ -119,9 +150,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
           borderStyle="round"
         />
       </Box>
-      <Box paddingX={2} marginBottom={1}>
-        <ShowMoreLines constrainHeight={constrainHeight} />
-      </Box>
+      <ShowMoreLines constrainHeight={constrainHeight} />
     </OverflowProvider>
   );
 };

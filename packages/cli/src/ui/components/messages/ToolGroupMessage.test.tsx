@@ -4,18 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  renderWithProviders,
-  createMockSettings,
-} from '../../../test-utils/render.js';
-import { describe, it, expect, vi } from 'vitest';
+import { renderWithProviders } from '../../../test-utils/render.js';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { ToolGroupMessage } from './ToolGroupMessage.js';
 import type { IndividualToolCallDisplay } from '../../types.js';
 import { ToolCallStatus } from '../../types.js';
 import { Scrollable } from '../shared/Scrollable.js';
-import type { Config } from '@google/gemini-cli-core';
+import { ASK_USER_DISPLAY_NAME, makeFakeConfig } from '@google/gemini-cli-core';
+import os from 'node:os';
 
 describe('<ToolGroupMessage />', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   const createToolCall = (
     overrides: Partial<IndividualToolCallDisplay> = {},
   ): IndividualToolCallDisplay => ({
@@ -32,19 +34,16 @@ describe('<ToolGroupMessage />', () => {
   const baseProps = {
     groupId: 1,
     terminalWidth: 80,
-    isFocused: true,
   };
 
-  const baseMockConfig = {
-    getModel: () => 'gemini-pro',
-    getTargetDir: () => '/test',
-    getDebugMode: () => false,
-    isTrustedFolder: () => true,
-    getIdeMode: () => false,
-    getEnableInteractiveShell: () => true,
-    getPreviewFeatures: () => false,
-    isEventDrivenSchedulerEnabled: () => true,
-  } as unknown as Config;
+  const baseMockConfig = makeFakeConfig({
+    model: 'gemini-pro',
+    targetDir: os.tmpdir(),
+    debugMode: false,
+    folderTrust: false,
+    ideMode: false,
+    enableInteractiveShell: true,
+  });
 
   describe('Golden Snapshots', () => {
     it('renders single successful tool call', () => {
@@ -62,7 +61,31 @@ describe('<ToolGroupMessage />', () => {
       unmount();
     });
 
-    it('renders multiple tool calls with different statuses', () => {
+    it('hides confirming tools (standard behavior)', () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'confirm-tool',
+          status: ToolCallStatus.Confirming,
+          confirmationDetails: {
+            type: 'info',
+            title: 'Confirm tool',
+            prompt: 'Do you want to proceed?',
+            onConfirm: vi.fn(),
+          },
+        }),
+      ];
+
+      const { lastFrame, unmount } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+        { config: baseMockConfig },
+      );
+
+      // Should render nothing because all tools in the group are confirming
+      expect(lastFrame()).toBe('');
+      unmount();
+    });
+
+    it('renders multiple tool calls with different statuses (only visible ones)', () => {
       const toolCalls = [
         createToolCall({
           callId: 'tool-1',
@@ -83,66 +106,7 @@ describe('<ToolGroupMessage />', () => {
           status: ToolCallStatus.Error,
         }),
       ];
-      const mockConfig = {
-        ...baseMockConfig,
-        isEventDrivenSchedulerEnabled: () => false,
-      } as unknown as Config;
 
-      const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
-        {
-          config: mockConfig,
-          uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
-          },
-        },
-      );
-      expect(lastFrame()).toMatchSnapshot();
-      unmount();
-    });
-
-    it('renders tool call awaiting confirmation', () => {
-      const toolCalls = [
-        createToolCall({
-          callId: 'tool-confirm',
-          name: 'confirmation-tool',
-          description: 'This tool needs confirmation',
-          status: ToolCallStatus.Confirming,
-          confirmationDetails: {
-            type: 'info',
-            title: 'Confirm Tool Execution',
-            prompt: 'Are you sure you want to proceed?',
-            onConfirm: vi.fn(),
-          },
-        }),
-      ];
-      const mockConfig = {
-        ...baseMockConfig,
-        isEventDrivenSchedulerEnabled: () => false,
-      } as unknown as Config;
-
-      const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
-        {
-          config: mockConfig,
-          uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
-          },
-        },
-      );
-      expect(lastFrame()).toMatchSnapshot();
-      unmount();
-    });
-
-    it('renders shell command with yellow border', () => {
-      const toolCalls = [
-        createToolCall({
-          callId: 'shell-1',
-          name: 'run_shell_command',
-          description: 'Execute shell command',
-          status: ToolCallStatus.Success,
-        }),
-      ];
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
         {
@@ -152,7 +116,12 @@ describe('<ToolGroupMessage />', () => {
           },
         },
       );
-      expect(lastFrame()).toMatchSnapshot();
+      // pending-tool should be hidden
+      const output = lastFrame();
+      expect(output).toContain('successful-tool');
+      expect(output).not.toContain('pending-tool');
+      expect(output).toContain('error-tool');
+      expect(output).toMatchSnapshot();
       unmount();
     });
 
@@ -177,21 +146,22 @@ describe('<ToolGroupMessage />', () => {
           status: ToolCallStatus.Pending,
         }),
       ];
-      const mockConfig = {
-        ...baseMockConfig,
-        isEventDrivenSchedulerEnabled: () => false,
-      } as unknown as Config;
 
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
         {
-          config: mockConfig,
+          config: baseMockConfig,
           uiState: {
             pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
           },
         },
       );
-      expect(lastFrame()).toMatchSnapshot();
+      // write_file (Pending) should be hidden
+      const output = lastFrame();
+      expect(output).toContain('read_file');
+      expect(output).toContain('run_shell_command');
+      expect(output).not.toContain('write_file');
+      expect(output).toMatchSnapshot();
       unmount();
     });
 
@@ -216,25 +186,6 @@ describe('<ToolGroupMessage />', () => {
           {...baseProps}
           toolCalls={toolCalls}
           availableTerminalHeight={10}
-        />,
-        {
-          config: baseMockConfig,
-          uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
-          },
-        },
-      );
-      expect(lastFrame()).toMatchSnapshot();
-      unmount();
-    });
-
-    it('renders when not focused', () => {
-      const toolCalls = [createToolCall()];
-      const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage
-          {...baseProps}
-          toolCalls={toolCalls}
-          isFocused={false}
         />,
         {
           config: baseMockConfig,
@@ -379,27 +330,6 @@ describe('<ToolGroupMessage />', () => {
   });
 
   describe('Border Color Logic', () => {
-    it('uses yellow border when tools are pending', () => {
-      const toolCalls = [createToolCall({ status: ToolCallStatus.Pending })];
-      const mockConfig = {
-        ...baseMockConfig,
-        isEventDrivenSchedulerEnabled: () => false,
-      } as unknown as Config;
-
-      const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
-        {
-          config: mockConfig,
-          uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
-          },
-        },
-      );
-      // The snapshot will capture the visual appearance including border color
-      expect(lastFrame()).toMatchSnapshot();
-      unmount();
-    });
-
     it('uses yellow border for shell commands even when successful', () => {
       const toolCalls = [
         createToolCall({
@@ -477,184 +407,95 @@ describe('<ToolGroupMessage />', () => {
     });
   });
 
-  describe('Confirmation Handling', () => {
-    it('shows confirmation dialog for first confirming tool only', () => {
+  describe('Ask User Filtering', () => {
+    it.each([
+      ToolCallStatus.Pending,
+      ToolCallStatus.Executing,
+      ToolCallStatus.Confirming,
+    ])('filters out ask_user when status is %s', (status) => {
       const toolCalls = [
         createToolCall({
-          callId: 'tool-1',
-          name: 'first-confirm',
-          status: ToolCallStatus.Confirming,
-          confirmationDetails: {
-            type: 'info',
-            title: 'Confirm First Tool',
-            prompt: 'Confirm first tool',
-            onConfirm: vi.fn(),
-          },
-        }),
-        createToolCall({
-          callId: 'tool-2',
-          name: 'second-confirm',
-          status: ToolCallStatus.Confirming,
-          confirmationDetails: {
-            type: 'info',
-            title: 'Confirm Second Tool',
-            prompt: 'Confirm second tool',
-            onConfirm: vi.fn(),
-          },
+          callId: `ask-user-${status}`,
+          name: ASK_USER_DISPLAY_NAME,
+          status,
         }),
       ];
-      const mockConfig = {
-        ...baseMockConfig,
-        isEventDrivenSchedulerEnabled: () => false,
-      } as unknown as Config;
 
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
-        {
-          config: mockConfig,
-          uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
-          },
-        },
+        { config: baseMockConfig },
       );
-      // Should only show confirmation for the first tool
+
       expect(lastFrame()).toMatchSnapshot();
       unmount();
     });
 
-    it('renders confirmation with permanent approval enabled', () => {
+    it.each([ToolCallStatus.Success, ToolCallStatus.Error])(
+      'does NOT filter out ask_user when status is %s',
+      (status) => {
+        const toolCalls = [
+          createToolCall({
+            callId: `ask-user-${status}`,
+            name: ASK_USER_DISPLAY_NAME,
+            status,
+          }),
+        ];
+
+        const { lastFrame, unmount } = renderWithProviders(
+          <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+          { config: baseMockConfig },
+        );
+
+        expect(lastFrame()).toMatchSnapshot();
+        unmount();
+      },
+    );
+
+    it('shows other tools when ask_user is filtered out', () => {
       const toolCalls = [
         createToolCall({
-          callId: 'tool-1',
-          name: 'confirm-tool',
-          status: ToolCallStatus.Confirming,
-          confirmationDetails: {
-            type: 'info',
-            title: 'Confirm Tool',
-            prompt: 'Do you want to proceed?',
-            onConfirm: vi.fn(),
-          },
-        }),
-      ];
-      const settings = createMockSettings({
-        security: { enablePermanentToolApproval: true },
-      });
-      const mockConfig = {
-        ...baseMockConfig,
-        isEventDrivenSchedulerEnabled: () => false,
-      } as unknown as Config;
-
-      const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
-        {
-          settings,
-          config: mockConfig,
-          uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
-          },
-        },
-      );
-      expect(lastFrame()).toContain('Allow for all future sessions');
-      expect(lastFrame()).toMatchSnapshot();
-      unmount();
-    });
-
-    it('renders confirmation with permanent approval disabled', () => {
-      const toolCalls = [
-        createToolCall({
-          callId: 'confirm-tool',
-          name: 'confirm-tool',
-          status: ToolCallStatus.Confirming,
-          confirmationDetails: {
-            type: 'info',
-            title: 'Confirm tool',
-            prompt: 'Do you want to proceed?',
-            onConfirm: vi.fn(),
-          },
-        }),
-      ];
-
-      const mockConfig = {
-        ...baseMockConfig,
-        isEventDrivenSchedulerEnabled: () => false,
-      } as unknown as Config;
-
-      const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
-        { config: mockConfig },
-      );
-      expect(lastFrame()).not.toContain('Allow for all future sessions');
-      expect(lastFrame()).toMatchSnapshot();
-      unmount();
-    });
-  });
-
-  describe('Event-Driven Scheduler', () => {
-    it('hides confirming tools when event-driven scheduler is enabled', () => {
-      const toolCalls = [
-        createToolCall({
-          callId: 'confirm-tool',
-          status: ToolCallStatus.Confirming,
-          confirmationDetails: {
-            type: 'info',
-            title: 'Confirm tool',
-            prompt: 'Do you want to proceed?',
-            onConfirm: vi.fn(),
-          },
-        }),
-      ];
-
-      const mockConfig = {
-        ...baseMockConfig,
-        isEventDrivenSchedulerEnabled: () => true,
-      } as unknown as Config;
-
-      const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
-        { config: mockConfig },
-      );
-
-      // Should render nothing because all tools in the group are confirming
-      expect(lastFrame()).toBe('');
-      expect(lastFrame()).toMatchSnapshot();
-      unmount();
-    });
-
-    it('shows only successful tools when mixed with confirming tools', () => {
-      const toolCalls = [
-        createToolCall({
-          callId: 'success-tool',
-          name: 'success-tool',
+          callId: 'other-tool',
+          name: 'other-tool',
           status: ToolCallStatus.Success,
         }),
         createToolCall({
-          callId: 'confirm-tool',
-          name: 'confirm-tool',
-          status: ToolCallStatus.Confirming,
-          confirmationDetails: {
-            type: 'info',
-            title: 'Confirm tool',
-            prompt: 'Do you want to proceed?',
-            onConfirm: vi.fn(),
-          },
+          callId: 'ask-user-pending',
+          name: ASK_USER_DISPLAY_NAME,
+          status: ToolCallStatus.Pending,
         }),
       ];
 
-      const mockConfig = {
-        ...baseMockConfig,
-        isEventDrivenSchedulerEnabled: () => true,
-      } as unknown as Config;
-
       const { lastFrame, unmount } = renderWithProviders(
         <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
-        { config: mockConfig },
+        { config: baseMockConfig },
       );
 
-      const output = lastFrame();
-      expect(output).toContain('success-tool');
-      expect(output).not.toContain('confirm-tool');
-      expect(output).not.toContain('Do you want to proceed?');
-      expect(output).toMatchSnapshot();
+      expect(lastFrame()).toMatchSnapshot();
+      unmount();
+    });
+
+    it('renders nothing when only tool is in-progress AskUser with borderBottom=false', () => {
+      // AskUser tools in progress are rendered by AskUserDialog, not ToolGroupMessage.
+      // When AskUser is the only tool and borderBottom=false (no border to close),
+      // the component should render nothing.
+      const toolCalls = [
+        createToolCall({
+          callId: 'ask-user-tool',
+          name: ASK_USER_DISPLAY_NAME,
+          status: ToolCallStatus.Executing,
+        }),
+      ];
+
+      const { lastFrame, unmount } = renderWithProviders(
+        <ToolGroupMessage
+          {...baseProps}
+          toolCalls={toolCalls}
+          borderBottom={false}
+        />,
+        { config: baseMockConfig },
+      );
+      // AskUser tools in progress are rendered by AskUserDialog, so we expect nothing.
+      expect(lastFrame()).toBe('');
       unmount();
     });
   });
