@@ -8,6 +8,7 @@ import { renderWithProviders } from '../../../test-utils/render.js';
 import { ToolResultDisplay } from './ToolResultDisplay.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { AnsiOutput } from '@google/gemini-cli-core';
+import type { VisualizationResult as VisualizationDisplay } from './VisualizationDisplay.js';
 
 // Mock UIStateContext partially
 const mockUseUIState = vi.fn();
@@ -188,6 +189,77 @@ describe('ToolResultDisplay', () => {
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();
+  });
+
+  it('renders visualization result', () => {
+    const visualization: VisualizationDisplay = {
+      type: 'visualization',
+      kind: 'bar',
+      title: 'Fastest BMW 0-60',
+      unit: 's',
+      data: {
+        series: [
+          {
+            name: 'BMW',
+            points: [
+              { label: 'M5 CS', value: 2.9 },
+              { label: 'M8 Competition', value: 3.0 },
+            ],
+          },
+        ],
+      },
+      meta: {
+        truncated: false,
+        originalItemCount: 2,
+      },
+    };
+    const { lastFrame } = render(
+      <ToolResultDisplay
+        resultDisplay={visualization}
+        terminalWidth={80}
+        availableTerminalHeight={20}
+      />,
+    );
+    const output = lastFrame();
+
+    expect(output).toContain('Fastest BMW 0-60');
+    expect(output).toContain('M5 CS');
+    expect(output).toContain('2.90s');
+  });
+
+  it('renders diagram visualization result', () => {
+    const visualization: VisualizationDisplay = {
+      type: 'visualization',
+      kind: 'diagram',
+      title: 'Service Graph',
+      data: {
+        diagramKind: 'architecture',
+        nodes: [
+          { id: 'ui', label: 'Web UI', type: 'frontend' },
+          { id: 'api', label: 'API', type: 'service' },
+        ],
+        edges: [{ from: 'ui', to: 'api', label: 'HTTPS' }],
+      },
+      meta: {
+        truncated: false,
+        originalItemCount: 2,
+      },
+    };
+
+    const { lastFrame } = render(
+      <ToolResultDisplay
+        resultDisplay={visualization}
+        terminalWidth={80}
+        availableTerminalHeight={20}
+      />,
+    );
+    const output = lastFrame();
+
+    expect(output).toContain('Service Graph');
+    expect(output).toContain('Web UI');
+    expect(output).toContain('API');
+    expect(output).toContain('Notes:');
+    expect(output).toContain('Web UI -> API: HTTPS');
   });
 
   it('does not fall back to plain text if availableHeight is set and not in alternate buffer', () => {

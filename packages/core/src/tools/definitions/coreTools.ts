@@ -14,6 +14,7 @@ export const LS_TOOL_NAME = 'list_directory';
 export const READ_FILE_TOOL_NAME = 'read_file';
 export const SHELL_TOOL_NAME = 'run_shell_command';
 export const WRITE_FILE_TOOL_NAME = 'write_file';
+export const RENDER_VISUALIZATION_TOOL_NAME = 'render_visualization';
 
 // ============================================================================
 // READ_FILE TOOL

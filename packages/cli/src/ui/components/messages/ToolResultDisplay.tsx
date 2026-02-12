@@ -19,6 +19,10 @@ import { Scrollable } from '../shared/Scrollable.js';
 import { ScrollableList } from '../shared/ScrollableList.js';
 import { SCROLL_TO_ITEM_END } from '../shared/VirtualizedList.js';
 import { ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
+import {
+  VisualizationResultDisplay,
+  type VisualizationResult,
+} from './VisualizationDisplay.js';
 
 const STATIC_HEIGHT = 1;
 const RESERVED_LINE_COUNT = 6; // for tool name, status, padding, and 'ShowMoreLines' hint
@@ -179,6 +183,19 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
       <Text wrap="wrap" color={theme.text.primary}>
         {truncatedResultDisplay}
       </Text>
+    );
+  } else if (
+    typeof truncatedResultDisplay === 'object' &&
+    'type' in truncatedResultDisplay &&
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    (truncatedResultDisplay as VisualizationResult).type === 'visualization'
+  ) {
+    content = (
+      <VisualizationResultDisplay
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        visualization={truncatedResultDisplay as VisualizationResult}
+        width={childWidth}
+      />
     );
   } else if (
     typeof truncatedResultDisplay === 'object' &&

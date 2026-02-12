@@ -15,6 +15,7 @@ import {
   GREP_TOOL_NAME,
   MEMORY_TOOL_NAME,
   READ_FILE_TOOL_NAME,
+  RENDER_VISUALIZATION_TOOL_NAME,
   SHELL_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
   WRITE_TODOS_TOOL_NAME,
@@ -61,6 +62,7 @@ export interface OperationalGuidelinesOptions {
   isGemini3: boolean;
   enableShellEfficiency: boolean;
   interactiveShellEnabled: boolean;
+  enableVisualizationTool?: boolean;
 }
 
 export type SandboxMode = 'macos-seatbelt' | 'generic' | 'outside';
@@ -270,7 +272,7 @@ ${shellEfficiencyGuidelines(options.enableShellEfficiency)}
 - **Command Execution:** Use the '${SHELL_TOOL_NAME}' tool for running shell commands, remembering the safety rule to explain modifying commands first.${toolUsageInteractive(
     options.interactive,
     options.interactiveShellEnabled,
-  )}${toolUsageRememberingFacts(options)}
+  )}${toolUsageVisualization(options.enableVisualizationTool)}${toolUsageRememberingFacts(options)}
 - **Respect User Confirmations:** Most tool calls (also denoted as 'function calls') will first require confirmation from the user, where they will either approve or cancel the function call. If a user cancels a function call, respect their choice and do _not_ try to make the function call again. It is okay to request the tool call again _only_ if the user requests that same tool call on a subsequent prompt. When a user cancels a function call, assume best intentions from the user and consider inquiring if they prefer any alternative paths forward.
 
 ## Interaction Details
@@ -619,6 +621,18 @@ function toolUsageRememberingFacts(
     ? ' If unsure whether to save something, you can ask the user, "Should I remember that for you?"'
     : '';
   return base + suffix;
+}
+
+function toolUsageVisualization(enabled?: boolean): string {
+  if (!enabled) {
+    return '';
+  }
+
+  return `
+- **Visualization Tool:** Use '${RENDER_VISUALIZATION_TOOL_NAME}' for compact visual output with these kinds only: \`bar\`, \`line\`, \`pie\`, \`table\`, \`diagram\`.
+- **Canonical data shapes:** bar/line -> \`data.series=[{name,points:[{label,value}]}]\`; pie -> \`data.slices=[{label,value}]\`; table -> \`data.columns + data.rows\`; diagram -> \`data.nodes + data.edges\` with optional \`direction: "LR"|"TB"\`.
+- **Shorthand accepted:** bar/line and pie also accept key/value maps; table accepts \`headers\` alias; diagram accepts \`links\`/\`connections\` and edge keys \`source/target\`.
+- **Selection rule:** For engineering dashboards (tests/build/risk/trace/coverage/cost), consolidate into a single rich \`table\`; for UML-like architecture and flow, use \`diagram\`.`;
 }
 
 function gitRepoKeepUserInformed(interactive: boolean): string {

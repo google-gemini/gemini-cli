@@ -28,6 +28,7 @@ import {
   ENTER_PLAN_MODE_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
+  RENDER_VISUALIZATION_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { resolveModel, isPreviewModel } from '../config/models.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
@@ -185,6 +186,9 @@ export class PromptProvider {
             isGemini3,
             enableShellEfficiency: config.getEnableShellOutputEfficiency(),
             interactiveShellEnabled: config.isInteractiveShellEnabled(),
+            enableVisualizationTool: enabledToolNames.has(
+              RENDER_VISUALIZATION_TOOL_NAME,
+            ),
           }),
         ),
         sandbox: this.withSection('sandbox', () => getSandboxMode()),

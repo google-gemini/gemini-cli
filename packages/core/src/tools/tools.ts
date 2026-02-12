@@ -664,7 +664,86 @@ export interface TodoList {
   todos: Todo[];
 }
 
-export type ToolResultDisplay = string | FileDiff | AnsiOutput | TodoList;
+export const VISUALIZATION_KINDS = [
+  'bar',
+  'line',
+  'pie',
+  'table',
+  'diagram',
+] as const;
+
+export type VisualizationKind = (typeof VISUALIZATION_KINDS)[number];
+export const DIAGRAM_KINDS = ['architecture', 'flowchart'] as const;
+export type DiagramKind = (typeof DIAGRAM_KINDS)[number];
+
+export interface DiagramNode {
+  id: string;
+  label: string;
+  type?: string;
+}
+
+export interface DiagramEdge {
+  from: string;
+  to: string;
+  label?: string;
+}
+
+export interface VisualizationPoint {
+  label: string;
+  value: number;
+}
+
+export interface VisualizationSeries {
+  name: string;
+  points: VisualizationPoint[];
+}
+
+export interface VisualizationPieSlice {
+  label: string;
+  value: number;
+}
+
+export interface VisualizationTableData {
+  columns: string[];
+  rows: Array<Array<string | number | boolean>>;
+  metricColumns?: number[];
+}
+
+export interface VisualizationDiagramData {
+  diagramKind: DiagramKind;
+  direction?: 'LR' | 'TB';
+  nodes: DiagramNode[];
+  edges: DiagramEdge[];
+}
+
+export type VisualizationData =
+  | { series: VisualizationSeries[] }
+  | { slices: VisualizationPieSlice[] }
+  | VisualizationTableData
+  | VisualizationDiagramData;
+
+export interface VisualizationDisplay {
+  type: 'visualization';
+  kind: VisualizationKind;
+  title?: string;
+  subtitle?: string;
+  xLabel?: string;
+  yLabel?: string;
+  unit?: string;
+  data: VisualizationData;
+  meta?: {
+    truncated: boolean;
+    originalItemCount: number;
+    validationWarnings?: string[];
+  };
+}
+
+export type ToolResultDisplay =
+  | string
+  | FileDiff
+  | AnsiOutput
+  | TodoList
+  | VisualizationDisplay;
 
 export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 
