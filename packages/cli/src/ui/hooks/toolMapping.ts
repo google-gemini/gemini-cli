@@ -61,10 +61,13 @@ export function mapToDisplay(
 
     const displayName = call.tool?.displayName ?? call.request.name;
 
-    if (call.status === 'error') {
+    if (call.status === 'error' || !call.invocation) {
       description = JSON.stringify(call.request.args);
     } else {
       description = call.invocation.getDescription();
+    }
+
+    if (call.tool) {
       renderOutputAsMarkdown = call.tool.isOutputMarkdown;
     }
 

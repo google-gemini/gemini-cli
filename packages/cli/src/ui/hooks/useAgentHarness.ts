@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   GeminiEventType as ServerGeminiEventType,
-  debugLogger,
-  AgentFactory,
+  ROOT_SCHEDULER_ID,
 } from '@google/gemini-cli-core';
+import { AgentFactory } from '@google/gemini-cli-core/dist/src/agents/agent-factory.js';
 import type {
   Config,
   ServerGeminiStreamEvent as GeminiEvent,
@@ -20,12 +20,14 @@ import {
   StreamingState,
   MessageType,
   type HistoryItemWithoutId,
+  type LoopDetectionConfirmationRequest,
 } from '../types.js';
 import { useStateAndRef } from './useStateAndRef.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { mapToDisplay as mapTrackedToolCallsToDisplay } from './toolMapping.js';
-import { ROOT_SCHEDULER_ID } from '@google/gemini-cli-core';
 import type { TrackedToolCall } from './useToolScheduler.js';
+import { type BackgroundShell } from './shellReducer.js';
+import type { RetryAttemptPayload } from '@google/gemini-cli-core';
 
 export interface UseAgentHarnessReturn {
   streamingState: StreamingState;
@@ -41,15 +43,15 @@ export interface UseAgentHarnessReturn {
   pendingHistoryItems: HistoryItemWithoutId[];
   handleApprovalModeChange: (mode: string) => void;
   activePtyId: number | null;
-  loopDetectionConfirmationRequest: unknown | null;
+  loopDetectionConfirmationRequest: LoopDetectionConfirmationRequest | null;
   lastOutputTime: number;
   backgroundShellCount: number;
   isBackgroundShellVisible: boolean;
   toggleBackgroundShell: () => void;
-  backgroundCurrentShell: unknown | null;
-  backgroundShells: Map<number, unknown>;
+  backgroundCurrentShell: (() => void) | null;
+  backgroundShells: Map<number, BackgroundShell>;
   dismissBackgroundShell: (pid: number) => void;
-  retryStatus: unknown | null;
+  retryStatus: RetryAttemptPayload | null;
 }
 
 /**
@@ -65,30 +67,79 @@ export const useAgentHarness = (
     StreamingState.Idle,
   );
   const [streamingContent, setStreamingContent] = useState('');
-  const [thought, thoughtRef, setThought] = useStateAndRef<ThoughtSummary | null>(null);
+  const streamingContentRef = useRef('');
+
+  const [thought, thoughtRef, setThought] =
+    useStateAndRef<ThoughtSummary | null>(null);
+
+  // Track subagent status and output
+  const [subagentStatus, setSubagentStatus] = useState<string | null>(null);
+  const [subagentOutput, setSubagentOutput] = useState<string | null>(null);
 
   // Tools for the CURRENT turn of the main agent
   const [toolCalls, setToolCalls] = useState<TrackedToolCall[]>([]);
   const toolCallsRef = useRef<TrackedToolCall[]>([]);
-  
-  // Sync ref with state
+
+  // Sync ref with state (still useful for some parts)
   useEffect(() => {
     toolCallsRef.current = toolCalls;
   }, [toolCalls]);
 
   const pushedToolCallIdsRef = useRef<Set<string>>(new Set());
 
-  // Track subagent activities for hierarchical display
-  // For now, we just log them. In future, we can add a specialized "SubagentBlock" history item.
-  
+  const pendingHistoryItems = useMemo(() => {
+    const items: HistoryItemWithoutId[] = [];
+    if (thought) {
+      items.push({
+        type: MessageType.THINKING,
+        thought,
+      } as any as HistoryItemWithoutId);
+    }
+    if (toolCalls.length > 0) {
+      const unpushed = toolCalls.filter(
+        (tc) => !pushedToolCallIdsRef.current.has(tc.request.callId),
+      );
+      if (unpushed.length > 0) {
+        items.push(
+          mapTrackedToolCallsToDisplay(unpushed as TrackedToolCall[], {
+            borderBottom: true,
+          }),
+        );
+      }
+    }
+            if (streamingContent) {
+              items.push({ type: MessageType.GEMINI, text: streamingContent });
+            }
+        
+            if (subagentStatus) {
+              items.push({
+                type: 'tool_group',
+                tools: [
+                  {
+                    displayName: subagentStatus.split(' is ')[0] || 'Subagent',
+                    status: 'validating',
+                    description: subagentStatus,
+                    resultDisplay: subagentOutput || undefined,
+                  },
+                ],
+                borderBottom: true,
+              } as any as HistoryItemWithoutId);
+            }
+        
+            return items;
+          }, [thought, toolCalls, streamingContent, subagentStatus, subagentOutput]);
+        
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const reset = useCallback(() => {
     setStreamingState(StreamingState.Idle);
     setStreamingContent('');
+    streamingContentRef.current = '';
     setThought(null);
     setToolCalls([]);
+    toolCallsRef.current = [];
     pushedToolCallIdsRef.current.clear();
+    setSubagentStatus(null);
   }, [setThought]);
 
   const cancelOngoingRequest = useCallback(() => {
@@ -104,7 +155,11 @@ export const useAgentHarness = (
       switch (event.type) {
         case ServerGeminiEventType.Content:
           setStreamingState(StreamingState.Responding);
-          setStreamingContent((prev) => prev + (event.value || ''));
+          setStreamingContent((prev) => {
+            const next = prev + (event.value || '');
+            streamingContentRef.current = next;
+            return next;
+          });
           break;
 
         case ServerGeminiEventType.Thought:
@@ -112,40 +167,57 @@ export const useAgentHarness = (
           break;
 
         case ServerGeminiEventType.ToolCallRequest:
-          setToolCalls((prev) => [
-            ...prev,
-            {
+          {
+            const tool = config.getToolRegistry().getTool(event.value.name);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const invocation = (tool as any)?.createInvocation?.(
+              event.value.args,
+              config.getMessageBus(),
+            );
+
+            const newCall = {
               request: event.value,
               status: 'validating',
               schedulerId: event.value.schedulerId || ROOT_SCHEDULER_ID,
-            } as TrackedToolCall,
-          ]);
+              tool,
+              invocation,
+            } as TrackedToolCall;
+
+            setToolCalls((prev) => {
+              const next = [...prev, newCall];
+              toolCallsRef.current = next;
+              return next;
+            });
+          }
           break;
 
         case ServerGeminiEventType.ToolCallResponse:
           {
             const response = event.value;
-            setToolCalls((prev) =>
-              prev.map((tc) =>
+            setToolCalls((prev) => {
+              const next = prev.map((tc) =>
                 tc.request.callId === response.callId
                   ? ({
                       ...tc,
                       status: 'success',
                       result: response,
-                    } as TrackedToolCall)
+                    } as unknown as TrackedToolCall)
                   : tc,
-              ),
-            );
+              );
+              toolCallsRef.current = next;
+              return next;
+            });
           }
           break;
 
         case ServerGeminiEventType.TurnFinished:
           // MAIN AGENT turn finished. Flush current state to history.
+          setSubagentStatus(null);
           if (thoughtRef.current) {
             addItem({
               type: MessageType.THINKING,
               thought: thoughtRef.current,
-            } as HistoryItemWithoutId);
+            } as any as HistoryItemWithoutId);
             setThought(null);
           }
 
@@ -165,16 +237,32 @@ export const useAgentHarness = (
             }
           }
 
-          if (streamingContent) {
-            addItem({ type: 'gemini', text: streamingContent });
+          if (streamingContentRef.current) {
+            addItem({ type: MessageType.GEMINI, text: streamingContentRef.current });
             setStreamingContent('');
+            streamingContentRef.current = '';
           }
 
           setToolCalls([]);
+          toolCallsRef.current = [];
           break;
 
         case ServerGeminiEventType.SubagentActivity:
-          debugLogger.debug(`[HarnessHook] Subagent activity: ${event.value.type} for ${event.value.agentName}`);
+          {
+            const activity = event.value;
+            const name =
+              activity.agentName.charAt(0).toUpperCase() +
+              activity.agentName.slice(1);
+
+            if (activity.type === 'TOOL_CALL_START') {
+              setSubagentStatus(`${name} is calling ${activity.data['name']}...`);
+              setSubagentOutput((prev) => (prev || '') + `🛠️ Calling ${activity.data['name']}...\n`);
+            } else if (activity.type === 'THOUGHT') {
+              setSubagentStatus(`${name} is thinking...`);
+            } else if (activity.type === 'TOOL_CALL_END') {
+              // Just a status update, the tool result will come via TOOL_CALL_RESPONSE eventually
+            }
+          }
           break;
 
         case ServerGeminiEventType.Finished:
@@ -185,7 +273,7 @@ export const useAgentHarness = (
           break;
       }
     },
-    [addItem, setThought, thoughtRef, streamingContent],
+    [addItem, config, setThought, thoughtRef],
   );
 
   const submitQuery = useCallback(
@@ -231,7 +319,7 @@ export const useAgentHarness = (
     cancelOngoingRequest,
     reset,
     initError: null,
-    pendingHistoryItems: [],
+    pendingHistoryItems,
     handleApprovalModeChange: () => {},
     activePtyId: null,
     loopDetectionConfirmationRequest: null,
@@ -240,7 +328,7 @@ export const useAgentHarness = (
     isBackgroundShellVisible: false,
     toggleBackgroundShell: () => {},
     backgroundCurrentShell: null,
-    backgroundShells: new Map(),
+    backgroundShells: new Map<number, BackgroundShell>(),
     dismissBackgroundShell: () => {},
     retryStatus: null,
   };
