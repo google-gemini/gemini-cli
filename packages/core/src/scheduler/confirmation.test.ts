@@ -31,7 +31,7 @@ import type { ToolModificationHandler } from './tool-modifier.js';
 import type { ValidatingToolCall, WaitingToolCall } from './types.js';
 import { ROOT_SCHEDULER_ID } from './types.js';
 import type { Config } from '../config/config.js';
-import { type EditorType } from '../utils/editor.js';
+import { type EditorType, resolveEditorAsync } from '../utils/editor.js';
 import { randomUUID } from 'node:crypto';
 
 // Mock Dependencies
@@ -43,7 +43,7 @@ vi.mock('../utils/editor.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../utils/editor.js')>();
   return {
     ...actual,
-    resolveEditorAsync: () => Promise.resolve('vim'),
+    resolveEditorAsync: vi.fn().mockResolvedValue('vim'),
   };
 });
 
@@ -97,6 +97,7 @@ describe('confirmation.ts', () => {
 
     beforeEach(() => {
       signal = new AbortController().signal;
+      vi.mocked(resolveEditorAsync).mockResolvedValue('vim');
 
       mockState = {
         getToolCall: vi.fn(),
@@ -296,8 +297,6 @@ describe('confirmation.ts', () => {
       // Wait for the loop to process the modification and re-subscribe
       await listenerPromise2;
 
-      expect(mockState.updateArgs).toHaveBeenCalled();
-
       // Second response: User approves the modified params
       emitResponse({
         type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
@@ -309,6 +308,7 @@ describe('confirmation.ts', () => {
       const result = await promise;
       expect(result.outcome).toBe(ToolConfirmationOutcome.ProceedOnce);
       expect(mockModifier.handleModifyWithEditor).toHaveBeenCalled();
+      expect(mockState.updateArgs).toHaveBeenCalled();
     });
 
     it('should handle inline modification (payload)', async () => {
