@@ -87,9 +87,10 @@ export function extractAllParts(result: A2AResponse): Part[] {
 export function extractTextFromParts(parts: Part[]): string {
   return parts
     .filter((p) => p.kind === 'text')
-    .map((p) => 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-       (p as unknown as { text: string }).text
+    .map(
+      (p) =>
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        (p as unknown as { text: string }).text,
     )
     .filter(Boolean)
     .join('\n');
@@ -151,7 +152,10 @@ export class A2ABridgeClient {
     );
 
     const factory = new ClientFactory(options);
-    this.client = await factory.createFromUrl(this.agentUrl, '');
+    // createFromUrl expects the agent card URL, not just the base URL
+    const agentCardUrl =
+      this.agentUrl.replace(/\/$/, '') + '/.well-known/agent-card.json';
+    this.client = await factory.createFromUrl(agentCardUrl, '');
 
     const card = await this.client.getAgentCard();
     logger.info(
