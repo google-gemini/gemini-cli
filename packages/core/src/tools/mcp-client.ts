@@ -733,9 +733,16 @@ function createTransportRequestInit(
   mcpServerConfig: MCPServerConfig,
   headers: Record<string, string>,
 ): RequestInit {
+  const expandedHeaders: Record<string, string> = {};
+  if (mcpServerConfig.headers) {
+    for (const [key, value] of Object.entries(mcpServerConfig.headers)) {
+      expandedHeaders[key] = expandEnvVars(value, process.env);
+    }
+  }
+
   return {
     headers: {
-      ...mcpServerConfig.headers,
+      ...expandedHeaders,
       ...headers,
     },
   };

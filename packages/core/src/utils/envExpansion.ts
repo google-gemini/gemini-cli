@@ -4,9 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { expand } from 'dotenv-expand';
+
 /**
  * Expands environment variables in a string using the provided environment record.
- * Supports POSIX/Bash syntax ($VAR, ${VAR}) and Windows syntax (%VAR%).
+ * Uses the standard `dotenv-expand` library to handle expansion consistently with
+ * other tools.
+ *
+ * Supports POSIX/Bash syntax ($VAR, ${VAR}).
+ * Note: Windows syntax (%VAR%) is not natively supported by dotenv-expand.
  *
  * @param str - The string containing environment variable placeholders.
  * @param env - A record of environment variable names and their values.
@@ -17,8 +23,27 @@ export function expandEnvVars(
   env: Record<string, string | undefined>,
 ): string {
   if (!str) return str;
-  return str.replace(
-    /\$(?:(\w+)|{(\w+)})|%(\w+)%/g,
-    (_, g1, g2, g3) => env[g1 || g2 || g3] ?? '',
-  );
+
+  // 1. Pre-process Windows-style variables (%VAR%) since dotenv-expand only handles POSIX ($VAR).
+  const processedStr = str.replace(/%(\w+)%/g, (_, name) => env[name] ?? '');
+
+  // 2. Use dotenv-expand for POSIX/Bash syntax ($VAR, ${VAR}).
+  // dotenv-expand is designed to process an object of key-value pairs (like a .env file).
+  // To expand a single string, we wrap it in an object with a temporary key.
+  const dummyKey = '__GCLI_EXPAND_TARGET__';
+
+  // Filter out undefined values to satisfy the Record<string, string> requirement safely
+  const processEnv: Record<string, string> = {};
+  for (const [key, value] of Object.entries(env)) {
+    if (value !== undefined) {
+      processEnv[key] = value;
+    }
+  }
+
+  const result = expand({
+    parsed: { [dummyKey]: processedStr },
+    processEnv,
+  });
+
+  return result.parsed?.[dummyKey] ?? '';
 }
