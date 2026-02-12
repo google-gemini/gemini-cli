@@ -1204,6 +1204,12 @@
           "markdownDescription": "Sandbox execution environment. Set to a boolean to enable or disable the sandbox, or provide a string path to a sandbox profile.\n\n- Category: `Tools`\n- Requires restart: `yes`",
           "$ref": "#/$defs/BooleanOrString"
         },
+        "sandboxImage": {
+          "title": "Sandbox Image",
+          "description": "Custom Docker/Podman image for the sandbox.",
+          "markdownDescription": "Custom Docker/Podman image for the sandbox.\n\n- Category: `Tools`\n- Requires restart: `yes`",
+          "type": "string"
+        },
         "shell": {
           "title": "Shell",
           "description": "Settings for shell execution.",

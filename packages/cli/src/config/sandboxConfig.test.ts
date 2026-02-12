@@ -192,11 +192,42 @@ describe('loadSandboxConfig', () => {
       expect(config).toEqual({ command: 'docker', image: 'env/image' });
     });
 
-    it('should use image from package.json if env var is not set', async () => {
+    it('should use image from package.json if env var and settings are not set', async () => {
       process.env['GEMINI_SANDBOX'] = 'docker';
       mockedCommandExistsSync.mockReturnValue(true);
       const config = await loadSandboxConfig({}, {});
       expect(config).toEqual({ command: 'docker', image: 'default/image' });
+    });
+
+    it('should use image from settings if GEMINI_SANDBOX_IMAGE is not set', async () => {
+      process.env['GEMINI_SANDBOX'] = 'docker';
+      mockedCommandExistsSync.mockReturnValue(true);
+      const config = await loadSandboxConfig(
+        { tools: { sandboxImage: 'settings/image' } },
+        {},
+      );
+      expect(config).toEqual({ command: 'docker', image: 'settings/image' });
+    });
+
+    it('should prefer GEMINI_SANDBOX_IMAGE over settings', async () => {
+      process.env['GEMINI_SANDBOX'] = 'docker';
+      process.env['GEMINI_SANDBOX_IMAGE'] = 'env/image';
+      mockedCommandExistsSync.mockReturnValue(true);
+      const config = await loadSandboxConfig(
+        { tools: { sandboxImage: 'settings/image' } },
+        {},
+      );
+      expect(config).toEqual({ command: 'docker', image: 'env/image' });
+    });
+
+    it('should use image from settings over package.json', async () => {
+      process.env['GEMINI_SANDBOX'] = 'docker';
+      mockedCommandExistsSync.mockReturnValue(true);
+      const config = await loadSandboxConfig(
+        { tools: { sandboxImage: 'settings/image' } },
+        {},
+      );
+      expect(config).toEqual({ command: 'docker', image: 'settings/image' });
     });
 
     it('should return undefined if command is found but no image is configured', async () => {

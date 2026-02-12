@@ -709,6 +709,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
+- **`tools.sandboxImage`** (string):
+  - **Description:** Custom Docker/Podman image for the sandbox.
+  - **Default:** `undefined`
+  - **Requires restart:** Yes
+
 - **`tools.shell.enableInteractiveShell`** (boolean):
   - **Description:** Use node-pty for an interactive shell experience. Fallback
     to child_process still applies.
@@ -1620,7 +1625,9 @@ Sandboxing is disabled by default, but you can enable it in a few ways:
 - Setting `GEMINI_SANDBOX` environment variable.
 - Sandbox is enabled when using `--yolo` or `--approval-mode=yolo` by default.
 
-By default, it uses a pre-built `gemini-cli-sandbox` Docker image.
+By default, it uses a pre-built `gemini-cli-sandbox` Docker image. You can
+override the sandbox image by setting the `GEMINI_SANDBOX_IMAGE` environment
+variable or by setting `tools.sandboxImage` in your `settings.json`.
 
 For project-specific sandboxing needs, you can create a custom Dockerfile at
 `.gemini/sandbox.Dockerfile` in your project's root directory. This Dockerfile

@@ -1127,6 +1127,15 @@ const SETTINGS_SCHEMA = {
         `,
         showInDialog: false,
       },
+      sandboxImage: {
+        type: 'string',
+        label: 'Sandbox Image',
+        category: 'Tools',
+        requiresRestart: true,
+        default: undefined as string | undefined,
+        description: 'Custom Docker/Podman image for the sandbox.',
+        showInDialog: false,
+      },
       shell: {
         type: 'object',
         label: 'Shell',
