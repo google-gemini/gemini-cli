@@ -5,6 +5,7 @@
  */
 
 import type {
+  AnyDeclarativeTool,
   AnyToolInvocation,
   CompletedToolCall,
   ContentGeneratorConfig,
@@ -1184,6 +1185,53 @@ describe('loggers', () => {
         { function_name: 'test-function' },
       );
     });
+
+    it('should merge data from response into metadata', () => {
+      const call: CompletedToolCall = {
+        status: 'success',
+        request: {
+          name: 'ask_user',
+          args: { questions: [] },
+          callId: 'test-call-id',
+          isClientInitiated: true,
+          prompt_id: 'prompt-id-1',
+        },
+        response: {
+          callId: 'test-call-id',
+          responseParts: [{ text: 'test-response' }],
+          resultDisplay: 'User answered: ...',
+          error: undefined,
+          errorType: undefined,
+          data: {
+            ask_user: {
+              question_types: ['choice'],
+              dismissed: false,
+            },
+          },
+        },
+        tool: undefined as unknown as AnyDeclarativeTool,
+        invocation: {} as AnyToolInvocation,
+        durationMs: 100,
+        outcome: ToolConfirmationOutcome.ProceedOnce,
+      };
+      const event = new ToolCallEvent(call);
+
+      logToolCall(mockConfig, event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Tool call: ask_user. Decision: accept. Success: true. Duration: 100ms.',
+        attributes: expect.objectContaining({
+          function_name: 'ask_user',
+          metadata: expect.objectContaining({
+            ask_user: {
+              question_types: ['choice'],
+              dismissed: false,
+            },
+          }),
+        }),
+      });
+    });
+
     it('should log a tool call with a reject decision', () => {
       const call: ErroredToolCall = {
         status: 'error',

@@ -192,15 +192,34 @@ export class AskUserInvocation extends BaseToolInvocation<
   }
 
   async execute(_signal: AbortSignal): Promise<ToolResult> {
+    const questionTypes = this.params.questions.map(
+      (q) => q.type ?? QuestionType.CHOICE,
+    );
+
     if (this.confirmationOutcome === ToolConfirmationOutcome.Cancel) {
       return {
         llmContent: 'User dismissed ask_user dialog without answering.',
         returnDisplay: 'User dismissed dialog',
+        data: {
+          ask_user: {
+            question_types: questionTypes,
+            dismissed: true,
+          },
+        },
       };
     }
 
     const answerEntries = Object.entries(this.userAnswers);
     const hasAnswers = answerEntries.length > 0;
+
+    const metrics: Record<string, unknown> = {
+      ask_user: {
+        question_types: questionTypes,
+        dismissed: false,
+        empty_submission: !hasAnswers,
+        answer_count: answerEntries.length,
+      },
+    };
 
     const returnDisplay = hasAnswers
       ? `**User answered:**\n${answerEntries
@@ -219,6 +238,7 @@ export class AskUserInvocation extends BaseToolInvocation<
     return {
       llmContent: JSON.stringify({ answers: this.userAnswers }),
       returnDisplay,
+      data: metrics,
     };
   }
 }
