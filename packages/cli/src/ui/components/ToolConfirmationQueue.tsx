@@ -140,7 +140,6 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
           />
         </Box>
         <Box
-          height={0}
           width={mainAreaWidth}
           borderLeft={true}
           borderRight={true}

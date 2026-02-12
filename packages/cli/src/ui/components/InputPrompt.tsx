@@ -1326,7 +1326,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           width={terminalWidth}
           flexDirection="row"
           alignItems="flex-start"
-          height={0}
+          height={1}
         />
       ) : null}
       <HalfLinePaddedBox
@@ -1550,7 +1550,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           width={terminalWidth}
           flexDirection="row"
           alignItems="flex-start"
-          height={0}
+          height={1}
         />
       ) : null}
       {suggestionsPosition === 'below' && suggestionsNode}
