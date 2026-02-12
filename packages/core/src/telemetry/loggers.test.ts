@@ -5,6 +5,7 @@
  */
 
 import type {
+  AnyDeclarativeTool,
   AnyToolInvocation,
   CompletedToolCall,
   ContentGeneratorConfig,
@@ -187,7 +188,7 @@ describe('loggers', () => {
   });
 
   describe('logCliConfiguration', () => {
-    it('should log the cli configuration', () => {
+    it('should log the cli configuration', async () => {
       const mockConfig = {
         getSessionId: () => 'test-session-id',
         getModel: () => 'test-model',
@@ -226,11 +227,14 @@ describe('loggers', () => {
           }),
         }),
         isInteractive: () => false,
+        getExperiments: () => undefined,
+        getExperimentsAsync: async () => undefined,
       } as unknown as Config;
 
       const startSessionEvent = new StartSessionEvent(mockConfig);
       logCliConfiguration(mockConfig, startSessionEvent);
 
+      await new Promise(process.nextTick);
       expect(mockLogger.emit).toHaveBeenCalledWith({
         body: 'CLI configuration loaded.',
         attributes: {
@@ -271,6 +275,8 @@ describe('loggers', () => {
       getTelemetryLogPromptsEnabled: () => true,
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as unknown as Config;
 
     it('should log a user prompt', () => {
@@ -308,6 +314,8 @@ describe('loggers', () => {
         getTargetDir: () => 'target-dir',
         getUsageStatisticsEnabled: () => true,
         isInteractive: () => false,
+        getExperiments: () => undefined,
+        getExperimentsAsync: async () => undefined,
       } as unknown as Config;
       const event = new UserPromptEvent(
         11,
@@ -343,6 +351,8 @@ describe('loggers', () => {
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as Config;
 
     const mockMetrics = {
@@ -519,6 +529,8 @@ describe('loggers', () => {
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as Config;
 
     const mockMetrics = {
@@ -651,6 +663,8 @@ describe('loggers', () => {
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
       getContentGeneratorConfig: () => ({
         authType: AuthType.LOGIN_WITH_GOOGLE,
       }),
@@ -727,6 +741,8 @@ describe('loggers', () => {
         getTelemetryEnabled: () => true,
         getTelemetryLogPromptsEnabled: () => true, // Enabled
         isInteractive: () => false,
+        getExperiments: () => undefined,
+        getExperimentsAsync: async () => undefined,
         getContentGeneratorConfig: () => ({
           authType: AuthType.USE_GEMINI,
         }),
@@ -814,6 +830,8 @@ describe('loggers', () => {
         getTelemetryEnabled: () => true,
         getTelemetryLogPromptsEnabled: () => false, // Disabled
         isInteractive: () => false,
+        getExperiments: () => undefined,
+        getExperimentsAsync: async () => undefined,
         getContentGeneratorConfig: () => ({
           authType: AuthType.USE_VERTEX_AI,
         }),
@@ -867,6 +885,8 @@ describe('loggers', () => {
         getTelemetryEnabled: () => true,
         getTelemetryLogPromptsEnabled: () => true,
         isInteractive: () => false,
+        getExperiments: () => undefined,
+        getExperimentsAsync: async () => undefined,
         getUsageStatisticsEnabled: () => true,
         getContentGeneratorConfig: () => ({
           authType: AuthType.USE_GEMINI,
@@ -903,6 +923,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as unknown as Config;
 
     it('should log flash fallback event', () => {
@@ -930,6 +952,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1024,6 +1048,8 @@ describe('loggers', () => {
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as Config;
 
     const mockMetrics = {
@@ -1159,6 +1185,53 @@ describe('loggers', () => {
         { function_name: 'test-function' },
       );
     });
+
+    it('should merge data from response into metadata', () => {
+      const call: CompletedToolCall = {
+        status: 'success',
+        request: {
+          name: 'ask_user',
+          args: { questions: [] },
+          callId: 'test-call-id',
+          isClientInitiated: true,
+          prompt_id: 'prompt-id-1',
+        },
+        response: {
+          callId: 'test-call-id',
+          responseParts: [{ text: 'test-response' }],
+          resultDisplay: 'User answered: ...',
+          error: undefined,
+          errorType: undefined,
+          data: {
+            ask_user: {
+              question_types: ['choice'],
+              dismissed: false,
+            },
+          },
+        },
+        tool: undefined as unknown as AnyDeclarativeTool,
+        invocation: {} as AnyToolInvocation,
+        durationMs: 100,
+        outcome: ToolConfirmationOutcome.ProceedOnce,
+      };
+      const event = new ToolCallEvent(call);
+
+      logToolCall(mockConfig, event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Tool call: ask_user. Decision: accept. Success: true. Duration: 100ms.',
+        attributes: expect.objectContaining({
+          function_name: 'ask_user',
+          metadata: expect.objectContaining({
+            ask_user: {
+              question_types: ['choice'],
+              dismissed: false,
+            },
+          }),
+        }),
+      });
+    });
+
     it('should log a tool call with a reject decision', () => {
       const call: ErroredToolCall = {
         status: 'error',
@@ -1595,6 +1668,8 @@ describe('loggers', () => {
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as Config;
 
     const mockMetrics = {
@@ -1655,6 +1730,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as unknown as Config;
 
     it('should log a tool output truncated event', () => {
@@ -1692,6 +1769,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1792,6 +1871,8 @@ describe('loggers', () => {
       getUsageStatisticsEnabled: () => true,
       getContentGeneratorConfig: () => null,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1842,6 +1923,8 @@ describe('loggers', () => {
       getUsageStatisticsEnabled: () => true,
       getContentGeneratorConfig: () => null,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1894,6 +1977,8 @@ describe('loggers', () => {
       getUsageStatisticsEnabled: () => true,
       getContentGeneratorConfig: () => null,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1938,6 +2023,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -1983,6 +2070,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -2028,6 +2117,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -2064,6 +2155,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -2115,6 +2208,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
     } as unknown as Config;
 
     beforeEach(() => {
@@ -2150,6 +2245,8 @@ describe('loggers', () => {
       getSessionId: () => 'test-session-id',
       getUsageStatisticsEnabled: () => true,
       isInteractive: () => false,
+      getExperiments: () => undefined,
+      getExperimentsAsync: async () => undefined,
       getTelemetryLogPromptsEnabled: () => false,
     } as unknown as Config;
 
@@ -2205,7 +2302,7 @@ describe('loggers', () => {
   });
 
   describe('Telemetry Buffering', () => {
-    it('should buffer events when SDK is not initialized', () => {
+    it('should buffer events when SDK is not initialized', async () => {
       vi.spyOn(sdk, 'isTelemetrySdkInitialized').mockReturnValue(false);
       const bufferSpy = vi
         .spyOn(sdk, 'bufferTelemetryEvent')

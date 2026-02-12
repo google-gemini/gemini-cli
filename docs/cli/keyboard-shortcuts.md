@@ -114,13 +114,13 @@ available combinations.
 | Dismiss background shell list.                                                                        | `Esc`                      |
 | Move focus from background shell to Gemini.                                                           | `Shift + Tab`              |
 | Move focus from background shell list to Gemini.                                                      | `Tab (no Shift)`           |
-| Show warning when trying to unfocus background shell via Tab.                                         | `Tab (no Shift)`           |
-| Show warning when trying to unfocus shell input via Tab.                                              | `Tab (no Shift)`           |
+| Show warning when trying to move focus away from background shell.                                    | `Tab (no Shift)`           |
+| Show warning when trying to move focus away from shell input.                                         | `Tab (no Shift)`           |
 | Move focus from Gemini to the active shell.                                                           | `Tab (no Shift)`           |
 | Move focus from the shell back to Gemini.                                                             | `Shift + Tab`              |
 | Clear the terminal screen and redraw the UI.                                                          | `Ctrl + L`                 |
 | Restart the application.                                                                              | `R`                        |
-| Suspend the application (not yet implemented).                                                        | `Ctrl + Z`                 |
+| Suspend the CLI and move it to the background.                                                        | `Ctrl + Z`                 |
 
 <!-- KEYBINDINGS-AUTOGEN:END -->
 
@@ -130,8 +130,15 @@ available combinations.
   terminal isn't configured to send Meta with Option.
 - `!` on an empty prompt: Enter or exit shell mode.
 - `?` on an empty prompt: Toggle the shortcuts panel above the input. Press
-  `Esc`, `Backspace`, or any printable key to close it. Press `?` again to close
-  the panel and insert a `?` into the prompt.
+  `Esc`, `Backspace`, any printable key, or a registered app hotkey to close it.
+  The panel also auto-hides while the agent is running/streaming or when
+  action-required dialogs are shown. Press `?` again to close the panel and
+  insert a `?` into the prompt.
+- `Tab` + `Tab` (while typing in the prompt): Toggle between minimal and full UI
+  details when no completion/search interaction is active. The selected mode is
+  remembered for future sessions. Full UI remains the default on first run, and
+  single `Tab` keeps its existing completion/focus behavior.
+- `Shift + Tab` (while typing in the prompt): Cycle approval modes.
 - `\` (at end of a line) + `Enter`: Insert a newline without leaving single-line
   mode.
 - `Esc` pressed twice quickly: Clear the input prompt if it is not empty,

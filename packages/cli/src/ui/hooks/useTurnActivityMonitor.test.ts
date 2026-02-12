@@ -9,7 +9,7 @@ import { renderHook } from '../../test-utils/render.js';
 import { useTurnActivityMonitor } from './useTurnActivityMonitor.js';
 import { StreamingState } from '../types.js';
 import { hasRedirection } from '@google/gemini-cli-core';
-import { type TrackedToolCall } from './useReactToolScheduler.js';
+import { type TrackedToolCall } from './useToolScheduler.js';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();

@@ -192,22 +192,45 @@ export class AskUserInvocation extends BaseToolInvocation<
   }
 
   async execute(_signal: AbortSignal): Promise<ToolResult> {
+    const questionTypes = this.params.questions.map(
+      (q) => q.type ?? QuestionType.CHOICE,
+    );
+
     if (this.confirmationOutcome === ToolConfirmationOutcome.Cancel) {
       return {
         llmContent: 'User dismissed ask_user dialog without answering.',
         returnDisplay: 'User dismissed dialog',
+        data: {
+          ask_user: {
+            question_types: questionTypes,
+            dismissed: true,
+          },
+        },
       };
     }
 
     const answerEntries = Object.entries(this.userAnswers);
     const hasAnswers = answerEntries.length > 0;
 
+    const metrics: Record<string, unknown> = {
+      ask_user: {
+        question_types: questionTypes,
+        dismissed: false,
+        empty_submission: !hasAnswers,
+        answer_count: answerEntries.length,
+      },
+    };
+
     const returnDisplay = hasAnswers
       ? `**User answered:**\n${answerEntries
           .map(([index, answer]) => {
             const question = this.params.questions[parseInt(index, 10)];
             const category = question?.header ?? `Q${index}`;
-            return `  ${category} → ${answer}`;
+            const prefix = `  ${category} → `;
+            const indent = ' '.repeat(prefix.length);
+
+            const lines = answer.split('\n');
+            return prefix + lines.join('\n' + indent);
           })
           .join('\n')}`
       : 'User submitted without answering questions.';
@@ -215,6 +238,7 @@ export class AskUserInvocation extends BaseToolInvocation<
     return {
       llmContent: JSON.stringify({ answers: this.userAnswers }),
       returnDisplay,
+      data: metrics,
     };
   }
 }

@@ -152,6 +152,26 @@ describe('Core System Prompt (prompts.ts)', () => {
     expect(prompt).toMatchSnapshot();
   });
 
+  it('should include available_skills with updated verbiage for preview models', () => {
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
+    const skills = [
+      {
+        name: 'test-skill',
+        description: 'A test skill description',
+        location: '/path/to/test-skill/SKILL.md',
+        body: 'Skill content',
+      },
+    ];
+    vi.mocked(mockConfig.getSkillManager().getSkills).mockReturnValue(skills);
+    const prompt = getCoreSystemPrompt(mockConfig);
+
+    expect(prompt).toContain('# Available Agent Skills');
+    expect(prompt).toContain(
+      "To activate a skill and receive its detailed instructions, call the `activate_skill` tool with the skill's name.",
+    );
+    expect(prompt).toMatchSnapshot();
+  });
+
   it('should NOT include skill guidance or available_skills when NO skills are provided', () => {
     vi.mocked(mockConfig.getSkillManager().getSkills).mockReturnValue([]);
     const prompt = getCoreSystemPrompt(mockConfig);
@@ -592,7 +612,7 @@ describe('Core System Prompt (prompts.ts)', () => {
     const prompt = getCoreSystemPrompt(mockConfig);
 
     expect(prompt).toContain(
-      'For complex tasks, consider using the `enter_plan_mode` tool to enter a dedicated planning phase before starting implementation.',
+      'If the request is ambiguous, broad in scope, or involves creating a new feature/application, you MUST use the `enter_plan_mode` tool to design your approach before making changes. Do NOT use Plan Mode for straightforward bug fixes, answering questions, or simple inquiries.',
     );
     expect(prompt).toMatchSnapshot();
   });
