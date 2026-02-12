@@ -15,6 +15,8 @@ export const READ_FILE_TOOL_NAME = 'read_file';
 export const SHELL_TOOL_NAME = 'run_shell_command';
 export const WRITE_FILE_TOOL_NAME = 'write_file';
 export const WEB_FETCH_TOOL_NAME = 'web_fetch';
+export const READ_MANY_FILES_TOOL_NAME = 'read_many_files';
+export const MEMORY_TOOL_NAME = 'save_memory';
 
 // ============================================================================
 // READ_FILE TOOL
@@ -146,6 +148,110 @@ export const WEB_FETCH_DEFINITION: ToolDefinition = {
         },
       },
       required: ['prompt'],
+    },
+  },
+};
+
+// ============================================================================
+// READ_MANY_FILES TOOL
+// ============================================================================
+
+export const READ_MANY_FILES_DEFINITION: ToolDefinition = {
+  base: {
+    name: READ_MANY_FILES_TOOL_NAME,
+    description: `Reads content from multiple files specified by glob patterns within a configured target directory. For text files, it concatenates their content into a single string. It is primarily designed for text-based files. However, it can also process image (e.g., .png, .jpg), audio (e.g., .mp3, .wav), and PDF (.pdf) files if their file names or extensions are explicitly included in the 'include' argument. For these explicitly requested non-text files, their data is read and included in a format suitable for model consumption (e.g., base64 encoded).
+
+This tool is useful when you need to understand or analyze a collection of files, such as:
+- Getting an overview of a codebase or parts of it (e.g., all TypeScript files in the 'src' directory).
+- Finding where specific functionality is implemented if the user asks broad questions about code.
+- Reviewing documentation files (e.g., all Markdown files in the 'docs' directory).
+- Gathering context from multiple configuration files.
+- When the user asks to "read all files in X directory" or "show me the content of all Y files".
+
+Use this tool when the user's query implies needing the content of several files simultaneously for context, analysis, or summarization. For text files, it uses default UTF-8 encoding and a '--- {filePath} ---' separator between file contents. The tool inserts a '--- End of content ---' after the last file. Ensure glob patterns are relative to the target directory. Glob patterns like 'src/**/*.js' are supported. Avoid using for single files if a more specific single-file reading tool is available, unless the user specifically requests to process a list containing just one file via this tool. Other binary files (not explicitly requested as image/audio/PDF) are generally skipped. Default excludes apply to common non-text files (except for explicitly requested images/audio/PDFs) and large dependency directories unless 'useDefaultExcludes' is false.`,
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        include: {
+          type: 'array',
+          items: {
+            type: 'string',
+            minLength: 1,
+          },
+          minItems: 1,
+          description:
+            'An array of glob patterns or paths. Examples: ["src/**/*.ts"], ["README.md", "docs/"]',
+        },
+        exclude: {
+          type: 'array',
+          items: {
+            type: 'string',
+            minLength: 1,
+          },
+          description:
+            'Optional. Glob patterns for files/directories to exclude. Added to default excludes if useDefaultExcludes is true. Example: "**/*.log", "temp/"',
+          default: [],
+        },
+        recursive: {
+          type: 'boolean',
+          description:
+            'Optional. Whether to search recursively (primarily controlled by `**` in glob patterns). Defaults to true.',
+          default: true,
+        },
+        useDefaultExcludes: {
+          type: 'boolean',
+          description:
+            'Optional. Whether to apply a list of default exclusion patterns (e.g., node_modules, .git, binary files). Defaults to true.',
+          default: true,
+        },
+        file_filtering_options: {
+          description:
+            'Whether to respect ignore patterns from .gitignore or .geminiignore',
+          type: 'object',
+          properties: {
+            respect_git_ignore: {
+              description:
+                'Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.',
+              type: 'boolean',
+            },
+            respect_gemini_ignore: {
+              description:
+                'Optional: Whether to respect .geminiignore patterns when listing files. Defaults to true.',
+              type: 'boolean',
+            },
+          },
+        },
+      },
+      required: ['include'],
+    },
+  },
+};
+
+// ============================================================================
+// MEMORY TOOL
+// ============================================================================
+
+export const MEMORY_DEFINITION: ToolDefinition = {
+  base: {
+    name: MEMORY_TOOL_NAME,
+    description: `Saves concise global user context (preferences, facts) for use across ALL workspaces.
+
+### CRITICAL: GLOBAL CONTEXT ONLY
+NEVER save workspace-specific context, local paths, or commands (e.g. "The entry point is src/index.js", "The test command is npm test"). These are local to the current workspace and must NOT be saved globally. EXCLUSIVELY for context relevant across ALL workspaces.
+
+- Use for "Remember X" or clear personal facts.
+- Do NOT use for session context. Examples: "Always lint after building", "Never run sudo commands", "Remember my address".`,
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        fact: {
+          type: 'string',
+          description:
+            'The specific fact or piece of information to remember. Should be a clear, self-contained statement.',
+        },
+      },
+      required: ['fact'],
+      additionalProperties: false,
     },
   },
 };

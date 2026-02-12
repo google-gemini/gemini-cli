@@ -24,6 +24,8 @@ import {
   LS_DEFINITION,
   getShellDefinition,
   WEB_FETCH_DEFINITION,
+  READ_MANY_FILES_DEFINITION,
+  MEMORY_DEFINITION,
 } from './coreTools.js';
 
 describe('coreTools snapshots for specific models', () => {
@@ -60,6 +62,8 @@ describe('coreTools snapshots for specific models', () => {
       definition: getShellDefinition(true, true),
     },
     { name: 'web_fetch', definition: WEB_FETCH_DEFINITION },
+    { name: 'read_many_files', definition: READ_MANY_FILES_DEFINITION },
+    { name: 'save_memory', definition: MEMORY_DEFINITION },
   ];
 
   for (const modelId of modelIds) {

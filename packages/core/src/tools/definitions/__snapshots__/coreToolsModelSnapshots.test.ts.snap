@@ -147,6 +147,72 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
 }
 `;
 
+exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: read_many_files 1`] = `
+{
+  "description": "Reads content from multiple files specified by glob patterns within a configured target directory. For text files, it concatenates their content into a single string. It is primarily designed for text-based files. However, it can also process image (e.g., .png, .jpg), audio (e.g., .mp3, .wav), and PDF (.pdf) files if their file names or extensions are explicitly included in the 'include' argument. For these explicitly requested non-text files, their data is read and included in a format suitable for model consumption (e.g., base64 encoded).
+
+This tool is useful when you need to understand or analyze a collection of files, such as:
+- Getting an overview of a codebase or parts of it (e.g., all TypeScript files in the 'src' directory).
+- Finding where specific functionality is implemented if the user asks broad questions about code.
+- Reviewing documentation files (e.g., all Markdown files in the 'docs' directory).
+- Gathering context from multiple configuration files.
+- When the user asks to "read all files in X directory" or "show me the content of all Y files".
+
+Use this tool when the user's query implies needing the content of several files simultaneously for context, analysis, or summarization. For text files, it uses default UTF-8 encoding and a '--- {filePath} ---' separator between file contents. The tool inserts a '--- End of content ---' after the last file. Ensure glob patterns are relative to the target directory. Glob patterns like 'src/**/*.js' are supported. Avoid using for single files if a more specific single-file reading tool is available, unless the user specifically requests to process a list containing just one file via this tool. Other binary files (not explicitly requested as image/audio/PDF) are generally skipped. Default excludes apply to common non-text files (except for explicitly requested images/audio/PDFs) and large dependency directories unless 'useDefaultExcludes' is false.",
+  "name": "read_many_files",
+  "parametersJsonSchema": {
+    "properties": {
+      "exclude": {
+        "default": [],
+        "description": "Optional. Glob patterns for files/directories to exclude. Added to default excludes if useDefaultExcludes is true. Example: "**/*.log", "temp/"",
+        "items": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "type": "array",
+      },
+      "file_filtering_options": {
+        "description": "Whether to respect ignore patterns from .gitignore or .geminiignore",
+        "properties": {
+          "respect_gemini_ignore": {
+            "description": "Optional: Whether to respect .geminiignore patterns when listing files. Defaults to true.",
+            "type": "boolean",
+          },
+          "respect_git_ignore": {
+            "description": "Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.",
+            "type": "boolean",
+          },
+        },
+        "type": "object",
+      },
+      "include": {
+        "description": "An array of glob patterns or paths. Examples: ["src/**/*.ts"], ["README.md", "docs/"]",
+        "items": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "minItems": 1,
+        "type": "array",
+      },
+      "recursive": {
+        "default": true,
+        "description": "Optional. Whether to search recursively (primarily controlled by \`**\` in glob patterns). Defaults to true.",
+        "type": "boolean",
+      },
+      "useDefaultExcludes": {
+        "default": true,
+        "description": "Optional. Whether to apply a list of default exclusion patterns (e.g., node_modules, .git, binary files). Defaults to true.",
+        "type": "boolean",
+      },
+    },
+    "required": [
+      "include",
+    ],
+    "type": "object",
+  },
+}
+`;
+
 exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: run_shell_command 1`] = `
 {
   "description": "This tool executes a given shell command as \`bash -c <command>\`. To run a command in the background, set the \`is_background\` parameter to true. Do NOT use \`&\` to background commands. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.
@@ -377,6 +443,72 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
     },
     "required": [
       "file_path",
+    ],
+    "type": "object",
+  },
+}
+`;
+
+exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: read_many_files 1`] = `
+{
+  "description": "Reads content from multiple files specified by glob patterns within a configured target directory. For text files, it concatenates their content into a single string. It is primarily designed for text-based files. However, it can also process image (e.g., .png, .jpg), audio (e.g., .mp3, .wav), and PDF (.pdf) files if their file names or extensions are explicitly included in the 'include' argument. For these explicitly requested non-text files, their data is read and included in a format suitable for model consumption (e.g., base64 encoded).
+
+This tool is useful when you need to understand or analyze a collection of files, such as:
+- Getting an overview of a codebase or parts of it (e.g., all TypeScript files in the 'src' directory).
+- Finding where specific functionality is implemented if the user asks broad questions about code.
+- Reviewing documentation files (e.g., all Markdown files in the 'docs' directory).
+- Gathering context from multiple configuration files.
+- When the user asks to "read all files in X directory" or "show me the content of all Y files".
+
+Use this tool when the user's query implies needing the content of several files simultaneously for context, analysis, or summarization. For text files, it uses default UTF-8 encoding and a '--- {filePath} ---' separator between file contents. The tool inserts a '--- End of content ---' after the last file. Ensure glob patterns are relative to the target directory. Glob patterns like 'src/**/*.js' are supported. Avoid using for single files if a more specific single-file reading tool is available, unless the user specifically requests to process a list containing just one file via this tool. Other binary files (not explicitly requested as image/audio/PDF) are generally skipped. Default excludes apply to common non-text files (except for explicitly requested images/audio/PDFs) and large dependency directories unless 'useDefaultExcludes' is false.",
+  "name": "read_many_files",
+  "parametersJsonSchema": {
+    "properties": {
+      "exclude": {
+        "default": [],
+        "description": "Optional. Glob patterns for files/directories to exclude. Added to default excludes if useDefaultExcludes is true. Example: "**/*.log", "temp/"",
+        "items": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "type": "array",
+      },
+      "file_filtering_options": {
+        "description": "Whether to respect ignore patterns from .gitignore or .geminiignore",
+        "properties": {
+          "respect_gemini_ignore": {
+            "description": "Optional: Whether to respect .geminiignore patterns when listing files. Defaults to true.",
+            "type": "boolean",
+          },
+          "respect_git_ignore": {
+            "description": "Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.",
+            "type": "boolean",
+          },
+        },
+        "type": "object",
+      },
+      "include": {
+        "description": "An array of glob patterns or paths. Examples: ["src/**/*.ts"], ["README.md", "docs/"]",
+        "items": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "minItems": 1,
+        "type": "array",
+      },
+      "recursive": {
+        "default": true,
+        "description": "Optional. Whether to search recursively (primarily controlled by \`**\` in glob patterns). Defaults to true.",
+        "type": "boolean",
+      },
+      "useDefaultExcludes": {
+        "default": true,
+        "description": "Optional. Whether to apply a list of default exclusion patterns (e.g., node_modules, .git, binary files). Defaults to true.",
+        "type": "boolean",
+      },
+    },
+    "required": [
+      "include",
     ],
     "type": "object",
   },
