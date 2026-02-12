@@ -9,6 +9,7 @@ import { AskUserTool } from './ask-user.js';
 import { QuestionType, type Question } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolConfirmationOutcome } from './tools.js';
+import { ToolErrorType } from './tool-error.js';
 
 describe('AskUserTool', () => {
   let mockMessageBus: MessageBus;
@@ -225,6 +226,55 @@ describe('AskUserTool', () => {
         ],
       });
       expect(result).toContain("must have required property 'description'");
+    });
+  });
+
+  describe('validateBuildAndExecute', () => {
+    it('should hide validation errors from returnDisplay', async () => {
+      const params = {
+        questions: [{ question: 'Test?', header: 'This is way too long' }],
+      };
+
+      const result = await tool.validateBuildAndExecute(
+        params,
+        new AbortController().signal,
+      );
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.type).toBe(ToolErrorType.INVALID_TOOL_PARAMS);
+      expect(result.returnDisplay).toBe('');
+    });
+
+    it('should NOT hide non-validation errors (if any were to occur)', async () => {
+      const validateParamsSpy = vi
+        .spyOn(tool, 'validateToolParams')
+        .mockReturnValue(null);
+
+      const params = {
+        questions: [{ question: 'Valid?', header: 'Valid' }],
+      };
+
+      const mockInvocation = {
+        execute: vi.fn().mockRejectedValue(new Error('Some execution error')),
+        params,
+        getDescription: vi.fn().mockReturnValue(''),
+        toolLocations: vi.fn().mockReturnValue([]),
+        shouldConfirmExecute: vi.fn().mockResolvedValue(false),
+      };
+
+      const buildSpy = vi.spyOn(tool, 'build').mockReturnValue(mockInvocation);
+
+      const result = await tool.validateBuildAndExecute(
+        params,
+        new AbortController().signal,
+      );
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.type).toBe(ToolErrorType.EXECUTION_FAILED);
+      expect(result.returnDisplay).toBe('Some execution error');
+
+      buildSpy.mockRestore();
+      validateParamsSpy.mockRestore();
     });
   });
 

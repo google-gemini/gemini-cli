@@ -13,6 +13,7 @@ import {
   type ToolConfirmationPayload,
   ToolConfirmationOutcome,
 } from './tools.js';
+import { ToolErrorType } from './tool-error.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { QuestionType, type Question } from '../confirmation-bus/types.js';
 import { ASK_USER_TOOL_NAME, ASK_USER_DISPLAY_NAME } from './tool-names.js';
@@ -153,6 +154,23 @@ export class AskUserTool extends BaseDeclarativeTool<
     toolDisplayName: string,
   ): AskUserInvocation {
     return new AskUserInvocation(params, messageBus, toolName, toolDisplayName);
+  }
+
+  override async validateBuildAndExecute(
+    params: AskUserParams,
+    abortSignal: AbortSignal,
+  ): Promise<ToolResult> {
+    const result = await super.validateBuildAndExecute(params, abortSignal);
+    if (
+      result.error &&
+      result.error.type === ToolErrorType.INVALID_TOOL_PARAMS
+    ) {
+      return {
+        ...result,
+        returnDisplay: '',
+      };
+    }
+    return result;
   }
 }
 

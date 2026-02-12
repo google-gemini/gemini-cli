@@ -53,7 +53,16 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 }) => {
   // Filter out in-progress Ask User tools (they have their own AskUserDialog UI)
   const toolCalls = useMemo(
-    () => allToolCalls.filter((t) => !isAskUserInProgress(t)),
+    () =>
+      allToolCalls.filter(
+        (t) =>
+          !isAskUserInProgress(t) &&
+          !(
+            t.name === ASK_USER_DISPLAY_NAME &&
+            t.status === ToolCallStatus.Error &&
+            !t.resultDisplay
+          ),
+      ),
     [allToolCalls],
   );
 
